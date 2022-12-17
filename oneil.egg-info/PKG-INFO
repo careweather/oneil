@@ -1,3 +1,17 @@
+Metadata-Version: 2.1
+Name: oneil
+Version: 0.10
+Summary: Design specification language for system modeling
+Home-page: https://github.com/careweather/oneil
+Author: Patrick Walton
+Author-email: patrick@careweather.com
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: POSIX :: Linux
+Description-Content-Type: text/markdown
+
 # The Oneil Design Language
 
 Oneil is a design specification language for rapid, comprehensive system modeling.
@@ -10,19 +24,11 @@ Oneil is pre-release, under construction. See [known issues](#known-issues-and-l
 
 ## Quickstart
 
-Clone oneil and install it using pip.
-
-``` { .sh }
-git clone git@github.com/careweather/oneil.git
-
-pip install -e oneil
-```
-
-<!-- Install Oneil using pip (add @\<version-number\> if you need a specific version):
+Install Oneil using pip (add @\<version-number\> if you need a specific version):
 
 ``` { .sh }
 pip install git+ssh://git@github.com/careweather/oneil.git
-``` -->
+```
 
 Once installed, Oneil can be run from the command line in the directory where your design is. This will open the oneil post-interpreter, which needs a model before it can accept commands:
 
@@ -443,3 +449,5 @@ Try closing all VS Code files and closing VS Code to clear its mystery cache.
 The initial methodology that inspired Oneil was proposed in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd), by M. Patrick Walton. The conclusion provided ideas and inspiration for early versions of Oneil.
 
 Oneil is named after American physicist and space activist [Gerard K. O'Neill](https://en.wikipedia.org/wiki/Gerard_K._O%27Neill) who proposed the gargantuan space settlements known as [O'Neill cylinders](https://en.wikipedia.org/wiki/O%27Neill_cylinder). The use of Oneil in the development of an O'Neill cylinder would be a dream come true.
+
+
