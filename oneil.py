@@ -24,7 +24,7 @@ class bcolors:
 
 __version__ = get_distribution("oneil").version
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "pi": "np.pi", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "pi": "np.pi", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log10": "par_log10"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
@@ -171,8 +171,6 @@ def parse_file(file_name, parent_model=None):
         ModelError(file_name, "", ["parse_file"]).throw(None, final_line, "End of File\n", "Empty model. No parameters, design values, or tests found.")
 
     return note, params, submodels, tests, design_overrides
-
-
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = ''
@@ -465,6 +463,34 @@ def par_abs(val):
     else:
         raise TypeError("Input to abs() must be of type Parameter, int, or float.")
 
+def par_log(val):
+    if pass_errors(val): return pass_errors(val, caller="par_log")
+
+    if isinstance(val, Parameter):
+        # ERR option ETC
+        if np.log(val.min) < np.log(val.max):
+            return Parameter((np.log(val.min), np.log(val.max)), val.units, "|{}|".format(val.id))
+        else:
+            return Parameter((np.log(val.max), np.log(val.min)), val.units, "|{}|".format(val.id))
+    elif isinstance(val, (int, float)):
+        return Parameter((np.log(val), np.log(val)), {}, "|{}|".format(val))
+    else:
+        raise TypeError("Input to log() must be of type Parameter, int, or float.")
+
+def par_log10(val):
+    if pass_errors(val): return pass_errors(val, caller="par_log10")
+
+    if isinstance(val, Parameter):
+        # ERR option ETC
+        if np.log10(val.min) < np.log10(val.max):
+            return Parameter((np.log10(val.min), np.log10(val.max)), val.units, "|{}|".format(val.id))
+        else:
+            return Parameter((np.log10(val.max), np.log10(val.min)), val.units, "|{}|".format(val.id))
+    elif isinstance(val, (int, float)):
+        return Parameter((np.log10(val), np.log10(val)), {}, id="|{}|".format(val))
+    else:
+        raise TypeError("Input to log10() must be of type Parameter, int, or float.")
+
 class Error:
     def __init__(self):
         pass
@@ -725,8 +751,8 @@ class Parameter:
             else:
                 if not self.options[1] >= self.options[0]:
                     self.error = ParameterError(self, "Minimum limit > maximum limit.", ["Parameter.write()"])
-                if not (self.min >= self.options[0] and self.max <= self.options[1]):
-                    self.error = ParameterError(self, "Values out of bounds. Revise values or limits.", ["Parameter.write()"])
+                # if not (self.min >= self.options[0] and self.max <= self.options[1]):
+                #     self.error = ParameterError(self, f"Values out of bounds [{self.options[0]}:{self.options[1]}]. Revise values or limits.", ["Parameter.write()"])
 
     def calculate(self, expression, glob, eval_params, eval_args):
         if not self.equation:
@@ -1830,43 +1856,43 @@ class Model:
                 return self.parameters[parameter_ID]
             return True
 
-def handler(model, inpt):
+def handler(model:Model, inpt):
     args = inpt.split(" ")
     cmd = args.pop(0)
 
-    match cmd:
-        case "tree":
-            model.tree(args)
-        case "summarize":
-            model.summarize()
-        case "all":
-            model.all()
-        case "design":
-            if any([arg for arg in args if "." in arg and ".on" not in arg]):
-                print("Only .on files are allowed.")
-                interpreter(model)
-            if model.name in [arg.strip(".on") for arg in args]:
-                print("Cannot overwrite model with itself.")
-                interpreter(model)
-            args = [arg if "." in arg else arg + ".on" for arg in args]
-            model.overwrite(args)
-        case "test":
-            model.test()
-        case "export":
-            model.export_pdf(args)
-        case "load":
-            loader(inpt.split(" "))
-        case "help":
-            print(help_text)
+    
+    if cmd == "tree":
+        model.tree(args)
+    elif cmd == "summarize":
+        model.summarize()
+    elif cmd == "all":
+        model.all()
+    elif cmd == "design":
+        if any([arg for arg in args if "." in arg and ".on" not in arg]):
+            print("Only .on files are allowed.")
             interpreter(model)
-        case "quit":
-            sys.exit()
-        case "quit()":
-            sys.exit()
-        case "exit":
-            sys.exit()
-        case _:
-            print(model.eval(inpt))
+        if model.name in [arg.strip(".on") for arg in args]:
+            print("Cannot overwrite model with itself.")
+            interpreter(model)
+        args = [arg if "." in arg else arg + ".on" for arg in args]
+        model.overwrite(args)
+    elif cmd == "test":
+        model.test()
+    elif cmd == "export":
+        model.export_pdf(args)
+    elif cmd == "load":
+        loader(inpt.split(" "))
+    elif cmd == "help":
+        print(help_text)
+        interpreter(model)
+    elif cmd == "quit":
+        sys.exit()
+    elif cmd == "quit()":
+        sys.exit()
+    elif cmd == "exit":
+        sys.exit()
+    else:
+        print(model.eval(inpt))
 
 help_text = """
 Commands:
@@ -1902,8 +1928,8 @@ Commands:
 
 def loader(args=[]):
 
-    if len(args) > 1:
-        inp = args[1]
+    if len(args) > 0:
+        inp = args[0]
     else:
         inp = ""
     model = None
@@ -1934,13 +1960,16 @@ def loader(args=[]):
         else:
             inp = input("Enter a model: ")
 
+    for arg in args[1:]: # Handle commands after the first as cli commands. 
+        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
+        handler(model, arg)
     interpreter(model)
 
 loader_help = """"
     Commands:
         [model-name]
-        [model-name].on
-            Load a model.
+        [model-name].on [args]
+            Load a model. [args] after the model name are run as seperate cli args
 
         help
             Print this help text.
@@ -1960,7 +1989,7 @@ def interpreter(model):
         else:
             handler(model, input("(" + bcolors.OKGREEN + model.design + "@" + bcolors.ENDC + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>>"))
     
-def main(args=sys.argv):
+def main(args=sys.argv[1:]):
     print("Oneil " + __version__)
     print("Type 'help' for a list of commands or see the README for more information.")
     print("-"*80)
