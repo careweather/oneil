@@ -19,9 +19,10 @@ autocmd BufNewFile,BufRead *.tex syntax sync fromstart
 
 "  Preamble - before the first colon
 syn match oneilBreakpoint /^\*\{1,2}/ contained
-syn match oneilName /^[^:(\[]*/ contained contains=oneilBreakpoint
+syn match oneilPerformance /\$/ contained
+syn match oneilName /^[^:(\[]*/ contained contains=oneilBreakpoint,oneilPerformance
 syn match oneilOptionKeys /[\[\]()]/ contained
-syn region oneilParameterPreamble start=/^\*\{0,2}\s*\w/ end=/:/me=e-1 contained contains=oneilName, oneilOptionKeys
+syn region oneilParameterPreamble start=/^\(\*\{1,2}\s*\)\?\(\$\s*\)\?\w/ end=/:/me=e-1 contained contains=oneilName, oneilOptionKeys
 
 "  ID - between the first colon and equals sign
 syn match oneilID /\%(:\)\@<=\s*\w\+\s*\ze=/ contained skipwhite
@@ -81,7 +82,7 @@ syn region oneilIncludeLine start=/^import/ end=/$/ transparent contains=oneilIn
 "  Notes
 "----------------------------------------------------------------/
 syn keyword oneilNoteTodo containedin=oneilNote contained TODO FIXME NOTE
-syn region oneilNote start=/^\(\t\+\|\s\+\)/ end=/\n*\(\_^\w\|\_^#\|\_^\*\)\@=/ fold contains=@tex,oneilNoteTodo
+syn region oneilNote start=/^\(\t\+\|\s\+\)/ end=/\n*\(\_^\w\|\_^#\|\_^\*\|\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
 syn sync fromstart
 set foldmethod=syntax
 
@@ -111,8 +112,8 @@ hi def link oneilModule			Function
 hi def link pythonModule		Function
 
 "  Assignments
+hi def link oneilPerformance		Operator	
 hi def link oneilParameter		Error
-
 hi def link oneilParameterKeys		Delimiter
 
 "hi def link oneilParameterPreamble	Constant

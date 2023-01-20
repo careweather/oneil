@@ -86,12 +86,11 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = []
 
                 if not os.path.exists(model + ".on"):
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, i+1, line, "File \"" + model + ".on\" does not exist.")
-
+                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
                 symbol = include.split('as')[1].strip()
 
                 if symbol in submodels.keys():
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, i+1, line, "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
+                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
 
                 submodels[symbol] = {'model': Model(model + ".on"), 'inputs': test_inputs, 'path': [model], 'line_no': i+1, 'line': line}
             elif line[:4] == 'from':
@@ -112,13 +111,13 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = []
 
                 if not os.path.exists(model + ".on"):
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, i+1, line, "File \"" + model + ".on\" does not exist.")
+                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
 
                 path = source.split('.') + [model] if '.' in source else [source, model]
                 symbol = include.split('use')[1].split("as")[1].strip()
 
                 if symbol in submodels.keys():
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, i+1, line, "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
+                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
 
                 submodels[symbol] = {'path': path, 'inputs': test_inputs, 'line_no': i+1, 'line': line}
             elif line[:6] == 'import':
@@ -168,7 +167,7 @@ def parse_file(file_name, parent_model=None):
     params = {p.id: p for p in parameters}
 
     if not params and not tests and not design_overrides:
-        ModelError(file_name, "", ["parse_file"]).throw(None, final_line, "End of File\n", "Empty model. No parameters, design values, or tests found.")
+        ModelError(file_name, "", ["parse_file"]).throw(None, "(final line) " + final_line + "- " + "End of File\n", "Empty model. No parameters, design values, or tests found.")
 
     return note, params, submodels, tests, design_overrides
 
@@ -176,6 +175,12 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = ''
     arguments = []
     equation=None
+
+    if line[0] == '$':
+        performance = True
+        line = line[1:].strip()
+    else:
+        performance = False
 
     if line[0] == '*':
         if line[1] == '*':
@@ -188,9 +193,9 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     body = line.split(':')[1]
     if len(line.split(':')) > 2:
         try:
-            units, multiplier = un.parse(line.split(':')[2].strip("\n"))
+            units, multiplier = un.parse(line.split(':')[2].strip("\n").strip())
         except:
-            UnitError("(in " + file_name + ")", "", ["parse_parameter"]).throw(None, line_number, line, "Failed to parse units: " + line.split(':')[2].strip("\n"))
+            UnitError([], "", ["parse_parameter"]).throw(None, "in " + file_name + " (line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + line.split(':')[2].strip("\n"))
     else: 
         units = {}
         multiplier = 1
@@ -248,7 +253,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     else:
         equation = multiplier*eval(assignment, MATH_CONSTANTS)
 
-    return Parameter(equation, units, id, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section)
+    return Parameter(equation, units, id, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance)
 
 
 def parse_value(line, line_no, file_name, section=""):
@@ -258,7 +263,7 @@ def parse_value(line, line_no, file_name, section=""):
         try:
             value_units, multiplier = un.parse(line.split(':')[1].strip())
         except:
-            UnitError("(in " + file_name + ")", "", ["parse_value"]).throw(None, line_no, line, "Failed to parse units: " + line.split(':')[1].strip("\n"))
+            UnitError([], "", ["parse_value"]).throw(None, "in " + file_name + " (line " + str(line_no) + ") " + line + "- " + "Failed to parse units: " + line.split(':')[1].strip("\n"))
         value_assignment = line.split('=')[1].split(':')[0].strip()
     else:
         value_units = {}
@@ -539,7 +544,10 @@ class ParameterError(Error):
             print("  - (" + str(self.parameter) + ") in " + self.parameter.name + " (" + self.parameter.id + ") from line " + str(self.parameter.line_no) + " in model " + self.parameter.model)
         else:
             print("  - " + str(self).parameter)
-        interpreter(model)
+        if model: 
+            interpreter(model)
+        else: 
+            quit()
 
 class NoteError(Error):
     def __init__(self, model, parameter, message):
@@ -579,8 +587,8 @@ class ModelError(Error):
         self.source = list(source)
         self.source_message = source_message
         
-    def throw(self, return_model, line_no, line, throw_message):
-        print(self.error_tag + " in " + self.filename + ": (line " + str(line_no) + ") " + line + "- " + throw_message)
+    def throw(self, return_model, throw_message):
+        print(self.error_tag + " in " + self.filename + ": " + throw_message)
         if self.source: 
             print("Source: " + str(self.source))
             print(self.source_message)
@@ -662,6 +670,7 @@ class Parameter:
         self.args = arguments
         self.section = section
         self.error = error
+        self.pointer = False
         
         # note
         self.notes = []
@@ -683,7 +692,7 @@ class Parameter:
             self.units = units
             for unit in units:
                 if unit not in un.BASE_UNITS:
-                    UnitError(self, "", ["Parameter.__init__"]).throw(None, unit + " is not currently a supported input unit. Only " + str(un.BASE_UNITS) + " are supported. Refactor " + unit + " in terms of " + str(un.BASE_UNITS))
+                    UnitError([self], "", ["Parameter.__init__"]).throw(None, unit + " is not currently a supported input unit. Only " + str(un.BASE_UNITS) + " are supported. Refactor " + unit + " in terms of " + str(un.BASE_UNITS))
         else:
             raise TypeError('Units must be of type dict. Type "' + str(type(units)) + " was given.")
 
@@ -708,7 +717,11 @@ class Parameter:
                     self.equation = equation
                 self.independent = False
             else:
-                self.assign(equation)
+                if self.options and isinstance(self.options, list):
+                    self.assign(equation)
+                else:
+                    self.equation = equation
+                    self.pointer = True
         else:
             ParameterError(self, "", ["Parameter.__init__"]).throw(None, "Parameter equation must be a callable, a float, an int, or a string. If callable, did you forget the preceding underscore. Or did you forget to place an equation in quotes?")
 
@@ -718,7 +731,7 @@ class Parameter:
     def write(self, value):
         if isinstance(value, Parameter):
             if value.units != self.units:
-                self.error = UnitError(self, "Input or calculated units (" + str(value.units) + ") do not match the required units: (" + str(self.units) + ").", ["Parameter.write()"])
+                self.error = UnitError([self], "Input or calculated units (" + str(value.units) + ") do not match the required units: (" + str(self.units) + ").", ["Parameter.write()"])
             self.min = value.min
             self.max = value.max
             if value.model: self.model = value.model
@@ -733,26 +746,25 @@ class Parameter:
         elif isinstance(value, (int, float)):
             self.min = self.max = value
         elif isinstance(value, str):
-            # if self.options == None or not isinstance(self.options, list):
-            #     raise ValueError(r"Options must be included in a list. (Are you trying to set one parameter equal to another? Include a math operator in your equation (e.g. x = y*1)")
-            # if value not in self.options:
-            #     raise ValueError(value + " is not an option for " + self.name + " (" + self.id + ") . Options include: " + self.options)
+            if value not in self.options:
+                self.error = ParameterError(self, "Parameter was assigned an option that is not among its options.", ["Parameter.write()"])
             self.min = self.max = value
         else:
             raise TypeError('Parameter value must be of type Parameter, tuple, int, float, or str. Type "' + str(type(value)) + " was given.")
 
-        if self.min > self.max:
-            self.error = ParameterError(self, "Parameter min is greater than Parameter max.", ["Parameter.write()"])
+        if self.min and self.max:
+            if self.min > self.max:
+                self.error = ParameterError(self, "Parameter min is greater than Parameter max.", ["Parameter.write()"])
 
-        if self.options and self.min and self.max:
-            if self.isdiscrete:
-                if not (self.min in self.options and self.max in self.options):
-                    self.error = ParameterError(self, "Parameter was given a value that is not among its options.", ["Parameter.write()"])
-            else:
-                if not self.options[1] >= self.options[0]:
-                    self.error = ParameterError(self, "Minimum limit > maximum limit.", ["Parameter.write()"])
-                # if not (self.min >= self.options[0] and self.max <= self.options[1]):
-                #     self.error = ParameterError(self, f"Values out of bounds [{self.options[0]}:{self.options[1]}]. Revise values or limits.", ["Parameter.write()"])
+            if self.options and self.min and self.max:
+                if self.isdiscrete:
+                    if not (self.min in self.options and self.max in self.options):
+                        self.error = ParameterError(self, "Parameter was given a value that is not among its options.", ["Parameter.write()"])
+                else:
+                    if not self.options[1] >= self.options[0]:
+                        self.error = ParameterError(self, "Minimum limit > maximum limit.", ["Parameter.write()"])
+                    # if not (self.min >= self.options[0] and self.max <= self.options[1]):
+                    #     self.error = ParameterError(self, f"Values out of bounds [{self.options[0]}:{self.options[1]}]. Revise values or limits.", ["Parameter.write()"])
 
     def calculate(self, expression, glob, eval_params, eval_args):
         if not self.equation:
@@ -1163,7 +1175,7 @@ class Parameter:
 class Model:
     def __init__(self, model_filename, design_filename=None):
         self.note, self.parameters, self.submodels, self.tests, _ = parse_file(model_filename)
-        
+
         self.name = model_filename.replace(".on", "")
         self.design = "default"
         self.constants = MATH_CONSTANTS
@@ -1176,6 +1188,18 @@ class Model:
         #ERR ID error
         # self._check_namespace()
 
+        for key, param in self.parameters.items():
+            # For equations that aren't strings that aren't option cases
+            if param.pointer:
+                if param.equation in self.parameters.keys():
+                    param.args = [param.equation]
+                else:
+                    param.error = ParameterError(param, "Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", ["Model.__init__"])
+        
+        for param in self.parameters.values():
+            if param.error:
+                param.error.throw(self, "Problem parsing parameter " + param.id + " in " + model_filename + ".")
+    
     # Checks that all of the arguments to each parameter are defined
     def _check_namespace(self):
         undefined = []
@@ -1263,10 +1287,9 @@ class Model:
                 path = copy.copy(self.submodels[submodel]['path'])
             else:
                 path = []
-
             result = self._rewrite_parameter(ID, parameter, path)
             if isinstance(result, ModelError):
-                result.throw(self, self.submodels[submodel]['line_no'], self.submodels[submodel]['line'], "Couldn't find " + submodel + " in path " + ".".join(path) + " while overwriting " + ID + " in " + design_files + ".")
+                result.throw(self, "(line " + str(self.submodels[submodel]['line_no']) + ") " + self.submodels[submodel]['line'] + "- " + "Couldn't find " + submodel + " in path " + ".".join(path) + " while overwriting " + ID + " in " + design_files + ".")
             elif isinstance(result, ParameterError):
                 result.throw(self, "Error rewriting parameter " + ID + " in " + design_files + ".")
 
@@ -1394,7 +1417,8 @@ class Model:
                         submodel_path = entry['path']
                         submodel = self._retrieve_model(submodel_path)
                         if isinstance(submodel, ModelError):
-                            submodel.throw(self, entry['line_no'], entry['line'], "Could not find submodel in path: " + submodel_path)
+                            submodel.throw(self, "(line " + str(entry['line_no']) + ") " + entry['line'] + "- " +
+"Could not find submodel in path: " + submodel_path)
 
                     for ID, param in submodel.parameters.items():
                         if design:
@@ -1521,13 +1545,13 @@ class Model:
                 if submodel_ID in self.submodels:
                     submodel = self.submodels[submodel_ID]
                 else:
-                    ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "interpreter", "", "Submodel ID \"" + submodel_ID + "\" not found.")
+                    ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "Submodel ID \"" + submodel_ID + "\" not found.")
                 path = copy.copy(submodel['path'])
                 
                 prefix = '_'.join(path) + "_"
                 result = self._retrieve_parameter(parameter_ID, path)
                 if isinstance(result, ModelError):
-                    result.throw(self, "", "?", "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                    result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
                 elif isinstance(result, Parameter):
                     submodel_parameters[prefix + parameter_ID] = result
                 else:
@@ -1543,7 +1567,7 @@ class Model:
 
         if isinstance(result, Parameter):
             if result.error:
-                result.throw(self, "interpreter", "", "Eval failed.")
+                result.error.throw(self, "(in interpreter) Eval failed.")
             else:
                 return result
         elif isinstance(result, (bool, np.bool_)):
@@ -1599,7 +1623,7 @@ class Model:
         result = self.test_submodels()
 
         if result != True:
-            result.throw(self, "tests", "", "Submodel test failed.")
+            result.throw(self, "(in Model.test) Submodel test failed.")
 
         # Eval each test expression, using self.parameters and the reference models
         for test in self.tests:
@@ -1615,7 +1639,7 @@ class Model:
                         if submodel_ID in self.submodels:
                             submodel = self.submodels[submodel_ID]
                         else:
-                            ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "interpreter", "", "Submodel ID \"" + submodel_ID + "\" not found.")
+                            ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model.test) Submodel ID \"" + submodel_ID + "\" not found.")
 
                         path = copy.copy(submodel['path'])
                         
@@ -1623,7 +1647,7 @@ class Model:
 
                         result = self._retrieve_parameter(arg_ID, path)
                         if isinstance(result, ModelError):
-                            result.throw(self, "", "?", "Couldn't find parameter " + arg_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                            result.throw(self, "Couldn't find parameter " + arg_ID + ". Invalid in submodel path " + submodel['path'] + ".")
                         elif isinstance(result, Parameter):
                             test_params[prefix + arg_ID] = result
                         else:
@@ -1780,7 +1804,7 @@ class Model:
                         if submodel_ID in self.submodels:
                             submodel = self.submodels[submodel_ID]
                         else:
-                            ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "interpreter", "", "Submodel ID \"" + submodel_ID + "\" not found.")
+                            ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model._calculate_recursively) Submodel ID \"" + submodel_ID + "\" not found.")
 
                         path = copy.copy(submodel['path'])
                         
@@ -1788,7 +1812,7 @@ class Model:
                         
                         result = self._retrieve_parameter(parameter_ID, path)
                         if isinstance(result, ModelError):
-                            result.throw(self, "", "?", "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                            result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
                         elif isinstance(result, Parameter):
                             submodel_parameters[prefix + parameter_ID] = result
                         else:
@@ -1800,12 +1824,15 @@ class Model:
                     else:
                         calc_args.append(arg)
 
-                calculation = parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)
-                if isinstance(calculation, Parameter) and calculation.error:
-                    calculation.error.throw(self, "Parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model + ") failed to calculate.\n\"" + parameter.line.strip() + "\"")
-                parameter.assign(calculation)
-                if parameter.error:
-                    parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model)
+                if parameter.pointer:
+                    parameter.assign(self.parameters[parameter.equation])
+                else:
+                    calculation = parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)
+                    if isinstance(calculation, Parameter) and calculation.error:
+                        calculation.error.throw(self, "Parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model + ") failed to calculate.\n\"" + parameter.line.strip() + "\"")
+                    parameter.assign(calculation)
+                    if parameter.error:
+                        parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model)
 
 
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.
