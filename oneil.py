@@ -524,7 +524,7 @@ class UnitError(Error):
                 print("  - (" + un.hr_units(parameter.units) + ") in " + parameter_text + " from line " + str(parameter.line_no) + model_text)
             else:
                 print("  - " + str(parameter))
-        if model: 
+        if model and model.calculated: 
             interpreter(model)
         else: 
             quit()
@@ -544,7 +544,7 @@ class ParameterError(Error):
             print("  - (" + str(self.parameter) + ") in " + self.parameter.name + " (" + self.parameter.id + ") from line " + str(self.parameter.line_no) + " in model " + self.parameter.model)
         else:
             print("  - " + str(self).parameter)
-        if model: 
+        if model and model.calculated: 
             interpreter(model)
         else: 
             quit()
@@ -560,7 +560,7 @@ class SyntaxError(Error):
     def __init__(self, model, filename, line_no, line, message):
         error = bcolors.FAIL + "SyntaxError" + bcolors.ENDC
         print(error + " in " + filename + ": (line " + str(line_no) + ") " + line + "- " + message)
-        if model:
+        if model and model.calculated:
             interpreter(model)
         else:
             loader([])
