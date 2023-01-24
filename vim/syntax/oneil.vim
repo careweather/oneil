@@ -27,13 +27,19 @@ syn region oneilParameterPreamble start=/^\(\*\{1,2}\s*\)\?\(\$\s*\)\?\w/ end=/:
 "  ID - between the first colon and equals sign
 syn match oneilID /\%(:\)\@<=\s*\w\+\s*\ze=/ contained skipwhite
 
+"  Piecewise Assignment
+syn match oneilPiecewiseKey /{/ contained
+syn match oneilConditionKey /if/ contained
+syn region oneilPiecewiseN start=/^\(\t\+\|\s\+\){/ end=/$/ contained contains=oneilPiecewiseKey, oneilConditionKey
+
+
 "  Assignment - between the equals sign and the second colon or the end
 syn match oneilMax /.max/ contained
 syn match oneilMin /.min/ contained
 syn match oneilSubmodule /\.\<[_a-z]\+\>\(\s*(\)\@!/ contained contains=oneilMin,oneilMax
 syn match oneilFunction /\w\+\ze(/ contained
 syn match oneilExtremesDelimiter /|/ contained
-syn match oneilAssignment /\%(\w\+\s*=\s*\)\@<=[^:]*/ contained contains=oneilSubmodule,oneilExtremesDelimiter,oneilFunction
+syn match oneilAssignment /\%(\w\+\s*=\s*\)\@<=[^:]*/ contained contains=oneilSubmodule,oneilExtremesDelimiter,oneilFunction,oneilPiecewiseKey,oneilConditionKey
 
 "  Units - after a second colon
 syn match oneilUnit /\%(=.*:\)\@<=.*$/ contained skipwhite
@@ -44,8 +50,7 @@ syn match oneilUnit /\%(=.*:\)\@<=.*$/ contained skipwhite
 "  properly constructed parameter are missing or malformed, error will show
 "  through
 syn match oneilParameterKeys /[:=]/ contained
-syn region oneilParameter start=/^\v(\t\+)@!(\n)@!(#)@!(\s\+)@!(use)@!(import)@!(test)@!/ end=/$/ contains=oneilParameterPreamble,oneilAssignment,oneilUnit, oneilID, oneilParameterKeys
-
+syn region oneilParameter start=/^\v(\t\+)@!(\n)@!(#)@!(\s\+)@!(use)@!(import)@!(test)@!/ end=/$/ contains=oneilParameterPreamble,oneilAssignment,oneilUnit, oneilID, oneilParameterKeys, oneilPiecewiseN
 
 "----------------------------------------------------------------/
 "  Design
@@ -82,7 +87,7 @@ syn region oneilIncludeLine start=/^import/ end=/$/ transparent contains=oneilIn
 "  Notes
 "----------------------------------------------------------------/
 syn keyword oneilNoteTodo containedin=oneilNote contained TODO FIXME NOTE
-syn region oneilNote start=/^\(\t\+\|\s\+\)/ end=/\n*\(\_^\w\|\_^#\|\_^\*\|\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
+syn region oneilNote start=/^\(\t\+\|\s\+\)\({\)\@!/ end=/\n*\(\_^\w\|\_^#\|\_^\*\|\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
 syn sync fromstart
 set foldmethod=syntax
 
@@ -128,6 +133,10 @@ hi def link oneilSubmodule		PreProc
 "hi def link oneilFunction		PreProc
 hi def link oneilExtremesDelimiter	Keyword
 hi def link oneilValue			Constant
+
+hi def link oneilPiecewiseKey		Keyword
+hi def link oneilConditionKey		Keyword
+"hi def link oneilPiecewiseN		Keyword
 
 "  Values
 hi def link oneilValueID		Identifier

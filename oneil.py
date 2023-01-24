@@ -40,36 +40,47 @@ def parse_file(file_name, parent_model=None):
     design_overrides = {}
     last_line_blank = False
     section = ""
+    multiplier = 0
 
     with open(file_name, 'r') as f:
         final_line = 0
         for i, line in enumerate(f.readlines()):
             final_line = i
             if line == '\n':
+                multiplier = 0
                 last_line_blank = True
                 continue
             elif '#' in line and line.strip()[0] == '#':
+                multiplier = 0
                 last_line_blank = False
                 continue
             elif line[0] == '\t' or line[0:1] == ' ':
                 if last_line_blank: line = "\n\n" + line
-                if prev_line == 'param':
-                    parameters[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
-                    parameters[-1].note_lines.append(i+1)
-                elif prev_line == 'test':
-                    tests[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
-                    tests[-1].note_line_nos.append(i+1)
-                elif prev_line == 'design':
-                    last_key = list(design_overrides.keys())[-1]
-                    design_overrides[last_key].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
-                    design_overrides[last_key].note_lines.append(i+1)
-                elif prev_line == '':
-                    note += line.strip()
+                if line.strip() and line.strip()[0] == '{':
+                    assert multiplier != 0, ValueError("Multiplier should never be zero.")
+                    parameter, arguments = parse_piecewise(line, imports, file_name.replace(".on", ""), i+1, multiplier)
+                    parameters[-1].equation.append(parameter)
+                    parameters[-1].args.extend(arguments)
                 else:
-                    raise ValueError("Invalid prev line type: " + line)
+                    multiplier = 0
+                    if prev_line == 'param':
+                        parameters[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
+                        parameters[-1].note_lines.append(i+1)
+                    elif prev_line == 'test':
+                        tests[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
+                        tests[-1].note_line_nos.append(i+1)
+                    elif prev_line == 'design':
+                        last_key = list(design_overrides.keys())[-1]
+                        design_overrides[last_key].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
+                        design_overrides[last_key].note_lines.append(i+1)
+                    elif prev_line == '':
+                        note += line.strip()
+                    else:
+                        raise ValueError("Invalid prev line type: " + line)
                 last_line_blank = False
 
-            elif line[:3] == 'use':
+            elif line[:4] == 'use ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
@@ -93,7 +104,8 @@ def parse_file(file_name, parent_model=None):
                     ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
 
                 submodels[symbol] = {'model': Model(model + ".on"), 'inputs': test_inputs, 'path': [model], 'line_no': i+1, 'line': line}
-            elif line[:4] == 'from':
+            elif line[:5] == 'from ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^from\s+\w+(\.\w+)*\s+use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
@@ -120,7 +132,8 @@ def parse_file(file_name, parent_model=None):
                     ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
 
                 submodels[symbol] = {'path': path, 'inputs': test_inputs, 'line_no': i+1, 'line': line}
-            elif line[:6] == 'import':
+            elif line[:7] == 'import ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^import\s+\w+\s*$", line))
                 except:
@@ -135,7 +148,8 @@ def parse_file(file_name, parent_model=None):
                 except:
                     ImportError(parent_model, file_name, i+1, line, module + ".py")
 
-            elif line[:7] == 'section':
+            elif line[:8] == 'section ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^section\s+[\w\s]*$", line))
                 except:
@@ -144,6 +158,7 @@ def parse_file(file_name, parent_model=None):
                 last_line_blank = False
                 section = line.replace("section", "").strip()
             elif line[0:4] == 'test' or line.replace(" ", "").replace("\t", "")[0:5] == '*test':
+                multiplier = 0
                 try:
                     assert(re.search(r"^(\*{1,2}\s*)?test\s*(\{\w+(,\s*\w+)*\})?:.*$", line))
                 except:
@@ -153,13 +168,16 @@ def parse_file(file_name, parent_model=None):
                 tests.append(Test(line, i+1, file_name.replace(".on", ""), section=section))
                 prev_line = 'test'
             elif re.search(r"^(\*{1,2}\s*)?\w+(\.\w+)?\s*=[^:]+(:.*)?$", line):
+                multiplier = 0
                 last_line_blank = False
                 value_ID = line.split('=')[0].strip()
                 design_overrides[value_ID] = parse_value(line, i+1, file_name.replace(".on", ""), section)
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
+                multiplier = 0
                 last_line_blank = False
-                parameters.append(parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section))
+                parameter, multiplier = parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section)
+                parameters.append(parameter)
                 prev_line = 'param'
             else:
                 SyntaxError(parent_model, file_name, i+1, line, "Invalid syntax.")
@@ -173,8 +191,6 @@ def parse_file(file_name, parent_model=None):
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = ''
-    arguments = []
-    equation=None
 
     if line[0] == '$':
         performance = True
@@ -226,8 +242,26 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
 
     # Parse the body
     id = body.split('=')[0].strip()
-    assignment = body.split('=')[1].strip().replace(' ', '')
+    assignment = "=".join(body.split('=')[1:]).strip().replace(' ', '')
 
+    if assignment.strip()[0] == '{':
+        equation, arguments = parse_piecewise(assignment, imports, file_name, line_number, multiplier)
+        equation = [equation]
+    else:
+        equation, arguments = parse_equation(assignment, imports, file_name, line_number, multiplier)
+
+    return Parameter(equation, units, id, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance), multiplier
+
+def parse_piecewise(assignment, imports, file_name, line_number, multiplier):
+    assignment = assignment.strip().strip('{')
+    equation, arguments = parse_equation(assignment.split('if')[0].strip(), imports, file_name, line_number, multiplier)
+    condition = assignment.split('if')[1].strip()
+    return (equation, condition), arguments
+
+def parse_equation(assignment, imports, file_name, line_number, multiplier):
+    arguments = []
+    equation=None
+    
     mathless_assignment = assignment
     for x in MATH_CONSTANTS:
         mathless_assignment = mathless_assignment.replace(x, '')
@@ -242,7 +276,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
                     arguments = assignment.split('(')[1].split(')')[0].split(',')
                     break
             if not equation:
-                SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid function: " + func)
+                SyntaxError(None, file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
 
         else:
             equation = assignment.strip("\n").strip()
@@ -253,8 +287,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     else:
         equation = multiplier*eval(assignment, MATH_CONSTANTS)
 
-    return Parameter(equation, units, id, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance)
-
+    return equation, arguments
 
 def parse_value(line, line_no, file_name, section=""):
     value_ID = line.split('=')[0].strip()
@@ -537,7 +570,11 @@ class ParameterError(Error):
         self.source_message = source_message
         
     def throw(self, model, throw_message):
-        print(self.error_tag + " in " + model.name + ": " + throw_message)
+        if model:
+            name = model.name
+        else:
+            name = ""
+        print(self.error_tag + " in " + name + ": " + throw_message)
         print("Source: " + str(self.source))
         if self.source_message: print(self.source_message)
         if isinstance(self.parameter, Parameter):
@@ -671,6 +708,7 @@ class Parameter:
         self.section = section
         self.error = error
         self.pointer = False
+        self.piecewise = False
         
         # note
         self.notes = []
@@ -722,6 +760,9 @@ class Parameter:
                 else:
                     self.equation = equation
                     self.pointer = True
+        elif isinstance(equation, list):
+            self.equation = equation
+            self.piecewise = True
         else:
             ParameterError(self, "", ["Parameter.__init__"]).throw(None, "Parameter equation must be a callable, a float, an int, or a string. If callable, did you forget the preceding underscore. Or did you forget to place an equation in quotes?")
 
