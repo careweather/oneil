@@ -105,6 +105,13 @@ If the allowable values of the parameter are discrete, they must be specified us
 Space domain [EarthOrbit, interplanetary, interstellar]: ...
 ```
 
+You can mark a parameter as a "performance" parameter by prepending it with a `$`. Performance parameters are included in summaries of the model.
+
+``` { .on }
+$ Artificial gravity: ...
+...
+```
+
 ### ID
 
 The ID follows the first colon and comes before the equals sign. It is the variable key used in the model namespace. Within a model, IDs must be unique.
@@ -372,7 +379,14 @@ Print all parameters dependent on the given parameter, for example:
 Summarize the design:
 
 ``` { Oneil interpreter }
->>> summarize
+(cylinder) >>> summarize
+--------------------------------------------------------------------------------
+Model: cylinder
+Design: default
+Parameters: 5 (4 independent, 1 dependent, 0 constants)
+Tests: 1
+--------------------------------------------------------------------------------
+g_a: 27.95 g
 ```
 
 ### Test
