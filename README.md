@@ -55,11 +55,19 @@ To see all the results of the model:
 
 Oneil supports syntax highlighting in vim. While Oneil is already designed for readability, the difference with syntax highlighting is night and day. To set this up on Linux, create a `~/.vim` directory with subdirectories `syntax` and `ftdetect` if they doesn't exist yet. From this directory create soft links to the files in the `vim` directory of the Oneil repository.
 
+Oneil supports syntax highlighting in vim. While Oneil is already designed for readability, the difference with syntax highlighting is night and day. To set this up on Linux, simlink the files in oneil/vim/ftdetect and oneil/vim/syntax to the corresponding folders in your `~/.vim` directory.
+
 ``` { .sh }
 cd ~/.vim/syntax
 ln -s path/to/oneil/vim/syntax/oneil.vim
 cd ../ftdetect
 ln -s path/to/oneil/vim/ftdetect/oneil.vim
+```
+
+If you don't have a `~\.vim` directory, you can just symlink the directory itself.
+
+``` { .sh }
+ln -s $CAREWEATHER/oneil/vim ~/.vim
 ```
 
 ## Parameters
@@ -94,7 +102,7 @@ Range values are given in base units, *not specified units*. Use a [test](#tests
 If the allowable values of the parameter are discrete, they must be specified using brackets. This is used for specifying different modes of operation. These can be word characters or numbers:
 
 ``` { .on }
-Transit mode [ground, air, space]: ...
+Space domain [EarthOrbit, interplanetary, interstellar]: ...
 ```
 
 ### ID
@@ -105,6 +113,9 @@ The ID follows the first colon and comes before the equals sign. It is the varia
 Cylinder diameter: D = ...
 Rotation rate: omega = ...
 Boltzmann's constant: C_b = ...
+Crew count: N_c = ...
+Resident count: N_r = ...
+Orbital altitude: h = ...
 ```
 
 ### Assignment
@@ -115,21 +126,73 @@ Value assignments can specify a single value or a minimum and maximum value sepa
 
 ``` { .on }
 Window count: n_w = 20
-Amplifier efficiency (0, 1): eta = 0.5|0.7
-Transit mode [ground, air, space]: M_t = space
+Communications amplifier efficiency (0, 1): eta_c = 0.5|0.7
+Space domain [EarthOrbit, interplanetary, interstellar]: D = interstellar
 ```
 
-Equation assignments define a parameter as a function of other parameters. This is typically done using a python expression with other parameter IDs as variables (e.g. `"m*x + b"` where `m`, `x`, and `b` are parameter IDs), but can also be done using a python breakout function.
+Parameters can also be set to equal another parameters.
+
+``` { .on }
+Radar amplifier efficiency (0, 1): eta_r = eta_c
+```
+
+Equation assignments define a parameter as a function of other parameters. This is typically done using a python expression with other parameter IDs as variables (e.g. `"m*x + b"` where `m`, `x`, and `b` are parameter IDs).
 
 ``` { .on }
 Cylinder radius: r = D/2 : ...
 Artificial gravity: g_a = r*omega**2 : ...
-Temperature: T = temperature(M_t) : ...
 ```
 
-Oneil uses parametric extrema math as defined in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd). Expressions are limited to the following operators and functions: `+`, `-`, `\*`, `/`, `\*\*`, `<`, `>`, `==,` `!=`, `<=`, `>=`, `min()`, `max()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()`, `sqrt()`, and `mnmx()`.
+Alternate equations for the minimum and maximum case can be given, separated by a pipe.
 
-Eventually standard math will be supported using another operator, but this is only supported currently for standard division using the `//` operator. You can hack standard trigonometric functions using `np.function` to invoke the numpy alternative, but this won't work if the argument to the function is a `Parameter`.
+``` { .on }
+Population: P = N_c | N_c + N_r
+```
+
+For more details on valid equations, see [here](#extrema-math).
+
+### Units
+
+Units are specified after a second colon using their [SI symbol](https://en.wikipedia.org/wiki/International_System_of_Units#Units_and_prefixes) with the "^" operator for exponents and a "/" preceeding *each* unit in the denominator. Units must be specified if the parameter has units, but can be left off for unitless parameters.
+
+``` { .on }
+Mass (0, 100000000): m = 1e6 :kg
+Cylinder diameter: D = 0.5 :km
+Angular position: theta_p = pi/2
+Window count: n_w = 20
+Rotation rate: omega = 1 :deg/min
+Amplifier efficiency (0, 1): eta = 0.5|0.7
+Boltzmann's constant: C_b = 1.380649e-23 :m^2*kg/s^2/K
+Cylinder radius: r = D/2 :km
+Artificial gravity: g_a = r*omega**2 :m/s^2
+Temperature: T = temperature(D) :K
+```
+
+Most [SI units](https://en.wikipedia.org/wiki/International_System_of_Units) are supported. Reference oneil/units/\_\_init\_\_.py for supported units. If a unit isn't supported, you can specify it in terms of base units: `kg`, `m`, `s`, `K`, `A`, `b`, `$`.
+
+## Extrema Math
+
+Oneil uses parametric extrema math as defined in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd). Expressions are limited to the following operators and functions: `+`, `-`, `\*`, `/`, `\*\*`, `<`, `>`, `==,` `!=`, `<=`, `>=`, `min()`, `max()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()`, `sqrt()`, `log()`, `log10`, and `mnmx()` (an extreme function which gets the extremes of the inputs). `|` and `&` are also available for parameters with boolean values.
+
+The `min` and `max` functions can be used on a single Parameter to access the minimum or maximum value of the Parameter's value range.
+
+Extrema math yields substantially different results for subtraction and division. You can specify standard math for these using the `--` and `//` operators.
+
+### Piecewise Equations
+
+Piecewise equations can be used for parameter assignments.
+
+``` { .on }
+Orbital gravity: g_o = {G*m_E/h**2 if D == 'EarthOrbit' :km/s
+                       {G*m_S/h**2 if D == 'interplanetary'
+                       {G*m_G/h**2 if D == 'interstellar'
+```
+
+(m_E, m_S, and m_G are the masses of the Earth, Sun, and galactic center)
+
+### Breakout Functions
+
+For functions not supported by the above equation formats, you can define a python function and link it.
 
 The breakout functions are stored in a separate python file, which must be imported in the Oneil file.
 
@@ -146,24 +209,11 @@ def temperature(transit_mode):
     ...
 ```
 
-### Units
-
-Units are specified after a second colon using their [SI symbol](https://en.wikipedia.org/wiki/International_System_of_Units#Units_and_prefixes) with the "^" operator for exponents and a "/" preceeding *each* unit in the denominator. Units must be specified if the parameter has units, but can be left off for unitless parameters.
+In the Oneil file, give only the python function on the right hand of the equation, including other parameters as inputs:
 
 ``` { .on }
-Mass (0, 100000000): m = 1e6 :kg
-Cylinder diameter: D = 0.5 :km
-Angular position: theta_p = pi/2
-Window count: n_w = 20
-Rotation rate: omega = 1 :deg/min
-Amplifier efficiency (0, 1): eta = 0.5|0.7
-Boltzmann's constant: C_b = 1.380649e-23 :m^2*kg/s^2/K
-Cylinder radius: r = D/2 :km
-Artificial gravity: g_a = r*omega**2 :m/s^2
-Temperature: T = temperature(M_t) :K
+Temperature: T = temperature(D) :K
 ```
-
-Most [SI units](https://en.wikipedia.org/wiki/International_System_of_Units) are supported. Reference oneil/units/\_\_init\_\_.py for supported units. If a unit isn't supported, you can specify it in terms of base units: `kg`, `m`, `s`, `K`, `A`, `b`, `$`.
 
 ## Submodels
 
@@ -308,13 +358,22 @@ omega: 60.0 °/s -- Rotation rate
 g_a: 27.95 g -- Artificial gravity
 ```
 
-<!-- ### Summarize
+### Dependents
+
+Print all parameters dependent on the given parameter, for example:
+
+``` { Oneil interpreter }
+(cylinder) >>> dependents omega
+['g_a', 't_day']
+```
+
+### Summarize
 
 Summarize the design:
 
 ``` { Oneil interpreter }
 >>> summarize
-``` -->
+```
 
 ### Test
 
@@ -392,7 +451,7 @@ This approach is new, so there are bound to be a lot of holes. The interpreter d
 
 ## Known Issues and Limitations
 
-* Range values are given in base units, *not specified units*.
+* Range/option values are given in base units, *not specified units*.
 * UnitError doesn't tell you what supported units are if you use an unsupported unit.
 * There isn't a way to specify desired output units. Units specified on dependent parameters are only used to check that the cooresponding base units match.
 * Scientific notation is supported in value assignments, but not limits. It should be supported in expressions, but this hasn't been tested.
@@ -441,5 +500,7 @@ Try closing all VS Code files and closing VS Code to clear its mystery cache.
 ## About
 
 The initial methodology that inspired Oneil was proposed in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd), by M. Patrick Walton. The conclusion provided ideas and inspiration for early versions of Oneil.
+
+Oneil was developed at Care Weather Technologies, Inc. to support development of the Veery scatterometer.
 
 Oneil is named after American physicist and space activist [Gerard K. O'Neill](https://en.wikipedia.org/wiki/Gerard_K._O%27Neill) who proposed the gargantuan space settlements known as [O'Neill cylinders](https://en.wikipedia.org/wiki/O%27Neill_cylinder). The use of Oneil in the development of an O'Neill cylinder would be a dream come true.
