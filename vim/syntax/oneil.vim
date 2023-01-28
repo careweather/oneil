@@ -16,6 +16,10 @@ autocmd BufNewFile,BufRead *.tex syntax sync fromstart
 "----------------------------------------------------------------/
 "  Parameter
 "----------------------------------------------------------------/
+"  Piecewise Assignment
+syn match oneilPiecewiseKey /{/ contained
+syn match oneilConditionKey /if/ contained
+syn region oneilPiecewiseN start=/\_^\s\+{/ end=/\_$/ contains=oneilPiecewiseKey, oneilConditionKey
 
 "  Preamble - before the first colon
 syn match oneilBreakpoint /^\*\{1,2}/ contained
@@ -33,7 +37,7 @@ syn match oneilMin /.min/ contained
 syn match oneilSubmodule /\.\<[_a-z]\+\>\(\s*(\)\@!/ contained contains=oneilMin,oneilMax
 syn match oneilFunction /\w\+\ze(/ contained
 syn match oneilExtremesDelimiter /|/ contained
-syn match oneilAssignment /\%(\w\+\s*=\s*\)\@<=[^:]*/ contained contains=oneilSubmodule,oneilExtremesDelimiter,oneilFunction
+syn match oneilAssignment /\%(\w\+\s*=\s*\)\@<=[^:]*/ contained contains=oneilSubmodule,oneilExtremesDelimiter,oneilFunction,oneilPiecewiseKey,oneilConditionKey
 
 "  Units - after a second colon
 syn match oneilUnit /\%(=.*:\)\@<=.*$/ contained skipwhite
@@ -44,45 +48,45 @@ syn match oneilUnit /\%(=.*:\)\@<=.*$/ contained skipwhite
 "  properly constructed parameter are missing or malformed, error will show
 "  through
 syn match oneilParameterKeys /[:=]/ contained
-syn region oneilParameter start=/^\v(\t\+)@!(\n)@!(#)@!(\s\+)@!(use)@!(import)@!(test)@!/ end=/$/ contains=oneilParameterPreamble,oneilAssignment,oneilUnit, oneilID, oneilParameterKeys
-
+syn region oneilParameter start=/\_^\v(\n)@!(#)@!(use)@!(import)@!(test)@!(section)@!(\s)@![^:=]*:/ end=/\_$\n/ contains=oneilParameterPreamble,oneilAssignment,oneilUnit,oneilID,oneilParameterKeys
 
 "----------------------------------------------------------------/
 "  Design
 "----------------------------------------------------------------/
 
 syn match oneilValueID /\w\+\.*\w*\s*\ze=/ contained skipwhite
-syn match oneilDesignValue /^\(\&\(.*:.*=.*\)\@!.\)*$/ contains=oneilUnit,oneilParameterKeys,oneilExtremesDelimiter,oneilValueID,oneilAssignment
+syn region oneilDesignValue start=/\_^\v(\s\+)@!(\n)@!(#)@!(\s\+)@!(use)@!(import)@!(test)@!(section)@!(\w+\s*\=)@=/ end=/\_$/ contains=oneilUnit,oneilParameterKeys,oneilExtremesDelimiter,oneilValueID,oneilAssignment
 
 "----------------------------------------------------------------/
 "  Tests
 "----------------------------------------------------------------/
 syn keyword oneilTestKeys test contained
 syn match oneilArgumentKeys /[{}]/ contained
-syn match oneilTestPreamble /^\*\{0,2}\s*\w[^\n]*:/me=e-1 contained contains=oneilTestKeys,oneilArgumentKeys,oneilBreakpoint
+syn match oneilTestPreamble /\_^\*\{0,2}\s*\w[^\n]*:/me=e-1 contained contains=oneilTestKeys,oneilArgumentKeys,oneilBreakpoint
 syn match oneilTestDelimiters /[:]/ contained
-syn region oneilTestExpression start=/:/ end=/$/ contained contains=oneilSubmodule
-syn region oneilTest start=/^\(\*\{1,2}\s*\)\{0,1}test/ end=/$/ contains=oneilTestPreamble,oneilTestDelimiters,oneilTestExpression
+syn region oneilTestExpression start=/:/ end=/\_$/ contained contains=oneilSubmodule
+syn region oneilTest start=/\_^\(\*\{1,2}\s*\)\{0,1}test/ end=/\_$/ contains=oneilTestPreamble,oneilTestDelimiters,oneilTestExpression
 
 
 "----------------------------------------------------------------/
 "  Includes
 "----------------------------------------------------------------/
 
-syn keyword oneilIncludeKeyword use as contained
+syn keyword oneilIncludeKeyword use as contained import
 syn match oneilModule /\w/ contained
 syn match pythonModule /\w/ contained
 
 " Include Regions
-syn region oneilIncludeLine start=/^use/ end=/$/ transparent contains=oneilIncludeKeyword,oneilModule
-syn region oneilIncludeLine start=/^import/ end=/$/ transparent contains=oneilIncludeKeyword,pythonModule
+syn region oneilIncludeLine start=/\_^use/ end=/\_$/ transparent contains=oneilIncludeKeyword,oneilModule
+syn region oneilIncludeLine start=/\_^import/ end=/\_$/ transparent contains=oneilIncludeKeyword,pythonModule
+syn region oneilIncludeLine start=/\_^from/ end=/\_$/ transparent contains=oneilIncludeKeyword,oneilModule
 
 
 "----------------------------------------------------------------/
 "  Notes
 "----------------------------------------------------------------/
 syn keyword oneilNoteTodo containedin=oneilNote contained TODO FIXME NOTE
-syn region oneilNote start=/^\(\t\+\|\s\+\)/ end=/\n*\(\_^\w\|\_^#\|\_^\*\|\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
+syn region oneilNote start=/\_^\s\+\(\S\)\@=\({\)\@!/ end=/\n*\(\n\_^\w\|\n\_^#\|\n\_^\*\|\n\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
 syn sync fromstart
 set foldmethod=syntax
 
@@ -91,12 +95,12 @@ set foldmethod=syntax
 "  Sections
 "----------------------------------------------------------------/
 syn keyword oneilSectionKeyword section contained
-syn region oneilSectionHeader start=/^section/ end=/$/ transparent contains=oneilSectionKeyword
+syn region oneilSectionHeader start=/\_^section/ end=/\_$/ transparent contains=oneilSectionKeyword
 
 "----------------------------------------------------------------/
 "  Comments
 "----------------------------------------------------------------/
-syn region oneilComment start=/^\s*#/ end=/$/
+syn region oneilComment start=/\_^\s*#/ end=/\_$/
 
 
 "----------------------------------------------------------------/
@@ -128,6 +132,10 @@ hi def link oneilSubmodule		PreProc
 "hi def link oneilFunction		PreProc
 hi def link oneilExtremesDelimiter	Keyword
 hi def link oneilValue			Constant
+
+hi def link oneilPiecewiseKey		Keyword
+hi def link oneilConditionKey		Keyword
+"hi def link oneilPiecewiseN		Keyword
 
 "  Values
 hi def link oneilValueID		Identifier

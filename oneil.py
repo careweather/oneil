@@ -10,6 +10,7 @@ from beautifultable import BeautifulTable
 import units as un
 import importlib
 import sys
+from functools import partial
 
 class bcolors:
     HEADER = '\033[95m'
@@ -22,13 +23,41 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+def isfloat(num):
+    try:
+        float(num)
+        return True
+    except ValueError:
+        return False
+
 __version__ = get_distribution("oneil").version
 
 FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "pi": "np.pi", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log10": "par_log10"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
-EQUATION_OPERATORS = ["+", "-", "*", "/", "**", "//", "%", "(", ")"]
+EQUATION_OPERATORS = ["+", "-", "*", "/", "**", "//", "%", "(", ")", "=", "<", ">", "!"]
+
+OPERATOR_OVERRIDES = {"--": "|minus|"}
+
+class Infix(object):
+    def __init__(self, func):
+        self.func = func
+    def __or__(self, other):
+        return self.func(other)
+    def __ror__(self, other):
+        return Infix(partial(self.func, other))
+    def __call__(self, v1, v2):
+        return self.func(v1, v2)
+    
+@Infix
+def minus(x, y):
+    if isinstance(x, Parameter):
+        return x._minus(y)
+    elif isinstance(y, Parameter):
+        return y._rminus(x)
+    else:
+        return x - y
 
 def parse_file(file_name, parent_model=None):
     parameters = []
@@ -40,36 +69,46 @@ def parse_file(file_name, parent_model=None):
     design_overrides = {}
     last_line_blank = False
     section = ""
+    multiplier = 0
 
     with open(file_name, 'r') as f:
         final_line = 0
         for i, line in enumerate(f.readlines()):
             final_line = i
             if line == '\n':
+                multiplier = 0
                 last_line_blank = True
                 continue
             elif '#' in line and line.strip()[0] == '#':
+                multiplier = 0
                 last_line_blank = False
                 continue
             elif line[0] == '\t' or line[0:1] == ' ':
                 if last_line_blank: line = "\n\n" + line
-                if prev_line == 'param':
-                    parameters[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
-                    parameters[-1].note_lines.append(i+1)
-                elif prev_line == 'test':
-                    tests[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
-                    tests[-1].note_line_nos.append(i+1)
-                elif prev_line == 'design':
-                    last_key = list(design_overrides.keys())[-1]
-                    design_overrides[last_key].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
-                    design_overrides[last_key].note_lines.append(i+1)
-                elif prev_line == '':
-                    note += line.strip()
+                if line.strip() and line.strip()[0] == '{':
+                    assert multiplier != 0, ValueError("Multiplier should never be zero.")
+                    parameter, arguments = parse_piecewise(line, parameters[-1].units, parameters[-1].id, imports, file_name.replace(".on", ""), i+1, multiplier)
+                    parameters[-1].add_piece(parameter, arguments)
                 else:
-                    raise ValueError("Invalid prev line type: " + line)
+                    multiplier = 0
+                    if prev_line == 'param':
+                        parameters[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
+                        parameters[-1].note_lines.append(i+1)
+                    elif prev_line == 'test':
+                        tests[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
+                        tests[-1].note_line_nos.append(i+1)
+                    elif prev_line == 'design':
+                        last_key = list(design_overrides.keys())[-1]
+                        design_overrides[last_key].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
+                        design_overrides[last_key].note_lines.append(i+1)
+                    elif prev_line == '':
+                        note += line.strip()
+                    else:
+                        raise ValueError("Invalid prev line type: " + line)
                 last_line_blank = False
 
-            elif line[:3] == 'use':
+            elif line[:4] == 'use ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
@@ -93,7 +132,8 @@ def parse_file(file_name, parent_model=None):
                     ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
 
                 submodels[symbol] = {'model': Model(model + ".on"), 'inputs': test_inputs, 'path': [model], 'line_no': i+1, 'line': line}
-            elif line[:4] == 'from':
+            elif line[:5] == 'from ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^from\s+\w+(\.\w+)*\s+use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
@@ -120,7 +160,8 @@ def parse_file(file_name, parent_model=None):
                     ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
 
                 submodels[symbol] = {'path': path, 'inputs': test_inputs, 'line_no': i+1, 'line': line}
-            elif line[:6] == 'import':
+            elif line[:7] == 'import ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^import\s+\w+\s*$", line))
                 except:
@@ -135,7 +176,8 @@ def parse_file(file_name, parent_model=None):
                 except:
                     ImportError(parent_model, file_name, i+1, line, module + ".py")
 
-            elif line[:7] == 'section':
+            elif line[:8] == 'section ':
+                multiplier = 0
                 try:
                     assert(re.search(r"^section\s+[\w\s]*$", line))
                 except:
@@ -144,6 +186,7 @@ def parse_file(file_name, parent_model=None):
                 last_line_blank = False
                 section = line.replace("section", "").strip()
             elif line[0:4] == 'test' or line.replace(" ", "").replace("\t", "")[0:5] == '*test':
+                multiplier = 0
                 try:
                     assert(re.search(r"^(\*{1,2}\s*)?test\s*(\{\w+(,\s*\w+)*\})?:.*$", line))
                 except:
@@ -153,13 +196,16 @@ def parse_file(file_name, parent_model=None):
                 tests.append(Test(line, i+1, file_name.replace(".on", ""), section=section))
                 prev_line = 'test'
             elif re.search(r"^(\*{1,2}\s*)?\w+(\.\w+)?\s*=[^:]+(:.*)?$", line):
+                multiplier = 0
                 last_line_blank = False
                 value_ID = line.split('=')[0].strip()
                 design_overrides[value_ID] = parse_value(line, i+1, file_name.replace(".on", ""), section)
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
+                multiplier = 0
                 last_line_blank = False
-                parameters.append(parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section))
+                parameter, multiplier = parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section)
+                parameters.append(parameter)
                 prev_line = 'param'
             else:
                 SyntaxError(parent_model, file_name, i+1, line, "Invalid syntax.")
@@ -173,8 +219,6 @@ def parse_file(file_name, parent_model=None):
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = ''
-    arguments = []
-    equation=None
 
     if line[0] == '$':
         performance = True
@@ -209,7 +253,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
                 limits.append(float(l))
             elif l in MATH_CONSTANTS:
                 limits.append(MATH_CONSTANTS[l])
-            elif any(character in EQUATION_OPERATORS for character in l):
+            elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
                 limits.append(eval(l, MATH_CONSTANTS))
             else:
                 SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid limit: " + l)
@@ -226,35 +270,66 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
 
     # Parse the body
     id = body.split('=')[0].strip()
-    assignment = body.split('=')[1].strip().replace(' ', '')
+    assignment = "=".join(body.split('=')[1:]).strip()
 
+    if assignment.strip()[0] == '{':
+        equation, arguments = parse_piecewise(assignment, units, id, imports, file_name, line_number, multiplier)
+        equation = [equation]
+    else:
+        equation, arguments = parse_equation(assignment.replace(' ', ''), units, id, imports, file_name, line_number, multiplier)
+
+    return Parameter(equation, units, id, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance), multiplier
+
+def parse_piecewise(assignment, units, id, imports, file_name, line_number, multiplier):
+    assignment = assignment.strip().strip('{')
+    equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, multiplier)
+    condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, multiplier)
+    return (Parameter(equation, units, id + ":eqpiece", ), Parameter(condition, {}, id + ":condpiece", )), eargs + cargs
+
+def parse_equation(assignment, units, id, imports, file_name, line_number, multiplier):  
     mathless_assignment = assignment
     for x in MATH_CONSTANTS:
         mathless_assignment = mathless_assignment.replace(x, '')
 
     if re.search('[a-zA-Z]', mathless_assignment):
-        # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
-        if re.search('\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
-            func = assignment.strip('(').split('(')[0]
-            for i in imports:
-                if func in i.__dict__.keys():
-                    equation = i.__dict__[func]
-                    arguments = assignment.split('(')[1].split(')')[0].split(',')
-                    break
-            if not equation:
-                SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid function: " + func)
-
+        if '|' in assignment:
+            mineq, minargs = convert_functions(assignment.split('|')[0], imports, file_name, line_number) 
+            maxeq, maxargs = convert_functions(assignment.split('|')[1], imports, file_name, line_number)
+            equation = (Parameter(mineq, units, id + ":mineq"), Parameter(maxeq, units, id + ":mineq"))
+            arguments = minargs + maxargs
         else:
-            equation = assignment.strip("\n").strip()
-    elif '|' in assignment:
-        min = multiplier*eval((assignment.split('|')[0]), MATH_CONSTANTS)
-        max = multiplier*eval((assignment.split('|')[1]), MATH_CONSTANTS)
-        equation = (min, max)
+            equation, arguments = convert_functions(assignment, imports, file_name, line_number)
+        
     else:
-        equation = multiplier*eval(assignment, MATH_CONSTANTS)
+        if '|' in assignment:
+            min = multiplier*eval((assignment.split('|')[0]), MATH_CONSTANTS)
+            max = multiplier*eval((assignment.split('|')[1]), MATH_CONSTANTS)
+            equation = (min, max)
+        else:
+            equation = multiplier*eval(assignment, MATH_CONSTANTS)
+        arguments = []
 
-    return Parameter(equation, units, id, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance)
+    return equation, arguments
 
+def convert_functions(assignment, imports, file_name, line_number):
+    arguments = []
+    if isfloat(assignment):
+        return float(assignment), arguments
+    # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
+    if re.search('\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
+        func = assignment.strip('(').split('(')[0]
+        for i in imports:
+            if func in i.__dict__.keys():
+                equation = i.__dict__[func]
+                arguments = assignment.split('(')[1].split(')')[0].split(',')
+                break
+        if not equation:
+            SyntaxError(None, file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
+
+    else:
+        equation = assignment.strip("\n").strip()
+
+    return equation, arguments
 
 def parse_value(line, line_no, file_name, section=""):
     value_ID = line.split('=')[0].strip()
@@ -305,7 +380,14 @@ def par_min(val1, val2=None):
     if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_min")
 
     if not val2:
-        val2 = val1
+        if isinstance(val1, Parameter):
+            if val1.units == {}:
+                return val1.min
+            else:
+             return Parameter((val1.min, val1.min), val1.units, f"min({val1.name})")
+        elif isinstance(val1, (int, float)):
+            return val1
+        
     val1, val2 = _process_minmax_par_inputs(val1, val2)
 
     if isinstance(val2, Parameter):
@@ -320,15 +402,22 @@ def par_min(val1, val2=None):
         if val1.units != {}:
             return Parameter((np.nan, np.nan), val1.units, "min(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to a unitless number.", ["par_min"]))
         return Parameter((min(val1.min, val2), min(val1.max, val2)), val1.units, "min({},{})".format(val1.name, val2))
-    else:
-        raise TypeError("Second input to min() must be of type Parameter, int, or float.")
+    
+    raise TypeError("Second input to min() must be of type Parameter, int, or float.")
 
 
 def par_max(val1, val2=None):
     if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_max")
 
     if not val2:
-        val2 = val1
+        if isinstance(val1, Parameter):
+            if val1.units == {}:
+                return val1.max
+            else:
+                return Parameter((val1.max, val1.max), val1.units, "max({})".format(val1.name))
+        elif isinstance(val1, (int, float)):
+            return val1
+
     val1, val2 = _process_minmax_par_inputs(val1, val2)
 
     if isinstance(val2, Parameter):
@@ -341,8 +430,8 @@ def par_max(val1, val2=None):
         if val1.units != {}:
             return Parameter((np.nan, np.nan), val1.units, "min(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to a unitless number.", ["par_min"]))
         return Parameter((max(val1.min, val2), max(val1.max, val2)), val1.units, "max({},{})".format(val1.name, val2))
-    else:
-        raise TypeError("Second input to max() must be of type Parameter, int, or float.")
+    
+    raise TypeError("Second input to max() must be of type Parameter, int, or float.")
 
 
 def par_sin(val):
@@ -513,21 +602,25 @@ class UnitError(Error):
         self.source = list(source)
         self.source_message = source_message
         
-    def throw(self, model, throw_message):
-        print(self.error_tag + " in " + model.name + ": " + throw_message)
+    def throw(self, model, throw_message, debug=False):
+        print(f"{self.error_tag} in {model.name}: {throw_message}")
         print("Source: " + str(self.source))
         print(self.source_message)
         for parameter in self.parameters:
             if isinstance(parameter, Parameter):
                 model_text = "" if not parameter.model else " in model " + parameter.model
-                parameter_text = parameter.name + " (" + parameter.id + ")" if parameter.name != parameter.id else parameter.name
-                print("  - (" + un.hr_units(parameter.units) + ") in " + parameter_text + " from line " + str(parameter.line_no) + model_text)
+                parameter_text = f"{parameter.name} ({parameter.id})" if parameter.name != parameter.id else parameter.name
+                print(f"  - ({un.hr_units(parameter.units)}) in {parameter_text} from line {parameter.line_no}{model_text}")
             else:
                 print("  - " + str(parameter))
-        if model and model.calculated: 
-            interpreter(model)
-        else: 
-            quit()
+        
+        if model:
+            if model.calculated: 
+                interpreter(model)
+            elif debug:
+                debugger(model)
+        
+        quit()
 
 class ParameterError(Error):
     def __init__(self, parameter, source_message, source):
@@ -536,30 +629,37 @@ class ParameterError(Error):
         self.source = list(source)
         self.source_message = source_message
         
-    def throw(self, model, throw_message):
-        print(self.error_tag + " in " + model.name + ": " + throw_message)
+    def throw(self, model, throw_message, debug=False):
+        if model:
+            name = model.name
+        else:
+            name = ""
+        print(f"{self.error_tag} in {name}: {throw_message}")
         print("Source: " + str(self.source))
         if self.source_message: print(self.source_message)
         if isinstance(self.parameter, Parameter):
-            print("  - (" + str(self.parameter) + ") in " + self.parameter.name + " (" + self.parameter.id + ") from line " + str(self.parameter.line_no) + " in model " + self.parameter.model)
+            print(f"  - ({str(self.parameter)}) in {self.parameter.name} ({self.parameter.id}) from line {str(self.parameter.line_no)} in model {model}")
         else:
-            print("  - " + str(self).parameter)
-        if model and model.calculated: 
-            interpreter(model)
-        else: 
-            quit()
+            print("  - " + str(self.parameter))
+        
+        if model:
+            if model.calculated: 
+                interpreter(model)
+            elif debug:
+                debugger(model)
+        
+        quit()
 
 class NoteError(Error):
     def __init__(self, model, parameter, message):
         error = bcolors.FAIL + "NoteError" + bcolors.ENDC
-        print(error + " in " + parameter.name + "(" + parameter.id + ") on line " + parameter.line_no + "in " + parameter.model + " model: " + message)
-        print("Note line " + parameter.note_line_no + ": " + parameter.note)
+        print(f"Note line {parameter.note_line_no}: {parameter.note}")
         interpreter(model)
 
 class SyntaxError(Error):
     def __init__(self, model, filename, line_no, line, message):
         error = bcolors.FAIL + "SyntaxError" + bcolors.ENDC
-        print(error + " in " + filename + ": (line " + str(line_no) + ") " + line + "- " + message)
+        print(f"{error} in {filename}: (line {line_no}) {line} - {message}")
         if model and model.calculated:
             interpreter(model)
         else:
@@ -568,13 +668,13 @@ class SyntaxError(Error):
 class IDError(Error):
     def __init__(self, model, ID, message):
         error = bcolors.FAIL + "IDError" + bcolors.ENDC
-        print(error + " (" + ID + ") in " + model.name + ": " + message)
+        print(f"{error} ({ID}) in {model.name}: {message}")
         interpreter(model)
 
 class ImportError(Error):
     def __init__(self, model, filename, line_no, line, imprt):
         error = bcolors.FAIL + "ImportError" + bcolors.ENDC
-        print(error + " in " + filename + ": (line " + str(line_no) + ") " + line + "- Failed to import " + imprt)
+        print(f"{error} in {filename}: (line {line_no}) {line} - Failed to import {imprt}. Does the import run by itself?")
         if model:
             interpreter(model)
         else:
@@ -588,7 +688,7 @@ class ModelError(Error):
         self.source_message = source_message
         
     def throw(self, return_model, throw_message):
-        print(self.error_tag + " in " + self.filename + ": " + throw_message)
+        print(f"{self.error_tag} in {self.filename}: {throw_message}")
         if self.source: 
             print("Source: " + str(self.source))
             print(self.source_message)
@@ -600,7 +700,7 @@ class ModelError(Error):
 class PythonError(Error):
     def __init__(self, parameter, message):
         error = bcolors.FAIL + "PythonError" + bcolors.ENDC
-        print(error + " in " + parameter.equation + ": (line " + str(parameter.line_no) + ") " + parameter.line + "- " + message)
+        print(f"{error} in {parameter.equation}: (line {parameter.line_no}) {parameter.line} - {message}")
         
 
 def pass_errors(*args, caller=None):
@@ -644,6 +744,8 @@ class Test:
         for old, new in FUNCTIONS.items():
             if "." + old not in self.expression:
                 self.expression = self.expression.replace(old + "(", new + "(")
+        for old, new in OPERATOR_OVERRIDES.items():
+            self.expression = self.expression.replace(old, new)
 
         self.args = [x for x in re.findall("(?!\d+)\w+\.?\w*", self.expression) if x not in FUNCTIONS]
 
@@ -671,6 +773,8 @@ class Parameter:
         self.section = section
         self.error = error
         self.pointer = False
+        self.piecewise = False
+        self.minmax_equation = False
         
         # note
         self.notes = []
@@ -701,12 +805,12 @@ class Parameter:
             self.callable = True
             self.equation = equation
             self.independent = False
-        elif isinstance(equation, (float, tuple, int)):
+        elif isinstance(equation, (float, int)):
             self.assign(equation)
         elif isinstance(equation, str):
-            if any(character in EQUATION_OPERATORS for character in equation):
+            if any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in equation):
                 # Find parameter names including "." imports
-                self.args = [x for x in re.findall("(?!\d+)\w+\.?\w*", equation) if x not in FUNCTIONS]
+                self.args = [x for x in re.findall("(?!\d+)\w+\.?\w*", re.sub('[\'|\"].*[\'|\"]','',equation)) if x not in FUNCTIONS]
 
                 # Trim duplicate args
                 self.args = list(set(self.args))
@@ -714,16 +818,44 @@ class Parameter:
                 for old, new in FUNCTIONS.items():
                     if "." + old not in equation:
                         equation = equation.replace(old + "(", new + "(")
-                    self.equation = equation
+                for old, new in OPERATOR_OVERRIDES.items():
+                    equation = equation.replace(old, new)
+
+                self.equation = equation
                 self.independent = False
             else:
                 if self.options and isinstance(self.options, list):
                     self.assign(equation)
                 else:
                     self.equation = equation
+                    self.args = [equation]
                     self.pointer = True
+        elif isinstance(equation, tuple):
+            if isinstance(equation[0], (float, int)) and isinstance(equation[1], (float, int)):
+                self.assign(equation)
+            else:
+                self.minmax_equation = True
+                self.equation = equation
+                args = equation[0].args + equation[1].args
+                self.args.extend(args)
+        elif isinstance(equation, list):
+            self.piecewise = True
+            self.equation = equation
+            piece_args = equation[0][0].args + equation[0][1].args
+            if not piece_args:
+                self.error = ParameterError([self], "Piecewise parameters must be dependent on another parameter.", ["Parameter.__init__"])
+            else:
+                self.args.extend(piece_args)
         else:
-            ParameterError(self, "", ["Parameter.__init__"]).throw(None, "Parameter equation must be a callable, a float, an int, or a string. If callable, did you forget the preceding underscore. Or did you forget to place an equation in quotes?")
+            ParameterError([self], "", ["Parameter.__init__"]).throw(None, "Parameter equation must be a callable, a float, an int, or a string. If callable, did you forget the preceding underscore. Or did you forget to place an equation in quotes?")
+
+    def add_piece(self, piece, callable_args):
+        self.equation.append(piece)
+        piece_args = piece[0].args + piece[1].args + callable_args
+        if not piece_args:
+            self.error = ParameterError([self], "Piecewise parameters must be dependent on another parameter.", ["Parameter.__init__"])
+        else:
+            self.args = list(set(self.args + piece_args))
 
     def assign(self, value):
         self.write(value)
@@ -789,17 +921,21 @@ class Parameter:
                 import pdb
 
                 breakpoint()
-                return self.equation(*function_args)
         else:
-            result = eval(expression, glob, eval_params)
-                
-            return result
+            try:
+                return eval(expression, glob, eval_params)
+            except:
+                PythonError(self, "Calculation error.")
+                import pdb
+
+                breakpoint()
 
     # Parameter Printing
 
-    def __repr__(self, sigfigs=4, indent=0, verbose=False):
-        output = " " * indent + self.id + ": "
-        output += self.human_readable(sigfigs)
+    def __repr__(self, sigfigs=4, indent=0, verbose=False, submodel_id=""):
+        output = " " * indent
+        output += self.id + "." + submodel_id if submodel_id else self.id
+        output += ": " + self.human_readable(sigfigs)
         output += " -- " + self.name if verbose else ""
         output += " (" + self.model + ")" if verbose and self.model else ""
         return output
@@ -810,8 +946,8 @@ class Parameter:
             print(key + ": " + self)
         print("\n")
 
-    def short_print(self, sigfigs=4, indent=0, verbose=False):
-        print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose))
+    def short_print(self, sigfigs=4, indent=0, verbose=False, submodel_id=""):
+        print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose, submodel_id=submodel_id))
 
     def hprint(self, sigfigs=4, indent=0):
         output = ("\n" + self.name + "\n--------------------\n" if self.performance else "")
@@ -828,9 +964,6 @@ class Parameter:
             else:
                 return un.hr_units(self.units, sigfigs=sigfigs)
 
-
-    # Parameter
-
     def copy(self):
         return Parameter((self.min, self.max), self.units, "copy of " + self.name, model=self.model, line_no=self.line_no, line=self.line)
 
@@ -844,6 +977,7 @@ class Parameter:
         self.units = parameter.units
         self.name = parameter.name
 
+    # "+" Addition, left-hand, all cases 
     def __add__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__add__")
 
@@ -856,7 +990,7 @@ class Parameter:
         else:
             return Parameter((np.nan, np.nan), self.units, "({}) + ({})".format(self.id, str(other)), error=UnitError([self, other], "Cannot add " + un.hr_units(self.units) + " to a unitless number", ["Parameter.__add__"]))
 
-    # Extreme subtraction "-"
+    # "-" Subtraction, left-hand, extreme
     def __sub__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__sub__")
 
@@ -870,8 +1004,8 @@ class Parameter:
         else:
             return Parameter((np.nan, np.nan), self.units, "({}) - ({})".format(self.id, str(other)), error=UnitError([self, other], "Cannot subtract a unitless number from " + un.hr_units(self.units), ["Parameter.__sub__"]))
 
-    # Standard subtraction "Parameter.minus(other)"
-    def minus(self, other):
+    # "--" Subtraction, left-hand, standard
+    def _minus(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.minus")
 
         if isinstance(other, Parameter):
@@ -885,6 +1019,7 @@ class Parameter:
         else:
             return Parameter((np.nan, np.nan), self.units, "({}) -- ({})".format(self.id, str(other)), error=UnitError([self, other], "Cannot subtract a unitless number from " + un.hr_units(self.units), ["Parameter.minus"]))
 
+    # "*" Multiplication, left-hand, all cases
     def __mul__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__mul__")
 
@@ -905,7 +1040,7 @@ class Parameter:
         else:
             TypeError("Multiplication must be between two Parameters or a Parameter and a number.")
 
-    # Extreme Division "/"
+    # "/" Division, left-hand, extreme
     def __truediv__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__truediv__")
 
@@ -928,7 +1063,7 @@ class Parameter:
         else:
             raise TypeError("Division must be between two Parameters or a Parameter and a number.")
 
-    # Standard Division "//"
+    # "//" Division, left-hand, standard
     def __floordiv__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__floordiv__")
 
@@ -949,6 +1084,7 @@ class Parameter:
         else:
             raise TypeError("Division must be between two Parameters or a Parameter and a number.")
 
+    # "**" Exponentiation, left-hand, all cases
     def __pow__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__pow__")
 
@@ -963,6 +1099,7 @@ class Parameter:
         else:
             raise TypeError("Exponent must be a single unitless Parameter or number.")
 
+    # "+" Addition, right-hand, all cases
     def __radd__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__radd__")
 
@@ -974,6 +1111,7 @@ class Parameter:
         else:
             raise TypeError("Addition must be between two Parameters or a Parameter and a number.")
 
+    # "-" Subtraction, right-hand, extreme
     def __rsub__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rsub__")
 
@@ -985,6 +1123,19 @@ class Parameter:
         else:
             raise TypeError("Addition must be between two Parameters or a Parameter and a number.")
 
+    # "--" Subtraction, right-hand, standard
+    def _rminus(self, other):
+        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rsub__")
+
+        if isinstance(other, (int, float)):
+            if self.units == {}:
+                return Parameter((other - self.min, other - self.max), {}, "({}) - ({})".format(str(other), self.id))
+            else:
+                return Parameter((np.nan, np.nan), self.units, "({}) - ({})".format(other, self.id), error=UnitError([self, other], "Cannot subtract " + un.hr_units(self.units) + " from a unitless number.", ["Parameter.__rsub__"]))
+        else:
+            raise TypeError("Addition must be between two Parameters or a Parameter and a number.")
+
+    # "*" Multiplication, right-hand, all cases
     def __rmul__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rmul__")
 
@@ -993,6 +1144,7 @@ class Parameter:
         else:
             raise TypeError("Multiplication must be between a Parameter and a number.")
 
+    # "/" Division, right-hand, extreme
     def __rtruediv__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rtruediv__")
 
@@ -1002,15 +1154,17 @@ class Parameter:
         else:
             raise TypeError("Division must be between a Parameter and a number.")
 
+    # "//" Division, right-hand, standard
     def __rfloordiv__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rfloordiv__")
 
         if isinstance(other, (int, float)):
             new_units = {k: -v for k, v in self.units.items()}
-            return Parameter((other / self.max, other / self.min), new_units, "({})//({})".format(str(other), self.id))
+            return Parameter((other / self.min, other / self.max), new_units, "({})//({})".format(str(other), self.id))
         else:
             raise TypeError("Division must be between a Parameter and a number.")
 
+    # "**" Exponentiation, right-hand, all cases
     def __rpow__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rpow__")
 
@@ -1021,6 +1175,7 @@ class Parameter:
         else:
             raise TypeError("Exponentiation must be between a Parameter and a number.")
 
+    # "<" Less than, left-hand, all cases
     def __lt__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__lt__")
 
@@ -1029,12 +1184,13 @@ class Parameter:
                 return Parameter((np.nan, np.nan), self.units, "({}) < ({})".format(other.id, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to " + un.hr_units(self.units) + ".", ["Parameter.__lt__"]))
             return self.min < other.min and self.max < other.max
         elif isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) < ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to a unitless number.", ["Parameter.__lt__"]))
             return self.min < other and self.max < other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # ">" Greater than, left-hand, all cases
     def __gt__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__gt__")
 
@@ -1043,12 +1199,13 @@ class Parameter:
                 return Parameter((np.nan, np.nan), self.units, "({}) > ({})".format(other.id, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to " + un.hr_units(self.units) + ".", ["Parameter.__gt__"]))
             return self.min > other.min and self.max > other.max
         elif isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) > ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to a unitless number.", ["Parameter.__gt__"]))
             return self.min > other and self.max > other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # ">=" Greater than or equal to, left-hand, all cases
     def __le__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__le__")
 
@@ -1057,12 +1214,13 @@ class Parameter:
                 return Parameter((np.nan, np.nan), self.units, "({}) <= ({})".format(other.id, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to " + un.hr_units(self.units) + ".", ["Parameter.__le__"]))
             return self.min <= other.min and self.max <= other.max
         elif isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) <= ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to a unitless number.", ["Parameter.__le__"]))
             return self.min <= other and self.max <= other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # "<=" Less than or equal to, left-hand, all cases
     def __ge__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__ge__")
 
@@ -1071,12 +1229,13 @@ class Parameter:
                 return Parameter((np.nan, np.nan), self.units, "({}) >= ({})".format(other.id, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to " + un.hr_units(self.units) + ".", ["Parameter.__ge__"]))
             return self.min >= other.min and self.max >= other.max
         elif isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) >= ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to a unitless number.", ["Parameter.__ge__"]))
             return self.min >= other and self.max >= other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # "==" Equal to, left-hand, all cases
     def __eq__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__eq__")
 
@@ -1085,7 +1244,7 @@ class Parameter:
                 return Parameter((np.nan, np.nan), self.units, "({}) == ({})".format(other.id, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to " + un.hr_units(self.units) + ".", ["Parameter.__eq__"]))
             return self.min == other.min and self.max == other.max
         elif isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) == ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to a unitless number.", ["Parameter.__eq__"]))
             return self.min == other and self.max == other
         elif isinstance(other, str):
@@ -1095,6 +1254,7 @@ class Parameter:
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # "!=" Not equal to, left-hand, all cases
     def __ne__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__ne__")
 
@@ -1103,7 +1263,7 @@ class Parameter:
                 return Parameter((np.nan, np.nan), self.units, "({}) != ({})".format(other.id, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to " + un.hr_units(self.units) + ".", ["Parameter.__ne__"]))
             return self.min != other.min and self.max != other.max
         elif isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) != ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare unit \"" + un.hr_units(self.units) + "\" to a unitless number.", ["Parameter.__ne__"]))
             return self.min != other and self.max != other
         elif isinstance(other, str):
@@ -1111,65 +1271,127 @@ class Parameter:
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # "<" Less than, right-hand, all cases
     def __rlt__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rlt__")
 
         if isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) < ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare a unitless number to unit \"" + un.hr_units(self.units) + "\".", ["Parameter.__rlt__"]))
             return other < self.min and other < self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # "<=" Less than or equal to, right-hand, all cases
     def __rgt__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rgt__")
 
         if isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) > ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare a unitless number to unit \"" + un.hr_units(self.units) + "\".", ["Parameter.__rgt__"]))
             return other > self.min and other > self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # ">=" Greater than or equal to, right-hand, all cases
     def __rle__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rle__")
 
         if isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) <= ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare a unitless number to unit \"" + un.hr_units(self.units) + "\".", ["Parameter.__rle__"]))
             return other <= self.min and other <= self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # ">=" Greater than or equal to, right-hand, all cases
     def __rge__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rge__")
 
         if isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) >= ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare a unitless number to unit \"" + un.hr_units(self.units) + "\".", ["Parameter.__rge__"]))
             return other >= self.min and other >= self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # "==" Equal to, right-hand, all cases
     def __req__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__req__")
 
         if isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) == ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare a unitless number to unit \"" + un.hr_units(self.units) + "\".", ["Parameter.__req__"]))
             return other == self.min and other == self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
+    # "!=" Not equal to, right-hand, all cases
     def __rne__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rne__")
 
         if isinstance(other, (int, float)):
-            if self.units != {}:
+            if other != 0 and self.units != {}:
                 return Parameter((np.nan, np.nan), self.units, "({}) != ({})".format(other, self.id), error=UnitError([self, other], "Cannot compare a unitless number to unit \"" + un.hr_units(self.units) + "\".", ["Parameter.__rne__"]))
             return other != self.min and other != self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
+
+    # "|" Logical OR, left-hand, all cases
+    def __or__(self, other):
+        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__or__")
+        
+        if self.units != {}:
+            return Parameter((np.nan, np.nan), self.units, "({}) | ({})".format(other, self.id), error=UnitError([self, other], "| is only valid for unitless parameters with boolean values.", ["Parameter.__or__"]))
+        
+        if isinstance(other, Parameter):
+            if other.units != {}:
+                return Parameter((np.nan, np.nan), self.units, "({}) | ({})".format(other, self.id), error=UnitError([self, other], "| is only valid for unitless parameters with boolean values.", ["Parameter.__or__"]))
+            return self.min or other.min or self.max or other.max
+        elif isinstance(other, (bool)):
+            return self.min or other or self.max
+        else:
+            raise TypeError("OR operator is only valid between two Parameters or a Parameter and a boolean.")
+
+    # "&" Logical AND, left-hand, all cases
+    def __and__(self, other):
+        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__and__")
+        
+        if self.units != {}:
+            return Parameter((np.nan, np.nan), self.units, "({}) & ({})".format(other, self.id), error=UnitError([self, other], "& is only valid for unitless parameters with boolean values.", ["Parameter.__or__"]))
+        
+        if isinstance(other, Parameter):
+            if other.units != {}:
+                return Parameter((np.nan, np.nan), self.units, "({}) & ({})".format(other, self.id), error=UnitError([self, other], "& is only valid for unitless parameters with boolean values.", ["Parameter.__or__"]))
+            return self.min and other.min and self.max and other.max
+        elif isinstance(other, (bool)):
+            return self.min and other and self.max
+        else:
+            raise TypeError("AND operator is only valid between two Parameters or a Parameter and a boolean.")
+
+    # "|" Logical OR, right-hand, all cases
+    def __ror__(self, other):
+        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__ror__")
+        
+        if self.units != {}:
+            return Parameter((np.nan, np.nan), self.units, "({}) | ({})".format(other, self.id), error=UnitError([self, other], "| is only valid for unitless parameters with boolean values.", ["Parameter.__or__"]))
+        
+        if isinstance(other, (bool)):
+            return self.min or other or self.max
+        else:
+            raise TypeError("OR operator is only valid between two Parameters or a Parameter and a boolean.")
+
+    # "&" Logical AND, right-hand, all cases
+    def __rand__(self, other):
+        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rand__")
+
+        if self.units != {}:
+            return Parameter((np.nan, np.nan), self.units, "({}) & ({})".format(other, self.id), error=UnitError([self, other], "& is only valid for unitless parameters with boolean values.", ["Parameter.__or__"]))
+
+        if isinstance(other, (bool)):
+            return self.min and other and self.max
+        else:
+            raise TypeError("AND operator is only valid between two Parameters or a Parameter and a boolean.")
 
 
 class Model:
@@ -1186,7 +1408,7 @@ class Model:
             self.overwrite(design_filename)
 
         #ERR ID error
-        # self._check_namespace()
+        self._check_namespace()
 
         for key, param in self.parameters.items():
             # For equations that aren't strings that aren't option cases
@@ -1201,26 +1423,24 @@ class Model:
                 param.error.throw(self, "Problem parsing parameter " + param.id + " in " + model_filename + ".")
     
     # Checks that all of the arguments to each parameter are defined
-    def _check_namespace(self):
+    def _check_namespace(self, verbose=False):
         undefined = []
         
         for k, param in self.parameters.items():
             for arg in param.args:
-                arg = arg.replace('.max','').replace('.min','')
                 if '.' in arg:
                     arg_id, source = arg.split('.')
-                    if source in self.submodels:
-                        if arg_id not in self.submodels[source]['model'].parameters:
-                            undefined.append(arg + " from " + param.id + " (line " + str(param.line + 1) +") in " + param.model)
-                    else:
-                        raise ImportError("Submodel " + source + " not found in " + self.name + ".on")
+                    # if source in self.submodels:
+                    #     if arg_id not in self._retrieve_model(self.submodels[source]['path']).parameters:
+                    #         undefined.append(arg + " from " + param.id + " (line " + str(param.line + 1) +") in " + param.model)
+                    # else:
+                    #     raise ImportError("Submodel " + source + " not found in " + self.name + ".on")
                 elif arg not in self.constants and arg not in self.parameters:
-                    undefined.append(arg + " from " + param.id + " (line " + str(param.line + 1) +") in " + param.model)
-                else:
+                    undefined.append(arg + " from " + param.id + " (line " + param.line +") in " + param.model)
+                elif verbose:
                     # Report the submodule parameters of the same ID.
-                    for i in self.submodels:
-                        self._check_namespace_recursively(self.submodels[i]['model'], arg, param)
-
+                    for key in self.submodels:
+                        self._check_namespace_recursively(self._retrieve_model(self.submodels[key]['path']), arg, param)
 
         # Return a list of all args that aren't defined.
         if undefined:
@@ -1229,28 +1449,19 @@ class Model:
     # Recursively report all submodule paramaters with the same ID
     def _check_namespace_recursively(self, submodel, arg, param, trail=[]):
         if arg in submodel.parameters:
-            print("Argument " + arg + " from " + param.model + " (line " + str(param.line + 1) + ") " + "is also in " + submodel.name + " (line " + str(submodel.parameters[arg].line + 1) +")")
+            print("Argument " + arg + " from " + param.model + " (line " + param.line + ") " + "is also in " + submodel.name + " (line " + submodel.parameters[arg].line +")")
         for i in submodel.submodels:
             if i in trail:
                 # return IDError() #TODO
                 print("IDError")
             new_trail = copy.copy(trail)
             new_trail.append(i)
-            submodel._check_namespace_recursively(submodel.submodels[i]['model'], arg, param, new_trail)
 
-    # Recursively retrieve a model from a submodel or submodel of a submodel, etc.
-    def _retrieve_model_recursively(self, path, trail=[]):
-        trail.append(self.name)
-        if path:
-            submodel_name = path.pop(0)
-            submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
-            if submodel:
-                submodel = submodel[0]
-                return submodel._retrieve_model(path, trail)
-            else:
-                return ModelError(submodel_name, "Submodel not found.", trail)
-        else:
-            return self
+            source = self._retrieve_model(submodel.submodels[i]['path'])
+            if isinstance(source, Error):
+                source.throw(self, "Problem parsing parameter " + param.id + " in " + self.name + ".on")
+
+            submodel._check_namespace_recursively(source, arg, param, new_trail)
 
     # Convert an empty model to a modeled design with all parameters assigned a value.
     def overwrite(self, design_files, quiet=False):
@@ -1507,13 +1718,18 @@ class Model:
             os.system("pdflatex -synctex=1 -interaction=nonstopmode export.tex")
         os.system("rm export.aux export.log export.bbl export.blg export.bcf export.run.xml export.synctex.gz")
 
-    def dependents(self, search_ID):
-        # Print all parameters that depend on the given parameter.
-        dependents = []
-        for ID, parameter in self.parameters.items():
-            if search_ID in parameter.args: dependents.append(ID)
-        if dependents: print(dependents)
-        else: print(search_ID + " has no dependents.")
+    def dependents(self, search_IDs):
+        for search_ID in search_IDs:
+            # Print all parameters that depend on the given parameter.
+            dependents = []
+            for ID, parameter in self.parameters.items():
+                if search_ID in parameter.args: dependents.append(ID)
+            if dependents: 
+                print(dependents)
+            elif search_ID not in self.parameters.keys():
+                IDError(self, search_ID, "Could not find parameter in model.")
+            else: 
+                print(search_ID + " has no dependents.")
 
     def _reset(self):
         for ID, parameter in self.parameters.items():
@@ -1537,9 +1753,12 @@ class Model:
         
         for f, pf in FUNCTIONS.items():
             expression = re.sub(r"(?<!\w)" + re.escape(f), re.escape(pf), expression)
+
+        for k, v in OPERATOR_OVERRIDES.items():
+            expression = expression.replace(k, v)
             
         for i, arg in enumerate(expression_args):
-            if "." in arg.replace(".min", "").replace(".max", ""):
+            if "." in arg:
                 parameter_ID, submodel_ID = arg.split(".")
 
                 if submodel_ID in self.submodels:
@@ -1551,7 +1770,7 @@ class Model:
                 prefix = '_'.join(path) + "_"
                 result = self._retrieve_parameter(parameter_ID, path)
                 if isinstance(result, ModelError):
-                    result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                    result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + str(submodel['path']) + ".")
                 elif isinstance(result, Parameter):
                     submodel_parameters[prefix + parameter_ID] = result
                 else:
@@ -1567,7 +1786,7 @@ class Model:
 
         if isinstance(result, Parameter):
             if result.error:
-                result.error.throw(self, "(in interpreter) Eval failed.")
+                result.error.throw(self, "(in interpreter) Eval failed.", debug=True)
             else:
                 return result
         elif isinstance(result, (bool, np.bool_)):
@@ -1633,7 +1852,7 @@ class Model:
             if not any(ref not in test_params for ref in test.refs):
                 print("Test (" + self.name + "): " + run_expression)
                 for i, arg in enumerate(test.args):
-                    if "." in arg.replace(".min", "").replace(".max", ""):
+                    if "." in arg:
                         arg_ID, submodel_ID = arg.split(".")
 
                         if submodel_ID in self.submodels:
@@ -1726,44 +1945,68 @@ class Model:
         if isinstance(parameter_IDs, str):
             if parameter_IDs == "performance": 
                 parameter_IDs = [ID for ID, param in self.parameters.items() if param.performance]
-            else: parameter_IDs = [parameter_IDs]
+            else: 
+                parameter_IDs = [parameter_IDs]
         if isinstance(parameter_IDs, list):
             if not parameter_IDs and verbose: parameter_IDs = list(self.parameters.keys())
             self._tree_recursively(parameter_IDs, indent=indent, sigfigs=sigfigs, levels=levels, verbose=verbose, up=up, turtles=turtles)
         else:
             raise TypeError("parameter_IDs must be a string or list.")
 
-    def _tree_recursively(self, parameter_IDs=[], indent=0, sigfigs=4, levels=12, verbose=False, up=False, trail=[], turtles=True):
+    def _tree_recursively(self, parameter_IDs=[], indent=0, sigfigs=4, levels=12, verbose=False, up=False, trail=[], turtles=True, submodel_id=""):
         if indent < levels:
-                for parameter_ID in parameter_IDs:
-                    parameter = self.parameters[parameter_ID]
-                    if indent == 0:
-                        parameter.hprint(sigfigs)
+            for parameter_ID in parameter_IDs:
+                parameter = self.parameters[parameter_ID]
+                if indent == 0:
+                    parameter.hprint(sigfigs)
+                else:
+                    parameter.short_print(sigfigs, indent=indent * 4, verbose=verbose, submodel_id=submodel_id)
+                if parameter.equation:
+                    print("    " * indent + "=", end="")
+                    if parameter.callable:
+                        header_side = "-"*((80 - len(str(parameter.equation.__name__))) // 2)
+                        print(" " + header_side + parameter.equation.__name__ + header_side)
+                        code = " " + inspect.getsource(parameter.equation)
+                        code = "    " * indent + " |" + code
+                        code = code.replace("\n", "\n" + "    " * (indent) + " |")
+                        print(str(code))
+                        print(" " + "    " * indent + "-" * 80)
+                    elif parameter.piecewise:
+                        print("    " * (indent) + "{" + str(parameter.equation[0][0].equation)  + " if " + str(parameter.equation[0][1].equation))
+                        for piece in parameter.equation[1:]:
+                            if piece[0].equation:
+                                print("    " * (indent) + " {" + str(piece[0].equation)  + " if " + str(piece[1].equation))
+                            else:
+                                print("    " * (indent) + " {" + str(piece[0])  + "if " + str(piece[1].equation))
+                    elif parameter.minmax_equation:
+                        print("    " * (indent) + str(parameter.equation[0].equation) + " | " + str(parameter.equation[1].equation))
                     else:
-                        parameter.short_print(sigfigs, indent=indent * 4, verbose=verbose)
-                    if parameter.equation:
-                        if parameter.callable:
-                            print("    " * indent + "-" * 30 + parameter.equation.__name__ + "-" * 30)
-                            code = inspect.getsource(parameter.equation)
-                            code = "    " * indent + "|" + code
-                            code = code.replace("\n", "\n" + "    " * (indent) + "|")
-                            print(code)
-                            print("    " * indent + "-" * 80)
-                        else:
-                            print("    " * indent + "=" + parameter.equation)
-                    
-                    if parameter.id in trail:
-                        ParameterError(parameter, "", source=["Model._tree_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
-                
-                    new_trail = copy.copy(trail)
+                        print(f"{parameter.equation}")
+            
+                new_trail = copy.copy(trail)
 
-                    if new_trail:
-                        new_trail.append(parameter.id)
-                    else:
-                        new_trail = [parameter.id]
-                            
-                    self._tree_recursively([arg for arg in parameter.args if arg in self.parameters], indent + 1, levels=levels, verbose=verbose, trail=new_trail)
-                    [print("    " * (indent + 1) + arg + ": " + str(self.constants[arg])) for arg in parameter.args if arg in self.constants]
+                parameter_trail_id = f"{parameter.id}.{submodel_id}" if submodel_id else parameter.id
+
+                if parameter_trail_id in trail:
+                    ParameterError(parameter, "", source=["Model._tree_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
+
+                if new_trail:
+                    new_trail.append(parameter_trail_id)
+                else:
+                    new_trail = [parameter_trail_id]
+                        
+                # Recursively continue tree for args in model self
+                self._tree_recursively([arg for arg in parameter.args if arg in self.parameters], indent + 1, levels=levels, verbose=verbose, trail=new_trail, submodel_id=submodel_id)
+                [print("    " * (indent + 1) + arg + ": " + str(self.constants[arg])) for arg in parameter.args if arg in self.constants]
+
+                # Recursively continue tree for args in self's submodels
+                # The submodel key is given in the form "parameter.submodel"
+                for arg in parameter.args:
+                    if "." in arg:
+                        submodel = self._retrieve_model(self.submodels[arg.split(".")[1]]['path'])
+                        submodel._tree_recursively([arg.split(".")[0]], indent + 1, levels=levels, verbose=verbose, trail=new_trail, submodel_id=arg.split(".")[1])
+
+                
         else:
             [self.parameters[ID].short_print(sigfigs, indent=indent * 4, verbose=verbose) for ID in parameter_IDs if ID in self.parameters | self.constants]
             if any([self.parameters[ID].args for ID in parameter_IDs]) and turtles: print("    " * indent + "🐢🐢🐢")
@@ -1772,67 +2015,91 @@ class Model:
         for parameter in parameters.values():
             if isinstance(parameter, Parameter) and any([parameter.min is None, parameter.max is None]):
                 
-                if not parameter.args:
-                    ParameterError(parameter, "", ["Model.__calculate_recursively"]).throw(self, "Parameter has no args nor a set value.")
+                # Update the trail for recursive errors.
+                new_trail = copy.copy(trail)
 
-                # Calculate any model parameters that haven't been calculated yet
-                arg_parameters = {arg: self.parameters[arg] for arg in [x for x in parameter.args if x in self.parameters]}
+                if new_trail:
+                    new_trail.append(parameter.id)
+                else:
+                    new_trail = [parameter.id]
 
-                if not all([True if all([parameter.min, parameter.max]) else False for arg, parameter in arg_parameters.items()]):
-                    calc_args = {k: self.parameters[k] for k in [x for x in parameter.args if x in self.parameters] if "." not in k}
-                    
-                    if parameter.id in trail:
-                        ParameterError(parameter, "", source=["Model._calculate_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
-                
-                    new_trail = copy.copy(trail)
+                if parameter.piecewise:
+                    piece_parameters = {}
+                    for i, piece in enumerate(parameter.equation):
+                        piece_parameters.update({piece[0].id + str(i): piece[0], piece[1].id + str(i): piece[1]})
+                    self._calculate_recursively(piece_parameters, new_trail)
+                elif parameter.minmax_equation:
+                    minmax_equation_parameters = {}
+                    for i, eq in enumerate(parameter.equation):
+                        minmax_equation_parameters.update({eq.id + str(i): eq})
+                    self._calculate_recursively(minmax_equation_parameters, new_trail)
+                else:
+                    if not parameter.args:
+                        raise ValueError(f"In Model._calculate_recursively for model {self.name}: Parameter has no args nor a set value.")
 
-                    if new_trail:
-                        new_trail.append(parameter.id)
-                    else:
-                        new_trail = [parameter.id]
-                    
-                    self._calculate_recursively(calc_args, new_trail)
+                    # Calculate any model parameters that haven't been calculated yet
+                    arg_parameters = {arg: self.parameters[arg] for arg in [x for x in parameter.args if x in self.parameters]}
 
-                # Make a dict of calculation parameters from the submodels
-                submodel_parameters = {}
-                calc_args = []
-                expression = parameter.equation
-                for i, arg in enumerate(parameter.args):
-                    if "." in arg.replace(".min", "").replace(".max", ""):
-                        parameter_ID, submodel_ID = arg.split(".")
-
-                        if submodel_ID in self.submodels:
-                            submodel = self.submodels[submodel_ID]
-                        else:
-                            ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model._calculate_recursively) Submodel ID \"" + submodel_ID + "\" not found.")
-
-                        path = copy.copy(submodel['path'])
+                    if not all([True if all([parameter.min, parameter.max]) else False for arg, parameter in arg_parameters.items()]):
+                        calc_args = {k: self.parameters[k] for k in [x for x in parameter.args if x in self.parameters] if "." not in k}
                         
-                        prefix = '_'.join(path) + "_"
+                        if parameter.id in trail:
+                            ParameterError(parameter, "", source=["Model._calculate_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
                         
-                        result = self._retrieve_parameter(parameter_ID, path)
-                        if isinstance(result, ModelError):
-                            result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
-                        elif isinstance(result, Parameter):
-                            submodel_parameters[prefix + parameter_ID] = result
+                        self._calculate_recursively(calc_args, new_trail)
+
+                    # Make a dict of calculation parameters from the submodels
+                    expression = parameter.equation
+                    submodel_parameters = {}
+                    calc_args = []
+                    for i, arg in enumerate(parameter.args):
+                        if "." in arg:
+                            parameter_ID, submodel_ID = arg.split(".")
+
+                            if submodel_ID in self.submodels:
+                                submodel = self.submodels[submodel_ID]
+                            else:
+                                ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model._calculate_recursively) Submodel ID \"" + submodel_ID + "\" not found.")
+
+                            path = copy.copy(submodel['path'])
+                            
+                            prefix = '_'.join(path) + "_"
+                            
+                            result = self._retrieve_parameter(parameter_ID, path)
+                            if isinstance(result, ModelError):
+                                result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                            elif isinstance(result, Parameter):
+                                submodel_parameters[prefix + parameter_ID] = result
+                            else:
+                                raise TypeError("Invalid result type: " + str(type(result)))
+
+                            calc_args.append(prefix + parameter_ID)
+                            if not parameter.callable:
+                                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefix + parameter_ID), expression)
                         else:
-                            raise TypeError("Invalid result type: " + str(type(result)))
+                            calc_args.append(arg)
 
-                        calc_args.append(prefix + parameter_ID)
-                        if not parameter.callable:
-                            expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefix + parameter_ID), expression)
-                    else:
-                        calc_args.append(arg)
-
+                # Calculate the parameter
+                calculation = None
                 if parameter.pointer:
-                    parameter.assign(self.parameters[parameter.equation])
+                    calculation = self.parameters[parameter.equation]
+                elif parameter.piecewise:
+                    for piece in parameter.equation:
+                        if piece[1].min:
+                            calculation = piece[0]
+                    if not calculation:
+                        ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, "Parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model + ") failed to calculate.\n\"" + parameter.line.strip() + "\"" + "\n" + str(parameter.equation))
+                elif parameter.minmax_equation:
+                    calculation = (parameter.equation[0].min, parameter.equation[1].max)
                 else:
                     calculation = parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)
                     if isinstance(calculation, Parameter) and calculation.error:
-                        calculation.error.throw(self, "Parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model + ") failed to calculate.\n\"" + parameter.line.strip() + "\"")
-                    parameter.assign(calculation)
-                    if parameter.error:
-                        parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model)
+                        model = None if not parameter.model else parameter.model
+                        calculation.error.throw(self, f"Parameter \"{parameter.id}\" (line {parameter.line_no} from model {model}) failed to calculate.\n{parameter.line.strip()}", debug=True)
+                
+                parameter.assign(calculation)
+                if parameter.error:
+                    parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model, debug=True)
 
 
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.
@@ -1848,18 +2115,22 @@ class Model:
             else:
                 return ModelError(parameter_ID, "Submodel not found.", new_trail)
         else:
-            return self.parameters[parameter_ID]
+            if parameter_ID in self.parameters:
+                return self.parameters[parameter_ID]
+            else:
+                return ModelError(parameter_ID, "Parameter not found.", new_trail)
 
     # Recursively retrieve a model from a submodel or submodel of a submodel, etc.
     def _retrieve_model(self, path, trail=[]):
         new_trail = copy.copy(trail)
         new_trail.append(self.name)
+        path = copy.copy(path)
         if path:
             submodel_name = path.pop(0)
-            submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
-            if submodel:
-                submodel = submodel[0]
-                return submodel._retrieve_model(path, trail)
+            submodels = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
+            if submodels:
+                submodels = submodels[0]
+                return submodels._retrieve_model(path, trail)
             else:
                 return ModelError(submodel_name, "Submodel not found.", new_trail)
         else:
@@ -1894,6 +2165,8 @@ def handler(model:Model, inpt):
         model.summarize()
     elif cmd == "all":
         model.all()
+    elif cmd == "dependents":
+        model.dependents(args)
     elif cmd == "design":
         if any([arg for arg in args if "." in arg and ".on" not in arg]):
             print("Only .on files are allowed.")
@@ -1931,6 +2204,9 @@ Commands:
 
     all
         Print all parameters.
+
+    dependents [param 1] [param 2] ... [param n]
+        Print all parameters that depend on the specified parameters.
 
     design [design 1] [design 2] ... [design n]
         Overwrite the current model with the specified designs.
@@ -2012,9 +2288,14 @@ loader_help = """"
 def interpreter(model):
     while True:
         if model.design == "default":
-            handler(model, input("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>>"))
+            handler(model, input(f"({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
         else:
-            handler(model, input("(" + bcolors.OKGREEN + model.design + "@" + bcolors.ENDC + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>>"))
+            handler(model, input(f"({bcolors.OKGREEN}{model.design}@{bcolors.ENDC}{bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
+
+def debugger(model):
+    print("Enterring debug mode. Type 'quit' to exit.")
+    while True:
+        handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
     
 def main(args=sys.argv[1:]):
     print("Oneil " + __version__)
