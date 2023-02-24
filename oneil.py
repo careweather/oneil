@@ -1939,7 +1939,7 @@ class Model:
         print("-" * 80)
 
         summary_parameters = list[self.parameters.keys()] if verbose else [k for k, v in self.parameters.items() if v.performance]
-        self.tree(summary_parameters, sigfigs=sigfigs, verbose=verbose, levels=0)
+        self.tree(summary_parameters, sigfigs=sigfigs, verbose=verbose, levels=0, turtles=False)
 
     def tree(self, parameter_IDs=[], indent=0, sigfigs=4, levels=12, verbose=False, up=False, turtles=True):
         if isinstance(parameter_IDs, str):
@@ -2067,7 +2067,7 @@ class Model:
                             
                             result = self._retrieve_parameter(parameter_ID, path)
                             if isinstance(result, ModelError):
-                                result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                                result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + str(submodel['path']) + ".")
                             elif isinstance(result, Parameter):
                                 submodel_parameters[prefix + parameter_ID] = result
                             else:
@@ -2099,7 +2099,7 @@ class Model:
                 
                 parameter.assign(calculation)
                 if parameter.error:
-                    parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model, debug=True)
+                    parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + str(parameter.model), debug=True)
 
 
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.

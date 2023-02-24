@@ -125,6 +125,8 @@ Resident count: N_r = ...
 Orbital altitude: h = ...
 ```
 
+Use short IDs where possible. They'll make it easier to read equations when you export to PDF.
+
 ### Assignment
 
 The parameter assignment can either be a value (independent) or an equation (dependent).
@@ -245,6 +247,8 @@ use cylinder as c
 from cylinder use life_support as l
 from cylinder.life_support use oxygen_tank as o
 ```
+
+Short import as symbols are ideal, because they make complex equations more readable.
 
 ## Designs
 
@@ -470,6 +474,7 @@ This approach is new, so there are bound to be a lot of holes. The interpreter d
 * There isn't a way to specify desired output units. Units specified on dependent parameters are only used to check that the cooresponding base units match.
 * Scientific notation is supported in value assignments, but not limits. It should be supported in expressions, but this hasn't been tested.
 * The Vim syntax highlighter gets *really* slow if you try to paste large amounts of LaTeX in. For now, make sure to paste large blocks of LaTeX using a different text editor or temporarily remove the ".on" file extension while you do.
+* The Vim syntax highlighter breaks for the rest of the file after a LaTeX syntax error in a note. As a result, the rest of the file will be highlighted as a note.
 * Currently can't use python functions for design overrides.
 * (many more listed in Airtable and Patrick's Notion)
 
