@@ -563,9 +563,9 @@ def par_log(val):
     if isinstance(val, Parameter):
         # ERR option ETC
         if np.log(val.min) < np.log(val.max):
-            return Parameter((np.log(val.min), np.log(val.max)), val.units, "|{}|".format(val.id))
+            return Parameter((np.log(val.min), np.log(val.max)), {}, "|{}|".format(val.id))
         else:
-            return Parameter((np.log(val.max), np.log(val.min)), val.units, "|{}|".format(val.id))
+            return Parameter((np.log(val.max), np.log(val.min)), {}, "|{}|".format(val.id))
     elif isinstance(val, (int, float)):
         return Parameter((np.log(val), np.log(val)), {}, "|{}|".format(val))
     else:
@@ -577,13 +577,15 @@ def par_log10(val):
     if isinstance(val, Parameter):
         # ERR option ETC
         if np.log10(val.min) < np.log10(val.max):
-            return Parameter((np.log10(val.min), np.log10(val.max)), val.units, "|{}|".format(val.id))
+            return Parameter((np.log10(val.min), np.log10(val.max)), {}, "|{}|".format(val.id))
         else:
-            return Parameter((np.log10(val.max), np.log10(val.min)), val.units, "|{}|".format(val.id))
+            return Parameter((np.log10(val.max), np.log10(val.min)), {}, "|{}|".format(val.id))
     elif isinstance(val, (int, float)):
         return Parameter((np.log10(val), np.log10(val)), {}, id="|{}|".format(val))
     else:
         raise TypeError("Input to log10() must be of type Parameter, int, or float.")
+
+
 
 class Error:
     def __init__(self):
