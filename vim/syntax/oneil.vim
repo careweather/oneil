@@ -34,7 +34,7 @@ syn match oneilID /\%(:\)\@<=\s*\w\+\s*\ze=/ contained skipwhite
 "  Assignment - between the equals sign and the second colon or the end
 syn match oneilMax /.max/ contained
 syn match oneilMin /.min/ contained
-syn match oneilSubmodule /\.\<[_a-z]\+\>\(\s*(\)\@!/ contained contains=oneilMin,oneilMax
+syn match oneilSubmodule /\.\<[_a-zA-Z]\+\>\(\s*(\)\@!/ contained contains=oneilMin,oneilMax
 syn match oneilFunction /\w\+\ze(/ contained
 syn match oneilExtremesDelimiter /|/ contained
 syn match oneilAssignment /\%(\w\+\s*=\s*\)\@<=[^:]*/ contained contains=oneilSubmodule,oneilExtremesDelimiter,oneilFunction,oneilPiecewiseKey,oneilConditionKey
@@ -86,7 +86,8 @@ syn region oneilIncludeLine start=/\_^from/ end=/\_$/ transparent contains=oneil
 "  Notes
 "----------------------------------------------------------------/
 syn keyword oneilNoteTodo containedin=oneilNote contained TODO FIXME NOTE
-syn region oneilNote start=/\_^\s\+\(\S\)\@=\({\)\@!/ end=/\n*\(\n\_^\w\|\n\_^#\|\n\_^\*\|\n\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
+syn region oneilNote start=/\_^\s\+\(\S\)\@=/ end=/\n*\(\n\_^\w\|\n\_^#\|\n\_^\*\|\n\_^\$\)\@=/me=e-4 fold contains=@tex,oneilNoteTodo
+"syn region oneilNote start=/\_^\s\+\(\S\)\@=\({\)\@!/ end=/\n*\(\n\_^\w\|\n\_^#\|\n\_^\*\|\n\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
 syn sync fromstart
 set foldmethod=syntax
 
