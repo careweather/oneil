@@ -40,7 +40,7 @@ EQUATION_OPERATORS = ["+", "-", "*", "/", "**", "//", "%", "(", ")", "=", "<", "
 
 OPERATOR_OVERRIDES = {"--": "|minus|"}
 
-class Infix(object):
+class Infix():
     def __init__(self, func):
         self.func = func
     def __or__(self, other):
@@ -58,6 +58,7 @@ def minus(x, y):
         return y._rminus(x)
     else:
         return x - y
+    
 
 def parse_file(file_name, parent_model=None):
     parameters = []
@@ -253,7 +254,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
                 limits.append(float(l))
             elif l in MATH_CONSTANTS:
                 limits.append(MATH_CONSTANTS[l])
-            elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
+            elif any(character in EQUATION_OPERATORS for character in l):
                 limits.append(eval(l, MATH_CONSTANTS))
             else:
                 SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid limit: " + l)
@@ -317,6 +318,7 @@ def convert_functions(assignment, imports, file_name, line_number):
         return float(assignment), arguments
     # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
     if re.search('\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
+        equation = None
         func = assignment.strip('(').split('(')[0]
         for i in imports:
             if func in i.__dict__.keys():
@@ -548,12 +550,12 @@ def par_abs(val):
 
     if isinstance(val, Parameter):
         # ERR option ETC
-        if np.abs(val.min) < np.abs(val.max):
-            return Parameter((np.abs(val.min), np.abs(val.max)), val.units, "|{}|".format(val.id))
+        if abs(val.min) < abs(val.max):
+            return Parameter((abs(val.min), abs(val.max)), val.units, "|{}|".format(val.id))
         else:
-            return Parameter((np.abs(val.max), np.abs(val.min)), val.units, "|{}|".format(val.id))
+            return Parameter((abs(val.max), abs(val.min)), val.units, "|{}|".format(val.id))
     elif isinstance(val, (int, float)):
-        return Parameter((np.abs(val), np.abs(val)), val.units, "|{}|".format(val))
+        return Parameter((abs(val), abs(val)), val.units, "|{}|".format(val))
     else:
         raise TypeError("Input to abs() must be of type Parameter, int, or float.")
 
@@ -810,7 +812,7 @@ class Parameter:
         elif isinstance(equation, (float, int)):
             self.assign(equation)
         elif isinstance(equation, str):
-            if any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in equation):
+            if any(character in EQUATION_OPERATORS for character in equation):
                 # Find parameter names including "." imports
                 self.args = [x for x in re.findall("(?!\d+)\w+\.?\w*", re.sub('[\'|\"].*[\'|\"]','',equation)) if x not in FUNCTIONS]
 
@@ -1343,6 +1345,9 @@ class Parameter:
     def __or__(self, other):
         if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__or__")
         
+        if isinstance(other, Infix):
+            return other.__ror__(self)
+
         if self.units != {}:
             return Parameter((np.nan, np.nan), self.units, "({}) | ({})".format(other, self.id), error=UnitError([self, other], "| is only valid for unitless parameters with boolean values.", ["Parameter.__or__"]))
         
@@ -1796,7 +1801,9 @@ class Model:
         else:
             raise TypeError("(Interpreter eval) Invalid result type: " + str(type(result)))
 
-    def test_submodels(self):
+    def test_submodels(self, verbose=True):
+        passes = 0
+
         for submodel_ID in self.submodels:
             
             # Prepare test inputs
@@ -1821,11 +1828,14 @@ class Model:
                     else:
                         return ParameterError(input, "Test input " + input + " for submodel " + submodel_ID.name + " not found in " + self.name + ".", source=["Model.test_submodels"])
                 test_path = copy.copy(self.submodels[submodel_ID]['path'])
-                return self._test_submodel_recursively(test_path, test_inputs)
+                new_passes = self._test_submodel_recursively(test_path, test_inputs, verbose=verbose)
+                new_passes = self._test_submodel_recursively(test_path, test_inputs, verbose=verbose) # TODO: Why does this fail the first time sometimes???
+                passes += new_passes
 
-        return True
+        return passes
 
-    def _test_submodel_recursively(self, path, test_params, trail=[]):
+    def _test_submodel_recursively(self, path, test_params, trail=[], verbose=True):
+        passes = 0
         new_trail = copy.copy(trail)
         new_trail.append(self.name)
         if path:
@@ -1833,17 +1843,22 @@ class Model:
             submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
             if submodel:
                 submodel = submodel[0]
-                return submodel._test_submodel_recursively(path, test_params)
+                new_passes = submodel._test_submodel_recursively(path, test_params)
+                new_passes = submodel._test_submodel_recursively(path, test_params)
+                passes += new_passes
             else:
                 return ModelError(submodel_name, "Submodel not found.", new_trail)
         else:
-            self.test(test_params=test_params)
-            return True
+            passes += self.test(test_params=test_params, top=False, verbose=verbose)
+            return passes
 
-    def test(self, test_params={}):
-        result = self.test_submodels()
+    def test(self, test_params={}, verbose=True, top=True):
+        if top: 
+            passes = self.test_submodels(verbose=verbose)
+        else:
+            passes = 0
 
-        if result != True:
+        if not isinstance(passes, int):
             result.throw(self, "(in Model.test) Submodel test failed.")
 
         # Eval each test expression, using self.parameters and the reference models
@@ -1852,7 +1867,7 @@ class Model:
 
             # Only run tests with inputs if inputs are present
             if not any(ref not in test_params for ref in test.refs):
-                print("Test (" + self.name + "): " + run_expression)
+                if verbose: print("Test (" + self.name + "): " + run_expression)
                 for i, arg in enumerate(test.args):
                     if "." in arg:
                         arg_ID, submodel_ID = arg.split(".")
@@ -1896,14 +1911,18 @@ class Model:
                 elif isinstance(calculation, (bool, np.bool_)):
                     result = "pass" if calculation else "fail"
 
-                print("\tResult: " + str(result))
+                if verbose: print("\tResult: " + str(result))
                 if result == "fail":
                     # Print the args and values
                     for arg in test.args:
                         if arg not in FUNCTIONS.values():
                             print("\t" + str(arg) + ": " + str(eval(arg, globals(), input_namespaces)))
+                else:
+                    passes += 1
             else:
                 print("Test (" + self.name + "): " + test.expression + " SKIPPED")
+
+        return passes
 
 
     def compare(self, alternate_design_file, parameter_IDs):
@@ -1937,7 +1956,7 @@ class Model:
         + " (" + str(len([p for ID, p in self.parameters.items() if p.independent])) + " independent, " 
         + str(len([p for ID, p in self.parameters.items() if not p.independent])) + " dependent, "
         + str(len(self.constants)) + " constants)")
-        print("Tests: " + str(len(self.tests)))
+        print("Tests: " + str(self.test(verbose=False)) + "/" + str(len(self.tests)))
         print("-" * 80)
 
         summary_parameters = list[self.parameters.keys()] if verbose else [k for k, v in self.parameters.items() if v.performance]
@@ -2304,3 +2323,10 @@ def main(args=sys.argv[1:]):
     print("Type 'help' for a list of commands or see the README for more information.")
     print("-"*80)
     loader(args)
+
+if __name__ == "__main__":
+    p1 = Parameter((1, 3), {'K': 1}, "test")
+    p2 = Parameter((2, 5), {'K': 1}, "test2")
+    # p1 = Parameter((1, 3), {}, "test")
+    # p2 = Parameter((2, 5), {}, "test2")
+    print(p1 |minus| p2)
