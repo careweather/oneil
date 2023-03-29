@@ -86,7 +86,7 @@ syn region oneilIncludeLine start=/\_^from/ end=/\_$/ transparent contains=oneil
 "  Notes
 "----------------------------------------------------------------/
 syn keyword oneilNoteTodo containedin=oneilNote contained TODO FIXME NOTE
-syn region oneilNote start=/\_^\s\+\(\S\)\@=/ end=/\n*\(\n\_^\w\|\n\_^#\|\n\_^\*\|\n\_^\$\)\@=/me=e-4 fold contains=@tex,oneilNoteTodo
+syn region oneilNote start=/\_^\s\+\(\S\)\@=\({\)\@!/ end=/\n*\(\n\_^\w\|\n\_^#\|\n\_^\*\|\n\_^\$\)\@=/me=e-4 fold contains=@tex,oneilNoteTodo
 "syn region oneilNote start=/\_^\s\+\(\S\)\@=\({\)\@!/ end=/\n*\(\n\_^\w\|\n\_^#\|\n\_^\*\|\n\_^\$\)\@=/ fold contains=@tex,oneilNoteTodo
 syn sync fromstart
 set foldmethod=syntax

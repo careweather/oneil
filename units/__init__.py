@@ -86,28 +86,31 @@ DERIVED_UNITS = {"V": (1, {'kg': 1, 'm': 2, 's': -3, 'A': -1}),
                  "us": (1e-6, {"s": 1}),
                  "ns": (1e-9, {"s": 1}),
                  "ps": (1e-12, {"s": 1}),
+                 "T": (1, {"kg": 1, "s": -2, "A": -1}),
+                 "mT": (1e-3, {"kg": 1, "s": -2, "A": -1}),
+                 "uT": (1e-6, {"kg": 1, "s": -2, "A": -1}),
 }
                  
-UNIT_PREFIXES = {"y": 10**-24,
-                 "z": 10**-21,
-                 "a": 10**-18,
-                 "f": 10**-15,
-                 "p": 10**-12,
-                 "n": 10**-9,
-                 "u": 10**-6,
-                 "m": 10**-3,
-                 "c": 10**-2,
-                 "d": 10**-1,
-                 "da": 10**1,
-                 "h": 10**2,
-                 "k": 10**3,
-                 "M": 10**6,
-                 "G": 10**9,
+UNIT_PREFIXES = {"y": 1e-24,
+                 "z": 1e-21,
+                 "a": 1e-18,
+                 "f": 1e-15,
+                 "p": 1e-12,
+                 "n": 1e-9,
+                 "u": 1e-6,
+                 "m": 1e-3,
+                 "c": 1e-2,
+                 "d": 1e-1,
+                 "da": 1e1,
+                 "h": 1e2,
+                 "k": 1e3,
+                 "M": 1e6,
+                 "G": 1e9,
                  "T": 10*12,
-                 "P": 10**15,
-                 "E": 10**18,
-                 "Z": 10**21,
-                 "Y": 10**24}
+                 "P": 1e15,
+                 "E": 1e18,
+                 "Z": 1e21,
+                 "Y": 1e24}
 
 def _round(num, n=3):
     formatstr = "%." + str(n) + "g"
@@ -295,21 +298,21 @@ def hr_parts(vals, units, sigfigs=3):
                 hrvals.append(val)
                 hrunits.append("m/s^2")
             elif abs(val) >= 0.0001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("mm/s^2")
             elif abs(val) >= 0.0000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("um/s^2")
             elif val != 0:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("nm/s^2")
             else:
                 hrvals.append(0)
                 hrunits.append("m/s^2")
     elif units == {"m": 1}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            if abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("km")
             elif abs(val) >= 0.5:
                 hrvals.append(val)
@@ -318,21 +321,21 @@ def hr_parts(vals, units, sigfigs=3):
                 hrvals.append(val * 100)
                 hrunits.append("cm")
             elif abs(val) >= 0.0001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("mm")
             elif abs(val) >= 0.0000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("um")
             elif val != 0:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("nm")
             else:
                 hrvals.append(0)
                 hrunits.append("m")
     elif units == {"m": 2}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            if abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("km^2")
             elif abs(val) >= 1:
                 hrvals.append(val)
@@ -341,21 +344,21 @@ def hr_parts(vals, units, sigfigs=3):
                 hrvals.append(val * 10000)
                 hrunits.append("cm^2")
             elif abs(val) >= 0.00000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("mm^2")
             elif abs(val) >= 0.00000000000001:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("um^2")
             elif val != 0:
-                hrvals.append(val * 10**18)
+                hrvals.append(val * 1e18)
                 hrunits.append("nm^2")
             else:
                 hrvals.append(0)
                 hrunits.append("m^2")
     elif units == {"m": 3}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**8:
-                hrvals.append(val / 10**9)
+            if abs(val) >= 1e8:
+                hrvals.append(val / 1e9)
                 hrunits.append("km^3")
             elif abs(val) >= 1:
                 hrvals.append(val)
@@ -364,13 +367,13 @@ def hr_parts(vals, units, sigfigs=3):
                 hrvals.append(val * 1000000)
                 hrunits.append("cm^3")
             elif abs(val) >= 0.000000000001:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("mm^3")
             elif abs(val) >= 0.000000000000000000001:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("um^3")
             elif val != 0:
-                hrvals.append(val * 10**27)
+                hrvals.append(val * 1e27)
                 hrunits.append("nm^3")
             else:
                 hrvals.append(0)
@@ -381,13 +384,13 @@ def hr_parts(vals, units, sigfigs=3):
                 hrvals.append(val)
                 hrunits.append("kg")
             elif abs(val) >= 0.0001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("g")
             elif abs(val) >= 0.0000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("mg")
             elif val != 0:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("ug")
             else:
                 hrvals.append(0)
@@ -395,230 +398,218 @@ def hr_parts(vals, units, sigfigs=3):
             
     elif units == {"kg": 1, "m": 2, "s": -2}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**15:
-                hrvals.append(val / 10**15)
+            if abs(val) >= 1e15:
+                hrvals.append(val / 1e15)
                 hrunits.append("PJ")
-            elif abs(val) >= 10**12:
-                hrvals.append(val / 10**12)
+            elif abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
                 hrunits.append("TJ")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 10**9)
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
                 hrunits.append("GJ")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("MJ")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("kJ")
             elif abs(val) >= 1:
                 hrvals.append(val)
                 hrunits.append("J")
             elif abs(val) >= 0.001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("mJ")
             elif abs(val) >= 0.000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("uJ")
             elif abs(val) >= 0.000000001:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("nJ")
             elif val != 0:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("pJ")
             else:
                 hrvals.append(0)
                 hrunits.append("J")
     elif units == {"kg": 1, "m": 2, "s": -3, "A": -1}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**15:
-                hrvals.append(val / 10**15)
+            if abs(val) >= 1e15:
+                hrvals.append(val / 1e15)
                 hrunits.append("PV")
-            elif abs(val) >= 10**12:
-                hrvals.append(val / 10**12)
+            elif abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
                 hrunits.append("TV")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 10**9)
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
                 hrunits.append("GV")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("MV")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("kV")
             elif abs(val) >= 1:
                 hrvals.append(val)
                 hrunits.append("V")
             elif abs(val) >= 0.001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("mV")
             elif abs(val) >= 0.000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("uV")
             elif abs(val) >= 0.000000001:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("nV")
             elif val != 0:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("pV")
             else:
                 hrvals.append(0)
                 hrunits.append("V")
     elif units == {"kg": 1, "m": 2, "s": -3}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**15:
-                hrvals.append(val / 10**15)
+            if abs(val) >= 1e15:
+                hrvals.append(val / 1e15)
                 hrunits.append("PW")
-            elif abs(val) >= 10**12:
-                hrvals.append(val / 10**12)
+            elif abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
                 hrunits.append("TW")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 10**9)
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
                 hrunits.append("GW")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("MW")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("kW")
             elif abs(val) >= 1:
                 hrvals.append(val)
                 hrunits.append("W")
             elif abs(val) >= 0.001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("mW")
             elif abs(val) >= 0.000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("uW")
             elif abs(val) >= 0.000000001:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("nW")
             elif val != 0:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("pW")
             else:
                 hrvals.append(0)
                 hrunits.append("W")
     elif units == {"kg": 1, "s": -3}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**15:
-                hrvals.append(val / 10**15)
+            if abs(val) >= 1e15:
+                hrvals.append(val / 1e15)
                 hrunits.append("PW/m^2")
-            elif abs(val) >= 10**12:
-                hrvals.append(val / 10**12)
+            elif abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
                 hrunits.append("TW/m^2")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 10**9)
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
                 hrunits.append("GW/m^2")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("MW/m^2")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("kW/m^2")
             elif abs(val) >= 1:
                 hrvals.append(val)
                 hrunits.append("W/m^2")
             elif abs(val) >= 0.001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("mW/m^2")
             elif abs(val) >= 0.000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("uW/m^2")
             elif abs(val) >= 0.000000001:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("nW/m^2")
             elif val != 0:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("pW/m^2")
             else:
                 hrvals.append(0)
                 hrunits.append("W/m^2")
     elif units == {"A": 1}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**15:
-                hrvals.append(val / 10**15)
+            if abs(val) >= 1e15:
+                hrvals.append(val / 1e15)
                 hrunits.append("PA")
-            elif abs(val) >= 10**12:
-                hrvals.append(val / 10**12)
+            elif abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
                 hrunits.append("TA")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 10**9)
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
                 hrunits.append("GA")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("MA")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("kA")
             elif abs(val) >= 1:
                 hrvals.append(val)
                 hrunits.append("A")
             elif abs(val) >= 0.001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("mA")
             elif abs(val) >= 0.000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("uA")
             elif abs(val) >= 0.000000001:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("nA")
             elif val != 0:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("pA")
             else:
                 hrvals.append(0)
                 hrunits.append("A")
     elif units == {"b": 1}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**15:
-                hrvals.append(val / 80**15)
+            if abs(val) >= 8e15:
+                hrvals.append(val / 8e15)
                 hrunits.append("PB")
-            elif abs(val) >= 10**12:
-                hrvals.append(val / 80**12)
+            elif abs(val) >= 8e12:
+                hrvals.append(val / 8e12)
                 hrunits.append("TB")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 80**9)
+            elif abs(val) >= 8e9:
+                hrvals.append(val / 8e9)
                 hrunits.append("GB")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 80**6)
+            elif abs(val) >= 8e6:
+                hrvals.append(val / 8e6)
                 hrunits.append("MB")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 80**3)
+            elif abs(val) >= 8e3:
+                hrvals.append(val / 8e3)
                 hrunits.append("kB")
-            elif abs(val) >= 1:
+            elif abs(val) >= 8:
                 hrvals.append(val / 8)
                 hrunits.append("B")
-            elif abs(val) >= 0.001:
-                hrvals.append(val * 80**3)
-                hrunits.append("mB")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 80**6)
-                hrunits.append("uB")
-            elif abs(val) >= 0.000000001:
-                hrvals.append(val * 80**9)
-                hrunits.append("nB")
-            elif val != 0:
-                hrvals.append(val * 80**12)
-                hrunits.append("pB")
             else:
-                hrvals.append(0)
-                hrunits.append("B")
+                hrvals.append(val)
+                hrunits.append("b")
     elif units == {"b": 1, "s": -1}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**15:
-                hrvals.append(val / 10**15)
+            if abs(val) >= 1e15:
+                hrvals.append(val / 1e15)
                 hrunits.append("Pbps")
-            elif abs(val) >= 10**12:
-                hrvals.append(val / 10**12)
+            elif abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
                 hrunits.append("Tbps")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 10**9)
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
                 hrunits.append("Gbps")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("Mbps")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("kbps")
             else:
                 hrvals.append(val)
@@ -656,30 +647,30 @@ def hr_parts(vals, units, sigfigs=3):
                 hrvals.append(val)
                 hrunits.append("s")
             elif abs(val) >= 0.001:
-                hrvals.append(val * 10**3)
+                hrvals.append(val * 1e3)
                 hrunits.append("ms")
             elif abs(val) >= 0.000001:
-                hrvals.append(val * 10**6)
+                hrvals.append(val * 1e6)
                 hrunits.append("us")
             elif abs(val) >= 0.000000001:
-                hrvals.append(val * 10**9)
+                hrvals.append(val * 1e9)
                 hrunits.append("ns")
             elif val != 0:
-                hrvals.append(val * 10**12)
+                hrvals.append(val * 1e12)
                 hrunits.append("ps")
             else:
                 hrvals.append(0)
                 hrunits.append("s")
     elif units == {"s": -1}:
         for i, val in enumerate(vals):
-            if abs(val)/(2*np.pi) >= 10**9:
-                hrvals.append(val/(2*np.pi*10**9))
+            if abs(val)/(2*np.pi) >= 1e9:
+                hrvals.append(val/(2*np.pi*1e9))
                 hrunits.append("GHz")
-            elif abs(val)/(2*np.pi) >= 10**6:
-                hrvals.append(val/(2*np.pi*10**6))
+            elif abs(val)/(2*np.pi) >= 1e6:
+                hrvals.append(val/(2*np.pi*1e6))
                 hrunits.append("MHz")
-            elif abs(val)/(2*np.pi) >= 10**3:
-                hrvals.append(val/(2*np.pi*10**3))
+            elif abs(val)/(2*np.pi) >= 1e3:
+                hrvals.append(val/(2*np.pi*1e3))
                 hrunits.append("kHz")
             elif abs(val)/(2*np.pi) >= 1:
                 hrvals.append(val/(2*np.pi))
@@ -701,20 +692,48 @@ def hr_parts(vals, units, sigfigs=3):
                 hrunits.append("rad/s")
     elif units == {"$": 1} or units == {"$": -1}:
         for i, val in enumerate(vals):
-            if abs(val) >= 10**12:
-                hrvals.append(val / 10**12)
+            if abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
                 hrunits.append("$T")
-            elif abs(val) >= 10**9:
-                hrvals.append(val / 10**9)
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
                 hrunits.append("$B")
-            elif abs(val) >= 10**6:
-                hrvals.append(val / 10**6)
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
                 hrunits.append("$M")
-            elif abs(val) >= 10**3:
-                hrvals.append(val / 10**3)
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
                 hrunits.append("$k")
             else:
-                hrvals.append(val / 10**12)
+                hrvals.append(val / 1e12)
+    elif units == {"kg": 1, "A": -1, "s": -2}:
+        for i, val in enumerate(vals):
+            if abs(val) >= 1e12:
+                hrvals.append(val / 1e12)
+                hrunits.append("TT")
+            elif abs(val) >= 1e9:
+                hrvals.append(val / 1e9)
+                hrunits.append("GT")
+            elif abs(val) >= 1e6:
+                hrvals.append(val / 1e6)
+                hrunits.append("MT")
+            elif abs(val) >= 1e3:
+                hrvals.append(val / 1e3)
+                hrunits.append("kT")
+            elif abs(val) >= 1:
+                hrvals.append(val)
+            elif abs(val) >= 1e-3:
+                hrvals.append(val * 1e3)
+                hrunits.append("mT")
+            elif abs(val) >= 1e-6:
+                hrvals.append(val * 1e6)
+                hrunits.append("µT")
+            elif abs(val) >= 1e-9:
+                hrvals.append(val * 1e9)
+                hrunits.append("nT")
+            else:
+                hrvals.append(val * 1e12)
+                hrunits.append("pT")
     else:
         # Undefined units
         hrvals = vals

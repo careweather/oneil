@@ -240,7 +240,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         try:
             units, multiplier = un.parse(line.split(':')[2].strip("\n").strip())
         except:
-            UnitError([], "", ["parse_parameter"]).throw(None, "in " + file_name + " (line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + line.split(':')[2].strip("\n"))
+            UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + line.split(':')[2].strip("\n"))
     else: 
         units = {}
         multiplier = 1
@@ -607,7 +607,8 @@ class UnitError(Error):
         self.source_message = source_message
         
     def throw(self, model, throw_message, debug=False):
-        print(f"{self.error_tag} in {model.name}: {throw_message}")
+        model_name = model if isinstance(model, str) else model.name
+        print(f"{self.error_tag} in {model_name}: {throw_message}")
         print("Source: " + str(self.source))
         print(self.source_message)
         for parameter in self.parameters:
@@ -618,7 +619,7 @@ class UnitError(Error):
             else:
                 print("  - " + str(parameter))
         
-        if model:
+        if model and isinstance(model, Model):
             if model.calculated: 
                 interpreter(model)
             elif debug:
@@ -878,15 +879,10 @@ class Parameter:
         elif isinstance(value, tuple):
             if self.isdiscrete:
                 self.error = ParameterError(self, "Multiple discrete values aren't supported.", ["Parameter.write()"])
-            self.min, self.max = value
-        elif isinstance(value, (int, float)):
-            self.min = self.max = value
-        elif isinstance(value, str):
-            if value not in self.options:
-                self.error = ParameterError(self, "Parameter was assigned an option that is not among its options.", ["Parameter.write()"])
-            self.min = self.max = value
+            self.write_one(value[0], "min")
+            self.write_one(value[1], "max")
         else:
-            raise TypeError('Parameter value must be of type Parameter, tuple, int, float, or str. Type "' + str(type(value)) + " was given.")
+            self.write_one(value, "minmax")
 
         if self.min and self.max:
             if self.min > self.max:
@@ -899,8 +895,38 @@ class Parameter:
                 else:
                     if not self.options[1] >= self.options[0]:
                         self.error = ParameterError(self, "Minimum limit > maximum limit.", ["Parameter.write()"])
-                    # if not (self.min >= self.options[0] and self.max <= self.options[1]):
-                    #     self.error = ParameterError(self, f"Values out of bounds [{self.options[0]}:{self.options[1]}]. Revise values or limits.", ["Parameter.write()"])
+                    if not (self.min >= self.options[0] and self.max <= self.options[1]):
+                        self.error = ParameterError(self, f"Values out of bounds [{self.options[0]}:{self.options[1]}]. Revise values or limits.", ["Parameter.write()"])
+
+    def write_one(self, value, minmax):
+
+        if isinstance(value, (int, float)):
+            if minmax == "minmax":
+                self.min = self.max = value
+            elif minmax == "min":
+                self.min = value
+            elif minmax == "max":
+                self.max = value
+        elif isinstance(value, (bool, np.bool_)):
+            if minmax == "minmax":
+                self.min = self.max = bool(value)
+            elif minmax == "min":
+                self.min = bool(value)
+            elif minmax == "max":
+                self.max = bool(value)
+        elif isinstance(value, str):
+            if value not in self.options:
+                self.error = ParameterError(self, "Parameter was assigned an option that is not among its options.", ["Parameter.write()"])
+            
+            if minmax == "minmax":
+                self.min = self.max = value
+            elif minmax == "min":
+                self.min = value
+            elif minmax == "max":
+                self.max = value
+        else:
+            raise TypeError('Parameter value must be of type Parameter, tuple, int, float, str, or bool. Type "' + str(type(value)) + " was given.")
+
 
     def calculate(self, expression, glob, eval_params, eval_args):
         if not self.equation:
@@ -1780,8 +1806,10 @@ class Model:
                     result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + str(submodel['path']) + ".")
                 elif isinstance(result, Parameter):
                     submodel_parameters[prefix + parameter_ID] = result
+                elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
+                    return result
                 else:
-                    raise TypeError("Invalid result type: " + str(type(result)))
+                    ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
                 expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefix + parameter_ID), expression)
 
         eval_params = self.parameters | submodel_parameters | self.constants
@@ -1797,9 +1825,12 @@ class Model:
             else:
                 return result
         elif isinstance(result, (bool, np.bool_)):
+            # Convert numpy bools to python bools
+            return bool(result)
+        elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
             return result
         else:
-            raise TypeError("(Interpreter eval) Invalid result type: " + str(type(result)))
+            ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
 
     def test_submodels(self, verbose=True):
         passes = 0
@@ -1826,7 +1857,7 @@ class Model:
                     elif input in self.parameters:
                         test_inputs[arg] = self.parameters[input]
                     else:
-                        return ParameterError(input, "Test input " + input + " for submodel " + submodel_ID.name + " not found in " + self.name + ".", source=["Model.test_submodels"])
+                        return ParameterError(input, "Test input " + input + " for submodel " + submodel_ID + " not found in " + self.name + ".", source=["Model.test_submodels"])
                 test_path = copy.copy(self.submodels[submodel_ID]['path'])
                 new_passes = self._test_submodel_recursively(test_path, test_inputs, verbose=verbose)
                 new_passes = self._test_submodel_recursively(test_path, test_inputs, verbose=verbose) # TODO: Why does this fail the first time sometimes???
@@ -1843,30 +1874,31 @@ class Model:
             submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
             if submodel:
                 submodel = submodel[0]
-                new_passes = submodel._test_submodel_recursively(path, test_params)
-                new_passes = submodel._test_submodel_recursively(path, test_params)
+                new_passes = submodel._test_submodel_recursively(path, test_params, verbose=verbose)
+                new_passes = submodel._test_submodel_recursively(path, test_params, verbose=verbose)
                 passes += new_passes
             else:
                 return ModelError(submodel_name, "Submodel not found.", new_trail)
         else:
-            passes += self.test(test_params=test_params, top=False, verbose=verbose)
+            passes += self.test(test_inputs=test_params, top=False, verbose=verbose)
             return passes
 
-    def test(self, test_params={}, verbose=True, top=True):
+    def test(self, test_inputs={}, verbose=True, top=True):
         if top: 
             passes = self.test_submodels(verbose=verbose)
         else:
             passes = 0
 
         if not isinstance(passes, int):
-            result.throw(self, "(in Model.test) Submodel test failed.")
+            passes.throw(self, "(in Model.test) Submodel test failed.")
 
         # Eval each test expression, using self.parameters and the reference models
         for test in self.tests:
+            test_params = {}
             run_expression = test.expression
 
             # Only run tests with inputs if inputs are present
-            if not any(ref not in test_params for ref in test.refs):
+            if not any(ref not in test_inputs for ref in test.refs):
                 if verbose: print("Test (" + self.name + "): " + run_expression)
                 for i, arg in enumerate(test.args):
                     if "." in arg:
@@ -1890,8 +1922,13 @@ class Model:
                             raise TypeError("Invalid result type: " + str(type(result)))
 
                         run_expression = run_expression.replace(arg, prefix + arg_ID)
+                    elif arg in test_inputs:
+                        test_params[arg] = test_inputs[arg]
+                    elif arg not in FUNCTIONS.values() and not any([arg in v for v in OPERATOR_OVERRIDES.values()]):
+                        test_params[arg] = self.parameters[arg]
 
-                input_namespaces = self.parameters | self.constants | test_params
+
+                test_params = test_params | self.constants
 
                 if test.trace == True:
                     print("Breakpoint for test: " + test.expression)
@@ -1899,27 +1936,26 @@ class Model:
                     import pdb
 
                     breakpoint()
-                    eval(run_expression, globals(), input_namespaces)
+                    eval(run_expression, globals(), test_params)
 
-                calculation = eval(run_expression, globals(), input_namespaces)
+                calculation = eval(run_expression, globals(), test_params)
 
                 if isinstance(calculation, Parameter):
                     if calculation.error:
-                        calculation.error.throw(self, "Test \"" + test.expression + " from model " + self.name + " failed.")
+                        calculation.error.throw(self, "Test \"" + test.expression + " from model " + self.name + " failed to calculate.")
                     else:
                         raise ValueError("Test expression returned a parameter without an error. That shouldn't happen. Parameters are vessels for errors when it comes to comparison operators right now. I know...it's dumb and needs to be fixed.")
                 elif isinstance(calculation, (bool, np.bool_)):
-                    result = "pass" if calculation else "fail"
+                    result = bcolors.OKGREEN + "pass" + bcolors.ENDC if calculation else bcolors.FAIL + "fail" + bcolors.ENDC
 
                 if verbose: print("\tResult: " + str(result))
-                if result == "fail":
+                if result == "fail" and verbose:
                     # Print the args and values
-                    for arg in test.args:
-                        if arg not in FUNCTIONS.values():
-                            print("\t" + str(arg) + ": " + str(eval(arg, globals(), input_namespaces)))
+                    for k, v in test_params.items():
+                        print("\t" + v.__repr__())
                 else:
                     passes += 1
-            else:
+            elif verbose:
                 print("Test (" + self.name + "): " + test.expression + " SKIPPED")
 
         return passes
@@ -2012,7 +2048,8 @@ class Model:
                     ParameterError(parameter, "", source=["Model._tree_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
 
                 if new_trail:
-                    new_trail.append(parameter_trail_id)
+                    if new_trail[-1] != parameter_trail_id:
+                        new_trail.append(parameter_trail_id)
                 else:
                     new_trail = [parameter_trail_id]
                         
@@ -2040,7 +2077,8 @@ class Model:
                 new_trail = copy.copy(trail)
 
                 if new_trail:
-                    new_trail.append(parameter.id)
+                    if new_trail[-1] != parameter.id:
+                        new_trail.append(parameter.id)
                 else:
                     new_trail = [parameter.id]
 
@@ -2323,10 +2361,3 @@ def main(args=sys.argv[1:]):
     print("Type 'help' for a list of commands or see the README for more information.")
     print("-"*80)
     loader(args)
-
-if __name__ == "__main__":
-    p1 = Parameter((1, 3), {'K': 1}, "test")
-    p2 = Parameter((2, 5), {'K': 1}, "test2")
-    # p1 = Parameter((1, 3), {}, "test")
-    # p2 = Parameter((2, 5), {}, "test2")
-    print(p1 |minus| p2)
