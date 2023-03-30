@@ -89,6 +89,27 @@ DERIVED_UNITS = {"V": (1, {'kg': 1, 'm': 2, 's': -3, 'A': -1}),
                  "T": (1, {"kg": 1, "s": -2, "A": -1}),
                  "mT": (1e-3, {"kg": 1, "s": -2, "A": -1}),
                  "uT": (1e-6, {"kg": 1, "s": -2, "A": -1}),
+                 "Ohm": (1, {"kg": 1, "m": 2, "s": -3, "A": -2}),
+                 "kOhm": (1e3, {"kg": 1, "m": 2, "s": -3, "A": -2}),
+                 "MOhm": (1e6, {"kg": 1, "m": 2, "s": -3, "A": -2}),
+                 "GOhm": (1e9, {"kg": 1, "m": 2, "s": -3, "A": -2}),
+                 "mOhm": (1e-3, {"kg": 1, "m": 2, "s": -3, "A": -2}),
+                 "uOhm": (1e-6, {"kg": 1, "m": 2, "s": -3, "A": -2}),
+                 "nOhm": (1e-9, {"kg": 1, "m": 2, "s": -3, "A": -2}),
+                 "N": (1, {"kg": 1, "m": 2, "s": -2}),
+                 "kN": (1e3, {"kg": 1, "m": 2, "s": -2}),
+                 "MN": (1e6, {"kg": 1, "m": 2, "s": -2}),
+                 "GN": (1e9, {"kg": 1, "m": 2, "s": -2}),
+                 "mN": (1e-3, {"kg": 1, "m": 2, "s": -2}),
+                 "uN": (1e-6, {"kg": 1, "m": 2, "s": -2}),
+                 "nN": (1e-9, {"kg": 1, "m": 2, "s": -2}),
+                 "G": (1e-4, {"kg": 1, "s": -2, "A": -1}),
+                 "mG": (1e-7, {"kg": 1, "s": -2, "A": -1}),
+                 "uG": (1e-10, {"kg": 1, "s": -2, "A": -1}),
+                 "nG": (1e-13, {"kg": 1, "s": -2, "A": -1}),
+                 "Gs": (1e-4, {"kg": 1, "s": -2, "A": -1}),
+                 "mGs": (1e-7, {"kg": 1, "s": -2, "A": -1}),
+                 "uGs": (1e-10, {"kg": 1, "s": -2, "A": -1}),
 }
                  
 UNIT_PREFIXES = {"y": 1e-24,
@@ -170,7 +191,7 @@ def parse_compound_units(unit_str):
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1]+1])
                     for key, value in DERIVED_UNITS[unit][1].items():
-                        units[key] += value * exponent
+                        units[key] -= value * exponent
                         multiplier /= DERIVED_UNITS[unit][0]**exponent
                 else:
                     for key, value in DERIVED_UNITS[unit][1].items():
