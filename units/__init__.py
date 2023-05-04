@@ -41,6 +41,9 @@ DERIVED_UNITS = {"V": (1, {'kg': 1, 'm': 2, 's': -3, 'A': -1}),
                  "kV": (1e3, {"kg": 1, "m": 2, "s": -3, "A": -1}),
                  "MV": (1e6, {"kg": 1, "m": 2, "s": -3, "A": -1}),
                  "mV": (1e-3, {"kg": 1, "m": 2, "s": -3, "A": -1}),
+                 "uV": (1e-6, {"kg": 1, "m": 2, "s": -3, "A": -1}),
+                 "nV": (1e-9, {"kg": 1, "m": 2, "s": -3, "A": -1}),
+                 "pV": (1e-12, {"kg": 1, "m": 2, "s": -3, "A": -1}),
                  "kW": (1e3, {"kg": 1, "m": 2, "s": -3}),
                  "MW": (1e6, {"kg": 1, "m": 2, "s": -3}),
                  "mW": (1e-3, {"kg": 1, "m": 2, "s": -3}),
@@ -96,13 +99,13 @@ DERIVED_UNITS = {"V": (1, {'kg': 1, 'm': 2, 's': -3, 'A': -1}),
                  "mOhm": (1e-3, {"kg": 1, "m": 2, "s": -3, "A": -2}),
                  "uOhm": (1e-6, {"kg": 1, "m": 2, "s": -3, "A": -2}),
                  "nOhm": (1e-9, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "N": (1, {"kg": 1, "m": 2, "s": -2}),
-                 "kN": (1e3, {"kg": 1, "m": 2, "s": -2}),
-                 "MN": (1e6, {"kg": 1, "m": 2, "s": -2}),
-                 "GN": (1e9, {"kg": 1, "m": 2, "s": -2}),
-                 "mN": (1e-3, {"kg": 1, "m": 2, "s": -2}),
-                 "uN": (1e-6, {"kg": 1, "m": 2, "s": -2}),
-                 "nN": (1e-9, {"kg": 1, "m": 2, "s": -2}),
+                 "N": (1, {"kg": 1, "m": 1, "s": -2}),
+                 "kN": (1e3, {"kg": 1, "m": 1, "s": -2}),
+                 "MN": (1e6, {"kg": 1, "m": 1, "s": -2}),
+                 "GN": (1e9, {"kg": 1, "m": 1, "s": -2}),
+                 "mN": (1e-3, {"kg": 1, "m": 1, "s": -2}),
+                 "uN": (1e-6, {"kg": 1, "m": 1, "s": -2}),
+                 "nN": (1e-9, {"kg": 1, "m": 1, "s": -2}),
                  "G": (1e-4, {"kg": 1, "s": -2, "A": -1}),
                  "mG": (1e-7, {"kg": 1, "s": -2, "A": -1}),
                  "uG": (1e-10, {"kg": 1, "s": -2, "A": -1}),
@@ -175,28 +178,27 @@ def parse_compound_units(unit_str):
                     units[unit] -= int(unit_str[index[1]+1])
                 else:
                     units[unit] -= 1
-            multiplier *= 1
         elif unit in DERIVED_UNITS:
             if index[0] == 0 or unit_str[index[0]-1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1]+1])
                     for key, value in DERIVED_UNITS[unit][1].items():
                         units[key] += value * exponent
-                        multiplier *= DERIVED_UNITS[unit][0]**exponent
+                    multiplier *= DERIVED_UNITS[unit][0]**exponent
                 else:
                     for key, value in DERIVED_UNITS[unit][1].items():
                         units[key] += value
-                        multiplier *= DERIVED_UNITS[unit][0]
+                    multiplier *= DERIVED_UNITS[unit][0]
             elif unit_str[index[0]-1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1]+1])
                     for key, value in DERIVED_UNITS[unit][1].items():
                         units[key] -= value * exponent
-                        multiplier /= DERIVED_UNITS[unit][0]**exponent
+                    multiplier /= DERIVED_UNITS[unit][0]**exponent
                 else:
                     for key, value in DERIVED_UNITS[unit][1].items():
                         units[key] -= value
-                        multiplier /= DERIVED_UNITS[unit][0]
+                    multiplier /= DERIVED_UNITS[unit][0]
         else:
             raise ValueError("Invalid unit: " + unit)
 
