@@ -2100,6 +2100,7 @@ class Model:
 
                 # For dependent parameters, continue the recursion
                 if parameter.equation:
+                    arg_params = []
                     print("    " * indent + "=", end="")
                     if parameter.callable:
                         header_side = "-"*((80 - len(str(parameter.equation.__name__))) // 2)
@@ -2111,12 +2112,14 @@ class Model:
                         print(" " + "    " * indent + "-" * 80)
                         arg_params = [arg for arg in parameter.args if arg in self.parameters]
                     elif parameter.piecewise:
-                        print("{" + str(parameter.equation[0][0].equation)  + " if " + str(parameter.equation[0][1].equation))
-                        for piece in parameter.equation[1:]:
-                            if piece[0].equation:
-                                print("    " * (indent) + " {" + str(piece[0].equation)  + " if " + str(piece[1].equation), end="")
-                            else:
-                                print("    " * (indent) + " {" + str(piece[0])  + "if " + str(piece[1].equation), end="")
+                        print("{" + str(parameter.equation[0][0].equation)  + " if " + str(parameter.equation[0][1].equation), end="")
+                        for i, piece in enumerate(parameter.equation):
+                            if i > 0:
+                                if piece[0].equation:
+                                    print("    " * (indent) + " {" + str(piece[0].equation)  + " if " + str(piece[1].equation), end="")
+                                else:
+                                    print("    " * (indent) + " {" + str(piece[0])  + "if " + str(piece[1].equation), end="")
+                                
                             if piece[1].min and piece[1].max:
                                 arg_params = [arg for arg in piece[0].args if arg in self.parameters]
                                 print(" <------")
@@ -2150,7 +2153,7 @@ class Model:
 
                     # Recursively continue tree for args in self's submodels
                     # The submodel key is given in the form "parameter.submodel"
-                    for arg in parameter.args:
+                    for arg in arg_params:
                         if "." in arg:
                             submodel = self._retrieve_model(self.submodels[arg.split(".")[1]]['path'])
                             submodel._tree_recursively([arg.split(".")[0]], indent + 1, levels=levels, verbose=verbose, trail=new_trail, submodel_id=arg.split(".")[1])
