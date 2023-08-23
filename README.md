@@ -17,6 +17,17 @@ git clone git@github.com/careweather/oneil.git
 
 pip install -e oneil
 ```
+You will need the following packages to run Oneil: 
+* Numpy
+* Beautiful Table
+* Py2tex
+* Pytexit
+
+These can be installed using the following command: 
+
+```
+pip install numpy beautifultable py2tex pytexit 
+```
 
 <!-- Install Oneil using pip (add @\<version-number\> if you need a specific version):
 
