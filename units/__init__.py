@@ -1,7 +1,7 @@
 import re
 import numpy as np
 
-BASE_UNITS = ["kg", "m", "s", "K", "A", "b", "$", "capacities"] # kilograms, meters, seconds, Kelvins, Amps, bits, dollars
+BASE_UNITS = ["kg", "m", "s", "K", "A", "b", "$", "capacities", "cd", "sr"] # kilograms, meters, seconds, Kelvins, Amps, bits, dollars, capacities, candelas, steradians
 
 UNIT_OPERATORS = ["*", "/", "^"]
 
@@ -113,6 +113,8 @@ DERIVED_UNITS = {"V": (1, {'kg': 1, 'm': 2, 's': -3, 'A': -1}),
                  "Gs": (1e-4, {"kg": 1, "s": -2, "A": -1}),
                  "mGs": (1e-7, {"kg": 1, "s": -2, "A": -1}),
                  "uGs": (1e-10, {"kg": 1, "s": -2, "A": -1}),
+                 "lm": (1, {"cd": 1}),
+                 "lx": (1, {"cd": 1, "sr": 1, "m": -2}),
 }
                  
 UNIT_PREFIXES = {"y": 1e-24,

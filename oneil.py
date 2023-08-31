@@ -1583,7 +1583,7 @@ class Model:
         else:
             raise TypeError("Design file must be a string or list of strings.")
                 
-
+        # Rewrite parameters with appended submodel paths.
         for ID, parameter in design.items():
             if "." in ID:
                 ID, submodel = ID.split(".")
@@ -1598,7 +1598,7 @@ class Model:
 
         self.defaults.append(list[set(self.parameters).difference(design)])
         
-        for ID, parameter in design_params.items():
+        for ID, parameter in design.items():
             self.parameters[ID] = parameter
 
         self.tests.extend(tests)
