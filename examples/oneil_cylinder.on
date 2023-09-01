@@ -1,0 +1,9 @@
+Mass (0, 100000000): m = 1e6 :kg
+Cylinder diameter: D = 1 :m
+Angular position: theta_p = pi/2
+Window count: n_w = 20
+Rotation rate: omega = 18 :rpm
+Amplifier efficiency (0, 1): eta = 0.5|0.7
+Boltzmann's constant: C_b = 1.380649e-23 :m^2*kg/s^2/K
+Cylinder radius: r = D/2 :km
+Artificial gravity: g_a = r*omega**2 :m/s^2
