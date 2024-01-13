@@ -32,7 +32,7 @@ def isfloat(num):
 
 __version__ = get_distribution("oneil").version
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log10": "par_log10", "floor": "par_floor"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log10": "par_log10", "ln": "par_log", "floor": "par_floor"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
@@ -447,9 +447,6 @@ def par_max(val1, val2=None):
     
     raise TypeError("Inputs to max() must be of type Parameter, int, or float.")
 
-
-
-
 def par_sin(val):
     if pass_errors(val): return pass_errors(val, caller="par_sin")
 
@@ -545,16 +542,15 @@ def apar_tan(val):
 def par_sqrt(val):
     if pass_errors(val): return pass_errors(val, caller="par_sqrt")
 
-    new_units = {k: v / 2 for k, v in val.units.items()}
-
     if isinstance(val, Parameter):
         if not val >= 0:
             return Parameter((np.nan, np.nan), val.units, "sqrt({})".format(val.id), error=ParameterError([val], "Input to sqrt must be >0.", ["par_sqrt"]))
+        new_units = {k: v / 2 for k, v in val.units.items()}
         return Parameter((np.sqrt(val.min), np.sqrt(val.max)), new_units, "sqrt({})".format(val.id))
     elif isinstance(val, (int, float)):
         if not val >= 0:
             return Parameter((np.nan, np.nan), {}, "sqrt({})".format(val), error=ParameterError([val], "Input to sqrt must be >0.", ["par_sqrt"]))
-        return Parameter((np.sqrt(val), np.sqrt(val)), new_units, "sqrt({})".format(val))
+        return Parameter((np.sqrt(val), np.sqrt(val)), {}, "sqrt({})".format(val))
     else:
         raise TypeError("Input to sqrt() must be of type Parameter, int, or float.")
 
@@ -611,6 +607,42 @@ def par_floor(val):
         return Parameter((np.floor(val), np.floor(val)), {}, "floor({})".format(val))
     else:
         raise TypeError("Input to floor() must be of type Parameter, int, or float.")
+    
+def par_ceiling(val):
+    if pass_errors(val): return pass_errors(val, caller="par_ceiling")
+
+    if isinstance(val, Parameter):
+        # ERR option ETC
+        return Parameter((np.ceil(val.min), np.ceil(val.max)), val.units, "ceil({})".format(val.id))
+    elif isinstance(val, (int, float)):
+        return Parameter((np.ceil(val), np.ceil(val)), {}, "ceil({})".format(val))
+    else:
+        raise TypeError("Input to ceil() must be of type Parameter, int, or float.")
+
+# def par_avg(val1, val2):
+#     if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_avg")
+
+#     if isinstance(val1, Parameter):
+#         if isinstance(val2, Parameter):
+#             if val1.id == val2.id:
+#                 avg = (val1.min + val1.max) / 2
+#                 return Parameter((avg, avg), val1.units, "avg({})".format(val1.id))
+#             if val1.units != val2.units:
+#                 return Parameter((np.nan, np.nan), val1.units, "avg(({}), ({}))".format(val1.id, val2.id), error=UnitError([val1, val2], "Cannot average " + un.hr_units(val1.units) + " to " + un.hr_units(val2.units) + ".", ["par_avg"]))
+#             return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "avg({},{})".format(val1.id, val2.id))
+#         elif isinstance(val2, (int, float)):
+#             if val1.units != {}:
+#                 return Parameter((np.nan, np.nan), val1.units, "avg(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot average " + un.hr_units(val1.units) + " to a unitless number.", ["par_avg"]))
+#             avg = (val1.min + val2) / 2
+#             return Parameter((min(val1.min, val2), max(val1.max, val2)), val1.units, "avg({},{})".format(val1.id, val2))
+#     elif isinstance(val1, (int, float)):
+#         if isinstance(val2, (int, float)):
+#             return (val1 + val2) / 2
+#     else:
+#         raise TypeError("Inputs to avg() must be of type Parameter, int, or float.")
+
+    
+
 
 class Error:
     def __init__(self):
@@ -630,7 +662,10 @@ class UnitError(Error):
         self.source_message = source_message
         
     def throw(self, model, throw_message, debug=False):
-        model_name = model if isinstance(model, str) else model.name
+        if model:
+            model_name = model if isinstance(model, str) else model.name
+        else:
+            model_name = "(no model)"
         print(f"{self.error_tag} in {model_name}: {throw_message}")
         print("Source: " + str(self.source))
         print(self.source_message)
@@ -2061,7 +2096,10 @@ class Model:
         for p in users: print(p.id)
 
     def all(self):
-        self.tree(list(self.parameters.keys()), levels=0, verbose=True, turtles=False)
+        # Sort the parameter keys alphabetically and wrap in a list
+        parameter_keys = list(self.parameters.keys())
+        parameter_keys.sort()
+        self.tree(parameter_keys, levels=0, verbose=True, turtles=False)
 
     def summarize(self, sigfigs=4, verbose=False):
         print("-" * 80)
@@ -2339,6 +2377,8 @@ def handler(model:Model, inpt):
         model.export_pdf(args)
     elif cmd == "load":
         loader(inpt.split(" "))
+    elif cmd == "reload":
+        loader(["reload", model.design + "@" + model.name])
     elif cmd == "help":
         print(help_text)
         interpreter(model)
@@ -2377,6 +2417,9 @@ Commands:
     load model
         Load a new model (starting over from scratch).
 
+    reload
+        Reload the current model with all designs (starting over from scratch).
+
     help
         Print this help text.
 
@@ -2388,8 +2431,15 @@ Commands:
 
 def loader(args=[]):
 
-    if len(args) > 0:
-        inp = args[0]
+    designs = []
+
+    if len(args) > 1:
+        print(args)
+        inp = args[1]
+        if "@" in inp:
+            designs = inp.split("@")[:-1]
+            designs.reverse()
+            inp = inp.split("@")[-1]
     else:
         inp = ""
     model = None
@@ -2420,7 +2470,12 @@ def loader(args=[]):
         else:
             inp = input("Enter a model: ")
 
-    for arg in args[1:]: # Handle commands after the first as cli commands. 
+    # Load designs
+    for design in designs:
+        handler(model, "design " + design)
+
+    # Handle commands after the first as cli commands.
+    for arg in args[2:]:
         print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
         handler(model, arg)
     interpreter(model)
@@ -2458,4 +2513,4 @@ def main(args=sys.argv[1:]):
     print("Oneil " + __version__)
     print("Type 'help' for a list of commands or see the README for more information.")
     print("-"*80)
-    loader(args)
+    loader(["oneil"] + args)
