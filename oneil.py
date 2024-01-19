@@ -1530,6 +1530,7 @@ class Model:
         self.constants = MATH_CONSTANTS
         self.calculated = False
         self.defaults = []
+        self.subtest_count = 0
         
         if design_filename:
             self.overwrite(design_filename)
@@ -1887,6 +1888,7 @@ class Model:
         for key, entry in self.submodels.items():
             if 'model' in entry.keys():
                 entry['model'].calculate(quiet=True)
+                self.subtest_count = len(entry['model'].tests) + entry['model'].subtest_count
 
         # Calculate dependent parameters.
         self._calculate_recursively(self.parameters)
@@ -1974,7 +1976,6 @@ class Model:
                         return ParameterError(input, "Test input " + input + " for submodel " + submodel_ID + " not found in " + self.name + ".", source=["Model.test_submodels"])
                 test_path = copy.copy(self.submodels[submodel_ID]['path'])
                 new_passes = self._test_submodel_recursively(test_path, test_inputs, verbose=verbose)
-                new_passes = self._test_submodel_recursively(test_path, test_inputs, verbose=verbose) # TODO: Why does this fail the first time sometimes???
                 passes += new_passes
 
         return passes
@@ -1988,14 +1989,14 @@ class Model:
             submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
             if submodel:
                 submodel = submodel[0]
-                new_passes = submodel._test_submodel_recursively(path, test_params, verbose=verbose)
-                new_passes = submodel._test_submodel_recursively(path, test_params, verbose=verbose)
+                new_passes = submodel._test_submodel_recursively(copy.copy(path), test_params, verbose=verbose)
                 passes += new_passes
             else:
                 return ModelError(submodel_name, "Submodel not found.", new_trail)
-        else:
-            passes += self.test(test_inputs=test_params, top=False, verbose=verbose)
-            return passes
+            
+        passes += self.test(test_inputs=test_params, top=False, verbose=verbose)
+        
+        return passes
 
     def test(self, test_inputs={}, verbose=True, top=True):
         if top: 
@@ -2109,7 +2110,7 @@ class Model:
         + " (" + str(len([p for ID, p in self.parameters.items() if p.independent])) + " independent, " 
         + str(len([p for ID, p in self.parameters.items() if not p.independent])) + " dependent, "
         + str(len(self.constants)) + " constants)")
-        print("Tests: " + str(self.test(verbose=False)) + "/" + str(len(self.tests)))
+        print("Tests: " + str(self.test(verbose=False)) + "/" + str(len(self.tests) + self.subtest_count))
         print("-" * 80)
 
         summary_parameters = list[self.parameters.keys()] if verbose else [k for k, v in self.parameters.items() if v.performance]
