@@ -32,7 +32,7 @@ def isfloat(num):
 
 __version__ = get_distribution("oneil").version
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log10": "par_log10", "ln": "par_log", "floor": "par_floor"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
@@ -596,6 +596,20 @@ def par_log10(val):
         return Parameter((np.log10(val), np.log10(val)), {}, id="|{}|".format(val))
     else:
         raise TypeError("Input to log10() must be of type Parameter, int, or float.")
+    
+def par_log2(val):
+    if pass_errors(val): return pass_errors(val, caller="par_log10")
+
+    if isinstance(val, Parameter):
+        # ERR option ETC
+        if np.log2(val.min) < np.log2(val.max):
+            return Parameter((np.log2(val.min), np.log2(val.max)), {}, "|{}|".format(val.id))
+        else:
+            return Parameter((np.log2(val.max), np.log2(val.min)), {}, "|{}|".format(val.id))
+    elif isinstance(val, (int, float)):
+        return Parameter((np.log2(val), np.log2(val)), {}, id="|{}|".format(val))
+    else:
+        raise TypeError("Input to log2() must be of type Parameter, int, or float.")
 
 def par_floor(val):
     if pass_errors(val): return pass_errors(val, caller="par_floor")
@@ -613,11 +627,11 @@ def par_ceiling(val):
 
     if isinstance(val, Parameter):
         # ERR option ETC
-        return Parameter((np.ceil(val.min), np.ceil(val.max)), val.units, "ceil({})".format(val.id))
+        return Parameter((np.ceil(val.min), np.ceil(val.max)), val.units, "ceiling({})".format(val.id))
     elif isinstance(val, (int, float)):
-        return Parameter((np.ceil(val), np.ceil(val)), {}, "ceil({})".format(val))
+        return Parameter((np.ceil(val), np.ceil(val)), {}, "ceiling({})".format(val))
     else:
-        raise TypeError("Input to ceil() must be of type Parameter, int, or float.")
+        raise TypeError("Input to ceiling() must be of type Parameter, int, or float.")
 
 # def par_avg(val1, val2):
 #     if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_avg")
@@ -1270,7 +1284,7 @@ class Parameter:
 
         if isinstance(other, (int, float)):
             new_units = {k: -v for k, v in self.units.items()}
-            return Parameter((other / self.max, other / self.min), new_units, "({})/({})".format(str(other), self.id))
+            return Parameter((other / self.max if self.max > 0 else np.inf, other / self.min if self.min > 0 else np.inf), new_units, "({})/({})".format(str(other), self.id))
         else:
             raise TypeError("Division must be between a Parameter and a number.")
 
@@ -1280,7 +1294,7 @@ class Parameter:
 
         if isinstance(other, (int, float)):
             new_units = {k: -v for k, v in self.units.items()}
-            return Parameter((other / self.min, other / self.max), new_units, "({})//({})".format(str(other), self.id))
+            return Parameter((other / self.min if self.min > 0 else np.inf, other / self.max if self.max > 0 else np.inf), new_units, "({})//({})".format(str(other), self.id))
         else:
             raise TypeError("Division must be between a Parameter and a number.")
 
