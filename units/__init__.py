@@ -8,17 +8,17 @@ For example, 1 m/s^2 would be represented as {"m": 1, "s": -2}.
 The base units are as follows:
 """
 BASE_UNITS = {
-    "kg"        :({"kg": 1}, 1, {"alt":("kilogram", "kilo")}),
-    "m"         :({"m": 1}, 1, {"alt":("meter", "metre")}),
-    "s"         :({"s": 1}, 1, {"alt":("second", "sec")}),
-    "K"         :({"K": 1}, 1, {"alt":("Kelvin")}),
-    "A"         :({"A": 1}, 1, {"alt":("Ampere", "Amp")}),
-    "b"         :({"b": 1}, 1, {"alt":("bit")}),
-    "$"         :({"$": 1}, 1, {"alt":("dollar")}),
-    "capacity"  :({"capacity": 1}, 1, {"plural":"capacities"}),
-    "cd"        :({"cd": 1}, 1, {"alt":("candela")}),
-    "sr"        :({"sr": 1}, 1, {"alt":("steradian")}),
-    "mol"       :({"mol": 1}, 1, {"alt":("mole")}),
+    "kg"       :({"kg": 1}, 1, {"alt":["kilogram", "kilo"], "SI min": 1, "SI max": 1}),
+    "m"         :({"m": 1}, 1, {"alt":["meter", "metre"], "SI max": 1e3}),
+    "s"         :({"s": 1}, 1, {"alt":["second", "sec"], "SI max": 1}),
+    "K"         :({"K": 1}, 1, {"alt":["Kelvin"], "SI min": 1, "SI max": 1}),
+    "A"         :({"A": 1}, 1, {"alt":["Ampere", "Amp"]}),
+    "b"         :({"b": 1}, 1, {"alt":["bit"], "SI min": 1, "SI max": 1}),
+    "$"         :({"$": 1}, 1, {"alt":["dollar"], "SI min": 1, "SI max": 1}),
+    "capacity"  :({"capacity": 1}, 1, {"plural":"capacities", "SI min": 1, "SI max": 1}),
+    "cd"        :({"cd": 1}, 1, {"alt":["candela"]}),
+    "sr"        :({"sr": 1}, 1, {"alt":["steradian"]}),
+    "mol"       :({"mol": 1}, 1, {"alt":["mole"]}),
 } # kilograms, meters, seconds, Kelvins, Amps, bits, dollars, capacities, candelas, steradians
 
 UNIT_OPERATORS = ["*", "/", "^"]
@@ -59,119 +59,110 @@ This dictionary units follow the following format: {unit, ({oneil base units}, m
 
 # SI units are those derived units for which the SI prefixes are widely used and no exceptions exist.
 SI_UNITS = {
-    "V": ({"kg": 1, "m": 2, "s": -3, "A": -1}, 1, {"alt": ("Volt")}),
-    "W": ({"kg": 1, "m": 2, "s": -3}, 1, {"alt": ("Watt")}),
-    "Hz": ({"s": -1}, 6.283185307179586, {"alt": ("Hertz"), "plural": "Hertz"}),
-    "gm": ({"kg": 1}, 0.001, {"alt": ("gram")}),
-    "A": ({"A": 1}, 1, {"alt": ("Amp")}),
-    "B": ({"b": 1}, 8, {"alt": ("Byte")}),
-    "cd": ({"cd": 1}, 1, {"alt": ("candela")}),
-    "J": ({"kg": 1, "m": 2, "s": -2}, 1, {"alt": ("Joule")}),
-    "Wh": ({"kg": 1, "m": 2, "s": -2}, 3600.0, {"alt": ("Watt-hour")}),
-    "Ah": ({"A": 1, "s": 1}, 3600, {"alt": ("Amp-hour")}),
-    "T": ({"kg": 1, "s": -2, "A": -1}, 1, {"alt": ("Tesla")}),
-    "Ohm": ({"kg": 1, "m": 2, "s": -3, "A": -2}, 1, {"alt": ("Ohm")}),
-    "N": ({"kg": 1, "m": 1, "s": -2}, 1, {"alt": ("Newton")}),
-    "Gs": ({"kg": 1, "s": -2, "A": -1}, 0.0001, {"alt": ("Gauss")}),
-    "lm": ({"cd": 1, "sr": 1}, 1, {"alt": ("lumen")}),
-    "lx": ({"cd": 1, "sr": 1, "m": -2}, 1, {"alt": ("lux"), "plural": "lux"}),
-    "bps": ({"b": 1, "s": -1}, 1, {"alt": ("bit/second"), "plural": "bits/second"}),
+    "V": ({"kg": 1, "m": 2, "s": -3, "A": -1}, 1, {"alt": ["Volt"]}),
+    "W": ({"kg": 1, "m": 2, "s": -3}, 1, {"alt": ["Watt"]}),
+    "Hz": ({"s": -1}, 6.283185307179586, {"alt": [("Hertz", "Hertz")], "SI min": 1}),
+    "g": ({"kg": 1}, 0.001, {"alt": ["gram"]}),
+    "cd": ({"cd": 1}, 1, {"alt": ["candela"]}),
+    "J": ({"kg": 1, "m": 2, "s": -2}, 1, {"alt": ["Joule"]}),
+    "Wh": ({"kg": 1, "m": 2, "s": -2}, 3600.0, {"alt": ["Watt-hour"]}),
+    "Ah": ({"A": 1, "s": 1}, 3600, {"alt": ["Amp-hour"]}),
+    "T": ({"kg": 1, "s": -2, "A": -1}, 1, {"alt": ["Tesla"]}),
+    "Ohm": ({"kg": 1, "m": 2, "s": -3, "A": -2}, 1, {"alt": ["Ohm"]}),
+    "N": ({"kg": 1, "m": 1, "s": -2}, 1, {"alt": ["Newton"]}),
+    "Gs": ({"kg": 1, "s": -2, "A": -1}, 0.0001, {"alt": ["Gauss"]}),
+    "lm": ({"cd": 1, "sr": 1}, 1, {"alt": ["lumen"]}),
+    "lx": ({"cd": 1, "sr": 1, "m": -2}, 1, {"alt": [("lux", "lux")]}),
+    "bps": ({"b": 1, "s": -1}, 1, {"alt": [("bit/second", "bits/second")], "SI min": 1}),
+    "B": ({"b": 1}, 8, {"alt": ["byte"], "SI min": 1}),
+    "W/m^2": ({"kg": 1, "s": -3}, 1, {"alt": [("Watt/meter^2", "Watts/meter^2")]}),
+    "m/s": ({"m": 1, "s": -1}, 1, {"alt": [("meter/second", "meters/second")]}),
+    "m/s^2": ({"m": 1, "s": -2}, 1, {"alt": [("meter/second^2", "meters/second^2")]}),
 }
 
-def prefix_units(prefixes, units):
+def prefix_units(units):
     prefixed_units = {}
     for ku, vu in units.items():
-        for kp, vp in prefixes.items():
-            if len(vu) == 3:
-                language = {}
-                if vu[2].get("plural"):
-                    language["plural"] = vp[2] + vu[2]["plural"]
-                elif vu[2].get("alt"):
-                    language["alt"] = vp[2] + vu[2]["alt"]
-            prefixed_units[kp + ku] = (vu[0], vp[1] * vu[1], {})
+        SI_min = vu[2].get("SI min", -np.inf)
+        SI_max = vu[2].get("SI max", np.inf)
+        for kp, vp in SI_PREFIXES.items():
+            if SI_min <= vp[1] <= SI_max:
+                if len(vu) == 3:
+                    language = {}
+                    if vu[2].get("alt"):
+                        language["alt"] = []
+                        for alt in vu[2]["alt"]:
+                            if isinstance(alt, tuple):
+                                language["alt"].append((kp + alt[0], kp + alt[1]))
+                            else:
+                                language["alt"].append(kp + alt)
+                prefixed_units[kp + ku] = (vu[0], vp[1] * vu[1], language)
 
     return prefixed_units
 
-SI_MULTIPLES = prefix_units(SI_PREFIXES, SI_UNITS)
+SI_MULTIPLES = prefix_units(SI_UNITS) | prefix_units(BASE_UNITS)
 
 # Legacy units are those derived units for which the SI prefixes are not widely used or exceptions exist.
 LEGACY_UNITS = {
-    "day": ({"s": 1}, 8.64e4),
+    "mil.": ({"s": 1}, 3.1556952e10, {"alt": ("millenium", "millenia")}),
+    "cen.": ({"s": 1}, 3.1556952e9, {"alt": ("century", "centuries")}),
+    "dec.": ({"s": 1}, 3.1556952e8, {"alt": ("decade")}), 
+    "yr": ({"s": 1}, 3.1556952e7, {"alt": ["year", "yr"]}),
+    "mon": ({"s": 1}, 2.629746e6, {"alt": ["month"]}),
     "week": ({"s": 1}, 6.048e5),
-    "month": ({"s": 1}, 2.629746e6),
-    "year": ({"s": 1}, 3.1556952e7, {"alt": ("yr")}),
-    "decade": ({"s": 1}, 3.1556952e8),
-    "century": ({"s": 1}, 3.1556952e9, {"plural": ("centuries")}),
-    "millennium": ({"s": 1}, 3.1556952e10, {"plural": ("millenia")}),
-    "hour": ({"s": 1}, 3600, {"alt": ("hr")}),
-    "minute": ({"s": 1}, 60, {"alt": ("min")}),
-    "rotation": ({}, 1, {"alt": ("revolution")}),
-    "cycle": ({}, 1),
-    "radian": ({}, 1, {"alt": ("rad")}),
-    "degree": ({}, 0.017453292519943295, {"alt": ("°")}),
-    "degree/second": ({"s": -1}, 0.017453292519943295, {"alt": ("°/s")}),
-    "degree/minute": ({"s": -1}, 1.0471975511965976, {"alt": ("°/min")}),
-    "degree/hour": ({"s": -1}, 62.83185307179586, {"alt": ("°/hr")}),
-    "rotations/minute": ({"s": -1}, 0.10471975511965977, {"alt": ("rpm", "rotations/min", "revolutions/minute", "revolutions/min")}),
-    "k$": ({"$": 1}, 1000.0, {"alt": ("thousand dollars")}),
-    "M$": ({"$": 1}, 1e6, {"alt": ("million dollars")}),
-    "B$": ({"$": 1}, 1e9, {"alt": ("billion dollars")}),
-    "T$": ({"$": 1}, 1e12, {"alt": ("trillion dollars")}),
-    "%":  ({}, 0.01, {"alt": ("percent"), "plural": "percent"}),
-    "km": ({"m": 1}, 1000, {"alt": ("kilometer")}),
-    "m": ({"m": 1}, 1, {"alt": ("meter", "metre")}),
-    "cm": ({"m": 1}, 0.01, {"alt": ("centimeter")}),
-    "mm": ({"m": 1}, 0.001, {"alt": ("millimeter")}),
-    "um": ({"m": 1}, 1e-6, {"alt": ("micrometer")}),
-    "nm": ({"m": 1}, 1e-9, {"alt": ("nanometer")}),
-    "g":  ({"m": 1, "s": -2}, 9.81, {"alt": ("Earth gravity"), "plural": "Earth gravities"}),
+    "day": ({"s": 1}, 8.64e4, {"alt": ["day"]}),
+    "hr": ({"s": 1}, 3600, {"alt": ["hour", "hr"]}),
+    "min": ({"s": 1}, 60, {"alt": ["minute", "min"]}),
+    "rev": ({}, 1, {"alt": ["revolution", "rotation", "rev"]}),
+    "cyc": ({}, 1, {"alt": ["cycle"]}),
+    "rad": ({}, 1, {"alt": ["radian"]}),
+    "°": ({}, 0.017453292519943295, {"alt": [("deg", "deg"), "degree"]}),
+    "°/s": ({"s": -1}, 0.017453292519943295, {"alt": [("degree/second", "degrees/second")]}),
+    "°/min": ({"s": -1}, 1.0471975511965976, {"alt": [("degree/minute", "degrees/minute")]}),
+    "°/hr": ({"s": -1}, 62.83185307179586, {"alt": [("degree/hour", "degrees/hour")]}),
+    "rpm": ({"s": -1}, 0.10471975511965977, {"alt": [("rotation/min", "rotations/min"), ("revolution/minute", "revolutions/minute"), ("revolution/min", "revolutions/min")]}),
+    "k$": ({"$": 1}, 1000.0, {"alt": ["thousand dollars"]}),
+    "M$": ({"$": 1}, 1e6, {"alt": ["million dollars"]}),
+    "B$": ({"$": 1}, 1e9, {"alt": ["billion dollars"]}),
+    "T$": ({"$": 1}, 1e12, {"alt": ["trillion dollars"]}),
+    "%":  ({}, 0.01, {"alt": [("percent", "percent")]}),
+    "g_E":  ({"m": 1, "s": -2}, 9.81, {"alt": [("Earth gravity", "Earth gravities")]}),
+    "cm": ({"m": 1}, 0.01, {"alt": ["centimeter"]}),
 }
 
-DERIVED_UNITS = SI_MULTIPLES | LEGACY_UNITS
+DERIVED_SI_UNITS = SI_MULTIPLES | LEGACY_UNITS
 
 ALT_UNITS = {}
-for k, v in DERIVED_UNITS.items():
+for k, v in DERIVED_SI_UNITS.items():
     if len(v) == 3:
         if "alt" in v[2]:
             for alt in v[2]["alt"]:
-                ALT_UNITS[alt] = (v[0], v[1])
-        if "plural" in v[2]:
-            ALT_UNITS[v[2]["plural"]] = (v[0], v[1])
-        else:
-            ALT_UNITS[k + "s"] = (v[0], v[1])
-    else:
-        ALT_UNITS[k + "s"] = (v[0], v[1])
+                # Handle plural alternates
+                if isinstance(alt, tuple):
+                    if alt[0] != alt[1]:
+                        ALT_UNITS[alt[1]] = (v[0], v[1])
+                    else:
+                        ALT_UNITS[alt[0]] = (v[0], v[1])
+                elif isinstance(alt, str):
+                    ALT_UNITS[alt] = (v[0], v[1])
+                    ALT_UNITS[alt + "s"] = (v[0], v[1])
+                else:
+                    raise ValueError("Invalid alternate format for unit alternate:", alt)
 
-NON_BASE_UNITS = DERIVED_UNITS | ALT_UNITS
-
-# @functools.cache
-def find_derived_unit(base_units, value):
-    unit = ""
-    
-    for k, v in LEGACY_UNITS.items():
-        if base_units == v[0]:
-
-            if not unit:
-                unit = k
-            elif LEGACY_UNITS[unit][1] > v[1]:
-                if LEGACY_UNITS[unit][1] > value:
-                    unit = k
-
-    return unit
-
+DERIVED_UNITS = DERIVED_SI_UNITS | ALT_UNITS
 
 def _round(num, n=3):
     formatstr = "%." + str(n) + "g"
     return float(formatstr % num)
 
-# @functools.cache
+@functools.cache
 def parse(unit_str):
     if unit_str in BASE_UNITS:
         units = {unit_str: 1}
         multiplier = 1
-    elif unit_str in NON_BASE_UNITS:
-        units = NON_BASE_UNITS[unit_str][0]
-        multiplier = NON_BASE_UNITS[unit_str][1]
+    elif unit_str in DERIVED_UNITS:
+        units = DERIVED_UNITS[unit_str][0]
+        multiplier = DERIVED_UNITS[unit_str][1]
     else:
         units, multiplier = parse_compound_units(unit_str)
 
@@ -206,27 +197,27 @@ def parse_compound_units(unit_str):
                     units[unit] -= int(unit_str[index[1] + 1])
                 else:
                     units[unit] -= 1
-        elif unit in NON_BASE_UNITS:
+        elif unit in DERIVED_UNITS:
             if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1] + 1])
-                    for key, value in NON_BASE_UNITS[unit][0].items():
+                    for key, value in DERIVED_UNITS[unit][0].items():
                         units[key] += value * exponent
-                    multiplier *= NON_BASE_UNITS[unit][1] ** exponent
+                    multiplier *= DERIVED_UNITS[unit][1] ** exponent
                 else:
-                    for key, value in NON_BASE_UNITS[unit][0].items():
+                    for key, value in DERIVED_UNITS[unit][0].items():
                         units[key] += value
-                    multiplier *= NON_BASE_UNITS[unit][1]
+                    multiplier *= DERIVED_UNITS[unit][1]
             elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1] + 1])
-                    for key, value in NON_BASE_UNITS[unit][0].items():
+                    for key, value in DERIVED_UNITS[unit][0].items():
                         units[key] -= value * exponent
-                    multiplier /= NON_BASE_UNITS[unit][1] ** exponent
+                    multiplier /= DERIVED_UNITS[unit][1] ** exponent
                 else:
-                    for key, value in NON_BASE_UNITS[unit][0].items():
+                    for key, value in DERIVED_UNITS[unit][0].items():
                         units[key] -= value
-                    multiplier /= NON_BASE_UNITS[unit][1]
+                    multiplier /= DERIVED_UNITS[unit][1]
         else:
             raise ValueError("Invalid unit: " + unit)
 
@@ -269,469 +260,40 @@ def hr_parts(vals, units, sigfigs=3):  # TODO: add sigfigs
     hrunits = []
     hrvals = []
 
-    if units == {"m": 1, "s": -2}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 5:
-                hrvals.append(val / 9.81)
-                hrunits.append("g")
-            elif abs(val) >= 0.1:
-                hrvals.append(val)
-                hrunits.append("m/s^2")
-            elif abs(val) >= 0.0001:
-                hrvals.append(val * 1e3)
-                hrunits.append("mm/s^2")
-            elif abs(val) >= 0.0000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("um/s^2")
-            elif val != 0:
-                hrvals.append(val * 1e9)
-                hrunits.append("nm/s^2")
-            else:
-                hrvals.append(0)
-                hrunits.append("m/s^2")
-    elif units == {"m": 1}:
-        unit = ""
-        for val in vals:
-            for k, v in DERIVED_UNITS.items():
-                if units == v[0]:
-                    if not unit:
-                        unit = k
-                    elif abs(val - v[1]) < abs(val - DERIVED_UNITS[unit][1]):
-                        unit = k
+    hrunit = ""
+    hrval = ""
+    for val in vals:
+        hrval, hrunit = find_derived_unit(units, val)
 
-            hrvals.append(val / DERIVED_UNITS[unit][1])
-            hrunits.append(unit)
-        # for i, val in enumerate(vals):
-        #     if abs(val) >= 1e3:
-        #         hrvals.append(val / 1e3)
-        #         hrunits.append("km")
-        #     elif abs(val) >= 0.5:
-        #         hrvals.append(val)
-        #         hrunits.append("m")
-        #     elif abs(val) >= 0.01:
-        #         hrvals.append(val * 100)
-        #         hrunits.append("cm")
-        #     elif abs(val) >= 0.0001:
-        #         hrvals.append(val * 1e3)
-        #         hrunits.append("mm")
-        #     elif abs(val) >= 0.0000001:
-        #         hrvals.append(val * 1e6)
-        #         hrunits.append("um")
-        #     elif val != 0:
-        #         hrvals.append(val * 1e9)
-        #         hrunits.append("nm")
-        #     else:
-        #         hrvals.append(0)
-        #         hrunits.append("m")
-    elif units == {"m": 2}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("km^2")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("m^2")
-            elif abs(val) >= 0.0001:
-                hrvals.append(val * 10000)
-                hrunits.append("cm^2")
-            elif abs(val) >= 0.00000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("mm^2")
-            elif abs(val) >= 0.00000000000001:
-                hrvals.append(val * 1e12)
-                hrunits.append("um^2")
-            elif val != 0:
-                hrvals.append(val * 1e18)
-                hrunits.append("nm^2")
-            else:
-                hrvals.append(0)
-                hrunits.append("m^2")
-    elif units == {"m": 3}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e8:
-                hrvals.append(val / 1e9)
-                hrunits.append("km^3")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("m^3")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 1000000)
-                hrunits.append("cm^3")
-            elif abs(val) >= 0.000000000001:
-                hrvals.append(val * 1e9)
-                hrunits.append("mm^3")
-            elif abs(val) >= 0.000000000000000000001:
-                hrvals.append(val * 1e12)
-                hrunits.append("um^3")
-            elif val != 0:
-                hrvals.append(val * 1e27)
-                hrunits.append("nm^3")
-            else:
-                hrvals.append(0)
-                hrunits.append("m^3")
-    elif units == {"kg": 1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 0.5:
-                hrvals.append(val)
-                hrunits.append("kg")
-            elif abs(val) >= 0.0001:
-                hrvals.append(val * 1e3)
-                hrunits.append("g")
-            elif abs(val) >= 0.0000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("mg")
-            elif val != 0:
-                hrvals.append(val * 1e9)
-                hrunits.append("ug")
-            else:
-                hrvals.append(0)
-                hrunits.append("kg")
-
-    elif units == {"kg": 1, "m": 2, "s": -2}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e15:
-                hrvals.append(val / 1e15)
-                hrunits.append("PJ")
-            elif abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("TJ")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("GJ")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("MJ")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("kJ")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("J")
-            elif abs(val) >= 0.001:
-                hrvals.append(val * 1e3)
-                hrunits.append("mJ")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("uJ")
-            elif abs(val) >= 0.000000001:
-                hrvals.append(val * 1e9)
-                hrunits.append("nJ")
-            elif val != 0:
-                hrvals.append(val * 1e12)
-                hrunits.append("pJ")
-            else:
-                hrvals.append(0)
-                hrunits.append("J")
-    elif units == {"kg": 1, "m": 2, "s": -3, "A": -1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e15:
-                hrvals.append(val / 1e15)
-                hrunits.append("PV")
-            elif abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("TV")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("GV")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("MV")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("kV")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("V")
-            elif abs(val) >= 0.001:
-                hrvals.append(val * 1e3)
-                hrunits.append("mV")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("uV")
-            elif abs(val) >= 0.000000001:
-                hrvals.append(val * 1e9)
-                hrunits.append("nV")
-            elif val != 0:
-                hrvals.append(val * 1e12)
-                hrunits.append("pV")
-            else:
-                hrvals.append(0)
-                hrunits.append("V")
-    elif units == {"kg": 1, "m": 2, "s": -3}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e15:
-                hrvals.append(val / 1e15)
-                hrunits.append("PW")
-            elif abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("TW")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("GW")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("MW")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("kW")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("W")
-            elif abs(val) >= 0.001:
-                hrvals.append(val * 1e3)
-                hrunits.append("mW")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("uW")
-            elif abs(val) >= 0.000000001:
-                hrvals.append(val * 1e9)
-                hrunits.append("nW")
-            elif val != 0:
-                hrvals.append(val * 1e12)
-                hrunits.append("pW")
-            else:
-                hrvals.append(0)
-                hrunits.append("W")
-    elif units == {"kg": 1, "s": -3}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e15:
-                hrvals.append(val / 1e15)
-                hrunits.append("PW/m^2")
-            elif abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("TW/m^2")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("GW/m^2")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("MW/m^2")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("kW/m^2")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("W/m^2")
-            elif abs(val) >= 0.001:
-                hrvals.append(val * 1e3)
-                hrunits.append("mW/m^2")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("uW/m^2")
-            elif abs(val) >= 0.000000001:
-                hrvals.append(val * 1e9)
-                hrunits.append("nW/m^2")
-            elif val != 0:
-                hrvals.append(val * 1e12)
-                hrunits.append("pW/m^2")
-            else:
-                hrvals.append(0)
-                hrunits.append("W/m^2")
-    elif units == {"A": 1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e15:
-                hrvals.append(val / 1e15)
-                hrunits.append("PA")
-            elif abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("TA")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("GA")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("MA")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("kA")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("A")
-            elif abs(val) >= 0.001:
-                hrvals.append(val * 1e3)
-                hrunits.append("mA")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("uA")
-            elif abs(val) >= 0.000000001:
-                hrvals.append(val * 1e9)
-                hrunits.append("nA")
-            elif val != 0:
-                hrvals.append(val * 1e12)
-                hrunits.append("pA")
-            else:
-                hrvals.append(0)
-                hrunits.append("A")
-    elif units == {"b": 1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 8e15:
-                hrvals.append(val / 8e15)
-                hrunits.append("PB")
-            elif abs(val) >= 8e12:
-                hrvals.append(val / 8e12)
-                hrunits.append("TB")
-            elif abs(val) >= 8e9:
-                hrvals.append(val / 8e9)
-                hrunits.append("GB")
-            elif abs(val) >= 8e6:
-                hrvals.append(val / 8e6)
-                hrunits.append("MB")
-            elif abs(val) >= 8e3:
-                hrvals.append(val / 8e3)
-                hrunits.append("kB")
-            elif abs(val) >= 8:
-                hrvals.append(val / 8)
-                hrunits.append("B")
-            else:
-                hrvals.append(val)
-                hrunits.append("b")
-    elif units == {"b": 1, "s": -1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e15:
-                hrvals.append(val / 1e15)
-                hrunits.append("Pbps")
-            elif abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("Tbps")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("Gbps")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("Mbps")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("kbps")
-            else:
-                hrvals.append(val)
-                hrunits.append("bps")
-    elif units == {"s": 1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 3.1556926e10:
-                hrvals.append(val / 3.1556926e10)
-                hrunits.append("millenia")
-            elif abs(val) >= 3.1556926e9:
-                hrvals.append(val / 3.1556926e9)
-                hrunits.append("centuries")
-            elif abs(val) >= 3.1556926e8:
-                hrvals.append(val / 3.1556926e8)
-                hrunits.append("decades")
-            elif abs(val) >= 3.1556926e7:
-                hrvals.append(val / 3.1556926e7)
-                hrunits.append("years")
-            elif abs(val) >= 2629743.83:
-                hrvals.append(val / 2629743.83)
-                hrunits.append("months")
-            elif abs(val) >= 604800:
-                hrvals.append(val / 604800)
-                hrunits.append("weeks")
-            elif abs(val) >= 86400:
-                hrvals.append(val / 86400)
-                hrunits.append("days")
-            elif abs(val) >= 7200:
-                hrvals.append(val / 3600)
-                hrunits.append("hours")
-            elif abs(val) >= 60:
-                hrvals.append(val / 60)
-                hrunits.append("mins")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-                hrunits.append("s")
-            elif abs(val) >= 0.001:
-                hrvals.append(val * 1e3)
-                hrunits.append("ms")
-            elif abs(val) >= 0.000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("us")
-            elif abs(val) >= 0.000000001:
-                hrvals.append(val * 1e9)
-                hrunits.append("ns")
-            elif val != 0:
-                hrvals.append(val * 1e12)
-                hrunits.append("ps")
-            else:
-                hrvals.append(0)
-                hrunits.append("s")
-    elif units == {"s": -1}:
-        for i, val in enumerate(vals):
-            if abs(val) / (2 * np.pi) >= 1e9:
-                hrvals.append(val / (2 * np.pi * 1e9))
-                hrunits.append("GHz")
-            elif abs(val) / (2 * np.pi) >= 1e6:
-                hrvals.append(val / (2 * np.pi * 1e6))
-                hrunits.append("MHz")
-            elif abs(val) / (2 * np.pi) >= 1e3:
-                hrvals.append(val / (2 * np.pi * 1e3))
-                hrunits.append("kHz")
-            elif abs(val) / (2 * np.pi) >= 1:
-                hrvals.append(val / (2 * np.pi))
-                hrunits.append("Hz")
-            # rad/s * (360 deg / 2pi rad) = deg/s
-            elif abs(val) * 180 / np.pi >= 1:
-                hrvals.append(val * 180 / np.pi)
-                hrunits.append("°/s")
-            # rad/s * (1 rotation/ 2 * pi rad) = rotations/s * (60 s / 1 min) = rpm
-            elif abs(val) * 30 / np.pi >= 1:
-                hrvals.append(val * 15 / np.pi)
-                hrunits.append("rpm")
-            # rad/s * (180 deg / pi rad) = deg/s * (60 s / 1 min) = deg/min
-            elif val != 0:
-                hrvals.append(val * (180 / np.pi) * 60)
-                hrunits.append("°/min")
-            else:
-                hrvals.append(0)
-                hrunits.append("rad/s")
-    elif units == {"$": 1} or units == {"$": -1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("$T")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("$B")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("$M")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("$k")
-            else:
-                hrvals.append(val / 1e12)
-    elif units == {"kg": 1, "A": -1, "s": -2}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e12:
-                hrvals.append(val / 1e12)
-                hrunits.append("TT")
-            elif abs(val) >= 1e9:
-                hrvals.append(val / 1e9)
-                hrunits.append("GT")
-            elif abs(val) >= 1e6:
-                hrvals.append(val / 1e6)
-                hrunits.append("MT")
-            elif abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("kT")
-            elif abs(val) >= 1:
-                hrvals.append(val)
-            elif abs(val) >= 1e-3:
-                hrvals.append(val * 1e3)
-                hrunits.append("mT")
-            elif abs(val) >= 1e-6:
-                hrvals.append(val * 1e6)
-                hrunits.append("µT")
-            elif abs(val) >= 1e-9:
-                hrvals.append(val * 1e9)
-                hrunits.append("nT")
-            else:
-                hrvals.append(val * 1e12)
-                hrunits.append("pT")
-    else:  # Undefined units
-        hrvals = vals
-        unitstr = build_compound_unit_str(units)
-        hrunits = [unitstr.strip()] * len(vals)
-
+        if not hrunit:
+            # Just build a raw unit string
+            hrval = val
+            unitstr = build_compound_unit_str(units)
+            hrunit = unitstr.strip()
+        hrvals.append(hrval)
+        hrunits.append(hrunit)
     return hrvals, hrunits
 
+@functools.cache
+def find_derived_unit(base_units, value):
+    hrval = ""
+    hrunit = ""
+
+    # Include powers of units
+
+    for i in range(1, 4):
+        unpowered_units = {k: v / i for k, v in base_units.items()}
+        for k, v in DERIVED_UNITS.items():
+            if unpowered_units == v[0]:
+                if not hrunit:
+                    hrunit = k
+                elif abs(value - v[1]**i) < abs(value - DERIVED_UNITS[hrunit][1]**i):
+                    hrunit = k
+                hrval = value / DERIVED_UNITS[hrunit][1]**i
+        if hrunit:
+            break
+
+    return hrval, hrunit
 
 def build_compound_unit_str(units):
     compound_unit_str = ""
@@ -776,4 +338,4 @@ def build_compound_unit_str(units):
     return compound_unit_str
 
 if __name__ == "__main__":
-    print(parse_compound_units("weeks"))
+    print(parse("cm"))
