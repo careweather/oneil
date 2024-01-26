@@ -1,166 +1,153 @@
 import re
 import numpy as np
+import functools
 
-BASE_UNITS = ["kg", "m", "s", "K", "A", "b", "$", "capacities", "cd", "sr"] # kilograms, meters, seconds, Kelvins, Amps, bits, dollars, capacities, candelas, steradians
+"""
+Oneil units are structured as dicts of base units and their exponents. 
+For example, 1 m/s^2 would be represented as {"m": 1, "s": -2}. 
+The base units are as follows:
+"""
+BASE_UNITS = [
+    "kg",
+    "m",
+    "s",
+    "K",
+    "A",
+    "b",
+    "$",
+    "capacities",
+    "cd",
+    "sr",
+]  # kilograms, meters, seconds, Kelvins, Amps, bits, dollars, capacities, candelas, steradians
 
 UNIT_OPERATORS = ["*", "/", "^"]
 
-DERIVED_UNITS = {"V": (1, {'kg': 1, 'm': 2, 's': -3, 'A': -1}),
-                 "W": (1, {'kg': 1, 'm': 2, 's': -3}),
-                 "minutes": (60, {"s": 1}),
-                 "hours": (3600, {"s": 1}),
-                 "days": (86400, {"s": 1}),
-                 "weeks": (604800, {"s": 1}),
-                 "months": (2629746, {"s": 1}),
-                 "years": (31556952, {"s": 1}),
-                 "decades": (315569520, {"s": 1}),
-                 "centuries": (3155695200, {"s": 1}),
-                 "millenniums": (31556952000, {"s": 1}),
-                 "Hz": (2*np.pi, {"s": -1}),
-                 "kHz": (2*np.pi*1e3, {"s": -1}),
-                 "MHz": (2*np.pi*1e6, {"s": -1}),
-                 "GHz": (2*np.pi*1e9, {"s": -1}),
-                 "hr": (3600, {"s": 1}),
-                 "min": (60, {"s": 1}),
-                 "rotations": (1, {}),
-                 "revolutions": (1, {}),
-                 "cycles": (1, {}),
-                 "yr": (31556952, {"s": 1}),
-                 "mm": (1e-3, {"m": 1}),
-                 "cm": (1e-2, {"m": 1}),
-                 "km": (1e3, {"m": 1}),
-                 "um": (1e-6, {"m": 1}),
-                 "nm": (1e-9, {"m": 1}),
-                 "g": (1e-3, {"kg": 1}),
-                 "mg": (1e-6, {"kg": 1}),
-                 "ug": (1e-9, {"kg": 1}),
-                 "J": (1, {"kg": 1, "m": 2, "s": -2}),
-                 "kJ": (1e3, {"kg": 1, "m": 2, "s": -2}),
-                 "MJ": (1e6, {"kg": 1, "m": 2, "s": -2}),
-                 "mJ": (1e-3, {"kg": 1, "m": 2, "s": -2}),
-                 "kV": (1e3, {"kg": 1, "m": 2, "s": -3, "A": -1}),
-                 "MV": (1e6, {"kg": 1, "m": 2, "s": -3, "A": -1}),
-                 "mV": (1e-3, {"kg": 1, "m": 2, "s": -3, "A": -1}),
-                 "uV": (1e-6, {"kg": 1, "m": 2, "s": -3, "A": -1}),
-                 "nV": (1e-9, {"kg": 1, "m": 2, "s": -3, "A": -1}),
-                 "pV": (1e-12, {"kg": 1, "m": 2, "s": -3, "A": -1}),
-                 "kW": (1e3, {"kg": 1, "m": 2, "s": -3}),
-                 "MW": (1e6, {"kg": 1, "m": 2, "s": -3}),
-                 "mW": (1e-3, {"kg": 1, "m": 2, "s": -3}),
-                 "uW": (1e-6, {"kg": 1, "m": 2, "s": -3}),
-                 "nW": (1e-9, {"kg": 1, "m": 2, "s": -3}),
-                 "pW": (1e-12, {"kg": 1, "m": 2, "s": -3}),
-                 "kWh": (3.6e6, {"kg": 1, "m": 2, "s": -2}),
-                 "MWh": (3.6e9, {"kg": 1, "m": 2, "s": -2}),
-                 "mWh": (3.6, {"kg": 1, "m": 2, "s": -2}),
-                 "Wh": (3.6e3, {"kg": 1, "m": 2, "s": -2}),
-                 "mA": (1e-3, {"A": 1}),
-                 "uA": (1e-6, {"A": 1}),
-                 "kA": (1e3, {"A": 1}),
-                 "Ah": (3600, {"A": 1, "s": 1}),
-                 "mAh": (3.6, {"A": 1, "s": 1}),
-                 "B": (8, {"b": 1}),
-                 "kB": (8e3, {"b": 1}),
-                 "MB": (8e6, {"b": 1}),
-                 "GB": (8e9, {"b": 1}),
-                 "TB": (8e12, {"b": 1}),
-                 "PB": (8e15, {"b": 1}),
-                 "bps": (1, {"b": 1, "s": -1}),
-                 "kbps": (1e3, {"b": 1, "s": -1}),
-                 "Mbps": (1e6, {"b": 1, "s": -1}),
-                 "Gbps": (1e9, {"b": 1, "s": -1}),
-                 "deg": (np.pi/180, {}),
-                 "rad": (1, {}),
-                 "radians": (1, {}),
-                 "degrees": (np.pi/180, {}),
-                 "°/s": (np.pi/180, {"s": -1}),
-                 "°/min": (60*np.pi/180, {"s": -1}),
-                 "°/hr": (3600*np.pi/180, {"s": -1}),
-                 "deg/s": (np.pi/180, {"s": -1}),
-                 "deg/min": (60*np.pi/180, {"s": -1}),
-                 "deg/hr": (3600*np.pi/180, {"s": -1}),
-                 "rpm": (2*np.pi/60, {"s": -1}),
-                 "k$": (1e3, {"$": 1}),
-                 "M$": (1e6, {"$": 1}),
-                 "B$": (1e9, {"$": 1}),
-                 "T$": (1e12, {"$": 1}),
-                 "%": (1e-2, {}),
-                 "ms": (1e-3, {"s": 1}),
-                 "us": (1e-6, {"s": 1}),
-                 "ns": (1e-9, {"s": 1}),
-                 "ps": (1e-12, {"s": 1}),
-                 "T": (1, {"kg": 1, "s": -2, "A": -1}),
-                 "mT": (1e-3, {"kg": 1, "s": -2, "A": -1}),
-                 "uT": (1e-6, {"kg": 1, "s": -2, "A": -1}),
-                 "Ohm": (1, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "kOhm": (1e3, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "MOhm": (1e6, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "GOhm": (1e9, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "mOhm": (1e-3, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "uOhm": (1e-6, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "nOhm": (1e-9, {"kg": 1, "m": 2, "s": -3, "A": -2}),
-                 "N": (1, {"kg": 1, "m": 1, "s": -2}),
-                 "kN": (1e3, {"kg": 1, "m": 1, "s": -2}),
-                 "MN": (1e6, {"kg": 1, "m": 1, "s": -2}),
-                 "GN": (1e9, {"kg": 1, "m": 1, "s": -2}),
-                 "mN": (1e-3, {"kg": 1, "m": 1, "s": -2}),
-                 "uN": (1e-6, {"kg": 1, "m": 1, "s": -2}),
-                 "nN": (1e-9, {"kg": 1, "m": 1, "s": -2}),
-                 "G": (1e-4, {"kg": 1, "s": -2, "A": -1}),
-                 "mG": (1e-7, {"kg": 1, "s": -2, "A": -1}),
-                 "uG": (1e-10, {"kg": 1, "s": -2, "A": -1}),
-                 "nG": (1e-13, {"kg": 1, "s": -2, "A": -1}),
-                 "Gs": (1e-4, {"kg": 1, "s": -2, "A": -1}),
-                 "mGs": (1e-7, {"kg": 1, "s": -2, "A": -1}),
-                 "uGs": (1e-10, {"kg": 1, "s": -2, "A": -1}),
-                 "lm": (1, {"cd": 1, "sr": 1}),
-                 "lx": (1, {"cd": 1, "sr": 1, "m": -2})
+SI_PREFIXES = {
+   1e-24 :  ("y","yocto"),
+   1e-21 :  ("z","zepto"),
+   1e-18 :  ("a","atto" ),
+   1e-15 :  ("f","femto"),
+   1e-12 :  ("p","pico" ),
+   1e-9  :  ("n","nano" ),
+   1e-6  :  ("u","micro"),
+   1e-3  :  ("m","milli"),
+   1e3   :  ("k","kilo" ),
+   1e6   :  ("M","mega" ),
+   1e9   :  ("G","giga" ),
+   1e12  :  ("T","tera" ),
+   1e15  :  ("P","peta" ),
+   1e18  :  ("E","exa"  ),
+   1e21  :  ("Z","zetta"),
+   1e24  :  ("Y","yotta"),
 }
-                 
-UNIT_PREFIXES = {"y": 1e-24,
-                 "z": 1e-21,
-                 "a": 1e-18,
-                 "f": 1e-15,
-                 "p": 1e-12,
-                 "n": 1e-9,
-                 "u": 1e-6,
-                 "m": 1e-3,
-                 "c": 1e-2,
-                 "d": 1e-1,
-                 "da": 1e1,
-                 "h": 1e2,
-                 "k": 1e3,
-                 "M": 1e6,
-                 "G": 1e9,
-                 "T": 10*12,
-                 "P": 1e15,
-                 "E": 1e18,
-                 "Z": 1e21,
-                 "Y": 1e24}
+
+"""
+DERIVED UNITS
+In the background, Oneil doesn't keep track of derived units.
+It uses the following dictionary to convert derived units to base units.
+When parsing units on a parameter, a multiplier is used to convert the value to the correct magnitude.
+When displaying a parameter, a human-readable threshold is used to decide the write derived unit to display.
+    The parameter is displayed using the derived unit with the largest threshold that is less than the parameter's value. 
+This dictionary units follow the following format: {unit, ({oneil base units}, multiplier, human-readable threshold)}.
+"""
+
+# SI units are those derived units for which the SI prefixes are widely used and no exceptions exist.
+SI_UNITS = {
+    "V": ({"kg": 1, "m": 2, "s": -3, "A": -1}, 1),
+    "W": ({"kg": 1, "m": 2, "s": -3}, 1),
+    "Hz": ({"s": -1}, 6.283185307179586),
+    "g": ({"kg": 1}, 0.001),
+    "A": ({"A": 1}, 1),
+    "B": ({"b": 1}, 8),
+    "cd": ({"cd": 1}, 1),
+    "J": ({"kg": 1, "m": 2, "s": -2}, 1),
+    "Wh": ({"kg": 1, "m": 2, "s": -2}, 3600.0),
+    "Ah": ({"A": 1, "s": 1}, 3600),
+    "T": ({"kg": 1, "s": -2, "A": -1}, 1),
+    "Ohm": ({"kg": 1, "m": 2, "s": -3, "A": -2}, 1),
+    "N": ({"kg": 1, "m": 1, "s": -2}, 1),
+    "Gs": ({"kg": 1, "s": -2, "A": -1}, 0.0001),
+    "lm": ({"cd": 1, "sr": 1}, 1),
+    "lx": ({"cd": 1, "sr": 1, "m": -2}, 1),
+    "bps": ({"b": 1, "s": -1}, 1),
+
+}
+
+# Legacy units are those derived units for which the SI prefixes are not widely used or exceptions exist.
+LEGACY_UNITS = {
+    "day": ({"s": 1}, 8.64e4),
+    "week": ({"s": 1}, 6.048e5),
+    "month": ({"s": 1}, 2.629746e6),
+    "year": ({"s": 1}, 3.1556952e7, {"alt": "yr"}),
+    "decade": ({"s": 1}, 3.1556952e8),
+    "century": ({"s": 1}, 3.1556952e9, {"plural": "centuries"}),
+    "millennium": ({"s": 1}, 3.1556952e10, {"plural": "millenia"}),
+    "hour": ({"s": 1}, 3600, {"alt": "hr"}),
+    "minute": ({"s": 1}, 60, {"alt": "min"}),
+    "rotation": ({}, 1, {"alt": "revolution"}),
+    "cycle": ({}, 1),
+    "radian": ({}, 1, {"alt": "rad"}),
+    "degree": ({}, 0.017453292519943295, {"alt": "°"}),
+    "degree/second": ({"s": -1}, 0.017453292519943295, {"alt": "°/s"}),
+    "degree/minute": ({"s": -1}, 1.0471975511965976, {"alt": "°/min"}),
+    "degree/hour": ({"s": -1}, 62.83185307179586, {"alt": "°/hr"}),
+    "rotations/minute": ({"s": -1}, 0.10471975511965977, {"alt": "rpm", "alt": "rotations/min", "alt": "revolutions/minute", "alt": "revolutions/min"}),
+    "k$": ({"$": 1}, 1000.0),
+    "M$": ({"$": 1}, 1e6),
+    "B$": ({"$": 1}, 1e9),
+    "T$": ({"$": 1}, 1e12),
+    "%":  ({}, 0.01),
+    "km": ({"m": 1}, 1000),
+    "m": ({"m": 1}, 1),
+    "cm": ({"m": 1}, 0.01),
+    "mm": ({"m": 1}, 0.001),
+    "um": ({"m": 1}, 1e-6),
+    "nm": ({"m": 1}, 1e-9),
+}
+
+# @functools.cache
+def find_derived_unit(base_units, value):
+    unit = ""
+    
+    for k, v in LEGACY_UNITS.items():
+        if base_units == v[0]:
+
+            if not unit:
+                unit = k
+            elif LEGACY_UNITS[unit][1] > v[1]:
+                if LEGACY_UNITS[unit][1] > value:
+                    unit = k
+
+    return unit
+
 
 def _round(num, n=3):
     formatstr = "%." + str(n) + "g"
     return float(formatstr % num)
 
+
 def parse(unit_str):
     if unit_str in BASE_UNITS:
         units = {unit_str: 1}
         multiplier = 1
-    elif unit_str in DERIVED_UNITS:
-        units = DERIVED_UNITS[unit_str][1]
-        multiplier = DERIVED_UNITS[unit_str][0]
+    elif unit_str in LEGACY_UNITS:
+        units = LEGACY_UNITS[unit_str][1]
+        multiplier = LEGACY_UNITS[unit_str][0]
     else:
         units, multiplier = parse_compound_units(unit_str)
 
     return units, multiplier
 
+
 def parse_compound_units(unit_str):
     # Parse the unit string based on operators /, *, ^
-    unit_list = [x for x in re.findall("[A-Za-z]+", unit_str) if x not in UNIT_OPERATORS]
+    unit_list = [
+        x for x in re.findall("[A-Za-z]+", unit_str) if x not in UNIT_OPERATORS
+    ]
 
     # Find the indices of the above matches
     indices = [m.span() for m in re.finditer("[A-Za-z]+", unit_str)]
-    
+
     # Initialize zero unit
     units = {unit: 0 for unit in BASE_UNITS}
 
@@ -169,38 +156,38 @@ def parse_compound_units(unit_str):
     # Iterate through the indices and unit_list together
     for index, unit in zip(indices, unit_list):
         if unit in BASE_UNITS:
-            if index[0] == 0 or unit_str[index[0]-1] == "*":
+            if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    units[unit] += int(unit_str[index[1]+1])
+                    units[unit] += int(unit_str[index[1] + 1])
                 else:
                     units[unit] += 1
 
-            elif unit_str[index[0]-1] == "/":
+            elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    units[unit] -= int(unit_str[index[1]+1])
+                    units[unit] -= int(unit_str[index[1] + 1])
                 else:
                     units[unit] -= 1
-        elif unit in DERIVED_UNITS:
-            if index[0] == 0 or unit_str[index[0]-1] == "*":
+        elif unit in LEGACY_UNITS:
+            if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    exponent = int(unit_str[index[1]+1])
-                    for key, value in DERIVED_UNITS[unit][1].items():
+                    exponent = int(unit_str[index[1] + 1])
+                    for key, value in LEGACY_UNITS[unit][1].items():
                         units[key] += value * exponent
-                    multiplier *= DERIVED_UNITS[unit][0]**exponent
+                    multiplier *= LEGACY_UNITS[unit][0] ** exponent
                 else:
-                    for key, value in DERIVED_UNITS[unit][1].items():
+                    for key, value in LEGACY_UNITS[unit][1].items():
                         units[key] += value
-                    multiplier *= DERIVED_UNITS[unit][0]
-            elif unit_str[index[0]-1] == "/":
+                    multiplier *= LEGACY_UNITS[unit][0]
+            elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    exponent = int(unit_str[index[1]+1])
-                    for key, value in DERIVED_UNITS[unit][1].items():
+                    exponent = int(unit_str[index[1] + 1])
+                    for key, value in LEGACY_UNITS[unit][1].items():
                         units[key] -= value * exponent
-                    multiplier /= DERIVED_UNITS[unit][0]**exponent
+                    multiplier /= LEGACY_UNITS[unit][0] ** exponent
                 else:
-                    for key, value in DERIVED_UNITS[unit][1].items():
+                    for key, value in LEGACY_UNITS[unit][1].items():
                         units[key] -= value
-                    multiplier /= DERIVED_UNITS[unit][0]
+                    multiplier /= LEGACY_UNITS[unit][0]
         else:
             raise ValueError("Invalid unit: " + unit)
 
@@ -209,86 +196,6 @@ def parse_compound_units(unit_str):
 
     return units, multiplier
 
-def base_units(units):
-        undefined_unit = False
-
-        unitstr = ""
-        if units == {"m": 1, "s": -2}:
-            unitstr = " m/s^2"
-        if units == {"m": 1, "s": -1}:
-            unitstr = " m/s"
-        elif units == {"m": 1}:
-            unitstr = " m"
-        elif units == {"m": 2}:
-            unitstr = " m^2"
-        elif units == {"m": 3}:
-            unitstr = " m^3"
-        elif units == {"kg": 1}:
-            unitstr = " kg"
-        elif units == {"kg": 1, "m": 2, "s": -2}:
-            unitstr = " J"
-        elif units == {"kg": 1, "m": 2, "s": -3, "A": -1}:
-            unitstr = " V"
-        elif units == {"kg": 1, "m": 2, "s": -3}:
-            unitstr = " W"
-        elif units == {"kg": 1, "s": -3}:
-            unitstr = " W/m^2"
-        elif units == {"A": 1}:
-            unitstr = " A"
-        elif units == {"b": 1}:
-            unitstr = " B"
-        elif units == {"b": 1, "s": -1}:
-            unitstr = " bps"
-        elif units == {"s": 1}:
-            unitstr = " s"
-        elif units == {"s": -1}:
-            unitstr = " rad/s"
-        elif units == {"$": 1} or units == {"$": -1}:
-            unitstr = "$"
-        elif not units:
-            pass
-        else:
-            undefined_unit = True
-
-        if undefined_unit:
-            nums = []
-            dens = []
-            if units:
-                for unit, exp in units.items():
-                    if exp > 0:
-                        nums.append(unit)
-                    elif exp < 0:
-                        dens.append(unit)
-                    else:
-                        raise ValueError("Unit with zero exponent should have been purged before display.")
-                if len(nums) > 0:
-                    if len(nums) > 1 and len(dens) > 0:
-                        unitstr += "("
-                    for i, num in enumerate(nums):
-                        if i > 0:
-                            unitstr += " "
-                        unitstr += num
-                        if units[num] != 1:
-                            unitstr += "^" + str(units[num])
-                    if len(nums) > 1 and len(dens) > 0:
-                        unitstr += ")"
-                else:
-                    unitstr += "1"
-                if len(dens) > 0:
-                    unitstr += "/"
-                    if len(dens) > 1:
-                        unitstr += "("
-                    for i, den in enumerate(dens):
-                        if i > 0:
-                            unitstr += " "
-                        unitstr += den
-                        if units != 1:
-                            unitstr += "^" + str(-units[den])
-                    if len(dens) > 1:
-                        unitstr += ")"
-
-        return unitstr
-
 def hr_vals_and_units(vals, units, sigfigs=3):
     hrvals, hrunits = hr_parts(vals, units, sigfigs)
 
@@ -296,7 +203,14 @@ def hr_vals_and_units(vals, units, sigfigs=3):
 
     if len(hrvals) > 1 and hrvals[0] != hrvals[1]:
         if hrunits[0] != hrunits[1]:
-            hrstr += " " + hrunits[0] + " | " + str(_round(hrvals[1], sigfigs)) + " " + hrunits[1]
+            hrstr += (
+                " "
+                + hrunits[0]
+                + " | "
+                + str(_round(hrvals[1], sigfigs))
+                + " "
+                + hrunits[1]
+            )
         else:
             hrstr += "|" + str(_round(hrvals[1], sigfigs)) + " " + hrunits[0]
     else:
@@ -304,12 +218,14 @@ def hr_vals_and_units(vals, units, sigfigs=3):
 
     return hrstr
 
+
 def hr_units(units, vals=[0, 0], sigfigs=3):
     _, hrunits = hr_parts(vals, units, sigfigs)
 
     return hrunits[0]
 
-def hr_parts(vals, units, sigfigs=3):
+
+def hr_parts(vals, units, sigfigs=3):  # TODO: add sigfigs
     vals = vals if vals[0] != vals[1] else [vals[0]]
     hrunits = []
     hrvals = []
@@ -335,28 +251,39 @@ def hr_parts(vals, units, sigfigs=3):
                 hrvals.append(0)
                 hrunits.append("m/s^2")
     elif units == {"m": 1}:
-        for i, val in enumerate(vals):
-            if abs(val) >= 1e3:
-                hrvals.append(val / 1e3)
-                hrunits.append("km")
-            elif abs(val) >= 0.5:
-                hrvals.append(val)
-                hrunits.append("m")
-            elif abs(val) >= 0.01:
-                hrvals.append(val * 100)
-                hrunits.append("cm")
-            elif abs(val) >= 0.0001:
-                hrvals.append(val * 1e3)
-                hrunits.append("mm")
-            elif abs(val) >= 0.0000001:
-                hrvals.append(val * 1e6)
-                hrunits.append("um")
-            elif val != 0:
-                hrvals.append(val * 1e9)
-                hrunits.append("nm")
-            else:
-                hrvals.append(0)
-                hrunits.append("m")
+        unit = ""
+        for val in vals:
+            for k, v in LEGACY_UNITS.items():
+                if units == v[0]:
+                    if not unit:
+                        unit = k
+                    elif abs(val - v[1]) < abs(val - LEGACY_UNITS[unit][1]):
+                        unit = k
+
+            hrvals.append(val / LEGACY_UNITS[unit][1])
+            hrunits.append(unit)
+        # for i, val in enumerate(vals):
+        #     if abs(val) >= 1e3:
+        #         hrvals.append(val / 1e3)
+        #         hrunits.append("km")
+        #     elif abs(val) >= 0.5:
+        #         hrvals.append(val)
+        #         hrunits.append("m")
+        #     elif abs(val) >= 0.01:
+        #         hrvals.append(val * 100)
+        #         hrunits.append("cm")
+        #     elif abs(val) >= 0.0001:
+        #         hrvals.append(val * 1e3)
+        #         hrunits.append("mm")
+        #     elif abs(val) >= 0.0000001:
+        #         hrvals.append(val * 1e6)
+        #         hrunits.append("um")
+        #     elif val != 0:
+        #         hrvals.append(val * 1e9)
+        #         hrunits.append("nm")
+        #     else:
+        #         hrvals.append(0)
+        #         hrunits.append("m")
     elif units == {"m": 2}:
         for i, val in enumerate(vals):
             if abs(val) >= 1e6:
@@ -420,7 +347,7 @@ def hr_parts(vals, units, sigfigs=3):
             else:
                 hrvals.append(0)
                 hrunits.append("kg")
-            
+
     elif units == {"kg": 1, "m": 2, "s": -2}:
         for i, val in enumerate(vals):
             if abs(val) >= 1e15:
@@ -688,20 +615,20 @@ def hr_parts(vals, units, sigfigs=3):
                 hrunits.append("s")
     elif units == {"s": -1}:
         for i, val in enumerate(vals):
-            if abs(val)/(2*np.pi) >= 1e9:
-                hrvals.append(val/(2*np.pi*1e9))
+            if abs(val) / (2 * np.pi) >= 1e9:
+                hrvals.append(val / (2 * np.pi * 1e9))
                 hrunits.append("GHz")
-            elif abs(val)/(2*np.pi) >= 1e6:
-                hrvals.append(val/(2*np.pi*1e6))
+            elif abs(val) / (2 * np.pi) >= 1e6:
+                hrvals.append(val / (2 * np.pi * 1e6))
                 hrunits.append("MHz")
-            elif abs(val)/(2*np.pi) >= 1e3:
-                hrvals.append(val/(2*np.pi*1e3))
+            elif abs(val) / (2 * np.pi) >= 1e3:
+                hrvals.append(val / (2 * np.pi * 1e3))
                 hrunits.append("kHz")
-            elif abs(val)/(2*np.pi) >= 1:
-                hrvals.append(val/(2*np.pi))
+            elif abs(val) / (2 * np.pi) >= 1:
+                hrvals.append(val / (2 * np.pi))
                 hrunits.append("Hz")
             # rad/s * (360 deg / 2pi rad) = deg/s
-            elif abs(val)*180/np.pi >= 1:
+            elif abs(val) * 180 / np.pi >= 1:
                 hrvals.append(val * 180 / np.pi)
                 hrunits.append("°/s")
             # rad/s * (1 rotation/ 2 * pi rad) = rotations/s * (60 s / 1 min) = rpm
@@ -759,46 +686,56 @@ def hr_parts(vals, units, sigfigs=3):
             else:
                 hrvals.append(val * 1e12)
                 hrunits.append("pT")
-    else:
-        # Undefined units
+    else:  # Undefined units
         hrvals = vals
-        unitstr = " "
-        nums = []
-        dens = []
-        if units:
-            for unit, exp in units.items():
-                if exp > 0:
-                    nums.append(unit)
-                elif exp < 0:
-                    dens.append(unit)
-                else:
-                    raise ValueError("Unit with zero exponent should have been purged before display.")
-            if len(nums) > 0:
-                if len(nums) > 1 and len(dens) > 0:
-                    unitstr += "("
-                for i, num in enumerate(nums):
-                    if i > 0:
-                        unitstr += " "
-                    unitstr += num
-                    if units[num] != 1:
-                        unitstr += "^" + str(units[num])
-                if len(nums) > 1 and len(dens) > 0:
-                    unitstr += ")"
-            else:
-                unitstr += "1"
-            if len(dens) > 0:
-                unitstr += "/"
-                if len(dens) > 1:
-                    unitstr += "("
-                for i, den in enumerate(dens):
-                    if i > 0:
-                        unitstr += " "
-                    unitstr += den
-                    if units != 1:
-                        unitstr += "^" + str(-units[den])
-                if len(dens) > 1:
-                    unitstr += ")"
+        unitstr = build_compound_unit_str(units)
         hrunits = [unitstr.strip()] * len(vals)
-                    
+
     return hrvals, hrunits
 
+
+def build_compound_unit_str(units):
+    compound_unit_str = ""
+    nums = []
+    dens = []
+    if units:
+        for unit, exp in units.items():
+            if exp > 0:
+                nums.append(unit)
+            elif exp < 0:
+                dens.append(unit)
+            else:
+                raise ValueError(
+                    "Unit with zero exponent should have been purged before display."
+                )
+        if len(nums) > 0:
+            if len(nums) > 1 and len(dens) > 0:
+                compound_unit_str += "("
+            for i, num in enumerate(nums):
+                if i > 0:
+                    compound_unit_str += " "
+                compound_unit_str += num
+                if units[num] != 1:
+                    compound_unit_str += "^" + str(units[num])
+            if len(nums) > 1 and len(dens) > 0:
+                compound_unit_str += ")"
+        else:
+            compound_unit_str += "1"
+        if len(dens) > 0:
+            compound_unit_str += "/"
+            if len(dens) > 1:
+                compound_unit_str += "("
+            for i, den in enumerate(dens):
+                if i > 0:
+                    compound_unit_str += " "
+                compound_unit_str += den
+                if units[den] != -1:
+                    compound_unit_str += "^" + str(-units[den])
+            if len(dens) > 1:
+                compound_unit_str += ")"
+
+    return compound_unit_str
+
+
+if __name__ == "__main__":
+    print(hr_parts([1e-4, 6e-1], {"m": 1}))

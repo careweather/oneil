@@ -950,7 +950,6 @@ class Parameter:
                     self.error = UnitError([self], "Input or calculated units (" + str(value.units) + ") do not match the required units: (" + str(self.units) + ").", ["Parameter.write()"])
                 self.min = value.min
                 self.max = value.max
-                # TODO: consider whether we should allow an independent value to cause a dependent parameter to be independent
             elif not value.independent:
                 self.equation = value.equation
                 self.args = value.args
