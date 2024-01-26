@@ -7,38 +7,44 @@ Oneil units are structured as dicts of base units and their exponents.
 For example, 1 m/s^2 would be represented as {"m": 1, "s": -2}. 
 The base units are as follows:
 """
-BASE_UNITS = [
-    "kg",
-    "m",
-    "s",
-    "K",
-    "A",
-    "b",
-    "$",
-    "capacities",
-    "cd",
-    "sr",
-]  # kilograms, meters, seconds, Kelvins, Amps, bits, dollars, capacities, candelas, steradians
+BASE_UNITS = {
+    "kg"        :({"kg": 1}, 1, {"alt":("kilogram", "kilo")}),
+    "m"         :({"m": 1}, 1, {"alt":("meter", "metre")}),
+    "s"         :({"s": 1}, 1, {"alt":("second", "sec")}),
+    "K"         :({"K": 1}, 1, {"alt":("Kelvin")}),
+    "A"         :({"A": 1}, 1, {"alt":("Ampere", "Amp")}),
+    "b"         :({"b": 1}, 1, {"alt":("bit")}),
+    "$"         :({"$": 1}, 1, {"alt":("dollar")}),
+    "capacity"  :({"capacity": 1}, 1, {"plural":"capacities"}),
+    "cd"        :({"cd": 1}, 1, {"alt":("candela")}),
+    "sr"        :({"sr": 1}, 1, {"alt":("steradian")}),
+    "mol"       :({"mol": 1}, 1, {"alt":("mole")}),
+} # kilograms, meters, seconds, Kelvins, Amps, bits, dollars, capacities, candelas, steradians
 
 UNIT_OPERATORS = ["*", "/", "^"]
 
 SI_PREFIXES = {
-   1e-24 :  ("y","yocto"),
-   1e-21 :  ("z","zepto"),
-   1e-18 :  ("a","atto" ),
-   1e-15 :  ("f","femto"),
-   1e-12 :  ("p","pico" ),
-   1e-9  :  ("n","nano" ),
-   1e-6  :  ("u","micro"),
-   1e-3  :  ("m","milli"),
-   1e3   :  ("k","kilo" ),
-   1e6   :  ("M","mega" ),
-   1e9   :  ("G","giga" ),
-   1e12  :  ("T","tera" ),
-   1e15  :  ("P","peta" ),
-   1e18  :  ("E","exa"  ),
-   1e21  :  ("Z","zetta"),
-   1e24  :  ("Y","yotta"),
+   "q": ({}, 1e-30, "quecto"),
+   "r": ({}, 1e-27, "ronto"),
+   "y": ({}, 1e-24, "yocto"),
+   "z": ({}, 1e-21, "zepto"),
+   "a": ({}, 1e-18, "atto" ),
+   "f": ({}, 1e-15, "femto"),
+   "p": ({}, 1e-12, "pico" ),
+   "n": ({}, 1e-9 , "nano" ),
+   "u": ({}, 1e-6 , "micro"),
+   "m": ({}, 1e-3 , "milli"),
+   "" : ({}, 1    , ""     ),
+   "k": ({}, 1e3  , "kilo" ),
+   "M": ({}, 1e6  , "mega" ),
+   "G": ({}, 1e9  , "giga" ),
+   "T": ({}, 1e12 , "tera" ),
+   "P": ({}, 1e15 , "peta" ),
+   "E": ({}, 1e18 , "exa"  ),
+   "Z": ({}, 1e21 , "zetta"),
+   "Y": ({}, 1e24 , "yotta"),
+   "R": ({}, 1e27 , "ronna" ),
+   "Q": ({}, 1e30 , "quetta"),
 }
 
 """
@@ -53,57 +59,90 @@ This dictionary units follow the following format: {unit, ({oneil base units}, m
 
 # SI units are those derived units for which the SI prefixes are widely used and no exceptions exist.
 SI_UNITS = {
-    "V": ({"kg": 1, "m": 2, "s": -3, "A": -1}, 1),
-    "W": ({"kg": 1, "m": 2, "s": -3}, 1),
-    "Hz": ({"s": -1}, 6.283185307179586),
-    "g": ({"kg": 1}, 0.001),
-    "A": ({"A": 1}, 1),
-    "B": ({"b": 1}, 8),
-    "cd": ({"cd": 1}, 1),
-    "J": ({"kg": 1, "m": 2, "s": -2}, 1),
-    "Wh": ({"kg": 1, "m": 2, "s": -2}, 3600.0),
-    "Ah": ({"A": 1, "s": 1}, 3600),
-    "T": ({"kg": 1, "s": -2, "A": -1}, 1),
-    "Ohm": ({"kg": 1, "m": 2, "s": -3, "A": -2}, 1),
-    "N": ({"kg": 1, "m": 1, "s": -2}, 1),
-    "Gs": ({"kg": 1, "s": -2, "A": -1}, 0.0001),
-    "lm": ({"cd": 1, "sr": 1}, 1),
-    "lx": ({"cd": 1, "sr": 1, "m": -2}, 1),
-    "bps": ({"b": 1, "s": -1}, 1),
-
+    "V": ({"kg": 1, "m": 2, "s": -3, "A": -1}, 1, {"alt": ("Volt")}),
+    "W": ({"kg": 1, "m": 2, "s": -3}, 1, {"alt": ("Watt")}),
+    "Hz": ({"s": -1}, 6.283185307179586, {"alt": ("Hertz"), "plural": "Hertz"}),
+    "gm": ({"kg": 1}, 0.001, {"alt": ("gram")}),
+    "A": ({"A": 1}, 1, {"alt": ("Amp")}),
+    "B": ({"b": 1}, 8, {"alt": ("Byte")}),
+    "cd": ({"cd": 1}, 1, {"alt": ("candela")}),
+    "J": ({"kg": 1, "m": 2, "s": -2}, 1, {"alt": ("Joule")}),
+    "Wh": ({"kg": 1, "m": 2, "s": -2}, 3600.0, {"alt": ("Watt-hour")}),
+    "Ah": ({"A": 1, "s": 1}, 3600, {"alt": ("Amp-hour")}),
+    "T": ({"kg": 1, "s": -2, "A": -1}, 1, {"alt": ("Tesla")}),
+    "Ohm": ({"kg": 1, "m": 2, "s": -3, "A": -2}, 1, {"alt": ("Ohm")}),
+    "N": ({"kg": 1, "m": 1, "s": -2}, 1, {"alt": ("Newton")}),
+    "Gs": ({"kg": 1, "s": -2, "A": -1}, 0.0001, {"alt": ("Gauss")}),
+    "lm": ({"cd": 1, "sr": 1}, 1, {"alt": ("lumen")}),
+    "lx": ({"cd": 1, "sr": 1, "m": -2}, 1, {"alt": ("lux"), "plural": "lux"}),
+    "bps": ({"b": 1, "s": -1}, 1, {"alt": ("bit/second"), "plural": "bits/second"}),
 }
+
+def prefix_units(prefixes, units):
+    prefixed_units = {}
+    for ku, vu in units.items():
+        for kp, vp in prefixes.items():
+            if len(vu) == 3:
+                language = {}
+                if vu[2].get("plural"):
+                    language["plural"] = vp[2] + vu[2]["plural"]
+                elif vu[2].get("alt"):
+                    language["alt"] = vp[2] + vu[2]["alt"]
+            prefixed_units[kp + ku] = (vu[0], vp[1] * vu[1], {})
+
+    return prefixed_units
+
+SI_MULTIPLES = prefix_units(SI_PREFIXES, SI_UNITS)
 
 # Legacy units are those derived units for which the SI prefixes are not widely used or exceptions exist.
 LEGACY_UNITS = {
     "day": ({"s": 1}, 8.64e4),
     "week": ({"s": 1}, 6.048e5),
     "month": ({"s": 1}, 2.629746e6),
-    "year": ({"s": 1}, 3.1556952e7, {"alt": "yr"}),
+    "year": ({"s": 1}, 3.1556952e7, {"alt": ("yr")}),
     "decade": ({"s": 1}, 3.1556952e8),
-    "century": ({"s": 1}, 3.1556952e9, {"plural": "centuries"}),
-    "millennium": ({"s": 1}, 3.1556952e10, {"plural": "millenia"}),
-    "hour": ({"s": 1}, 3600, {"alt": "hr"}),
-    "minute": ({"s": 1}, 60, {"alt": "min"}),
-    "rotation": ({}, 1, {"alt": "revolution"}),
+    "century": ({"s": 1}, 3.1556952e9, {"plural": ("centuries")}),
+    "millennium": ({"s": 1}, 3.1556952e10, {"plural": ("millenia")}),
+    "hour": ({"s": 1}, 3600, {"alt": ("hr")}),
+    "minute": ({"s": 1}, 60, {"alt": ("min")}),
+    "rotation": ({}, 1, {"alt": ("revolution")}),
     "cycle": ({}, 1),
-    "radian": ({}, 1, {"alt": "rad"}),
-    "degree": ({}, 0.017453292519943295, {"alt": "°"}),
-    "degree/second": ({"s": -1}, 0.017453292519943295, {"alt": "°/s"}),
-    "degree/minute": ({"s": -1}, 1.0471975511965976, {"alt": "°/min"}),
-    "degree/hour": ({"s": -1}, 62.83185307179586, {"alt": "°/hr"}),
-    "rotations/minute": ({"s": -1}, 0.10471975511965977, {"alt": "rpm", "alt": "rotations/min", "alt": "revolutions/minute", "alt": "revolutions/min"}),
-    "k$": ({"$": 1}, 1000.0),
-    "M$": ({"$": 1}, 1e6),
-    "B$": ({"$": 1}, 1e9),
-    "T$": ({"$": 1}, 1e12),
-    "%":  ({}, 0.01),
-    "km": ({"m": 1}, 1000),
-    "m": ({"m": 1}, 1),
-    "cm": ({"m": 1}, 0.01),
-    "mm": ({"m": 1}, 0.001),
-    "um": ({"m": 1}, 1e-6),
-    "nm": ({"m": 1}, 1e-9),
+    "radian": ({}, 1, {"alt": ("rad")}),
+    "degree": ({}, 0.017453292519943295, {"alt": ("°")}),
+    "degree/second": ({"s": -1}, 0.017453292519943295, {"alt": ("°/s")}),
+    "degree/minute": ({"s": -1}, 1.0471975511965976, {"alt": ("°/min")}),
+    "degree/hour": ({"s": -1}, 62.83185307179586, {"alt": ("°/hr")}),
+    "rotations/minute": ({"s": -1}, 0.10471975511965977, {"alt": ("rpm", "rotations/min", "revolutions/minute", "revolutions/min")}),
+    "k$": ({"$": 1}, 1000.0, {"alt": ("thousand dollars")}),
+    "M$": ({"$": 1}, 1e6, {"alt": ("million dollars")}),
+    "B$": ({"$": 1}, 1e9, {"alt": ("billion dollars")}),
+    "T$": ({"$": 1}, 1e12, {"alt": ("trillion dollars")}),
+    "%":  ({}, 0.01, {"alt": ("percent"), "plural": "percent"}),
+    "km": ({"m": 1}, 1000, {"alt": ("kilometer")}),
+    "m": ({"m": 1}, 1, {"alt": ("meter", "metre")}),
+    "cm": ({"m": 1}, 0.01, {"alt": ("centimeter")}),
+    "mm": ({"m": 1}, 0.001, {"alt": ("millimeter")}),
+    "um": ({"m": 1}, 1e-6, {"alt": ("micrometer")}),
+    "nm": ({"m": 1}, 1e-9, {"alt": ("nanometer")}),
+    "g":  ({"m": 1, "s": -2}, 9.81, {"alt": ("Earth gravity"), "plural": "Earth gravities"}),
 }
+
+DERIVED_UNITS = SI_MULTIPLES | LEGACY_UNITS
+
+ALT_UNITS = {}
+for k, v in DERIVED_UNITS.items():
+    if len(v) == 3:
+        if "alt" in v[2]:
+            for alt in v[2]["alt"]:
+                ALT_UNITS[alt] = (v[0], v[1])
+        if "plural" in v[2]:
+            ALT_UNITS[v[2]["plural"]] = (v[0], v[1])
+        else:
+            ALT_UNITS[k + "s"] = (v[0], v[1])
+    else:
+        ALT_UNITS[k + "s"] = (v[0], v[1])
+
+NON_BASE_UNITS = DERIVED_UNITS | ALT_UNITS
 
 # @functools.cache
 def find_derived_unit(base_units, value):
@@ -125,14 +164,14 @@ def _round(num, n=3):
     formatstr = "%." + str(n) + "g"
     return float(formatstr % num)
 
-
+# @functools.cache
 def parse(unit_str):
     if unit_str in BASE_UNITS:
         units = {unit_str: 1}
         multiplier = 1
-    elif unit_str in LEGACY_UNITS:
-        units = LEGACY_UNITS[unit_str][1]
-        multiplier = LEGACY_UNITS[unit_str][0]
+    elif unit_str in NON_BASE_UNITS:
+        units = NON_BASE_UNITS[unit_str][0]
+        multiplier = NON_BASE_UNITS[unit_str][1]
     else:
         units, multiplier = parse_compound_units(unit_str)
 
@@ -167,27 +206,27 @@ def parse_compound_units(unit_str):
                     units[unit] -= int(unit_str[index[1] + 1])
                 else:
                     units[unit] -= 1
-        elif unit in LEGACY_UNITS:
+        elif unit in NON_BASE_UNITS:
             if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1] + 1])
-                    for key, value in LEGACY_UNITS[unit][1].items():
+                    for key, value in NON_BASE_UNITS[unit][0].items():
                         units[key] += value * exponent
-                    multiplier *= LEGACY_UNITS[unit][0] ** exponent
+                    multiplier *= NON_BASE_UNITS[unit][1] ** exponent
                 else:
-                    for key, value in LEGACY_UNITS[unit][1].items():
+                    for key, value in NON_BASE_UNITS[unit][0].items():
                         units[key] += value
-                    multiplier *= LEGACY_UNITS[unit][0]
+                    multiplier *= NON_BASE_UNITS[unit][1]
             elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1] + 1])
-                    for key, value in LEGACY_UNITS[unit][1].items():
+                    for key, value in NON_BASE_UNITS[unit][0].items():
                         units[key] -= value * exponent
-                    multiplier /= LEGACY_UNITS[unit][0] ** exponent
+                    multiplier /= NON_BASE_UNITS[unit][1] ** exponent
                 else:
-                    for key, value in LEGACY_UNITS[unit][1].items():
+                    for key, value in NON_BASE_UNITS[unit][0].items():
                         units[key] -= value
-                    multiplier /= LEGACY_UNITS[unit][0]
+                    multiplier /= NON_BASE_UNITS[unit][1]
         else:
             raise ValueError("Invalid unit: " + unit)
 
@@ -253,14 +292,14 @@ def hr_parts(vals, units, sigfigs=3):  # TODO: add sigfigs
     elif units == {"m": 1}:
         unit = ""
         for val in vals:
-            for k, v in LEGACY_UNITS.items():
+            for k, v in DERIVED_UNITS.items():
                 if units == v[0]:
                     if not unit:
                         unit = k
-                    elif abs(val - v[1]) < abs(val - LEGACY_UNITS[unit][1]):
+                    elif abs(val - v[1]) < abs(val - DERIVED_UNITS[unit][1]):
                         unit = k
 
-            hrvals.append(val / LEGACY_UNITS[unit][1])
+            hrvals.append(val / DERIVED_UNITS[unit][1])
             hrunits.append(unit)
         # for i, val in enumerate(vals):
         #     if abs(val) >= 1e3:
@@ -736,6 +775,5 @@ def build_compound_unit_str(units):
 
     return compound_unit_str
 
-
 if __name__ == "__main__":
-    print(hr_parts([1e-4, 6e-1], {"m": 1}))
+    print(parse_compound_units("weeks"))
