@@ -155,7 +155,7 @@ def _round(num, n=3):
     formatstr = "%." + str(n) + "g"
     return float(formatstr % num)
 
-@functools.cache
+# @functools.cache
 def parse(unit_str):
     if unit_str in BASE_UNITS:
         units = {unit_str: 1}
@@ -274,7 +274,7 @@ def hr_parts(vals, units, sigfigs=3):  # TODO: add sigfigs
         hrunits.append(hrunit)
     return hrvals, hrunits
 
-@functools.cache
+# @functools.cache
 def find_derived_unit(base_units, value):
     hrval = ""
     hrunit = ""
