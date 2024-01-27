@@ -221,6 +221,7 @@ def parse_file(file_name, parent_model=None):
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = ''
+    hrunits=''
 
     if line[0] == '$':
         performance = True
@@ -238,10 +239,11 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     preamble = line.split(':')[0]
     body = line.split(':')[1]
     if len(line.split(':')) > 2:
+        hrunits = line.split(':')[2].strip("\n").strip()
         try:
-            units, multiplier = un.parse(line.split(':')[2].strip("\n").strip())
+            units, multiplier = un.parse(hrunits)
         except:
-            UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + line.split(':')[2].strip("\n"))
+            UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
     else: 
         units = {}
         multiplier = 1
@@ -252,11 +254,11 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         limits = []
         for l in preamble.replace(" ", "").split('(')[1].split(')')[0].split(','):
             if l.replace('.','').isnumeric():
-                limits.append(float(l))
+                limits.append(float(l)/multiplier)
             elif l in MATH_CONSTANTS:
-                limits.append(MATH_CONSTANTS[l])
+                limits.append(MATH_CONSTANTS[l]/multiplier)
             elif any(character in EQUATION_OPERATORS for character in l):
-                limits.append(eval(l, MATH_CONSTANTS))
+                limits.append(eval(l, MATH_CONSTANTS)/multiplier)
             else:
                 SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid limit: " + l)
         options = tuple(limits)
@@ -280,7 +282,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     else:
         equation, arguments = parse_equation(assignment.replace(' ', ''), units, id, imports, file_name, line_number, multiplier)
 
-    return Parameter(equation, units, id, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance), multiplier
+    return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance), multiplier
 
 def parse_piecewise(assignment, units, id, imports, file_name, line_number, multiplier):
     eargs = []
@@ -828,7 +830,7 @@ class Test:
 
 
 class Parameter:
-    def __init__(self, equation, units, id, model="", line_no=None, line="", name=None, options=None, performance=False, trace=False, section="", arguments=[], error=None):
+    def __init__(self, equation, units, id, hr_units="", model="", line_no=None, line="", name=None, options=None, performance=False, trace=False, section="", arguments=[], error=None):
         if trace == 'init':            
             import pdb
             breakpoint()
@@ -852,6 +854,7 @@ class Parameter:
         self.pointer = False
         self.piecewise = False
         self.minmax_equation = False
+        self.hr_units = hr_units
         
         # note
         self.notes = []
@@ -1091,7 +1094,7 @@ class Parameter:
                 if isinstance(self.min, str):
                     return self.min if self.min == self.max else self.min + " | " + self.max
                 else:
-                    return un.hr_vals_and_units((self.min,self.max), self.units, sigfigs)
+                    return un.hr_vals_and_units((self.min,self.max), self.units, self.hr_units, sigfigs)
             else:
                 return un.hr_units(self.units, sigfigs=sigfigs)
 
