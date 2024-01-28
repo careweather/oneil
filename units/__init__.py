@@ -189,13 +189,15 @@ DIMENSIONLESS_UNITS = {
     "%":  ({}, 0.01, {"alt": [("percent", "percent")]}),
     "ppm": ({}, 1e-6, {"alt": [("part per million", "parts per million")]}),
     "ppb": ({}, 1e-9, {"alt": [("part per billion", "parts per billion")]}),
+    "": ({}, 1),
+    "'": ({}, 0.0002908882086657216, {"alt": ["arcminute", "arcmin"]}),
+    '"': ({}, 4.84813681109536e-06, {"alt": ["arcsecond", "arcsec"]}),
 }
 
 if any(u for v in DIMENSIONLESS_UNITS.values() for u in v[0]):
     raise ValueError("Units in DIMENSIONLESS_UNITS should be \{\}.")
 
-ALL_UNITS = STANDARD_UNITS | alt(STANDARD_UNITS) | DIMENSIONLESS_UNITS | alt(DIMENSIONLESS_UNITS)
-
+LINEAR_UNITS = STANDARD_UNITS | alt(STANDARD_UNITS) | DIMENSIONLESS_UNITS | alt(DIMENSIONLESS_UNITS)
 
 #################################################
 # UNIT PARSING
@@ -204,14 +206,18 @@ ALL_UNITS = STANDARD_UNITS | alt(STANDARD_UNITS) | DIMENSIONLESS_UNITS | alt(DIM
 def parse(unit_str):
     if unit_str in BASE_UNITS:
         units = {unit_str: 1}
-        multiplier = 1
-    elif unit_str in ALL_UNITS:
-        units = ALL_UNITS[unit_str][0]
-        multiplier = ALL_UNITS[unit_str][1]
+        unit_fx = lambda x:x
+    elif unit_str in LINEAR_UNITS:
+        units = LINEAR_UNITS[unit_str][0]
+        unit_fx = lambda x:x*LINEAR_UNITS[unit_str][1]
+    elif unit_str.strip("dB") in LINEAR_UNITS:
+        units = LINEAR_UNITS[unit_str.strip("dB")][0]
+        unit_fx = lambda x:10**(x/10)*LINEAR_UNITS[unit_str][1]
     else:
         units, multiplier = _parse_compound_units(unit_str)
+        unit_fx = lambda x:x*multiplier
 
-    return units, multiplier
+    return units, unit_fx
 
 
 def _parse_compound_units(unit_str):
@@ -242,27 +248,27 @@ def _parse_compound_units(unit_str):
                     units[unit] -= int(unit_str[index[1] + 1])
                 else:
                     units[unit] -= 1
-        elif unit in ALL_UNITS:
+        elif unit in LINEAR_UNITS:
             if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1] + 1])
-                    for key, value in ALL_UNITS[unit][0].items():
+                    for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] += value * exponent
-                    multiplier *= ALL_UNITS[unit][1] ** exponent
+                    multiplier *= LINEAR_UNITS[unit][1] ** exponent
                 else:
-                    for key, value in ALL_UNITS[unit][0].items():
+                    for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] += value
-                    multiplier *= ALL_UNITS[unit][1]
+                    multiplier *= LINEAR_UNITS[unit][1]
             elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
                     exponent = int(unit_str[index[1] + 1])
-                    for key, value in ALL_UNITS[unit][0].items():
+                    for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] -= value * exponent
-                    multiplier /= ALL_UNITS[unit][1] ** exponent
+                    multiplier /= LINEAR_UNITS[unit][1] ** exponent
                 else:
-                    for key, value in ALL_UNITS[unit][0].items():
+                    for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] -= value
-                    multiplier /= ALL_UNITS[unit][1]
+                    multiplier /= LINEAR_UNITS[unit][1]
         else:
             raise ValueError("Invalid unit: " + unit)
 
@@ -335,8 +341,12 @@ def _find_derived_unit(base_units, value, pref=None):
     hrunit = ""
 
     # If a unit was specified by the user, use it.
-    if pref and pref in ALL_UNITS:
-            return value / ALL_UNITS[pref][1], pref
+    if pref:
+        if pref in LINEAR_UNITS:
+            return value / LINEAR_UNITS[pref][1], pref
+        elif pref.strip("dB") in LINEAR_UNITS:
+            return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
+            
 
     # Search for derived units with matching base and closest matching value.
     # Search includes powers of the collection of base units.
@@ -395,3 +405,6 @@ def _build_compound_unit_str(units):
                 compound_unit_str += ")"
 
     return compound_unit_str
+
+if __name__ == "__main__":
+    print(_find_derived_unit({}, 100, "dB"))

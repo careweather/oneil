@@ -70,29 +70,25 @@ def parse_file(file_name, parent_model=None):
     design_overrides = {}
     last_line_blank = False
     section = ""
-    multiplier = 0
 
     with open(file_name, 'r') as f:
         final_line = 0
         for i, line in enumerate(f.readlines()):
+            unit_fx = lambda x:x
             final_line = i
             if line == '\n':
-                multiplier = 0
                 last_line_blank = True
                 continue
             elif '#' in line and line.strip()[0] == '#':
-                multiplier = 0
                 last_line_blank = False
                 continue
             elif line[0] == '\t' or line[0:1] == ' ':
                 if last_line_blank: line = "\n\n" + line
                 if line.strip() and line.strip()[0] == '{':
                     arguments = []
-                    assert multiplier != 0, ValueError("Multiplier should never be zero.")
-                    parameter, arguments = parse_piecewise(line, parameters[-1].units, parameters[-1].id, imports, file_name.replace(".on", ""), i+1, multiplier)
+                    parameter, arguments = parse_piecewise(line, parameters[-1].units, parameters[-1].id, imports, file_name.replace(".on", ""), i+1, unit_fx)
                     parameters[-1].add_piece(parameter, arguments)
                 else:
-                    multiplier = 0
                     if prev_line == 'param':
                         parameters[-1].notes.append(line.replace("\t", "", 1).replace(" "*4, "", 1))
                         parameters[-1].note_lines.append(i+1)
@@ -110,7 +106,6 @@ def parse_file(file_name, parent_model=None):
                 last_line_blank = False
 
             elif line[:4] == 'use ':
-                multiplier = 0
                 try:
                     assert(re.search(r"^use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
@@ -135,7 +130,6 @@ def parse_file(file_name, parent_model=None):
 
                 submodels[symbol] = {'model': Model(model + ".on"), 'inputs': test_inputs, 'path': [model], 'line_no': i+1, 'line': line}
             elif line[:5] == 'from ':
-                multiplier = 0
                 try:
                     assert(re.search(r"^from\s+\w+(\.\w+)*\s+use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
@@ -163,7 +157,6 @@ def parse_file(file_name, parent_model=None):
 
                 submodels[symbol] = {'path': path, 'inputs': test_inputs, 'line_no': i+1, 'line': line}
             elif line[:7] == 'import ':
-                multiplier = 0
                 try:
                     assert(re.search(r"^import\s+\w+\s*$", line))
                 except:
@@ -179,7 +172,6 @@ def parse_file(file_name, parent_model=None):
                     ImportError(parent_model, file_name, i+1, line, module + ".py")
 
             elif line[:8] == 'section ':
-                multiplier = 0
                 try:
                     assert(re.search(r"^section\s+[\w\s]*$", line))
                 except:
@@ -188,7 +180,6 @@ def parse_file(file_name, parent_model=None):
                 last_line_blank = False
                 section = line.replace("section", "").strip()
             elif line[0:4] == 'test' or line.replace(" ", "").replace("\t", "")[0:5] == '*test':
-                multiplier = 0
                 try:
                     assert(re.search(r"^(\*{1,2}\s*)?test\s*(\{\w+(,\s*\w+)*\})?:.*$", line))
                 except:
@@ -198,15 +189,13 @@ def parse_file(file_name, parent_model=None):
                 tests.append(Test(line, i+1, file_name.replace(".on", ""), section=section))
                 prev_line = 'test'
             elif re.search(r"^(\*{1,2}\s*)?\w+(\.\w+)?\s*=[^:]+(:.*)?$", line):
-                multiplier = 0
                 last_line_blank = False
                 value_ID = line.split('=')[0].strip()
                 design_overrides[value_ID] = parse_value(line, i+1, file_name.replace(".on", ""), section)
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
-                multiplier = 0
                 last_line_blank = False
-                parameter, multiplier = parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section)
+                parameter, unit_fx = parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section)
                 parameters.append(parameter)
                 prev_line = 'param'
             else:
@@ -240,13 +229,15 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     body = line.split(':')[1]
     if len(line.split(':')) > 2:
         hrunits = line.split(':')[2].strip("\n").strip()
+        test=1
         try:
-            units, multiplier = un.parse(hrunits)
+            units, unit_fx = un.parse(hrunits)
         except:
             UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
     else: 
         units = {}
-        multiplier = 1
+        unit_fx = lambda x:x
+        
 
     # Parse the preamble
     if '(' and ')' in preamble:
@@ -254,11 +245,11 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         limits = []
         for l in preamble.replace(" ", "").split('(')[1].split(')')[0].split(','):
             if l.replace('.','').isnumeric():
-                limits.append(float(l)/multiplier)
+                limits.append((unit_fx)(float(l))) #UNIT-FX-USE
             elif l in MATH_CONSTANTS:
-                limits.append(MATH_CONSTANTS[l]/multiplier)
+                limits.append((unit_fx)(MATH_CONSTANTS[l]))
             elif any(character in EQUATION_OPERATORS for character in l):
-                limits.append(eval(l, MATH_CONSTANTS)/multiplier)
+                limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
             else:
                 SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid limit: " + l)
         options = tuple(limits)
@@ -277,24 +268,24 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     assignment = "=".join(body.split('=')[1:]).strip()
 
     if assignment.strip()[0] == '{':
-        equation, arguments = parse_piecewise(assignment, units, id, imports, file_name, line_number, multiplier)
+        equation, arguments = parse_piecewise(assignment, units, id, imports, file_name, line_number, unit_fx)
         equation = [equation]
     else:
-        equation, arguments = parse_equation(assignment.replace(' ', ''), units, id, imports, file_name, line_number, multiplier)
+        equation, arguments = parse_equation(assignment.replace(' ', ''), units, id, imports, file_name, line_number, unit_fx)
 
-    return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance), multiplier
+    return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance), unit_fx
 
-def parse_piecewise(assignment, units, id, imports, file_name, line_number, multiplier):
+def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit_fx):
     eargs = []
     cargs = []
     equation = ""
     condition = ""
     assignment = assignment.strip().strip('{')
-    equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, multiplier)
-    condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, multiplier)
+    equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx)
+    condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx)
     return (Parameter(equation, units, id + ":eqpiece"), Parameter(condition, {}, id + ":condpiece")), eargs + cargs
 
-def parse_equation(assignment, units, id, imports, file_name, line_number, multiplier):
+def parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx):
     arguments = []
     mathless_assignment = assignment
     
@@ -313,12 +304,12 @@ def parse_equation(assignment, units, id, imports, file_name, line_number, multi
         
     else:
         if '|' in assignment:
-            min = multiplier*eval((assignment.split('|')[0]), MATH_CONSTANTS)
-            max = multiplier*eval((assignment.split('|')[1]), MATH_CONSTANTS)
+            min = (unit_fx)(eval((assignment.split('|')[0]), MATH_CONSTANTS))
+            max = (unit_fx)(eval((assignment.split('|')[1]), MATH_CONSTANTS))
             equation = (min, max)
         else:
-            equation = multiplier*eval(assignment, MATH_CONSTANTS)
-
+            equation = (unit_fx)(eval(assignment, MATH_CONSTANTS))
+    #UNIT-FX-USE
 
     return equation, arguments
 
@@ -348,21 +339,21 @@ def parse_value(line, line_no, file_name, section=""):
 
     if ':' in line:
         try:
-            value_units, multiplier = un.parse(line.split(':')[1].strip())
+            value_units, unit_fx = un.parse(line.split(':')[1].strip())
         except:
             UnitError([], "", ["parse_value"]).throw(None, "in " + file_name + " (line " + str(line_no) + ") " + line + "- " + "Failed to parse units: " + line.split(':')[1].strip("\n"))
         value_assignment = line.split('=')[1].split(':')[0].strip()
     else:
         value_units = {}
-        multiplier = 1
+        unit_fx = lambda x:x
         value_assignment = line.split('=')[1].strip()
 
     if '|' in value_assignment:
-        min = multiplier*eval(value_assignment.split('|')[0], MATH_CONSTANTS)
-        max = multiplier*eval(value_assignment.split('|')[1], MATH_CONSTANTS)
+        min = (unit_fx)(eval(value_assignment.split('|')[0], MATH_CONSTANTS)) #UNIT-FX-USE
+        max = (unit_fx)(eval(value_assignment.split('|')[1], MATH_CONSTANTS)) #UNIT-FX-USE
         equation = (min, max)
     elif value_assignment in MATH_CONSTANTS or value_assignment.replace(".","").replace("-","").isnumeric():
-        equation = multiplier*eval(value_assignment, MATH_CONSTANTS)
+        equation = (unit_fx)(eval(value_assignment, MATH_CONSTANTS)) #UNIT-FX-USE
     else: 
         equation = value_assignment
 
