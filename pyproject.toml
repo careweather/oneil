@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name="oneil"
+version="0.11"
+authors=[
+  { name="Patrick Walton", email="m.patrick.walton@gmail.com" },
+]
+description="Design specification language for system modeling"
+readme="README.md"
+requires-python=">=3.10"
+classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Python :: 3",
+        "Operating System :: POSIX :: Linux",
+	]
+
+[project.urls]
+Homepage="https://github.com/careweather/oneil"
+Issues="https://github.com/careweather/oneil/issues"
+
+[project.scripts]
+oneil = "oneil:main"

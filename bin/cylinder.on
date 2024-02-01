@@ -1,9 +1,0 @@
-Mass (0, 100000000): m = 1e6 :kg
-Cylinder diameter: D = 0.5 :km
-Cylinder radius: r = D/2 :km
-Rotation rate: omega = 1 :deg/min
-Artificial gravity: g_a = r*omega**2 :m/s^2
-Standard Earth gravity: g_E = 9.81 :m/s^2
-
-
-test : g_E*0.9 <= g_a <= g_E*1.1

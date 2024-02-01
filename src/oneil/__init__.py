@@ -2,14 +2,12 @@ import re
 import numpy as np
 import inspect
 from pkg_resources import get_distribution
-from pathlib import Path
 from pytexit import py2tex
-import os
+import os, sys
 import copy
 from beautifultable import BeautifulTable
 import units as un
 import importlib
-import sys
 from functools import partial
 
 class bcolors:
@@ -318,7 +316,7 @@ def convert_functions(assignment, imports, file_name, line_number):
     if isfloat(assignment):
         return float(assignment), arguments
     # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
-    if re.search('\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
+    if re.search(r'\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
         equation = None
         func = assignment.strip('(').split('(')[0]
         for i in imports:
@@ -359,16 +357,14 @@ def parse_value(line, line_no, file_name, section=""):
 
     return Parameter(equation, value_units, value_ID, model=file_name.replace(".on", ""), line_no=line_no, line=line, name=value_ID + " from " + file_name, section=section)
 
-
+# Ensures the val1 is a Parameter for use in the min and max functions.
 def _process_minmax_par_inputs(val1, val2):
     if pass_errors(val1, val2): return pass_errors(val1, val2, caller="process_minmax_par_inputs")
 
     if isinstance(val2, Parameter) and not isinstance(val1, Parameter):
-        tempval = val1
-        val1 = val2.copy()
-        val2 = tempval
-
-    return val1, val2
+        return val2, val1
+    else:
+        return val1, val2
 
 
 def par_minmax(val1, val2):
@@ -626,30 +622,6 @@ def par_ceiling(val):
     else:
         raise TypeError("Input to ceiling() must be of type Parameter, int, or float.")
 
-# def par_avg(val1, val2):
-#     if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_avg")
-
-#     if isinstance(val1, Parameter):
-#         if isinstance(val2, Parameter):
-#             if val1.id == val2.id:
-#                 avg = (val1.min + val1.max) / 2
-#                 return Parameter((avg, avg), val1.units, "avg({})".format(val1.id))
-#             if val1.units != val2.units:
-#                 return Parameter((np.nan, np.nan), val1.units, "avg(({}), ({}))".format(val1.id, val2.id), error=UnitError([val1, val2], "Cannot average " + un.hr_units(val1.units) + " to " + un.hr_units(val2.units) + ".", ["par_avg"]))
-#             return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "avg({},{})".format(val1.id, val2.id))
-#         elif isinstance(val2, (int, float)):
-#             if val1.units != {}:
-#                 return Parameter((np.nan, np.nan), val1.units, "avg(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot average " + un.hr_units(val1.units) + " to a unitless number.", ["par_avg"]))
-#             avg = (val1.min + val2) / 2
-#             return Parameter((min(val1.min, val2), max(val1.max, val2)), val1.units, "avg({},{})".format(val1.id, val2))
-#     elif isinstance(val1, (int, float)):
-#         if isinstance(val2, (int, float)):
-#             return (val1 + val2) / 2
-#     else:
-#         raise TypeError("Inputs to avg() must be of type Parameter, int, or float.")
-
-    
-
 
 class Error:
     def __init__(self):
@@ -817,7 +789,7 @@ class Test:
         for old, new in OPERATOR_OVERRIDES.items():
             self.expression = self.expression.replace(old, new)
 
-        self.args = [x for x in re.findall("(?!\d+)\w+\.?\w*", self.expression) if x not in FUNCTIONS]
+        self.args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", self.expression) if x not in FUNCTIONS]
 
 
 class Parameter:
@@ -881,7 +853,7 @@ class Parameter:
         elif isinstance(equation, str):
             if any(character in EQUATION_OPERATORS for character in equation):
                 # Find parameter names including "." imports
-                self.args = [x for x in re.findall("(?!\d+)\w+\.?\w*", re.sub('[\'|\"].*[\'|\"]','',equation)) if x not in FUNCTIONS]
+                self.args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", re.sub('[\'|\"].*[\'|\"]','',equation)) if x not in FUNCTIONS]
 
                 # Trim duplicate args
                 self.args = list(set(self.args))
@@ -1711,7 +1683,7 @@ class Model:
             for func, vfunc in FUNCTIONS.items(): param_eq = param_eq.replace(vfunc, func)
 
             snippet = "\n\\subsubsection{" + param.name.title() + "}"
-            snippet += "\label{sssec:" + param_ID + "}\n"
+            snippet += "\\label{sssec:" + param_ID + "}\n"
             snippet += 'The equation for ' + param.name + " is \n"
 
             snippet += "\\begin{equation}\n"
@@ -1721,7 +1693,7 @@ class Model:
 
         else:
             snippet = "\n\\subsubsection{" + param.name.title() + "}"
-            snippet += "\label{sssec:" + param_ID + "}\n"
+            snippet += "\\label{sssec:" + param_ID + "}\n"
             snippet += param.name + " is a constant value of\n"
             snippet += "\\begin{equation}\n"
             snippet += "\t\\label{eq:" + param_ID + "}\n"
@@ -1734,7 +1706,7 @@ class Model:
 
     def test_snippet(self, ID, test):
         snippet = "\n\\subsubsection{" + ID.replace("_", "~").title() + "}"
-        snippet += "\label{sssec:" + ID.replace("_", "-") + "}\n"
+        snippet += "\\label{sssec:" + ID.replace("_", "-") + "}\n"
         snippet += "\\begin{equation}\n"
         snippet += "\t\\label{eq:" + ID.replace("_", "-") + "}\n"
         snippet += "\t\\boxed{" + self._param2latex(test.expression) + "}~.\n"
@@ -1837,8 +1809,8 @@ class Model:
             elif isinstance(entry, Test):
                 document += self.test_snippet(ID, entry)
 
-        if "\cite" in document:
-            document += "\n\printbibliography\\end{document}"
+        if "\\cite" in document:
+            document += "\n\\printbibliography\\end{document}"
         else:
             document += "\n\\end{document}"
         
@@ -1905,7 +1877,7 @@ class Model:
     def eval(self, expression):
         # Make a dict of calculation parameters from the submodels
         submodel_parameters = {}
-        expression_args = [x for x in re.findall("(?!\d+)\w+\.?\w*", expression) if x not in FUNCTIONS]
+        expression_args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", expression) if x not in FUNCTIONS]
         
         for f, pf in FUNCTIONS.items():
             expression = re.sub(r"(?<!\w)" + re.escape(f), re.escape(pf), expression)

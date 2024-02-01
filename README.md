@@ -529,8 +529,8 @@ Try closing all VS Code files and closing VS Code to clear its mystery cache.
 
 ## About
 
-The initial methodology that inspired Oneil was proposed in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd), by M. Patrick Walton. The conclusion provided ideas and inspiration for early versions of Oneil.
+The initial methodology that inspired Oneil was proposed in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd), by M. Patrick Walton. For that work, the methodology was painfully implemented in a Google sheet. The conclusion provided ideas and inspiration for early versions of Oneil.
 
-Oneil was developed at Care Weather Technologies, Inc. to support development of the Veery scatterometer.
+Oneil was developed at Care Weather Technologies, Inc. to support development of the Veery scatterometer. Veery was designed to perform as well as $100M heritage scatterometers at 3 orders of magnitude less cost. This dramatic improvement was facilitated in part by Oneil's streamlined system engineering capabilities.
 
 Oneil is named after American physicist and space activist [Gerard K. O'Neill](https://en.wikipedia.org/wiki/Gerard_K._O%27Neill) who proposed the gargantuan space settlements known as [O'Neill cylinders](https://en.wikipedia.org/wiki/O%27Neill_cylinder). We built Oneil to meet our own needs, but we hope it stitches together the many domains required to make O'Neill cylinders and move humanity up the [Kardashev scale](https://en.wikipedia.org/wiki/Kardashev_scale).

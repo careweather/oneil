@@ -1,6 +1,5 @@
 import re
 import numpy as np
-import functools
 
 
 #################################################
@@ -195,7 +194,7 @@ DIMENSIONLESS_UNITS = {
 }
 
 if any(u for v in DIMENSIONLESS_UNITS.values() for u in v[0]):
-    raise ValueError("Units in DIMENSIONLESS_UNITS should be \{\}.")
+    raise ValueError("Units in DIMENSIONLESS_UNITS should be {}.")
 
 LINEAR_UNITS = STANDARD_UNITS | alt(STANDARD_UNITS) | DIMENSIONLESS_UNITS | alt(DIMENSIONLESS_UNITS)
 
