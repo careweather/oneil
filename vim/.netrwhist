@@ -1,5 +1,11 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhistcnt =3
+let g:netrw_dirhistcnt =9
+let g:netrw_dirhist_9='/home/patrick/careweather/veery/.git'
+let g:netrw_dirhist_8='/home/patrick/careweather/veery/software/bbb/configs'
+let g:netrw_dirhist_7='/home/patrick/buildroot/configs'
+let g:netrw_dirhist_6='/home/patrick/careweather/veery/software/beaglebone/configs'
+let g:netrw_dirhist_5='/home/patrick/pic2/package'
+let g:netrw_dirhist_4='/home/patrick/buildroot/board/bootlin/beagleboneblack/etc'
 let g:netrw_dirhist_3='/home/patrick/careweather/nest/.git'
 let g:netrw_dirhist_2='/home/patrick/careweather/veery/model/basilisk/examples'
 let g:netrw_dirhist_1='/home/patrick/careweather/veery/.git'
