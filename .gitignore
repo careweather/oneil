@@ -1,4 +1,6 @@
-__pycache__
-.vscode
-.venv
+__pycache__/
+.vscode/
+.venv/
 *.egg-info
+.vim/
+.netrwhist

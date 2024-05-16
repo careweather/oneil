@@ -11,11 +11,12 @@ import importlib
 from functools import partial
 
 class bcolors:
-    HEADER = '\033[95m'
+    MAGENTA = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'
     OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
+    YELLOW = '\033[93m'
+    ORANGE = '\033[38;5;208m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
     BOLD = '\033[1m'
@@ -1509,7 +1510,8 @@ class Model:
         self.constants = MATH_CONSTANTS
         self.calculated = False
         self.defaults = []
-        self.subtest_count = 0
+        self.fail_count = 0
+        self.test_count = 0
         
         if design_filename:
             self.overwrite(design_filename)
@@ -1867,11 +1869,15 @@ class Model:
         for key, entry in self.submodels.items():
             if 'model' in entry.keys():
                 entry['model'].calculate(quiet=True)
-                self.subtest_count = len(entry['model'].tests) + entry['model'].subtest_count
 
         # Calculate dependent parameters.
         self._calculate_recursively(self.parameters)
+
+        # Run tests
+        self.test(verbose=False)
+
         if not quiet: self.summarize()
+
         self.calculated = True
 
     def eval(self, expression):
@@ -1927,67 +1933,53 @@ class Model:
         else:
             ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
 
-    def test_submodels(self, verbose=True):
-        passes = 0
+    def _test_recursively(self, path=[], test_inputs={}, trail=[], verbose=True):
+        fails = 0
+        tests = 0
 
-        for submodel_ID in self.submodels:
+        for submodel_ID in {k:v for (k,v) in self.submodels.items() if 'model' in v}:
             
             # Prepare test inputs
-            test_inputs = {}
-            if self.submodels[submodel_ID]['inputs']:
-                for arg, input in self.submodels[submodel_ID]['inputs'].items():
-                    if '.' in input:
-                        input_ID, source = input.split('.')
-                        retrieval_path = copy.copy(self.submodels[source]['path'])
+            if not test_inputs:
+                if self.submodels[submodel_ID]['inputs']:
+                    for arg, input in self.submodels[submodel_ID]['inputs'].items():
+                        if '.' in input:
+                            input_ID, source = input.split('.')
+                            retrieval_path = copy.copy(self.submodels[source]['path'])
 
-                        result = self._retrieve_parameter(input_ID, retrieval_path)
-                        if isinstance(result, ModelError):
-                            result.source_message = "Couldn't find parameter " + input_ID + ". Invalid in submodel path " + retrieval_path + "."
-                            return result
-                        elif isinstance(result, Parameter):
-                            test_inputs[arg] = result
+                            result = self._retrieve_parameter(input_ID, retrieval_path)
+                            if isinstance(result, ModelError):
+                                result.source_message = "Couldn't find parameter " + input_ID + ". Invalid in submodel path " + retrieval_path + "."
+                                return result
+                            elif isinstance(result, Parameter):
+                                test_inputs[arg] = result
+                            else:
+                                raise TypeError("Invalid result type: " + str(type(result)))
+
+                        elif input in self.parameters:
+                            test_inputs[arg] = self.parameters[input]
                         else:
-                            raise TypeError("Invalid result type: " + str(type(result)))
-
-                    elif input in self.parameters:
-                        test_inputs[arg] = self.parameters[input]
-                    else:
-                        return ParameterError(input, "Test input " + input + " for submodel " + submodel_ID + " not found in " + self.name + ".", source=["Model.test_submodels"])
-                test_path = copy.copy(self.submodels[submodel_ID]['path'])
-                new_passes = self._test_submodel_recursively(test_path, test_inputs, verbose=verbose)
-                passes += new_passes
-
-        return passes
-
-    def _test_submodel_recursively(self, path, test_params, trail=[], verbose=True):
-        passes = 0
-        new_trail = copy.copy(trail)
-        new_trail.append(self.name)
-        if path:
-            submodel_name = path.pop(0)
-            submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
-            if submodel:
-                submodel = submodel[0]
-                new_passes = submodel._test_submodel_recursively(copy.copy(path), test_params, verbose=verbose)
-                passes += new_passes
-            else:
-                return ModelError(submodel_name, "Submodel not found.", new_trail)
-            
-        passes += self.test(test_inputs=test_params, top=False, verbose=verbose)
+                            return ParameterError(input, "Test input " + input + " for submodel " + submodel_ID + " not found in " + self.name + ".", source=["Model.test_submodels"])
+                
+            # Test the submodel
+            path = copy.copy(self.submodels[submodel_ID]['path'])
         
-        return passes
-
-    def test(self, test_inputs={}, verbose=True, top=True):
-        if top: 
-            passes = self.test_submodels(verbose=verbose)
-        else:
-            passes = 0
-
-        if not isinstance(passes, int):
-            passes.throw(self, "(in Model.test) Submodel test failed.")
-
+            new_trail = copy.copy(trail)
+            new_trail.append(self.name)
+            if path:
+                submodel_name = path.pop(0)
+                submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
+                if submodel:
+                    submodel = submodel[0]
+                    new_fails, new_tests = submodel._test_recursively(copy.copy(path), test_inputs, new_trail, verbose=verbose)
+                    fails += new_fails
+                    tests += new_tests
+                else:
+                    return ModelError(submodel_name, "Submodel not found.", new_trail)
+            
         # Eval each test expression, using self.parameters and the reference models
         for test in self.tests:
+            tests += 1
             test_params = {}
             run_expression = test.expression
 
@@ -2043,16 +2035,31 @@ class Model:
                     result = bcolors.OKGREEN + "pass" + bcolors.ENDC if calculation else bcolors.FAIL + "fail" + bcolors.ENDC
 
                 if verbose: print("\tResult: " + str(result))
-                if result == "fail" and verbose:
-                    # Print the args and values
-                    for k, v in test_params.items():
-                        print("\t" + v.__repr__())
-                else:
-                    passes += 1
-            elif verbose:
-                print("Test (" + self.name + "): " + test.expression + " SKIPPED")
 
-        return passes
+                if not calculation:
+                    fails += 1
+                    if verbose:
+                        # Print the args and values
+                        for k, v in test_params.items():
+                            if isinstance(v, Parameter):
+                                print("\t" + v.__repr__())
+            else:
+                fails += 1
+                if verbose:
+                    print("Test (" + self.name + "): " + test.expression + " SKIPPED")
+
+        if not isinstance(fails, int):
+            fails.throw(self, "(in Model.test) Submodel test failed.")
+        
+        return fails, tests
+
+    def test(self, verbose=True):
+        fail_count, test_count = self._test_recursively(verbose=verbose)
+
+        self.fail_count = fail_count
+        self.test_count = test_count
+
+        return fail_count, test_count
 
 
     def compare(self, alternate_design_file, parameter_IDs):
@@ -2084,12 +2091,16 @@ class Model:
     def summarize(self, sigfigs=4, verbose=False):
         print("-" * 80)
         print(bcolors.OKBLUE + "Model: " + self.name + bcolors.ENDC)
-        print(bcolors.OKGREEN + "Design: " + self.design + bcolors.ENDC)
+        print(bcolors.ORANGE + "Design: " + self.design + bcolors.ENDC)
         print("Parameters: " + str(len(self.parameters) + len(self.constants)) 
         + " (" + str(len([p for ID, p in self.parameters.items() if p.independent])) + " independent, " 
         + str(len([p for ID, p in self.parameters.items() if not p.independent])) + " dependent, "
         + str(len(self.constants)) + " constants)")
-        print("Tests: " + str(self.test(verbose=False)) + "/" + str(len(self.tests) + self.subtest_count))
+        print(f"Tests: {self.test_count - self.fail_count}/{self.test_count}", end="")
+        if self.fail_count:
+            print(" (" + bcolors.BOLD + bcolors.FAIL + "FAIL" + bcolors.ENDC + ")")
+        else:
+            print(" (" + bcolors.OKGREEN + "PASS" + bcolors.ENDC + ")")
         print("-" * 80)
 
         summary_parameters = list[self.parameters.keys()] if verbose else [k for k, v in self.parameters.items() if v.performance]
@@ -2482,7 +2493,7 @@ def interpreter(model):
         if model.design == "default":
             handler(model, input(f"({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
         else:
-            handler(model, input(f"({bcolors.OKGREEN}{model.design}@{bcolors.ENDC}{bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
+            handler(model, input(f"({bcolors.ORANGE}{model.design}@{bcolors.ENDC}{bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
 
 def debugger(model):
     print("Enterring debug mode. Type 'quit' to exit.")
