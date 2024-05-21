@@ -792,9 +792,7 @@ class Test:
         for old, new in OPERATOR_OVERRIDES.items():
             self.expression = self.expression.replace(old, new)
 
-        print("breakpoint")
-
-        self.args = [x for x in re.findall(r"\b(?!\d+)(?<!')\b\w+\.?\w*\b(?!')\b", self.expression) if x not in FUNCTIONS and x not in BOOLEAN_OPERATORS]
+        self.args = [x for x in re.findall(r"\b(?!\d+)(?<!')(?<!\")\b\w+\.?\w*\b(?!')(?!\")\b", self.expression) if x not in FUNCTIONS and x not in BOOLEAN_OPERATORS]
 
 
 class Parameter:
