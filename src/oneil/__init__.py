@@ -31,7 +31,7 @@ def isfloat(num):
 
 __version__ = get_distribution("oneil").version
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
@@ -369,6 +369,34 @@ def _process_minmax_par_inputs(val1, val2):
     else:
         return val1, val2
 
+def par_extent(val1, val2=None):
+    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_min")
+
+    if not val2:
+        if isinstance(val1, Parameter):
+            if val1.units == {}:
+                return max(abs(val1.min), abs(val1.max))
+            else:
+             return Parameter(max(abs(val1.min), abs(val1.max)), val1.units, f"extent({val1.name})")
+        elif isinstance(val1, (int, float)):
+            return val1
+        
+    val1, val2 = _process_minmax_par_inputs(val1, val2)
+
+    if isinstance(val2, Parameter):
+        if val1.id == val2.id:
+            return Parameter(max(abs(val1.min), abs(val1.max)), val1.units, "extent({})".format(val1.name))
+        
+        if val1.units != val2.units:
+            return Parameter((np.nan, np.nan), val1.units, "extent(({}), ({}))".format(val1.id, val2.id), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to " + un.hr_units(val2.units) + ".", ["par_min"]))
+
+        return Parameter((max(abs(val1.min), abs(val1.max), abs(val2.min), abs(val2.max))), val1.units, "extent({},{})".format(val1.name, val2.name))
+    elif isinstance(val2, (int, float)):
+        if val1.units != {}:
+            return Parameter((np.nan, np.nan), val1.units, "extent(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to a unitless number.", ["par_min"]))
+        return Parameter((max(abs(val1.min), abs(val1.max), abs(val2))), val1.units, "extent({},{})".format(val1.name, val2))
+    
+    raise TypeError("Second input to extent() must be of type Parameter, int, or float.")
 
 def par_minmax(val1, val2):
     if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_minmax")
