@@ -17,15 +17,17 @@ git clone git@github.com/careweather/oneil.git
 
 pip install -e oneil
 ```
-You will need the following packages to run Oneil: 
+
+You will need the following packages to run Oneil:
+
 * Numpy
 * Beautiful Table
 * Py2tex
 * Pytexit
 
-These can be installed using the following command: 
+These can be installed using the following command:
 
-```
+``` { .sh }
 pip install numpy beautifultable py2tex pytexit 
 ```
 
@@ -147,7 +149,7 @@ Value assignments can specify a single value or a minimum and maximum value sepa
 ``` { .on }
 Window count: n_w = 20
 Communications amplifier efficiency (0, 1): eta_c = 0.5|0.7
-Space domain [EarthOrbit, interplanetary, interstellar]: D = interstellar
+Space domain [EarthOrbit, interplanetary, interstellar]: D_s = interstellar
 ```
 
 Parameters can also be set to equal another parameters.
@@ -203,9 +205,9 @@ Extrema math yields substantially different results for subtraction and division
 Piecewise equations can be used for parameter assignments.
 
 ``` { .on }
-Orbital gravity: g_o = {G*m_E/h**2 if D == 'EarthOrbit' :km/s
-                       {G*m_S/h**2 if D == 'interplanetary'
-                       {G*m_G/h**2 if D == 'interstellar'
+Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'EarthOrbit' :km/s
+                       {G*m_S/h**2 if D_s == 'interplanetary'
+                       {G*m_G/h**2 if D_s == 'interstellar'
 ```
 
 (m_E, m_S, and m_G are the masses of the Earth, Sun, and galactic center)
@@ -493,9 +495,9 @@ This approach is new, so there are bound to be a lot of holes. The interpreter d
 
 ### Something funny is happening with angular frequencies and frequencies
 
-The funny thing about Hz and rad/s is that `1 Hz != 1` rad/s even though `1 Hz = 1/s` and `1 rad/s = 1/s`. You can thank the [International System of Units](https://iopscience.iop.org/article/10.1088/1681-7575/ac0240) for this madness. To escape this issue, Oneil doesn't recognize the SI definition of Hz. If you specify Hz as a unit, Oneil will internally convert it to rad/s by multiplying by 2 pi. If you want to use a frequency in an equation that expects Hz, you need to make sure the equation converts your frequency to Hz. For example, instead of `c=lambda*f` for the speed of light, you would use `c=lambda*f/(2*pi)`.
+The funny thing about Hz and rad/s is that `1 Hz != 1 rad/s` even though `1 Hz = 1/s` and `1 rad/s = 1/s`. You can [thank the International System of Units for this madness](https://iopscience.iop.org/article/10.1088/1681-7575/ac0240). To escape this issue, Oneil doesn't recognize the SI definition of Hz. If you specify Hz as a unit, Oneil will internally convert it to rad/s by multiplying by 2 pi. If you want to use a frequency in an equation that expects Hz, you need to make sure the equation converts your frequency (rad/s) to Hz. For example, instead of `c=lambda*f` for the speed of light, you would use `c=lambda*f/(2*pi)`.
 
-> As a side note, some people have suggested that this problem is solved if you use `cycles` as a base unit and let `Hz = 1 cycle/s`, but this quickly becomes messy as cycles will get propagated throughout your model. It's much easier to remember to convert rad/s to Hz in equations that need it.
+> As a side note, some people have suggested that this problem is solved if you use `cycles` as a base unit and let `Hz = 1 cycle/s`, but this quickly becomes messy as cycles will get propagated throughout your model. It's much cleaner to convert rad/s to Hz in equations that expect it.
 
 ### Oneil has a bug
 

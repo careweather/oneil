@@ -39,6 +39,8 @@ EQUATION_OPERATORS = ["+", "-", "*", "/", "**", "//", "%", "(", ")", "=", "<", "
 
 OPERATOR_OVERRIDES = {"--": "|minus|"}
 
+BOOLEAN_OPERATORS = ["and", "or", "not"]
+
 class Infix():
     def __init__(self, func):
         self.func = func
@@ -790,7 +792,9 @@ class Test:
         for old, new in OPERATOR_OVERRIDES.items():
             self.expression = self.expression.replace(old, new)
 
-        self.args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", self.expression) if x not in FUNCTIONS]
+        print("breakpoint")
+
+        self.args = [x for x in re.findall(r"\b(?!\d+)(?<!')\b\w+\.?\w*\b(?!')\b", self.expression) if x not in FUNCTIONS and x not in BOOLEAN_OPERATORS]
 
 
 class Parameter:
@@ -2010,7 +2014,7 @@ class Model:
                         run_expression = run_expression.replace(arg, prefix + arg_ID)
                     elif arg in test_inputs:
                         test_params[arg] = test_inputs[arg]
-                    elif arg not in FUNCTIONS.values() and not any([arg in v for v in OPERATOR_OVERRIDES.values()]) and not arg in self.constants:
+                    elif arg not in FUNCTIONS.values() and not any([arg in v for v in OPERATOR_OVERRIDES.values()]) and not arg in self.constants and arg not in BOOLEAN_OPERATORS:
                         test_params[arg] = self.parameters[arg]
 
 
@@ -2039,6 +2043,9 @@ class Model:
                 if not calculation:
                     fails += 1
                     if verbose:
+                        # Print the test explanation
+                        if test.notes: print("\t" + test.notes[0].strip("\n"))
+                        
                         # Print the args and values
                         for k, v in test_params.items():
                             if isinstance(v, Parameter):
@@ -2046,7 +2053,7 @@ class Model:
             else:
                 fails += 1
                 if verbose:
-                    print("Test (" + self.name + "): " + test.expression + " SKIPPED")
+                    print("Test (" + self.name + "): " + test.expression + " (" + bcolors.FAIL + "skipped" + bcolors.ENDC + ")")
 
         if not isinstance(fails, int):
             fails.throw(self, "(in Model.test) Submodel test failed.")
