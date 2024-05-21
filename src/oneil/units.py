@@ -211,7 +211,7 @@ def parse(unit_str):
         unit_fx = lambda x:x*LINEAR_UNITS[unit_str][1]
     elif unit_str.strip("dB") in LINEAR_UNITS:
         units = LINEAR_UNITS[unit_str.strip("dB")][0]
-        unit_fx = lambda x:10**(x/10)*LINEAR_UNITS[unit_str][1]
+        unit_fx = lambda x:10**(x/10)*LINEAR_UNITS[unit_str.strip("dB")][1]
     else:
         units, multiplier = _parse_compound_units(unit_str)
         unit_fx = lambda x:x*multiplier

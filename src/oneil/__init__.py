@@ -6,7 +6,7 @@ from pytexit import py2tex
 import os, sys
 import copy
 from beautifultable import BeautifulTable
-import units as un
+from . import units as un
 import importlib
 from functools import partial
 
@@ -31,13 +31,13 @@ def isfloat(num):
 
 __version__ = get_distribution("oneil").version
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
-EQUATION_OPERATORS = ["+", "-", "*", "/", "**", "//", "%", "(", ")", "=", "<", ">", "!"]
+EQUATION_OPERATORS = ["+", "-", "*", "/", "//", "%", "(", ")", "=", "<", ">", "!"]
 
-OPERATOR_OVERRIDES = {"--": "|minus|"}
+OPERATOR_OVERRIDES = {"--": "|minus|", "^": "**"}
 
 BOOLEAN_OPERATORS = ["and", "or", "not"]
 
@@ -249,7 +249,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
                 limits.append((unit_fx)(float(l))) #UNIT-FX-USE
             elif l in MATH_CONSTANTS:
                 limits.append((unit_fx)(MATH_CONSTANTS[l]))
-            elif any(character in EQUATION_OPERATORS for character in l):
+            elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
                 limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
             else:
                 SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid limit: " + l)
@@ -318,22 +318,49 @@ def convert_functions(assignment, imports, file_name, line_number):
     arguments = []
     if isfloat(assignment):
         return float(assignment), arguments
+    
+    # Regex to find function calls in the form "name(arg1, arg2, ...)"
+    pattern = re.compile(r'(\w+)\(([^()]*)\)')
+    results = pattern.findall(assignment)
+
     # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
-    if re.search(r'\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
-        equation = None
-        func = assignment.strip('(').split('(')[0]
+    if results:
+        func, arg_str = results[0]
+
+    if results and not func in FUNCTIONS:
+        equation = []
+        arguments = arg_str.split(",")
         for i in imports:
             if func in i.__dict__.keys():
                 equation = i.__dict__[func]
-                arguments = assignment.split('(')[1].split(')')[0].split(',')
                 break
         if not equation:
             SyntaxError(None, file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
-
     else:
         equation = assignment.strip("\n").strip()
 
     return equation, arguments
+
+# def convert_functions(assignment, imports, file_name, line_number):
+#     arguments = []
+#     if isfloat(assignment):
+#         return float(assignment), arguments
+#     # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
+#     if re.search(r'\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
+#         equation = None
+#         func = assignment.strip('(').split('(')[0]
+#         for i in imports:
+#             if func in i.__dict__.keys():
+#                 equation = i.__dict__[func]
+#                 arguments = assignment.split('(')[1].split(')')[0].split(',')
+#                 break
+#         if not equation:
+#             SyntaxError(None, file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
+
+#     else:
+#         equation = assignment.strip("\n").strip()
+
+#     return equation, arguments
 
 def parse_value(line, line_no, file_name, section=""):
     value_ID = line.split('=')[0].strip()
@@ -404,6 +431,22 @@ def par_minmax(val1, val2):
     if val1.units != val2.units:
         return Parameter((np.nan, np.nan), val1.units, "minmax(({}), ({}))".format(val1.id, val2.id), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to " + un.hr_units(val2.units) + ".", ["par_minmax"]))
     return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "Min/max({},{})".format(val1.name, val2.name))
+
+def par_range(val1):
+    if pass_errors(val1): return pass_errors(val1, caller="par_range")
+
+    if isinstance(val1, Parameter):
+        return Parameter(val1.max - val1.min, val1.units, "range({})".format(val1.name))
+    else:
+        raise TypeError("Input to range() must be of type Parameter.")
+    
+def par_strip(val1):
+    if pass_errors(val1): return pass_errors(val1, caller="par_strip")
+
+    if isinstance(val1, Parameter):
+        return Parameter((val1.min, val1.max), {}, "strip({})".format(val1.name))
+    else:
+        raise TypeError("Input to strip() must be of type Parameter.")
 
 
 def par_min(val1, val2=None):
@@ -882,7 +925,7 @@ class Parameter:
             self.assign(equation)
             self.independent = True
         elif isinstance(equation, str):
-            if any(character in EQUATION_OPERATORS for character in equation):
+            if any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in equation):
                 # Find parameter names including "." imports
                 self.args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", re.sub('[\'|\"].*[\'|\"]','',equation)) if x not in FUNCTIONS]
 
