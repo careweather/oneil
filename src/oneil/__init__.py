@@ -31,7 +31,7 @@ def isfloat(num):
 
 __version__ = get_distribution("oneil").version
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip", "mid": "par_mid"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
@@ -432,19 +432,27 @@ def par_minmax(val1, val2):
         return Parameter((np.nan, np.nan), val1.units, "minmax(({}), ({}))".format(val1.id, val2.id), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to " + un.hr_units(val2.units) + ".", ["par_minmax"]))
     return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "Min/max({},{})".format(val1.name, val2.name))
 
-def par_range(val1):
-    if pass_errors(val1): return pass_errors(val1, caller="par_range")
+def par_range(val):
+    if pass_errors(val): return pass_errors(val, caller="par_range")
 
-    if isinstance(val1, Parameter):
-        return Parameter(val1.max - val1.min, val1.units, "range({})".format(val1.name))
+    if isinstance(val, Parameter):
+        return Parameter(val.max - val.min, val.units, "range({})".format(val.name))
     else:
         raise TypeError("Input to range() must be of type Parameter.")
     
-def par_strip(val1):
-    if pass_errors(val1): return pass_errors(val1, caller="par_strip")
+def par_mid(val):
+    if pass_errors(val): return pass_errors(val, caller="par_mid")
 
-    if isinstance(val1, Parameter):
-        return Parameter((val1.min, val1.max), {}, "strip({})".format(val1.name))
+    if isinstance(val, Parameter):
+        return Parameter((val.max + val.min)/2, val.units, "mid({})".format(val.name))
+    else:
+        raise TypeError("Input to mid() must be of type Parameter.")
+    
+def par_strip(val):
+    if pass_errors(val): return pass_errors(val, caller="par_strip")
+
+    if isinstance(val, Parameter):
+        return Parameter((val.min, val.max), {}, "strip({})".format(val.name))
     else:
         raise TypeError("Input to strip() must be of type Parameter.")
 
@@ -1118,9 +1126,9 @@ class Parameter:
         print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose, submodel_id=submodel_id))
 
     def hprint(self, sigfigs=4, indent=0):
-        output = ("\n" + self.name + "\n--------------------\n" if self.performance else "")
+        output = ("\n" + self.name + "\n--------------------\n")
         output += " " * indent + self.id + ": "
-        output += self.human_readable(sigfigs)
+        output += self.human_readable(sigfigs) + "\n"
         print(output)
 
     def human_readable(self, sigfigs=4):
@@ -2455,8 +2463,11 @@ def handler(model:Model, inpt):
         sys.exit()
     elif cmd == "exit":
         sys.exit()
+    elif inpt in model.parameters:
+        model.parameters[inpt].hprint()
     else:
         print(model.eval(inpt))
+            
 
 help_text = """
 Commands:
