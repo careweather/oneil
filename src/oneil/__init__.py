@@ -120,7 +120,7 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {l.split('=')[0].strip():l.split('=')[1].strip() for l in model.split('(')[1].split(')')[0].split(',')}
                     model = model.split('(')[0].strip()
                 else:
-                    test_inputs = []
+                    test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
                     ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
@@ -145,7 +145,7 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {l.split('=')[0].strip():l.split('=')[1].strip() for l in model.split('(')[1].split(')')[0].split(',')}
                     model = model.split('(')[0].strip()
                 else:
-                    test_inputs = []
+                    test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
                     ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
@@ -2017,54 +2017,14 @@ class Model:
     def _test_recursively(self, path=[], test_inputs={}, trail=[], verbose=True):
         fails = 0
         tests = 0
-
-        for submodel_ID in {k:v for (k,v) in self.submodels.items() if 'model' in v}:
             
-            # Prepare test inputs
-            if not test_inputs:
-                if self.submodels[submodel_ID]['inputs']:
-                    for arg, input in self.submodels[submodel_ID]['inputs'].items():
-                        if '.' in input:
-                            input_ID, source = input.split('.')
-                            retrieval_path = copy.copy(self.submodels[source]['path'])
-
-                            result = self._retrieve_parameter(input_ID, retrieval_path)
-                            if isinstance(result, ModelError):
-                                result.source_message = "Couldn't find parameter " + input_ID + ". Invalid in submodel path " + retrieval_path + "."
-                                return result
-                            elif isinstance(result, Parameter):
-                                test_inputs[arg] = result
-                            else:
-                                raise TypeError("Invalid result type: " + str(type(result)))
-
-                        elif input in self.parameters:
-                            test_inputs[arg] = self.parameters[input]
-                        else:
-                            return ParameterError(input, "Test input " + input + " for submodel " + submodel_ID + " not found in " + self.name + ".", source=["Model.test_submodels"])
-                
-            # Test the submodel
-            path = copy.copy(self.submodels[submodel_ID]['path'])
-        
-            new_trail = copy.copy(trail)
-            new_trail.append(self.name)
-            if path:
-                submodel_name = path.pop(0)
-                submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
-                if submodel:
-                    submodel = submodel[0]
-                    new_fails, new_tests = submodel._test_recursively(copy.copy(path), test_inputs, new_trail, verbose=verbose)
-                    fails += new_fails
-                    tests += new_tests
-                else:
-                    return ModelError(submodel_name, "Submodel not found.", new_trail)
-            
-        # Eval each test expression, using self.parameters and the reference models
+        # Test this model. Eval each test expression, using self.parameters and the reference models
         for test in self.tests:
             tests += 1
             test_params = {}
             run_expression = test.expression
 
-            # Only run tests with inputs if inputs are present
+            # Only run tests with inputs if inputs were found
             if not any(ref not in test_inputs for ref in test.refs):
                 if verbose: print("Test (" + self.name + "): " + run_expression)
                 for i, arg in enumerate(test.args):
@@ -2132,11 +2092,70 @@ class Model:
                 if verbose:
                     print("Test (" + self.name + "): " + test.expression + " (" + bcolors.FAIL + "skipped" + bcolors.ENDC + ")")
 
+
+        # Initiate testing of this model's submodels
+        for submodel_ID in {k:v for (k,v) in self.submodels.items() if 'model' in v}:
+            submodel_entry = self.submodels[submodel_ID]
+            submodel = submodel_entry['model']
+            
+            # Prepare test inputs for the submodel
+            if submodel_entry['inputs']:
+                for arg, inp in submodel_entry['inputs'].items():                 
+                    if isinstance(inp, Parameter):
+                        test_inputs[arg] = inp
+                    elif isinstance(inp, str):
+                        if '.' in inp:
+                            input_ID, source = inp.split('.')
+                            retrieval_path = copy.copy(self.submodels[source]['path'])
+
+                            result = self._retrieve_parameter(input_ID, retrieval_path)
+                            if isinstance(result, ModelError):
+                                result.source_message = f"Couldn't find parameter {input_ID}. Invalid in submodel path {retrieval_path}."
+                                return result
+                            elif isinstance(result, Parameter):
+                                test_inputs[arg] = result
+                            else:
+                                raise TypeError("Invalid result type: " + str(type(result)))
+                        elif inp in self.parameters:
+                            test_inputs[arg] = self.parameters[inp]
+                        else:
+                            return ParameterError(inp, f"Test input {inp} for submodel {submodel_ID} not found in {self.name}.", source=["Model.test_submodels"])
+                    else:
+                        raise TypeError("Invalid test input type: " + str(type(inp)))
+                
+                    if '.' in arg:
+                        arg_ID, source = arg.split('.')
+                        passthrough_path = copy.copy(self.submodels[source]['path'])
+                        end_model = passthrough_path.pop()
+                        passthrough_model = self._retrieve_model(passthrough_path)
+                        if isinstance(passthrough_model, ModelError):
+                            passthrough_model.throw(self, f"A passthrough test argument ({arg}) was specified for {submodel.name} import, but the passthrough model (.{source}) was not found.", self.submodels[source]['path'])
+                        else:
+                            end_model_ID = [k for k, v in passthrough_model.submodels.items() if v['path'] == [end_model]][0]
+                            passthrough_model.submodels[end_model_ID]['inputs'][arg_ID] = test_inputs[arg]
+                            del test_inputs[arg]
+
+            # Test the submodel
+            path = copy.copy(self.submodels[submodel_ID]['path'])
+            new_trail = copy.copy(trail)
+            new_trail.append(self.name)
+            if path:
+                submodel_name = path.pop(0)
+                submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
+                if submodel:
+                    submodel = submodel[0]
+                    new_fails, new_tests = submodel._test_recursively(copy.copy(path), test_inputs, new_trail, verbose=verbose)
+                    fails += new_fails
+                    tests += new_tests
+                else:
+                    return ModelError(submodel_name, "Submodel not found.", new_trail)
+
+
         if not isinstance(fails, int):
             fails.throw(self, "(in Model.test) Submodel test failed.")
         
         return fails, tests
-
+    
     def test(self, verbose=True):
         fail_count, test_count = self._test_recursively(verbose=verbose)
 
