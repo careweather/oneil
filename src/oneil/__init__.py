@@ -397,7 +397,7 @@ def _process_minmax_par_inputs(val1, val2):
         return val1, val2
 
 def par_extent(val1, val2=None):
-    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_min")
+    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_extent")
 
     if not val2:
         if isinstance(val1, Parameter):
@@ -415,12 +415,12 @@ def par_extent(val1, val2=None):
             return Parameter(max(abs(val1.min), abs(val1.max)), val1.units, "extent({})".format(val1.name))
         
         if val1.units != val2.units:
-            return Parameter((np.nan, np.nan), val1.units, "extent(({}), ({}))".format(val1.id, val2.id), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to " + un.hr_units(val2.units) + ".", ["par_min"]))
+            return Parameter((np.nan, np.nan), val1.units, "extent(({}), ({}))".format(val1.id, val2.id), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to " + un.hr_units(val2.units) + ".", ["par_extent"]))
 
         return Parameter((max(abs(val1.min), abs(val1.max), abs(val2.min), abs(val2.max))), val1.units, "extent({},{})".format(val1.name, val2.name))
     elif isinstance(val2, (int, float)):
         if val1.units != {}:
-            return Parameter((np.nan, np.nan), val1.units, "extent(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to a unitless number.", ["par_min"]))
+            return Parameter((np.nan, np.nan), val1.units, "extent(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to a unitless number.", ["par_extent"]))
         return Parameter((max(abs(val1.min), abs(val1.max), abs(val2))), val1.units, "extent({},{})".format(val1.name, val2))
     
     raise TypeError("Second input to extent() must be of type Parameter, int, or float.")
@@ -483,8 +483,8 @@ def par_min(val1, val2=None):
         if val1.units != {}:
             return Parameter((np.nan, np.nan), val1.units, "min(({}), ({}))".format(val1.id, str(val2)), error=UnitError([val1, val2], "Cannot compare " + un.hr_units(val1.units) + " to a unitless number.", ["par_min"]))
         return Parameter((min(val1.min, val2), min(val1.max, val2)), val1.units, "min({},{})".format(val1.name, val2))
-    
-    raise TypeError("Second input to min() must be of type Parameter, int, or float.")
+    else:
+        raise TypeError("Second input to min() must be of type Parameter, int, or float.")
 
 
 def par_max(val1, val2=None):
@@ -515,8 +515,8 @@ def par_max(val1, val2=None):
     elif isinstance(val1, (int, float)):
         if isinstance(val2, (int, float)):
             return max(val1, val2)
-    
-    raise TypeError("Inputs to max() must be of type Parameter, int, or float.")
+    else:
+        raise TypeError("Inputs to max() must be of type Parameter, int, or float.")
 
 def par_sin(val):
     if pass_errors(val): return pass_errors(val, caller="par_sin")
@@ -1708,9 +1708,7 @@ class Model:
             self.design = new_design + "@" + self.design if self.design != "default" else new_design
 
         self._reset_recursively()
-        self.calculate()
-
-        if not quiet: self.summarize()
+        self.build()
 
     def _param2latex(self, param_ID):
         # Replace parameter functions with their normal function names
@@ -1945,14 +1943,9 @@ class Model:
             if 'model' in entry.keys():
                 entry['model']._reset_recursively()
 
-    def calculate(self, quiet=False):
+    def build(self, quiet=False):
         # Calculate imports
-        for key, entry in self.submodels.items():
-            if 'model' in entry.keys():
-                entry['model'].calculate(quiet=True)
-
-        # Calculate dependent parameters.
-        self._calculate_recursively(self.parameters)
+        self._calculate_models_recursively(quiet)
 
         # Run tests
         self.test(verbose=False)
@@ -1960,6 +1953,15 @@ class Model:
         if not quiet: self.summarize()
 
         self.calculated = True
+
+    def _calculate_models_recursively(self, quiet=False):
+        # Initiate recursive calculation of submodel parameters.
+        for key, entry in self.submodels.items():
+                    if 'model' in entry.keys():
+                        entry['model']._calculate_models_recursively(quiet=True)
+
+        # Calculate this models dependent parameters.
+        self._calculate_parameters_recursively(self.parameters)
 
     def eval(self, expression):
         # Make a dict of calculation parameters from the submodels
@@ -2014,7 +2016,7 @@ class Model:
         else:
             ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
 
-    def _test_recursively(self, path=[], test_inputs={}, trail=[], verbose=True):
+    def _test_recursively(self, log, path=[], test_inputs={}, trail=[], verbose=True):
         fails = 0
         tests = 0
             
@@ -2092,11 +2094,11 @@ class Model:
                 if verbose:
                     print("Test (" + self.name + "): " + test.expression + " (" + bcolors.FAIL + "skipped" + bcolors.ENDC + ")")
 
-
         # Initiate testing of this model's submodels
-        for submodel_ID in {k:v for (k,v) in self.submodels.items() if 'model' in v}:
+        for submodel_ID in {k:v for (k,v) in self.submodels.items() if 'model' in v and v['model'].name not in log}:
             submodel_entry = self.submodels[submodel_ID]
             submodel = submodel_entry['model']
+            log.append(submodel.name)
             
             # Prepare test inputs for the submodel
             if submodel_entry['inputs']:
@@ -2144,7 +2146,7 @@ class Model:
                 submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
                 if submodel:
                     submodel = submodel[0]
-                    new_fails, new_tests = submodel._test_recursively(copy.copy(path), test_inputs, new_trail, verbose=verbose)
+                    new_fails, new_tests = submodel._test_recursively(log, copy.copy(path), test_inputs, new_trail, verbose=verbose)
                     fails += new_fails
                     tests += new_tests
                 else:
@@ -2157,7 +2159,8 @@ class Model:
         return fails, tests
     
     def test(self, verbose=True):
-        fail_count, test_count = self._test_recursively(verbose=verbose)
+        log = []
+        fail_count, test_count = self._test_recursively(log, verbose=verbose)
 
         self.fail_count = fail_count
         self.test_count = test_count
@@ -2169,7 +2172,7 @@ class Model:
         alternate = copy.deepcopy(self)
         alternate._reset()
         alternate.overwrite(alternate_design_file)
-        alternate.calculate(quiet=True)
+        alternate.build(quiet=True)
 
         table = BeautifulTable()
         table.columns.header = ["Parameter", self.design, alternate.design, self.design + "\n" + "-"*max(len(self.design), len(alternate.design)) + "\n" + alternate.design]
@@ -2293,7 +2296,7 @@ class Model:
             [self.parameters[ID].short_print(sigfigs, indent=indent * 4, verbose=verbose) for ID in parameter_IDs if ID in self.parameters | self.constants]
             if any([self.parameters[ID].args for ID in parameter_IDs]) and turtles: print("    " * indent + "🐢🐢🐢")
 
-    def _calculate_recursively(self, parameters, trail=[]):
+    def _calculate_parameters_recursively(self, parameters, trail=[]):
         for parameter in parameters.values():
             if isinstance(parameter, Parameter) and any([parameter.min is None, parameter.max is None]):
                 
@@ -2310,12 +2313,12 @@ class Model:
                     piece_parameters = {}
                     for i, piece in enumerate(parameter.equation):
                         piece_parameters.update({piece[0].id + str(i): piece[0], piece[1].id + str(i): piece[1]})
-                    self._calculate_recursively(piece_parameters, new_trail)
+                    self._calculate_parameters_recursively(piece_parameters, new_trail)
                 elif parameter.minmax_equation:
                     minmax_equation_parameters = {}
                     for i, eq in enumerate(parameter.equation):
                         minmax_equation_parameters.update({eq.id + str(i): eq})
-                    self._calculate_recursively(minmax_equation_parameters, new_trail)
+                    self._calculate_parameters_recursively(minmax_equation_parameters, new_trail)
                 else:
                     if not parameter.args:
                         raise ValueError(f"In Model._calculate_recursively for model {self.name}: Parameter has no args nor a set value.")
@@ -2329,7 +2332,7 @@ class Model:
                         if parameter.id in trail:
                             ParameterError(parameter, "", source=["Model._calculate_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
                         
-                        self._calculate_recursively(calc_args, new_trail)
+                        self._calculate_parameters_recursively(calc_args, new_trail)
 
                     # Make a dict of calculation parameters from the submodels
                     expression = parameter.equation
@@ -2559,7 +2562,7 @@ def loader(args=[]):
             if os.path.exists(inp):
                 print("Loading model " + inp + "...")
                 model = Model(inp)
-                model.calculate()
+                model.build()
             else:
                 print("Model " + inp + " not found.")
                 inp = ""
