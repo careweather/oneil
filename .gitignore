@@ -3,4 +3,4 @@ __pycache__/
 .venv/
 *.egg-info
 .vim/
-.netrwhist
+.netrwhist/
