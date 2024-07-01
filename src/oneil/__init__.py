@@ -10,6 +10,8 @@ from . import units as un
 import importlib
 from functools import partial
 
+np.seterr(all='raise')
+
 class bcolors:
     MAGENTA = '\033[95m'
     OKBLUE = '\033[94m'
@@ -1234,8 +1236,12 @@ class Parameter:
                         del new_units[k]
                 else:
                     new_units[k] = -v
-            results = [self.min / other.max, self.max / other.min]
-            return Parameter((min(results), max(results)), new_units, "({}) / ({})".format(self.id, other.id))
+            try:
+                results = [self.min / other.max, self.max / other.min]
+            except FloatingPointError:
+                return Parameter((np.nan, np.nan), new_units, "({}) / ({})".format(self.id, other.id), error=ParameterError([self, other], "Division by zero.", ["Parameter.__truediv__"]))
+            else:
+                return Parameter((min(results), max(results)), new_units, "({}) / ({})".format(self.id, other.id))
         elif isinstance(other, (int, float)):
             results = [self.min / other, self.max / other]
             return Parameter((min(results), max(results)), self.units, "({}) / ({})".format(self.id, str(other)))
@@ -1255,8 +1261,12 @@ class Parameter:
                         del new_units[k]
                 else:
                     new_units[k] = -v
-            results = [self.min / other.min, self.max / other.max]
-            return Parameter((min(results), max(results)), new_units, "({}) // ({})".format(self.id, other.id))
+            try:
+                results = [self.min / other.min, self.max / other.max]
+            except FloatingPointError:
+                return Parameter((np.nan, np.nan), new_units, "({}) // ({})".format(self.id, other.id), error=ParameterError([self, other], "Division by zero.", ["Parameter.__floordiv__"]))
+            else:
+                return Parameter((min(results), max(results)), new_units, "({}) // ({})".format(self.id, other.id))
         elif isinstance(other, (int, float)):
             results = [self.min / other, self.max / other]
             return Parameter((min(results), max(results)), self.units, "({}) // ({})".format(self.id, str(other)))
