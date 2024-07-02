@@ -33,7 +33,7 @@ def isfloat(num):
 
 __version__ = get_distribution("oneil").version
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip", "mid": "par_mid"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip", "mid": "par_mid", "sign": "par_sign"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
@@ -450,6 +450,14 @@ def par_mid(val):
     else:
         raise TypeError("Input to mid() must be of type Parameter.")
     
+def par_sign(val):
+    if pass_errors(val): return pass_errors(val, caller="par_sign")
+
+    if isinstance(val, Parameter):
+        return Parameter((np.sign(val.min), np.sign(val.max)), {}, "sign({})".format(val.name))
+    else:
+        raise TypeError("Input to sign() must be of type Parameter.")
+    
 def par_strip(val):
     if pass_errors(val): return pass_errors(val, caller="par_strip")
 
@@ -638,7 +646,7 @@ def par_abs(val):
         else:
             return Parameter((abs(val.max), abs(val.min)), val.units, "|{}|".format(val.id))
     elif isinstance(val, (int, float)):
-        return Parameter((abs(val), abs(val)), val.units, "|{}|".format(val))
+        return Parameter((abs(val), abs(val)), {}, "|{}|".format(val))
     else:
         raise TypeError("Input to abs() must be of type Parameter, int, or float.")
 
@@ -1094,19 +1102,12 @@ class Parameter:
             try:
                 return self.equation(*function_args)
             except:
-                PythonError(self, "Calculation error.")
-                import pdb
-
-                breakpoint()
-                return self.equation(*function_args)
+                PythonError(self, "Calculation error.") #TODO: report the error over CLI (below too)
         else:
             try:
                 return eval(expression, glob, eval_params | MATH_CONSTANTS)
             except:
                 PythonError(self, "Calculation error.")
-                import pdb
-
-                breakpoint()
 
     # Parameter Printing
 
