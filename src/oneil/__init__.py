@@ -9,6 +9,10 @@ from beautifultable import BeautifulTable
 from . import units as un
 import importlib
 from functools import partial
+import traceback, logging
+
+# Configure logging to output to the console
+logging.basicConfig(level=logging.ERROR, format='%(message)s')
 
 np.seterr(all='raise')
 
@@ -722,7 +726,7 @@ class Error:
 class DesignError(Error):
     def __init__(self, model, filename):
         error = bcolors.FAIL + "DesignError" + bcolors.ENDC
-        print(error + " can't find " + filename)
+        print(error + " can't find design files:" + filename)
         interpreter(model)
 
 class UnitError(Error):
@@ -832,10 +836,17 @@ class ModelError(Error):
             loader([])
 
 class PythonError(Error):
-    def __init__(self, parameter, message):
+    def __init__(self, parameter, message, original_exception=None):
         error = bcolors.FAIL + "PythonError" + bcolors.ENDC
-        print(f"{error} in {parameter.equation}: (line {parameter.line_no}) {parameter.line} - {message}")
-        
+        if original_exception:
+            message += f": {original_exception}\n"
+            message += f"\n{traceback.format_exc()}"
+        full_message = f"{error} in {parameter.equation}: (line {parameter.line_no}) {parameter.line}{message}"
+        print(full_message)
+        logging.error(full_message)  # Log the error message
+
+        if original_exception:
+            raise original_exception
 
 def pass_errors(*args, caller=None):
     for arg in args:
@@ -1100,13 +1111,13 @@ class Parameter:
 
             try:
                 return self.equation(*function_args)
-            except:
-                PythonError(self, "Calculation error.") #TODO: report the error over CLI (below too)
+            except Exception as e:
+                PythonError(self, "Calculation error", e)
         else:
             try:
                 return eval(expression, glob, eval_params | MATH_CONSTANTS)
-            except:
-                PythonError(self, "Calculation error.")
+            except Exception as e:
+                PythonError(self, "Calculation error", e)
 
     # Parameter Printing
 
@@ -1666,7 +1677,7 @@ class Model:
     # Convert an empty model to a modeled design with all parameters assigned a value.
     def overwrite(self, design_files, quiet=False):
         if not design_files:
-            # TODO: ERR
+            DesignError(self, [])
             return
         
         # Import design parameters.
