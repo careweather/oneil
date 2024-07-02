@@ -216,7 +216,7 @@ def parse_file(file_name, parent_model=None):
     return note, params, submodels, tests, design_overrides
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
-    trace = ''
+    trace = False
     hrunits=''
 
     if line[0] == '$':
@@ -229,7 +229,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         if line[1] == '*':
             import pdb;
             breakpoint
-        trace = 'calc'
+        trace = True
         line = line[1:].strip()
 
     preamble = line.split(':')[0]
@@ -897,7 +897,7 @@ class Test:
 
 class Parameter:
     def __init__(self, equation, units, id, hr_units="", model="", line_no=None, line="", name=None, options=None, performance=False, trace=False, section="", arguments=[], error=None):
-        if trace == 'init':            
+        if trace:            
             import pdb
             breakpoint()
 
@@ -1016,6 +1016,8 @@ class Parameter:
             if value.min is not None and value.max is not None:
                 if value.units != self.units:
                     self.error = UnitError([self], "Input or calculated units (" + str(value.units) + ") do not match the required units: (" + str(self.units) + ").", ["Parameter.write()"])
+                else:
+                    self.error=value.error
                 self.min = value.min
                 self.max = value.max
             elif not value.independent:
@@ -1028,6 +1030,7 @@ class Parameter:
                 self.pointer = value.pointer
                 self.min = self.max = None
                 self.independent = False
+                self.error=value.error
             else:
                 raise ValueError("Parameter " + value.id + " cannot be written to " + self.id + ", because it is empty and independent.")
             
@@ -1039,7 +1042,6 @@ class Parameter:
             self.note_lines = value.note_lines
             self.section = value.section
             self.isdiscrete = value.isdiscrete
-            self.error = value.error
             self.trace = value.trace
         elif isinstance(value, tuple):
             if self.isdiscrete:
@@ -1094,14 +1096,14 @@ class Parameter:
 
 
     def calculate(self, expression, glob, eval_params, eval_args):
+        if self.trace:
+            import pdb
+            breakpoint()
+        
         if not self.equation:
             return ParameterError(self, "Parameter needs an equation or value defined.", ["Parameter.calculate()"])
         if (self.min or self.max):
             return ParameterError(self, "Parameters cannot be re-calculated.", ["Parameter.calculate()"])
-
-        if self.trace == 'calc':
-            import pdb
-            breakpoint()
 
         if self.callable:
             if not all(k in eval_params for k in eval_args):
@@ -2080,7 +2082,7 @@ class Model:
 
                 test_params = test_params | self.constants
 
-                if test.trace == True:
+                if test.trace:
                     print("Breakpoint for test: " + test.expression)
                     
                     import pdb
@@ -2248,7 +2250,11 @@ class Model:
     def _tree_recursively(self, parameter_IDs=[], indent=0, sigfigs=4, levels=12, verbose=False, up=False, trail=[], turtles=True, submodel_id=""):
         if indent < levels:
             for parameter_ID in parameter_IDs:
-                parameter = self.parameters[parameter_ID]
+                if parameter_ID in self.parameters:
+                    parameter = self.parameters[parameter_ID]
+                else:
+                    IDError(self, parameter_ID, "Parameter not found in model.").throw(self, "Parameter not found in model.")
+
                 if indent == 0:
                     parameter.hprint(sigfigs)
                 else:
