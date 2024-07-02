@@ -907,7 +907,7 @@ class Parameter:
         self.section = section
         self.error = error
         self.pointer = False
-        self.piecewise = False
+        self.piecewise = True if isinstance(equation, list) else False
         self.minmax_equation = False
         self.hr_units = hr_units
         
@@ -985,7 +985,6 @@ class Parameter:
             ParameterError([self], "", ["Parameter.__init__"]).throw(None, "Parameter equation must be a callable, a float, an int, or a string. If callable, did you forget the preceding underscore. Or did you forget to place an equation in quotes?")
 
     def add_piece(self, piece, callable_args):
-        self.piecewise = True
         self.equation.append(piece)
         piece_args = piece[0].args + piece[1].args + callable_args
         if not piece_args:
@@ -1144,7 +1143,7 @@ class Parameter:
                 else:
                     return un.hr_vals_and_units((self.min,self.max), self.units, self.hr_units, sigfigs)
             else:
-                return un.hr_units(self.units, sigfigs=sigfigs)
+                return un.hr_units(self.units)
 
     def copy(self):
         return Parameter((self.min, self.max), self.units, "copy of " + self.name, model=self.model, line_no=self.line_no, line=self.line)
@@ -2321,10 +2320,21 @@ class Model:
                     new_trail = [parameter.id]
 
                 if parameter.piecewise:
-                    piece_parameters = {}
+                    piece_equations = {}
+                    piece_conditions = {}
+                    true_equations = {}
+                    
+                    if len(parameter.equation) < 2:
+                        ParameterError(parameter, "Piecewise function requires at least two pieces.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
+                    
                     for i, piece in enumerate(parameter.equation):
-                        piece_parameters.update({piece[0].id + str(i): piece[0], piece[1].id + str(i): piece[1]})
-                    self._calculate_parameters_recursively(piece_parameters, new_trail)
+                        piece_equations.update({piece[0].id + str(i): piece[0]})
+                        piece_conditions.update({piece[1].id + str(i): piece[1]})
+                    self._calculate_parameters_recursively(piece_conditions, new_trail)
+                    for cond in piece_conditions:
+                        if piece_conditions[cond].min and piece_conditions[cond].max:
+                            true_equations.update({cond.replace("cond", "eq"): piece_equations[cond.replace("cond", "eq")]})
+                    self._calculate_parameters_recursively(true_equations, new_trail)
                 elif parameter.minmax_equation:
                     minmax_equation_parameters = {}
                     for i, eq in enumerate(parameter.equation):
@@ -2384,7 +2394,7 @@ class Model:
                     for piece in parameter.equation:
                         if piece[1].min and piece[1].max:
                             calculation = piece[0]
-                    if not calculation:
+                    if calculation is None or calculation.min is None or calculation.max is None:
                         ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, "Parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model + ") failed to calculate.\n\"" + parameter.line.strip() + "\"" + "\n" + str(parameter.equation))
                 elif parameter.minmax_equation:
                     calculation = (parameter.equation[0].min, parameter.equation[1].max)
