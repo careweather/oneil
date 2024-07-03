@@ -197,10 +197,11 @@ def parse_file(file_name, parent_model=None):
                 prev_line = 'test'
             elif re.search(r"^(\*{1,2}\s*)?\w+(\.\w+)?\s*=>?[^:]+(:.*)?$", line):
                 last_line_blank = False
-                if '=>' in line:
-                    design_overrides[line.split('=>')[0].strip()] = parse_value(line, i+1, file_name.replace(".on", ""), section)
-                else:
-                    design_overrides[line.split('=')[0].strip()] = parse_value(line, i+1, file_name.replace(".on", ""), section)
+
+                id, equation, arguments, units, unit_fx, pointer = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
+                isdiscrete = True if not pointer and isinstance(equation, str) else False
+                options = [equation] if not pointer and isinstance(equation, str) else None
+                design_overrides[id] = Parameter(equation, units, id, model=file_name.replace(".on", ""), line_no=i+1, line=line, name=f"{id} from {file_name}", options=options, section=section, pointer=pointer)
                 
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
@@ -292,7 +293,7 @@ def parse_body(body, line, line_number, file_name, imports):
         units = {}
         unit_fx = lambda x:x
 
-    equation, arguments = parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer)
+    equation, arguments = parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer=pointer)
 
     return id, equation, arguments, units, unit_fx, pointer
 
@@ -971,11 +972,11 @@ class Parameter:
                 self.independent = False
                 self.pointer = False
             else:
-                if self.options and isinstance(self.options, list):
+                if self.isdiscrete:
                     self.assign(equation)
                     self.independent = True
                     if self.pointer:
-                        self.error = ParameterError([self], "Switch parameters cannot use pointers.", ["Parameter.__init__"])
+                        self.error = ParameterError([self], "Discrete parameters cannot use pointers.", ["Parameter.__init__"])
                 elif self.pointer:
                     self.equation = equation
                     self.args = [equation]
@@ -1006,14 +1007,20 @@ class Parameter:
             self.args = list(set(self.args + piece_args))
 
     def assign(self, value):
-        self.write(value)
+        if value is not None:
+            self.write(value)
+        else:
+            self.error = ParameterError([self], "Value is empty.", ["Parameter.assign()"])
 
     def write(self, value):
         if isinstance(value, Parameter):
-            if self.options and value.equation in self.options:
-                value.min = value.max = value.equation
-                value.equation = None
-                value.isdiscrete = True
+            if self.isdiscrete:
+                if value.equation in self.options:
+                    value.min = value.max = value.equation
+                    value.equation = None
+                    value.isdiscrete = True
+                else:
+                    self.error = ParameterError([self], "Parameter was given a value that is not among its options.", ["Parameter.write()"])
                 
             if value.min is not None and value.max is not None:
                 if value.units != self.units:
@@ -1034,7 +1041,7 @@ class Parameter:
                 self.independent = False
                 self.error=value.error
             else:
-                raise ValueError("Parameter " + value.id + " cannot be written to " + self.id + ", because it is empty and independent.")
+                self.error = ValueError(f"Parameter {value.id} cannot be written to {self.id}, because it is empty and independent.")
             
             if value.model: self.model = value.model
 
@@ -1114,12 +1121,14 @@ class Parameter:
             function_args = [eval_params[arg] for arg in eval_args]
 
             try:
-                return self.equation(*function_args)
+                result = self.equation(*function_args)
+                return result
             except Exception as e:
                 PythonError(self, "Calculation error", e)
         else:
             try:
-                return eval(expression, glob, eval_params | MATH_CONSTANTS)
+                result = eval(expression, glob, eval_params | MATH_CONSTANTS)
+                return result
             except Exception as e:
                 PythonError(self, "Calculation error", e)
 
@@ -1165,13 +1174,6 @@ class Parameter:
 
     def __str__(self):
         return self.human_readable(4)
-
-    def _clone(self, parameter):
-        #warnings.warn("A value, " + str(parameter) + ", was cloned.")
-        self.min = parameter.min
-        self.max = parameter.max
-        self.units = parameter.units
-        self.name = parameter.name
 
     # "+" Addition, left-hand, all cases 
     def __add__(self, other):
@@ -1733,9 +1735,9 @@ class Model:
                 path = []
             result = self._rewrite_parameter(ID, parameter, path)
             if isinstance(result, ModelError):
-                result.throw(self, "(line " + str(self.submodels[submodel]['line_no']) + ") " + self.submodels[submodel]['line'] + "- " + "Couldn't find " + submodel + " in path " + ".".join(path) + " while overwriting " + ID + " in " + design_files + ".")
+                result.throw(self, f"(line {self.submodels[submodel]['line_no']}) {self.submodels[submodel]['line']} - Couldn't find {submodel} in path {'.'.join(path)} while overwriting {ID} in {design_files}.")
             elif isinstance(result, ParameterError):
-                result.throw(self, "Error rewriting parameter " + ID + " in " + design_files + ".")
+                result.throw(self, f"Error rewriting parameter {ID} in {design_files}.")
 
         self.defaults.append(list[set(self.parameters).difference(design)])
         
@@ -2435,7 +2437,7 @@ class Model:
                         if piece[1].min and piece[1].max:
                             calculation = piece[0]
                     if calculation is None or calculation.min is None or calculation.max is None:
-                        ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
+                        ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line}\"\n{str(parameter.equation)}")
                 elif parameter.minmax_equation:
                     calculation = (parameter.equation[0].min, parameter.equation[1].max)
                 else:
@@ -2446,36 +2448,11 @@ class Model:
                         if isinstance(calculation, Parameter) and calculation.error:
                             model = None if not parameter.model else parameter.model
                             calculation.error.throw(self, f"Parameter \"{parameter.id}\" (line {parameter.line_no} from model {model}) failed to calculate.\n{parameter.line}", debug=True)
+                            
                 
                 parameter.assign(calculation)
                 if parameter.error:
                     parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + str(parameter.model), debug=True)
-
-    def _get_pointer_calculation(self, parameter, parameters):
-        if parameter.minmax_equation:
-            mineq, maxeq = parameter.equation
-            if mineq.pointer:
-                if mineq.equation in parameters.keys():
-                    mincalc = parameters[mineq.equation].min
-                else:
-                    ParameterError(parameter, "Pointer to non-existent parameter.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
-            else:
-                mincalc = mineq.min
-
-            if maxeq.pointer:
-                if maxeq.equation in parameters.keys():
-                    maxcalc = parameters[maxeq.equation].max
-                else:
-                    ParameterError(parameter, "Pointer to non-existent parameter.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
-            else:
-                maxcalc = maxeq.max
-                
-            calculation = Parameter((mincalc, maxcalc), parameter.units, "{parameter.id}_calc", "", parameter.model, parameter.line_no, name="{parameter.name} pointer calculation")
-
-        else:
-            calculation = parameters[parameter.equation]
-
-        return calculation
 
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.
     def _retrieve_parameter(self, parameter_ID, path, trail=[]):
@@ -2525,12 +2502,14 @@ class Model:
                 return ModelError(parameter_ID, "Submodel not found.", trail)
         else:
             self.parameters[parameter_ID].write(parameter)
+            
             if self.parameters[parameter_ID].error:
-                return self.parameters[parameter_ID]
+                return self.parameters[parameter_ID].error
+            
             return True
 
 def handler(model:Model, inpt):
-    args = inpt.split(" ")
+    args = inpt.strip().split(" ")
     cmd = args.pop(0)
     opt_list = [arg for arg in args if "=" in arg]
     opts = {}
@@ -2689,14 +2668,14 @@ loader_help = """"
 def interpreter(model):
     while True:
         if model.design == "default":
-            handler(model, input(f"({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
+            handler(model, input(f"({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
         else:
-            handler(model, input(f"({bcolors.ORANGE}{model.design}@{bcolors.ENDC}{bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
+            handler(model, input(f"({bcolors.ORANGE}{model.design}@{bcolors.ENDC}{bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
 
 def debugger(model):
     print("Enterring debug mode. Type 'quit' to exit.")
     while True:
-        handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>>"))
+        handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
     
 def main(args=sys.argv[1:]):
     print("Oneil " + __version__)
