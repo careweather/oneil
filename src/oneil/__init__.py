@@ -221,7 +221,6 @@ def parse_file(file_name, parent_model=None):
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = False
-    hrunits=''
 
     if line[0] == '$':
         performance = True
@@ -241,7 +240,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     body = line.split(':')[1:]
 
     # Parse the body
-    id, equation, arguments, units, unit_fx, pointer = parse_body(body, line, line_number, file_name, imports)
+    id, equation, arguments, units, unit_fx, hrunits, pointer = parse_body(body, line, line_number, file_name, imports)
 
     # Parse the preamble
     if '(' and ')' in preamble:
@@ -280,6 +279,7 @@ def parse_body(body, line, line_number, file_name, imports):
         assignment = "=".join(body[0].split('=')[1:]).strip()
         pointer=False
         
+    
     if len(body) > 1:
         hrunits = body[1].strip("\n").strip()
         test=1
@@ -292,10 +292,11 @@ def parse_body(body, line, line_number, file_name, imports):
     else: 
         units = {}
         unit_fx = lambda x:x
+        hrunits=''
 
     equation, arguments = parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer=pointer)
 
-    return id, equation, arguments, units, unit_fx, pointer
+    return id, equation, arguments, units, unit_fx, hrunits, pointer
 
 def parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer):
     
@@ -366,31 +367,6 @@ def convert_functions(assignment, imports, file_name, line_number):
         equation = assignment.strip("\n").strip()
 
     return equation, arguments
-
-def parse_value(line, line_no, file_name, section="",pointer=False):
-    value_ID = line.split('=')[0].strip()
-
-    if ':' in line:
-        try:
-            value_units, unit_fx = un.parse(line.split(':')[1].strip())
-        except:
-            UnitError([], "", ["parse_value"]).throw(None, "in " + file_name + " (line " + str(line_no) + ") " + line + "- " + "Failed to parse units: " + line.split(':')[1].strip("\n"))
-        value_assignment = line.split('=')[1].split(':')[0].strip()
-    else:
-        value_units = {}
-        unit_fx = lambda x:x
-        value_assignment = line.split('=')[1].strip()
-
-    if '|' in value_assignment:
-        min = (unit_fx)(eval(value_assignment.split('|')[0], MATH_CONSTANTS)) #UNIT-FX-USE
-        max = (unit_fx)(eval(value_assignment.split('|')[1], MATH_CONSTANTS)) #UNIT-FX-USE
-        equation = (min, max)
-    elif value_assignment in MATH_CONSTANTS or value_assignment.replace(".","").replace("-","").isnumeric():
-        equation = (unit_fx)(eval(value_assignment, MATH_CONSTANTS)) #UNIT-FX-USE
-    else: 
-        equation = value_assignment
-
-    return Parameter(equation, value_units, value_ID, model=file_name.replace(".on", ""), line_no=line_no, line=line, name=value_ID + " from " + file_name, section=section, pointer=False)
 
 # Ensures the val1 is a Parameter for use in the min and max functions.
 def _process_minmax_par_inputs(val1, val2):
