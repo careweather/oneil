@@ -235,19 +235,12 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         trace = True
         line = line[1:].strip()
 
+    # Split into preamble and body around the first colon
     preamble = line.split(':')[0]
-    body = line.split(':')[1]
-    if len(line.split(':')) > 2:
-        hrunits = line.split(':')[2].strip("\n").strip()
-        test=1
-        try:
-            units, unit_fx = un.parse(hrunits)
-        except:
-            UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
-    else: 
-        units = {}
-        unit_fx = lambda x:x
-        
+    body = line.split(':')[1:]
+
+    # Parse the body
+    id, equation, arguments, units, unit_fx, pointer = parse_body(body, line, line_number, file_name, imports)
 
     # Parse the preamble
     if '(' and ')' in preamble:
@@ -255,7 +248,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         limits = []
         for l in preamble.replace(" ", "").split('(')[1].split(')')[0].split(','):
             if l.replace('.','').isnumeric():
-                limits.append((unit_fx)(float(l))) #UNIT-FX-USE
+                limits.append((unit_fx)(float(l)))
             elif l in MATH_CONSTANTS:
                 limits.append((unit_fx)(MATH_CONSTANTS[l]))
             elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
@@ -273,23 +266,68 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     if not name:
         SyntaxError(None, file_name, line_number, line, "Parse parameter: name cannot be empty.")
 
-    # Parse the body
-    if '=>' in body:
-        id = body.split('=>')[0].strip()
-        assignment = "=".join(body.split('=>')[1:]).strip()
+    return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance, pointer=pointer), unit_fx
+
+def parse_body(body, line, line_number, file_name, imports):
+    
+    if '=>' in body[0]:
+        id = body[0].split('=>')[0].strip()
+        assignment = "=".join(body[0].split('=>')[1:]).strip()
         pointer = True
     else:
-        id = body.split('=')[0].strip()
-        assignment = "=".join(body.split('=')[1:]).strip()
+        id = body[0].split('=')[0].strip()
+        assignment = "=".join(body[0].split('=')[1:]).strip()
         pointer=False
+        
+    if len(body) > 1:
+        hrunits = body[1].strip("\n").strip()
+        test=1
+        try:
+            units, unit_fx = un.parse(hrunits)
+        except:
+            UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
+    elif len(body) > 2:
+        SyntaxError(None, file_name, line_number, line, "Parse parameter: too many colons.")
+    else: 
+        units = {}
+        unit_fx = lambda x:x
 
+    equation, arguments = parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer)
+
+    return id, equation, arguments, units, unit_fx, pointer
+
+def parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer):
+    
     if assignment.strip()[0] == '{':
         equation, arguments = parse_piecewise(assignment, units, id, imports, file_name, line_number, unit_fx, pointer)
         equation = [equation]
     else:
-        equation, arguments = parse_equation(assignment.replace(' ', ''), units, id, imports, file_name, line_number, unit_fx)
+        assignment = assignment.replace(' ', '')
+        arguments = []
+        mathless_assignment = assignment
+        
+        if any(op in mathless_assignment for op in MATH_CONSTANTS):
+            for x in MATH_CONSTANTS:
+                mathless_assignment = mathless_assignment.replace(x, '')
 
-    return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance, pointer=pointer), unit_fx
+        if re.search('[a-zA-Z]', mathless_assignment):
+            if '|' in assignment:
+                mineq, minargs = convert_functions(assignment.split('|')[0], imports, file_name, line_number) 
+                maxeq, maxargs = convert_functions(assignment.split('|')[1], imports, file_name, line_number)
+                equation = (Parameter(mineq, units, id + ":mineq", pointer=pointer), Parameter(maxeq, units, id + ":maxeq", pointer=pointer))
+                arguments = minargs + maxargs
+            else:
+                equation, arguments = convert_functions(assignment, imports, file_name, line_number)
+            
+        else:
+            if '|' in assignment:
+                min = (unit_fx)(eval((assignment.split('|')[0]), MATH_CONSTANTS))
+                max = (unit_fx)(eval((assignment.split('|')[1]), MATH_CONSTANTS))
+                equation = (min, max)
+            else:
+                equation = (unit_fx)(eval(assignment, MATH_CONSTANTS))
+
+    return equation, arguments
 
 def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit_fx, pointer=False):
     eargs = []
@@ -297,36 +335,9 @@ def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit
     equation = ""
     condition = ""
     assignment = assignment.strip().strip('{')
-    equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx)
-    condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx)
+    equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
+    condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     return (Parameter(equation, units, id + ":eqpiece", pointer=pointer), Parameter(condition, {}, id + ":condpiece")), eargs + cargs
-
-def parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx):
-    arguments = []
-    mathless_assignment = assignment
-    
-    if any(op in mathless_assignment for op in MATH_CONSTANTS):
-        for x in MATH_CONSTANTS:
-            mathless_assignment = mathless_assignment.replace(x, '')
-
-    if re.search('[a-zA-Z]', mathless_assignment):
-        if '|' in assignment:
-            mineq, minargs = convert_functions(assignment.split('|')[0], imports, file_name, line_number) 
-            maxeq, maxargs = convert_functions(assignment.split('|')[1], imports, file_name, line_number)
-            equation = (Parameter(mineq, units, id + ":mineq"), Parameter(maxeq, units, id + ":maxeq"))
-            arguments = minargs + maxargs
-        else:
-            equation, arguments = convert_functions(assignment, imports, file_name, line_number)
-        
-    else:
-        if '|' in assignment:
-            min = (unit_fx)(eval((assignment.split('|')[0]), MATH_CONSTANTS))
-            max = (unit_fx)(eval((assignment.split('|')[1]), MATH_CONSTANTS))
-            equation = (min, max)
-        else:
-            equation = (unit_fx)(eval(assignment, MATH_CONSTANTS))
-
-    return equation, arguments
 
 def convert_functions(assignment, imports, file_name, line_number):
     arguments = []
@@ -354,27 +365,6 @@ def convert_functions(assignment, imports, file_name, line_number):
         equation = assignment.strip("\n").strip()
 
     return equation, arguments
-
-# def convert_functions(assignment, imports, file_name, line_number):
-#     arguments = []
-#     if isfloat(assignment):
-#         return float(assignment), arguments
-#     # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
-#     if re.search(r'\w+\(', assignment) and not any(func + '(' in assignment for func in FUNCTIONS):
-#         equation = None
-#         func = assignment.strip('(').split('(')[0]
-#         for i in imports:
-#             if func in i.__dict__.keys():
-#                 equation = i.__dict__[func]
-#                 arguments = assignment.split('(')[1].split(')')[0].split(',')
-#                 break
-#         if not equation:
-#             SyntaxError(None, file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
-
-#     else:
-#         equation = assignment.strip("\n").strip()
-
-#     return equation, arguments
 
 def parse_value(line, line_no, file_name, section="",pointer=False):
     value_ID = line.split('=')[0].strip()
@@ -1636,21 +1626,30 @@ class Model:
         self._check_namespace()
 
         for key, param in self.parameters.items():
-            # For equations that aren't strings that aren't option cases
             if param.pointer:
-                if param.piecewise: #TODO: doesn't work, each param needs its own pointer symbol for this to work or we need to mark which ones are pointers
+                if param.piecewise:
                     for eq, cond in param.equation:
                         if eq.pointer:
-                            if eq.equation in self.parameters.keys():
-                                param.args.append(eq.equation)
+                            if eq.minmax_equation:
+                                for p in eq.equation:
+                                    if p.equation in self.parameters.keys():
+                                        param.args.append(p.equation)
                             else:
-                                param.error = ParameterError(param, "Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", ["Model.__init__"])
+                                if eq.equation in self.parameters.keys():
+                                    param.args.append(eq.equation)
+                                else:
+                                    param.error = ParameterError(param, "Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", ["Model.__init__"])
                             
                 else:
-                    if param.equation in self.parameters.keys():
-                        param.args.append(param.equation)
+                    if param.minmax_equation:
+                        for p in param.equation:
+                            if p.equation in self.parameters.keys():
+                                param.args.append(p.equation)
                     else:
-                        param.error = ParameterError(param, "Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", ["Model.__init__"])
+                        if param.equation in self.parameters.keys():
+                            param.args.append(param.equation)
+                        else:
+                            param.error = ParameterError(param, "Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", ["Model.__init__"])
         
         for param in self.parameters.values():
             if param.error:
@@ -2347,7 +2346,8 @@ class Model:
     def _calculate_parameters_recursively(self, parameters, trail=[]):
         for parameter in parameters.values():
             if isinstance(parameter, Parameter) and any([parameter.min is None, parameter.max is None]):
-                
+                submodel_parameters = {}
+
                 # Update the trail for recursive errors.
                 new_trail = copy.copy(trail)
 
@@ -2357,6 +2357,7 @@ class Model:
                 else:
                     new_trail = [parameter.id]
 
+                # If parameter has subparameters (piecewise, minmax), calculate them, else, calculate this parameter directly.
                 if parameter.piecewise:
                     piece_equations = {}
                     piece_conditions = {}
@@ -2369,10 +2370,12 @@ class Model:
                         piece_equations.update({piece[0].id + str(i): piece[0]})
                         piece_conditions.update({piece[1].id + str(i): piece[1]})
                     self._calculate_parameters_recursively(piece_conditions, new_trail)
+
                     for cond in piece_conditions:
                         if piece_conditions[cond].min and piece_conditions[cond].max:
                             true_equations.update({cond.replace("cond", "eq"): piece_equations[cond.replace("cond", "eq")]})
                     self._calculate_parameters_recursively(true_equations, new_trail)
+
                 elif parameter.minmax_equation:
                     minmax_equation_parameters = {}
                     for i, eq in enumerate(parameter.equation):
@@ -2382,7 +2385,7 @@ class Model:
                     if not parameter.args:
                         ParameterError(parameter, "Parameter has no args nor a set value.", source=["Model._calculate_recursively"]).throw(self, f"In Model._calculate_recursively for model {self.name}: Parameter has no args nor a set value.")
 
-                    # Calculate any model parameters that haven't been calculated yet
+                    # Calculate any argument parameters that haven't been calculated yet
                     arg_parameters = {arg: self.parameters[arg] for arg in [x for x in parameter.args if x in self.parameters]}
 
                     if not all([True if all([parameter.min, parameter.max]) else False for arg, parameter in arg_parameters.items()]):
@@ -2395,7 +2398,6 @@ class Model:
 
                     # Make a dict of calculation parameters from the submodels
                     expression = parameter.equation
-                    submodel_parameters = {}
                     calc_args = []
                     for i, arg in enumerate(parameter.args):
                         if "." in arg:
@@ -2424,31 +2426,56 @@ class Model:
                         else:
                             calc_args.append(arg)
 
+                # all_params = self.parameters | submodel_parameters | self.constants
+
                 # Calculate the parameter
                 calculation = None
                 if parameter.piecewise:
                     for piece in parameter.equation:
                         if piece[1].min and piece[1].max:
-                            if piece[0].pointer:
-                                calculation = self.parameters[piece[0].equation]
-                            else:
-                                calculation = piece[0]
+                            calculation = piece[0]
                     if calculation is None or calculation.min is None or calculation.max is None:
-                        ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, "Parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + parameter.model + ") failed to calculate.\n\"" + parameter.line.strip() + "\"" + "\n" + str(parameter.equation))
-                elif parameter.pointer:
-                    calculation = self.parameters[parameter.equation]
+                        ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
                 elif parameter.minmax_equation:
                     calculation = (parameter.equation[0].min, parameter.equation[1].max)
                 else:
-                    calculation = parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)                    
-                    if isinstance(calculation, Parameter) and calculation.error:
-                        model = None if not parameter.model else parameter.model
-                        calculation.error.throw(self, f"Parameter \"{parameter.id}\" (line {parameter.line_no} from model {model}) failed to calculate.\n{parameter.line}", debug=True)
+                    if parameter.pointer:
+                        calculation = (self.parameters | submodel_parameters | self.constants)[expression]
+                    else:
+                        calculation = parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)                    
+                        if isinstance(calculation, Parameter) and calculation.error:
+                            model = None if not parameter.model else parameter.model
+                            calculation.error.throw(self, f"Parameter \"{parameter.id}\" (line {parameter.line_no} from model {model}) failed to calculate.\n{parameter.line}", debug=True)
                 
                 parameter.assign(calculation)
                 if parameter.error:
                     parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + str(parameter.model), debug=True)
 
+    def _get_pointer_calculation(self, parameter, parameters):
+        if parameter.minmax_equation:
+            mineq, maxeq = parameter.equation
+            if mineq.pointer:
+                if mineq.equation in parameters.keys():
+                    mincalc = parameters[mineq.equation].min
+                else:
+                    ParameterError(parameter, "Pointer to non-existent parameter.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
+            else:
+                mincalc = mineq.min
+
+            if maxeq.pointer:
+                if maxeq.equation in parameters.keys():
+                    maxcalc = parameters[maxeq.equation].max
+                else:
+                    ParameterError(parameter, "Pointer to non-existent parameter.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
+            else:
+                maxcalc = maxeq.max
+                
+            calculation = Parameter((mincalc, maxcalc), parameter.units, "{parameter.id}_calc", "", parameter.model, parameter.line_no, name="{parameter.name} pointer calculation")
+
+        else:
+            calculation = parameters[parameter.equation]
+
+        return calculation
 
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.
     def _retrieve_parameter(self, parameter_ID, path, trail=[]):

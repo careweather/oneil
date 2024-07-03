@@ -66,11 +66,13 @@ To see all the results of the model:
 
 ## Toolchain
 
-Oneil supports syntax highlighting in vim. While Oneil is already designed for readability, the difference with syntax highlighting is night and day. To set this up on Linux, create a `~/.vim` directory with subdirectories `syntax` and `ftdetect` if they doesn't exist yet. From this directory create soft links to the files in the `vim` directory of the Oneil repository.
-
-Oneil supports syntax highlighting in vim. While Oneil is already designed for readability, the difference with syntax highlighting is night and day. To set this up on Linux, simlink the files in oneil/vim/ftdetect and oneil/vim/syntax to the corresponding folders in your `~/.vim` directory.
+Oneil supports syntax highlighting in vim. While Oneil is already designed for readability, the difference with syntax highlighting is night and day. To set this up on Linux, create a `~/.vim` directory with subdirectories `syntax` and `ftdetect` if they don't exist yet. From this directory create soft links to the files in the `vim` directory of the Oneil repository.
 
 ``` { .sh }
+mkdir ~/.vim
+cd ~/.vim
+mkdir syntax
+mkdir ftdetect
 cd ~/.vim/syntax
 ln -s path/to/oneil/vim/syntax/oneil.vim
 cd ../ftdetect
