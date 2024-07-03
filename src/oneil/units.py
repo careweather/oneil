@@ -406,4 +406,4 @@ def _build_compound_unit_str(units):
     return compound_unit_str
 
 if __name__ == "__main__":
-    print(_find_derived_unit({}, 100, "dB"))
+    print(_find_derived_unit({}, 100, "dBmW"))
