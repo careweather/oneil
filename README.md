@@ -8,29 +8,37 @@ Oneil enables specification of a system `Model`, which is a collection of `Param
 
 Oneil is pre-release, under construction. See [known issues](#known-issues-and-limitations) and [troubleshooting](#troubleshooting) for context on its limitations.
 
+## Features
+
+Oneil makes it easier than ever to build, debug, explore, and version control models and designs of complex systems. It comes with a variety of features to that end:
+
+* Fully-updated design with every modification (no more passing results back and forth)
+* Seamless background unit handling (say goodbye to conversions).
+* Single source of truth for equations with clean syntax.
+* Automatic calculation of possible range of extremes.
+* Tests and reality checks.
+* Command-line interface for evaluating models and designs:
+  * Dependency trees for at-a-glance calculation tracing.
+* Python extensibility.
+* Vim highlighting.
+* (coming soon) Automatic documentation:
+  * Model derivations.
+  * Design test reports.
+  * Parametric figures.
+* (coming soon) Side-by-side design comparisons.
+* (future) Caching and automatic change reports.
+* (future) VSCode highlighting and linting.
+
 ## Quickstart
 
-Clone oneil and install it using pip.
+Clone Oneil and install it.
 
 ``` { .sh }
 git clone git@github.com/careweather/oneil.git
-
-pip install -e oneil
+oneil/install.sh
 ```
 
-You will need the following packages to run Oneil:
-
-* Numpy
-* Beautiful Table
-* Py2tex
-* Pytexit
-
-These can be installed using the following command:
-
-``` { .sh }
-pip install numpy beautifultable py2tex pytexit 
-```
-
+<!-- Add this back in when repo is public and test.>
 <!-- Install Oneil using pip (add @\<version-number\> if you need a specific version):
 
 ``` { .sh }
@@ -62,6 +70,21 @@ To see all the results of the model:
 <param 2>: <min>|<max> <unit>
 ...
 <param n>: <min>|<max> <unit>
+```
+
+## Manual Install
+
+Alternatively, if you've cloned Oneil, you can install it using pip. You will need the following packages to run Oneil:
+
+* Numpy
+* Beautiful Table
+* Pytexit
+
+Install using the following commands:
+
+``` { .sh }
+pip install path/to/oneil
+pip install numpy beautifultable pytexit 
 ```
 
 ## Toolchain
@@ -113,9 +136,11 @@ Angular position (-pi/2, pi/2): ...
 Total heat flux (-inf, inf): ...
 ```
 
-Range values are given in base units, *not specified units*. Use a [test](#tests) to check against a specified unit. If no range is specified, Oneil assumes the allowable range is is 0 to infinity (non-negative numbers). Ranges are intended to capture the maximum range of physical possibility. They should be as broad as possible. To check that values are within a reasonable range, use a test (see below).
+If no range is specified, Oneil assumes the allowable range is 0 to infinity (non-negative real numbers). Ranges are given in the same units as the parameter.
 
-If the allowable values of the parameter are discrete, they must be specified using brackets. This is used for specifying different modes of operation. These can be word characters or numbers:
+Ranges are hard limits. Use them to ensure fundamental physical properties are true (for example, distances can't be negative). To check that parameter values are within a subjective range with respect to other parameters, use a test (see below).
+
+If the allowable values of the parameter are discrete, they must be specified using brackets. This is used for specifying different modes of operation. These can be words or numbers:
 
 ``` { .on }
 Space domain [EarthOrbit, interplanetary, interstellar]: ...
@@ -128,22 +153,23 @@ $ Artificial gravity: ...
 ...
 ```
 
-### ID
+### Body - ID
 
 The ID follows the first colon and comes before the equals sign. It is the variable key used in the model namespace. Within a model, IDs must be unique.
 
 ``` { .on }
 Cylinder diameter: D = ...
 Rotation rate: omega = ...
-Boltzmann's constant: C_b = ...
 Crew count: N_c = ...
 Resident count: N_r = ...
 Orbital altitude: h = ...
+Quiescent power: P_q = ...
+Active power: P_a = ...
 ```
 
 Use short IDs where possible. They'll make it easier to read equations when you export to PDF.
 
-### Assignment
+### Body - Assignment
 
 The parameter assignment can either be a value (independent) or an equation (dependent).
 
@@ -155,12 +181,6 @@ Communications amplifier efficiency (0, 1): eta_c = 0.5|0.7
 Space domain [EarthOrbit, interplanetary, interstellar]: D_s = interstellar
 ```
 
-Parameters can also be set to equal another parameters.
-
-``` { .on }
-Radar amplifier efficiency (0, 1): eta_r = eta_c
-```
-
 Equation assignments define a parameter as a function of other parameters. This is typically done using a python expression with other parameter IDs as variables (e.g. `"m*x + b"` where `m`, `x`, and `b` are parameter IDs).
 
 ``` { .on }
@@ -168,15 +188,27 @@ Cylinder radius: r = D/2 : ...
 Artificial gravity: g_a = r*omega**2 : ...
 ```
 
+If the equation for a parameter simply sets it equal to another parameter, a pointer (`=>`) must be used:
+
+``` { .on }
+Radar amplifier efficiency (0, 1): eta_r => eta_c
+```
+
 Alternate equations for the minimum and maximum case can be given, separated by a pipe.
 
 ``` { .on }
-Population: P = N_c | N_c + N_r
+Power consumption: P_c = eta_c*P_q | eta_c*P_a
+```
+
+Again, if one of these equations is just another parameter, a pointer must be used:
+
+``` { .on }
+Population: P => N_c | N_c + N_r
 ```
 
 For more details on valid equations, see [here](#extrema-math).
 
-### Units
+### Body - Units
 
 Units are specified after a second colon using their [SI symbol](https://en.wikipedia.org/wiki/International_System_of_Units#Units_and_prefixes) with the "^" operator for exponents and a "/" preceeding *each* unit in the denominator. Units must be specified if the parameter has units, but can be left off for unitless parameters.
 
@@ -195,13 +227,23 @@ Temperature: T = temperature(D) :K
 
 Most [SI units](https://en.wikipedia.org/wiki/International_System_of_Units) are supported. Reference oneil/units/\_\_init\_\_.py for supported units. If a unit isn't supported, you can specify it in terms of base units: `kg`, `m`, `s`, `K`, `A`, `b`, `$`.
 
+Oneil currently supports `dB` as a nonlinear display unit. When any unit is specified with prefix `dB`, Oneil internally converts the parameter to the corresponding linear value, performs all calculations in linear terms, and reconverts the value to dB for display. This means that equations that contain parameters with dB units should use linear math. For example, when calculating the signal to noise ratio by hand, you might subtract the noise (dB) from the signal (dB), but in oneil, you divide the signal by the noise:
+
+``` { .on }
+Noise power: P_n = -100 :dBmW
+Signal power: P_s = -90 :dBmW
+Signal-to-noise ratio: S_N = P_s/P_n
+```
+
+Note that while [limits](#preamble-syntax) are typically specified in the parameter's units, limits only support linear values. Parameters with dB units should typically not specify a limit (other than the default 0-inf) since negative linear values would lead to imaginary dB values.
+
 ## Extrema Math
 
-Oneil uses parametric extrema math as defined in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd). Expressions are limited to the following operators and functions: `+`, `-`, `\*`, `/`, `\*\*`, `<`, `>`, `==,` `!=`, `<=`, `>=`, `min()`, `max()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()`, `sqrt()`, `log()`, `log10`, and `mnmx()` (an extreme function which gets the extremes of the inputs). `|` and `&` are also available for parameters with boolean values.
+In the backend, Oneil uses parametric extrema math to calculate the extremes of the range of possibilities for a given calculation, as defined in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd). Expressions are limited to the following operators and functions: `+`, `-`, `\*`, `/`, `^`, `==,` `!=`, `<=`, `>=`, `%`, `()`, `min()`, `max()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()`, `sqrt()`, `ln()`, `log()`, `log10()`, `floor()`, `ceiling()`, `extent()`, `range()`, `abs()`, `sign()`, `mid()`, `strip()` (removes units in calculation), and `mnmx()` (an extreme function which gets the extremes of the inputs).
 
 The `min` and `max` functions can be used on a single Parameter to access the minimum or maximum value of the Parameter's value range.
 
-Extrema math yields substantially different results for subtraction and division. You can specify standard math for these using the `--` and `//` operators.
+Extrema math yields substantially different results for subtraction and division. If the extreme cases are incompatible with a given parameter, you can specify standard math using the `--` and `//` operators.
 
 ### Piecewise Equations
 
@@ -213,7 +255,9 @@ Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'EarthOrbit' :km/s
                        {G*m_G/h**2 if D_s == 'interstellar'
 ```
 
-(m_E, m_S, and m_G are the masses of the Earth, Sun, and galactic center)
+(`m_E`, `m_S`, and `m_G` are the masses of the Earth, Sun, and galactic center)
+
+The conditions for piecewise equations are pythonic, so pythonic comparison operators are used and discrete string options should be given in single quotes. Conditions are evaluated in order, and the first equation corresponding to a true condition is returned as the equation for the parameter.
 
 ### Breakout Functions
 
@@ -256,7 +300,7 @@ use cylinder as c
 Length of day: t_day = omega.c/2*pi :day
 ```
 
-To use a parameter, it's submodel has to be specified directly. For example, if cylinder uses submodel life_support, specifying cylinder does not give access to life_support. Life_support and any of it's submodels must also be specified if parameters from them are needed.
+To use a parameter, it's submodel has to be specified directly. For example, if cylinder uses submodel life_support, specifying cylinder does not give access to life_support. Life_support and any of it's submodels must also be specified if parameters from them are needed. Short import as symbols are ideal as they make complex equations more readable.
 
 ``` { .on }
 use cylinder as c
@@ -264,23 +308,25 @@ from cylinder use life_support as l
 from cylinder.life_support use oxygen_tank as o
 ```
 
-Short import as symbols are ideal, because they make complex equations more readable.
-
 ## Designs
 
-While models specify values for independent parameters that make up the default design, you may want to specify multiple other variations of the design. Design files use the same syntax of model files, but they typically do not require full parameter specifications, instead they simply define the values of a subset of the independent parameters that deviate from the default design. For example,
+A design consists of the values assigned to independent parameters in a model. Oneil model files include a default design, but it's really helpful to overwrite that default with a variety of variation designs. Design files use the same syntax of model files, but only require the body instead of the whole line (no preamble required). Designs let you change a subset of the independent parameters from the default design. For example,
 
 ``` { .on }
 m = 1e6 :kg
 D = 0.5 :km
 omega = 1 :deg/min
+case = clockwise
+L => L.d
 ```
 
-These can be used to overwrite the default values on the model and evaluate the variation's performance. See [the interpreter's `design` command](#design). The only difference between a value as above and a full parameter is that the value doesn't fully overwrite the metadata of the parameter in the original model.
+These can be used to overwrite the default values on the model and evaluate the variation's performance. See [the interpreter's `design` command](#design). A design parameter overwrites the value of the model parameter while keeping the original metadata.
+
+If you want your design to alter a submodel parameter, you'll need to make sure the corresponding model uses that submodel.
 
 ## Tests
 
-Models and designs can also specify tests to verify that the parameters of a model properly calculate what they are intended to. Tests are python expressions that use comparison operators to return True or False. Tests can't include unit specifications, so any values with units must be specified separately.
+Models can also specify tests to verify that the parameters of the model properly calculate what they are intended to. Tests use [extrema math](#extrema-math) expressions with comparison operators (`==`, `>`, `<`, `>=`, `<=`, `!=`) to return True or False. Tests can't include unit specifications, so any values with units must be specified separately. This turns out to be a useful limitation that prevents magic numbers.
 
 ``` { .on }
 Earth gravity: g_E = 9.81 :m/s^2
@@ -485,22 +531,19 @@ This approach is new, so there are bound to be a lot of holes. The interpreter d
 
 ## Known Issues and Limitations
 
-* Range/option values are given in base units, *not specified units*.
 * UnitError doesn't tell you what supported units are if you use an unsupported unit.
-* There isn't a way to specify desired output units. Units specified on dependent parameters are only used to check that the cooresponding base units match.
 * Scientific notation is supported in value assignments, but not limits. It should be supported in expressions, but this hasn't been tested.
 * The Vim syntax highlighter gets *really* slow if you try to paste large amounts of LaTeX in. For now, make sure to paste large blocks of LaTeX using a different text editor or temporarily remove the ".on" file extension while you do.
 * The Vim syntax highlighter breaks for the rest of the file after a LaTeX syntax error in a note. As a result, the rest of the file will be highlighted as a note.
-* Currently can't use python functions for design overrides.
-* (many more listed in Airtable and Patrick's Notion)
+* Many more.
 
 ## Troubleshooting
 
 ### Something funny is happening with angular frequencies and frequencies
 
-The funny thing about Hz and rad/s is that `1 Hz != 1 rad/s` even though `1 Hz = 1/s` and `1 rad/s = 1/s`. You can [thank the International System of Units for this madness](https://iopscience.iop.org/article/10.1088/1681-7575/ac0240). To escape this issue, Oneil doesn't recognize the SI definition of Hz. If you specify Hz as a unit, Oneil will internally convert it to rad/s by multiplying by 2 pi. If you want to use a frequency in an equation that expects Hz, you need to make sure the equation converts your frequency (rad/s) to Hz. For example, instead of `c=lambda*f` for the speed of light, you would use `c=lambda*f/(2*pi)`.
+The funny thing about Hz and rad/s is that `1 Hz != 1 rad/s` even though `1 Hz = 1/s` and `1 rad/s = 1/s`. You can [thank the International System of Units for this madness](https://iopscience.iop.org/article/10.1088/1681-7575/ac0240). To escape this, Oneil doesn't recognize the SI definition of Hz. If you specify Hz as a unit, Oneil will internally convert it to rad/s by multiplying by 2 pi. If you want to use a frequency in an equation that expects Hz, you need to make sure the equation converts your frequency (rad/s) to Hz. For example, instead of `c=lambda*f` for the speed of light, you would use `c=lambda*f/(2*pi)`.
 
-> As a side note, some people have suggested that this problem is solved if you use `cycles` as a base unit and let `Hz = 1 cycle/s`, but this quickly becomes messy as cycles will get propagated throughout your model. It's much cleaner to convert rad/s to Hz in equations that expect it.
+> As a side note, some people have suggested that this problem is solved if you use `cycles` as a base unit and let `Hz = 1 cycle/s`, but this quickly becomes messy as cycles will get propagated throughout your model where you don't want it. It's much cleaner to convert rad/s to Hz in equations that expect it.
 
 ### Oneil has a bug
 

@@ -2412,6 +2412,7 @@ class Model:
                     for piece in parameter.equation:
                         if piece[1].min and piece[1].max:
                             calculation = piece[0]
+                            break
                     if calculation is None or calculation.min is None or calculation.max is None:
                         ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line}\"\n{str(parameter.equation)}")
                 elif parameter.minmax_equation:
