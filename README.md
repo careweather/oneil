@@ -523,11 +523,7 @@ or
 
 ## Error Handling in the Interpreter
 
-Ideally, if there is a problem with your Oneil code, the interpreter will tell you about it. If you get a python error, then it should be a problem with Oneil.
-
-If you trigger an error in your initial model, the interpreter will go back to ask you for a model. If your model loads successfully and you trigger an error with an interpreter command, ideally the interpreter will go back to the model to accept another command.
-
-This approach is new, so there are bound to be a lot of holes. The interpreter doesn't yet support step by step debugging, so you'll have to use [VSCode for this](#oneil-has-a-bug) for now.
+Ideally, if there's a problem with your Oneil code or Python extensions, the Oneil compiler will catch it and tell you. If you instead see an error missed by Oneil and raised by Python, it's likely an error with the Oneil compiler which is still in development. If that happens, please post the issue in GitHub. The compiler doesn't yet support step by step debugging, so you'll have to use [VSCode for this](#oneil-has-a-bug) for now.
 
 ## Known Issues and Limitations
 
@@ -535,7 +531,8 @@ This approach is new, so there are bound to be a lot of holes. The interpreter d
 * Scientific notation is supported in value assignments, but not limits. It should be supported in expressions, but this hasn't been tested.
 * The Vim syntax highlighter gets *really* slow if you try to paste large amounts of LaTeX in. For now, make sure to paste large blocks of LaTeX using a different text editor or temporarily remove the ".on" file extension while you do.
 * The Vim syntax highlighter breaks for the rest of the file after a LaTeX syntax error in a note. As a result, the rest of the file will be highlighted as a note.
-* Many more.
+
+And many more. These will be ported to GitHub issues for planning and visibility in coming months. If you find an issue that isn't listed in GitHub, please post it.
 
 ## Troubleshooting
 

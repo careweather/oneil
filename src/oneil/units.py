@@ -6,7 +6,7 @@ import numpy as np
 # UNIT DEFINITIIONS
 #################################################
 
-"""
+BASE_DETAILS = """
 Oneil base units are structured as dicts of base units and their exponents. 
 For example, 1 m/s^2 would be represented as {"m": 1, "s": -2}.
 
@@ -115,13 +115,9 @@ def prefix_units(units):
 
     return prefixed_units
 
-"""
-DERIVED UNITS
-In the background, Oneil doesn't keep track of derived units.
-It uses the following collecitons to convert derived units to base units, and vice versa.
-When parsing units on a parameter, a multiplier is used to convert the value to the correct magnitude.
-When displaying a parameter, the same multiplier is used to decide the write derived unit to display.
-    The parameter is displayed using the derived unit with the multiplier closest to the parameter's value. 
+DERIVED_DETAILS = """
+In the background, Oneil doesn't keep track of derived units. 
+It converts SI units and legacy units to base units for all calculation, only converting them back for display.
 """
 
 # SI units are those derived units for which the SI prefixes are commonly used.
@@ -152,14 +148,14 @@ if invalid_units(SI_UNITS):
 
 SI_MULTIPLES = prefix_units(SI_UNITS) | prefix_units(BASE_UNITS)
 
-# Legacy units are those derived units for which the SI prefixes are not used.
+LEGACY_DETAILS = "Legacy units are those derived units for which the SI prefixes are not used."
 LEGACY_UNITS = {
     "mil.": ({"s": 1}, 3.1556952e10, {"alt": ("millenium", "millenia")}),
     "cen.": ({"s": 1}, 3.1556952e9, {"alt": ("century", "centuries")}),
     "dec.": ({"s": 1}, 3.1556952e8, {"alt": ("decade")}), 
     "yr": ({"s": 1}, 3.1556952e7, {"alt": ["year", "yr"]}),
     "mon": ({"s": 1}, 2.629746e6, {"alt": ["month"]}),
-    "week": ({"s": 1}, 6.048e5),
+    "week": ({"s": 1}, 6.048e5, {"alt":[]}),
     "day": ({"s": 1}, 8.64e4, {"alt": ["day"]}),
     "hr": ({"s": 1}, 3600, {"alt": ["hour", "hr"]}),
     "min": ({"s": 1}, 60, {"alt": ["minute", "min"]}),
@@ -188,7 +184,7 @@ DIMENSIONLESS_UNITS = {
     "%":  ({}, 0.01, {"alt": [("percent", "percent")]}),
     "ppm": ({}, 1e-6, {"alt": [("part per million", "parts per million")]}),
     "ppb": ({}, 1e-9, {"alt": [("part per billion", "parts per billion")]}),
-    "": ({}, 1),
+    "": ({}, 1, {"alt":[]}),
     "'": ({}, 0.0002908882086657216, {"alt": ["arcminute", "arcmin"]}),
     '"': ({}, 4.84813681109536e-06, {"alt": ["arcsecond", "arcsec"]}),
 }
@@ -197,6 +193,23 @@ if any(u for v in DIMENSIONLESS_UNITS.values() for u in v[0]):
     raise ValueError("Units in DIMENSIONLESS_UNITS should be {}.")
 
 LINEAR_UNITS = STANDARD_UNITS | alt(STANDARD_UNITS) | DIMENSIONLESS_UNITS | alt(DIMENSIONLESS_UNITS)
+
+def print_all():
+    print("\n\nThe following units are supported by Oneil.")
+    print("-"*30 + "\nBASE UNITS\n" + "-"*30 + f"\n{BASE_DETAILS}\n" + "-"*30)
+    for k, v in BASE_UNITS.items():
+        print(f"   - {k}, aka {v[2]['alt']}")
+    print("-"*30 + "\nDERIVED UNITS\n" + "-"*30 + f"\n{DERIVED_DETAILS}\n" + "-"*30)
+    print("SI Units\n" + "-"*30)
+    for k, v in SI_UNITS.items():
+        print(f"   - {k}, aka {v[2]['alt']}")
+    print("-"*30 + "\nSI Prefixes\n" + "-"*30)
+    for k, v in SI_PREFIXES.items():
+        print(f"   - {k}, {v[2]}")
+    print("-"*30 + "\nLegacy Units\n" + "-"*30 + f"\n{LEGACY_DETAILS}\n" + "-"*30)
+    for k, v in (LEGACY_UNITS | DIMENSIONLESS_UNITS).items():
+        print(f"   - {k}, aka {v[2]['alt']}")
+
 
 #################################################
 # UNIT PARSING
@@ -406,4 +419,5 @@ def _build_compound_unit_str(units):
     return compound_unit_str
 
 if __name__ == "__main__":
-    print(_find_derived_unit({}, 100, "dBmW"))
+    # print(_find_derived_unit({}, 100, "dBmW"))
+    print_all()

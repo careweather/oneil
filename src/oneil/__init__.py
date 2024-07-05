@@ -2524,6 +2524,8 @@ def handler(model:Model, inpt):
     elif cmd == "help":
         print(help_text)
         interpreter(model)
+    elif cmd == "units":
+        print(un.print_all())
     elif cmd == "quit":
         sys.exit()
     elif cmd == "quit()":
@@ -2567,6 +2569,9 @@ Commands:
 
     help
         Print this help text.
+
+    units
+        Print all units supported in Oneil.
 
     quit
     quit()
