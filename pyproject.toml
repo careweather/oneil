@@ -16,6 +16,11 @@ classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: POSIX :: Linux",
 	]
+dependencies = [
+	"beautifultable==1.1.0",
+	"numpy==2.0.0",
+	"pytexit==0.4.0",
+]
 
 [project.urls]
 Homepage="https://github.com/careweather/oneil"
