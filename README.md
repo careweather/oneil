@@ -2,21 +2,19 @@
 
 Oneil is a design specification language for rapid, comprehensive system modeling.
 
-Traditional approaches to systems engineering are cumbersome and inaccessible to other engineers. Oneil enables everyone to think like a system engineer by contributing to one central source of system knowledge and understanding how their design decisions impact the whole.
+Traditional approaches to system engineering are too cumbersome for non-system engineers who don't have all day. Oneil makes it easy for everyone to contribute to the central source of system knowledge. With Oneil everyone can think like a system engineer and understand how their design impacts the whole.
 
-Oneil enables specification of a system `Model`, which is a collection of `Parameters`. The Model can be used to evaluate any corresponding design (collection of value assignments for the parameters of the model).
-
-Oneil is pre-release, under construction. See [known issues](#known-issues-and-limitations) and [troubleshooting](#troubleshooting) for context on its limitations.
+Oneil enables specification of a system "model", which is a collection of "parameters", or attributes of the system. The model can be used to evaluate any corresponding design (which is a collection of value assignments for the parameters of the model).
 
 ## Features
 
-Oneil makes it easier than ever to build, debug, explore, and version control models and designs of complex systems. It comes with a variety of features to that end:
+Oneil makes it easier than ever to build, debug, explore, and version-control models and designs of complex systems.
 
 * Fully-updated design with every modification (no more passing results back and forth)
 * Seamless background unit handling (say goodbye to conversions).
-* Single source of truth for equations with clean syntax.
-* Automatic calculation of possible range of extremes.
-* Tests and reality checks.
+* Single source of truth for equations (united documentation and code).
+* Automatic calculation of extreme range of possibilities.
+* Built-in tests and reality checks.
 * Command-line interface for evaluating models and designs:
   * Dependency trees for at-a-glance calculation tracing.
 * Python extensibility.
@@ -28,6 +26,10 @@ Oneil makes it easier than ever to build, debug, explore, and version control mo
 * (coming soon) Side-by-side design comparisons.
 * (future) Caching and automatic change reports.
 * (future) VSCode highlighting and linting.
+
+## Requirements
+
+Oneil has only been tested on Linux. Instructions for Oneil use assume you are on Linux.
 
 ## Quickstart
 
@@ -45,7 +47,7 @@ oneil/install.sh
 pip install git+ssh://git@github.com/careweather/oneil.git
 ``` -->
 
-Once installed, Oneil can be run from the command line in the directory where your design is. This will open the oneil post-interpreter, which needs a model before it can accept commands:
+Once installed, Oneil can be run from the command line in the directory where your design is. This will open the oneil command line interface, which needs a model before it can accept commands:
 
 ``` { .sh }
 $ cd path/to/directory/containing/your/model
@@ -57,14 +59,14 @@ Loading model your-model.on
 Model: your-model
 Design: default
 Parameters: <count>
-Tests: <count>
+Tests: <count> (PASS/FAIL)
 ----------------------------------------
 (your-model) >>>
 ```
 
 To see all the results of the model:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 >>> all
 <param 1>: <min>|<max> <unit>
 <param 2>: <min>|<max> <unit>
@@ -87,9 +89,13 @@ pip install path/to/oneil
 pip install numpy beautifultable pytexit 
 ```
 
-## Toolchain
+### Toolchain
 
-Oneil supports syntax highlighting in vim. While Oneil is already designed for readability, the difference with syntax highlighting is night and day. To set this up on Linux, create a `~/.vim` directory with subdirectories `syntax` and `ftdetect` if they don't exist yet. From this directory create soft links to the files in the `vim` directory of the Oneil repository.
+Oneil supports syntax highlighting in vim. Oneil is already designed for readability, but syntax highlighting makes it even better.
+
+If you installed using `install.sh`, then vim should be installed and configured.
+
+Otherwise, create a `~/.vim` directory with subdirectories `syntax` and `ftdetect` if they don't exist yet. From this directory create soft links to the files in the `vim` directory of the Oneil repository.
 
 ``` { .sh }
 mkdir ~/.vim
@@ -110,15 +116,21 @@ ln -s $CAREWEATHER/oneil/vim ~/.vim
 
 ## Parameters
 
-The oneil language supports definition of a collection of `Parameters`, starting with *independent* parameters that have specified values, and progressing through *dependent* parameters that are specified functions of other parameters. The syntax for defining a parameter in Oneil is:
+The oneil language supports definition of a collection of "parameters", with *independent* parameters that have specified values and *dependent* parameters that are functions of other parameters. The syntax for defining a parameter in Oneil is:
 
 ``` { .on }
-Preamble: ID = Assignment :Units
+Preamble: Body
+```
+
+Or expressed in more detail:
+
+``` { .on }
+Name (Limits): ID = Assignment :Units
 ```
 
 Detailed syntax rules for each of these parts is described in the following sections.
 
-### Preamble Syntax
+## Preamble Syntax
 
 At a minimum, the preamble must contain the name of the parameter. The name must be plain text with no special characters except apostrophes. For example:
 
@@ -128,7 +140,7 @@ Angular position: ...
 Boltzmann's constant: ...
 ```
 
-The preamble may also specify the allowable range of the parameter. Oneil checks all parameters to ensure their assigned or calculated values are within this range. Ranges can be specified using ints, floats, or math constants as follows:
+The preamble may also specify limits on the parameter. Oneil checks all parameters to ensure their assigned or calculated values are within their limits. Limits can be specified using ints, floats, or math constants as follows:
 
 ``` { .on }
 Mass (0, 10e8): ...
@@ -136,14 +148,15 @@ Angular position (-pi/2, pi/2): ...
 Total heat flux (-inf, inf): ...
 ```
 
-If no range is specified, Oneil assumes the allowable range is 0 to infinity (non-negative real numbers). Ranges are given in the same units as the parameter.
+If no limits are specified, Oneil assumes the allowable domain is 0 to infinity (non-negative real numbers). Limits are given in the same units as the parameter.
 
-Ranges are hard limits. Use them to ensure fundamental physical properties are true (for example, distances can't be negative). To check that parameter values are within a subjective range with respect to other parameters, use a test (see below).
+Use limits to ensure fundamental physical properties are true (distances can't be negative, for example). To check that parameter values are reasonable with respect to other parameters, use a test (see below).
 
-If the allowable values of the parameter are discrete, they must be specified using brackets. This is used for specifying different modes of operation. These can be words or numbers:
+You can specify discrete limits using brackets. These can be words or numbers:
 
 ``` { .on }
 Space domain [EarthOrbit, interplanetary, interstellar]: ...
+Dimensions [1, 2, 3]: ...
 ```
 
 You can mark a parameter as a "performance" parameter by prepending it with a `$`. Performance parameters are included in summaries of the model.
@@ -153,9 +166,9 @@ $ Artificial gravity: ...
 ...
 ```
 
-### Body - ID
+## Body Syntax
 
-The ID follows the first colon and comes before the equals sign. It is the variable key used in the model namespace. Within a model, IDs must be unique.
+The first element of the body is the ID. It follows the first colon and comes before the equals sign. The ID is a short alternative to the name used for readable equations. It's the key used for a parameter in the model namespace and must be unique within a model file.
 
 ``` { .on }
 Cylinder diameter: D = ...
@@ -167,28 +180,28 @@ Quiescent power: P_q = ...
 Active power: P_a = ...
 ```
 
-Use short IDs where possible. They'll make it easier to read equations when you export to PDF.
+Oneil names and IDs overcome the classic naming conflict in mathematical computing: long variable names make equations unreadable while short names make variables unidentifiable. Oneil makes it possible specify equations in short form while keeping parameter meaning clear.
 
-### Body - Assignment
+### Assignment
 
 The parameter assignment can either be a value (independent) or an equation (dependent).
 
-Value assignments can specify a single value or a minimum and maximum value separated by a pipe. These values use numbers, math constants, or in the case of discrete options, they can also use a set of word characters.
+Value assignments can specify a single value or a minimum and maximum value separated by a pipe. These values use numbers, math constants, or in the case of discrete values, they can also use a set of [word characters](https://stackoverflow.com/questions/2998519/net-regex-what-is-the-word-character-w).
 
 ``` { .on }
 Window count: n_w = 20
 Communications amplifier efficiency (0, 1): eta_c = 0.5|0.7
-Space domain [EarthOrbit, interplanetary, interstellar]: D_s = interstellar
+Space domain [earth_orbital, interplanetary, interstellar]: D_s = interstellar
 ```
 
-Equation assignments define a parameter as a function of other parameters. This is typically done using a python expression with other parameter IDs as variables (e.g. `"m*x + b"` where `m`, `x`, and `b` are parameter IDs).
+Equation assignments define a parameter as a function of other parameters using parameter IDs (e.g. `"m*x + b"` where `m`, `x`, and `b` are parameter IDs).
 
 ``` { .on }
 Cylinder radius: r = D/2 : ...
 Artificial gravity: g_a = r*omega**2 : ...
 ```
 
-If the equation for a parameter simply sets it equal to another parameter, a pointer (`=>`) must be used:
+Use a pointer (`=>`) if the equation for a parameter simply sets it equal to another parameter:
 
 ``` { .on }
 Radar amplifier efficiency (0, 1): eta_r => eta_c
@@ -206,11 +219,13 @@ Again, if one of these equations is just another parameter, a pointer must be us
 Population: P => N_c | N_c + N_r
 ```
 
+Note that pointers cannot be used with discrete variables.
+
 For more details on valid equations, see [here](#extrema-math).
 
-### Body - Units
+### Units
 
-Units are specified after a second colon using their [SI symbol](https://en.wikipedia.org/wiki/International_System_of_Units#Units_and_prefixes) with the "^" operator for exponents and a "/" preceeding *each* unit in the denominator. Units must be specified if the parameter has units, but can be left off for unitless parameters.
+Units are specified after a second colon with the "^" operator for exponents and a "/" preceeding *each* unit in the denominator. Units must be specified if the parameter has units, but can be left off for unitless parameters.
 
 ``` { .on }
 Mass (0, 100000000): m = 1e6 :kg
@@ -225,7 +240,7 @@ Artificial gravity: g_a = r*omega**2 :m/s^2
 Temperature: T = temperature(D) :K
 ```
 
-Most [SI units](https://en.wikipedia.org/wiki/International_System_of_Units) are supported. Reference oneil/units/\_\_init\_\_.py for supported units. If a unit isn't supported, you can specify it in terms of base units: `kg`, `m`, `s`, `K`, `A`, `b`, `$`.
+You can review supported units using the [CLI units command](#unit-help). If a unit isn't supported, you can specify it in terms of base units: `kg`, `m`, `s`, `K`, `A`, `b`, `$`.
 
 Oneil currently supports `dB` as a nonlinear display unit. When any unit is specified with prefix `dB`, Oneil internally converts the parameter to the corresponding linear value, performs all calculations in linear terms, and reconverts the value to dB for display. This means that equations that contain parameters with dB units should use linear math. For example, when calculating the signal to noise ratio by hand, you might subtract the noise (dB) from the signal (dB), but in oneil, you divide the signal by the noise:
 
@@ -235,13 +250,16 @@ Signal power: P_s = -90 :dBmW
 Signal-to-noise ratio: S_N = P_s/P_n
 ```
 
-Note that while [limits](#preamble-syntax) are typically specified in the parameter's units, limits only support linear values. Parameters with dB units should typically not specify a limit (other than the default 0-inf) since negative linear values would lead to imaginary dB values.
+While [limits](#preamble-syntax) are typically specified in the parameter's units, limits only support linear values. Parameters with dB units should typically not specify a limit (other than the default 0-inf) since negative linear values would lead to imaginary dB values.
+
+> [!IMPORTANT]
+> Oneil handles nearly all unit conversion in the background, but there is a [major exception with frequencies (Hz) and angular frequencies (rad/s)](#something-funny-is-happening-with-angular-frequencies-and-frequencies).
 
 ## Extrema Math
 
 In the backend, Oneil uses parametric extrema math to calculate the extremes of the range of possibilities for a given calculation, as defined in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd). Expressions are limited to the following operators and functions: `+`, `-`, `\*`, `/`, `^`, `==,` `!=`, `<=`, `>=`, `%`, `()`, `min()`, `max()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()`, `sqrt()`, `ln()`, `log()`, `log10()`, `floor()`, `ceiling()`, `extent()`, `range()`, `abs()`, `sign()`, `mid()`, `strip()` (removes units in calculation), and `mnmx()` (an extreme function which gets the extremes of the inputs).
 
-The `min` and `max` functions can be used on a single Parameter to access the minimum or maximum value of the Parameter's value range.
+The `min()` and `max()` functions can be used to compare parameters or it can be used on a single Parameter to access the minimum or maximum value of the Parameter's value range.
 
 Extrema math yields substantially different results for subtraction and division. If the extreme cases are incompatible with a given parameter, you can specify standard math using the `--` and `//` operators.
 
@@ -250,14 +268,14 @@ Extrema math yields substantially different results for subtraction and division
 Piecewise equations can be used for parameter assignments.
 
 ``` { .on }
-Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'EarthOrbit' :km/s
+Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'earth_orbital' :km/s
                        {G*m_S/h**2 if D_s == 'interplanetary'
                        {G*m_G/h**2 if D_s == 'interstellar'
 ```
 
 (`m_E`, `m_S`, and `m_G` are the masses of the Earth, Sun, and galactic center)
 
-The conditions for piecewise equations are pythonic, so pythonic comparison operators are used and discrete string options should be given in single quotes. Conditions are evaluated in order, and the first equation corresponding to a true condition is returned as the equation for the parameter.
+The conditions for piecewise equations are pythonic, so pythonic comparison operators are used and discrete values that use strings should be given in single quotes. Conditions are evaluated in order, and the first equation corresponding to a true condition is calculated to obtain the value for the parameter.
 
 ### Breakout Functions
 
@@ -278,21 +296,23 @@ def temperature(transit_mode):
     ...
 ```
 
-In the Oneil file, give only the python function on the right hand of the equation, including other parameters as inputs:
+In the Oneil file, give the python function on the right hand of the equation, including other parameters as inputs:
 
 ``` { .on }
 Temperature: T = temperature(D) :K
 ```
 
+Multiplying a python function by another parameter is not currently supported. Specify the factors as separate parameters and use another parameter to multiply them.
+
 ## Submodels
 
-A model can use parameters from a submodel by specifying the submodel as
+A model can use parameters from a submodel:
 
 ``` { .on }
 use submodel as s
 ```
 
-The word after use gives the submodel which should match the name of an oneil file with ".on" as a file extension. The symbol after as is used with a "." after parameters from that model to show where they come from. For example:
+The word after use gives the submodel which should match the name of an oneil file with ".on" as the file extension. The symbol after as is used with a "." after parameters from that model to show where they come from. For example:
 
 ``` { . on }
 use cylinder as c
@@ -300,17 +320,17 @@ use cylinder as c
 Length of day: t_day = omega.c/2*pi :day
 ```
 
-To use a parameter, it's submodel has to be specified directly. For example, if cylinder uses submodel life_support, specifying cylinder does not give access to life_support. Life_support and any of it's submodels must also be specified if parameters from them are needed. Short import as symbols are ideal as they make complex equations more readable.
+To use a parameter, it's submodel has to be specified directly. For example, if cylinder uses submodel life_support, specifying cylinder does not give access to life_support. Life_support and any of it's submodels must also be specified if parameters from them are needed. Submodel symbols should be as short as possible for readability.
 
 ``` { .on }
 use cylinder as c
-from cylinder use life_support as l
+from cylinder use life_support as ls
 from cylinder.life_support use oxygen_tank as o
 ```
 
 ## Designs
 
-A design consists of the values assigned to independent parameters in a model. Oneil model files include a default design, but it's really helpful to overwrite that default with a variety of variation designs. Design files use the same syntax of model files, but only require the body instead of the whole line (no preamble required). Designs let you change a subset of the independent parameters from the default design. For example,
+A design consists of the values assigned to independent parameters in a model. Oneil model files include a default design, but Oneil makes it easy to overwrite that default with alternative designs. Design files use the same syntax of model files, but only require the body instead of the whole line (no preamble required). Designs let you change a subset of the independent parameters from the default design. For example,
 
 ``` { .on }
 m = 1e6 :kg
@@ -320,13 +340,11 @@ case = clockwise
 L => L.d
 ```
 
-These can be used to overwrite the default values on the model and evaluate the variation's performance. See [the interpreter's `design` command](#design). A design parameter overwrites the value of the model parameter while keeping the original metadata.
-
-If you want your design to alter a submodel parameter, you'll need to make sure the corresponding model uses that submodel.
+To use a design, see [the command line interface `design` command](#design). A design parameter overwrites the value of the model parameter while keeping the original metadata. If you want your design to alter a submodel parameter, you'll need to make sure the corresponding model uses that submodel.
 
 ## Tests
 
-Models can also specify tests to verify that the parameters of the model properly calculate what they are intended to. Tests use [extrema math](#extrema-math) expressions with comparison operators (`==`, `>`, `<`, `>=`, `<=`, `!=`) to return True or False. Tests can't include unit specifications, so any values with units must be specified separately. This turns out to be a useful limitation that prevents magic numbers.
+Models can also specify tests to verify model reasonability and accuracy. Tests use math expressions with comparison operators (`==`, `>`, `<`, `>=`, `<=`, `!=`) to return True or False. Tests can't include unit specifications, so any values with units must be specified separately and used in the test equation. This turns out to be a useful limitation for preventing magic numbers.
 
 ``` { .on }
 Earth gravity: g_E = 9.81 :m/s^2
@@ -336,25 +354,23 @@ test : g_E*0.9 <= g_a <= g_E*1.1
     The artificial gravity should be within 10% of Earth's gravity.
 ```
 
-If a submodel test needs a parameter from a model that includes it, this can be specified by giving an ID in brackets before the colon:
+Say you have a submodel that's only valid in certain larger contexts. You can specify a test in that submodel that requires an input from a parent model to pass:
 
 ``` { .on }
 test {delta_g} : g_E - delta_g <= g_a <= g_E + delta_g
 ```
 
-These parameters can be passed to the submodel in the `use` statement:
+In this case, the test is specifying that the submodel needs to be given a value named `delta_g` for verification. In the parent model, these parameters can be passed to the submodel in the `use` statement:
 
 ``` { .on }
 use cylinder(delta_g=delta_ghuman) as c
 ```
 
-Designs and tests can be combined to create a verification design, a design for a system with known performance and tests that check whether the model accurately predicts its known performance.
-
 ## Notes and Comments
 
-Oneil defines "notes" and "comments" differently. Notes describe the model and justify the choice of values or provide the derivation of an equation. Comments are "notes to self" contained in the specification file. When the model is exported, notes are included, but comments are not.
+Oneil defines "notes" and "comments" differently. Notes are comments that you want to show up in reports explaining and justifying the model or design. Comments are "notes to self" that don't show up in any reports. When the model is exported to a report, notes are included, but comments are not.
 
-Oneil recognizes notes as any line that is not blank and begins with whitespace. When a note is found, Oneil will tie it to the most recently-defined parameter or test (immediately above the commend in the file). If none are found, Oneil will tie the note to the model itself. On export, notes are processed as LaTeX.
+Oneil recognizes notes as any line that is not blank and begins with whitespace (four spaces or a tab, for example). When a note is found, Oneil will tie it to the most recently-defined parameter or test (above the note in the file). If none are found, Oneil will tie the note to the model itself. On export, notes are processed as LaTeX.
 
 Oneil recognizes any line starting with `#` as a comment.
 
@@ -371,19 +387,15 @@ Standard Earth gravity: g_E = 9.81 m/s^2
     From \href{https://en.wikipedia.org/wiki/Gravity_of_Earth}{wikipedia}.
 ```
 
-## Breakpoints and Debugging
+## Using the Command line interface
 
-Debugging capabilities are limited and little tested, but you should be able to get some debugging if you prepend a line with `*` to add a breakpoint on that line.
-
-## Using the Interpreter
-
-See the [quickstart](#quickstart) for how to start the interpreter and load a model. Once a model has been loaded in the interpreter, the model can be explored and evaluated using any expression or the interpreter functions described in the following sections.
+See the [quickstart](#quickstart) for how to start the command line interface (CLI) and load a model. Once a model has been loaded in the CLI, the model can be explored and evaluated using an expression or the CLI functions described in the following sections.
 
 ### Queries and Expressions
 
-The interpreter can be used to query any parameter in the model or evaluate an expression consisting of numbers and parameters. For example:
+The CLI can be used to query any parameter in the model or evaluate an expression consisting of numbers and parameters. For example:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 (cylinder) >>> r
 250 km
 (cylinder) >>>  (r/10)*omega**2
@@ -392,7 +404,7 @@ The interpreter can be used to query any parameter in the model or evaluate an e
 True
 ```
 
-The following interpreter commands are reserved. If you use one of them as an ID in your model, you won't be able to query that ID, because Oneil will prefer the command.
+The following CLI commands are reserved. If you use one of them as an ID in your model, you won't be able to query that ID, because Oneil will prefer the command.
 
 ### Tree
 
@@ -422,7 +434,7 @@ g_a: 27.95 g
 
 Print all parameters and their results, for example:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 (cylinder) >>> all
 m: 1000000.0 kg -- Mass
 D: 500.0 m -- Diameter
@@ -435,7 +447,7 @@ g_a: 27.95 g -- Artificial gravity
 
 Print all parameters dependent on the given parameter, for example:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 (cylinder) >>> dependents omega
 ['g_a', 't_day']
 ```
@@ -444,13 +456,13 @@ Print all parameters dependent on the given parameter, for example:
 
 Summarize the design:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 (cylinder) >>> summarize
 --------------------------------------------------------------------------------
 Model: cylinder
 Design: default
 Parameters: 5 (4 independent, 1 dependent, 0 constants)
-Tests: 1
+Tests: 1 (PASS/FAIL)
 --------------------------------------------------------------------------------
 g_a: 27.95 g
 ```
@@ -459,7 +471,7 @@ g_a: 27.95 g
 
 Run tests on the model and any added designs:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 >>> test
 Test (cylinder): g_E*0.9 <= g_a <= g_E*1.1
     Result: fail
@@ -468,11 +480,14 @@ Test (cylinder): g_E*0.9 <= g_a <= g_E*1.1
     g_E: 1.0 g
 ```
 
-### Export
+### Export to a report (not maintained)
+
+> [!CAUTION]
+> This feature has not been maintained, but will be resored soon.
 
 Export a model (if no args) or a list of parameters (if args) to a typeset pdf:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 >>> export <param 1> <param 2> ... <param n>
 ```
 
@@ -486,32 +501,40 @@ The current implementation uses biblatex for references.
 
 Write a design onto the model:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 (your-model) >>> design design-name [variation-name]
 ----------------------------------------
 Model: your-model
 Design: variation-of-variation
 Parameters: <count>
-Tests: <count>
+Tests: <count> (PASS/FAIL)
 ----------------------------------------
 (variation-name@design-name@your-model) >>>
 ```
 
-The interpreter writes the first design to the model, overwriting any overlapping model defaults. If there are further designs, it writes the first variation, overwriting any overlapping defaults or values from the first design. It continues overwriting until it reaches the last design. See below for more details on designs.
+The compiler writes the first design to the model, overwriting any overlapping model defaults. If there are further designs, it writes the each subsequent design, overwriting any overlapping defaults or values from the preceding ones. See below for more details on designs.
 
 ### Load
 
 Load a new model:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 >>> load model-name
+```
+
+### Unit Help
+
+See all units supported by Oneil:
+
+``` { Oneil CLI }
+>>> units
 ```
 
 ### Quit
 
-Exit the interpreter:
+Exit the CLI:
 
-``` { Oneil interpreter }
+``` { Oneil CLI }
 >>> quit
 ```
 
@@ -521,13 +544,14 @@ or
 >>> quit()
 ```
 
-## Error Handling in the Interpreter
+### Error Handling in the CLI
 
-Ideally, if there's a problem with your Oneil code or Python extensions, the Oneil compiler will catch it and tell you. If you instead see an error missed by Oneil and raised by Python, it's likely an error with the Oneil compiler which is still in development. If that happens, please post the issue in GitHub. The compiler doesn't yet support step by step debugging, so you'll have to use [VSCode for this](#oneil-has-a-bug) for now.
+Ideally, if there's a problem with your Oneil code or Python extensions, the Oneil compiler will catch it and tell you. In that case, you can try debugging by prepending a parameter with `*`, but debugging is limited and requires some understanding of how Oneil handles parameters in the background.
+
+If you instead see an error missed by Oneil and raised by Python, it's likely an error with the Oneil compiler which is still in development. If that happens, please post the issue in GitHub. The compiler doesn't yet support step by step debugging, so you'll have to use [VSCode for this](#oneil-has-a-bug) for now.
 
 ## Known Issues and Limitations
 
-* UnitError doesn't tell you what supported units are if you use an unsupported unit.
 * Scientific notation is supported in value assignments, but not limits. It should be supported in expressions, but this hasn't been tested.
 * The Vim syntax highlighter gets *really* slow if you try to paste large amounts of LaTeX in. For now, make sure to paste large blocks of LaTeX using a different text editor or temporarily remove the ".on" file extension while you do.
 * The Vim syntax highlighter breaks for the rest of the file after a LaTeX syntax error in a note. As a result, the rest of the file will be highlighted as a note.
@@ -544,7 +568,7 @@ The funny thing about Hz and rad/s is that `1 Hz != 1 rad/s` even though `1 Hz =
 
 ### Oneil has a bug
 
-Ideally, just tell Patrick about the bug, but if you want to try and fix it yourself, here are some things that will help:
+You can report bugs using the issues section on Github. If you want to try and fix a bug yourself, here are some things that will help:
 
 To edit Oneil, you'll need to clone it and install it with the editable flag (-e), which ensures the pip install tracks your local changes.
 
@@ -554,7 +578,7 @@ git clone git@github.com/careweather/oneil.git
 pip install -e oneil
 ```
 
-To debug Oneil, you can call the interpreter from a python file:
+To debug Oneil, you can call the CLI from a python file:
 
 ``` { .py }
 import oneil
@@ -572,10 +596,14 @@ oneil.main(["", "your-model.on"])
 
 Try closing all VS Code files and closing VS Code to clear its mystery cache.
 
+## Contributing
+
+If you're interested in contributing, email [us](mailto:oneil@careweather.com).
+
 ## About
 
 The initial methodology that inspired Oneil was proposed in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd), by M. Patrick Walton. For that work, the methodology was painfully implemented in a Google sheet. The conclusion provided ideas and inspiration for early versions of Oneil.
 
-Oneil was developed at Care Weather Technologies, Inc. to support design of the Veery scatterometer. Veery is designed to perform as well as $100M heritage scatterometers at 3 orders of magnitude less cost. This dramatic improvement was facilitated in part by Oneil's streamlined system engineering capabilities.
+Oneil was developed at Care Weather Technologies, Inc. to support design of the Veery scatterometer. Veery is designed to perform as well as $100M heritage scatterometers at orders of magnitude less cost. This dramatic improvement is facilitated in part by Oneil's streamlined systems engineering capabilities.
 
 Oneil is named after American physicist and space activist [Gerard K. O'Neill](https://en.wikipedia.org/wiki/Gerard_K._O%27Neill) who proposed the gargantuan space settlements known as [O'Neill cylinders](https://en.wikipedia.org/wiki/O%27Neill_cylinder). We built Oneil to meet our own needs, but we hope it stitches together the many domains required to make O'Neill cylinders and move humanity up the [Kardashev scale](https://en.wikipedia.org/wiki/Kardashev_scale).
