@@ -1,0 +1,13 @@
+The Oneil repository and source distributions depend on several libraries that are compatibly licensed. We list these here.
+
+Name: beautifultable
+Source: https://github.com/pri22296/beautifultable
+License: MIT
+
+Name: numpy
+Source: https://github.com/numpy/numpy
+License: BSD-2-Clause AND BSD-3-Clause
+
+Name: pytexit
+Source: https://github.com/erwanp/pytexit
+License: CeCILL
