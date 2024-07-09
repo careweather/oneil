@@ -1,5 +1,6 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhistcnt =9
+let g:netrw_dirhistcnt =0
+let g:netrw_dirhist_0='/home/patrick/careweather/oneil/src/oneil'
 let g:netrw_dirhist_9='/home/patrick/careweather/veery/.git'
 let g:netrw_dirhist_8='/home/patrick/careweather/veery/software/bbb/configs'
 let g:netrw_dirhist_7='/home/patrick/buildroot/configs'
