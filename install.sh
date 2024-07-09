@@ -19,6 +19,10 @@ while getopts "e" opt; do
   esac
 done
 
+
+# Install dependencies using absolute paths
+pip3 install -r "$SCRIPT_DIR/src/oneil/requirements.txt"
+
 # Install package
 if [ "$EDITABLE" = true ]; then
   pip3 install -e "$SCRIPT_DIR"
