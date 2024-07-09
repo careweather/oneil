@@ -1,0 +1,4 @@
+beautifultable==1.1.0
+numpy==2.0.0
+pytexit==0.4.0
+setuptools==67.7.2
