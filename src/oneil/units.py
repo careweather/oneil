@@ -141,6 +141,7 @@ SI_UNITS = {
     "W/m^2": ({"kg": 1, "s": -3}, 1, {"alt": [("Watt/meter^2", "Watts/meter^2")]}),
     "m/s": ({"m": 1, "s": -1}, 1, {"alt": [("meter/second", "meters/second")]}),
     "m/s^2": ({"m": 1, "s": -2}, 1, {"alt": [("meter/second^2", "meters/second^2")]}),
+    "Pa": ({"kg": 1, "m": -1, "s": -2}, 1, {"alt": ["Pascal"]}),
 }
 
 if invalid_units(SI_UNITS):
@@ -169,6 +170,13 @@ LEGACY_UNITS = {
     "T$": ({"$": 1}, 1e12, {"alt": ["trillion dollars"]}),
     "g_E": ({"m": 1, "s": -2}, 9.81, {"alt": [("Earth gravity", "Earth gravities")]}),
     "cm": ({"m": 1}, 0.01, {"alt": ["centimeter"]}),
+    "psi": ({"kg": 1, "m": -1, "s": -2}, 6894.757293168361, {"alt": ["pound per square inch"]}),
+    "atm": ({"kg": 1, "m": -1, "s": -2}, 101325.0, {"alt": ["atmosphere", "atmospheres"]}),
+    "bar": ({"kg": 1, "m": -1, "s": -2}, 1e5, {"alt": ["bar"]}),
+    "Ba": ({"kg": 1, "m": -1, "s": -2}, 0.1, {"alt": ["barye, barad, barrie, bary, baryd, baryed, or barie"]}),
+    "dyne": ({"kg": 1, "m": 1, "s": -2}, 1e-5, {"alt": ["dyne"]}),
+    "mmHg": ({"kg": 1, "m": -1, "s": -2}, 133.322387415, {"alt": ["mm Hg", "millimeter of mercury"]}),
+    "torr": ({"kg": 1, "m": -1, "s": -2}, 133.3224, {"alt": ["torr"]}),
 }
 
 if invalid_units(LEGACY_UNITS):
