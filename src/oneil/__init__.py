@@ -47,6 +47,8 @@ OPERATOR_OVERRIDES = {"--": "|minus|", "^": "**"}
 
 BOOLEAN_OPERATORS = ["and", "or", "not"]
 
+OPERATORS = EQUATION_OPERATORS + BOOLEAN_OPERATORS + list(OPERATOR_OVERRIDES.keys())
+
 class Infix():
     def __init__(self, func):
         self.func = func
@@ -1127,23 +1129,25 @@ class Parameter:
     def short_print(self, sigfigs=4, indent=0, verbose=False, submodel_id=""):
         print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose, submodel_id=submodel_id))
 
-    def hprint(self, sigfigs=4, indent=0):
+    def hprint(self, sigfigs=4, indent=0, pref=None):
         output = ("\n" + self.name + "\n--------------------\n")
         output += " " * indent + self.id + ": "
-        output += self.human_readable(sigfigs) + "\n"
+        output += self.human_readable(sigfigs, pref) + "\n"
         print(output)
 
-    def human_readable(self, sigfigs=4):
+    def human_readable(self, sigfigs=4, pref=None):
         if self.isdiscrete:
             return self.min + " | " + self.max
         else:
+            if not pref and self.hr_units is not None:
+                pref = self.hr_units
             if self.min is not None and self.max is not None:
                 if isinstance(self.min, str):
                     return self.min if self.min == self.max else self.min + " | " + self.max
                 else:
-                    return un.hr_vals_and_units((self.min,self.max), self.units, self.hr_units, sigfigs)
+                    return un.hr_vals_and_units((self.min,self.max), self.units, pref, sigfigs)
             else:
-                return un.hr_units(self.units)
+                return "None"
 
     def copy(self):
         return Parameter((self.min, self.max), self.units, "copy of " + self.name, model=self.model, line_no=self.line_no, line=self.line)
@@ -2534,8 +2538,17 @@ def handler(model:Model, inpt):
         sys.exit()
     elif inpt in model.parameters:
         model.parameters[inpt].hprint()
-    else:
+    elif ":" in inpt:
+        #TODO: check that the unit is valid too.
+        if inpt.split()[0] in model.parameters:
+            model.parameters[inpt.split()[0]].hprint(inpt.split()[1])
+        else:
+            print(f"Parameter {inpt.split()[0]} not found.")
+    elif any([op in inpt for op in OPERATORS]):
         print(model.eval(inpt))
+    else:
+        print(f"Command {inpt} not found. Type 'help' for a list of commands.")
+        interpreter(model)
             
 
 help_text = """
