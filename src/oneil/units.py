@@ -209,6 +209,8 @@ def print_all():
     print("-"*30 + "\nLegacy Units\n" + "-"*30 + f"\n{LEGACY_DETAILS}\n" + "-"*30)
     for k, v in (LEGACY_UNITS | DIMENSIONLESS_UNITS).items():
         print(f"   - {k}, aka {v[2]['alt']}")
+    print("-"*30 + "\nNONLINEAR UNITS\n" + "-"*30)
+    print("Any linear unit can be prepended by dB to produce a nonlinear logarithmic unit.")
 
 
 #################################################
