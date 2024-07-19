@@ -138,10 +138,11 @@ SI_UNITS = {
     "lx": ({"cd": 1, "sr": 1, "m": -2}, 1, {"alt": [("lux", "lux")]}),
     "bps": ({"b": 1, "s": -1}, 1, {"alt": [("bit/second", "bits/second")], "SI min": 1}),
     "B": ({"b": 1}, 8, {"alt": ["byte"], "SI min": 1}),
-    "W/m^2": ({"kg": 1, "s": -3}, 1, {"alt": [("Watt/meter^2", "Watts/meter^2")]}),
-    "m/s": ({"m": 1, "s": -1}, 1, {"alt": [("meter/second", "meters/second")]}),
-    "m/s^2": ({"m": 1, "s": -2}, 1, {"alt": [("meter/second^2", "meters/second^2")]}),
+    # "W/m^2": ({"kg": 1, "s": -3}, 1, {"alt": [("Watt/meter^2", "Watts/meter^2")]}),
+    # "m/s": ({"m": 1, "s": -1}, 1, {"alt": [("meter/second", "meters/second")]}),
+    # "m/s^2": ({"m": 1, "s": -2}, 1, {"alt": [("meter/second^2", "meters/second^2")]}),
     "Pa": ({"kg": 1, "m": -1, "s": -2}, 1, {"alt": ["Pascal"]}),
+    # "m^2": ({"m": 2}, 1, {"alt": ["meter^2", "square meter"]}),
 }
 
 if invalid_units(SI_UNITS):
@@ -171,6 +172,7 @@ LEGACY_UNITS = {
     "g_E": ({"m": 1, "s": -2}, 9.81, {"alt": [("Earth gravity", "Earth gravities")]}),
     "cm": ({"m": 1}, 0.01, {"alt": ["centimeter"]}),
     "psi": ({"kg": 1, "m": -1, "s": -2}, 6894.757293168361, {"alt": ["pound per square inch"]}),
+    "kpsi": ({"kg": 1, "m": -1, "s": -2}, 6894757.293168361, {"alt": ["kilopound per square inch"]}),
     "atm": ({"kg": 1, "m": -1, "s": -2}, 101325.0, {"alt": ["atmosphere", "atmospheres"]}),
     "bar": ({"kg": 1, "m": -1, "s": -2}, 1e5, {"alt": ["bar"]}),
     "Ba": ({"kg": 1, "m": -1, "s": -2}, 0.1, {"alt": ["barye, barad, barrie, bary, baryd, baryed, or barie"]}),
@@ -183,6 +185,8 @@ if invalid_units(LEGACY_UNITS):
     raise ValueError("Invalid unit in LEGACY_UNITS: " + invalid_units(LEGACY_UNITS))
 
 STANDARD_UNITS = SI_MULTIPLES | LEGACY_UNITS
+
+NON_BASE_STANDARD_UNITS = prefix_units(SI_UNITS) | LEGACY_UNITS
 
 DIMENSIONLESS_UNITS = {
     "rev": ({}, 1, {"alt": ["revolution", "rotation", "rev"]}),
@@ -371,17 +375,21 @@ def _find_derived_unit(base_units, value, pref=None):
             
 
     # Search for derived units with matching base and closest matching value.
-    # Search includes powers of the collection of base units.
-    for i in range(1, 4):
+    # Search includes powers of the collection of base units (up to 10)
+    for i in range(1, 11):
         unpowered_units = {k: v / i for k, v in base_units.items()}
-        for k, v in STANDARD_UNITS.items():
+        for k, v in NON_BASE_STANDARD_UNITS.items():
             if unpowered_units == v[0]:
-                if not hrunit:
+                if f"{k}^{i}" == pref:
                     hrunit = k
-                elif abs(value - v[1]**i) < abs(value - STANDARD_UNITS[hrunit][1]**i):
+                    break
+                elif not hrunit:
                     hrunit = k
-                hrval = value / STANDARD_UNITS[hrunit][1]**i
+                elif abs(value - v[1]**i) < abs(value - NON_BASE_STANDARD_UNITS[hrunit][1]**i):
+                    hrunit = k
+                hrval = value / NON_BASE_STANDARD_UNITS[hrunit][1]**i
         if hrunit:
+            hrunit += "^" + str(i)
             break
 
     return hrval, hrunit
