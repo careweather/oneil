@@ -378,16 +378,17 @@ def _find_derived_unit(base_units, value, pref=None):
     # Search includes powers of the collection of base units (up to 10)
     for i in range(1, 11):
         unpowered_units = {k: v / i for k, v in base_units.items()}
-        for k, v in NON_BASE_STANDARD_UNITS.items():
+        for k, v in STANDARD_UNITS.items():
             if unpowered_units == v[0]:
                 if f"{k}^{i}" == pref:
                     hrunit = k
+                    hrval = value / STANDARD_UNITS[hrunit][1]**i
                     break
                 elif not hrunit:
                     hrunit = k
-                elif abs(value - v[1]**i) < abs(value - NON_BASE_STANDARD_UNITS[hrunit][1]**i):
+                elif abs(value - v[1]**i) < abs(value - STANDARD_UNITS[hrunit][1]**i):
                     hrunit = k
-                hrval = value / NON_BASE_STANDARD_UNITS[hrunit][1]**i
+                hrval = value / STANDARD_UNITS[hrunit][1]**i
         if hrunit:
             hrunit += "^" + str(i)
             break
