@@ -2538,10 +2538,10 @@ def handler(model:Model, inpt):
         sys.exit()
     elif inpt in model.parameters:
         model.parameters[inpt].hprint()
-    elif ":" in inpt:
+    elif ":" in inpt: #WARNING: unfinished feature, has bugs4
         #TODO: check that the unit is valid too.
-        if inpt.split()[0] in model.parameters:
-            model.parameters[inpt.split()[0]].hprint(inpt.split()[1])
+        if inpt.split(":")[0] in model.parameters:
+            model.parameters[inpt.split(":")[0]].hprint(pref=inpt.split(":")[1])
         else:
             print(f"Parameter {inpt.split()[0]} not found.")
     elif any([op in inpt for op in OPERATORS]):
