@@ -2538,10 +2538,12 @@ def handler(model:Model, inpt):
         sys.exit()
     elif inpt in model.parameters:
         model.parameters[inpt].hprint()
-    elif ":" in inpt: #WARNING: unfinished feature, has bugs4
-        #TODO: check that the unit is valid too.
+    elif ":" in inpt: 
         if inpt.split(":")[0] in model.parameters:
-            model.parameters[inpt.split(":")[0]].hprint(pref=inpt.split(":")[1])
+            try:
+                model.parameters[inpt.split(":")[0]].hprint(pref=inpt.split(":")[1])
+            except ValueError:
+                print(f"Requested units ({inpt.split(':')[1]}) do not match parameter units ({model.parameters[inpt.split(":")[0]].hr_units}).")
         else:
             print(f"Parameter {inpt.split()[0]} not found.")
     elif any([op in inpt for op in OPERATORS]):
