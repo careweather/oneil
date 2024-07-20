@@ -369,9 +369,15 @@ def _find_derived_unit(base_units, value, pref=None):
     # If a unit was specified by the user, use it.
     if pref:
         if pref in LINEAR_UNITS:
-            return value / LINEAR_UNITS[pref][1], pref
+            if LINEAR_UNITS[pref][0] == base_units:
+                return value / LINEAR_UNITS[pref][1], pref
+            else:
+                raise ValueError("Requested units do not match parameter units.")
         elif pref.strip("dB") in LINEAR_UNITS:
-            return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
+            if LINEAR_UNITS[pref.strip("dB")][0] == base_units:
+                return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
+            else:
+                raise ValueError("Requested units do not match parameter units.")
             
 
     # Search for derived units with matching base and closest matching value.
