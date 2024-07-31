@@ -393,7 +393,7 @@ See the [quickstart](#quickstart) for how to start the command line interface (C
 
 ### Queries and Expressions
 
-The CLI can be used to query any parameter in the model or evaluate an expression consisting of numbers and parameters. For example:
+The CLI can be used for to query any parameter in the model, evaluate an expression consisting of numbers and parameters, and convert a parameter other units. For example:
 
 ``` { Oneil CLI }
 (cylinder) >>> r
@@ -402,6 +402,8 @@ The CLI can be used to query any parameter in the model or evaluate an expressio
 2.795 g
 (cylinder) >>> (r/30)*omega**2 < R_E
 True
+(cylinder) >>> r:m
+250000 m
 ```
 
 The following CLI commands are reserved. If you use one of them as an ID in your model, you won't be able to query that ID, because Oneil will prefer the command.
