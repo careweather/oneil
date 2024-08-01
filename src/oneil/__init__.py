@@ -1640,6 +1640,8 @@ class Model:
     # Checks that all of the arguments to each parameter are defined
     def _check_namespace(self, verbose=False):
         undefined = []
+
+        # TODO: check for reserved symbols: `if arg in FUNCTIONS.values() or any([arg in v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS`
         
         for k, param in self.parameters.items():
             for arg in param.args:
@@ -2078,7 +2080,9 @@ class Model:
                         run_expression = run_expression.replace(arg, prefix + arg_ID)
                     elif arg in test_inputs:
                         test_params[arg] = test_inputs[arg]
-                    elif arg not in FUNCTIONS.values() and not any([arg in v for v in OPERATOR_OVERRIDES.values()]) and not arg in self.constants and arg not in BOOLEAN_OPERATORS:
+                    elif arg in FUNCTIONS.values() or any([arg==v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS:
+                        IDError(self, arg, f"Test argument ({arg}) uses a reserved keyword.")
+                    else:
                         test_params[arg] = self.parameters[arg]
 
 
