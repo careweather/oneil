@@ -2547,7 +2547,7 @@ def handler(model:Model, inpt):
             try:
                 model.parameters[inpt.split(":")[0]].hprint(pref=inpt.split(":")[1])
             except ValueError:
-                print(f"Requested units ({inpt.split(':')[1]}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[inpt.split(":")[0]].units)}).")
+                print(f"Requested units ({inpt.split(':')[1]}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[inpt.split(':')[0]].units)}).")
         else:
             print(f"Parameter {inpt.split()[0]} not found.")
     elif any([op in inpt for op in OPERATORS]):
@@ -2644,9 +2644,13 @@ def loader(args=[]):
         handler(model, "design " + design)
 
     # Handle commands after the first as cli commands.
+    
     for arg in args[2:]:
         print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
         handler(model, arg)
+
+    if len(args) > 2:
+        quit() 
     interpreter(model)
 
 loader_help = """"
