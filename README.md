@@ -1,6 +1,6 @@
 # The Oneil Design Language
 
-Oneil is a design specification language for rapid, comprehensive system modeling.
+Oneil is a design specification language for streamlined deep tech system modeling.
 
 Traditional approaches to system engineering are too cumbersome for non-system engineers who don't have all day. Oneil makes it easy for everyone to contribute to the central source of system knowledge. With Oneil everyone can think like a system engineer and understand how their design impacts the whole.
 
