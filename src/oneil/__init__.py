@@ -1129,6 +1129,12 @@ class Parameter:
     def short_print(self, sigfigs=4, indent=0, verbose=False, submodel_id=""):
         print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose, submodel_id=submodel_id))
 
+    def long_print(self, sigfigs=8, indent=0, pref=None):
+        output = " " * indent + self.name + ": "
+        output += self.id + " = "
+        output += self.human_readable(sigfigs, pref)
+        print(output)
+
     def hprint(self, sigfigs=4, indent=0, pref=None):
         output = ("\n" + self.name + "\n--------------------\n")
         output += " " * indent + self.id + ": "
@@ -2223,6 +2229,19 @@ class Model:
         parameter_keys.sort()
         self.tree(parameter_keys, levels=0, verbose=True, turtles=False)
 
+    def independent(self, indent=0):
+        print(f"{' ' * indent}{self.name}:")
+        for param in self.parameters.values():
+            if param.independent:
+                param.long_print(indent=indent+4)
+        
+        for submodel_dict in self.submodels.values():
+            if 'model' in submodel_dict:
+                print(f"{' ' * indent}{submodel_dict['model'].name}:")
+                for param in submodel_dict['model'].parameters.values():
+                    if param.independent:
+                        param.long_print(indent=indent+4)
+
     def summarize(self, sigfigs=4, verbose=False):
         print("-" * 80)
         print(bcolors.OKBLUE + "Model: " + self.name + bcolors.ENDC)
@@ -2512,6 +2531,8 @@ def handler(model:Model, inpt):
         model.all()
     elif cmd == "dependents":
         model.dependents(args)
+    elif cmd == "independent":
+        model.independent()
     elif cmd == "design":
         if any([arg for arg in args if "." in arg and ".on" not in arg]):
             print("Only .on files are allowed.")
@@ -2570,6 +2591,9 @@ Commands:
 
     dependents [param 1] [param 2] ... [param n]
         Print all parameters that depend on the specified parameters.
+
+    independent
+        Print all independent parameters.
 
     design [design 1] [design 2] ... [design n]
         Overwrite the current model with the specified designs.
