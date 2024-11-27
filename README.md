@@ -29,15 +29,26 @@ Oneil makes it easier than ever to build, debug, explore, and version-control mo
 
 ## Requirements
 
-Oneil has only been tested on Linux. Instructions for Oneil use assume you are on Linux.
+Oneil is compatible with Windows and Linux. 
 
 ## Quickstart
 
-Clone Oneil and install it.
+Clone Oneil
 
 ``` { .sh }
-git clone git@github.com/careweather/oneil.git
+git clone https://github.com/careweather/oneil.git
+```
+
+Installation
+
+Linux:
+``` { .sh }
 oneil/install.sh
+```
+
+Windows:
+``` { .bat }
+oneil/install.bat
 ```
 
 <!-- Add this back in when repo is public and test.>
