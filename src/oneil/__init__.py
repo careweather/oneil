@@ -200,10 +200,10 @@ def parse_file(file_name, parent_model=None):
             elif re.search(r"^(\*{1,2}\s*)?\w+(\.\w+)?\s*=>?[^:]+(:.*)?$", line):
                 last_line_blank = False
 
-                id, equation, arguments, units, unit_fx, pointer = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
+                id, equation, arguments, units, unit_fx, hrunits, pointer = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
                 isdiscrete = True if not pointer and isinstance(equation, str) else False
                 options = [equation] if not pointer and isinstance(equation, str) else None
-                design_overrides[id] = Parameter(equation, units, id, model=file_name.replace(".on", ""), line_no=i+1, line=line, name=f"{id} from {file_name}", options=options, section=section, pointer=pointer)
+                design_overrides[id] = Parameter(equation, units, id, hr_units=hrunits, model=file_name.replace(".on", ""), line_no=i+1, line=line, name=f"{id} from {file_name}", options=options, section=section, pointer=pointer)
                 
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
@@ -703,7 +703,7 @@ class Error:
 class DesignError(Error):
     def __init__(self, model, filename):
         error = bcolors.FAIL + "DesignError" + bcolors.ENDC
-        print(error + " can't find design files:" + filename)
+        print(error + " can't find design files: " + filename)
         interpreter(model)
 
 class UnitError(Error):
@@ -2549,7 +2549,10 @@ def handler(model:Model, inpt):
     elif cmd == "load":
         loader(inpt.split(" "))
     elif cmd == "reload":
-        loader(["reload", model.design + "@" + model.name])
+        if model.design == "default":
+            loader(["reload", model.name])
+        else:
+            loader(["reload", model.design + "@" + model.name])
     elif cmd == "help":
         print(help_text)
         interpreter(model)
