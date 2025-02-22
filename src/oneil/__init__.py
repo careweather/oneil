@@ -2505,12 +2505,17 @@ class Model:
             else:
                 return ModelError(parameter_ID, "Submodel not found.", trail)
         else:
-            self.parameters[parameter_ID].write(parameter)
-            
-            if self.parameters[parameter_ID].error:
-                return self.parameters[parameter_ID].error
-            
-            return True
+            try:
+                self.parameters[parameter_ID].write(parameter)
+            except Exception as e:
+                if parameter_ID not in self.parameters:
+                    return IDError(self, parameter_ID, f"Parameter from design file {parameter.model} not found in model {self.name}.")
+                else:
+                    raise e
+            else:
+                return True
+            # if self.parameters[parameter_ID].error:
+            #     return self.parameters[parameter_ID].error
 
 def handler(model:Model, inpt):
     args = inpt.strip().split(" ")
