@@ -2009,25 +2009,17 @@ class Model:
             
         for i, arg in enumerate(expression_args):
             if "." in arg:
-                parameter_ID, submodel_ID = arg.split(".")
+                result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                if submodel_ID in self.submodels:
-                    submodel = self.submodels[submodel_ID]
-                else:
-                    ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "Submodel ID \"" + submodel_ID + "\" not found.")
-                path = copy.copy(submodel['path'])
-                
-                prefix = '_'.join(path) + "_"
-                result = self._retrieve_parameter(parameter_ID, path)
-                if isinstance(result, ModelError):
-                    result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + str(submodel['path']) + ".")
+                if isinstance(result, Error):
+                    result.throw(self, "Error in eval().")
                 elif isinstance(result, Parameter):
-                    submodel_parameters[prefix + parameter_ID] = result
+                    submodel_parameters[prefixed_ID] = result
                 elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
                     return result
                 else:
                     ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
-                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefix + parameter_ID), expression)
+                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
 
         eval_params = self.parameters | submodel_parameters | self.constants
 
@@ -2064,26 +2056,16 @@ class Model:
                 if verbose: print("Test (" + self.name + "): " + run_expression)
                 for i, arg in enumerate(test.args):
                     if "." in arg:
-                        arg_ID, submodel_ID = arg.split(".")
+                        result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                        if submodel_ID in self.submodels:
-                            submodel = self.submodels[submodel_ID]
-                        else:
-                            ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model.test) Submodel ID \"" + submodel_ID + "\" not found.")
-
-                        path = copy.copy(submodel['path'])
-                        
-                        prefix = '_'.join(path) + "_"
-
-                        result = self._retrieve_parameter(arg_ID, path)
-                        if isinstance(result, ModelError):
-                            result.throw(self, "Couldn't find parameter " + arg_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                        if isinstance(result, Error):
+                            result.throw(self, "Error in _test_recursively().")
                         elif isinstance(result, Parameter):
-                            test_params[prefix + arg_ID] = result
+                            test_params[prefixed_ID] = result
                         else:
                             raise TypeError("Invalid result type: " + str(type(result)))
 
-                        run_expression = run_expression.replace(arg, prefix + arg_ID)
+                        run_expression = run_expression.replace(arg, prefixed_ID)
                     elif arg in test_inputs:
                         test_params[arg] = test_inputs[arg]
                     elif arg in FUNCTIONS.values() or any([arg==v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS:
@@ -2142,13 +2124,10 @@ class Model:
                         test_inputs[arg] = inp
                     elif isinstance(inp, str):
                         if '.' in inp:
-                            input_ID, source = inp.split('.')
-                            retrieval_path = copy.copy(self.submodels[source]['path'])
+                            result, _ = self.retrieve_parameter_from_submodel(inp)
 
-                            result = self._retrieve_parameter(input_ID, retrieval_path)
-                            if isinstance(result, ModelError):
-                                result.source_message = f"Couldn't find parameter {input_ID}. Invalid in submodel path {retrieval_path}."
-                                return result
+                            if isinstance(result, Error):
+                                result.throw(self, "Error in _test_recursively().")
                             elif isinstance(result, Parameter):
                                 test_inputs[arg] = result
                             else:
@@ -2406,28 +2385,18 @@ class Model:
                     calc_args = []
                     for i, arg in enumerate(parameter.args):
                         if "." in arg:
-                            parameter_ID, submodel_ID = arg.split(".")
+                            result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                            if submodel_ID in self.submodels:
-                                submodel = self.submodels[submodel_ID]
-                            else:
-                                ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model._calculate_recursively) Submodel ID \"" + submodel_ID + "\" not found.")
-
-                            path = copy.copy(submodel['path'])
-                            
-                            prefix = '_'.join(path) + "_"
-                            
-                            result = self._retrieve_parameter(parameter_ID, path)
-                            if isinstance(result, ModelError):
-                                result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + str(submodel['path']) + ".")
+                            if isinstance(result, Error):
+                                result.throw(self, "Error in _calculate_parameters_recursively().")
                             elif isinstance(result, Parameter):
-                                submodel_parameters[prefix + parameter_ID] = result
+                                submodel_parameters[prefixed_ID] = result
                             else:
                                 raise TypeError("Invalid result type: " + str(type(result)))
 
-                            calc_args.append(prefix + parameter_ID)
+                            calc_args.append(prefixed_ID)
                             if not parameter.callable:
-                                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefix + parameter_ID), expression)
+                                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
                         else:
                             calc_args.append(arg)
 
@@ -2458,23 +2427,37 @@ class Model:
                 if parameter.error:
                     parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + str(parameter.model), debug=True)
 
+    def retrieve_parameter_from_submodel(self, ID):
+        parameter_ID, submodel_ID = ID.split(".")
+        path = []
+        
+        if submodel_ID in self.submodels:
+            path = copy.copy(self.submodels[submodel_ID]['path'])
+            result = self._retrieve_parameter_recursively(parameter_ID, path)
+        else:
+            result = IDError(self, ID, f"Submodel ID \"{submodel_ID}\" not found.")
+
+        return result, '_'.join(path) + "_" + parameter_ID
+    
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.
-    def _retrieve_parameter(self, parameter_ID, path, trail=[]):
-        new_trail = copy.copy(trail)
-        new_trail.append(self.name)
+    def _retrieve_parameter_recursively(self, parameter_ID, path, trail=[]):
+        new_trail = copy.copy(trail).append(self.name)
+
         if path:
             submodel_name = path.pop(0)
             submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
             if submodel:
                 submodel = submodel[0]
-                return submodel._retrieve_parameter(parameter_ID, path, trail)
+                result = submodel._retrieve_parameter_recursively(parameter_ID, path, trail)
             else:
-                return ModelError(parameter_ID, "Submodel not found.", new_trail)
+                result = IDError(submodel, parameter_ID, f"Submodel ID \"{submodel_ID}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({", ".join(new_trail.append(submodel_name).append(path))}).")
         else:
             if parameter_ID in self.parameters:
-                return self.parameters[parameter_ID]
+                result = self.parameters[parameter_ID]
             else:
-                return ModelError(parameter_ID, "Parameter not found.", new_trail)
+                result = IDError(self, parameter_ID, f"Parameter ID \"{parameter_ID}\" not found in path ({self.name + (new_trail or "")}).")
+        
+        return result
 
     # Recursively retrieve a model from a submodel or submodel of a submodel, etc.
     def _retrieve_model(self, path, trail=[]):
@@ -2571,7 +2554,15 @@ def handler(model:Model, inpt):
         sys.exit()
     elif inpt in model.parameters:
         model.parameters[inpt].hprint()
-    elif ":" in inpt: 
+    elif "." in inpt:
+        result, _ = model.retrieve_parameter_from_submodel(inpt)
+        if isinstance(result, Error):
+            result.throw(self, "")
+        elif isinstance(result, Parameter):
+            result.hprint()
+        else:
+            raise TypeError("Invalid result type: " + str(type(result)))
+    elif ":" in inpt:
         if inpt.split(":")[0] in model.parameters:
             try:
                 model.parameters[inpt.split(":")[0]].hprint(pref=inpt.split(":")[1])
