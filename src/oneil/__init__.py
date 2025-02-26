@@ -787,6 +787,8 @@ class IDError(Error):
         self.source_model = model
 
     def throw(self, return_model, throw_message):
+        if throw_message:
+            print(throw_message)
         if self.source_message:
             print(self.source_message)
         if return_model:
@@ -1619,8 +1621,10 @@ class Model:
         if design_filename:
             self.overwrite(design_filename)
 
-        #ERR ID error
-        self._check_namespace()
+        namespace = self._check_namespace()
+
+        if isinstance(namespace, Error):
+            namespace.throw(self, "Error in namespace check.")
 
         for key, param in self.parameters.items():
             if param.pointer:
@@ -1654,7 +1658,7 @@ class Model:
     
     # Checks that all of the arguments to each parameter are defined
     def _check_namespace(self, verbose=False):
-        undefined = []
+        undefined = {}
 
         # TODO: check for reserved symbols: `if arg in FUNCTIONS.values() or any([arg in v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS`
         
@@ -1668,7 +1672,7 @@ class Model:
                     # else:
                     #     raise ImportError("Submodel " + source + " not found in " + self.name + ".on")
                 elif arg not in self.constants and arg not in self.parameters:
-                    undefined.append(arg + " from " + param.id + " (line " + param.line +") in " + param.model)
+                    undefined[arg] = f"{arg} from {param.id} (line {param.line}) in {param.model}"
                 elif verbose:
                     # Report the submodule parameters of the same ID.
                     for key in self.submodels:
@@ -1676,7 +1680,9 @@ class Model:
 
         # Return a list of all args that aren't defined.
         if undefined:
-            raise NameError(self.name.capitalize() + " has the following undefined arguments:\n- " + "\n- ".join(undefined))
+            return IDError(self, f"{undefined.keys()}", self.name.capitalize() + " has undefined arguments:\n- " + "\n- ".join(undefined.values()))
+        else:
+            return
 
     # Recursively report all submodule paramaters with the same ID
     def _check_namespace_recursively(self, submodel, arg, param, trail=[]):
