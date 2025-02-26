@@ -1061,7 +1061,7 @@ class Parameter:
                     if not self.options[1] >= self.options[0]:
                         self.error = ParameterError(self, "Minimum limit > maximum limit.", ["Parameter.write()"])
                     if not (self.min >= self.options[0] and self.max <= self.options[1]):
-                        self.error = ParameterError(self, f"Values out of bounds [{self.options[0]}:{self.options[1]}]. Revise values or limits.", ["Parameter.write()"])
+                        self.error = ParameterError(self, f"Values out of bounds [{un.hr_vals_and_units(self.options,self.units,self.hr_units)}]. Revise values or limits.", ["Parameter.write()"])
 
     def write_one(self, value, minmax):
 
