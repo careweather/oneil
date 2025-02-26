@@ -2271,8 +2271,17 @@ class Model:
             for parameter_ID in parameter_IDs:
                 if parameter_ID in self.parameters:
                     parameter = self.parameters[parameter_ID]
+                elif "." in parameter_ID:
+                    result, _ = self.retrieve_parameter_from_submodel(parameter_ID)
+
+                    if isinstance(result, Error):
+                        result.throw(self, "Error in _calculate_parameters_recursively().")
+                    elif isinstance(result, Parameter):
+                        parameter = result
+                    else:
+                        raise TypeError("Invalid result type: " + str(type(result)))
                 else:
-                    IDError(self, parameter_ID, "Parameter not found in model.").throw(self, "Parameter not found in model.")
+                    IDError(self, parameter_ID, "Parameter not found in model.").throw(self, "Parameter not found in model.").throw(self, "Error in _calculate_parameters_recursively().")
 
                 if indent == 0:
                     parameter.hprint(sigfigs)
