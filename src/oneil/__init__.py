@@ -782,9 +782,18 @@ class SyntaxError(Error):
 
 class IDError(Error):
     def __init__(self, model, ID, message):
-        error = bcolors.FAIL + "IDError" + bcolors.ENDC
-        print(f"{error} ({ID}) in {model.name}: {message}")
-        interpreter(model)
+        self.error_tag = bcolors.FAIL + "IDError" + bcolors.ENDC
+        self.source_message = f"{self.error_tag} ({ID}) in {model.name}: {message}"
+        self.source_model = model
+
+    def throw(self, return_model, throw_message):
+        if self.source_message:
+            print(self.source_message)
+        if return_model:
+            interpreter(return_model)
+        else:
+            loader([])
+
 
 class ImportError(Error):
     def __init__(self, model, filename, line_no, line, imprt):
@@ -2450,7 +2459,7 @@ class Model:
                 submodel = submodel[0]
                 result = submodel._retrieve_parameter_recursively(parameter_ID, path, trail)
             else:
-                result = IDError(submodel, parameter_ID, f"Submodel ID \"{submodel_ID}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({", ".join(new_trail.append(submodel_name).append(path))}).")
+                result = IDError(submodel, parameter_ID, f"Submodel name \"{submodel_name}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({", ".join(new_trail.append(submodel_name).append(path))}).")
         else:
             if parameter_ID in self.parameters:
                 result = self.parameters[parameter_ID]
@@ -2557,7 +2566,7 @@ def handler(model:Model, inpt):
     elif "." in inpt:
         result, _ = model.retrieve_parameter_from_submodel(inpt)
         if isinstance(result, Error):
-            result.throw(self, "")
+            result.throw(model, "")
         elif isinstance(result, Parameter):
             result.hprint()
         else:
