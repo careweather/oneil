@@ -2576,16 +2576,6 @@ def handler(model:Model, inpt):
         sys.exit()
     elif cmd == "exit":
         sys.exit()
-    elif inpt in model.parameters:
-        model.parameters[inpt].hprint()
-    elif "." in inpt:
-        result, _ = model.retrieve_parameter_from_submodel(inpt)
-        if isinstance(result, Error):
-            result.throw(model, "")
-        elif isinstance(result, Parameter):
-            result.hprint()
-        else:
-            raise TypeError("Invalid result type: " + str(type(result)))
     elif ":" in inpt:
         if inpt.split(":")[0] in model.parameters:
             try:
@@ -2596,6 +2586,16 @@ def handler(model:Model, inpt):
             print(f"Parameter {inpt.split()[0]} not found.")
     elif any([op in inpt for op in OPERATORS]):
         print(model.eval(inpt))
+    elif inpt in model.parameters:
+        model.parameters[inpt].hprint()
+    elif "." in inpt:
+        result, _ = model.retrieve_parameter_from_submodel(inpt)
+        if isinstance(result, Error):
+            result.throw(model, "")
+        elif isinstance(result, Parameter):
+            result.hprint()
+        else:
+            raise TypeError("Invalid result type: " + str(type(result)))
     else:
         print(f"Command {inpt} not found. Type 'help' for a list of commands.")
         interpreter(model)
