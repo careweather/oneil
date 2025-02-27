@@ -365,6 +365,7 @@ def _hr_parts(vals, units, pref=None):
 def _find_derived_unit(base_units, value, pref=None):
     hrval = ""
     hrunit = ""
+    units = {}
 
     # If a unit was specified by the user, use it.
     if pref:
@@ -396,7 +397,8 @@ def _find_derived_unit(base_units, value, pref=None):
                     hrunit = k
                 hrval = value / STANDARD_UNITS[hrunit][1]**i
         if hrunit:
-            hrunit += "^" + str(i)
+            if i > 1:
+                hrunit += "^" + str(i)
             break
 
     return hrval, hrunit
