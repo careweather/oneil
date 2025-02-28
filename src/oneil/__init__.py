@@ -338,7 +338,9 @@ def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit
     cargs = []
     equation = ""
     condition = ""
+    if '{' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing { from piecewise definition.")
     assignment = assignment.strip().strip('{')
+    if 'if' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing condition (\"if\") from piecewise definition.")
     equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     return (Parameter(equation, units, id + ":eqpiece", pointer=pointer), Parameter(condition, {}, id + ":condpiece")), eargs + cargs
@@ -738,11 +740,11 @@ class UnitError(Error):
         quit()
 
 class ParameterError(Error):
-    def __init__(self, parameter, source_message, source):
+    def __init__(self, parameter, source_message, source=[]):
         self.error_tag = bcolors.FAIL + "ParameterError" + bcolors.ENDC
         self.parameter = parameter
-        self.source = list(source)
         self.source_message = source_message
+        self.source = list(source)
         
     def throw(self, model, throw_message, debug=False):
         if model:
@@ -2014,6 +2016,7 @@ class Model:
     def eval(self, expression):
         # Make a dict of calculation parameters from the submodels
         submodel_parameters = {}
+        result = None
         expression_args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", expression) if x not in FUNCTIONS]
         
         for f, pf in FUNCTIONS.items():
@@ -2033,7 +2036,7 @@ class Model:
                 elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
                     return result
                 else:
-                    ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
+                    ParameterError(expression, "Eval failed.", ["Model.eval()"]).throw(self, "(in interpreter) Eval failed.")
                 expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
 
         eval_params = self.parameters | submodel_parameters | self.constants
@@ -2054,7 +2057,7 @@ class Model:
         elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
             return result
         else:
-            ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
+            ParameterError(expression, "Eval failed.", ["Model.eval()"]).throw(self, "(in interpreter) Eval failed.")
 
     def _test_recursively(self, log, path=[], test_inputs={}, trail=[], verbose=True):
         fails = 0
@@ -2454,14 +2457,16 @@ class Model:
     def retrieve_parameter_from_submodel(self, ID):
         parameter_ID, submodel_ID = ID.split(".")
         path = []
+        prefixed_ID = ""
         
         if submodel_ID in self.submodels:
             path = copy.copy(self.submodels[submodel_ID]['path'])
+            prefixed_ID = '_'.join(path) + "_" + parameter_ID
             result = self._retrieve_parameter_recursively(parameter_ID, path)
         else:
             result = IDError(self, ID, f"Submodel ID \"{submodel_ID}\" not found.")
 
-        return result, '_'.join(path) + "_" + parameter_ID
+        return result, prefixed_ID
     
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.
     def _retrieve_parameter_recursively(self, parameter_ID, path, trail=[]):
