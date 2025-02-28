@@ -2408,7 +2408,6 @@ class Model:
                         self._calculate_parameters_recursively(calc_args, new_trail)
 
                     # Make a dict of calculation parameters from the submodels
-                    expression = parameter.equation
                     calc_args = []
                     for i, arg in enumerate(parameter.args):
                         if "." in arg:
@@ -2419,13 +2418,23 @@ class Model:
                             elif isinstance(result, Parameter):
                                 submodel_parameters[prefixed_ID] = result
                             else:
-                                raise TypeError("Invalid result type: " + str(type(result)))
-
-                            calc_args.append(prefixed_ID)
-                            if not parameter.callable:
-                                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
+                                raise TypeError("Invalid result type: " + str(type(result)))    
+                            
+                            calc_args.append(prefixed_ID)                        
                         else:
                             calc_args.append(arg)
+
+                    # Substitute submodel params in the expression
+                    # This has to be done sorted or longer params could get accidentally replaced by a shorter params that match the beginning of the longer param
+                    expression = parameter.equation
+                    sorted_parameter_args = [arg for arg in parameter.args]
+                    sorted_parameter_args.sort(key=len, reverse=True)
+                    for i, arg in enumerate(sorted_parameter_args):
+                        if "." in arg:
+                            result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
+
+                            if not parameter.callable:
+                                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
 
                 # all_params = self.parameters | submodel_parameters | self.constants
 
