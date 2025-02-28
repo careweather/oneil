@@ -249,11 +249,11 @@ def parse(unit_str):
 def _parse_compound_units(unit_str):
     # Parse the unit string based on operators /, *, ^
     unit_list = [
-        x for x in re.findall("[A-Za-z]+", unit_str) if x not in UNIT_OPERATORS
+        x for x in re.findall("[A-Za-z$%'\"°]+", unit_str) if x not in UNIT_OPERATORS
     ]
 
     # Find the indices of the above matches
-    indices = [m.span() for m in re.finditer("[A-Za-z]+", unit_str)]
+    indices = [m.span() for m in re.finditer("[A-Za-z$%'\"°]+", unit_str)]
 
     # Initialize zero unit
     units = {unit: 0 for unit in BASE_UNITS}
