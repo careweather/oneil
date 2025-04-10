@@ -184,7 +184,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^section\s+[\w\s]*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
+                    SyntaxError(parent_model, file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
                 
                 last_line_blank = False
                 section = line.replace("section", "").strip()
