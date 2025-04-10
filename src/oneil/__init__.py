@@ -2488,12 +2488,12 @@ class Model:
                 submodel = submodel[0]
                 result = submodel._retrieve_parameter_recursively(parameter_ID, path, trail)
             else:
-                result = IDError(submodel, parameter_ID, f"Submodel name \"{submodel_name}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({", ".join(new_trail.append(submodel_name).append(path))}).")
+                result = IDError(submodel, parameter_ID, f"Submodel name \"{submodel_name}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({', '.join(new_trail.append(submodel_name).append(path))}).")
         else:
             if parameter_ID in self.parameters:
                 result = self.parameters[parameter_ID]
             else:
-                result = IDError(self, parameter_ID, f"Parameter ID \"{parameter_ID}\" not found in path ({self.name + (new_trail or "")}).")
+                result = IDError(self, parameter_ID, f"Parameter ID \"{parameter_ID}\" not found in path ({self.name + (new_trail or '')}).")
         
         return result
 
