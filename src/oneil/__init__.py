@@ -2591,13 +2591,27 @@ def handler(model:Model, inpt):
     elif cmd == "exit":
         sys.exit()
     elif ":" in inpt:
-        if inpt.split(":")[0] in model.parameters:
+        param_expr = inpt.split(":")[0].strip()
+        requested_units = inpt.split(":")[1].strip()
+        
+        if param_expr in model.parameters.keys():
             try:
-                model.parameters[inpt.split(":")[0]].hprint(pref=inpt.split(":")[1])
+                model.parameters[param_expr].hprint(pref=requested_units)
             except ValueError:
-                print(f"Requested units ({inpt.split(':')[1]}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[inpt.split(':')[0]].units)}).")
+                print(f"Requested units ({requested_units}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[param_expr].units)}).")
         else:
-            print(f"Parameter {inpt.split()[0]} not found.")
+            # Try to evaluate the expression on the left side
+            try:
+                result = model.eval(param_expr)
+                if isinstance(result, Parameter):
+                    try:
+                        result.hprint(pref=requested_units)
+                    except ValueError:
+                        print(f"Requested units ({requested_units}) do not match calculated expression units ({un._build_compound_unit_str(result.units)}).")
+                else:
+                    print(f"Result: {result} (unitless, cannot convert to {requested_units})")
+            except Exception as e:
+                print(f"Could not evaluate expression '{param_expr}': {str(e)}") 
     elif any([op in inpt for op in OPERATORS]):
         print(model.eval(inpt))
     elif inpt in model.parameters:
