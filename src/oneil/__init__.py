@@ -287,7 +287,7 @@ def parse_body(body, line, line_number, file_name, imports):
         test=1
         try:
             units, unit_fx = un.parse(hrunits)
-        except:
+        except Exception as e:
             UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
     elif len(body) > 2:
         SyntaxError(None, file_name, line_number, line, "Parse parameter: too many colons.")

@@ -246,14 +246,47 @@ def parse(unit_str):
     return units, unit_fx
 
 
+def _validate_compound_unit_format(unit_str):
+    """Validate that unit_str does not begin or end with an operator and does not have consecutive operators."""
+    # Check if string starts with an operator
+    if any(unit_str.startswith(op) for op in UNIT_OPERATORS):
+        raise ValueError(f"Unit string cannot start with an operator: {unit_str}")
+    
+    # Check if string ends with an operator
+    if any(unit_str.endswith(op) for op in UNIT_OPERATORS):
+        raise ValueError(f"Unit string cannot end with an operator: {unit_str}")
+    
+    # Check for consecutive operators
+    for i in range(len(unit_str) - 1):
+        if unit_str[i] in UNIT_OPERATORS and unit_str[i+1] in UNIT_OPERATORS:
+            raise ValueError(f"Unit string cannot have consecutive operators: {unit_str}")
+
+
 def _parse_compound_units(unit_str):
+    # Validate unit string format
+    _validate_compound_unit_format(unit_str)
+    
     # Parse the unit string based on operators /, *, ^
     unit_list = [
         x for x in re.findall("[A-Za-z$%'\"°]+", unit_str) if x not in UNIT_OPERATORS
     ]
 
+    value_list = [
+        x for x in re.findall("[0-9.]+", unit_str) if x not in UNIT_OPERATORS
+    ]
+
     # Find the indices of the above matches
-    indices = [m.span() for m in re.finditer("[A-Za-z$%'\"°]+", unit_str)]
+    unit_indices = [m.span() for m in re.finditer("[A-Za-z$%'\"°]+", unit_str)]
+
+    # Find indices of all numeric values
+    value_indices = [m.span() for m in re.finditer("[0-9.]+", unit_str)]
+
+    # Helper function to get exponent value after the caret symbol
+    def get_exponent(start_pos):
+        for v_idx, v_span in enumerate(value_indices):
+            if v_span[0] == start_pos:
+                return int(value_list[v_idx])
+        raise ValueError(f"Missing exponent after ^ in unit string: {unit_str}")
 
     # Initialize zero unit
     units = {unit: 0 for unit in BASE_UNITS}
@@ -261,23 +294,23 @@ def _parse_compound_units(unit_str):
     multiplier = 1
 
     # Iterate through the indices and unit_list together
-    for index, unit in zip(indices, unit_list):
+    for index, unit in zip(unit_indices, unit_list):
         if unit in BASE_UNITS:
             if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    units[unit] += int(unit_str[index[1] + 1])
+                    units[unit] += get_exponent(index[1] + 1)
                 else:
                     units[unit] += 1
 
             elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    units[unit] -= int(unit_str[index[1] + 1])
+                    units[unit] -= get_exponent(index[1] + 1)
                 else:
                     units[unit] -= 1
         elif unit in LINEAR_UNITS:
             if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    exponent = int(unit_str[index[1] + 1])
+                    exponent = get_exponent(index[1] + 1)
                     for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] += value * exponent
                     multiplier *= LINEAR_UNITS[unit][1] ** exponent
@@ -287,7 +320,7 @@ def _parse_compound_units(unit_str):
                     multiplier *= LINEAR_UNITS[unit][1]
             elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    exponent = int(unit_str[index[1] + 1])
+                    exponent = get_exponent(index[1] + 1)
                     for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] -= value * exponent
                     multiplier /= LINEAR_UNITS[unit][1] ** exponent
