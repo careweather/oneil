@@ -396,9 +396,6 @@ def _hr_parts(vals, units, pref=None):
     return hrvals, hrunits
 
 def _find_derived_unit(base_units, value, pref=None):
-    hrval = ""
-    hrunit = ""
-    units = {}
 
     # If a unit was specified by the user, use it.
     if pref:
@@ -412,8 +409,85 @@ def _find_derived_unit(base_units, value, pref=None):
                 return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
             else:
                 raise ValueError("Requested units do not match parameter units.")
+        else:
+            # Handle compound units for display
+            # Validate unit string format
+            _validate_compound_unit_format(pref)
             
+            pref = pref
+            
+            # Break down the preferred unit string
+            unit_list = [
+                x for x in re.findall("[A-Za-z$%'\"°]+", pref) if x not in UNIT_OPERATORS
+            ]
+            
+            # Find the indices of the units in the string
+            unit_indices = [m.span() for m in re.finditer("[A-Za-z$%'\"°]+", pref)]
+            
+            # Find indices of all numeric values (for exponents)
+            value_list = [x for x in re.findall("[0-9.]+", pref) if x not in UNIT_OPERATORS]
+            value_indices = [m.span() for m in re.finditer("[0-9.]+", pref)]
+            
+            # Helper function to get exponent value after the caret symbol
+            def get_exponent(start_pos):
+                for v_idx, v_span in enumerate(value_indices):
+                    if v_span[0] == start_pos:
+                        return float(value_list[v_idx])
+                return 1.0  # Default exponent if none found
+            
+            # Initialize calculation variables
+            compound_multiplier = 1.0
+            computed_units = {unit: 0 for unit in BASE_UNITS}
+            
+            # Iterate through the indices and unit_list together
+            for index, unit in zip(unit_indices, unit_list):
+                if unit in BASE_UNITS:
+                    if index[0] == 0 or pref[index[0] - 1] == "*":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            computed_units[unit] += get_exponent(index[1] + 1)
+                        else:
+                            computed_units[unit] += 1
 
+                    elif pref[index[0] - 1] == "/":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            computed_units[unit] -= get_exponent(index[1] + 1)
+                        else:
+                            computed_units[unit] -= 1
+                elif unit in LINEAR_UNITS:
+                    if index[0] == 0 or pref[index[0] - 1] == "*":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            exponent = get_exponent(index[1] + 1)
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] += v * exponent
+                            compound_multiplier /= LINEAR_UNITS[unit][1] ** (-exponent)
+                        else:
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] += v
+                            compound_multiplier /= LINEAR_UNITS[unit][1]
+                    elif pref[index[0] - 1] == "/":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            exponent = get_exponent(index[1] + 1)
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] -= v * exponent
+                            compound_multiplier *= LINEAR_UNITS[unit][1] ** (-exponent)
+                        else:
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] -= v
+                            compound_multiplier *= LINEAR_UNITS[unit][1]
+                else:
+                    raise ValueError("Invalid unit: " + unit)
+
+            # Strip zero units
+            computed_units = {k: v for k, v in computed_units.items() if v != 0}
+            
+            # Verify the computed units match the base units
+            if computed_units == base_units:
+                return value * compound_multiplier, pref
+            else:
+                raise ValueError(f"Requested compound units '{pref}' do not match parameter units {base_units}.")
+
+    hrval = ""
+    hrunit = ""
     # Search for derived units with matching base and closest matching value.
     # Search includes powers of the collection of base units (up to 10)
     for i in range(1, 11):
