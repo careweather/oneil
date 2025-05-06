@@ -179,6 +179,14 @@ LEGACY_UNITS = {
     "dyne": ({"kg": 1, "m": 1, "s": -2}, 1e-5, {"alt": ["dyne"]}),
     "mmHg": ({"kg": 1, "m": -1, "s": -2}, 133.322387415, {"alt": ["mm Hg", "millimeter of mercury"]}),
     "torr": ({"kg": 1, "m": -1, "s": -2}, 133.3224, {"alt": ["torr"]}),
+    "in": ({"m": 1}, 0.0254, {"alt": ["inch", "inches"]}),
+    "ft": ({"m": 1}, 0.3048, {"alt": ["foot", "feet"]}),
+    "yd": ({"m": 1}, 0.9144, {"alt": ["yard", "yards"]}),
+    "mi": ({"m": 1}, 1609.344, {"alt": ["mile", "miles"]}),
+    "nmi": ({"m": 1}, 1852.0, {"alt": ["nautical mile", "nautical miles"]}),
+    "lb": ({"kg": 1}, 0.45359237, {"alt": ["lbs", "pound", "pounds"]}),
+    "mph": ({"m": 1, "s": -1}, 0.44704, {"alt": ["mile per hour", "miles per hour"]}),
+
 }
 
 if invalid_units(LEGACY_UNITS):
