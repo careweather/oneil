@@ -2663,19 +2663,7 @@ Commands:
         Exit the program.
 """
 
-def loader(args=[]):
-
-    designs = []
-
-    if len(args) > 1:
-        print(args)
-        inp = args[1]
-        if "@" in inp:
-            designs = inp.split("@")[:-1]
-            designs.reverse()
-            inp = inp.split("@")[-1]
-    else:
-        inp = ""
+def loader(inp: str, designs: list[str]) -> Model:
     model = None
 
     while not model:
@@ -2708,11 +2696,7 @@ def loader(args=[]):
     for design in designs:
         handler(model, "design " + design)
 
-    # Handle commands after the first as cli commands.
-    for arg in args[2:]:
-        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
-        handler(model, arg)
-    interpreter(model)
+    return model
 
 loader_help = """"
     Commands:
@@ -2747,4 +2731,29 @@ def main(args=sys.argv[1:]):
     print("Oneil " + __version__)
     print("Type 'help' for a list of commands or see the README for more information.")
     print("-"*80)
-    loader(["oneil"] + args)
+
+    # parse the files and commands
+    designs = []
+    if len(args) > 1:
+        print(args)
+        inp = args[1]
+        if "@" in inp:
+            designs = inp.split("@")[:-1]
+            designs.reverse()
+            inp = inp.split("@")[-1]
+    else:
+        inp = ""
+
+    # load the model
+    model = loader(inp, designs)
+
+    # Handle commands after the first as cli commands.
+    for arg in args[2:]:
+        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
+        handler(model, arg)
+
+    if len(args) > 2:
+        quit() 
+
+    # run the interpeter on the model
+    interpreter(model)
