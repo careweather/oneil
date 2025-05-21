@@ -6,27 +6,17 @@ from pytexit import py2tex
 import os, sys
 import copy
 from beautifultable import BeautifulTable
-from . import units as un
 import importlib
 from functools import partial
 import traceback, logging
+
+import bcolors
+import units as un
 
 # Configure logging to output to the console
 logging.basicConfig(level=logging.ERROR, format='%(message)s')
 
 np.seterr(all='raise')
-
-class bcolors:
-    MAGENTA = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    ORANGE = '\033[38;5;208m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 def isfloat(num):
     try:
