@@ -768,7 +768,7 @@ class SyntaxError(Error):
         if model and model.calculated:
             interpreter(model)
         else:
-            loader([])
+            loader("", [])
 
 class IDError(Error):
     def __init__(self, model, ID, message):
@@ -794,7 +794,7 @@ class ImportError(Error):
         if model:
             interpreter(model)
         else:
-            loader([])
+            loader("", [])
 
 class ModelError(Error):
     def __init__(self, filename, source_message="", source=None):
@@ -811,7 +811,7 @@ class ModelError(Error):
         if return_model:
             interpreter(return_model)
         else:
-            loader([])
+            loader("", [])
 
 class PythonError(Error):
     def __init__(self, parameter, message, original_exception=None):
@@ -2526,7 +2526,7 @@ class Model:
             # if self.parameters[parameter_ID].error:
             #     return self.parameters[parameter_ID].error
 
-def handler(model:Model, inpt):
+def handler(model: Model, inpt: str):
     args = inpt.strip().split(" ")
     cmd = args.pop(0)
     opt_list = [arg for arg in args if "=" in arg]
@@ -2561,12 +2561,19 @@ def handler(model:Model, inpt):
     elif cmd == "export":
         model.export_pdf(args)
     elif cmd == "load":
-        loader(inpt.split(" "))
+        model_name, model_designs, commands = parse_args(args)
+
+        loader(model_name, model_designs)
+
+        for command in commands:
+            print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+            handler(model, command)
+
     elif cmd == "reload":
         if model.design == "default":
-            loader(["reload", model.name])
+            loader(model.name, [])
         else:
-            loader(["reload", model.design + "@" + model.name])
+            loader(model.name, [model.design])
     elif cmd == "help":
         print(help_text)
         interpreter(model)
@@ -2724,29 +2731,39 @@ def debugger(model):
     print("Enterring debug mode. Type 'quit' to exit.")
     while True:
         handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
+
+def parse_args(args: list[str]) -> tuple[str, list[str], list[str]]:
+    # if there are no arguments, then the user needs to be prompted for details
+    # so we return empty data
+    if len(args) == 0:
+        return "", [], []
+
+    # args example: `cooper_station@oneill_cylinder all test`
+    inputs = args[0].split("@")
+    commands = args[1:]
+
+    # the model is the last one listed
+    input_model = inputs[-1]
+
+    # the designs are the others listed
+    # NOTE: I'm not sure why it's reversed, but that's what the previous code did
+    input_designs = list(reversed(inputs[:-1]))
+
+    return input_model, input_designs, commands
     
 def main(args=sys.argv[1:]):
     console.print_welcome_message()
 
     # parse the files and commands
-    designs = []
-    if len(args) > 1:
-        print(args)
-        inp = args[1]
-        if "@" in inp:
-            designs = inp.split("@")[:-1]
-            designs.reverse()
-            inp = inp.split("@")[-1]
-    else:
-        inp = ""
+    inp, designs, commands = parse_args(args)
 
     # load the model
     model = loader(inp, designs)
 
     # Handle commands after the first as cli commands.
-    for arg in args[2:]:
-        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
-        handler(model, arg)
+    for command in commands:
+        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+        handler(model, command)
 
     if len(args) > 2:
         quit() 
