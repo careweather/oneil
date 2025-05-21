@@ -1,7 +1,6 @@
 import re
 import numpy as np
 import inspect
-from pkg_resources import get_distribution
 from pytexit import py2tex
 import os, sys
 import copy
@@ -11,6 +10,7 @@ from functools import partial
 import traceback, logging
 
 import bcolors
+import console
 import units as un
 
 # Configure logging to output to the console
@@ -24,8 +24,6 @@ def isfloat(num):
         return True
     except ValueError:
         return False
-
-__version__ = get_distribution("oneil").version
 
 FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip", "mid": "par_mid", "sign": "par_sign"}
 
@@ -2728,9 +2726,7 @@ def debugger(model):
         handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
     
 def main(args=sys.argv[1:]):
-    print("Oneil " + __version__)
-    print("Type 'help' for a list of commands or see the README for more information.")
-    print("-"*80)
+    console.print_welcome_message()
 
     # parse the files and commands
     designs = []
