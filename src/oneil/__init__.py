@@ -119,11 +119,11 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"File \"{model}.on\" does not exist.")
                 symbol = include.split('as')[1].strip()
 
                 if symbol in submodels.keys():
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
 
                 submodels[symbol] = {'model': Model(model + ".on"), 'inputs': test_inputs, 'path': [model], 'line_no': i+1, 'line': line}
             elif line[:5] == 'from ':
@@ -144,13 +144,13 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"File \"{model}.on\" does not exist.")
 
                 path = source.split('.') + [model] if '.' in source else [source, model]
                 symbol = include.split('use')[1].split("as")[1].strip()
 
                 if symbol in submodels.keys():
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
 
                 submodels[symbol] = {'path': path, 'inputs': test_inputs, 'line_no': i+1, 'line': line}
             elif line[:7] == 'import ':
@@ -202,12 +202,12 @@ def parse_file(file_name, parent_model=None):
             else:
                 raise SyntaxError(file_name, i+1, line, "Invalid syntax.")
 
-    params = {p.id: p for p in parameters}
+        params = {p.id: p for p in parameters}
 
-    if not params and not tests and not design_overrides:
-        ModelError(file_name, "", ["parse_file"]).throw(None, "(final line) " + final_line + "- " + "End of File\n", "Empty model. No parameters, design values, or tests found.")
+        if not params and not tests and not design_overrides:
+            raise ModelLoadingError(file_name, final_line, prev_line, "Empty model. No parameters, design values, or tests found.")
 
-    return note, params, submodels, tests, design_overrides
+        return note, params, submodels, tests, design_overrides
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = False
@@ -791,17 +791,24 @@ class ImportError(Exception):
         else:
             loader("", [])
 
+class ModelLoadingError(Exception):
+    def __init__(self, filename: str, line_no: int, line: str, message: str):
+        self.filename = filename
+        self.line_no = line_no
+        self.line = line
+        self.message = message
+
 class ModelError(Exception):
-    def __init__(self, filename: str, source_message: str = "", source=None):
+    def __init__(self, filename: str, source_message: str = "", source: list[str] = []):
         self.error_tag = bcolors.FAIL + "ModelError" + bcolors.ENDC
         self.filename = filename
-        self.source = list(source)
+        self.source = source
         self.source_message = source_message
         
     def throw(self, return_model, throw_message):
         print(f"{self.error_tag} in {self.filename}: {throw_message}")
         if self.source: 
-            print("Source: " + str(self.source))
+            print(f"Source: {self.source}")
             print(self.source_message)
         if return_model:
             interpreter(return_model)
@@ -2689,6 +2696,10 @@ def loader(inp: str, designs: list[str]) -> Model:
                 except SyntaxError as err:
                     model = None
                     console.print_error("SyntaxError", f" in {err.filename}", f"(line {err.line_no}) \"{err.line}\" - {err.message}")
+                    inp = ""
+                except ModelLoadingError as err:
+                    model = None
+                    console.print_error("ModelLoadingError", f" in {err.filename}", f"(line {err.line_no}) \"{err.line}\" - {err.message}")
                     inp = ""
             else:
                 print("Model " + inp + " not found.")
