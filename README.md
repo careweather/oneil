@@ -74,6 +74,16 @@ To see all the results of the model:
 <param n>: <min>|<max> <unit>
 ```
 
+### Development
+
+If you are developing Oneil, you will want to install Oneil in "editable" mode. To do this, use the `-e` flag.
+
+```sh
+oneil/install.sh -e
+```
+
+This will allow you to modify Oneil's python code and run it with `oneil` without having to re-run `oneil/install.sh` for every change.
+
 ## Manual Install
 
 Alternatively, if you've cloned Oneil, you can install it using pip. You will need the following packages to run Oneil:
