@@ -686,17 +686,13 @@ def par_ceiling(val):
         raise TypeError("Input to ceiling() must be of type Parameter, int, or float.")
 
 
-class Error:
-    def __init__(self):
-        pass
-
-class DesignError(Error):
+class DesignError(Exception):
     def __init__(self, model, filename):
         error = bcolors.FAIL + "DesignError" + bcolors.ENDC
         print(error + " can't find design files: " + filename)
         interpreter(model)
 
-class UnitError(Error):
+class UnitError(Exception):
     def __init__(self, parameters, source_message, source):
         self.error_tag = bcolors.FAIL + "UnitError" + bcolors.ENDC
         self.parameters = parameters
@@ -727,7 +723,7 @@ class UnitError(Error):
         
         quit()
 
-class ParameterError(Error):
+class ParameterError(Exception):
     def __init__(self, parameter, source_message, source=[]):
         self.error_tag = bcolors.FAIL + "ParameterError" + bcolors.ENDC
         self.parameter = parameter
@@ -755,13 +751,13 @@ class ParameterError(Error):
         
         quit()
 
-class NoteError(Error):
+class NoteError(Exception):
     def __init__(self, model, parameter, message):
         error = bcolors.FAIL + "NoteError" + bcolors.ENDC
         print(f"Note line {parameter.note_line_no}: {parameter.note}")
         interpreter(model)
 
-class SyntaxError(Error):
+class SyntaxError(Exception):
     def __init__(self, model, filename, line_no, line, message):
         error = bcolors.FAIL + "SyntaxError" + bcolors.ENDC
         print(f"{error} in {filename}: (line {line_no}) {line} - {message}")
@@ -770,7 +766,7 @@ class SyntaxError(Error):
         else:
             loader("", [])
 
-class IDError(Error):
+class IDError(Exception):
     def __init__(self, model, ID, message):
         self.error_tag = bcolors.FAIL + "IDError" + bcolors.ENDC
         self.source_message = f"{self.error_tag} ({ID}) in {model.name}: {message}"
@@ -784,10 +780,11 @@ class IDError(Error):
         if return_model:
             interpreter(return_model)
         else:
-            loader([])
+            loader("", [])
 
 
-class ImportError(Error):
+
+class ImportError(Exception):
     def __init__(self, model, filename, line_no, line, imprt):
         error = bcolors.FAIL + "ImportError" + bcolors.ENDC
         print(f"{error} in {filename}: (line {line_no}) {line} - Failed to import {imprt}. Does the import run by itself?")
@@ -796,7 +793,7 @@ class ImportError(Error):
         else:
             loader("", [])
 
-class ModelError(Error):
+class ModelError(Exception):
     def __init__(self, filename, source_message="", source=None):
         self.error_tag = bcolors.FAIL + "ModelError" + bcolors.ENDC
         self.filename = filename
@@ -813,7 +810,7 @@ class ModelError(Error):
         else:
             loader("", [])
 
-class PythonError(Error):
+class PythonError(Exception):
     def __init__(self, parameter, message, original_exception=None):
         error = bcolors.FAIL + "PythonError" + bcolors.ENDC
         if original_exception:
