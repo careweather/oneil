@@ -5,3 +5,6 @@ default: run
 
 run *args="../../examples/oneil_cylinder.on":
     cd src/oneil && python3 -c "import __init__; __init__.main()" {{args}}
+
+run-test name:
+    cd src/oneil && python3 -c "import __init__; __init__.main()" "../../test/{{name}}.on" all
