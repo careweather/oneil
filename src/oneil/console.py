@@ -1,6 +1,6 @@
 from pkg_resources import get_distribution
 
-import bcolors
+from . import bcolors
 
 __version__ = get_distribution("oneil").version
 

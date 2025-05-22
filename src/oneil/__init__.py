@@ -9,9 +9,9 @@ import importlib
 from functools import partial
 import traceback, logging
 
-import bcolors
-import console
-import units as un
+from . import bcolors
+from . import console
+from . import units as un
 
 # Configure logging to output to the console
 logging.basicConfig(level=logging.ERROR, format='%(message)s')
