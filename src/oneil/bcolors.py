@@ -12,3 +12,10 @@ FAIL = '\033[91m'
 ENDC = '\033[0m'
 BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
+
+def error(msg: str):
+    """
+    Wrap the message in red
+    """
+
+    return f"{FAIL}{BOLD}{msg}{ENDC}"

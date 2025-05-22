@@ -106,7 +106,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Use includes must be of the form \"use <model> as <symbol>\"")
+                    raise SyntaxError(file_name, i+1, line, "Use includes must be of the form \"use <model> as <symbol>\"")
                 
                 last_line_blank = False
                 include = line.replace("use", "")
@@ -130,7 +130,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^from\s+\w+(\.\w+)*\s+use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "From includes must be of the form \"from <source> use <model> as <symbol>\"")
+                    raise SyntaxError(file_name, i+1, line, "From includes must be of the form \"from <source> use <model> as <symbol>\"")
 
                 last_line_blank = False
                 include = line.replace("from", "")
@@ -157,7 +157,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^import\s+\w+\s*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Python imports must be of the form \"import <module>\"")
+                    raise SyntaxError(file_name, i+1, line, "Python imports must be of the form \"import <module>\"")
                 
                 last_line_blank = False
                 sys.path.append(os.getcwd())
@@ -172,7 +172,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^section\s+[\w\s]*$", line))
                 except:
-                    SyntaxError(parent_model, file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
+                    raise SyntaxError(file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
                 
                 last_line_blank = False
                 section = line.replace("section", "").strip()
@@ -180,7 +180,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^(\*{1,2}\s*)?test\s*(\{\w+(,\s*\w+)*\})?:.*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Tests must be of the form \"test {<input 1>, <input 2>, ... ,<input n>}: <expression>\" where {<input 1>, <input 2>, ... ,<input n>} is optional, each <input> consists of word characters only, and <expression> is a valid python expression with valid parameters and constants.")
+                    raise SyntaxError(file_name, i+1, line, "Tests must be of the form \"test {<input 1>, <input 2>, ... ,<input n>}: <expression>\" where {<input 1>, <input 2>, ... ,<input n>} is optional, each <input> consists of word characters only, and <expression> is a valid python expression with valid parameters and constants.")
                 
                 last_line_blank = False
                 tests.append(Test(line, i+1, file_name.replace(".on", ""), section=section))
@@ -200,7 +200,7 @@ def parse_file(file_name, parent_model=None):
                 parameters.append(parameter)
                 prev_line = 'param'
             else:
-                SyntaxError(parent_model, file_name, i+1, line, "Invalid syntax.")
+                raise SyntaxError(file_name, i+1, line, "Invalid syntax.")
 
     params = {p.id: p for p in parameters}
 
@@ -244,7 +244,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
             elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
                 limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
             else:
-                SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid limit: " + l)
+                raise SyntaxError(file_name, line_number, line, "Parse parameter: invalid limit: " + l)
         options = tuple(limits)
     elif '[' and ']' in preamble:
         name = preamble.split('[')[0].strip()
@@ -254,7 +254,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         options = (0, np.inf)
 
     if not name:
-        SyntaxError(None, file_name, line_number, line, "Parse parameter: name cannot be empty.")
+        raise SyntaxError(file_name, line_number, line, "Parse parameter: name cannot be empty.")
 
     return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance, pointer=pointer), unit_fx
 
@@ -278,7 +278,7 @@ def parse_body(body, line, line_number, file_name, imports):
         except Exception as e:
             UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
     elif len(body) > 2:
-        SyntaxError(None, file_name, line_number, line, "Parse parameter: too many colons.")
+        raise SyntaxError(file_name, line_number, line, "Parse parameter: too many colons.")
     else: 
         units = {}
         unit_fx = lambda x:x
@@ -326,9 +326,9 @@ def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit
     cargs = []
     equation = ""
     condition = ""
-    if '{' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing { from piecewise definition.")
+    if '{' not in assignment: raise SyntaxError(file_name, line_number, assignment, "Missing { from piecewise definition.")
     assignment = assignment.strip().strip('{')
-    if 'if' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing condition (\"if\") from piecewise definition.")
+    if 'if' not in assignment: raise SyntaxError(file_name, line_number, assignment, "Missing condition (\"if\") from piecewise definition.")
     equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     return (Parameter(equation, units, id + ":eqpiece", pointer=pointer), Parameter(condition, {}, id + ":condpiece")), eargs + cargs
@@ -354,7 +354,7 @@ def convert_functions(assignment, imports, file_name, line_number):
                 equation = i.__dict__[func]
                 break
         if not equation:
-            SyntaxError(None, file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
+            raise SyntaxError(file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
     else:
         equation = assignment.strip("\n").strip()
 
@@ -758,13 +758,11 @@ class NoteError(Exception):
         interpreter(model)
 
 class SyntaxError(Exception):
-    def __init__(self, model, filename, line_no, line, message):
-        error = bcolors.FAIL + "SyntaxError" + bcolors.ENDC
-        print(f"{error} in {filename}: (line {line_no}) {line} - {message}")
-        if model and model.calculated:
-            interpreter(model)
-        else:
-            loader("", [])
+    def __init__(self, filename: str, line_no: int, line: str, message: str):
+        self.filename = filename
+        self.line_no = line_no
+        self.line = line
+        self.message = message
 
 class IDError(Exception):
     def __init__(self, model, ID, message):
@@ -794,7 +792,7 @@ class ImportError(Exception):
             loader("", [])
 
 class ModelError(Exception):
-    def __init__(self, filename, source_message="", source=None):
+    def __init__(self, filename: str, source_message: str = "", source=None):
         self.error_tag = bcolors.FAIL + "ModelError" + bcolors.ENDC
         self.filename = filename
         self.source = list(source)
@@ -852,14 +850,14 @@ class Test:
             try:
                 self.refs = [l.strip() for l in line.split(':')[0].split('{')[1].split('}')[0].split(',')]
             except:
-                SyntaxError(None, model, line_no, line, "Invalid syntax for test references.")
+                SyntaxError(model, line_no, line, "Invalid syntax for test references.")
         else:
             self.refs = []
 
         self.expression = line.split(':')[1].strip()
 
         if not self.expression:
-            SyntaxError(None, model, line_no, line, "Empty test expression.")
+            SyntaxError(model, line_no, line, "Empty test expression.")
 
         for old, new in FUNCTIONS.items():
             if "." + old not in self.expression:
@@ -2685,8 +2683,13 @@ def loader(inp: str, designs: list[str]) -> Model:
                     continue
             if os.path.exists(inp):
                 print("Loading model " + inp + "...")
-                model = Model(inp)
-                model.build()
+                try:
+                    model = Model(inp)
+                    model.build()
+                except SyntaxError as err:
+                    model = None
+                    console.print_error("SyntaxError", f" in {err.filename}", f"(line {err.line_no}) \"{err.line}\" - {err.message}")
+                    inp = ""
             else:
                 print("Model " + inp + " not found.")
                 inp = ""

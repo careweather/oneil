@@ -9,5 +9,5 @@ def print_welcome_message():
     print("Type 'help' for a list of commands or see the README for more information.")
     print("-"*80)
 
-def print_error(msg : str):
-    print(f"{bcolors.FAIL}{bcolors.BOLD}ERROR{bcolors.ENDC}: {msg}")
+def print_error(kind: str, desc: str, msg: str):
+    print(f"{bcolors.error(kind)}{desc}: {msg}")
