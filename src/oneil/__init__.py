@@ -1,32 +1,22 @@
 import re
 import numpy as np
 import inspect
-from pkg_resources import get_distribution
 from pytexit import py2tex
 import os, sys
 import copy
 from beautifultable import BeautifulTable
-from . import units as un
 import importlib
 from functools import partial
 import traceback, logging
+
+from . import bcolors
+from . import console
+from . import units as un
 
 # Configure logging to output to the console
 logging.basicConfig(level=logging.ERROR, format='%(message)s')
 
 np.seterr(all='raise')
-
-class bcolors:
-    MAGENTA = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    ORANGE = '\033[38;5;208m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 def isfloat(num):
     try:
@@ -34,8 +24,6 @@ def isfloat(num):
         return True
     except ValueError:
         return False
-
-__version__ = get_distribution("oneil").version
 
 FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip", "mid": "par_mid", "sign": "par_sign"}
 
@@ -118,7 +106,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Use includes must be of the form \"use <model> as <symbol>\"")
+                    raise SyntaxError(file_name, i+1, line, "Use includes must be of the form \"use <model> as <symbol>\"")
                 
                 last_line_blank = False
                 include = line.replace("use", "")
@@ -131,18 +119,18 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"File \"{model}.on\" does not exist.")
                 symbol = include.split('as')[1].strip()
 
                 if symbol in submodels.keys():
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
 
                 submodels[symbol] = {'model': Model(model + ".on"), 'inputs': test_inputs, 'path': [model], 'line_no': i+1, 'line': line}
             elif line[:5] == 'from ':
                 try:
                     assert(re.search(r"^from\s+\w+(\.\w+)*\s+use\s+\w+(\(.+=.+\))?\s+as\s+\w+\s*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "From includes must be of the form \"from <source> use <model> as <symbol>\"")
+                    raise SyntaxError(file_name, i+1, line, "From includes must be of the form \"from <source> use <model> as <symbol>\"")
 
                 last_line_blank = False
                 include = line.replace("from", "")
@@ -156,20 +144,20 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "File \"" + model + ".on\" does not exist.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"File \"{model}.on\" does not exist.")
 
                 path = source.split('.') + [model] if '.' in source else [source, model]
                 symbol = include.split('use')[1].split("as")[1].strip()
 
                 if symbol in submodels.keys():
-                    ModelError(file_name, "", ["parse_file"]).throw(parent_model, "(line " + str(i+1) + ") " + line + "- " + "Submodel symbol \"" + symbol + "\" has duplicate definitions.")
+                    raise ModelLoadingError(file_name, i + 1, line, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
 
                 submodels[symbol] = {'path': path, 'inputs': test_inputs, 'line_no': i+1, 'line': line}
             elif line[:7] == 'import ':
                 try:
                     assert(re.search(r"^import\s+\w+\s*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Python imports must be of the form \"import <module>\"")
+                    raise SyntaxError(file_name, i+1, line, "Python imports must be of the form \"import <module>\"")
                 
                 last_line_blank = False
                 sys.path.append(os.getcwd())
@@ -184,7 +172,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^section\s+[\w\s]*$", line))
                 except:
-                    SyntaxError(parent_model, file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
+                    raise SyntaxError(file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
                 
                 last_line_blank = False
                 section = line.replace("section", "").strip()
@@ -192,7 +180,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^(\*{1,2}\s*)?test\s*(\{\w+(,\s*\w+)*\})?:.*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Tests must be of the form \"test {<input 1>, <input 2>, ... ,<input n>}: <expression>\" where {<input 1>, <input 2>, ... ,<input n>} is optional, each <input> consists of word characters only, and <expression> is a valid python expression with valid parameters and constants.")
+                    raise SyntaxError(file_name, i+1, line, "Tests must be of the form \"test {<input 1>, <input 2>, ... ,<input n>}: <expression>\" where {<input 1>, <input 2>, ... ,<input n>} is optional, each <input> consists of word characters only, and <expression> is a valid python expression with valid parameters and constants.")
                 
                 last_line_blank = False
                 tests.append(Test(line, i+1, file_name.replace(".on", ""), section=section))
@@ -212,14 +200,14 @@ def parse_file(file_name, parent_model=None):
                 parameters.append(parameter)
                 prev_line = 'param'
             else:
-                SyntaxError(parent_model, file_name, i+1, line, "Invalid syntax.")
+                raise SyntaxError(file_name, i+1, line, "Invalid syntax.")
 
-    params = {p.id: p for p in parameters}
+        params = {p.id: p for p in parameters}
 
-    if not params and not tests and not design_overrides:
-        ModelError(file_name, "", ["parse_file"]).throw(None, "(final line) " + final_line + "- " + "End of File\n", "Empty model. No parameters, design values, or tests found.")
+        if not params and not tests and not design_overrides:
+            raise ModelLoadingError(file_name, final_line, prev_line, "Empty model. No parameters, design values, or tests found.")
 
-    return note, params, submodels, tests, design_overrides
+        return note, params, submodels, tests, design_overrides
 
 def parse_parameter(line, line_number, file_name, imports, section=""):
     trace = False
@@ -256,7 +244,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
             elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
                 limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
             else:
-                SyntaxError(None, file_name, line_number, line, "Parse parameter: invalid limit: " + l)
+                raise SyntaxError(file_name, line_number, line, "Parse parameter: invalid limit: " + l)
         options = tuple(limits)
     elif '[' and ']' in preamble:
         name = preamble.split('[')[0].strip()
@@ -266,7 +254,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
         options = (0, np.inf)
 
     if not name:
-        SyntaxError(None, file_name, line_number, line, "Parse parameter: name cannot be empty.")
+        raise SyntaxError(file_name, line_number, line, "Parse parameter: name cannot be empty.")
 
     return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance, pointer=pointer), unit_fx
 
@@ -290,7 +278,7 @@ def parse_body(body, line, line_number, file_name, imports):
         except Exception as e:
             UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
     elif len(body) > 2:
-        SyntaxError(None, file_name, line_number, line, "Parse parameter: too many colons.")
+        raise SyntaxError(file_name, line_number, line, "Parse parameter: too many colons.")
     else: 
         units = {}
         unit_fx = lambda x:x
@@ -338,9 +326,9 @@ def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit
     cargs = []
     equation = ""
     condition = ""
-    if '{' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing { from piecewise definition.")
+    if '{' not in assignment: raise SyntaxError(file_name, line_number, assignment, "Missing { from piecewise definition.")
     assignment = assignment.strip().strip('{')
-    if 'if' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing condition (\"if\") from piecewise definition.")
+    if 'if' not in assignment: raise SyntaxError(file_name, line_number, assignment, "Missing condition (\"if\") from piecewise definition.")
     equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     return (Parameter(equation, units, id + ":eqpiece", pointer=pointer), Parameter(condition, {}, id + ":condpiece")), eargs + cargs
@@ -366,7 +354,7 @@ def convert_functions(assignment, imports, file_name, line_number):
                 equation = i.__dict__[func]
                 break
         if not equation:
-            SyntaxError(None, file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
+            raise SyntaxError(file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
     else:
         equation = assignment.strip("\n").strip()
 
@@ -698,17 +686,13 @@ def par_ceiling(val):
         raise TypeError("Input to ceiling() must be of type Parameter, int, or float.")
 
 
-class Error:
-    def __init__(self):
-        pass
-
-class DesignError(Error):
+class DesignError(Exception):
     def __init__(self, model, filename):
         error = bcolors.FAIL + "DesignError" + bcolors.ENDC
         print(error + " can't find design files: " + filename)
         interpreter(model)
 
-class UnitError(Error):
+class UnitError(Exception):
     def __init__(self, parameters, source_message, source):
         self.error_tag = bcolors.FAIL + "UnitError" + bcolors.ENDC
         self.parameters = parameters
@@ -739,7 +723,7 @@ class UnitError(Error):
         
         quit()
 
-class ParameterError(Error):
+class ParameterError(Exception):
     def __init__(self, parameter, source_message, source=[]):
         self.error_tag = bcolors.FAIL + "ParameterError" + bcolors.ENDC
         self.parameter = parameter
@@ -767,22 +751,20 @@ class ParameterError(Error):
         
         quit()
 
-class NoteError(Error):
+class NoteError(Exception):
     def __init__(self, model, parameter, message):
         error = bcolors.FAIL + "NoteError" + bcolors.ENDC
         print(f"Note line {parameter.note_line_no}: {parameter.note}")
         interpreter(model)
 
-class SyntaxError(Error):
-    def __init__(self, model, filename, line_no, line, message):
-        error = bcolors.FAIL + "SyntaxError" + bcolors.ENDC
-        print(f"{error} in {filename}: (line {line_no}) {line} - {message}")
-        if model and model.calculated:
-            interpreter(model)
-        else:
-            loader([])
+class SyntaxError(Exception):
+    def __init__(self, filename: str, line_no: int, line: str, message: str):
+        self.filename = filename
+        self.line_no = line_no
+        self.line = line
+        self.message = message
 
-class IDError(Error):
+class IDError(Exception):
     def __init__(self, model, ID, message):
         self.error_tag = bcolors.FAIL + "IDError" + bcolors.ENDC
         self.source_message = f"{self.error_tag} ({ID}) in {model.name}: {message}"
@@ -796,36 +778,44 @@ class IDError(Error):
         if return_model:
             interpreter(return_model)
         else:
-            loader([])
+            loader("", [])
 
 
-class ImportError(Error):
+
+class ImportError(Exception):
     def __init__(self, model, filename, line_no, line, imprt):
         error = bcolors.FAIL + "ImportError" + bcolors.ENDC
         print(f"{error} in {filename}: (line {line_no}) {line} - Failed to import {imprt}. Does the import run by itself?")
         if model:
             interpreter(model)
         else:
-            loader([])
+            loader("", [])
 
-class ModelError(Error):
-    def __init__(self, filename, source_message="", source=None):
+class ModelLoadingError(Exception):
+    def __init__(self, filename: str, line_no: int, line: str, message: str):
+        self.filename = filename
+        self.line_no = line_no
+        self.line = line
+        self.message = message
+
+class ModelError(Exception):
+    def __init__(self, filename: str, source_message: str = "", source: list[str] = []):
         self.error_tag = bcolors.FAIL + "ModelError" + bcolors.ENDC
         self.filename = filename
-        self.source = list(source)
+        self.source = source
         self.source_message = source_message
         
     def throw(self, return_model, throw_message):
         print(f"{self.error_tag} in {self.filename}: {throw_message}")
         if self.source: 
-            print("Source: " + str(self.source))
+            print(f"Source: {self.source}")
             print(self.source_message)
         if return_model:
             interpreter(return_model)
         else:
-            loader([])
+            loader("", [])
 
-class PythonError(Error):
+class PythonError(Exception):
     def __init__(self, parameter, message, original_exception=None):
         error = bcolors.FAIL + "PythonError" + bcolors.ENDC
         if original_exception:
@@ -867,14 +857,14 @@ class Test:
             try:
                 self.refs = [l.strip() for l in line.split(':')[0].split('{')[1].split('}')[0].split(',')]
             except:
-                SyntaxError(None, model, line_no, line, "Invalid syntax for test references.")
+                SyntaxError(model, line_no, line, "Invalid syntax for test references.")
         else:
             self.refs = []
 
         self.expression = line.split(':')[1].strip()
 
         if not self.expression:
-            SyntaxError(None, model, line_no, line, "Empty test expression.")
+            SyntaxError(model, line_no, line, "Empty test expression.")
 
         for old, new in FUNCTIONS.items():
             if "." + old not in self.expression:
@@ -2538,7 +2528,7 @@ class Model:
             # if self.parameters[parameter_ID].error:
             #     return self.parameters[parameter_ID].error
 
-def handler(model:Model, inpt):
+def handler(model: Model, inpt: str):
     args = inpt.strip().split(" ")
     cmd = args.pop(0)
     opt_list = [arg for arg in args if "=" in arg]
@@ -2573,12 +2563,19 @@ def handler(model:Model, inpt):
     elif cmd == "export":
         model.export_pdf(args)
     elif cmd == "load":
-        loader(inpt.split(" "))
+        model_name, model_designs, commands = parse_args(args)
+
+        loader(model_name, model_designs)
+
+        for command in commands:
+            print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+            handler(model, command)
+
     elif cmd == "reload":
         if model.design == "default":
-            loader(["reload", model.name])
+            loader(model.name, [])
         else:
-            loader(["reload", model.design + "@" + model.name])
+            loader(model.name, [model.design])
     elif cmd == "help":
         print(help_text)
         interpreter(model)
@@ -2673,19 +2670,7 @@ Commands:
         Exit the program.
 """
 
-def loader(args=[]):
-
-    designs = []
-
-    if len(args) > 1:
-        print(args)
-        inp = args[1]
-        if "@" in inp:
-            designs = inp.split("@")[:-1]
-            designs.reverse()
-            inp = inp.split("@")[-1]
-    else:
-        inp = ""
+def loader(inp: str, designs: list[str]) -> Model:
     model = None
 
     while not model:
@@ -2705,8 +2690,17 @@ def loader(args=[]):
                     continue
             if os.path.exists(inp):
                 print("Loading model " + inp + "...")
-                model = Model(inp)
-                model.build()
+                try:
+                    model = Model(inp)
+                    model.build()
+                except SyntaxError as err:
+                    model = None
+                    console.print_error("SyntaxError", f" in {err.filename}", f"(line {err.line_no}) \"{err.line}\" - {err.message}")
+                    inp = ""
+                except ModelLoadingError as err:
+                    model = None
+                    console.print_error("ModelLoadingError", f" in {err.filename}", f"(line {err.line_no}) \"{err.line}\" - {err.message}")
+                    inp = ""
             else:
                 print("Model " + inp + " not found.")
                 inp = ""
@@ -2718,11 +2712,7 @@ def loader(args=[]):
     for design in designs:
         handler(model, "design " + design)
 
-    # Handle commands after the first as cli commands.
-    for arg in args[2:]:
-        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
-        handler(model, arg)
-    interpreter(model)
+    return model
 
 loader_help = """"
     Commands:
@@ -2752,9 +2742,42 @@ def debugger(model):
     print("Enterring debug mode. Type 'quit' to exit.")
     while True:
         handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
+
+def parse_args(args: list[str]) -> tuple[str, list[str], list[str]]:
+    # if there are no arguments, then the user needs to be prompted for details
+    # so we return empty data
+    if len(args) == 0:
+        return "", [], []
+
+    # args example: `cooper_station@oneill_cylinder all test`
+    inputs = args[0].split("@")
+    commands = args[1:]
+
+    # the model is the last one listed
+    input_model = inputs[-1]
+
+    # the designs are the others listed
+    # NOTE: I'm not sure why it's reversed, but that's what the previous code did
+    input_designs = list(reversed(inputs[:-1]))
+
+    return input_model, input_designs, commands
     
 def main(args=sys.argv[1:]):
-    print("Oneil " + __version__)
-    print("Type 'help' for a list of commands or see the README for more information.")
-    print("-"*80)
-    loader(["oneil"] + args)
+    console.print_welcome_message()
+
+    # parse the files and commands
+    inp, designs, commands = parse_args(args)
+
+    # load the model
+    model = loader(inp, designs)
+
+    # Handle commands after the first as cli commands.
+    for command in commands:
+        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+        handler(model, command)
+
+    if len(args) > 2:
+        quit() 
+
+    # run the interpeter on the model
+    interpreter(model)
