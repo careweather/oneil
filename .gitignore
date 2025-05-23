@@ -5,3 +5,4 @@ __pycache__/
 .vim/
 .netrwhist
 .justfile
+examples/real-world
