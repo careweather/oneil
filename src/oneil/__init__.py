@@ -696,10 +696,18 @@ class OneilError(Exception):
         raise NotImplementedError("Subclasses must implement this method")
         
 class DesignError(OneilError):
-    def __init__(self, model, filename):
-        error = bcolors.FAIL + "DesignError" + bcolors.ENDC
-        print(error + " can't find design files: " + filename)
-        interpreter(model)
+    def __init__(self, filenames: list[str]):
+        self.filenames = filenames
+        
+    def kind(self):
+        return "DesignError"
+        
+    def context(self):
+        return None
+        
+    def message(self):
+        files_str = ", ".join(self.filenames)
+        return f"Can't find design files: [{files_str}]"
 
 class UnitError(OneilError):
     def __init__(self, parameters, source_message, source):
@@ -1705,18 +1713,17 @@ class Model:
     # Convert an empty model to a modeled design with all parameters assigned a value.
     def overwrite(self, design_files, quiet=False):
         if not design_files:
-            DesignError(self, [])
-            return
+            raise DesignError([])
         
         # Import design parameters.
         if isinstance(design_files, str):
             if not os.path.exists(design_files):
-                DesignError(self, design_files)
+                raise DesignError([design_files])
             _, design_params, _, tests, design = parse_file(design_files, self)
         elif isinstance(design_files, list):
-            for file in design_files:
-                if not os.path.exists(file):
-                    DesignError(self, file)
+            missing_files = [file for file in design_files if not os.path.exists(file)]
+            if len(missing_files) > 0:
+                raise DesignError(missing_files)
             _, design_params, _, tests, design = parse_file(design_files[0], self)
             if len(design_files) > 1:
                 for design_file in design_files[1:]:
