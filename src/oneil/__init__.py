@@ -685,14 +685,23 @@ def par_ceiling(val):
     else:
         raise TypeError("Input to ceiling() must be of type Parameter, int, or float.")
 
-
-class DesignError(Exception):
+class OneilError(Exception):
+    def kind(self) -> str:
+        raise NotImplementedError("Subclasses must implement this method")
+    
+    def context(self) -> str | None:
+        raise NotImplementedError("Subclasses must implement this method")
+    
+    def message(self) -> str:
+        raise NotImplementedError("Subclasses must implement this method")
+        
+class DesignError(OneilError):
     def __init__(self, model, filename):
         error = bcolors.FAIL + "DesignError" + bcolors.ENDC
         print(error + " can't find design files: " + filename)
         interpreter(model)
 
-class UnitError(Exception):
+class UnitError(OneilError):
     def __init__(self, parameters, source_message, source):
         self.error_tag = bcolors.FAIL + "UnitError" + bcolors.ENDC
         self.parameters = parameters
@@ -723,7 +732,7 @@ class UnitError(Exception):
         
         quit()
 
-class ParameterError(Exception):
+class ParameterError(OneilError):
     def __init__(self, parameter, source_message, source=[]):
         self.error_tag = bcolors.FAIL + "ParameterError" + bcolors.ENDC
         self.parameter = parameter
@@ -751,20 +760,20 @@ class ParameterError(Exception):
         
         quit()
 
-class NoteError(Exception):
+class NoteError(OneilError):
     def __init__(self, model, parameter, message):
         error = bcolors.FAIL + "NoteError" + bcolors.ENDC
         print(f"Note line {parameter.note_line_no}: {parameter.note}")
         interpreter(model)
 
-class SyntaxError(Exception):
+class SyntaxError(OneilError):
     def __init__(self, filename: str, line_no: int, line: str, message: str):
         self.filename = filename
         self.line_no = line_no
         self.line = line
         self.message = message
 
-class IDError(Exception):
+class IDError(OneilError):
     def __init__(self, model, ID, message):
         self.error_tag = bcolors.FAIL + "IDError" + bcolors.ENDC
         self.source_message = f"{self.error_tag} ({ID}) in {model.name}: {message}"
@@ -782,7 +791,7 @@ class IDError(Exception):
 
 
 
-class ImportError(Exception):
+class ImportError(OneilError):
     def __init__(self, model, filename, line_no, line, imprt):
         error = bcolors.FAIL + "ImportError" + bcolors.ENDC
         print(f"{error} in {filename}: (line {line_no}) {line} - Failed to import {imprt}. Does the import run by itself?")
@@ -791,14 +800,14 @@ class ImportError(Exception):
         else:
             loader("", [])
 
-class ModelLoadingError(Exception):
+class ModelLoadingError(OneilError):
     def __init__(self, filename: str, line_no: int, line: str, message: str):
         self.filename = filename
         self.line_no = line_no
         self.line = line
         self.message = message
 
-class ModelError(Exception):
+class ModelError(OneilError):
     def __init__(self, filename: str, source_message: str = "", source: list[str] = []):
         self.error_tag = bcolors.FAIL + "ModelError" + bcolors.ENDC
         self.filename = filename
@@ -815,7 +824,7 @@ class ModelError(Exception):
         else:
             loader("", [])
 
-class PythonError(Exception):
+class PythonError(OneilError):
     def __init__(self, parameter, message, original_exception=None):
         error = bcolors.FAIL + "PythonError" + bcolors.ENDC
         if original_exception:
@@ -2019,7 +2028,7 @@ class Model:
             if "." in arg:
                 result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                if isinstance(result, Error):
+                if isinstance(result, OneilError):
                     result.throw(self, "Error in eval().")
                 elif isinstance(result, Parameter):
                     submodel_parameters[prefixed_ID] = result
@@ -2066,7 +2075,7 @@ class Model:
                     if "." in arg:
                         result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                        if isinstance(result, Error):
+                        if isinstance(result, OneilError):
                             result.throw(self, "Error in _test_recursively().")
                         elif isinstance(result, Parameter):
                             test_params[prefixed_ID] = result
