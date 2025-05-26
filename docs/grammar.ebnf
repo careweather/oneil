@@ -1,0 +1,119 @@
+(* Oneil Language Grammar in EBNF *)
+
+(* NOTE: Because this grammar is whitespace sensitive, inline whitespace is
+         marked throughout the grammar.  In the future, we may move the grammar
+         away from whitespace sensitivity, in which case tokens will be implied
+         to be separated by inline whitespace.
+         
+         In addition, identifiers and keywords are assumed to be separated by
+         whitespace, as is standard. So, `importabc` is parsed as a single
+         token, not `import` followed by `abc`. *)
+
+(* Whitespace *)
+InlineWhitespace = { Space | Tab } ;  (* Adjacent spaces/tabs grouped into single token *)
+LineBreak = "\n" | "\r\n" ;  (* Each line break is a separate token *)
+Space = " " ;
+Tab = "\t" ;
+BlankLine = InlineWhitespace, LineBreak ;
+Ws = InlineWhitespace ; (* for conciseness *)
+
+(* Top Level Structure *)
+Program = { ( Declaration, LineBreak ) | Comment | BlankLine } ;
+Declaration = ImportDecl | UseDecl | FromDecl | SectionDecl | ParameterDecl | TestDecl | DesignOverrideDecl | Note ;
+
+(* Notes and Comments *)
+Note = Indent, NoteLine, { { BlankLine }, Indent, NoteLine } ;
+NoteLine = { Any character except LineBreak }, LineBreak ;
+Indent = (Space | Tab), InlineWhitespace ;  (* at least 1 space or tab, followed by any number of spaces or tabs *)
+Comment = "#", { Any character except LineBreak }, LineBreak ;
+
+(* Imports *)
+ImportDecl = "import", Ws, Identifier, Ws, LineBreak ;
+UseDecl = "use", Ws, Model, Ws, [ ModelInputs, Ws ], "as", Ws, Identifier, Ws, LineBreak ;
+FromDecl = "from", Ws, ModulePath, Ws, "use", Ws, Model, Ws, [ ModelInputs, Ws ], "as", Ws, Identifier, Ws, LineBreak ;
+ModulePath = Identifier, { ".", Identifier } ;
+ModelInputs = "(", Ws, Assignment, { Ws, ",", Ws, Assignment }, Ws, ")" ;
+Model = Identifier ;  (* Model name without .on extension *)
+
+(* Sections *)
+SectionDecl = "section", Ws, Identifier, { Ws, Identifier }, Ws, LineBreak ;
+
+(* Parameters *)
+ParameterDecl = [ Performance, Ws ], [ Trace, Ws ], [ Name, Ws ], [ Limits, Ws ], ":", Ws, Assignment, Ws, [ UnitDecl, Ws ], LineBreak ;
+Performance = "$" ;
+Trace = "*" | "**" ;
+Name = Identifier ;
+Limits = "(", Ws, Expression, Ws, ",", Ws, Expression, Ws, ")" ;
+Assignment = Identifier, Ws, "=", Ws, Expression ;
+UnitDecl = ":", Ws, UnitExpr ;
+
+(* Tests *)
+TestDecl = [ Trace, Ws ], "test", Ws, [ TestInputs, Ws ], ":", Ws, Expression, Ws, LineBreak ;
+TestInputs = "{", Ws, Identifier, Ws, { ",", Ws, Identifier, Ws, }, "}" ;
+
+(* Design Overrides *)
+(* TODO: find out the difference between `Assignment`s and `DesignOverride`s *)
+DesignOverrideDecl = [ Trace, Ws ], Identifier, [ ".", Identifier ], Ws, ( "=>" | "=" ), Ws, Expression, Ws, [ ":", Ws, UnitExpr, Ws ], LineBreak ;
+
+(* Expressions *)
+Expression = NumericExpr | PiecewiseExpr ;
+
+(* Numeric Expression Precedence (highest to lowest):
+   1. Parentheses, function calls
+   2. Unary minus (-)
+   3. Exponentiation ( ** ) - right associative
+   4. Multiplication, division, floor division, modulo (*, /, //, %) - left associative
+   5. Addition, subtraction (+, -) - left associative
+*)
+NumericExpr = AdditiveExpr ;
+AdditiveExpr = [ AdditiveExpr, Ws, AdditiveOp, Ws, ], MultiplicativeExpr ;
+AdditiveOp = "+" | "-" | "--" ;
+MultiplicativeExpr = [ MultiplicativeExpr, Ws, MultiplicativeOp, Ws, ], ExponentialExpr ;
+MultiplicativeOp = "*" | "/" | "//" | "%" ;
+ExponentialExpr = NegExpr, [ Ws, "^", Ws, , ExponentialExpr ] ;  (* right associative *)
+NegExpr = ( "-", Ws, NegExpr ) | PrimaryNumericExpr ;
+PrimaryNumericExpr = Number | Identifier { ".", Identifier } | FunctionCall | ( "(", Ws, NumericExpr, Ws, ")" ) ;
+
+(* Boolean Expression Precedence (highest to lowest):
+   1. Comparisons (<, >, <=, >=, ==, !=) - non-associative
+   2. NOT - unary prefix
+   3. AND - left associative
+   4. OR - left associative
+*)
+BooleanExpr = OrExpr;
+OrExpr = [ OrExpr, Ws, "or", Ws, ], AndExpr ;
+AndExpr = [ AndExpr, Ws, "and", Ws, ], NotExpr ;
+NotExpr = [ "not", Ws, ], NotExpr | ComparisonExpr ;
+ComparisonExpr = PrimaryBooleanExpr, Ws, ComparisonOp, Ws, PrimaryBooleanExpr ;
+ComparisonOp = "<" | ">" | "<=" | ">=" | "==" | "!=" ;
+PrimaryBooleanExpr = NumericExpr | ( "(", Ws, BooleanExpr, Ws, ")" ) ;
+
+PiecewiseExpr = PiecewisePart, { LineBreak, { LineBreak }, PiecewisePart } ;
+PiecewisePart = "{", Ws, NumericExpr, Ws, "if", Ws, BooleanExpr, Ws, [ ":", Ws, UnitExpr ], Ws ;
+
+(* Function Calls *)
+FunctionCall = Identifier, "(", Ws, [ Expression, Ws, { ",", Ws, Expression, Ws } ], ")" ;
+
+(* Units *)
+UnitExpr = UnitTerm, { Ws, ( "*" | "/" ), Ws, UnitTerm } ;
+UnitTerm = Identifier, [ "^", Ws, Number ] | "(" Ws, UnitExpr, Ws, ")" ;
+
+(* Basic Elements *)
+Identifier = Letter, { Letter | Digit | "_" } ;
+Number = [ Sign ], ( Integer | Float | Scientific ) ;
+Integer = Digit, { Digit } ;
+Float = [ Integer ], ".", Digit, { Digit } ;
+Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
+Sign = "+" | "-" ;
+Letter = "A" | ... | "Z" | "a" | ... | "z" ;
+Digit = "0" | "1" | ... | "9" ;
+
+(* Built-in Functions *)
+BuiltInFunction = "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | 
+                 "sinh" | "cosh" | "tanh" | "min" | "max" | "sqrt" | 
+                 "abs" | "mnmx" | "log" | "log2" | "log10" | "ln" | 
+                 "floor" | "ceiling" | "extent" | "range" | "strip" | 
+                 "mid" | "sign" ;
+
+(* Built-in Constants *)
+MathConstant = "pi" | "e" | "inf" ; 
