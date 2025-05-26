@@ -276,7 +276,7 @@ def parse_body(body, line, line_number, file_name, imports):
         try:
             units, unit_fx = un.parse(hrunits)
         except Exception as e:
-            UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
+            raise UnitParseError(file_name, line_number, hrunits)
     elif len(body) > 2:
         raise SyntaxError(file_name, line_number, line, "Parse parameter: too many colons.")
     else: 
@@ -708,6 +708,21 @@ class DesignError(OneilError):
     def message(self):
         files_str = ", ".join(self.filenames)
         return f"Can't find design files: [{files_str}]"
+
+class UnitParseError(OneilError):
+    def __init__(self, filename: str, line_no: int, hrunits: str):
+        self.filename = filename
+        self.line_no = line_no
+        self.hrunits = hrunits
+        
+    def kind(self) -> str:
+        return "UnitParseError"
+        
+    def context(self) -> str | None:
+        return "in {self.filename} (line {self.line_no})"
+        
+    def message(self) -> str:
+        return f"Failed to parse units '{self.hrunits}'"
 
 class UnitError(OneilError):
     def __init__(self, parameters, source_message, source):
