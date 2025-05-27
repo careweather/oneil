@@ -659,6 +659,12 @@ class OneilError(Exception):
     
     def message(self) -> str:
         raise NotImplementedError("Subclasses must implement this method")
+
+    def __str__(self):
+        if self.context() != None:
+            return f"{self.kind()} {self.context()}: {self.message()}"
+        else:
+            return f"{self.kind()}: {self.message()}"
         
 class DesignError(OneilError):
     def __init__(self, filenames: list[str]):
@@ -784,7 +790,7 @@ class IDError(OneilError):
         return "IDError"
         
     def context(self) -> str | None:
-        return f"in model {self.model} (ID: {self.ID})"
+        return f"in model {self.model.name} (ID: {self.ID})"
         
     def message(self) -> str:
         return f"{self.message_}"
@@ -1011,7 +1017,7 @@ class Parameter:
                     value.equation = None
                     value.isdiscrete = True
                 else:
-                    raise ParameterError("Parameter was given a value that is not among its options.", self)
+                    raise ParameterError(f"Parameter was given a value that is not among its options: {value.options}", self)
                 
             if value.min is not None and value.max is not None:
                 if value.units != self.units:
@@ -1055,7 +1061,7 @@ class Parameter:
             if self.options and self.min and self.max:
                 if self.isdiscrete:
                     if not (self.min in self.options and self.max in self.options):
-                        raise ParameterError("Parameter was given a value that is not among its options.", self)
+                        raise ParameterError(f"Parameter was given a value that is not among its options: {self.options}", self)
                 else:
                     if not self.options[1] >= self.options[0]:
                         raise ParameterError("Minimum limit > maximum limit.", self)
@@ -1080,7 +1086,7 @@ class Parameter:
                 self.max = bool(value)
         elif isinstance(value, str):
             if value not in self.options:
-                raise ParameterError("Parameter was assigned an option that is not among its options.", self)
+                raise ParameterError(f"Parameter was assigned an option that is not among its options: {self.options}", self)
             
             if minmax == "minmax":
                 self.min = self.max = value
@@ -1157,13 +1163,13 @@ class Parameter:
 
     def human_readable(self, sigfigs=4, pref=None):
         if self.isdiscrete:
-            return self.min + " | " + self.max
+            return f"{self.min} | {self.max}"
         else:
             if not pref and self.hr_units is not None:
                 pref = self.hr_units
             if self.min is not None and self.max is not None:
                 if isinstance(self.min, str):
-                    return self.min if self.min == self.max else self.min + " | " + self.max
+                    return self.min if self.min == self.max else f"{self.min} | {self.max}"
                 else:
                     return un.hr_vals_and_units((self.min,self.max), self.units, pref, sigfigs)
             else:
