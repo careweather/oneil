@@ -887,7 +887,7 @@ class Test:
 
 
 class Parameter:
-    def __init__(self, equation, units, id, hr_units="", model="", line_no=None, line="", name=None, options=None, performance=False, trace=False, section="", arguments=[], error=None, pointer=False):
+    def __init__(self, equation, units, id, hr_units="", model="", line_no=None, line="", name=None, options=None, performance=False, trace=False, section="", arguments=[], pointer=False):
         if trace:            
             import pdb
             breakpoint()
@@ -907,7 +907,6 @@ class Parameter:
         self.equation = None
         self.args = copy.deepcopy(arguments)
         self.section = section
-        self.error = error
         self.pointer = pointer
         self.piecewise = True if isinstance(equation, list) else False
         self.minmax_equation = False
@@ -1017,8 +1016,6 @@ class Parameter:
             if value.min is not None and value.max is not None:
                 if value.units != self.units:
                     raise UnitError(f"Input or calculated units ({value.units}) do not match the required units: ({self.units}).", [self, value]).with_context(self)
-                else:
-                    self.error=value.error
                 self.min = value.min
                 self.max = value.max
             elif not value.independent:
@@ -1031,9 +1028,8 @@ class Parameter:
                 self.pointer = value.pointer
                 self.min = self.max = None
                 self.independent = False
-                self.error=value.error
             else:
-                self.error = ValueError(f"Parameter {value.id} cannot be written to {self.id}, because it is empty and independent.")
+                raise ParameterError(f"Parameter {value.id} cannot be written to {self.id}, because it is empty and independent.", self)
             
             if value.model: self.model = value.model
 
