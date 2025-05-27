@@ -856,21 +856,18 @@ class ModelLoadingError(OneilError):
         return self.message_
 
 class ModelError(OneilError):
-    def __init__(self, filename: str, source_message: str = "", source: list[str] = []):
-        self.error_tag = bcolors.FAIL + "ModelError" + bcolors.ENDC
+    def __init__(self, filename: str, source: list[str] = [], message: str = ""):
         self.filename = filename
         self.source = source
-        self.source_message = source_message
         
-    def throw(self, return_model, throw_message):
-        print(f"{self.error_tag} in {self.filename}: {throw_message}")
-        if self.source: 
-            print(f"Source: {self.source}")
-            print(self.source_message)
-        if return_model:
-            interpreter(return_model)
-        else:
-            loader("", [])
+    def kind(self) -> str:
+        return "ModelError"
+        
+    def context(self) -> str | None:
+        return f"in {self.filename}"
+        
+    def message(self) -> str:
+        return f"Submodel not found (source: {' -> '.join(self.source)})"
 
 class PythonError(OneilError):
     def __init__(self, parameter, message, original_exception=None):
@@ -2243,7 +2240,7 @@ class Model:
                     fails += new_fails
                     tests += new_tests
                 else:
-                    return ModelError(submodel_name, "Submodel not found.", new_trail)
+                    raise ModelError(submodel_name, new_trail)
 
 
         if not isinstance(fails, int):
@@ -2570,7 +2567,7 @@ class Model:
                 submodels = submodels[0]
                 return submodels._retrieve_model(path, trail)
             else:
-                return ModelError(submodel_name, "Submodel not found.", new_trail)
+                raise ModelError(submodel_name, new_trail)
         else:
             return self
 
@@ -2585,7 +2582,7 @@ class Model:
                 submodel = submodel[0]
                 return submodel._rewrite_parameter(parameter_ID, parameter, path, new_trail)
             else:
-                return ModelError(parameter_ID, "Submodel not found.", trail)
+                raise ModelError(parameter_ID, trail)
         else:
             try:
                 self.parameters[parameter_ID].write(parameter)
