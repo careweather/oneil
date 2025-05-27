@@ -869,18 +869,19 @@ class ModelError(OneilError):
     def message(self) -> str:
         return f"Submodel not found (source: {' -> '.join(self.source)})"
 
-class PythonError(OneilError):
-    def __init__(self, parameter, message, original_exception=None):
-        error = bcolors.FAIL + "PythonError" + bcolors.ENDC
-        if original_exception:
-            message += f": {original_exception}\n"
-            message += f"\n{traceback.format_exc()}"
-        full_message = f"{error} in {parameter.equation}: (line {parameter.line_no}) {parameter.line}{message}"
-        print(full_message)
-        logging.error(full_message)  # Log the error message
+class CalculationError(OneilError):
+    def __init__(self, parameter, error):
+        self.parameter = parameter
+        self.error = error
 
-        if original_exception:
-            raise original_exception
+    def kind(self) -> str:
+        return "CalculationError"
+        
+    def context(self) -> str | None:
+        return f"in {self.parameter.equation} (line {self.parameter.line_no})"
+        
+    def message(self) -> str:
+        return f"{self.error}"
 
 def pass_errors(*args, caller=None):
     for arg in args:
@@ -1159,13 +1160,13 @@ class Parameter:
                 result = self.equation(*function_args)
                 return result
             except Exception as e:
-                PythonError(self, "Calculation error", e)
+                raise CalculationError(self, e)
         else:
             try:
                 result = eval(expression, glob, eval_params | MATH_CONSTANTS)
                 return result
             except Exception as e:
-                PythonError(self, "Calculation error", e)
+                raise CalculationError(self, e)
 
     # Parameter Printing
 
