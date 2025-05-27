@@ -793,12 +793,6 @@ class DivideByZeroError(OneilError):
     def message(self) -> str:
         return f"Cannot divide by zero ({self.parameter.id} is 0)"
 
-class NoteError(OneilError):
-    def __init__(self, model, parameter, message):
-        error = bcolors.FAIL + "NoteError" + bcolors.ENDC
-        print(f"Note line {parameter.note_line_no}: {parameter.note}")
-        interpreter(model)
-
 class SyntaxError(OneilError):
     def __init__(self, filename: str, line_no: int, line: str, message: str):
         self.filename = filename
