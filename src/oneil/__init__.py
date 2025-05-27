@@ -548,12 +548,12 @@ def apar_sin(val):
         if val.units != {}:
             raise UnitError("Input to arcsine must be unitless.", [val])
         if not -1 <= val.min <= 1 or not -1 <= val.max <= 1:
-            return Parameter((np.nan, np.nan), val.units, "asin({})".format(val.id), error=ParameterError([val], "Input to arcsine must be between -1 and 1.", ["apar_sin"]))
+            raise ParameterError("Input to arcsine must be between -1 and 1 (apar_sin).", val)
         results = [np.arcsin(val.min), np.arcsin(val.max)]
         return Parameter((min(results), max(results)), {}, "asin({})".format(val.id))
     elif isinstance(val, (int, float)):
         if not -1 <= val <= 1:
-            return Parameter((np.nan, np.nan), {}, "asin({})".format(val), error=ParameterError([val], "Input to arcsine must be between -1 and 1.", ["apar_sin"]))
+            raise ParameterError("Input to arcsine must be between -1 and 1 (apar_sin).", val)
         return Parameter((np.arcsin(val), np.arcsin(val)), {}, "asin({})".format(val))
     else:
         raise TypeError("Input to asin() must be of type Parameter, int, or float.")
@@ -566,12 +566,12 @@ def apar_cos(val):
         if val.units != {}:
             raise UnitError("Input to arccosine must be unitless.", [val])
         if not -1 <= val.min <= 1 or not -1 <= val.max <= 1:
-            return Parameter((np.nan, np.nan), val.units, "acos({})".format(val.id), error=ParameterError([val], "Input to arccosine must be between -1 and 1.", ["apar_cos"]))
+            raise ParameterError("Input to arccosine must be between -1 and 1 (apar_cos).", val)
         results = [np.arccos(val.min), np.arccos(val.max)]
         return Parameter((min(results), max(results)), {}, "acos({})".format(val.id))
     elif isinstance(val, (int, float)):
         if not -1 <= val <= 1:
-            return Parameter((np.nan, np.nan), {}, "acos({})".format(val), error=ParameterError([val], "Input to arccosine must be between -1 and 1.", ["apar_cos"]))
+            raise ParameterError("Input to arccosine must be between -1 and 1 (apar_cos).", val)
         return Parameter((np.arccos(val), np.arccos(val)), {}, "acos({})".format(val))
     else:
         raise TypeError("Input to acos() must be of type Parameter, int, or float.")
@@ -596,12 +596,12 @@ def par_sqrt(val):
 
     if isinstance(val, Parameter):
         if not val >= 0:
-            return Parameter((np.nan, np.nan), val.units, "sqrt({})".format(val.id), error=ParameterError([val], "Input to sqrt must be >0.", ["par_sqrt"]))
+            raise ParameterError("Input to sqrt must be >0 (par_sqrt).", val)
         new_units = {k: v / 2 for k, v in val.units.items()}
         return Parameter((np.sqrt(val.min), np.sqrt(val.max)), new_units, "sqrt({})".format(val.id))
     elif isinstance(val, (int, float)):
         if not val >= 0:
-            return Parameter((np.nan, np.nan), {}, "sqrt({})".format(val), error=ParameterError([val], "Input to sqrt must be >0.", ["par_sqrt"]))
+            raise ParameterError("Input to sqrt must be >0 (par_sqrt).", val)
         return Parameter((np.sqrt(val), np.sqrt(val)), {}, "sqrt({})".format(val))
     else:
         raise TypeError("Input to sqrt() must be of type Parameter, int, or float.")
@@ -760,32 +760,38 @@ class UnitError(OneilError):
         return message
 
 class ParameterError(OneilError):
-    def __init__(self, parameter, source_message, source=[]):
-        self.error_tag = bcolors.FAIL + "ParameterError" + bcolors.ENDC
+    def __init__(self, message, parameter):
         self.parameter = parameter
-        self.source_message = source_message
-        self.source = list(source)
-        
-    def throw(self, model, throw_message, debug=False):
-        if model:
-            name = model.name
-        else:
-            name = ""
-        print(f"{self.error_tag} in {name}: {throw_message}")
-        print("Source: " + str(self.source))
-        if self.source_message: print(self.source_message)
+        self.message_ = message
+
+    def kind(self) -> str:
+        return "ParameterError"
+
+    def context(self) -> str | None:
+        if self.parameter:
+            return f"in {self.parameter.name} ({self.parameter.id}) from line {self.parameter.line_no} in model {self.parameter.model}"
+        return None
+    
+    def message(self) -> str:
+        message = self.message_
         if isinstance(self.parameter, Parameter):
-            print(f"  - ({str(self.parameter)}) in {self.parameter.name} ({self.parameter.id}) from line {str(self.parameter.line_no)} in model {model}")
+            message += f"\n  - ({str(self.parameter)}) in {self.parameter.name} ({self.parameter.id}) from line {str(self.parameter.line_no)} in model {self.parameter.model}"
         else:
-            print("  - " + str(self.parameter))
+            message += "\n  - " + str(self.parameter)
+        return message
+
+class DivideByZeroError(OneilError):
+    def __init__(self, parameter):
+        self.parameter = parameter
         
-        if model:
-            if model.calculated: 
-                interpreter(model)
-            elif debug:
-                debugger(model)
+    def kind(self) -> str:
+        return "DivideByZeroError"
         
-        quit()
+    def context(self) -> str | None:
+        return f"in {self.parameter.name} ({self.parameter.id}) from line {self.parameter.line_no} in model {self.parameter.model}"
+        
+    def message(self) -> str:
+        return f"Cannot divide by zero ({self.parameter.id} is 0)"
 
 class NoteError(OneilError):
     def __init__(self, model, parameter, message):
@@ -1010,12 +1016,12 @@ class Parameter:
                     self.assign(equation)
                     self.independent = True
                     if self.pointer:
-                        self.error = ParameterError([self], "Discrete parameters cannot use pointers.", ["Parameter.__init__"])
+                        raise ParameterError("Discrete parameters cannot use pointers.", self)
                 elif self.pointer:
                     self.equation = equation
                     self.args = [equation]
                 else:
-                    self.error = ParameterError([self], "Invalid parameter equation.", ["Parameter.__init__"])
+                    raise ParameterError("Invalid parameter equation.", self)
                     
         elif isinstance(equation, tuple):
             if isinstance(equation[0], (float, int)) and isinstance(equation[1], (float, int)):
@@ -1030,13 +1036,13 @@ class Parameter:
             for piece in equation:
                 self.add_piece(piece, [])
         else:
-            ParameterError([self], "", ["Parameter.__init__"]).throw(None, f"Parameter equation must be a callable, a float, an int, or a string. Type {type(equation)} was given.")
+            raise ParameterError(f"Parameter equation must be a callable, a float, an int, or a string. (type {type(equation)} was given.)", self)
 
     def add_piece(self, piece, callable_args):
         self.equation.append(piece)
         piece_args = piece[0].args + piece[1].args + callable_args
         if not piece_args:
-            self.error = ParameterError([self], "Piecewise parameters must be dependent on another parameter.", ["Parameter.__init__"])
+            raise ParameterError("Piecewise parameters must be dependent on another parameter.", self)
         else:
             self.args = list(set(self.args + piece_args))
 
@@ -1044,7 +1050,7 @@ class Parameter:
         if value is not None:
             self.write(value)
         else:
-            self.error = ParameterError([self], "Value is empty.", ["Parameter.assign()"])
+            raise ParameterError("Value is empty.", self)
 
     def write(self, value):
         if isinstance(value, Parameter):
@@ -1054,7 +1060,7 @@ class Parameter:
                     value.equation = None
                     value.isdiscrete = True
                 else:
-                    self.error = ParameterError([self], "Parameter was given a value that is not among its options.", ["Parameter.write()"])
+                    raise ParameterError("Parameter was given a value that is not among its options.", self)
                 
             if value.min is not None and value.max is not None:
                 if value.units != self.units:
@@ -1088,7 +1094,7 @@ class Parameter:
             self.trace = value.trace
         elif isinstance(value, tuple):
             if self.isdiscrete:
-                self.error = ParameterError(self, "Multiple discrete values aren't supported.", ["Parameter.write()"])
+                raise ParameterError("Multiple discrete values aren't supported.", self)
             self.write_one(value[0], "min")
             self.write_one(value[1], "max")
         else:
@@ -1096,17 +1102,17 @@ class Parameter:
 
         if self.min and self.max:
             if self.min > self.max:
-                self.error = ParameterError(self, "Parameter min is greater than Parameter max.", ["Parameter.write()"])
+                raise ParameterError("Parameter min is greater than Parameter max.", self)
 
             if self.options and self.min and self.max:
                 if self.isdiscrete:
                     if not (self.min in self.options and self.max in self.options):
-                        self.error = ParameterError(self, "Parameter was given a value that is not among its options.", ["Parameter.write()"])
+                        raise ParameterError("Parameter was given a value that is not among its options.", self)
                 else:
                     if not self.options[1] >= self.options[0]:
-                        self.error = ParameterError(self, "Minimum limit > maximum limit.", ["Parameter.write()"])
+                        raise ParameterError("Minimum limit > maximum limit.", self)
                     if not (self.min >= self.options[0] and self.max <= self.options[1]):
-                        self.error = ParameterError(self, f"Values out of bounds [{un.hr_vals_and_units(self.options,self.units,self.hr_units)}]. Revise values or limits.", ["Parameter.write()"])
+                        raise ParameterError(f"Values out of bounds [{un.hr_vals_and_units(self.options,self.units,self.hr_units)}]. Revise values or limits.", self)
 
     def write_one(self, value, minmax):
 
@@ -1126,7 +1132,7 @@ class Parameter:
                 self.max = bool(value)
         elif isinstance(value, str):
             if value not in self.options:
-                self.error = ParameterError(self, "Parameter was assigned an option that is not among its options.", ["Parameter.write()"])
+                raise ParameterError("Parameter was assigned an option that is not among its options.", self)
             
             if minmax == "minmax":
                 self.min = self.max = value
@@ -1144,13 +1150,13 @@ class Parameter:
             breakpoint()
         
         if not self.equation:
-            return ParameterError(self, "Parameter needs an equation or value defined.", ["Parameter.calculate()"])
+            raise ParameterError("Parameter needs an equation or value defined.", self)
         if (self.min or self.max):
-            return ParameterError(self, "Parameters cannot be re-calculated.", ["Parameter.calculate()"])
+            raise ParameterError("Parameters cannot be re-calculated.", self)
 
         if self.callable:
             if not all(k in eval_params for k in eval_args):
-                return ParameterError(self, "Parameter is missing one or more arguments: " + str([arg for arg in eval_args if arg not in eval_params]), ["Parameter.calculate()"])
+                raise ParameterError("Parameter is missing one or more arguments: " + str([arg for arg in eval_args if arg not in eval_params]), self)
 
             function_args = [eval_params[arg] for arg in eval_args]
 
@@ -1299,7 +1305,7 @@ class Parameter:
             try:
                 results = [self.min / other.max, self.max / other.min]
             except FloatingPointError:
-                return Parameter((np.nan, np.nan), new_units, "({}) / ({})".format(self.id, other.id), error=ParameterError([self, other], "Division by zero.", ["Parameter.__truediv__"]))
+                raise DivideByZeroError(other)
             else:
                 return Parameter((min(results), max(results)), new_units, "({}) / ({})".format(self.id, other.id))
         elif isinstance(other, (int, float)):
@@ -1324,7 +1330,7 @@ class Parameter:
             try:
                 results = [self.min / other.min, self.max / other.max]
             except FloatingPointError:
-                return Parameter((np.nan, np.nan), new_units, "({}) // ({})".format(self.id, other.id), error=ParameterError([self, other], "Division by zero.", ["Parameter.__floordiv__"]))
+                raise DivideByZeroError(other)
             else:
                 return Parameter((min(results), max(results)), new_units, "({}) // ({})".format(self.id, other.id))
         elif isinstance(other, (int, float)):
@@ -1701,7 +1707,7 @@ class Model:
                                 if eq.equation in self.parameters.keys():
                                     param.args.append(eq.equation)
                                 else:
-                                    param.error = ParameterError(param, "Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", ["Model.__init__"])
+                                    raise ParameterError("Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", param)
                             
                 else:
                     if param.minmax_equation:
@@ -1712,7 +1718,7 @@ class Model:
                         if param.equation in self.parameters.keys():
                             param.args.append(param.equation)
                         else:
-                            param.error = ParameterError(param, "Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", ["Model.__init__"])
+                            raise ParameterError("Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", param)
         
         for param in self.parameters.values():
             if param.error:
@@ -1800,8 +1806,6 @@ class Model:
             result = self._rewrite_parameter(ID, parameter, path)
             if isinstance(result, ModelError):
                 result.throw(self, f"(line {self.submodels[submodel]['line_no']}) {self.submodels[submodel]['line']} - Couldn't find {submodel} in path {'.'.join(path)} while overwriting {ID} in {design_files}.")
-            elif isinstance(result, ParameterError):
-                result.throw(self, f"Error rewriting parameter {ID} in {design_files}.")
 
         self.defaults.append(list[set(self.parameters).difference(design)])
         
@@ -2095,7 +2099,7 @@ class Model:
                 elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
                     return result
                 else:
-                    ParameterError(expression, "Eval failed.", ["Model.eval()"]).throw(self, "(in interpreter) Eval failed.")
+                    raise ParameterError("Eval failed.", expression)
                 expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
 
         eval_params = self.parameters | submodel_parameters | self.constants
@@ -2118,7 +2122,7 @@ class Model:
         elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
             return result
         else:
-            ParameterError(expression, "Eval failed.", ["Model.eval()"]).throw(self, "(in interpreter) Eval failed.")
+            raise ParameterError("Eval failed.", expression)
 
     def _test_recursively(self, log, path=[], test_inputs={}, trail=[], verbose=True):
         fails = 0
@@ -2217,7 +2221,7 @@ class Model:
                         elif inp in self.parameters:
                             test_inputs[arg] = self.parameters[inp]
                         else:
-                            return ParameterError(inp, f"Test input {inp} for submodel {submodel_ID} not found in {self.name}.", source=["Model.test_submodels"])
+                            raise ParameterError(f"Test input {inp} for submodel {submodel_ID} not found in {self.name}.", inp)
                     else:
                         raise TypeError("Invalid test input type: " + str(type(inp)))
                 
@@ -2396,7 +2400,7 @@ class Model:
                     parameter_trail_id = f"{parameter.id}.{submodel_id}" if submodel_id else parameter.id
 
                     if parameter_trail_id in trail:
-                        ParameterError(parameter, "", source=["Model._tree_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
+                        raise ParameterError("Circular dependency found in path: " + "=>".join(trail) + ".", parameter)
 
                     if new_trail:
                         if new_trail[-1] != parameter_trail_id:
@@ -2439,7 +2443,7 @@ class Model:
                     true_equations = {}
                     
                     if len(parameter.equation) < 2:
-                        ParameterError(parameter, "Piecewise function requires at least two pieces.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line.strip()}\"\n{str(parameter.equation)}")
+                        raise ParameterError(f"Piecewise function requires at least two pieces.", parameter)
                     
                     for i, piece in enumerate(parameter.equation):
                         piece_equations.update({piece[0].id + str(i): piece[0]})
@@ -2458,7 +2462,7 @@ class Model:
                     self._calculate_parameters_recursively(minmax_equation_parameters, new_trail)
                 else:
                     if not parameter.args:
-                        ParameterError(parameter, "Parameter has no args nor a set value.", source=["Model._calculate_recursively"]).throw(self, f"In Model._calculate_recursively for model {self.name}: Parameter has no args nor a set value.")
+                        raise ParameterError("Parameter has no args nor a set value.", parameter)
 
                     # Calculate any argument parameters that haven't been calculated yet
                     arg_parameters = {arg: self.parameters[arg] for arg in [x for x in parameter.args if x in self.parameters]}
@@ -2467,7 +2471,7 @@ class Model:
                         calc_args = {k: self.parameters[k] for k in [x for x in parameter.args if x in self.parameters] if "." not in k}
                         
                         if parameter.id in trail:
-                            ParameterError(parameter, "", source=["Model._calculate_recursively"]).throw(self, "Circular dependency found in path: " + "=>".join(trail) + ".")
+                            raise ParameterError("Circular dependency found in path: " + "=>".join(trail) + ".", parameter)
                         
                         self._calculate_parameters_recursively(calc_args, new_trail)
 
@@ -2510,7 +2514,7 @@ class Model:
                             calculation = piece[0]
                             break
                     if calculation is None or calculation.min is None or calculation.max is None:
-                        ParameterError(parameter, "No piecewise condition was met.", source=["Model._calculate_recursively"]).throw(self, f"Parameter \"{parameter.id}\" (line {str(parameter.line_no)} from model {parameter.model}) failed to calculate.\n\"{parameter.line}\"\n{str(parameter.equation)}")
+                        raise ParameterError("No piecewise condition was met.", parameter)
                 elif parameter.minmax_equation:
                     calculation = (parameter.equation[0].min, parameter.equation[1].max)
                 else:
