@@ -242,7 +242,10 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
             elif l in MATH_CONSTANTS:
                 limits.append((unit_fx)(MATH_CONSTANTS[l]))
             elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
-                limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
+                try:
+                    limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
+                except Exception as e:
+                    raise CalculationError(None, e)
             else:
                 raise SyntaxError(file_name, line_number, line, "Parse parameter: invalid limit: " + l)
         options = tuple(limits)
@@ -313,11 +316,17 @@ def parse_equation(assignment, units, id, imports, file_name, line_number, unit_
             
         else:
             if '|' in assignment:
-                min = (unit_fx)(eval((assignment.split('|')[0]), MATH_CONSTANTS))
-                max = (unit_fx)(eval((assignment.split('|')[1]), MATH_CONSTANTS))
+                try:
+                    min = (unit_fx)(eval((assignment.split('|')[0]), MATH_CONSTANTS))
+                    max = (unit_fx)(eval((assignment.split('|')[1]), MATH_CONSTANTS))
+                except Exception as e:
+                    raise CalculationError(None, e)
                 equation = (min, max)
             else:
-                equation = (unit_fx)(eval(assignment, MATH_CONSTANTS))
+                try:
+                    equation = (unit_fx)(eval(assignment, MATH_CONSTANTS))
+                except Exception as e:
+                    raise CalculationError(None, e)
 
     return equation, arguments
 
@@ -1106,12 +1115,16 @@ class Parameter:
             try:
                 result = self.equation(*function_args)
                 return result
+            except OneilError as e:
+                raise e
             except Exception as e:
                 raise CalculationError(self, e)
         else:
             try:
                 result = eval(expression, glob, eval_params | MATH_CONSTANTS)
                 return result
+            except OneilError as e:
+                raise e
             except Exception as e:
                 raise CalculationError(self, e)
 
@@ -2049,6 +2062,8 @@ class Model:
                     calculation = eval(run_expression, globals(), test_params)
                 except UnitError as e:
                     raise e.with_context(self)
+                except Exception as e:
+                    raise CalculationError(self, e)
 
                 if isinstance(calculation, Parameter):
                     if calculation.error:
@@ -2567,7 +2582,10 @@ def handler(model: Model, inpt: str):
                 except Exception as e:
                     print(f"Could not evaluate expression '{param_expr}': {str(e)}") 
         elif any([op in inpt for op in OPERATORS]):
-            print(model.eval(inpt))
+            try:
+                print(model.eval(inpt))
+            except Exception as e:
+                print(f"Could not evaluate expression '{inpt}': {str(e)}")
         elif inpt in model.parameters:
             model.parameters[inpt].hprint()
         elif "." in inpt:
