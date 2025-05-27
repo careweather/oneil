@@ -1613,10 +1613,6 @@ class Model:
                         else:
                             raise ParameterError("Parameter " + param.id + " (line " + str(param.line_no + 1) + ") in " + param.model + " has a string, non-equation assignment (" + param.equation + ") that is not in the model and has no options defined. If it's supposed to be a case, specify options. If it's supposed to be assigned to another value, make sure that value is also defined.", param)
         
-        for param in self.parameters.values():
-            if param.error:
-                param.error.throw(self, "Problem parsing parameter " + param.id + " in " + model_filename + ".")
-    
     # Checks that all of the arguments to each parameter are defined
     def _check_namespace(self, verbose=False):
         undefined = {}
@@ -1655,8 +1651,6 @@ class Model:
             new_trail.append(i)
 
             source = self._retrieve_model(submodel.submodels[i]['path'])
-            if isinstance(source, Error):
-                source.throw(self, "Problem parsing parameter " + param.id + " in " + self.name + ".on")
 
             submodel._check_namespace_recursively(source, arg, param, new_trail)
 
@@ -1695,8 +1689,6 @@ class Model:
             else:
                 path = []
             result = self._rewrite_parameter(ID, parameter, path)
-            if isinstance(result, ModelError):
-                result.throw(self, f"(line {self.submodels[submodel]['line_no']}) {self.submodels[submodel]['line']} - Couldn't find {submodel} in path {'.'.join(path)} while overwriting {ID} in {design_files}.")
 
         self.defaults.append(list[set(self.parameters).difference(design)])
         
@@ -1819,9 +1811,6 @@ class Model:
                     else:
                         submodel_path = entry['path']
                         submodel = self._retrieve_model(submodel_path)
-                        if isinstance(submodel, ModelError):
-                            submodel.throw(self, "(line " + str(entry['line_no']) + ") " + entry['line'] + "- " +
-"Could not find submodel in path: " + submodel_path)
 
                     for ID, param in submodel.parameters.items():
                         if design:
@@ -1983,9 +1972,7 @@ class Model:
             if "." in arg:
                 result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                if isinstance(result, OneilError):
-                    result.throw(self, "Error in eval().")
-                elif isinstance(result, Parameter):
+                if isinstance(result, Parameter):
                     submodel_parameters[prefixed_ID] = result
                 elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
                     return result
@@ -2003,10 +1990,7 @@ class Model:
             raise IDError(self, expression, str(e))
 
         if isinstance(result, Parameter):
-            if result.error:
-                result.error.throw(self, "(in interpreter) Eval failed.", debug=True)
-            else:
-                return result
+            return result
         elif isinstance(result, (bool, np.bool_)):
             # Convert numpy bools to python bools
             return bool(result)
@@ -2032,9 +2016,7 @@ class Model:
                     if "." in arg:
                         result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                        if isinstance(result, OneilError):
-                            result.throw(self, "Error in _test_recursively().")
-                        elif isinstance(result, Parameter):
+                        if isinstance(result, Parameter):
                             test_params[prefixed_ID] = result
                         else:
                             raise TypeError("Invalid result type: " + str(type(result)))
@@ -2065,12 +2047,7 @@ class Model:
                 except Exception as e:
                     raise CalculationError(self, e)
 
-                if isinstance(calculation, Parameter):
-                    if calculation.error:
-                        calculation.error.throw(self, "Test \"" + test.expression + " from model " + self.name + " failed to calculate.")
-                    else:
-                        raise ValueError("Test expression returned a parameter without an error. That shouldn't happen. Parameters are vessels for errors when it comes to comparison operators right now. I know...it's dumb and needs to be fixed.")
-                elif isinstance(calculation, (bool, np.bool_)):
+                if isinstance(calculation, (bool, np.bool_)):
                     result = bcolors.OKGREEN + "pass" + bcolors.ENDC if calculation else bcolors.FAIL + "fail" + bcolors.ENDC
 
                 if verbose: print("\tResult: " + str(result))
@@ -2105,9 +2082,7 @@ class Model:
                         if '.' in inp:
                             result, _ = self.retrieve_parameter_from_submodel(inp)
 
-                            if isinstance(result, Error):
-                                result.throw(self, "Error in _test_recursively().")
-                            elif isinstance(result, Parameter):
+                            if isinstance(result, Parameter):
                                 test_inputs[arg] = result
                             else:
                                 raise TypeError("Invalid result type: " + str(type(result)))
@@ -2123,12 +2098,9 @@ class Model:
                         passthrough_path = copy.copy(self.submodels[source]['path'])
                         end_model = passthrough_path.pop()
                         passthrough_model = self._retrieve_model(passthrough_path)
-                        if isinstance(passthrough_model, ModelError):
-                            passthrough_model.throw(self, f"A passthrough test argument ({arg}) was specified for {submodel.name} import, but the passthrough model (.{source}) was not found.", self.submodels[source]['path'])
-                        else:
-                            end_model_ID = [k for k, v in passthrough_model.submodels.items() if v['path'] == [end_model]][0]
-                            passthrough_model.submodels[end_model_ID]['inputs'][arg_ID] = test_inputs[arg]
-                            del test_inputs[arg]
+                        end_model_ID = [k for k, v in passthrough_model.submodels.items() if v['path'] == [end_model]][0]
+                        passthrough_model.submodels[end_model_ID]['inputs'][arg_ID] = test_inputs[arg]
+                        del test_inputs[arg]
 
             # Test the submodel
             path = copy.copy(self.submodels[submodel_ID]['path'])
@@ -2145,10 +2117,6 @@ class Model:
                 else:
                     raise ModelError(submodel_name, new_trail)
 
-
-        if not isinstance(fails, int):
-            fails.throw(self, "(in Model.test) Submodel test failed.")
-        
         return fails, tests
     
     def test(self, verbose=True):
@@ -2238,9 +2206,7 @@ class Model:
                 elif "." in parameter_ID:
                     result, _ = self.retrieve_parameter_from_submodel(parameter_ID)
 
-                    if isinstance(result, Error):
-                        result.throw(self, "Error in _calculate_parameters_recursively().")
-                    elif isinstance(result, Parameter):
+                    if isinstance(result, Parameter):
                         parameter = result
                     else:
                         raise TypeError("Invalid result type: " + str(type(result)))
@@ -2374,9 +2340,7 @@ class Model:
                         if "." in arg:
                             result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                            if isinstance(result, Error):
-                                result.throw(self, "Error in _calculate_parameters_recursively().")
-                            elif isinstance(result, Parameter):
+                            if isinstance(result, Parameter):
                                 submodel_parameters[prefixed_ID] = result
                             else:
                                 raise TypeError("Invalid result type: " + str(type(result)))    
@@ -2415,14 +2379,7 @@ class Model:
                         calculation = (self.parameters | submodel_parameters | self.constants)[expression]
                     else:
                         calculation = parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)                    
-                        if isinstance(calculation, Parameter) and calculation.error:
-                            model = None if not parameter.model else parameter.model
-                            calculation.error.throw(self, f"Parameter \"{parameter.id}\" (line {parameter.line_no} from model {model}) failed to calculate.\n{parameter.line}", debug=True)
-                            
-                
                 parameter.assign(calculation)
-                if parameter.error:
-                    parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + str(parameter.model), debug=True)
 
     def retrieve_parameter_from_submodel(self, ID):
         parameter_ID, submodel_ID = ID.split(".")
