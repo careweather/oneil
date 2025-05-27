@@ -7,16 +7,12 @@ import copy
 from beautifultable import BeautifulTable
 import importlib
 from functools import partial
-import traceback, logging
 
 from . import bcolors
 from . import errors as err
 from . import console
 from . import units as un
 from .errors import OneilError
-
-# Configure logging to output to the console
-logging.basicConfig(level=logging.ERROR, format='%(message)s')
 
 np.seterr(all='raise')
 
