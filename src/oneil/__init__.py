@@ -2495,91 +2495,93 @@ def handler(model: Model, inpt: str):
         arg_value = float(arg_value) if isfloat(arg_value) else arg_value
         opts[arg.split("=")[0]] = arg_value
     
-    if cmd == "tree":
-        model.tree(args, **opts)
-    elif cmd == "summarize":
-        model.summarize()
-    elif cmd == "all":
-        model.all()
-    elif cmd == "dependents":
-        model.dependents(args)
-    elif cmd == "independent":
-        model.independent()
-    elif cmd == "design":
-        if any([arg for arg in args if "." in arg and ".on" not in arg]):
-            print("Only .on files are allowed.")
-            interpreter(model)
-        if model.name in [arg.strip(".on") for arg in args]:
-            print("Cannot overwrite model with itself.")
-            interpreter(model)
-        args = [arg if "." in arg else arg + ".on" for arg in args]
-        model.overwrite(args)
-    elif cmd == "test":
-        model.test()
-    elif cmd == "export":
-        model.export_pdf(args)
-    elif cmd == "load":
-        model_name, model_designs, commands = parse_args(args)
+    try:
+        if cmd == "tree":
+            model.tree(args, **opts)
+        elif cmd == "summarize":
+            model.summarize()
+        elif cmd == "all":
+            model.all()
+        elif cmd == "dependents":
+            model.dependents(args)
+        elif cmd == "independent":
+            model.independent()
+        elif cmd == "design":
+            if any([arg for arg in args if "." in arg and ".on" not in arg]):
+                print("Only .on files are allowed.")
+                return
+            if model.name in [arg.strip(".on") for arg in args]:
+                print("Cannot overwrite model with itself.")
+                return
+            args = [arg if "." in arg else arg + ".on" for arg in args]
+            model.overwrite(args)
+        elif cmd == "test":
+            model.test()
+        elif cmd == "export":
+            model.export_pdf(args)
+        elif cmd == "load":
+            model_name, model_designs, commands = parse_args(args)
 
-        loader(model_name, model_designs)
+            loader(model_name, model_designs)
 
-        for command in commands:
-            print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
-            handler(model, command)
+            for command in commands:
+                print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+                handler(model, command)
 
-    elif cmd == "reload":
-        if model.design == "default":
-            loader(model.name, [])
+        elif cmd == "reload":
+            if model.design == "default":
+                loader(model.name, [])
+            else:
+                loader(model.name, [model.design])
+        elif cmd == "help":
+            print(help_text)
+            return
+        elif cmd == "units":
+            print(un.print_all())
+        elif cmd == "quit":
+            sys.exit()
+        elif cmd == "quit()":
+            sys.exit()
+        elif cmd == "exit":
+            sys.exit()
+        elif ":" in inpt:
+            param_expr = inpt.split(":")[0].strip()
+            requested_units = inpt.split(":")[1].strip()
+            
+            if param_expr in model.parameters.keys():
+                try:
+                    model.parameters[param_expr].hprint(pref=requested_units)
+                except ValueError:
+                    print(f"Requested units ({requested_units}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[param_expr].units)}).")
+            else:
+                # Try to evaluate the expression on the left side
+                try:
+                    result = model.eval(param_expr)
+                    if isinstance(result, Parameter):
+                        try:
+                            result.hprint(pref=requested_units)
+                        except ValueError:
+                            print(f"Requested units ({requested_units}) do not match calculated expression units ({un._build_compound_unit_str(result.units)}).")
+                    else:
+                        print(f"Result: {result} (unitless, cannot convert to {requested_units})")
+                except Exception as e:
+                    print(f"Could not evaluate expression '{param_expr}': {str(e)}") 
+        elif any([op in inpt for op in OPERATORS]):
+            print(model.eval(inpt))
+        elif inpt in model.parameters:
+            model.parameters[inpt].hprint()
+        elif "." in inpt:
+            result, _ = model.retrieve_parameter_from_submodel(inpt)
+            if isinstance(result, Parameter):
+                result.hprint()
+            else:
+                raise TypeError("Invalid result type: " + str(type(result)))
         else:
-            loader(model.name, [model.design])
-    elif cmd == "help":
-        print(help_text)
-        interpreter(model)
-    elif cmd == "units":
-        print(un.print_all())
-    elif cmd == "quit":
-        sys.exit()
-    elif cmd == "quit()":
-        sys.exit()
-    elif cmd == "exit":
-        sys.exit()
-    elif ":" in inpt:
-        param_expr = inpt.split(":")[0].strip()
-        requested_units = inpt.split(":")[1].strip()
-        
-        if param_expr in model.parameters.keys():
-            try:
-                model.parameters[param_expr].hprint(pref=requested_units)
-            except ValueError:
-                print(f"Requested units ({requested_units}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[param_expr].units)}).")
-        else:
-            # Try to evaluate the expression on the left side
-            try:
-                result = model.eval(param_expr)
-                if isinstance(result, Parameter):
-                    try:
-                        result.hprint(pref=requested_units)
-                    except ValueError:
-                        print(f"Requested units ({requested_units}) do not match calculated expression units ({un._build_compound_unit_str(result.units)}).")
-                else:
-                    print(f"Result: {result} (unitless, cannot convert to {requested_units})")
-            except Exception as e:
-                print(f"Could not evaluate expression '{param_expr}': {str(e)}") 
-    elif any([op in inpt for op in OPERATORS]):
-        print(model.eval(inpt))
-    elif inpt in model.parameters:
-        model.parameters[inpt].hprint()
-    elif "." in inpt:
-        result, _ = model.retrieve_parameter_from_submodel(inpt)
-        if isinstance(result, Error):
-            result.throw(model, "")
-        elif isinstance(result, Parameter):
-            result.hprint()
-        else:
-            raise TypeError("Invalid result type: " + str(type(result)))
-    else:
-        print(f"Command {inpt} not found. Type 'help' for a list of commands.")
-        interpreter(model)
+            print(f"Command {inpt} not found. Type 'help' for a list of commands.")
+            return
+    except OneilError as err:
+        console.print_error(err)
+        return
             
 
 help_text = """
@@ -2649,11 +2651,7 @@ def loader(inp: str, designs: list[str]) -> Model:
                 try:
                     model = Model(inp)
                     model.build()
-                except SyntaxError as err:
-                    console.print_error(err)
-                    model = None
-                    inp = ""
-                except ModelLoadingError as err:
+                except OneilError as err:
                     console.print_error(err)
                     model = None
                     inp = ""
