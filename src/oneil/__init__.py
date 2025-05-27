@@ -166,7 +166,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     imports.append(importlib.import_module(module))
                 except:
-                    ImportError(parent_model, file_name, i+1, line, module + ".py")
+                    raise ImportError(file_name, i+1, line, module + ".py")
 
             elif line[:8] == 'section ':
                 try:
@@ -826,13 +826,19 @@ class IDError(OneilError):
 
 
 class ImportError(OneilError):
-    def __init__(self, model, filename, line_no, line, imprt):
-        error = bcolors.FAIL + "ImportError" + bcolors.ENDC
-        print(f"{error} in {filename}: (line {line_no}) {line} - Failed to import {imprt}. Does the import run by itself?")
-        if model:
-            interpreter(model)
-        else:
-            loader("", [])
+    def __init__(self, filename, line_no, line, imprt):
+        self.filename = filename
+        self.line_no = line_no
+        self.imprt = imprt
+        
+    def kind(self) -> str:
+        return "ImportError"
+        
+    def context(self) -> str | None:
+        return f"in {self.filename} (line {self.line_no})"
+        
+    def message(self) -> str:
+        return f"Failed to import '{self.imprt}'. Does the import run by itself?"
 
 class ModelLoadingError(OneilError):
     def __init__(self, filename: str, line_no: int, message: str):
