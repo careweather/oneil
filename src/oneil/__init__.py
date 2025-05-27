@@ -811,20 +811,18 @@ class SyntaxError(OneilError):
 
 class IDError(OneilError):
     def __init__(self, model, ID, message):
-        self.error_tag = bcolors.FAIL + "IDError" + bcolors.ENDC
-        self.source_message = f"{self.error_tag} ({ID}) in {model.name}: {message}"
-        self.source_model = model
-
-    def throw(self, return_model, throw_message):
-        if throw_message:
-            print(throw_message)
-        if self.source_message:
-            print(self.source_message)
-        if return_model:
-            interpreter(return_model)
-        else:
-            loader("", [])
-
+        self.model = model
+        self.ID = ID
+        self.message_ = message
+        
+    def kind(self) -> str:
+        return "IDError"
+        
+    def context(self) -> str | None:
+        return f"in model {self.model} (ID: {self.ID})"
+        
+    def message(self) -> str:
+        return f"{self.message_}"
 
 
 class ImportError(OneilError):
@@ -1685,9 +1683,6 @@ class Model:
 
         namespace = self._check_namespace()
 
-        if isinstance(namespace, Error):
-            namespace.throw(self, "Error in namespace check.")
-
         for key, param in self.parameters.items():
             if param.pointer:
                 if param.piecewise:
@@ -1742,9 +1737,7 @@ class Model:
 
         # Return a list of all args that aren't defined.
         if undefined:
-            return IDError(self, f"{undefined.keys()}", self.name.capitalize() + " has undefined arguments:\n- " + "\n- ".join(undefined.values()))
-        else:
-            return
+            raise IDError(self, f"{undefined.keys()}", self.name.capitalize() + " has undefined arguments:\n- " + "\n- ".join(undefined.values()))
 
     # Recursively report all submodule paramaters with the same ID
     def _check_namespace_recursively(self, submodel, arg, param, trail=[]):
@@ -2022,7 +2015,7 @@ class Model:
             if dependents: 
                 print(dependents)
             elif search_ID not in self.parameters.keys():
-                IDError(self, search_ID, "Could not find parameter in model.")
+                raise IDError(self, search_ID, "Could not find parameter in model.")
             else: 
                 print(search_ID + " has no dependents.")
 
@@ -2103,7 +2096,7 @@ class Model:
         except UnitError as e:
             raise e.with_context(self)
         except Exception as e:
-            IDError(self, expression, str(e))
+            raise IDError(self, expression, str(e))
 
         if isinstance(result, Parameter):
             if result.error:
@@ -2146,7 +2139,7 @@ class Model:
                     elif arg in test_inputs:
                         test_params[arg] = test_inputs[arg]
                     elif arg in FUNCTIONS.values() or any([arg==v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS:
-                        IDError(self, arg, f"Test argument ({arg}) uses a reserved keyword.")
+                        raise IDError(self, arg, f"Test argument ({arg}) uses a reserved keyword.")
                     else:
                         test_params[arg] = self.parameters[arg]
 
@@ -2346,7 +2339,7 @@ class Model:
                     else:
                         raise TypeError("Invalid result type: " + str(type(result)))
                 else:
-                    IDError(self, parameter_ID, "Parameter not found in model.").throw(self, "Parameter not found in model.").throw(self, "Error in _calculate_parameters_recursively().")
+                    raise IDError(self, parameter_ID, "Parameter not found in model.")
 
                 if indent == 0:
                     parameter.hprint(sigfigs)
@@ -2535,7 +2528,7 @@ class Model:
             prefixed_ID = '_'.join(path) + "_" + parameter_ID
             result = self._retrieve_parameter_recursively(parameter_ID, path)
         else:
-            result = IDError(self, ID, f"Submodel ID \"{submodel_ID}\" not found.")
+            raise IDError(self, ID, f"Submodel ID \"{submodel_ID}\" not found.")
 
         return result, prefixed_ID
     
@@ -2550,12 +2543,12 @@ class Model:
                 submodel = submodel[0]
                 result = submodel._retrieve_parameter_recursively(parameter_ID, path, trail)
             else:
-                result = IDError(submodel, parameter_ID, f"Submodel name \"{submodel_name}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({', '.join(new_trail.append(submodel_name).append(path))}).")
+                raise IDError(submodel, parameter_ID, f"Submodel name \"{submodel_name}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({', '.join(new_trail.append(submodel_name).append(path))}).")
         else:
             if parameter_ID in self.parameters:
                 result = self.parameters[parameter_ID]
             else:
-                result = IDError(self, parameter_ID, f"Parameter ID \"{parameter_ID}\" not found in path ({self.name + (new_trail or '')}).")
+                raise IDError(self, parameter_ID, f"Parameter ID \"{parameter_ID}\" not found in path ({self.name + (new_trail or '')}).")
         
         return result
 
@@ -2592,7 +2585,7 @@ class Model:
                 self.parameters[parameter_ID].write(parameter)
             except Exception as e:
                 if parameter_ID not in self.parameters:
-                    return IDError(self, parameter_ID, f"Parameter from design file {parameter.model} not found in model {self.name}.")
+                    raise IDError(self, parameter_ID, f"Parameter from design file {parameter.model} not found in model {self.name}.")
                 else:
                     raise e
             else:
