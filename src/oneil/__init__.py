@@ -362,16 +362,12 @@ def convert_functions(assignment, imports, file_name, line_number):
 
 # Ensures the val1 is a Parameter for use in the min and max functions.
 def _process_minmax_par_inputs(val1, val2):
-    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="process_minmax_par_inputs")
-
     if isinstance(val2, Parameter) and not isinstance(val1, Parameter):
         return val2, val1
     else:
         return val1, val2
 
 def par_extent(val1, val2=None):
-    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_extent")
-
     if not val2:
         if isinstance(val1, Parameter):
             if val1.units == {}:
@@ -399,39 +395,29 @@ def par_extent(val1, val2=None):
     raise TypeError("Second input to extent() must be of type Parameter, int, or float.")
 
 def par_minmax(val1, val2):
-    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_minmax")
-
     if val1.units != val2.units:
         raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
     return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "Min/max({},{})".format(val1.name, val2.name))
 
 def par_range(val):
-    if pass_errors(val): return pass_errors(val, caller="par_range")
-
     if isinstance(val, Parameter):
         return Parameter(val.max - val.min, val.units, "range({})".format(val.name))
     else:
         raise TypeError("Input to range() must be of type Parameter.")
     
 def par_mid(val):
-    if pass_errors(val): return pass_errors(val, caller="par_mid")
-
     if isinstance(val, Parameter):
         return Parameter((val.max + val.min)/2, val.units, "mid({})".format(val.name))
     else:
         raise TypeError("Input to mid() must be of type Parameter.")
     
 def par_sign(val):
-    if pass_errors(val): return pass_errors(val, caller="par_sign")
-
     if isinstance(val, Parameter):
         return Parameter((np.sign(val.min), np.sign(val.max)), {}, "sign({})".format(val.name))
     else:
         raise TypeError("Input to sign() must be of type Parameter.")
     
 def par_strip(val):
-    if pass_errors(val): return pass_errors(val, caller="par_strip")
-
     if isinstance(val, Parameter):
         return Parameter((val.min, val.max), {}, "strip({})".format(val.name))
     else:
@@ -439,8 +425,6 @@ def par_strip(val):
 
 
 def par_min(val1, val2=None):
-    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_min")
-
     if not val2:
         if isinstance(val1, Parameter):
             if val1.units == {}:
@@ -469,8 +453,6 @@ def par_min(val1, val2=None):
 
 
 def par_max(val1, val2=None):
-    if pass_errors(val1, val2): return pass_errors(val1, val2, caller="par_max")
-
     if not val2:
         if isinstance(val1, Parameter):
             if val1.units == {}:
@@ -500,8 +482,6 @@ def par_max(val1, val2=None):
         raise TypeError("Inputs to max() must be of type Parameter, int, or float.")
 
 def par_sin(val):
-    if pass_errors(val): return pass_errors(val, caller="par_sin")
-
     if isinstance(val, Parameter):
         if val.units != {}:
             raise UnitError("Input to sine must be unitless.", [val])
@@ -514,8 +494,6 @@ def par_sin(val):
 
 
 def par_cos(val):
-    if pass_errors(val): return pass_errors(val, caller="par_cos")
-
     if isinstance(val, Parameter):
         if val.units != {}:
             raise UnitError("Input to cosine must be unitless.", [val])
@@ -528,8 +506,6 @@ def par_cos(val):
 
 
 def par_tan(val):
-    if pass_errors(val): return pass_errors(val, caller="par_tan")
-
     if isinstance(val, Parameter):
         if val.units != {}:
             raise UnitError("Input to tangent must be unitless.", [val])
@@ -542,8 +518,6 @@ def par_tan(val):
 
 
 def apar_sin(val):
-    if pass_errors(val): return pass_errors(val, caller="apar_sin")
-
     if isinstance(val, Parameter):
         if val.units != {}:
             raise UnitError("Input to arcsine must be unitless.", [val])
@@ -560,8 +534,6 @@ def apar_sin(val):
 
 
 def apar_cos(val):
-    if pass_errors(val): return pass_errors(val, caller="apar_cos")
-
     if isinstance(val, Parameter):
         if val.units != {}:
             raise UnitError("Input to arccosine must be unitless.", [val])
@@ -578,8 +550,6 @@ def apar_cos(val):
 
 
 def apar_tan(val):
-    if pass_errors(val): return pass_errors(val, caller="apar_tan")
-
     if isinstance(val, Parameter):
         if val.units != {}:
             raise UnitError("Input to arctangent must be unitless.", [val])
@@ -592,8 +562,6 @@ def apar_tan(val):
 
 
 def par_sqrt(val):
-    if pass_errors(val): return pass_errors(val, caller="par_sqrt")
-
     if isinstance(val, Parameter):
         if not val >= 0:
             raise ParameterError("Input to sqrt must be >0 (par_sqrt).", val)
@@ -608,8 +576,6 @@ def par_sqrt(val):
 
 
 def par_abs(val):
-    if pass_errors(val): return pass_errors(val, caller="par_abs")
-
     if isinstance(val, Parameter):
         # ERR option ETC
         if abs(val.min) < abs(val.max):
@@ -622,8 +588,6 @@ def par_abs(val):
         raise TypeError("Input to abs() must be of type Parameter, int, or float.")
 
 def par_log(val):
-    if pass_errors(val): return pass_errors(val, caller="par_log")
-
     if isinstance(val, Parameter):
         # ERR option ETC
         if np.log(val.min) < np.log(val.max):
@@ -636,8 +600,6 @@ def par_log(val):
         raise TypeError("Input to log() must be of type Parameter, int, or float.")
 
 def par_log10(val):
-    if pass_errors(val): return pass_errors(val, caller="par_log10")
-
     if isinstance(val, Parameter):
         # ERR option ETC
         if np.log10(val.min) < np.log10(val.max):
@@ -650,8 +612,6 @@ def par_log10(val):
         raise TypeError("Input to log10() must be of type Parameter, int, or float.")
     
 def par_log2(val):
-    if pass_errors(val): return pass_errors(val, caller="par_log10")
-
     if isinstance(val, Parameter):
         # ERR option ETC
         if np.log2(val.min) < np.log2(val.max):
@@ -664,8 +624,6 @@ def par_log2(val):
         raise TypeError("Input to log2() must be of type Parameter, int, or float.")
 
 def par_floor(val):
-    if pass_errors(val): return pass_errors(val, caller="par_floor")
-
     if isinstance(val, Parameter):
         # ERR option ETC
         return Parameter((np.floor(val.min), np.floor(val.max)), val.units, "floor({})".format(val.id))
@@ -675,8 +633,6 @@ def par_floor(val):
         raise TypeError("Input to floor() must be of type Parameter, int, or float.")
     
 def par_ceiling(val):
-    if pass_errors(val): return pass_errors(val, caller="par_ceiling")
-
     if isinstance(val, Parameter):
         # ERR option ETC
         return Parameter((np.ceil(val.min), np.ceil(val.max)), val.units, "ceiling({})".format(val.id))
@@ -882,15 +838,6 @@ class CalculationError(OneilError):
         
     def message(self) -> str:
         return f"{self.error}"
-
-def pass_errors(*args, caller=None):
-    for arg in args:
-        if isinstance(arg, Parameter):
-            if arg.error:
-                if caller:
-                    arg.error.source.append(caller)
-                return arg
-    return False
 
 class Test:
     def __init__(self, line, line_no, model, section=""):
@@ -1221,8 +1168,6 @@ class Parameter:
 
     # "+" Addition, left-hand, all cases 
     def __add__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__add__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 raise UnitError(f"Cannot add {un.hr_units(other.units)} to {un.hr_units(self.units)}.", [self, other])
@@ -1234,8 +1179,6 @@ class Parameter:
 
     # "-" Subtraction, left-hand, extreme
     def __sub__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__sub__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 raise UnitError(f"Cannot subtract {un.hr_units(other.units)} from {un.hr_units(self.units)}.", [self, other])
@@ -1249,8 +1192,6 @@ class Parameter:
 
     # "--" Subtraction, left-hand, standard
     def _minus(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.minus")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 raise UnitError(f"Cannot subtract {un.hr_units(other.units)} from {un.hr_units(self.units)}.", [self, other])
@@ -1264,8 +1205,6 @@ class Parameter:
 
     # "*" Multiplication, left-hand, all cases
     def __mul__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__mul__")
-
         if isinstance(other, Parameter):
             new_units = {k: v for k, v in self.units.items()}
             for k, v in other.units.items():
@@ -1285,8 +1224,6 @@ class Parameter:
 
     # "/" Division, left-hand, extreme
     def __truediv__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__truediv__")
-
         if isinstance(other, Parameter):
             if self.id == other.id and self.model == other.model: 
                 return Parameter(1, {}, "({}) / ({})".format(self.id, other.id))
@@ -1312,8 +1249,6 @@ class Parameter:
 
     # "//" Division, left-hand, standard
     def __floordiv__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__floordiv__")
-
         if isinstance(other, Parameter):
             new_units = {k: v for k, v in self.units.items()}
             for k, v in other.units.items():
@@ -1337,8 +1272,6 @@ class Parameter:
 
     # "**" Exponentiation, left-hand, all cases
     def __pow__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__pow__")
-
         if isinstance(other, Parameter):
             if self.min != self.max or other.units != {}:
                 raise UnitError(f"Exponent must be a single unitless Parameter or number.", [self, other])
@@ -1354,8 +1287,6 @@ class Parameter:
 
     # "+" Addition, right-hand, all cases
     def __radd__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__radd__")
-
         if isinstance(other, (int, float)):
             if self.units == {}:
                 return Parameter((other + self.min, other + self.max), {}, "({}) + ({})".format(str(other), self.id))
@@ -1366,8 +1297,6 @@ class Parameter:
 
     # "-" Subtraction, right-hand, extreme
     def __rsub__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rsub__")
-
         if isinstance(other, (int, float)):
             if self.units == {}:
                 return Parameter((other - self.max, other - self.min), {}, "({}) - ({})".format(str(other), self.id))
@@ -1378,8 +1307,6 @@ class Parameter:
 
     # "--" Subtraction, right-hand, standard
     def _rminus(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rsub__")
-
         if isinstance(other, (int, float)):
             if self.units == {}:
                 return Parameter((other - self.min, other - self.max), {}, "({}) - ({})".format(str(other), self.id))
@@ -1390,8 +1317,6 @@ class Parameter:
 
     # "*" Multiplication, right-hand, all cases
     def __rmul__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rmul__")
-
         if isinstance(other, (int, float)):
             return Parameter((self.min * other, self.max * other), self.units, "({})({})".format(str(other), self.id))
         else:
@@ -1399,8 +1324,6 @@ class Parameter:
 
     # "/" Division, right-hand, extreme
     def __rtruediv__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rtruediv__")
-
         if isinstance(other, (int, float)):
             new_units = {k: -v for k, v in self.units.items()}
             return Parameter((other / self.max if self.max > 0 else np.inf, other / self.min if self.min > 0 else np.inf), new_units, "({})/({})".format(str(other), self.id))
@@ -1409,8 +1332,6 @@ class Parameter:
 
     # "//" Division, right-hand, standard
     def __rfloordiv__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rfloordiv__")
-
         if isinstance(other, (int, float)):
             new_units = {k: -v for k, v in self.units.items()}
             return Parameter((other / self.min if self.min > 0 else np.inf, other / self.max if self.max > 0 else np.inf), new_units, "({})//({})".format(str(other), self.id))
@@ -1419,8 +1340,6 @@ class Parameter:
 
     # "**" Exponentiation, right-hand, all cases
     def __rpow__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rpow__")
-
         if isinstance(other, (int, float)):
             if self.units != {}:
                 raise UnitError(f"Exponent must be a single unitless Parameter or number.", [self, other])
@@ -1434,8 +1353,6 @@ class Parameter:
 
     # "<" Less than, left-hand, all cases
     def __lt__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__lt__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (less than).", [self, other])
@@ -1449,8 +1366,6 @@ class Parameter:
 
     # ">" Greater than, left-hand, all cases
     def __gt__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__gt__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (greater than).", [self, other])
@@ -1464,8 +1379,6 @@ class Parameter:
 
     # ">=" Greater than or equal to, left-hand, all cases
     def __le__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__le__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (less than or equal).", [self, other])
@@ -1479,8 +1392,6 @@ class Parameter:
 
     # "<=" Less than or equal to, left-hand, all cases
     def __ge__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__ge__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (greater than or equal).", [self, other])
@@ -1494,8 +1405,6 @@ class Parameter:
 
     # "==" Equal to, left-hand, all cases
     def __eq__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__eq__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 message = f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (equal)."
@@ -1515,8 +1424,6 @@ class Parameter:
 
     # "!=" Not equal to, left-hand, all cases
     def __ne__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__ne__")
-
         if isinstance(other, Parameter):
             if self.units != other.units:
                 message = f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (not equal)."
@@ -1534,8 +1441,6 @@ class Parameter:
 
     # "<" Less than, right-hand, all cases
     def __rlt__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rlt__")
-
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (less than)."
@@ -1546,8 +1451,6 @@ class Parameter:
 
     # "<=" Less than or equal to, right-hand, all cases
     def __rgt__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rgt__")
-
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (greater than)."
@@ -1558,8 +1461,6 @@ class Parameter:
 
     # ">=" Greater than or equal to, right-hand, all cases
     def __rle__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rle__")
-
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (less than or equal)."
@@ -1570,8 +1471,6 @@ class Parameter:
 
     # ">=" Greater than or equal to, right-hand, all cases
     def __rge__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rge__")
-
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (greater than or equal)."
@@ -1582,8 +1481,6 @@ class Parameter:
 
     # "==" Equal to, right-hand, all cases
     def __req__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__req__")
-
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (equal)."
@@ -1594,8 +1491,6 @@ class Parameter:
 
     # "!=" Not equal to, right-hand, all cases
     def __rne__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rne__")
-
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (not equal)."
@@ -1606,8 +1501,6 @@ class Parameter:
 
     # "|" Logical OR, left-hand, all cases
     def __or__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__or__")
-        
         if isinstance(other, Infix):
             return other.__ror__(self)
 
@@ -1627,8 +1520,6 @@ class Parameter:
 
     # "&" Logical AND, left-hand, all cases
     def __and__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__and__")
-        
         if self.units != {}:
             message = f"& is only valid for unitless parameters with boolean values."
             raise UnitError(message, [self, other])
@@ -1645,8 +1536,6 @@ class Parameter:
 
     # "|" Logical OR, right-hand, all cases
     def __ror__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__ror__")
-        
         if self.units != {}:
             message = f"| is only valid for unitless parameters with boolean values."
             raise UnitError(message, [self, other])
@@ -1658,8 +1547,6 @@ class Parameter:
 
     # "&" Logical AND, right-hand, all cases
     def __rand__(self, other):
-        if pass_errors(self, other): return pass_errors(self, other, caller="Parameter.__rand__")
-
         if self.units != {}:
             message = f"& is only valid for unitless parameters with boolean values."
             raise UnitError(message, [self, other])
