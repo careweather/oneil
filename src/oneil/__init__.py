@@ -2703,12 +2703,12 @@ def loader(inp: str, designs: list[str]) -> Model:
                     model = Model(inp)
                     model.build()
                 except SyntaxError as err:
+                    console.print_error(err)
                     model = None
-                    console.print_error("SyntaxError", f" in {err.filename}", f"(line {err.line_no}) \"{err.line}\" - {err.message}")
                     inp = ""
                 except ModelLoadingError as err:
+                    console.print_error(err)
                     model = None
-                    console.print_error("ModelLoadingError", f" in {err.filename}", f"(line {err.line_no}) \"{err.line}\" - {err.message}")
                     inp = ""
             else:
                 print("Model " + inp + " not found.")

@@ -9,5 +9,8 @@ def print_welcome_message():
     print("Type 'help' for a list of commands or see the README for more information.")
     print("-"*80)
 
-def print_error(kind: str, desc: str, msg: str):
-    print(f"{bcolors.error(kind)}{desc}: {msg}")
+def print_error(error):
+    if error.context() == None:
+        print(f"{bcolors.error(error.kind())}: {error.message()}")
+    else:
+        print(f"{bcolors.error(error.kind())} {error.context()}: {error.message()}")
