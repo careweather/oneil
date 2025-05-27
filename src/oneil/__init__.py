@@ -119,11 +119,11 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
-                    raise ModelLoadingError(file_name, i + 1, line, f"File \"{model}.on\" does not exist.")
+                    raise ModelLoadingError(file_name, i + 1, f"File \"{model}.on\" does not exist.")
                 symbol = include.split('as')[1].strip()
 
                 if symbol in submodels.keys():
-                    raise ModelLoadingError(file_name, i + 1, line, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
+                    raise ModelLoadingError(file_name, i + 1, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
 
                 submodels[symbol] = {'model': Model(model + ".on"), 'inputs': test_inputs, 'path': [model], 'line_no': i+1, 'line': line}
             elif line[:5] == 'from ':
@@ -144,13 +144,13 @@ def parse_file(file_name, parent_model=None):
                     test_inputs = {}
 
                 if not os.path.exists(model + ".on"):
-                    raise ModelLoadingError(file_name, i + 1, line, f"File \"{model}.on\" does not exist.")
+                    raise ModelLoadingError(file_name, i + 1, f"File \"{model}.on\" does not exist.")
 
                 path = source.split('.') + [model] if '.' in source else [source, model]
                 symbol = include.split('use')[1].split("as")[1].strip()
 
                 if symbol in submodels.keys():
-                    raise ModelLoadingError(file_name, i + 1, line, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
+                    raise ModelLoadingError(file_name, i + 1, f"Submodel symbol \"{symbol}\" has duplicate definitions.")
 
                 submodels[symbol] = {'path': path, 'inputs': test_inputs, 'line_no': i+1, 'line': line}
             elif line[:7] == 'import ':
@@ -205,7 +205,7 @@ def parse_file(file_name, parent_model=None):
         params = {p.id: p for p in parameters}
 
         if not params and not tests and not design_overrides:
-            raise ModelLoadingError(file_name, final_line, prev_line, "Empty model. No parameters, design values, or tests found.")
+            raise ModelLoadingError(file_name, final_line, "Empty model. No parameters, design values, or tests found.")
 
         return note, params, submodels, tests, design_overrides
 
@@ -798,7 +798,16 @@ class SyntaxError(OneilError):
         self.filename = filename
         self.line_no = line_no
         self.line = line
-        self.message = message
+        self.message_ = message
+
+    def kind(self) -> str:
+        return "SyntaxError"
+        
+    def context(self) -> str | None:
+        return f"in {self.filename} (line {self.line_no})"
+        
+    def message(self) -> str:
+        return self.message_
 
 class IDError(OneilError):
     def __init__(self, model, ID, message):
@@ -828,11 +837,19 @@ class ImportError(OneilError):
             loader("", [])
 
 class ModelLoadingError(OneilError):
-    def __init__(self, filename: str, line_no: int, line: str, message: str):
+    def __init__(self, filename: str, line_no: int, message: str):
         self.filename = filename
         self.line_no = line_no
-        self.line = line
-        self.message = message
+        self.message_ = message
+
+    def kind(self) -> str:
+        return "ModelLoadingError"
+        
+    def context(self) -> str | None:
+        return f"in {self.filename} (line {self.line_no})"
+        
+    def message(self) -> str:
+        return self.message_
 
 class ModelError(OneilError):
     def __init__(self, filename: str, source_message: str = "", source: list[str] = []):
