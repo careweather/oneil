@@ -10,8 +10,10 @@ from functools import partial
 import traceback, logging
 
 from . import bcolors
+from . import errors as err
 from . import console
 from . import units as un
+from .errors import OneilError
 
 # Configure logging to output to the console
 logging.basicConfig(level=logging.ERROR, format='%(message)s')
@@ -48,6 +50,7 @@ class Infix():
         return self.func(v1, v2)
     
 @Infix
+@err.add_trace
 def minus(x, y):
     if isinstance(x, Parameter):
         return x._minus(y)
@@ -376,6 +379,7 @@ def _process_minmax_par_inputs(val1, val2):
     else:
         return val1, val2
 
+@err.add_trace
 def par_extent(val1, val2=None):
     if not val2:
         if isinstance(val1, Parameter):
@@ -403,36 +407,41 @@ def par_extent(val1, val2=None):
     
     raise TypeError("Second input to extent() must be of type Parameter, int, or float.")
 
+@err.add_trace
 def par_minmax(val1, val2):
     if val1.units != val2.units:
         raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
     return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "Min/max({},{})".format(val1.name, val2.name))
 
+@err.add_trace
 def par_range(val):
     if isinstance(val, Parameter):
         return Parameter(val.max - val.min, val.units, "range({})".format(val.name))
     else:
         raise TypeError("Input to range() must be of type Parameter.")
     
+@err.add_trace
 def par_mid(val):
     if isinstance(val, Parameter):
         return Parameter((val.max + val.min)/2, val.units, "mid({})".format(val.name))
     else:
         raise TypeError("Input to mid() must be of type Parameter.")
     
+@err.add_trace
 def par_sign(val):
     if isinstance(val, Parameter):
         return Parameter((np.sign(val.min), np.sign(val.max)), {}, "sign({})".format(val.name))
     else:
         raise TypeError("Input to sign() must be of type Parameter.")
     
+@err.add_trace
 def par_strip(val):
     if isinstance(val, Parameter):
         return Parameter((val.min, val.max), {}, "strip({})".format(val.name))
     else:
         raise TypeError("Input to strip() must be of type Parameter.")
 
-
+@err.add_trace
 def par_min(val1, val2=None):
     if not val2:
         if isinstance(val1, Parameter):
@@ -460,7 +469,7 @@ def par_min(val1, val2=None):
     else:
         raise TypeError("Second input to min() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def par_max(val1, val2=None):
     if not val2:
         if isinstance(val1, Parameter):
@@ -490,6 +499,7 @@ def par_max(val1, val2=None):
     else:
         raise TypeError("Inputs to max() must be of type Parameter, int, or float.")
 
+@err.add_trace
 def par_sin(val):
     if isinstance(val, Parameter):
         if val.units != {}:
@@ -501,7 +511,7 @@ def par_sin(val):
     else:
         raise TypeError("Input to sin() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def par_cos(val):
     if isinstance(val, Parameter):
         if val.units != {}:
@@ -513,7 +523,7 @@ def par_cos(val):
     else:
         raise TypeError("Input to cos() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def par_tan(val):
     if isinstance(val, Parameter):
         if val.units != {}:
@@ -525,7 +535,7 @@ def par_tan(val):
     else:
         raise TypeError("Input to tan() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def apar_sin(val):
     if isinstance(val, Parameter):
         if val.units != {}:
@@ -541,7 +551,7 @@ def apar_sin(val):
     else:
         raise TypeError("Input to asin() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def apar_cos(val):
     if isinstance(val, Parameter):
         if val.units != {}:
@@ -557,7 +567,7 @@ def apar_cos(val):
     else:
         raise TypeError("Input to acos() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def apar_tan(val):
     if isinstance(val, Parameter):
         if val.units != {}:
@@ -569,7 +579,7 @@ def apar_tan(val):
     else:
         raise TypeError("Input to atan() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def par_sqrt(val):
     if isinstance(val, Parameter):
         if not val >= 0:
@@ -583,7 +593,7 @@ def par_sqrt(val):
     else:
         raise TypeError("Input to sqrt() must be of type Parameter, int, or float.")
 
-
+@err.add_trace
 def par_abs(val):
     if isinstance(val, Parameter):
         # ERR option ETC
@@ -596,6 +606,7 @@ def par_abs(val):
     else:
         raise TypeError("Input to abs() must be of type Parameter, int, or float.")
 
+@err.add_trace
 def par_log(val):
     if isinstance(val, Parameter):
         # ERR option ETC
@@ -608,6 +619,7 @@ def par_log(val):
     else:
         raise TypeError("Input to log() must be of type Parameter, int, or float.")
 
+@err.add_trace
 def par_log10(val):
     if isinstance(val, Parameter):
         # ERR option ETC
@@ -620,6 +632,7 @@ def par_log10(val):
     else:
         raise TypeError("Input to log10() must be of type Parameter, int, or float.")
     
+@err.add_trace
 def par_log2(val):
     if isinstance(val, Parameter):
         # ERR option ETC
@@ -632,6 +645,7 @@ def par_log2(val):
     else:
         raise TypeError("Input to log2() must be of type Parameter, int, or float.")
 
+@err.add_trace
 def par_floor(val):
     if isinstance(val, Parameter):
         # ERR option ETC
@@ -641,6 +655,7 @@ def par_floor(val):
     else:
         raise TypeError("Input to floor() must be of type Parameter, int, or float.")
     
+@err.add_trace
 def par_ceiling(val):
     if isinstance(val, Parameter):
         # ERR option ETC
@@ -650,32 +665,6 @@ def par_ceiling(val):
     else:
         raise TypeError("Input to ceiling() must be of type Parameter, int, or float.")
 
-class OneilError(Exception):
-    def __init__(self, notes: list[str] = []):
-        self.notes_ = notes
-
-    def kind(self) -> str:
-        raise NotImplementedError("Subclasses must implement this method")
-    
-    def context(self) -> str | None:
-        raise NotImplementedError("Subclasses must implement this method")
-    
-    def message(self) -> str:
-        raise NotImplementedError("Subclasses must implement this method")
-
-    def notes(self) -> list[str]:
-        return self.notes_
-
-    def with_note(self, note: str):
-        self.notes_.append(note)
-        return self
-
-    def __str__(self):
-        if self.context() != None:
-            return f"{self.kind()} {self.context()}: {self.message()}"
-        else:
-            return f"{self.kind()}: {self.message()}"
-        
 class DesignError(OneilError):
     def __init__(self, filenames: list[str]):
         self.filenames = filenames
@@ -1209,6 +1198,7 @@ class Parameter:
         return self.human_readable(4)
 
     # "+" Addition, left-hand, all cases 
+    @err.add_trace
     def __add__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1220,6 +1210,7 @@ class Parameter:
             raise UnitError(f"Cannot add {un.hr_units(self.units)} to a unitless number.", [self, other])
 
     # "-" Subtraction, left-hand, extreme
+    @err.add_trace
     def __sub__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1233,6 +1224,7 @@ class Parameter:
             raise UnitError(f"Cannot subtract a unitless number from {un.hr_units(self.units)}.", [self, other])
 
     # "--" Subtraction, left-hand, standard
+    @err.add_trace
     def _minus(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1246,6 +1238,7 @@ class Parameter:
             raise UnitError(f"Cannot subtract a unitless number from {un.hr_units(self.units)}.", [self, other])
 
     # "*" Multiplication, left-hand, all cases
+    @err.add_trace
     def __mul__(self, other):
         if isinstance(other, Parameter):
             new_units = {k: v for k, v in self.units.items()}
@@ -1265,6 +1258,7 @@ class Parameter:
             TypeError("Multiplication must be between two Parameters or a Parameter and a number.")
 
     # "/" Division, left-hand, extreme
+    @err.add_trace
     def __truediv__(self, other):
         if isinstance(other, Parameter):
             if self.id == other.id and self.model == other.model: 
@@ -1290,6 +1284,7 @@ class Parameter:
             raise TypeError("Division must be between two Parameters or a Parameter and a number.")
 
     # "//" Division, left-hand, standard
+    @err.add_trace
     def __floordiv__(self, other):
         if isinstance(other, Parameter):
             new_units = {k: v for k, v in self.units.items()}
@@ -1313,6 +1308,7 @@ class Parameter:
             raise TypeError("Division must be between two Parameters or a Parameter and a number.")
 
     # "**" Exponentiation, left-hand, all cases
+    @err.add_trace
     def __pow__(self, other):
         if isinstance(other, Parameter):
             if self.min != self.max or other.units != {}:
@@ -1328,6 +1324,7 @@ class Parameter:
             raise TypeError("Exponent must be a single unitless Parameter or number.")
 
     # "+" Addition, right-hand, all cases
+    @err.add_trace
     def __radd__(self, other):
         if isinstance(other, (int, float)):
             if self.units == {}:
@@ -1338,6 +1335,7 @@ class Parameter:
             raise TypeError("Addition must be between two Parameters or a Parameter and a number.")
 
     # "-" Subtraction, right-hand, extreme
+    @err.add_trace
     def __rsub__(self, other):
         if isinstance(other, (int, float)):
             if self.units == {}:
@@ -1348,6 +1346,7 @@ class Parameter:
             raise TypeError("Subtraction must be between two Parameters or a Parameter and a number.")
 
     # "--" Subtraction, right-hand, standard
+    @err.add_trace
     def _rminus(self, other):
         if isinstance(other, (int, float)):
             if self.units == {}:
@@ -1358,6 +1357,7 @@ class Parameter:
             raise TypeError("Subtraction must be between two Parameters or a Parameter and a number.")
 
     # "*" Multiplication, right-hand, all cases
+    @err.add_trace
     def __rmul__(self, other):
         if isinstance(other, (int, float)):
             return Parameter((self.min * other, self.max * other), self.units, "({})({})".format(str(other), self.id))
@@ -1365,6 +1365,7 @@ class Parameter:
             raise TypeError("Multiplication must be between a Parameter and a number.")
 
     # "/" Division, right-hand, extreme
+    @err.add_trace
     def __rtruediv__(self, other):
         if isinstance(other, (int, float)):
             new_units = {k: -v for k, v in self.units.items()}
@@ -1373,6 +1374,7 @@ class Parameter:
             raise TypeError("Division must be between a Parameter and a number.")
 
     # "//" Division, right-hand, standard
+    @err.add_trace
     def __rfloordiv__(self, other):
         if isinstance(other, (int, float)):
             new_units = {k: -v for k, v in self.units.items()}
@@ -1381,6 +1383,7 @@ class Parameter:
             raise TypeError("Division must be between a Parameter and a number.")
 
     # "**" Exponentiation, right-hand, all cases
+    @err.add_trace
     def __rpow__(self, other):
         if isinstance(other, (int, float)):
             if self.units != {}:
@@ -1390,10 +1393,12 @@ class Parameter:
             raise TypeError("Exponentiation must be between a Parameter and a number.")
 
     # "-" Unary operator
+    @err.add_trace
     def __neg__(self):
         return Parameter((-self.max, -self.min), self.units, "-({})".format(self.id))
 
     # "<" Less than, left-hand, all cases
+    @err.add_trace
     def __lt__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1407,6 +1412,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # ">" Greater than, left-hand, all cases
+    @err.add_trace
     def __gt__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1420,6 +1426,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # ">=" Greater than or equal to, left-hand, all cases
+    @err.add_trace
     def __le__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1433,6 +1440,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "<=" Less than or equal to, left-hand, all cases
+    @err.add_trace
     def __ge__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1446,6 +1454,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "==" Equal to, left-hand, all cases
+    @err.add_trace
     def __eq__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1465,6 +1474,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "!=" Not equal to, left-hand, all cases
+    @err.add_trace
     def __ne__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
@@ -1482,6 +1492,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "<" Less than, right-hand, all cases
+    @err.add_trace
     def __rlt__(self, other):
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
@@ -1492,6 +1503,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "<=" Less than or equal to, right-hand, all cases
+    @err.add_trace
     def __rgt__(self, other):
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
@@ -1502,6 +1514,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # ">=" Greater than or equal to, right-hand, all cases
+    @err.add_trace
     def __rle__(self, other):
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
@@ -1512,6 +1525,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # ">=" Greater than or equal to, right-hand, all cases
+    @err.add_trace
     def __rge__(self, other):
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
@@ -1522,6 +1536,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "==" Equal to, right-hand, all cases
+    @err.add_trace
     def __req__(self, other):
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
@@ -1532,6 +1547,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "!=" Not equal to, right-hand, all cases
+    @err.add_trace
     def __rne__(self, other):
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
@@ -1542,6 +1558,7 @@ class Parameter:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
 
     # "|" Logical OR, left-hand, all cases
+    @err.add_trace
     def __or__(self, other):
         if isinstance(other, Infix):
             return other.__ror__(self)
@@ -1561,6 +1578,7 @@ class Parameter:
             raise TypeError("OR operator is only valid between two Parameters or a Parameter and a boolean.")
 
     # "&" Logical AND, left-hand, all cases
+    @err.add_trace
     def __and__(self, other):
         if self.units != {}:
             message = f"& is only valid for unitless parameters with boolean values."
@@ -1577,6 +1595,7 @@ class Parameter:
             raise TypeError("AND operator is only valid between two Parameters or a Parameter and a boolean.")
 
     # "|" Logical OR, right-hand, all cases
+    @err.add_trace
     def __ror__(self, other):
         if self.units != {}:
             message = f"| is only valid for unitless parameters with boolean values."
@@ -1588,6 +1607,7 @@ class Parameter:
             raise TypeError("OR operator is only valid between two Parameters or a Parameter and a boolean.")
 
     # "&" Logical AND, right-hand, all cases
+    @err.add_trace
     def __rand__(self, other):
         if self.units != {}:
             message = f"& is only valid for unitless parameters with boolean values."
