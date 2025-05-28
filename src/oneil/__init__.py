@@ -884,14 +884,14 @@ class Test:
             try:
                 self.refs = [l.strip() for l in line.split(':')[0].split('{')[1].split('}')[0].split(',')]
             except:
-                SyntaxError(model, line_no, line, "Invalid syntax for test references.")
+                raise SyntaxError(model, line_no, line, "Invalid syntax for test references.")
         else:
             self.refs = []
 
         self.expression = line.split(':')[1].strip()
 
         if not self.expression:
-            SyntaxError(model, line_no, line, "Empty test expression.")
+            raise SyntaxError(model, line_no, line, "Empty test expression.")
 
         for old, new in FUNCTIONS.items():
             if "." + old not in self.expression:
