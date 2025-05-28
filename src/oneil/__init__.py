@@ -690,7 +690,7 @@ class UnitParseError(OneilError):
         return "UnitParseError"
         
     def context(self) -> str | None:
-        return "in {self.filename} (line {self.line_no})"
+        return f"in {self.filename} (line {self.line_no})"
         
     def message(self) -> str:
         return f"Failed to parse units '{self.hrunits}'"
