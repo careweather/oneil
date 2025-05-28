@@ -397,12 +397,12 @@ def par_extent(val1, val2=None):
             return Parameter(max(abs(val1.min), abs(val1.max)), val1.units, "extent({})".format(val1.name))
         
         if val1.units != val2.units:
-            raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_extent).", [val1, val2])
+            raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_extent).", [val1, val2])
 
         return Parameter((max(abs(val1.min), abs(val1.max), abs(val2.min), abs(val2.max))), val1.units, "extent({},{})".format(val1.name, val2.name))
     elif isinstance(val2, (int, float)):
         if val1.units != {}:
-            raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to a unitless number (par_extent).", [val1, val2])
+            raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to a unitless number (par_extent).", [val1, val2])
         return Parameter((max(abs(val1.min), abs(val1.max), abs(val2))), val1.units, "extent({},{})".format(val1.name, val2))
     
     raise TypeError("Second input to extent() must be of type Parameter, int, or float.")
@@ -410,7 +410,7 @@ def par_extent(val1, val2=None):
 @err.add_trace
 def par_minmax(val1, val2):
     if val1.units != val2.units:
-        raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
+        raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
     return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "Min/max({},{})".format(val1.name, val2.name))
 
 @err.add_trace
@@ -459,12 +459,12 @@ def par_min(val1, val2=None):
             return Parameter((val1.min, val1.min), val1.units, "min({})".format(val1.name))
         
         if val1.units != val2.units:
-            raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
+            raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
 
         return Parameter((min(val1.min, val2.min), min(val1.max, val2.max)), val1.units, "min({},{})".format(val1.name, val2.name))
     elif isinstance(val2, (int, float)):
         if val1.units != {}:
-            raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to a unitless number (par_minmax).", [val1, val2])
+            raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to a unitless number (par_minmax).", [val1, val2])
         return Parameter((min(val1.min, val2), min(val1.max, val2)), val1.units, "min({},{})".format(val1.name, val2))
     else:
         raise TypeError("Second input to min() must be of type Parameter, int, or float.")
@@ -487,11 +487,11 @@ def par_max(val1, val2=None):
             if val1.id == val2.id: 
                 return Parameter((val1.max, val1.max), val1.units, "max({})".format(val1.name))
             if val1.units != val2.units:
-                raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
             return Parameter((max(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "max({},{})".format(val1.name, val2.name))
         elif isinstance(val2, (int, float)):
             if val1.units != {}:
-                raise UnitError(f"Cannot compare {un.hr_units(val1.units)} to a unitless number (par_minmax).", [val1, val2])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to a unitless number (par_minmax).", [val1, val2])
             return Parameter((max(val1.min, val2), max(val1.max, val2)), val1.units, "max({},{})".format(val1.name, val2))
     elif isinstance(val1, (int, float)):
         if isinstance(val2, (int, float)):
@@ -503,7 +503,7 @@ def par_max(val1, val2=None):
 def par_sin(val):
     if isinstance(val, Parameter):
         if val.units != {}:
-            raise UnitError("Input to sine must be unitless.", [val])
+            raise UnitEvaluationError("Input to sine must be unitless.", [val])
         results = [np.sin(val.min), np.sin(val.max)]
         return Parameter((min(results), max(results)), {}, "sin({})".format(val.id))
     elif isinstance(val, (int, float)):
@@ -515,7 +515,7 @@ def par_sin(val):
 def par_cos(val):
     if isinstance(val, Parameter):
         if val.units != {}:
-            raise UnitError("Input to cosine must be unitless.", [val])
+            raise UnitEvaluationError("Input to cosine must be unitless.", [val])
         results = [np.cos(val.min), np.cos(val.max)]
         return Parameter((min(results), max(results)), {}, "cos({})".format(val.id))
     elif isinstance(val, (int, float)):
@@ -527,7 +527,7 @@ def par_cos(val):
 def par_tan(val):
     if isinstance(val, Parameter):
         if val.units != {}:
-            raise UnitError("Input to tangent must be unitless.", [val])
+            raise UnitEvaluationError("Input to tangent must be unitless.", [val])
         results = [np.tan(val.min), np.tan(val.max)]
         return Parameter((min(results), max(results)), {}, "tan({})".format(val.id))
     elif isinstance(val, (int, float)):
@@ -539,7 +539,7 @@ def par_tan(val):
 def apar_sin(val):
     if isinstance(val, Parameter):
         if val.units != {}:
-            raise UnitError("Input to arcsine must be unitless.", [val])
+            raise UnitEvaluationError("Input to arcsine must be unitless.", [val])
         if not -1 <= val.min <= 1 or not -1 <= val.max <= 1:
             raise ParameterError("Input to arcsine must be between -1 and 1 (apar_sin).", val)
         results = [np.arcsin(val.min), np.arcsin(val.max)]
@@ -555,7 +555,7 @@ def apar_sin(val):
 def apar_cos(val):
     if isinstance(val, Parameter):
         if val.units != {}:
-            raise UnitError("Input to arccosine must be unitless.", [val])
+            raise UnitEvaluationError("Input to arccosine must be unitless.", [val])
         if not -1 <= val.min <= 1 or not -1 <= val.max <= 1:
             raise ParameterError("Input to arccosine must be between -1 and 1 (apar_cos).", val)
         results = [np.arccos(val.min), np.arccos(val.max)]
@@ -571,7 +571,7 @@ def apar_cos(val):
 def apar_tan(val):
     if isinstance(val, Parameter):
         if val.units != {}:
-            raise UnitError("Input to arctangent must be unitless.", [val])
+            raise UnitEvaluationError("Input to arctangent must be unitless.", [val])
         results = [np.arctan(val.min), np.arctan(val.max)]
         return Parameter((min(results), max(results)), {}, "atan({})".format(val.id))
     elif isinstance(val, (int, float)):
@@ -694,7 +694,7 @@ class UnitParseError(OneilError):
     def message(self) -> str:
         return f"Failed to parse units '{self.hrunits}'"
 
-class UnitError(OneilError):
+class UnitEvaluationError(OneilError):
     def __init__(self, message: str, vals: list):
         self.message_ = message
         self.vals = vals
@@ -713,7 +713,7 @@ class UnitError(OneilError):
         return self
         
     def kind(self) -> str:
-        return "UnitError"
+        return "UnitEvaluationError"
         
     def context(self) -> str | None:
         if self.context_:
@@ -954,7 +954,7 @@ class Parameter:
             self.units = units
             for unit in units:
                 if unit not in un.BASE_UNITS:
-                    raise UnitError(f"{unit} is not currently a supported input unit. Only {un.BASE_UNITS} are supported. Refactor {unit} in terms of {un.BASE_UNITS}", []).with_context(self)
+                    raise UnitEvaluationError(f"{unit} is not currently a supported input unit. Only {un.BASE_UNITS} are supported. Refactor {unit} in terms of {un.BASE_UNITS}", []).with_context(self)
         else:
             raise TypeError('Units must be of type dict. Type "' + str(type(units)) + " was given.")
 
@@ -1037,7 +1037,7 @@ class Parameter:
                 
             if value.min is not None and value.max is not None:
                 if value.units != self.units:
-                    raise UnitError(f"Input or calculated units ({value.units}) do not match the required units: ({self.units}).", [self, value]).with_context(self)
+                    raise UnitEvaluationError(f"Input or calculated units ({value.units}) do not match the required units: ({self.units}).", [self, value]).with_context(self)
                 self.min = value.min
                 self.max = value.max
             elif not value.independent:
@@ -1202,40 +1202,40 @@ class Parameter:
     def __add__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
-                raise UnitError(f"Cannot add {un.hr_units(other.units)} to {un.hr_units(self.units)}.", [self, other])
+                raise UnitEvaluationError(f"Cannot add {un.hr_units(other.units)} to {un.hr_units(self.units)}.", [self, other])
             return Parameter((self.min + other.min, self.max + other.max), self.units, "({}) + ({})".format(self.id, other.id))
         elif self.units == {}:
             return Parameter((self.min + other, self.max + other), {}, "({}) + ({})".format(self.id, str(other)))
         else:
-            raise UnitError(f"Cannot add {un.hr_units(self.units)} to a unitless number.", [self, other])
+            raise UnitEvaluationError(f"Cannot add {un.hr_units(self.units)} to a unitless number.", [self, other])
 
     # "-" Subtraction, left-hand, extreme
     @err.add_trace
     def __sub__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
-                raise UnitError(f"Cannot subtract {un.hr_units(other.units)} from {un.hr_units(self.units)}.", [self, other])
+                raise UnitEvaluationError(f"Cannot subtract {un.hr_units(other.units)} from {un.hr_units(self.units)}.", [self, other])
             if self.id == other.id and self.model == other.model: 
                 return Parameter(0, {}, "({}) - ({})".format(self.id, other.id))
             return Parameter((self.min - other.max, self.max - other.min), self.units, "({}) - ({})".format(self.id, other.id))
         elif self.units == {}:
             return Parameter((self.min - other, self.max - other), {}, "({}) - ({})".format(self.id, str(other)))
         else:
-            raise UnitError(f"Cannot subtract a unitless number from {un.hr_units(self.units)}.", [self, other])
+            raise UnitEvaluationError(f"Cannot subtract a unitless number from {un.hr_units(self.units)}.", [self, other])
 
     # "--" Subtraction, left-hand, standard
     @err.add_trace
     def _minus(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
-                raise UnitError(f"Cannot subtract {un.hr_units(other.units)} from {un.hr_units(self.units)}.", [self, other])
+                raise UnitEvaluationError(f"Cannot subtract {un.hr_units(other.units)} from {un.hr_units(self.units)}.", [self, other])
             results = [self.min - other.min, self.max - other.max]
             return Parameter((min(results), max(results)), self.units, "({}) -- ({})".format(self.id, other.id))
         elif self.units == {}:
             results = [self.min - other, self.max - other]
             return Parameter((min(results), max(results)), {}, "({}) -- ({})".format(self.id, str(other)))
         else:
-            raise UnitError(f"Cannot subtract a unitless number from {un.hr_units(self.units)}.", [self, other])
+            raise UnitEvaluationError(f"Cannot subtract a unitless number from {un.hr_units(self.units)}.", [self, other])
 
     # "*" Multiplication, left-hand, all cases
     @err.add_trace
@@ -1312,7 +1312,7 @@ class Parameter:
     def __pow__(self, other):
         if isinstance(other, Parameter):
             if self.min != self.max or other.units != {}:
-                raise UnitError(f"Exponent must be a single unitless Parameter or number.", [self, other])
+                raise UnitEvaluationError(f"Exponent must be a single unitless Parameter or number.", [self, other])
             new_units = {k: v * other.min for k, v in self.units.items()}
             results = [self.min**other.min, self.max**other.max, self.min**other.max, self.max**other.min]
             return Parameter((min(results), max(results)), new_units, "({})**({})".format(self.id, other.id))
@@ -1330,7 +1330,7 @@ class Parameter:
             if self.units == {}:
                 return Parameter((other + self.min, other + self.max), {}, "({}) + ({})".format(str(other), self.id))
             else:
-                raise UnitError(f"Cannot add {un.hr_units(self.units)} to a unitless number.", [self, other])
+                raise UnitEvaluationError(f"Cannot add {un.hr_units(self.units)} to a unitless number.", [self, other])
         else:
             raise TypeError("Addition must be between two Parameters or a Parameter and a number.")
 
@@ -1341,7 +1341,7 @@ class Parameter:
             if self.units == {}:
                 return Parameter((other - self.max, other - self.min), {}, "({}) - ({})".format(str(other), self.id))
             else:
-                raise UnitError(f"Cannot subtract {un.hr_units(self.units)} from a unitless number (__rsub__).", [self, other])
+                raise UnitEvaluationError(f"Cannot subtract {un.hr_units(self.units)} from a unitless number (__rsub__).", [self, other])
         else:
             raise TypeError("Subtraction must be between two Parameters or a Parameter and a number.")
 
@@ -1352,7 +1352,7 @@ class Parameter:
             if self.units == {}:
                 return Parameter((other - self.min, other - self.max), {}, "({}) - ({})".format(str(other), self.id))
             else:
-                raise UnitError(f"Cannot subtract {un.hr_units(self.units)} from a unitless number.", [self, other])
+                raise UnitEvaluationError(f"Cannot subtract {un.hr_units(self.units)} from a unitless number.", [self, other])
         else:
             raise TypeError("Subtraction must be between two Parameters or a Parameter and a number.")
 
@@ -1387,7 +1387,7 @@ class Parameter:
     def __rpow__(self, other):
         if isinstance(other, (int, float)):
             if self.units != {}:
-                raise UnitError(f"Exponent must be a single unitless Parameter or number.", [self, other])
+                raise UnitEvaluationError(f"Exponent must be a single unitless Parameter or number.", [self, other])
             return Parameter((other**self.min, other**self.max), {}, "({})**({})".format(str(other), self.id))
         else:
             raise TypeError("Exponentiation must be between a Parameter and a number.")
@@ -1402,11 +1402,11 @@ class Parameter:
     def __lt__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (less than).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (less than).", [self, other])
             return self.min < other.min and self.max < other.max
         elif isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (less than).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (less than).", [self, other])
             return self.min < other and self.max < other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1416,11 +1416,11 @@ class Parameter:
     def __gt__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (greater than).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (greater than).", [self, other])
             return self.min > other.min and self.max > other.max
         elif isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (greater than).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (greater than).", [self, other])
             return self.min > other and self.max > other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1430,11 +1430,11 @@ class Parameter:
     def __le__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (less than or equal).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (less than or equal).", [self, other])
             return self.min <= other.min and self.max <= other.max
         elif isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (less than or equal).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (less than or equal).", [self, other])
             return self.min <= other and self.max <= other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1444,11 +1444,11 @@ class Parameter:
     def __ge__(self, other):
         if isinstance(other, Parameter):
             if self.units != other.units:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (greater than or equal).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (greater than or equal).", [self, other])
             return self.min >= other.min and self.max >= other.max
         elif isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
-                raise UnitError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (greater than or equal).", [self, other])
+                raise UnitEvaluationError(f"Cannot compare {un.hr_units(self.units)} to a unitless number (greater than or equal).", [self, other])
             return self.min >= other and self.max >= other
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1459,12 +1459,12 @@ class Parameter:
         if isinstance(other, Parameter):
             if self.units != other.units:
                 message = f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return self.min == other.min and self.max == other.max
         elif isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare {un.hr_units(self.units)} to a unitless number (equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return self.min == other and self.max == other
         elif isinstance(other, str):
             return self.min == other
@@ -1479,12 +1479,12 @@ class Parameter:
         if isinstance(other, Parameter):
             if self.units != other.units:
                 message = f"Cannot compare {un.hr_units(self.units)} to {un.hr_units(other.units)} (not equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return self.min != other.min and self.max != other.max
         elif isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare {un.hr_units(self.units)} to a unitless number (not equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return self.min != other and self.max != other
         elif isinstance(other, str):
             return self.min == other
@@ -1497,7 +1497,7 @@ class Parameter:
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (less than)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return other < self.min and other < self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1508,7 +1508,7 @@ class Parameter:
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (greater than)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return other > self.min and other > self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1519,7 +1519,7 @@ class Parameter:
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (less than or equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return other <= self.min and other <= self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1530,7 +1530,7 @@ class Parameter:
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (greater than or equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return other >= self.min and other >= self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1541,7 +1541,7 @@ class Parameter:
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return other == self.min and other == self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1552,7 +1552,7 @@ class Parameter:
         if isinstance(other, (int, float)):
             if other != 0 and self.units != {}:
                 message = f"Cannot compare a unitless number to unit \"{un.hr_units(self.units)}\" (not equal)."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return other != self.min and other != self.max
         else:
             raise TypeError("Comparison must be between a two Parameters or a Parameter and a number.")
@@ -1565,12 +1565,12 @@ class Parameter:
 
         if self.units != {}:
             message = f"| is only valid for unitless parameters with boolean values."
-            raise UnitError(message, [self, other])
+            raise UnitEvaluationError(message, [self, other])
         
         if isinstance(other, Parameter):
             if other.units != {}:
                 message = f"| is only valid for unitless parameters with boolean values."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return self.min or other.min or self.max or other.max
         elif isinstance(other, (bool)):
             return self.min or other or self.max
@@ -1582,12 +1582,12 @@ class Parameter:
     def __and__(self, other):
         if self.units != {}:
             message = f"& is only valid for unitless parameters with boolean values."
-            raise UnitError(message, [self, other])
+            raise UnitEvaluationError(message, [self, other])
         
         if isinstance(other, Parameter):
             if other.units != {}:
                 message = f"& is only valid for unitless parameters with boolean values."
-                raise UnitError(message, [self, other])
+                raise UnitEvaluationError(message, [self, other])
             return self.min and other.min and self.max and other.max
         elif isinstance(other, (bool)):
             return self.min and other and self.max
@@ -1599,7 +1599,7 @@ class Parameter:
     def __ror__(self, other):
         if self.units != {}:
             message = f"| is only valid for unitless parameters with boolean values."
-            raise UnitError(message, [self, other])
+            raise UnitEvaluationError(message, [self, other])
         
         if isinstance(other, (bool)):
             return self.min or other or self.max
@@ -1611,7 +1611,7 @@ class Parameter:
     def __rand__(self, other):
         if self.units != {}:
             message = f"& is only valid for unitless parameters with boolean values."
-            raise UnitError(message, [self, other])
+            raise UnitEvaluationError(message, [self, other])
 
         if isinstance(other, (bool)):
             return self.min and other and self.max
@@ -2045,7 +2045,7 @@ class Model:
 
         try:
             result = eval(expression, globals(), eval_params)
-        except UnitError as e:
+        except UnitEvaluationError as e:
             raise e.with_context(self)
         except Exception as e:
             raise IDError(self, expression, str(e))
@@ -2103,7 +2103,7 @@ class Model:
 
                 try:
                     calculation = eval(run_expression, globals(), test_params)
-                except UnitError as e:
+                except UnitEvaluationError as e:
                     raise e.with_context(self)
                 except ArithmeticError as e:
                     raise CalculationError(run_expression.file_name, run_expression.line_number, e)
