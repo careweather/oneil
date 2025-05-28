@@ -244,8 +244,8 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
             elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
                 try:
                     limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
-                except Exception as e:
-                    raise CalculationError(None, e)
+                except ArithmeticError as e:
+                    raise CalculationError(file_name, line_number, e)
             else:
                 raise SyntaxError(file_name, line_number, line, "Parse parameter: invalid limit: " + l)
         options = tuple(limits)
@@ -319,14 +319,14 @@ def parse_equation(assignment, units, id, imports, file_name, line_number, unit_
                 try:
                     min = (unit_fx)(eval((assignment.split('|')[0]), MATH_CONSTANTS))
                     max = (unit_fx)(eval((assignment.split('|')[1]), MATH_CONSTANTS))
-                except Exception as e:
-                    raise CalculationError(None, e)
+                except ArithmeticError as e:
+                    raise CalculationError(file_name, line_number, e)
                 equation = (min, max)
             else:
                 try:
                     equation = (unit_fx)(eval(assignment, MATH_CONSTANTS))
-                except Exception as e:
-                    raise CalculationError(None, e)
+                except ArithmeticError as e:
+                    raise CalculationError(file_name, line_number, e)
 
     return equation, arguments
 
@@ -840,16 +840,31 @@ class ModelError(OneilError):
     def message(self) -> str:
         return f"Submodel not found (source: {' -> '.join(self.source)})"
 
-class CalculationError(OneilError):
+class ImportedFunctionError(OneilError):
     def __init__(self, parameter, error):
         self.parameter = parameter
         self.error = error
 
     def kind(self) -> str:
-        return "CalculationError"
+        return "ImportedFunctionError"
         
     def context(self) -> str | None:
         return f"in {self.parameter.equation} (line {self.parameter.line_no})"
+        
+    def message(self) -> str:
+        return f"{self.error}"
+
+class CalculationError(OneilError):
+    def __init__(self, file_name, line_number, error):
+        self.file_name = file_name
+        self.line_number = line_number
+        self.error = error
+
+    def kind(self) -> str:
+        return "CalculationError"
+
+    def context(self) -> str | None:
+        return f"in {self.file_name} (line {self.line_number})"
         
     def message(self) -> str:
         return f"{self.error}"
@@ -1120,7 +1135,7 @@ class Parameter:
             except OneilError as e:
                 raise e
             except Exception as e:
-                raise CalculationError(self, e)
+                raise ImportedFunctionError(self, e)
         else:
             try:
                 result = eval(expression, glob, eval_params | MATH_CONSTANTS)
@@ -1128,7 +1143,7 @@ class Parameter:
             except OneilError as e:
                 raise e
             except Exception as e:
-                raise CalculationError(self, e)
+                raise ImportedFunctionError(self, e)
 
     # Parameter Printing
 
@@ -2046,8 +2061,10 @@ class Model:
                     calculation = eval(run_expression, globals(), test_params)
                 except UnitError as e:
                     raise e.with_context(self)
+                except ArithmeticError as e:
+                    raise CalculationError(run_expression.file_name, run_expression.line_number, e)
                 except Exception as e:
-                    raise CalculationError(self, e)
+                    raise ImportedFunctionError(self, e)
 
                 if isinstance(calculation, (bool, np.bool_)):
                     result = bcolors.OKGREEN + "pass" + bcolors.ENDC if calculation else bcolors.FAIL + "fail" + bcolors.ENDC
