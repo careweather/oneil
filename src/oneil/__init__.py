@@ -2045,6 +2045,8 @@ class Model:
             result = eval(expression, globals(), eval_params)
         except UnitEvaluationError as e:
             raise e.with_context(self)
+        except OneilError as e:
+            raise e
         except Exception as e:
             raise IDError(self, expression, str(e))
 
@@ -2105,6 +2107,8 @@ class Model:
                     raise e.with_context(self)
                 except ZeroDivisionError as e:
                     raise DivideByZeroError((run_expression.file_name, run_expression.line_number))
+                except OneilError as e:
+                    raise e
                 except Exception as e:
                     raise ImportedFunctionError(self, e)
 
