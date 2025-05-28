@@ -56,7 +56,7 @@ def minus(x, y):
         return x - y
     
 
-def parse_file(file_name, parent_model=None):
+def parse_file(file_name):
     parameters = []
     submodels = {}
     imports = []
