@@ -1,7 +1,4 @@
 class OneilError(Exception):
-    def __init__(self, notes: list[str] = []):
-        self.notes_ = notes
-
     def kind(self) -> str:
         raise NotImplementedError("Subclasses must implement this method")
     
@@ -12,10 +9,16 @@ class OneilError(Exception):
         raise NotImplementedError("Subclasses must implement this method")
 
     def notes(self) -> list[str]:
-        return self.notes_
+        if hasattr(self, "notes_"):
+            return self.notes_
+        else:
+            return []
 
     def with_note(self, note: str):
-        self.notes_.append(note)
+        if hasattr(self, "notes_"):
+            self.notes_.append(note)
+        else:
+            self.notes_ = [note]
         return self
 
     def __str__(self):
