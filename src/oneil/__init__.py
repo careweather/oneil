@@ -710,6 +710,14 @@ class UnitError(OneilError):
         self.message_ = message
         self.vals = vals
         self.context_: Parameter | Model | None = None
+        self.notes_ = []
+        for val in self.vals:
+            if isinstance(val, Parameter):
+                model_text = "" if not val.model else " in model " + val.model
+                parameter_text = f"{val.name} ({val.id})" if val.name != val.id else val.name
+                self.notes_.append(f"({un.hr_units(val.units)}) in {parameter_text} from line {val.line_no}{model_text}")
+            else:
+                self.notes_.append(str(val))
 
     def with_context(self, context):
         self.context_ = context
@@ -731,19 +739,17 @@ class UnitError(OneilError):
         
     def message(self) -> str:
         message = self.message_
-        for val in self.vals:
-            if isinstance(val, Parameter):
-                model_text = "" if not val.model else " in model " + val.model
-                parameter_text = f"{val.name} ({val.id})" if val.name != val.id else val.name
-                message += f"\n  - ({un.hr_units(val.units)}) in {parameter_text} from line {val.line_no}{model_text}"
-            else:
-                message += f"\n  - {str(val)}"
         return message
 
 class ParameterError(OneilError):
     def __init__(self, message, parameter):
         self.parameter = parameter
         self.message_ = message
+
+        if isinstance(self.parameter, Parameter):
+            self.notes_ = [f"({str(self.parameter)}) in {self.parameter.name} ({self.parameter.id}) from line {str(self.parameter.line_no)} in model {self.parameter.model}"]
+        else:
+            self.notes_ = [str(self.parameter)]
 
     def kind(self) -> str:
         return "ParameterError"
@@ -754,12 +760,7 @@ class ParameterError(OneilError):
         return None
     
     def message(self) -> str:
-        message = self.message_
-        if isinstance(self.parameter, Parameter):
-            message += f"\n  - ({str(self.parameter)}) in {self.parameter.name} ({self.parameter.id}) from line {str(self.parameter.line_no)} in model {self.parameter.model}"
-        else:
-            message += "\n  - " + str(self.parameter)
-        return message
+        return self.message_
 
 class DivideByZeroError(OneilError):
     def __init__(self, parameter):
@@ -1665,7 +1666,10 @@ class Model:
 
         # Return a list of all args that aren't defined.
         if undefined:
-            raise IDError(self, f"{undefined.keys()}", self.name.capitalize() + " has undefined arguments:\n- " + "\n- ".join(undefined.values()))
+            error = IDError(self, f"{undefined.keys()}", self.name.capitalize() + " has undefined arguments")
+            for value in undefined.values():
+                error = error.with_note(value)
+            raise error
 
     # Recursively report all submodule paramaters with the same ID
     def _check_namespace_recursively(self, submodel, arg, param, trail=[]):
