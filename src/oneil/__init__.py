@@ -2760,21 +2760,26 @@ def parse_args(args: list[str]) -> tuple[str, list[str], list[str]]:
     return input_model, input_designs, commands
     
 def main(args=sys.argv[1:]):
-    console.print_welcome_message()
+    try:
+        console.print_welcome_message()
 
-    # parse the files and commands
-    inp, designs, commands = parse_args(args)
+        # parse the files and commands
+        inp, designs, commands = parse_args(args)
 
-    # load the model
-    model = loader(inp, designs)
+        # load the model
+        model = loader(inp, designs)
 
-    # Handle commands after the first as cli commands.
-    for command in commands:
-        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
-        handler(model, command)
+        # Handle commands after the first as cli commands.
+        for command in commands:
+            print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+            handler(model, command)
 
-    if len(args) > 2:
-        quit() 
+        if len(args) > 2:
+            quit() 
 
-    # run the interpeter on the model
-    interpreter(model)
+        # run the interpeter on the model
+        interpreter(model)
+    except KeyboardInterrupt:
+        # Handle when the user presses Ctrl+C
+        print(f"\n\n{bcolors.ITALIC}Quitting...{bcolors.ENDC}")
+        sys.exit(0)
