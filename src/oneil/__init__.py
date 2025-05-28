@@ -165,8 +165,8 @@ def parse_file(file_name, parent_model=None):
 
                 try:
                     imports.append(importlib.import_module(module))
-                except:
-                    raise ImportError(file_name, i+1, line, module + ".py")
+                except Exception as e:
+                    raise ImportError(file_name, i+1, line, module + ".py", e)
 
             elif line[:8] == 'section ':
                 try:
@@ -797,10 +797,11 @@ class IDError(OneilError):
 
 
 class ImportError(OneilError):
-    def __init__(self, filename, line_no, line, imprt):
+    def __init__(self, filename, line_no, line, imprt, error):
         self.filename = filename
         self.line_no = line_no
         self.imprt = imprt
+        self.error = error
         
     def kind(self) -> str:
         return "ImportError"
@@ -809,7 +810,7 @@ class ImportError(OneilError):
         return f"in {self.filename} (line {self.line_no})"
         
     def message(self) -> str:
-        return f"Failed to import '{self.imprt}'. Does the import run by itself?"
+        return f"Failed to import '{self.imprt}': {self.error}. Does the import run by itself?"
 
 class ModelLoadingError(OneilError):
     def __init__(self, filename: str, line_no: int, message: str):
