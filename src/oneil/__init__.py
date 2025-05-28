@@ -350,21 +350,27 @@ def convert_functions(assignment, imports, file_name, line_number):
     pattern = re.compile(r'(\w+)\(([^()]*)\)')
     results = pattern.findall(assignment)
 
-    # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
-    if results:
-        func, arg_str = results[0]
+    equation = assignment.strip("\n").strip()
 
-    if results and not func in FUNCTIONS:
-        equation = []
-        arguments = arg_str.split(",")
-        for i in imports:
-            if func in i.__dict__.keys():
-                equation = i.__dict__[func]
-                break
-        if not equation:
-            raise SyntaxError(file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
-    else:
-        equation = assignment.strip("\n").strip()
+    # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
+    if not results:
+        return equation, arguments
+
+    func, arg_str = results[0]
+    
+    if func in FUNCTIONS:
+        return equation, arguments
+        
+    equation = []
+    arguments = arg_str.split(",")
+    
+    for i in imports:
+        if func in i.__dict__.keys():
+            equation = i.__dict__[func]
+            break
+            
+    if not equation:
+        raise SyntaxError(file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
 
     return equation, arguments
 
