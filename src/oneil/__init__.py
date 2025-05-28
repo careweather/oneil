@@ -1614,7 +1614,10 @@ class Model:
         if design_filename:
             self.overwrite(design_filename)
 
-        namespace = self._check_namespace()
+        try:
+            self._check_namespace()
+        except OneilError as e:
+            raise e.with_note(f"In namespace check for {self.name}")
 
         for key, param in self.parameters.items():
             if param.pointer:
@@ -1719,8 +1722,14 @@ class Model:
                 ID, submodel = ID.split(".")
                 path = copy.copy(self.submodels[submodel]['path'])
             else:
+                submodel = ID
                 path = []
-            result = self._rewrite_parameter(ID, parameter, path)
+            try:
+                self._rewrite_parameter(ID, parameter, path)
+            except ModelError as e:
+                raise e.with_note(f"Couldn't find {submodel} in path {'.'.join(path)} while overwriting {ID} in {design_files} (line {self.submodels[submodel]['line_no']})")
+            except ParameterError as e:
+                raise e.with_note(f"In parameter {ID} in {design_files}")
 
         self.defaults.append(list[set(self.parameters).difference(design)])
         
