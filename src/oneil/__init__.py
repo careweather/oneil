@@ -651,6 +651,9 @@ def par_ceiling(val):
         raise TypeError("Input to ceiling() must be of type Parameter, int, or float.")
 
 class OneilError(Exception):
+    def __init__(self, notes: list[str] = []):
+        self.notes_ = notes
+
     def kind(self) -> str:
         raise NotImplementedError("Subclasses must implement this method")
     
@@ -659,6 +662,13 @@ class OneilError(Exception):
     
     def message(self) -> str:
         raise NotImplementedError("Subclasses must implement this method")
+
+    def notes(self) -> list[str]:
+        return self.notes_
+
+    def with_note(self, note: str):
+        self.notes_.append(note)
+        return self
 
     def __str__(self):
         if self.context() != None:
