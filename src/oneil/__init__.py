@@ -247,8 +247,8 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
             elif any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in l):
                 try:
                     limits.append((unit_fx)(eval(l, MATH_CONSTANTS)))
-                except ArithmeticError as e:
-                    raise CalculationError(file_name, line_number, e)
+                except ZeroDivisionError as e:
+                    raise DivideByZeroError((file_name, line_number))
             else:
                 raise SyntaxError(file_name, line_number, line, "Parse parameter: invalid limit: " + l)
         options = tuple(limits)
@@ -322,14 +322,14 @@ def parse_equation(assignment, units, id, imports, file_name, line_number, unit_
                 try:
                     min = (unit_fx)(eval((assignment.split('|')[0]), MATH_CONSTANTS))
                     max = (unit_fx)(eval((assignment.split('|')[1]), MATH_CONSTANTS))
-                except ArithmeticError as e:
-                    raise CalculationError(file_name, line_number, e)
+                except ZeroDivisionError as e:
+                    raise DivideByZeroError((file_name, line_number))
                 equation = (min, max)
             else:
                 try:
                     equation = (unit_fx)(eval(assignment, MATH_CONSTANTS))
-                except ArithmeticError as e:
-                    raise CalculationError(file_name, line_number, e)
+                except ZeroDivisionError as e:
+                    raise DivideByZeroError((file_name, line_number))
 
     return equation, arguments
 
@@ -752,17 +752,30 @@ class ParameterError(OneilError):
         return self.message_
 
 class DivideByZeroError(OneilError):
-    def __init__(self, parameter):
-        self.parameter = parameter
+    def __init__(self, parameter_or_location):
+        if isinstance(parameter_or_location, Parameter):
+            self.parameter = parameter_or_location
+            self.location = None
+        else:
+            self.parameter = None
+            self.location = parameter_or_location
         
     def kind(self) -> str:
         return "DivideByZeroError"
         
     def context(self) -> str | None:
-        return f"in {self.parameter.name} ({self.parameter.id}) from line {self.parameter.line_no} in model {self.parameter.model}"
+        if self.parameter != None:
+            return f"in {self.parameter.name} ({self.parameter.id}) from line {self.parameter.line_no} in model {self.parameter.model}"
+        elif self.location != None:
+            return f"in {self.location[0]} (line {self.location[1]})"
+        else:
+            return None
         
     def message(self) -> str:
-        return f"Cannot divide by zero ({self.parameter.id} is 0)"
+        if self.parameter != None:
+            return f"Cannot divide by zero ({self.parameter.id} is 0)"
+        else:
+            return f"Cannot divide by zero"
 
 class SyntaxError(OneilError):
     def __init__(self, filename: str, line_no: int, line: str, message: str):
@@ -851,21 +864,6 @@ class ImportedFunctionError(OneilError):
         
     def context(self) -> str | None:
         return f"in {self.parameter.equation} (line {self.parameter.line_no})"
-        
-    def message(self) -> str:
-        return f"{self.error}"
-
-class CalculationError(OneilError):
-    def __init__(self, file_name, line_number, error):
-        self.file_name = file_name
-        self.line_number = line_number
-        self.error = error
-
-    def kind(self) -> str:
-        return "CalculationError"
-
-    def context(self) -> str | None:
-        return f"in {self.file_name} (line {self.line_number})"
         
     def message(self) -> str:
         return f"{self.error}"
@@ -2105,8 +2103,8 @@ class Model:
                     calculation = eval(run_expression, globals(), test_params)
                 except UnitEvaluationError as e:
                     raise e.with_context(self)
-                except ArithmeticError as e:
-                    raise CalculationError(run_expression.file_name, run_expression.line_number, e)
+                except ZeroDivisionError as e:
+                    raise DivideByZeroError((run_expression.file_name, run_expression.line_number))
                 except Exception as e:
                     raise ImportedFunctionError(self, e)
 
