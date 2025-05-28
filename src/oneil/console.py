@@ -10,7 +10,7 @@ def print_welcome_message():
     print("-"*80)
 
 def print_error(error):
-    notes = map(lambda note: f"\n  - {note}", error.notes())
+    notes = ''.join(list(map(lambda note: f"\n  - {note}", error.notes())))
     if error.context() == None:
         print(f"{bcolors.error(error.kind())}: {error.message()}{notes}")
     else:
