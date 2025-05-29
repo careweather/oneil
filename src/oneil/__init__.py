@@ -903,7 +903,7 @@ class Test:
         for old, new in OPERATOR_OVERRIDES.items():
             self.expression = self.expression.replace(old, new)
 
-        self.args = [x for x in re.findall(r"\b(?!\d+)(?<!')(?<!\")\b\w+\.?\w*\b(?!')(?!\")\b", self.expression) if x not in FUNCTIONS and x not in BOOLEAN_OPERATORS]
+        self.args = [x for x in re.findall(r"\b(?!\d+)(?<!')(?<!\")\b\w+\.?\w*\b(?!')(?!\")\b", self.expression) if x not in FUNCTIONS.values() and x not in BOOLEAN_OPERATORS]
 
 
 class Parameter:
@@ -2086,6 +2086,7 @@ class Model:
                     elif arg in test_inputs:
                         test_params[arg] = test_inputs[arg]
                     elif arg in FUNCTIONS.values() or any([arg==v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS:
+                        print(test.__dict__)
                         raise IDError(self, arg, f"Test argument ({arg}) uses a reserved keyword.")
                     else:
                         test_params[arg] = self.parameters[arg]
