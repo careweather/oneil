@@ -1,0 +1,25 @@
+{
+  "name": "oneil",
+  "displayName": "Oneil",
+  "description": "VS Code support for the Oneil design specification language",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "oneil",
+      "aliases": ["Oneil", "oneil"],
+      "extensions": [".on"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "oneil",
+      "scopeName": "source.oneil",
+      "path": "./syntaxes/oneil.tmLanguage.json"
+    }]
+  }
+}
