@@ -1,32 +1,134 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "Oneil",
+	"scopeName": "source.oneil",
 	"patterns": [
+		{
+			"include": "#comments"
+		},
 		{
 			"include": "#keywords"
 		},
 		{
-			"include": "#strings"
+			"include": "#numbers"
+		},
+		{
+			"include": "#operators"
+		},
+		{
+			"include": "#functions"
+		},
+		{
+			"include": "#constants"
+		},
+		{
+			"include": "#units"
+		},
+		{
+			"include": "#identifiers"
 		}
 	],
 	"repository": {
-		"keywords": {
-			"patterns": [{
-				"name": "keyword.control.oneil",
-				"match": "\\b(if|while|for|return)\\b"
-			}]
-		},
-		"strings": {
-			"name": "string.quoted.double.oneil",
-			"begin": "\"",
-			"end": "\"",
+		"comments": {
 			"patterns": [
 				{
-					"name": "constant.character.escape.oneil",
-					"match": "\\\\."
+					"comment": "single-line comments",
+					"name": "comment.line.number-sign.oneil",
+					"begin": "#",
+					"end": "$",
+					"patterns": [
+						{
+							"comment": "comment tags",
+							"name": "keyword.other.commenttag.oneil",
+							"match": "\\b(TODO|NOTE|FIXME)\\b"
+						}
+					]
+				},
+				{
+					"comment": "notes",
+					"name": "comment.block.documentation.oneil",
+					"begin": "^\\s+(?=[^{#\\s])",
+					"end": "$",
+					"contentName": "meta.embedded.latex",
+					"patterns": [
+						{
+							"include": "text.tex.latex"
+						}
+					]
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.oneil",
+					"match": "\\b(import|use|from|as|section|test|if|and|or|not)\\b"
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"name": "constant.numeric.scientific.oneil",
+					"match": "\\b[0-9]+\\.?[0-9]*[eE][+-]?[0-9]+\\b"
+				},
+				{
+					"name": "constant.numeric.float.oneil",
+					"match": "\\b[0-9]+\\.[0-9]+\\b"
+				},
+				{
+					"name": "constant.numeric.integer.oneil",
+					"match": "\\b[0-9]+\\b"
+				}
+			]
+		},
+		"operators": {
+			"patterns": [
+				{
+					"name": "keyword.operator.arithmetic.oneil",
+					"match": "\\+|-|--|\\*|/|//|%|\\^"
+				},
+				{
+					"name": "keyword.operator.comparison.oneil",
+					"match": "<=|>=|==|!=|<|>"
+				},
+				{
+					"name": "keyword.operator.assignment.oneil",
+					"match": "=|=>"
+				}
+			]
+		},
+		"functions": {
+			"patterns": [
+				{
+					"name": "support.function.oneil",
+					"match": "\\b(sin|cos|tan|asin|acos|atan|sinh|cosh|tanh|min|max|sqrt|abs|mnmx|log|log2|log10|ln|floor|ceiling|extent|range|strip|mid|sign)\\b"
+				}
+			]
+		},
+		"constants": {
+			"patterns": [
+				{
+					"name": "constant.language.oneil",
+					"match": "\\b(pi|e|inf)\\b"
+				}
+			]
+		},
+		"units": {
+			"patterns": [
+				{
+					"name": "entity.name.type.unit.oneil",
+					"match": "(?<=:)\\s*[A-Za-z_][A-Za-z0-9_]*(?:\\^[+-]?[0-9]+)?(?:\\s*[*/]\\s*[A-Za-z_][A-Za-z0-9_]*(?:\\^[+-]?[0-9]+)?)*"
+				}
+			]
+		},
+		"identifiers": {
+			"patterns": [
+				{
+					"name": "variable.other.oneil",
+					"match": "[A-Za-z_][A-Za-z0-9_]*"
 				}
 			]
 		}
-	},
-	"scopeName": "source.oneil"
+	}
 }

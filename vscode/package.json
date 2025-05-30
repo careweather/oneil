@@ -10,16 +10,31 @@
     "Programming Languages"
   ],
   "contributes": {
-    "languages": [{
-      "id": "oneil",
-      "aliases": ["Oneil", "oneil"],
-      "extensions": [".on"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "oneil",
-      "scopeName": "source.oneil",
-      "path": "./syntaxes/oneil.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "oneil",
+        "aliases": [
+          "Oneil",
+          "oneil"
+        ],
+        "extensions": [
+          ".on"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "oneil",
+        "scopeName": "source.oneil",
+        "path": "./syntaxes/oneil.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.latex": "latex"
+        },
+        "tokenTypes": {
+          "meta.embedded.latex": "other"
+        }
+      }
+    ]
   }
 }
