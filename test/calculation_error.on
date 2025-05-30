@@ -1,0 +1,8 @@
+# limit calculation error
+Limit(1/0, 0): limit = 1
+
+# equation calculation error
+Equation: equation = 1 / 0
+
+# min/max calculation error
+Min Max: min_max = 1 / 0 | 1
