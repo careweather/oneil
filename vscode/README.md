@@ -23,7 +23,7 @@ We are actively working on expanding the capabilities of this extension. Upcomin
 
 ## Requirements
 
-- Visual Studio Code version 1.80.0 or higher
+- Visual Studio Code version 1.0.0 or higher
 
 ## Known Issues
 
@@ -33,13 +33,3 @@ Please [report any issues](https://github.com/careweather/oneil/issues) you enco
 
 We welcome contributions! Feel free to [submit pull requests](https://github.com/careweather/oneil/pulls) or [open issues](https://github.com/careweather/oneil/issues) on our GitHub repository.
 
-## Release Notes
-
-### 0.1.0
-
-- Initial release
-- Added basic syntax highlighting support for Oneil files
-
----
-
-**Enjoy coding in Oneil!**
