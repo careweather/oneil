@@ -1,65 +1,45 @@
-# oneil README
+# Oneil Programming Language Support for VS Code
 
-This is the README for your extension "oneil". After writing up a brief description, we recommend including the following sections.
+This VS Code extension adds language support for the Oneil programming language.
 
-## Features
+## Current Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Syntax Highlighting**: Enhances code readability with semantic syntax highlighting for Oneil language constructs.
 
-For example if there is an image subfolder under your extension project workspace:
+## Planned Features
 
-\!\[feature X\]\(images/feature-x.png\)
+We are actively working on expanding the capabilities of this extension. Upcoming features include:
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **IntelliSense and Autocomplete**: Smart code completion for Oneil
+- **Hover Information**: Documentation and type information when hovering over code elements
+- **More to come!**: We're continuously working to improve the development experience for Oneil programmers
+
+## Installation
+
+1. Open VS Code
+2. Go to the Extensions view (Ctrl+Shift+X)
+3. Search for "Oneil"
+4. Click Install
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+- Visual Studio Code version 1.80.0 or higher
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+Please [report any issues](https://github.com/careweather/oneil/issues) you encounter on our GitHub repository.
+
+## Contributing
+
+We welcome contributions! Feel free to [submit pull requests](https://github.com/careweather/oneil/pulls) or [open issues](https://github.com/careweather/oneil/issues) on our GitHub repository.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.1.0
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+- Initial release
+- Added basic syntax highlighting support for Oneil files
 
 ---
 
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+**Enjoy coding in Oneil!**
