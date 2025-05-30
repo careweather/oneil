@@ -3,12 +3,21 @@
   "displayName": "Oneil",
   "description": "VS Code support for the Oneil design specification language",
   "version": "0.1.0",
+  "publisher": "careweather",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.0.0"
   },
   "categories": [
     "Programming Languages"
   ],
+  "bugs": {
+    "url": "https://github.com/careweather/oneil/issues"
+  },
+  "homepage": "https://github.com/careweather/oneil",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/careweather/oneil.git"
+  },
   "contributes": {
     "languages": [
       {
