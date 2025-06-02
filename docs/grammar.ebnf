@@ -10,9 +10,10 @@
 
 (* Whitespace *)
 LineBreak = "\n" | "\r\n" ;  (* Each line break is a separate token *)
+EndOfLine = LineBreak | Comment | ? end of file ? ;
 
 (* Top Level Structure *)
-Program = { ( Declaration, LineBreak ) | Note | Comment } ;
+Program = { Declaration | Note | Comment } ;
 Declaration = ImportDecl | UseDecl | FromDecl | SectionDecl | ParameterDecl | TestDecl ;
 
 (* Notes and Comments *)
@@ -24,18 +25,18 @@ NoteLine = { Any character except LineBreak or MultiLineNoteDelimiter }, LineBre
 Comment = "#", { Any character except LineBreak }, LineBreak ;
 
 (* Imports *)
-ImportDecl = "import", Identifier, LineBreak ;
-UseDecl = "use", Model, [ ModelInputs ], "as", Identifier, LineBreak ;
-FromDecl = "from", ModulePath, "use", Model, [ ModelInputs ], "as", Identifier, LineBreak ;
+ImportDecl = "import", Identifier, EndOfLine ;
+UseDecl = "use", Model, [ ModelInputs ], "as", Identifier, EndOfLine ;
+FromDecl = "from", ModulePath, "use", Model, [ ModelInputs ], "as", Identifier, EndOfLine ;
 ModulePath = Identifier, { ".", Identifier } ;
 ModelInputs = "(", Assignment, { ",", Assignment }, ")" ;
 Model = Identifier ;  (* Model name without .on extension *)
 
 (* Sections *)
-SectionDecl = "section", Label, LineBreak ;
+SectionDecl = "section", Label, EndOfLine ;
 
 (* Parameters *)
-ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, [ UnitDecl ], LineBreak ;
+ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, [ UnitDecl ], EndOfLine ;
 Performance = "$" ;
 Trace = "*" | "**" ;
 Name = Label ;
@@ -44,12 +45,12 @@ Assignment = Identifier, "=", Expression ;
 UnitDecl = ":", UnitExpr ;
 
 (* Tests *)
-TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expression, LineBreak ;
+TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expression, EndOfLine ;
 TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
 
 (* Design Overrides *)
 (* TODO: find out the difference between `Assignment`s and `DesignOverride`s *)
-DesignOverrideDecl = [ Trace ], Identifier, [ ".", Identifier ], ( "=>" | "=" ), Expression, [ ":", UnitExpr ], LineBreak ;
+DesignOverrideDecl = [ Trace ], Identifier, [ ".", Identifier ], ( "=>" | "=" ), Expression, [ ":", UnitExpr ], EndOfLine ;
 
 (* Expressions *)
 Expression = NumericExpr | PiecewiseExpr ;
@@ -84,7 +85,7 @@ ComparisonExpr = PrimaryBooleanExpr, ComparisonOp, PrimaryBooleanExpr ;
 ComparisonOp = "<" | ">" | "<=" | ">=" | "==" | "!=" ;
 PrimaryBooleanExpr = NumericExpr | ( "(", BooleanExpr, ")" ) ;
 
-PiecewiseExpr = PiecewisePart, { LineBreak, { LineBreak }, PiecewisePart } ;
+PiecewiseExpr = PiecewisePart, { EndOfLine, { EndOfLine }, PiecewisePart } ;
 PiecewisePart = "{", NumericExpr, "if", BooleanExpr, [ ":", UnitExpr ], "}" ;
 
 (* Function Calls *)
