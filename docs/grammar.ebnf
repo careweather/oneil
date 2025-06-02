@@ -47,10 +47,6 @@ UnitDecl = ":", UnitExpr ;
 TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expression, EndOfLine ;
 TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
 
-(* Design Overrides *)
-(* TODO: find out the difference between `Assignment`s and `DesignOverride`s *)
-DesignOverrideDecl = [ Trace ], Identifier, [ ".", Identifier ], ( "=>" | "=" ), Expression, [ ":", UnitExpr ], EndOfLine ;
-
 (* Expressions *)
 Expression = NumericExpr | PiecewiseExpr ;
 
