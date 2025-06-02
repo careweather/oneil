@@ -32,13 +32,13 @@ ModelInputs = "(", Assignment, { ",", Assignment }, ")" ;
 Model = Identifier ;  (* Model name without .on extension *)
 
 (* Sections *)
-SectionDecl = "section", Identifier, { Identifier }, LineBreak ;
+SectionDecl = "section", Label, LineBreak ;
 
 (* Parameters *)
 ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, [ UnitDecl ], LineBreak ;
 Performance = "$" ;
 Trace = "*" | "**" ;
-Name = Identifier ;
+Name = Label ;
 Limits = "(", Expression, ",", Expression, ")" ;
 Assignment = Identifier, "=", Expression ;
 UnitDecl = ":", UnitExpr ;
@@ -96,6 +96,7 @@ UnitTerm = Identifier, [ "^", Number ] | "(" UnitExpr, ")" ;
 
 (* Basic Elements *)
 Identifier = Letter, { Letter | Digit | "_" } ;
+Label = Identifier, { "-" | Identifier } ;
 Number = [ Sign ], ( Integer | Float | Scientific ) ;
 Integer = Digit, { Digit } ;
 Float = [ Integer ], ".", Digit, { Digit } ;
