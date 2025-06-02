@@ -14,7 +14,7 @@ EndOfLine = LineBreak | Comment | ? end of file ? ;
 
 (* Top Level Structure *)
 Program = { Declaration | Note | Comment } ;
-Declaration = ImportDecl | UseDecl | FromDecl | SectionDecl | ParameterDecl | TestDecl ;
+Declaration = ImportDecl | UseDecl | SectionDecl | ParameterDecl | TestDecl ;
 
 (* Notes and Comments *)
 Note = SingleLineNote | MultiLineNote ;
@@ -26,8 +26,7 @@ Comment = "#", { Any character except LineBreak }, LineBreak ;
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-UseDecl = "use", Model, [ ModelInputs ], "as", Identifier, EndOfLine ;
-FromDecl = "from", ModulePath, "use", Model, [ ModelInputs ], "as", Identifier, EndOfLine ;
+UseDecl = [ "from", ModulePath ], "use", Model, [ ModelInputs ], "as", Identifier, EndOfLine ;
 ModulePath = Identifier, { ".", Identifier } ;
 ModelInputs = "(", Assignment, { ",", Assignment }, ")" ;
 Model = Identifier ;  (* Model name without .on extension *)
