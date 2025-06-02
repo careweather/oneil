@@ -104,13 +104,3 @@ Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
 Sign = "+" | "-" ;
 Letter = "A" | ... | "Z" | "a" | ... | "z" ;
 Digit = "0" | "1" | ... | "9" ;
-
-(* Built-in Functions *)
-BuiltInFunction = "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | 
-                 "sinh" | "cosh" | "tanh" | "min" | "max" | "sqrt" | 
-                 "abs" | "mnmx" | "log" | "log2" | "log10" | "ln" | 
-                 "floor" | "ceiling" | "extent" | "range" | "strip" | 
-                 "mid" | "sign" ;
-
-(* Built-in Constants *)
-MathConstant = "pi" | "e" | "inf" ; 
