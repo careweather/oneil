@@ -1,59 +1,55 @@
 (* Oneil Language Grammar in EBNF *)
 
-(* NOTE: Because this grammar is whitespace sensitive, inline whitespace is
-         marked throughout the grammar.  In the future, we may move the grammar
-         away from whitespace sensitivity, in which case tokens will be implied
-         to be separated by inline whitespace.
+(* NOTE: Identifiers and keywords are assumed to be separated by whitespace, as
+         is standard. So, `importabc` is parsed as a single token, not `import`
+         followed by `abc`.
          
-         In addition, identifiers and keywords are assumed to be separated by
-         whitespace, as is standard. So, `importabc` is parsed as a single
-         token, not `import` followed by `abc`. *)
+         In addition, inline whitespace (space and tabs) do not have any
+         significance other than seperating tokens. Therefore, all tokens may
+         optionally be separated by inline whitespace. *)
 
 (* Whitespace *)
-InlineWhitespace = { Space | Tab } ;  (* Adjacent spaces/tabs grouped into single token *)
 LineBreak = "\n" | "\r\n" ;  (* Each line break is a separate token *)
-Space = " " ;
-Tab = "\t" ;
-BlankLine = InlineWhitespace, LineBreak ;
-Ws = InlineWhitespace ; (* for conciseness *)
 
 (* Top Level Structure *)
-Program = { ( Declaration, LineBreak ) | Comment | BlankLine } ;
-Declaration = ImportDecl | UseDecl | FromDecl | SectionDecl | ParameterDecl | TestDecl | DesignOverrideDecl | Note ;
+Program = { ( Declaration, LineBreak ) | Note | Comment } ;
+Declaration = ImportDecl | UseDecl | FromDecl | SectionDecl | ParameterDecl | TestDecl ;
 
 (* Notes and Comments *)
-Note = Indent, NoteLine, { { BlankLine }, Indent, NoteLine } ;
-NoteLine = { Any character except LineBreak }, LineBreak ;
-Indent = (Space | Tab), InlineWhitespace ;  (* at least 1 space or tab, followed by any number of spaces or tabs *)
+Note = SingleLineNote | MultiLineNote ;
+SingleLineNote = "~", { Any character except LineBreak }, LineBreak ;
+MultiLineNote = MultiLineNoteDelimiter, { NoteLine }, MultiLineNoteDelimiter ;
+MultiLineNoteDelimiter = "~~~", "~"*, LineBreak ;
+NoteLine = { Any character except LineBreak or MultiLineNoteDelimiter }, LineBreak ; (* can contain anything except the multi-note delimiter*)
 Comment = "#", { Any character except LineBreak }, LineBreak ;
 
 (* Imports *)
-ImportDecl = "import", Ws, Identifier, Ws, LineBreak ;
-UseDecl = "use", Ws, Model, Ws, [ ModelInputs, Ws ], "as", Ws, Identifier, Ws, LineBreak ;
-FromDecl = "from", Ws, ModulePath, Ws, "use", Ws, Model, Ws, [ ModelInputs, Ws ], "as", Ws, Identifier, Ws, LineBreak ;
+ImportDecl = "import", Identifier, LineBreak ;
+UseDecl = "use", Model, [ ModelInputs ], "as", Identifier, LineBreak ;
+FromDecl = "from", ModulePath, "use", Model, [ ModelInputs ], "as", Identifier, LineBreak ;
 ModulePath = Identifier, { ".", Identifier } ;
-ModelInputs = "(", Ws, Assignment, { Ws, ",", Ws, Assignment }, Ws, ")" ;
+ModelInputs = "(", Assignment, { ",", Assignment }, ")" ;
 Model = Identifier ;  (* Model name without .on extension *)
 
 (* Sections *)
-SectionDecl = "section", Ws, Identifier, { Ws, Identifier }, Ws, LineBreak ;
+SectionDecl = "section", Identifier, { Identifier }, LineBreak ;
 
 (* Parameters *)
-ParameterDecl = [ Performance, Ws ], [ Trace, Ws ], [ Name, Ws ], [ Limits, Ws ], ":", Ws, Assignment, Ws, [ UnitDecl, Ws ], LineBreak ;
+ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, [ UnitDecl ], LineBreak ;
 Performance = "$" ;
 Trace = "*" | "**" ;
 Name = Identifier ;
-Limits = "(", Ws, Expression, Ws, ",", Ws, Expression, Ws, ")" ;
-Assignment = Identifier, Ws, "=", Ws, Expression ;
-UnitDecl = ":", Ws, UnitExpr ;
+Limits = "(", Expression, ",", Expression, ")" ;
+Assignment = Identifier, "=", Expression ;
+UnitDecl = ":", UnitExpr ;
 
 (* Tests *)
-TestDecl = [ Trace, Ws ], "test", Ws, [ TestInputs, Ws ], ":", Ws, Expression, Ws, LineBreak ;
-TestInputs = "{", Ws, Identifier, Ws, { ",", Ws, Identifier, Ws, }, "}" ;
+TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expression, LineBreak ;
+TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
 
 (* Design Overrides *)
 (* TODO: find out the difference between `Assignment`s and `DesignOverride`s *)
-DesignOverrideDecl = [ Trace, Ws ], Identifier, [ ".", Identifier ], Ws, ( "=>" | "=" ), Ws, Expression, Ws, [ ":", Ws, UnitExpr, Ws ], LineBreak ;
+DesignOverrideDecl = [ Trace ], Identifier, [ ".", Identifier ], ( "=>" | "=" ), Expression, [ ":", UnitExpr ], LineBreak ;
 
 (* Expressions *)
 Expression = NumericExpr | PiecewiseExpr ;
@@ -66,13 +62,13 @@ Expression = NumericExpr | PiecewiseExpr ;
    5. Addition, subtraction (+, -) - left associative
 *)
 NumericExpr = AdditiveExpr ;
-AdditiveExpr = [ AdditiveExpr, Ws, AdditiveOp, Ws, ], MultiplicativeExpr ;
+AdditiveExpr = [ AdditiveExpr, AdditiveOp, ], MultiplicativeExpr ;
 AdditiveOp = "+" | "-" | "--" ;
-MultiplicativeExpr = [ MultiplicativeExpr, Ws, MultiplicativeOp, Ws, ], ExponentialExpr ;
+MultiplicativeExpr = [ MultiplicativeExpr, MultiplicativeOp, ], ExponentialExpr ;
 MultiplicativeOp = "*" | "/" | "//" | "%" ;
-ExponentialExpr = NegExpr, [ Ws, "^", Ws, , ExponentialExpr ] ;  (* right associative *)
-NegExpr = ( "-", Ws, NegExpr ) | PrimaryNumericExpr ;
-PrimaryNumericExpr = Number | Identifier { ".", Identifier } | FunctionCall | ( "(", Ws, NumericExpr, Ws, ")" ) ;
+ExponentialExpr = NegExpr, [ "^", , ExponentialExpr ] ;  (* right associative *)
+NegExpr = ( "-", NegExpr ) | PrimaryNumericExpr ;
+PrimaryNumericExpr = Number | Identifier { ".", Identifier } | FunctionCall | ( "(", NumericExpr, ")" ) ;
 
 (* Boolean Expression Precedence (highest to lowest):
    1. Comparisons (<, >, <=, >=, ==, !=) - non-associative
@@ -81,22 +77,22 @@ PrimaryNumericExpr = Number | Identifier { ".", Identifier } | FunctionCall | ( 
    4. OR - left associative
 *)
 BooleanExpr = OrExpr;
-OrExpr = [ OrExpr, Ws, "or", Ws, ], AndExpr ;
-AndExpr = [ AndExpr, Ws, "and", Ws, ], NotExpr ;
-NotExpr = [ "not", Ws, ], NotExpr | ComparisonExpr ;
-ComparisonExpr = PrimaryBooleanExpr, Ws, ComparisonOp, Ws, PrimaryBooleanExpr ;
+OrExpr = [ OrExpr, "or", ], AndExpr ;
+AndExpr = [ AndExpr, "and", ], NotExpr ;
+NotExpr = [ "not", ], NotExpr | ComparisonExpr ;
+ComparisonExpr = PrimaryBooleanExpr, ComparisonOp, PrimaryBooleanExpr ;
 ComparisonOp = "<" | ">" | "<=" | ">=" | "==" | "!=" ;
-PrimaryBooleanExpr = NumericExpr | ( "(", Ws, BooleanExpr, Ws, ")" ) ;
+PrimaryBooleanExpr = NumericExpr | ( "(", BooleanExpr, ")" ) ;
 
 PiecewiseExpr = PiecewisePart, { LineBreak, { LineBreak }, PiecewisePart } ;
-PiecewisePart = "{", Ws, NumericExpr, Ws, "if", Ws, BooleanExpr, Ws, [ ":", Ws, UnitExpr ], Ws ;
+PiecewisePart = "{", NumericExpr, "if", BooleanExpr, [ ":", UnitExpr ], "}" ;
 
 (* Function Calls *)
-FunctionCall = Identifier, "(", Ws, [ Expression, Ws, { ",", Ws, Expression, Ws } ], ")" ;
+FunctionCall = Identifier, "(", [ Expression, { ",", Expression } ], ")" ;
 
 (* Units *)
-UnitExpr = UnitTerm, { Ws, ( "*" | "/" ), Ws, UnitTerm } ;
-UnitTerm = Identifier, [ "^", Ws, Number ] | "(" Ws, UnitExpr, Ws, ")" ;
+UnitExpr = UnitTerm, { ( "*" | "/" ), UnitTerm } ;
+UnitTerm = Identifier, [ "^", Number ] | "(" UnitExpr, ")" ;
 
 (* Basic Elements *)
 Identifier = Letter, { Letter | Digit | "_" } ;
