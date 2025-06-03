@@ -8,21 +8,21 @@
          significance other than seperating tokens. Therefore, all tokens may
          optionally be separated by inline whitespace. *)
 
-(* Whitespace *)
+(* Whitespace and Comments *)
 LineBreak = "\n" | "\r\n" ;  (* Each line break is a separate token *)
-EndOfLine = { LineBreak | Comment } | ? end of file ? ;
+Comment = "#", { Any character except LineBreak }, LineBreak ;
+EndOfLine = { LineBreak | Comment | ? end of file ? } ;
 
 (* Top Level Structure *)
 Model = [ EndOfLine ], [ Note ], { Declaration } { Section } ;
 Declaration = ImportDecl | UseDecl | ParameterDecl | TestDecl ;
 
-(* Notes and Comments *)
+(* Notes *)
 Note = SingleLineNote | MultiLineNote ;
 SingleLineNote = "~", { Any character except LineBreak }, LineBreak ;
 MultiLineNote = MultiLineNoteDelimiter, { NoteLine }, MultiLineNoteDelimiter ;
 MultiLineNoteDelimiter = "~~~", "~"*, LineBreak ;
 NoteLine = { Any character except LineBreak or MultiLineNoteDelimiter }, LineBreak ; (* can contain anything except the multi-note delimiter*)
-Comment = "#", { Any character except LineBreak }, LineBreak ;
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
