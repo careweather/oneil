@@ -57,7 +57,6 @@ mod structure {
     }
 }
 
-// NOTES
 mod note {
     use nom::character::complete::line_ending;
     use nom::combinator::{cut, verify};
@@ -117,5 +116,60 @@ mod note {
 
 pub use note::note;
 
-// KEYWORDS
-mod keyword {}
+mod keyword {
+    use nom::{Parser as _, bytes::complete::tag};
+
+    use super::{Result, Span, util::token};
+
+    const KEYWORDS: &[&str] = &[
+        "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
+    ];
+
+    pub fn and<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("and")).parse(input)
+    }
+
+    pub fn as_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("as")).parse(input)
+    }
+
+    pub fn false_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("false")).parse(input)
+    }
+
+    pub fn from<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("from")).parse(input)
+    }
+
+    pub fn if_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("if")).parse(input)
+    }
+
+    pub fn import<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("import")).parse(input)
+    }
+
+    pub fn not<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("not")).parse(input)
+    }
+
+    pub fn or<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("or")).parse(input)
+    }
+
+    pub fn true_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("true")).parse(input)
+    }
+
+    pub fn section<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("section")).parse(input)
+    }
+
+    pub fn test<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("test")).parse(input)
+    }
+
+    pub fn use_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("use")).parse(input)
+    }
+}
