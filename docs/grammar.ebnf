@@ -39,7 +39,9 @@ ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, [
 Performance = "$" ;
 Trace = "*" | "**" ;
 Name = Label ;
-Limits = "(", Expression, ",", Expression, ")" ;
+Limits = ContinuousLimits | DiscreteLimits ;
+ContinuousLimits = "(", NumericExpr, ",", NumericExpr, ")" ;
+DiscreteLimits = "[", Expression, { ",", Expression }, "]" ;
 Assignment = Identifier, "=", Expression ;
 UnitDecl = ":", UnitExpr ;
 
