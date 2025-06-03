@@ -40,8 +40,8 @@ Performance = "$" ;
 Trace = "*" | "**" ;
 Name = Label ;
 Limits = ContinuousLimits | DiscreteLimits ;
-ContinuousLimits = "(", NumericExpr, ",", NumericExpr, ")" ;
-DiscreteLimits = "[", Expression, { ",", Expression }, "]" ;
+ContinuousLimits = "(", ValueExpr, ",", ValueExpr, ")" ;
+DiscreteLimits = "[", ValueExpr, { ",", ValueExpr }, "]" ;
 Assignment = Identifier, "=", Expression ;
 
 (* Tests *)
@@ -49,23 +49,25 @@ TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expression, EndOfLine ;
 TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
 
 (* Expressions *)
-Expression = NumericExpr | PiecewiseExpr ;
+Expression = ValueExpr | PiecewiseExpr ;
 
-(* Numeric Expression Precedence (highest to lowest):
+(* Value Expression Precedence (highest to lowest):
    1. Parentheses, function calls
    2. Unary minus (-)
    3. Exponentiation ( ** ) - right associative
    4. Multiplication, division, floor division, modulo (*, /, //, %) - left associative
    5. Addition, subtraction (+, -) - left associative
+
+   NOTE: values include both numeric and string values
 *)
-NumericExpr = AdditiveExpr, [ ":", UnitExpr ] ;
+ValueExpr = AdditiveExpr, [ ":", UnitExpr ] ;
 AdditiveExpr = [ AdditiveExpr, AdditiveOp, ], MultiplicativeExpr ;
 AdditiveOp = "+" | "-" | "--" ;
 MultiplicativeExpr = [ MultiplicativeExpr, MultiplicativeOp, ], ExponentialExpr ;
 MultiplicativeOp = "*" | "/" | "//" | "%" ;
 ExponentialExpr = NegExpr, [ "^", , ExponentialExpr ] ;  (* right associative *)
-NegExpr = ( "-", NegExpr ) | PrimaryNumericExpr ;
-PrimaryNumericExpr = Number | Identifier { ".", Identifier } | FunctionCall | ( "(", NumericExpr, ")" ) ;
+NegExpr = ( "-", NegExpr ) | PrimaryValueExpr ;
+PrimaryValueExpr = Number | StringLiteral | Identifier { ".", Identifier } | FunctionCall | ( "(", ValueExpr, ")" ) ;
 
 (* Boolean Expression Precedence (highest to lowest):
    1. Comparisons (<, >, <=, >=, ==, !=) - non-associative
@@ -79,10 +81,10 @@ AndExpr = [ AndExpr, "and", ], NotExpr ;
 NotExpr = [ "not", ], NotExpr | ComparisonExpr ;
 ComparisonExpr = PrimaryBooleanExpr, ComparisonOp, PrimaryBooleanExpr ;
 ComparisonOp = "<" | ">" | "<=" | ">=" | "==" | "!=" ;
-PrimaryBooleanExpr = NumericExpr | ( "(", BooleanExpr, ")" ) ;
+PrimaryBooleanExpr = ValueExpr ;
 
 PiecewiseExpr = PiecewisePart, { EndOfLine, { EndOfLine }, PiecewisePart } ;
-PiecewisePart = "{", NumericExpr, "if", BooleanExpr, [ ":", UnitExpr ], "}" ;
+PiecewisePart = "{", ValueExpr, "if", BooleanExpr, [ ":", UnitExpr ], "}" ;
 
 (* Function Calls *)
 FunctionCall = Identifier, "(", [ Expression, { ",", Expression } ], ")" ;
@@ -101,3 +103,4 @@ Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
 Sign = "+" | "-" ;
 Letter = "A" | ... | "Z" | "a" | ... | "z" ;
 Digit = "0" | "1" | ... | "9" ;
+StringLiteral = "\"", { Any character except LineBreak or "\" }, "\"", ;
