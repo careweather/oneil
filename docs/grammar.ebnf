@@ -32,7 +32,7 @@ ModelInputs = "(", Assignment, { ",", Assignment }, ")" ;
 Model = Identifier ;  (* Model name without .on extension *)
 
 (* Sections *)
-SectionDecl = "section", Label, EndOfLine ;
+SectionDecl = "section", Label, EndOfLine, { ImportDecl | UseDecl | ParameterDecl | TestDecl } ;
 
 (* Parameters *)
 ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine ;
