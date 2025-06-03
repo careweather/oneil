@@ -13,7 +13,7 @@ LineBreak = "\n" | "\r\n" ;  (* Each line break is a separate token *)
 EndOfLine = LineBreak | Comment | ? end of file ? ;
 
 (* Top Level Structure *)
-Program = { Declaration | Note | Comment } ;
+Program = [ Note ], { Declaration | Comment } ;
 Declaration = ImportDecl | UseDecl | SectionDecl | ParameterDecl | TestDecl ;
 
 (* Notes and Comments *)
@@ -32,10 +32,10 @@ ModelInputs = "(", Assignment, { ",", Assignment }, ")" ;
 Model = Identifier ;  (* Model name without .on extension *)
 
 (* Sections *)
-SectionDecl = "section", Label, EndOfLine, { ImportDecl | UseDecl | ParameterDecl | TestDecl } ;
+SectionDecl = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | ParameterDecl | TestDecl } ;
 
 (* Parameters *)
-ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine ;
+ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine, [ Note ] ;
 Performance = "$" ;
 Trace = "*" | "**" ;
 Name = Label ;
