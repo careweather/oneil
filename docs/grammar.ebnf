@@ -83,7 +83,7 @@ PiecewisePart = "{", Expr, "if", Expr ;
 FunctionCall = Identifier, "(", [ Expr, { ",", Expr } ], ")" ;
 
 (* Units *)
-UnitExpr = UnitTerm, { ( "*" | "/" ), UnitTerm } ;
+UnitExpr = [ UnitExpr, ( "*" | "/" ) ], UnitTerm ;
 UnitTerm = Identifier, [ "^", Number ] | "(" UnitExpr, ")" ;
 
 (* Basic Elements *)

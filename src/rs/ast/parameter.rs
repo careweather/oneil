@@ -1,4 +1,5 @@
 use super::expression::Expr;
+use super::unit::UnitExpr;
 
 /// A value assigned to a parameter.
 ///
@@ -6,8 +7,8 @@ use super::expression::Expr;
 /// that evaluate to different values based on conditions.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
-    Simple(Expr),
-    Piecewise(PiecewiseExpr),
+    Simple(Expr, UnitExpr),
+    Piecewise(PiecewiseExpr, UnitExpr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
