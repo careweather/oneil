@@ -1,0 +1,198 @@
+use nom::{Parser as _, bytes::complete::tag, character::complete::satisfy, combinator::peek};
+
+use super::{Parser, Result, Span, util::token};
+
+const KEYWORDS: &[&str] = &[
+    "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
+];
+
+fn keyword(kw_str: &str) -> impl Parser<Span> {
+    token((
+        tag(kw_str),
+        peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')),
+    ))
+}
+
+/// Parses the 'and' keyword token.
+pub fn and(input: Span) -> Result<Span> {
+    keyword("and").parse(input)
+}
+
+/// Parses the 'as' keyword token.
+pub fn as_(input: Span) -> Result<Span> {
+    keyword("as").parse(input)
+}
+
+/// Parses the 'false' keyword token.
+pub fn false_(input: Span) -> Result<Span> {
+    keyword("false").parse(input)
+}
+
+/// Parses the 'from' keyword token.
+pub fn from(input: Span) -> Result<Span> {
+    keyword("from").parse(input)
+}
+
+/// Parses the 'if' keyword token.
+pub fn if_(input: Span) -> Result<Span> {
+    keyword("if").parse(input)
+}
+
+/// Parses the 'import' keyword token.
+pub fn import(input: Span) -> Result<Span> {
+    keyword("import").parse(input)
+}
+
+/// Parses the 'not' keyword token.
+pub fn not(input: Span) -> Result<Span> {
+    keyword("not").parse(input)
+}
+
+/// Parses the 'or' keyword token.
+pub fn or(input: Span) -> Result<Span> {
+    keyword("or").parse(input)
+}
+
+/// Parses the 'true' keyword token.
+pub fn true_(input: Span) -> Result<Span> {
+    keyword("true").parse(input)
+}
+
+/// Parses the 'section' keyword token.
+pub fn section(input: Span) -> Result<Span> {
+    keyword("section").parse(input)
+}
+
+/// Parses the 'test' keyword token.
+pub fn test(input: Span) -> Result<Span> {
+    keyword("test").parse(input)
+}
+
+/// Parses the 'use' keyword token.
+pub fn use_(input: Span) -> Result<Span> {
+    keyword("use").parse(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::token::Span;
+
+    #[test]
+    fn test_and() {
+        let input = Span::new("and rest");
+        let (rest, matched) = and(input).expect("should parse 'and' keyword");
+        assert_eq!(matched.fragment(), &"and");
+        assert_eq!(rest.fragment(), &"rest");
+    }
+
+    #[test]
+    fn test_as() {
+        let input = Span::new("as foo");
+        let (rest, matched) = as_(input).expect("should parse 'as' keyword");
+        assert_eq!(matched.fragment(), &"as");
+        assert_eq!(rest.fragment(), &"foo");
+    }
+
+    #[test]
+    fn test_false() {
+        let input = Span::new("false true");
+        let (rest, matched) = false_(input).expect("should parse 'false' keyword");
+        assert_eq!(matched.fragment(), &"false");
+        assert_eq!(rest.fragment(), &"true");
+    }
+
+    #[test]
+    fn test_from() {
+        let input = Span::new("from bar");
+        let (rest, matched) = from(input).expect("should parse 'from' keyword");
+        assert_eq!(matched.fragment(), &"from");
+        assert_eq!(rest.fragment(), &"bar");
+    }
+
+    #[test]
+    fn test_if() {
+        let input = Span::new("if baz");
+        let (rest, matched) = if_(input).expect("should parse 'if' keyword");
+        assert_eq!(matched.fragment(), &"if");
+        assert_eq!(rest.fragment(), &"baz");
+    }
+
+    #[test]
+    fn test_import() {
+        let input = Span::new("import foo");
+        let (rest, matched) = import(input).expect("should parse 'import' keyword");
+        assert_eq!(matched.fragment(), &"import");
+        assert_eq!(rest.fragment(), &"foo");
+    }
+
+    #[test]
+    fn test_not() {
+        let input = Span::new("not bar");
+        let (rest, matched) = not(input).expect("should parse 'not' keyword");
+        assert_eq!(matched.fragment(), &"not");
+        assert_eq!(rest.fragment(), &"bar");
+    }
+
+    #[test]
+    fn test_or() {
+        let input = Span::new("or baz");
+        let (rest, matched) = or(input).expect("should parse 'or' keyword");
+        assert_eq!(matched.fragment(), &"or");
+        assert_eq!(rest.fragment(), &"baz");
+    }
+
+    #[test]
+    fn test_true() {
+        let input = Span::new("true false");
+        let (rest, matched) = true_(input).expect("should parse 'true' keyword");
+        assert_eq!(matched.fragment(), &"true");
+        assert_eq!(rest.fragment(), &"false");
+    }
+
+    #[test]
+    fn test_section() {
+        let input = Span::new("section test");
+        let (rest, matched) = section(input).expect("should parse 'section' keyword");
+        assert_eq!(matched.fragment(), &"section");
+        assert_eq!(rest.fragment(), &"test");
+    }
+
+    #[test]
+    fn test_test() {
+        let input = Span::new("test use");
+        let (rest, matched) = test(input).expect("should parse 'test' keyword");
+        assert_eq!(matched.fragment(), &"test");
+        assert_eq!(rest.fragment(), &"use");
+    }
+
+    #[test]
+    fn test_use() {
+        let input = Span::new("use foo");
+        let (rest, matched) = use_(input).expect("should parse 'use' keyword");
+        assert_eq!(matched.fragment(), &"use");
+        assert_eq!(rest.fragment(), &"foo");
+    }
+
+    #[test]
+    fn test_keyword_with_trailing_whitespace() {
+        let input = Span::new("and   foo");
+        let (rest, matched) = and(input).expect("should parse 'and' with trailing whitespace");
+        assert_eq!(matched.fragment(), &"and");
+        assert_eq!(rest.fragment(), &"foo");
+    }
+
+    #[test]
+    fn test_keyword_not_at_start() {
+        let input = Span::new("foo and bar");
+        let res = and(input);
+        assert!(res.is_err(), "should not parse 'and' if not at start");
+    }
+
+    #[test]
+    fn test_keyword_prefix() {
+        let input = Span::new("anderson");
+        let res = and(input);
+        assert!(res.is_err(), "should not parse 'and' as prefix");
+    }
+}
