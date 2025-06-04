@@ -22,7 +22,7 @@ mod util {
     }
 }
 
-mod structure {
+pub mod structure {
     use nom::{
         Parser as _,
         bytes::complete::tag,
@@ -116,7 +116,7 @@ mod note {
 
 pub use note::note;
 
-mod keyword {
+pub mod keyword {
     use nom::{Parser as _, bytes::complete::tag};
 
     use super::{Result, Span, util::token};
@@ -174,7 +174,7 @@ mod keyword {
     }
 }
 
-mod symbol {
+pub mod symbol {
     use nom::{Parser as _, bytes::complete::tag};
 
     use super::{Result, Span, util::token};
