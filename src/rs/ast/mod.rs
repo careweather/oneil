@@ -6,17 +6,18 @@
 //! This module contains the core data structures that represent Oneil programs
 //! in memory after parsing.
 
-mod declaration;
-mod expression;
-mod literal;
-mod model;
-mod note;
-mod parameter;
-mod unit;
+pub mod declaration;
+pub mod expression;
+pub mod literal;
+pub mod model;
+pub mod note;
+pub mod parameter;
+pub mod unit;
 
-pub use declaration::*;
-pub use expression::*;
-pub use literal::*;
-pub use model::*;
-pub use note::*;
-pub use parameter::*;
+pub use declaration::Decl;
+pub use expression::Expr;
+pub use literal::Literal;
+pub use model::Model;
+pub use note::Note;
+pub use parameter::ParameterValue;
+pub use unit::UnitExpr;
