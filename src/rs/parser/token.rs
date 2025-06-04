@@ -512,7 +512,7 @@ pub mod literal {
     pub fn number(input: Span) -> Result<Span> {
         let sign1 = opt(char('+').or(char('-')));
         let sign2 = opt(char('+').or(char('-')));
-        let e = opt(char('e').or(char('E')));
+        let e = char('e').or(char('E'));
         token((
             opt(sign1),
             digit1,
