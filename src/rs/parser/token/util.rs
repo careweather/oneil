@@ -7,10 +7,22 @@ use nom::{
 
 use super::{Parser, Result, Span};
 
+/// Parses inline whitespace (spaces and tabs) and returns unit `()`.
+///
+/// This function consumes any amount of whitespace (including none) and always succeeds.
+/// It's useful for handling optional whitespace between tokens.
 pub fn inline_whitespace(input: Span) -> Result<()> {
     value((), space0).parse(input)
 }
 
+/// Wraps a parser to handle trailing whitespace after the matched content.
+///
+/// This function takes a parser `f` and returns a new parser that:
+/// 1. Recognizes the content matched by `f`
+/// 2. Consumes any trailing whitespace after the match
+/// 3. Returns the matched content as a `Span`
+///
+/// This is useful for tokenizing where whitespace between tokens should be handled automatically.
 pub fn token<'a, F, O>(f: F) -> impl Parser<'a, Span<'a>>
 where
     F: Parser<'a, O>,
