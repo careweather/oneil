@@ -23,24 +23,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_inline_whitespace() {
+    fn test_inline_whitespace_spaces() {
         let input = Span::new("   abc");
         let (rest, _) = inline_whitespace(input).expect("should parse leading spaces");
         assert_eq!(rest.fragment(), &"abc");
+    }
 
+    #[test]
+    fn test_inline_whitespace_tabs() {
         let input = Span::new("\t\tfoo");
         let (rest, _) = inline_whitespace(input).expect("should parse leading tabs");
         assert_eq!(rest.fragment(), &"foo");
+    }
 
+    #[test]
+    fn test_inline_whitespace_none() {
         let input = Span::new("bar");
         let (rest, _) = inline_whitespace(input).expect("should parse no whitespace");
         assert_eq!(rest.fragment(), &"bar");
     }
 
     #[test]
-    fn test_token() {
+    fn test_token_with_whitespace() {
         use nom::bytes::complete::tag;
-        // token should parse a tag and trailing whitespace
         let mut parser = token(tag("foo"));
         let input = Span::new("foo   bar");
         let (rest, matched) = parser
@@ -48,8 +53,11 @@ mod tests {
             .expect("should parse token with trailing whitespace");
         assert_eq!(matched.fragment(), &"foo");
         assert_eq!(rest.fragment(), &"bar");
+    }
 
-        // token should not consume if tag does not match
+    #[test]
+    fn test_token_no_match() {
+        use nom::bytes::complete::tag;
         let mut parser = token(tag("baz"));
         let input = Span::new("foo   bar");
         let res = parser.parse(input);

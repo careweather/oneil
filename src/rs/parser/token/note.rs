@@ -60,14 +60,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_single_line_note() {
-        // Single line note with newline
+    fn test_single_line_note_with_newline() {
         let input = Span::new("~ this is a note\nrest");
         let (rest, matched) = single_line_note(input).expect("should parse single line note");
         assert_eq!(matched.fragment(), &"~ this is a note");
         assert_eq!(rest.fragment(), &"rest");
+    }
 
-        // Single line note at EOF
+    #[test]
+    fn test_single_line_note_at_eof() {
         let input = Span::new("~ note");
         let (rest, matched) =
             single_line_note(input).expect("should parse single line note at EOF");
@@ -76,28 +77,33 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_line_note() {
-        // Multi-line note with content and closing delimiter
+    fn test_multi_line_note_basic() {
         let input = Span::new("~~~\nThis is a multi-line note.\nSecond line.\n~~~\nrest");
         let (rest, matched) = multi_line_note(input).expect("should parse multi-line note");
         assert!(matched.fragment().contains("This is a multi-line note."));
         assert!(matched.fragment().contains("Second line."));
         assert_eq!(rest.fragment(), &"rest");
+    }
 
-        // Multi-line note with extra tildes in delimiter
+    #[test]
+    fn test_multi_line_note_extra_tildes() {
         let input = Span::new("~~~~~\nfoo\nbar\n~~~~~\nrest");
         let (rest, matched) =
             multi_line_note(input).expect("should parse multi-line note with extra tildes");
         assert!(matched.fragment().contains("foo"));
         assert!(matched.fragment().contains("bar"));
         assert_eq!(rest.fragment(), &"rest");
+    }
 
-        // Empty multi-line note
+    #[test]
+    fn test_multi_line_note_empty() {
         let input = Span::new("~~~\n~~~\nrest");
         let (rest, _) = multi_line_note(input).expect("should parse empty multi-line note");
         assert_eq!(rest.fragment(), &"rest");
+    }
 
-        // Multi-line note not closed
+    #[test]
+    fn test_multi_line_note_unclosed() {
         let input = Span::new("~~~\nUnclosed note\n");
         let res = multi_line_note(input);
         assert!(res.is_err(), "should not parse unclosed multi-line note");
