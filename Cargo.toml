@@ -3,6 +3,10 @@ name = "oneil"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "oneil"
+path = "src/rs/lib.rs"
+
 [[bin]]
 name = "oneil"
 path = "src/rs/main.rs"
