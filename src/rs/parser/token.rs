@@ -173,3 +173,117 @@ mod keyword {
         token(tag("use")).parse(input)
     }
 }
+
+mod symbol {
+    use nom::{Parser as _, bytes::complete::tag};
+
+    use super::{Result, Span, util::token};
+
+    pub fn bang_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("!=")).parse(input)
+    }
+
+    pub fn bar<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("|")).parse(input)
+    }
+
+    pub fn brace_left<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("{")).parse(input)
+    }
+
+    pub fn brace_right<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("}")).parse(input)
+    }
+
+    pub fn bracket_left<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("[")).parse(input)
+    }
+
+    pub fn bracket_right<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("]")).parse(input)
+    }
+
+    pub fn caret<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("^")).parse(input)
+    }
+
+    pub fn colon<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag(":")).parse(input)
+    }
+
+    pub fn comma<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag(",")).parse(input)
+    }
+
+    pub fn dollar<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("$")).parse(input)
+    }
+
+    pub fn dot<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag(".")).parse(input)
+    }
+
+    pub fn equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("=")).parse(input)
+    }
+
+    pub fn equals_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("==")).parse(input)
+    }
+
+    pub fn greater_than<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag(">")).parse(input)
+    }
+
+    pub fn greater_than_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag(">=")).parse(input)
+    }
+
+    pub fn less_than<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("<")).parse(input)
+    }
+
+    pub fn less_than_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("<=")).parse(input)
+    }
+
+    pub fn minus<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("-")).parse(input)
+    }
+
+    pub fn minus_minus<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("--")).parse(input)
+    }
+
+    pub fn paren_left<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("(")).parse(input)
+    }
+
+    pub fn paren_right<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag(")")).parse(input)
+    }
+
+    pub fn percent<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("%")).parse(input)
+    }
+
+    pub fn plus<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("+")).parse(input)
+    }
+
+    pub fn star<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("*")).parse(input)
+    }
+
+    pub fn star_star<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("**")).parse(input)
+    }
+
+    pub fn slash<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("/")).parse(input)
+    }
+
+    pub fn slash_slash<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token(tag("//")).parse(input)
+    }
+}
