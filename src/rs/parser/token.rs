@@ -489,9 +489,18 @@ pub mod keyword {
 }
 
 pub mod symbol {
-    use nom::{Parser as _, bytes::complete::tag};
+    use nom::{
+        Parser as _,
+        bytes::complete::tag,
+        character::complete::satisfy,
+        combinator::{peek, value},
+    };
 
-    use super::{Result, Span, util::token};
+    use super::{Parser, Result, Span, util::token};
+
+    fn next_char_is_not(c: char) -> impl Fn(Span) -> Result<()> {
+        move |input: Span| value((), peek(satisfy(|next_char: char| next_char != c))).parse(input)
+    }
 
     /// Parses the '!=' symbol token.
     pub fn bang_equals(input: Span) -> Result<Span> {
@@ -550,7 +559,7 @@ pub mod symbol {
 
     /// Parses the '=' symbol token.
     pub fn equals(input: Span) -> Result<Span> {
-        token(tag("=")).parse(input)
+        token(tag("=").and(next_char_is_not('='))).parse(input)
     }
 
     /// Parses the '==' symbol token.
@@ -560,7 +569,7 @@ pub mod symbol {
 
     /// Parses the '>' symbol token.
     pub fn greater_than(input: Span) -> Result<Span> {
-        token(tag(">")).parse(input)
+        token(tag(">").and(next_char_is_not('='))).parse(input)
     }
 
     /// Parses the '>=' symbol token.
@@ -570,7 +579,7 @@ pub mod symbol {
 
     /// Parses the '<' symbol token.
     pub fn less_than(input: Span) -> Result<Span> {
-        token(tag("<")).parse(input)
+        token(tag("<").and(next_char_is_not('='))).parse(input)
     }
 
     /// Parses the '<=' symbol token.
@@ -580,7 +589,7 @@ pub mod symbol {
 
     /// Parses the '-' symbol token.
     pub fn minus(input: Span) -> Result<Span> {
-        token(tag("-")).parse(input)
+        token(tag("-").and(next_char_is_not('-'))).parse(input)
     }
 
     /// Parses the '--' symbol token.
@@ -610,7 +619,7 @@ pub mod symbol {
 
     /// Parses the '*' symbol token.
     pub fn star(input: Span) -> Result<Span> {
-        token(tag("*")).parse(input)
+        token(tag("*").and(next_char_is_not('*'))).parse(input)
     }
 
     /// Parses the '**' symbol token.
@@ -620,7 +629,7 @@ pub mod symbol {
 
     /// Parses the '/' symbol token.
     pub fn slash(input: Span) -> Result<Span> {
-        token(tag("/")).parse(input)
+        token(tag("/").and(next_char_is_not('/'))).parse(input)
     }
 
     /// Parses the '//' symbol token.
