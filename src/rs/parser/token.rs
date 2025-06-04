@@ -288,72 +288,79 @@ mod note {
 }
 
 pub mod keyword {
-    use nom::{Parser as _, bytes::complete::tag};
+    use nom::{Parser as _, bytes::complete::tag, character::complete::satisfy, combinator::peek};
 
-    use super::{Result, Span, util::token};
+    use super::{Parser, Result, Span, util::token};
 
     const KEYWORDS: &[&str] = &[
         "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
     ];
 
+    fn keyword(kw_str: &str) -> impl Parser<Span> {
+        token((
+            tag(kw_str),
+            peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')),
+        ))
+    }
+
     /// Parses the 'and' keyword token.
     pub fn and(input: Span) -> Result<Span> {
-        token(tag("and")).parse(input)
+        keyword("and").parse(input)
     }
 
     /// Parses the 'as' keyword token.
     pub fn as_(input: Span) -> Result<Span> {
-        token(tag("as")).parse(input)
+        keyword("as").parse(input)
     }
 
     /// Parses the 'false' keyword token.
     pub fn false_(input: Span) -> Result<Span> {
-        token(tag("false")).parse(input)
+        keyword("false").parse(input)
     }
 
     /// Parses the 'from' keyword token.
     pub fn from(input: Span) -> Result<Span> {
-        token(tag("from")).parse(input)
+        keyword("from").parse(input)
     }
 
     /// Parses the 'if' keyword token.
     pub fn if_(input: Span) -> Result<Span> {
-        token(tag("if")).parse(input)
+        keyword("if").parse(input)
     }
 
     /// Parses the 'import' keyword token.
     pub fn import(input: Span) -> Result<Span> {
-        token(tag("import")).parse(input)
+        keyword("import").parse(input)
     }
 
     /// Parses the 'not' keyword token.
     pub fn not(input: Span) -> Result<Span> {
-        token(tag("not")).parse(input)
+        keyword("not").parse(input)
     }
 
     /// Parses the 'or' keyword token.
     pub fn or(input: Span) -> Result<Span> {
-        token(tag("or")).parse(input)
+        keyword("or").parse(input)
     }
 
     /// Parses the 'true' keyword token.
     pub fn true_(input: Span) -> Result<Span> {
-        token(tag("true")).parse(input)
+        keyword("true").parse(input)
     }
 
     /// Parses the 'section' keyword token.
     pub fn section(input: Span) -> Result<Span> {
-        token(tag("section")).parse(input)
+        keyword("section").parse(input)
     }
 
     /// Parses the 'test' keyword token.
     pub fn test(input: Span) -> Result<Span> {
-        token(tag("test")).parse(input)
+        keyword("test").parse(input)
     }
 
     /// Parses the 'use' keyword token.
     pub fn use_(input: Span) -> Result<Span> {
-        token(tag("use")).parse(input)
+        keyword("use").parse(input)
     }
 
     #[cfg(test)]
