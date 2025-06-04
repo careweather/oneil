@@ -48,6 +48,7 @@ pub mod structure {
         value((), (tag("#"), not_line_ending, line_ending.or(eof))).parse(input)
     }
 
+    /// Parses one or more linebreaks, comments, or end-of-file markers, including trailing whitespace.
     pub fn end_of_line(input: Span) -> Result<Span> {
         recognize(many1((
             linebreak.or(comment).or(end_of_file),
@@ -109,6 +110,7 @@ mod note {
         .parse(input)
     }
 
+    /// Parses a single-line or multi-line note, returning the note span.
     pub fn note(input: Span) -> Result<Span> {
         single_line_note.or(multi_line_note).parse(input)
     }
@@ -125,50 +127,62 @@ pub mod keyword {
         "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
     ];
 
+    /// Parses the 'and' keyword token.
     pub fn and(input: Span) -> Result<Span> {
         token(tag("and")).parse(input)
     }
 
+    /// Parses the 'as' keyword token.
     pub fn as_(input: Span) -> Result<Span> {
         token(tag("as")).parse(input)
     }
 
+    /// Parses the 'false' keyword token.
     pub fn false_(input: Span) -> Result<Span> {
         token(tag("false")).parse(input)
     }
 
+    /// Parses the 'from' keyword token.
     pub fn from(input: Span) -> Result<Span> {
         token(tag("from")).parse(input)
     }
 
+    /// Parses the 'if' keyword token.
     pub fn if_(input: Span) -> Result<Span> {
         token(tag("if")).parse(input)
     }
 
+    /// Parses the 'import' keyword token.
     pub fn import(input: Span) -> Result<Span> {
         token(tag("import")).parse(input)
     }
 
+    /// Parses the 'not' keyword token.
     pub fn not(input: Span) -> Result<Span> {
         token(tag("not")).parse(input)
     }
 
+    /// Parses the 'or' keyword token.
     pub fn or(input: Span) -> Result<Span> {
         token(tag("or")).parse(input)
     }
 
+    /// Parses the 'true' keyword token.
     pub fn true_(input: Span) -> Result<Span> {
         token(tag("true")).parse(input)
     }
 
+    /// Parses the 'section' keyword token.
     pub fn section(input: Span) -> Result<Span> {
         token(tag("section")).parse(input)
     }
 
+    /// Parses the 'test' keyword token.
     pub fn test(input: Span) -> Result<Span> {
         token(tag("test")).parse(input)
     }
 
+    /// Parses the 'use' keyword token.
     pub fn use_(input: Span) -> Result<Span> {
         token(tag("use")).parse(input)
     }
@@ -179,110 +193,137 @@ pub mod symbol {
 
     use super::{Result, Span, util::token};
 
+    /// Parses the '!=' symbol token.
     pub fn bang_equals(input: Span) -> Result<Span> {
         token(tag("!=")).parse(input)
     }
 
+    /// Parses the '|' symbol token.
     pub fn bar(input: Span) -> Result<Span> {
         token(tag("|")).parse(input)
     }
 
+    /// Parses the '{' symbol token.
     pub fn brace_left(input: Span) -> Result<Span> {
         token(tag("{")).parse(input)
     }
 
+    /// Parses the '}' symbol token.
     pub fn brace_right(input: Span) -> Result<Span> {
         token(tag("}")).parse(input)
     }
 
+    /// Parses the '[' symbol token.
     pub fn bracket_left(input: Span) -> Result<Span> {
         token(tag("[")).parse(input)
     }
 
+    /// Parses the ']' symbol token.
     pub fn bracket_right(input: Span) -> Result<Span> {
         token(tag("]")).parse(input)
     }
 
+    /// Parses the '^' symbol token.
     pub fn caret(input: Span) -> Result<Span> {
         token(tag("^")).parse(input)
     }
 
+    /// Parses the ':' symbol token.
     pub fn colon(input: Span) -> Result<Span> {
         token(tag(":")).parse(input)
     }
 
+    /// Parses the ',' symbol token.
     pub fn comma(input: Span) -> Result<Span> {
         token(tag(",")).parse(input)
     }
 
+    /// Parses the '$' symbol token.
     pub fn dollar(input: Span) -> Result<Span> {
         token(tag("$")).parse(input)
     }
 
+    /// Parses the '.' symbol token.
     pub fn dot(input: Span) -> Result<Span> {
         token(tag(".")).parse(input)
     }
 
+    /// Parses the '=' symbol token.
     pub fn equals(input: Span) -> Result<Span> {
         token(tag("=")).parse(input)
     }
 
+    /// Parses the '==' symbol token.
     pub fn equals_equals(input: Span) -> Result<Span> {
         token(tag("==")).parse(input)
     }
 
+    /// Parses the '>' symbol token.
     pub fn greater_than(input: Span) -> Result<Span> {
         token(tag(">")).parse(input)
     }
 
+    /// Parses the '>=' symbol token.
     pub fn greater_than_equals(input: Span) -> Result<Span> {
         token(tag(">=")).parse(input)
     }
 
+    /// Parses the '<' symbol token.
     pub fn less_than(input: Span) -> Result<Span> {
         token(tag("<")).parse(input)
     }
 
+    /// Parses the '<=' symbol token.
     pub fn less_than_equals(input: Span) -> Result<Span> {
         token(tag("<=")).parse(input)
     }
 
+    /// Parses the '-' symbol token.
     pub fn minus(input: Span) -> Result<Span> {
         token(tag("-")).parse(input)
     }
 
+    /// Parses the '--' symbol token.
     pub fn minus_minus(input: Span) -> Result<Span> {
         token(tag("--")).parse(input)
     }
 
+    /// Parses the '(' symbol token.
     pub fn paren_left(input: Span) -> Result<Span> {
         token(tag("(")).parse(input)
     }
 
+    /// Parses the ')' symbol token.
     pub fn paren_right(input: Span) -> Result<Span> {
         token(tag(")")).parse(input)
     }
 
+    /// Parses the '%' symbol token.
     pub fn percent(input: Span) -> Result<Span> {
         token(tag("%")).parse(input)
     }
 
+    /// Parses the '+' symbol token.
     pub fn plus(input: Span) -> Result<Span> {
         token(tag("+")).parse(input)
     }
 
+    /// Parses the '*' symbol token.
     pub fn star(input: Span) -> Result<Span> {
         token(tag("*")).parse(input)
     }
 
+    /// Parses the '**' symbol token.
     pub fn star_star(input: Span) -> Result<Span> {
         token(tag("**")).parse(input)
     }
 
+    /// Parses the '/' symbol token.
     pub fn slash(input: Span) -> Result<Span> {
         token(tag("/")).parse(input)
     }
 
+    /// Parses the '//' symbol token.
     pub fn slash_slash(input: Span) -> Result<Span> {
         token(tag("//")).parse(input)
     }
@@ -298,6 +339,7 @@ pub mod literal {
 
     use super::{Result, Span, util::token};
 
+    /// Parses a number literal, supporting optional sign, decimal, and exponent.
     pub fn number(input: Span) -> Result<Span> {
         let sign1 = opt(char('+').or(char('-')));
         let sign2 = opt(char('+').or(char('-')));
@@ -311,6 +353,7 @@ pub mod literal {
         .parse(input)
     }
 
+    /// Parses a string literal delimited by double quotes.
     pub fn string(input: Span) -> Result<Span> {
         token((
             char('"'),
@@ -325,6 +368,7 @@ pub mod naming {
 
     use super::{Result, Span, util::token};
 
+    /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
     pub fn identifier(input: Span) -> Result<Span> {
         token((
             satisfy(|c: char| c.is_alphabetic() || c == '_'),
@@ -333,6 +377,7 @@ pub mod naming {
         .parse(input)
     }
 
+    /// Parses a label (alphabetic or underscore, then alphanumeric, underscore, dash, space, or tab).
     pub fn label(input: Span) -> Result<Span> {
         token((
             satisfy(|c: char| c.is_alphabetic() || c == '_'),
