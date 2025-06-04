@@ -1,3 +1,27 @@
+//! Provides parsers for notes in the Oneil language.
+//!
+//! This module contains parsers for both single-line and multi-line notes.
+//! Single-line notes start with `~` and continue until the end of the line.
+//! Multi-line notes are delimited by `~~~` on their own lines and can contain
+//! multiple lines of content.
+//!
+//! # Examples
+//!
+//! ```
+//! use oneil::parser::token::note::{single_line_note, multi_line_note};
+//! use oneil::parser::util::Span;
+//!
+//! // Parse a single-line note
+//! let input = Span::new("~ This is a note\nrest");
+//! let (rest, matched) = single_line_note(input).unwrap();
+//! assert_eq!(matched.fragment(), &"~ This is a note");
+//!
+//! // Parse a multi-line note
+//! let input = Span::new("~~~\nLine 1\nLine 2\n~~~\nrest");
+//! let (rest, matched) = multi_line_note(input).unwrap();
+//! assert_eq!(matched.fragment(), &"~~~\nLine 1\nLine 2\n~~~");
+//! ```
+
 use nom::Parser as _;
 use nom::bytes::complete::take_while;
 use nom::character::complete::{char, line_ending, not_line_ending};

@@ -1,3 +1,33 @@
+//! Provides parsers for structural elements in the Oneil language.
+//!
+//! This module currently contains parsers for end-of-line tokens, which include:
+//! - Line breaks (`\n`)
+//! - Comments (starting with `#` and continuing to end of line)
+//! - End-of-file markers
+//! - Any combination of the above with optional whitespace
+//!
+//! # Examples
+//!
+//! ```
+//! use oneil::parser::token::structure::end_of_line;
+//! use oneil::parser::util::Span;
+//!
+//! // Parse a comment followed by newline
+//! let input = Span::new("# This is a comment\nrest");
+//! let (rest, matched) = end_of_line(input).unwrap();
+//! assert_eq!(rest.fragment(), &"rest");
+//!
+//! // Parse multiple blank lines
+//! let input = Span::new("\n\n\nrest");
+//! let (rest, matched) = end_of_line(input).unwrap();
+//! assert_eq!(rest.fragment(), &"rest");
+//!
+//! // Parse end of file
+//! let input = Span::new("");
+//! let (rest, matched) = end_of_line(input).unwrap();
+//! assert_eq!(rest.fragment(), &"");
+//! ```
+
 use nom::{
     Parser as _,
     character::complete::{char, line_ending, not_line_ending},

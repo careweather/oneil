@@ -1,8 +1,60 @@
+//! Provides parsers for identifiers and labels in the Oneil language.
+//!
+//! This module contains parsers for identifiers (variable names, function names, etc.)
+//! and labels (section names, test names, etc.). Identifiers follow standard programming
+//! language rules, while labels are more permissive to allow for descriptive names.
+//!
+//! # Examples
+//!
+//! ```
+//! use oneil::parser::token::naming::{identifier, label};
+//! use oneil::parser::util::Span;
+//!
+//! // Parse an identifier
+//! let input = Span::new("my_var123 rest");
+//! let (rest, matched) = identifier(input).unwrap();
+//! assert_eq!(matched.fragment(), &"my_var123");
+//!
+//! // Parse a label
+//! let input = Span::new("My Test Case: rest");
+//! let (rest, matched) = label(input).unwrap();
+//! assert_eq!(matched.fragment(), &"My Test Case");
+//! ```
+
 use nom::{Parser as _, bytes::complete::take_while, character::complete::satisfy};
 
 use super::{Result, Span, util::token};
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::token::naming::identifier;
+/// use oneil::parser::util::Span;
+///
+/// // Basic identifier
+/// let input = Span::new("variable rest");
+/// let (rest, matched) = identifier(input).unwrap();
+/// assert_eq!(matched.fragment(), &"variable");
+/// assert_eq!(rest.fragment(), &"rest");
+///
+/// // Identifier with underscore and numbers
+/// let input = Span::new("my_var_123 rest");
+/// let (rest, matched) = identifier(input).unwrap();
+/// assert_eq!(matched.fragment(), &"my_var_123");
+/// assert_eq!(rest.fragment(), &"rest");
+///
+/// // Identifier starting with underscore
+/// let input = Span::new("_private rest");
+/// let (rest, matched) = identifier(input).unwrap();
+/// assert_eq!(matched.fragment(), &"_private");
+/// assert_eq!(rest.fragment(), &"rest");
+///
+/// // Invalid identifier (starting with number) should fail
+/// let input = Span::new("123invalid");
+/// assert!(identifier(input).is_err());
+/// ```
 pub fn identifier(input: Span) -> Result<Span> {
     token((
         satisfy(|c: char| c.is_alphabetic() || c == '_'),
@@ -12,6 +64,37 @@ pub fn identifier(input: Span) -> Result<Span> {
 }
 
 /// Parses a label (alphabetic or underscore, then alphanumeric, underscore, dash, space, or tab).
+/// # Examples
+///
+/// Note that labels are often followed by a colon as a delimiter, but other
+/// tokens (such as a linebreak) can also be used.
+///
+/// ```
+/// use oneil::parser::token::naming::label;
+/// use oneil::parser::util::Span;
+///
+/// // Basic label
+/// let input = Span::new("Test Case: rest");
+/// let (rest, matched) = label(input).unwrap();
+/// assert_eq!(matched.fragment(), &"Test Case");
+/// assert_eq!(rest.fragment(), &": rest");
+///
+/// // Label with mixed characters
+/// let input = Span::new("My_Test-Case: rest");
+/// let (rest, matched) = label(input).unwrap();
+/// assert_eq!(matched.fragment(), &"My_Test-Case");
+/// assert_eq!(rest.fragment(), &": rest");
+///
+/// // Label with tabs
+/// let input = Span::new("Test\tCase: rest");
+/// let (rest, matched) = label(input).unwrap();
+/// assert_eq!(matched.fragment(), &"Test\tCase");
+/// assert_eq!(rest.fragment(), &": rest");
+///
+/// // Invalid label (starting with number) should fail
+/// let input = Span::new("123Test");
+/// assert!(label(input).is_err());
+/// ```
 pub fn label(input: Span) -> Result<Span> {
     token((
         satisfy(|c: char| c.is_alphabetic() || c == '_'),

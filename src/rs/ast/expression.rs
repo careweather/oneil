@@ -1,5 +1,6 @@
 use super::literal::Literal;
 
+/// An expression in the Oneil language
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     BinaryOp {
@@ -7,14 +8,17 @@ pub enum Expr {
         left: Box<Expr>,
         right: Box<Expr>,
     },
+
     UnaryOp {
         op: UnaryOp,
         expr: Box<Expr>,
     },
+
     FunctionCall {
         name: String,
         args: Vec<Expr>,
     },
+
     Literal(Literal),
 }
 

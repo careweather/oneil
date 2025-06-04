@@ -1,5 +1,9 @@
 use super::expression::Expr;
 
+/// A value assigned to a parameter.
+///
+/// Parameter values can be either simple expressions or piecewise expressions
+/// that evaluate to different values based on conditions.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     Simple(Expr),

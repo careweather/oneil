@@ -1,8 +1,30 @@
+//! Provides parsers for Oneil language keywords.
+//!
+//! This module contains parsers for all reserved keywords in the Oneil language.
+//! Each keyword parser ensures that the keyword is followed by a non-alphanumeric
+//! character or '_' to prevent partial matches (e.g., "and" vs "android").
+//!
+//! # Examples
+//!
+//! ```
+//! use oneil::parser::token::keyword::{and, if_};
+//! use oneil::parser::util::Span;
+//!
+//! let input = Span::new("and true");
+//! let (rest, matched) = and(input).unwrap();
+//! assert_eq!(matched.fragment(), &"and");
+//!
+//! let input = Span::new("if x > 0");
+//! let (rest, matched) = if_(input).unwrap();
+//! assert_eq!(matched.fragment(), &"if");
+//! ```
+
 use nom::{Parser as _, bytes::complete::tag, character::complete::satisfy, combinator::peek};
 
 use super::{Parser, Result, Span, util::token};
 
-const KEYWORDS: &[&str] = &[
+/// Keywords that are valid in the Oneil language.
+pub const KEYWORDS: &[&str] = &[
     "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
 ];
 

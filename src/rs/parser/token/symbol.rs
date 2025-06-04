@@ -1,3 +1,29 @@
+//! Provides parsers for symbols in the Oneil language.
+//!
+//! This module contains parsers for all symbol tokens in the Oneil language,
+//! including operators, delimiters, and other special characters.
+//!
+//! # Examples
+//!
+//! ```
+//! use oneil::parser::token::symbol::{bang_equals, brace_left, brace_right};
+//! use oneil::parser::util::Span;
+//!
+//! // Parse a not-equals operator
+//! let input = Span::new("!= rest");
+//! let (rest, matched) = bang_equals(input).unwrap();
+//! assert_eq!(matched.fragment(), &"!=");
+//!
+//! // Parse braces
+//! let input = Span::new("{ rest");
+//! let (rest, matched) = brace_left(input).unwrap();
+//! assert_eq!(matched.fragment(), &"{");
+//!
+//! let input = Span::new("} rest");
+//! let (rest, matched) = brace_right(input).unwrap();
+//! assert_eq!(matched.fragment(), &"}");
+//! ```
+
 use nom::{
     Parser as _,
     bytes::complete::tag,
@@ -5,7 +31,7 @@ use nom::{
     combinator::{peek, value},
 };
 
-use super::{Parser, Result, Span, util::token};
+use super::{Result, Span, util::token};
 
 fn next_char_is_not(c: char) -> impl Fn(Span) -> Result<()> {
     move |input: Span| value((), peek(satisfy(|next_char: char| next_char != c))).parse(input)

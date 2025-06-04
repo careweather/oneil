@@ -1,3 +1,26 @@
+//! Provides parsers for literal values in the Oneil language.
+//!
+//! This module contains parsers for numeric and string literals. The numeric parser
+//! supports integers and floating point numbers with optional signs and exponents.
+//! The string parser handles double-quoted string literals.
+//!
+//! # Examples
+//!
+//! ```
+//! use oneil::parser::token::literal::{number, string};
+//! use oneil::parser::util::Span;
+//!
+//! // Parse a floating point number
+//! let input = Span::new("-42.5e-2");
+//! let (rest, matched) = number(input).unwrap();
+//! assert_eq!(matched.fragment(), &"-42.5e-2");
+//!
+//! // Parse a string literal
+//! let input = Span::new("\"hello world\" rest");
+//! let (rest, matched) = string(input).unwrap();
+//! assert_eq!(matched.fragment(), &"\"hello world\"");
+//! ```
+
 use nom::{
     Parser as _,
     bytes::complete::take_while,

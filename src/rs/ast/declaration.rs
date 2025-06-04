@@ -2,17 +2,23 @@ use super::expression::Expr;
 use super::note::Note;
 use super::parameter::{Limits, ParameterValue, TraceLevel};
 
+/// A declaration in an Oneil program
+///
+/// Declarations are top-level constructs that define imports, model usage,
+/// parameters, and tests.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
     Import {
         path: String,
     },
+
     Use {
         from_model: Option<String>,
         use_model: String,
         inputs: Option<Vec<ModelInput>>,
         as_name: String,
     },
+
     Parameter {
         name: String,
         ident: String,
@@ -22,6 +28,7 @@ pub enum Decl {
         trace_level: TraceLevel,
         note: Option<Note>,
     },
+
     Test {
         trace_level: TraceLevel,
         inputs: Vec<String>,
