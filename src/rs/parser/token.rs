@@ -287,3 +287,59 @@ pub mod symbol {
         token(tag("//")).parse(input)
     }
 }
+
+pub mod literal {
+    use nom::{
+        Parser as _,
+        bytes::complete::take_while,
+        character::complete::{char, digit1},
+        combinator::{cut, opt},
+    };
+
+    use super::{Result, Span, util::token};
+
+    pub fn number<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        let sign1 = opt(char('+').or(char('-')));
+        let sign2 = opt(char('+').or(char('-')));
+        let e = opt(char('e').or(char('E')));
+        token((
+            opt(sign1),
+            digit1,
+            opt((char('.'), cut(digit1))),
+            opt((e, cut((sign2, digit1)))),
+        ))
+        .parse(input)
+    }
+
+    pub fn string<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token((
+            char('"'),
+            cut((take_while(|c: char| c != '"' && c != '\n'), char('"'))),
+        ))
+        .parse(input)
+    }
+}
+
+pub mod naming {
+    use nom::{Parser as _, bytes::complete::take_while, character::complete::satisfy};
+
+    use super::{Result, Span, util::token};
+
+    pub fn identifier<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token((
+            satisfy(|c: char| c.is_alphabetic() || c == '_'),
+            take_while(|c: char| c.is_alphanumeric() || c == '_'),
+        ))
+        .parse(input)
+    }
+
+    pub fn label<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+        token((
+            satisfy(|c: char| c.is_alphabetic() || c == '_'),
+            take_while(|c: char| {
+                c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
+            }),
+        ))
+        .parse(input)
+    }
+}

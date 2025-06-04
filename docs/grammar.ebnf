@@ -73,7 +73,7 @@ MultiplicativeExpr = [ MultiplicativeExpr, MultiplicativeOp, ], ExponentialExpr 
 MultiplicativeOp = "*" | "/" | "//" | "%" ;
 ExponentialExpr = NegExpr, [ "^", , ExponentialExpr ] ;  (* right associative *)
 NegExpr = ( "-", NegExpr ) | PrimaryExpr ;
-PrimaryExpr = NumberLiteral | StringLiteral | Identifier { ".", Identifier } | FunctionCall | ( "(", Expr, ")" ) ;
+PrimaryExpr = NumberLiteral | StringLiteral | BooleanLiteral | Identifier { ".", Identifier } | FunctionCall | ( "(", Expr, ")" ) ;
 
 PiecewiseExpr = PiecewisePart, [ ":", UnitExpr ], { EndOfLine, { EndOfLine }, PiecewisePart } ;
 PiecewisePart = "{", Expr, "if", Expr ;
@@ -90,7 +90,7 @@ Identifier = Letter, { Letter | Digit | "_" } ;
 Label = Identifier, { "-" | Identifier } ;
 NumberLiteral = [ Sign ], ( Integer | Float | Scientific ) ;
 Integer = Digit, { Digit } ;
-Float = [ Integer ], ".", Digit, { Digit } ;
+Float = Integer , ".", Digit, { Digit } ;
 Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
 Sign = "+" | "-" ;
 Letter = "A" | ... | "Z" | "a" | ... | "z" ;
