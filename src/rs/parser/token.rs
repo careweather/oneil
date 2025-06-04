@@ -27,7 +27,7 @@ pub mod structure {
         Parser as _,
         bytes::complete::tag,
         character::complete::{line_ending, not_line_ending},
-        combinator::{eof, recognize, value},
+        combinator::{eof, opt, recognize, value},
         multi::many1,
     };
 
@@ -49,10 +49,14 @@ pub mod structure {
 
     /// Parses one or more linebreaks, comments, or end-of-file markers, including trailing whitespace.
     pub fn end_of_line(input: Span) -> Result<Span> {
-        recognize(many1((
-            linebreak.or(comment).or(end_of_file),
-            inline_whitespace,
-        )))
+        recognize(
+            (
+                many1((linebreak.or(comment), inline_whitespace)),
+                opt(end_of_file),
+            )
+                .map(|_| ())
+                .or(end_of_file),
+        )
         .parse(input)
     }
 
