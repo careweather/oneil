@@ -10,7 +10,7 @@ mod util {
 
     use super::{Parser, Result, Span};
 
-    pub fn inline_whitespace<'a>(input: Span<'a>) -> Result<'a, ()> {
+    pub fn inline_whitespace(input: Span) -> Result<()> {
         value((), space0).parse(input)
     }
 
@@ -35,20 +35,20 @@ pub mod structure {
 
     use super::{Result, Span};
 
-    fn linebreak<'a>(input: Span<'a>) -> Result<'a, ()> {
+    fn linebreak(input: Span) -> Result<()> {
         value((), line_ending).parse(input)
     }
 
-    fn end_of_file<'a>(input: Span<'a>) -> Result<'a, ()> {
+    fn end_of_file(input: Span) -> Result<()> {
         value((), eof).parse(input)
     }
 
     // TODO: write a test for this parser
-    fn comment<'a>(input: Span<'a>) -> Result<'a, ()> {
+    fn comment(input: Span) -> Result<()> {
         value((), (tag("#"), not_line_ending, line_ending.or(eof))).parse(input)
     }
 
-    pub fn end_of_line<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn end_of_line(input: Span) -> Result<Span> {
         recognize(many1((
             linebreak.or(comment).or(end_of_file),
             inline_whitespace,
@@ -69,11 +69,11 @@ mod note {
 
     use super::{Result, Span, structure::end_of_line, util::inline_whitespace};
 
-    fn single_line_note<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    fn single_line_note(input: Span) -> Result<Span> {
         terminated(recognize((tag("~"), not_line_ending)), end_of_line).parse(input)
     }
 
-    fn multi_line_note_delimiter<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    fn multi_line_note_delimiter(input: Span) -> Result<Span> {
         recognize((
             inline_whitespace,
             tag("~~~"),
@@ -83,7 +83,7 @@ mod note {
         .parse(input)
     }
 
-    fn multi_line_note_content<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    fn multi_line_note_content(input: Span) -> Result<Span> {
         verify(recognize(many0((not_line_ending, line_ending))), |s| {
             // TODO: this allows for a content line to contain something like
             //       `~~~foo`, which we would want to disallow (I think)
@@ -92,7 +92,7 @@ mod note {
         .parse(input)
     }
 
-    fn multi_line_note<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    fn multi_line_note(input: Span) -> Result<Span> {
         // TODO(error): add a note in the error that this failure is due to an
         //              unclosed multi-line note
         terminated(
@@ -109,7 +109,7 @@ mod note {
         .parse(input)
     }
 
-    pub fn note<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn note(input: Span) -> Result<Span> {
         single_line_note.or(multi_line_note).parse(input)
     }
 }
@@ -125,51 +125,51 @@ pub mod keyword {
         "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
     ];
 
-    pub fn and<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn and(input: Span) -> Result<Span> {
         token(tag("and")).parse(input)
     }
 
-    pub fn as_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn as_(input: Span) -> Result<Span> {
         token(tag("as")).parse(input)
     }
 
-    pub fn false_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn false_(input: Span) -> Result<Span> {
         token(tag("false")).parse(input)
     }
 
-    pub fn from<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn from(input: Span) -> Result<Span> {
         token(tag("from")).parse(input)
     }
 
-    pub fn if_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn if_(input: Span) -> Result<Span> {
         token(tag("if")).parse(input)
     }
 
-    pub fn import<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn import(input: Span) -> Result<Span> {
         token(tag("import")).parse(input)
     }
 
-    pub fn not<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn not(input: Span) -> Result<Span> {
         token(tag("not")).parse(input)
     }
 
-    pub fn or<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn or(input: Span) -> Result<Span> {
         token(tag("or")).parse(input)
     }
 
-    pub fn true_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn true_(input: Span) -> Result<Span> {
         token(tag("true")).parse(input)
     }
 
-    pub fn section<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn section(input: Span) -> Result<Span> {
         token(tag("section")).parse(input)
     }
 
-    pub fn test<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn test(input: Span) -> Result<Span> {
         token(tag("test")).parse(input)
     }
 
-    pub fn use_<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn use_(input: Span) -> Result<Span> {
         token(tag("use")).parse(input)
     }
 }
@@ -179,111 +179,111 @@ pub mod symbol {
 
     use super::{Result, Span, util::token};
 
-    pub fn bang_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn bang_equals(input: Span) -> Result<Span> {
         token(tag("!=")).parse(input)
     }
 
-    pub fn bar<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn bar(input: Span) -> Result<Span> {
         token(tag("|")).parse(input)
     }
 
-    pub fn brace_left<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn brace_left(input: Span) -> Result<Span> {
         token(tag("{")).parse(input)
     }
 
-    pub fn brace_right<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn brace_right(input: Span) -> Result<Span> {
         token(tag("}")).parse(input)
     }
 
-    pub fn bracket_left<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn bracket_left(input: Span) -> Result<Span> {
         token(tag("[")).parse(input)
     }
 
-    pub fn bracket_right<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn bracket_right(input: Span) -> Result<Span> {
         token(tag("]")).parse(input)
     }
 
-    pub fn caret<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn caret(input: Span) -> Result<Span> {
         token(tag("^")).parse(input)
     }
 
-    pub fn colon<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn colon(input: Span) -> Result<Span> {
         token(tag(":")).parse(input)
     }
 
-    pub fn comma<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn comma(input: Span) -> Result<Span> {
         token(tag(",")).parse(input)
     }
 
-    pub fn dollar<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn dollar(input: Span) -> Result<Span> {
         token(tag("$")).parse(input)
     }
 
-    pub fn dot<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn dot(input: Span) -> Result<Span> {
         token(tag(".")).parse(input)
     }
 
-    pub fn equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn equals(input: Span) -> Result<Span> {
         token(tag("=")).parse(input)
     }
 
-    pub fn equals_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn equals_equals(input: Span) -> Result<Span> {
         token(tag("==")).parse(input)
     }
 
-    pub fn greater_than<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn greater_than(input: Span) -> Result<Span> {
         token(tag(">")).parse(input)
     }
 
-    pub fn greater_than_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn greater_than_equals(input: Span) -> Result<Span> {
         token(tag(">=")).parse(input)
     }
 
-    pub fn less_than<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn less_than(input: Span) -> Result<Span> {
         token(tag("<")).parse(input)
     }
 
-    pub fn less_than_equals<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn less_than_equals(input: Span) -> Result<Span> {
         token(tag("<=")).parse(input)
     }
 
-    pub fn minus<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn minus(input: Span) -> Result<Span> {
         token(tag("-")).parse(input)
     }
 
-    pub fn minus_minus<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn minus_minus(input: Span) -> Result<Span> {
         token(tag("--")).parse(input)
     }
 
-    pub fn paren_left<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn paren_left(input: Span) -> Result<Span> {
         token(tag("(")).parse(input)
     }
 
-    pub fn paren_right<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn paren_right(input: Span) -> Result<Span> {
         token(tag(")")).parse(input)
     }
 
-    pub fn percent<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn percent(input: Span) -> Result<Span> {
         token(tag("%")).parse(input)
     }
 
-    pub fn plus<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn plus(input: Span) -> Result<Span> {
         token(tag("+")).parse(input)
     }
 
-    pub fn star<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn star(input: Span) -> Result<Span> {
         token(tag("*")).parse(input)
     }
 
-    pub fn star_star<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn star_star(input: Span) -> Result<Span> {
         token(tag("**")).parse(input)
     }
 
-    pub fn slash<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn slash(input: Span) -> Result<Span> {
         token(tag("/")).parse(input)
     }
 
-    pub fn slash_slash<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn slash_slash(input: Span) -> Result<Span> {
         token(tag("//")).parse(input)
     }
 }
@@ -298,7 +298,7 @@ pub mod literal {
 
     use super::{Result, Span, util::token};
 
-    pub fn number<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn number(input: Span) -> Result<Span> {
         let sign1 = opt(char('+').or(char('-')));
         let sign2 = opt(char('+').or(char('-')));
         let e = opt(char('e').or(char('E')));
@@ -311,7 +311,7 @@ pub mod literal {
         .parse(input)
     }
 
-    pub fn string<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn string(input: Span) -> Result<Span> {
         token((
             char('"'),
             cut((take_while(|c: char| c != '"' && c != '\n'), char('"'))),
@@ -325,7 +325,7 @@ pub mod naming {
 
     use super::{Result, Span, util::token};
 
-    pub fn identifier<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn identifier(input: Span) -> Result<Span> {
         token((
             satisfy(|c: char| c.is_alphabetic() || c == '_'),
             take_while(|c: char| c.is_alphanumeric() || c == '_'),
@@ -333,7 +333,7 @@ pub mod naming {
         .parse(input)
     }
 
-    pub fn label<'a>(input: Span<'a>) -> Result<'a, Span<'a>> {
+    pub fn label(input: Span) -> Result<Span> {
         token((
             satisfy(|c: char| c.is_alphabetic() || c == '_'),
             take_while(|c: char| {
