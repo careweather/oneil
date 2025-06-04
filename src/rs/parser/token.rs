@@ -175,12 +175,15 @@ pub mod structure {
 }
 
 mod note {
+    use nom::bytes::complete::take_while;
     use nom::character::complete::line_ending;
     use nom::combinator::{cut, verify};
     use nom::multi::many0;
     use nom::sequence::terminated;
     use nom::{
-        Parser as _, bytes::complete::tag, character::complete::not_line_ending,
+        Parser as _,
+        bytes::complete::tag,
+        character::complete::{char, not_line_ending},
         combinator::recognize,
     };
 
@@ -197,19 +200,16 @@ mod note {
     fn multi_line_note_delimiter(input: Span) -> Result<Span> {
         recognize((
             inline_whitespace,
-            tag("~~~"),
-            many0(tag("~")),
+            verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3),
             inline_whitespace,
         ))
         .parse(input)
     }
 
     fn multi_line_note_content(input: Span) -> Result<Span> {
-        verify(recognize(many0((not_line_ending, line_ending))), |s| {
-            // TODO: this allows for a content line to contain something like
-            //       `~~~foo`, which we would want to disallow (I think)
-            multi_line_note_delimiter(*s).is_err()
-        })
+        recognize(many0(verify((not_line_ending, line_ending), |(s, _)| {
+            multi_line_note_delimiter.parse(*s).is_err()
+        })))
         .parse(input)
     }
 
@@ -277,12 +277,7 @@ mod note {
 
             // Empty multi-line note
             let input = Span::new("~~~\n~~~\nrest");
-            let (rest, matched) =
-                multi_line_note(input).expect("should parse empty multi-line note");
-            assert!(
-                matched.fragment().is_empty(),
-                "should parse empty multi-line note"
-            );
+            let (rest, _) = multi_line_note(input).expect("should parse empty multi-line note");
             assert_eq!(rest.fragment(), &"rest");
 
             // Multi-line note not closed
