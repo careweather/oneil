@@ -26,7 +26,8 @@ NoteLine = { Any character except LineBreak or MultiLineNoteDelimiter }, LineBre
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-UseDecl = [ "from", ModulePath ], "use", ModelName, [ ModelInputs ], "as", Identifier, EndOfLine ;
+FromDecl = "from", ModulePath, "use", ModelName, [ ModelInputs ], "as", Identifier, EndOfLine ;
+UseDecl = "use", ModulePath, [ ModelInputs ], "as", Identifier, EndOfLine ;
 ModulePath = Identifier, { ".", Identifier } ;
 ModelInputs = "(", ModelInput, { ",", ModelInput }, ")" ;
 ModelInput = Identifier, "=", Expr ;
