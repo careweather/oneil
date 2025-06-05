@@ -3,6 +3,7 @@
 //! This module provides the parsing functionality for converting Oneil source
 //! code into an Abstract Syntax Tree (AST).
 
+pub mod expression;
 pub mod token;
 mod util;
 
