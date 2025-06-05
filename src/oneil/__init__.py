@@ -2562,7 +2562,7 @@ def handler(model: Model, inpt: str):
         elif cmd == "load":
             model_name, model_designs, commands = parse_args(args)
 
-            model = loader(model_name, model_designs)
+            model = loader(model_name, model_designs, capture_errors=False)
 
             for command in commands:
                 print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
@@ -2570,9 +2570,9 @@ def handler(model: Model, inpt: str):
 
         elif cmd == "reload":
             if model.design == "default":
-                model = loader(model.name, [])
+                model = loader(model.name, [], capture_errors=False)
             else:
-                model = loader(model.name, [model.design])
+                model = loader(model.name, [model.design], capture_errors=False)
         elif cmd == "help":
             print(help_text)
             return
@@ -2671,7 +2671,7 @@ Commands:
         Exit the program.
 """
 
-def loader(inp: str, designs: list[str]) -> Model:
+def loader(inp: str, designs: list[str], capture_errors: bool = True) -> Model:
     model = None
 
     while not model:
@@ -2695,9 +2695,12 @@ def loader(inp: str, designs: list[str]) -> Model:
                     model = Model(inp)
                     model.build()
                 except OneilError as err:
-                    console.print_error(err)
-                    model = None
-                    inp = ""
+                    if not capture_errors:
+                        raise err
+                    else:
+                        console.print_error(err)
+                        model = None
+                        inp = ""
             else:
                 print("Model " + inp + " not found.")
                 inp = ""
