@@ -16,15 +16,19 @@ Steps to reproduce the behavior:
 3. Type '...'
 4. See error
 
+**Observed behavior**
+A brief description of the behavior you observed
+
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
+**Environment:**
  - OS: [e.g. Linux, Windows]
- - Version: [e.g. v0.12]
+ - Oneil version: [e.g. v0.12]
+ - Relevant files (if any): [eg. radar.on]
 
 **Additional context**
 Add any other context about the problem here.
