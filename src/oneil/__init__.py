@@ -1718,15 +1718,15 @@ class Model:
         if isinstance(design_files, str):
             if not os.path.exists(design_files):
                 raise DesignError([design_files])
-            _, design_params, _, tests, design = parse_file(design_files, self)
+            _, design_params, _, tests, design = parse_file(design_files)
         elif isinstance(design_files, list):
             missing_files = [file for file in design_files if not os.path.exists(file)]
             if len(missing_files) > 0:
                 raise DesignError(missing_files)
-            _, design_params, _, tests, design = parse_file(design_files[0], self)
+            _, design_params, _, tests, design = parse_file(design_files[0])
             if len(design_files) > 1:
                 for design_file in design_files[1:]:
-                    _, overdesign_params, _, overtests, overdesign = parse_file(design_file, self)
+                    _, overdesign_params, _, overtests, overdesign = parse_file(design_file)
                     for ID, parameter in overdesign.items():
                         design[ID] = parameter
                     for ID, parameter in overdesign_params.items():
