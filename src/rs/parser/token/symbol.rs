@@ -28,13 +28,17 @@ use nom::{
     Parser as _,
     bytes::complete::tag,
     character::complete::{char, satisfy},
-    combinator::{peek, value},
+    combinator::{eof, peek, value},
 };
 
 use super::{Result, Span, util::token};
 
 fn next_char_is_not(c: char) -> impl Fn(Span) -> Result<()> {
-    move |input: Span| value((), peek(satisfy(|next_char: char| next_char != c))).parse(input)
+    move |input: Span| {
+        let next_char_is_not_c = peek(satisfy(|next_char: char| next_char != c)).map(|_| ());
+        let reached_end_of_file = eof.map(|_| ());
+        value((), next_char_is_not_c.or(reached_end_of_file)).parse(input)
+    }
 }
 
 /// Parses the '!=' symbol token.
@@ -448,5 +452,26 @@ mod tests {
         let input = Span::new("foo + bar");
         let res = plus(input);
         assert!(res.is_err(), "should not parse '+' if not at start");
+    }
+
+    #[test]
+    fn test_next_char_is_not_succeeds() {
+        let input = Span::new("abc");
+        let (rest, _) = next_char_is_not('b')(input).expect("next char should not be 'b'");
+        assert_eq!(rest.fragment(), &"abc");
+    }
+
+    #[test]
+    fn test_next_char_is_not_succeeds_with_eof() {
+        let input = Span::new("");
+        let (rest, _) = next_char_is_not('b')(input).expect("next char should not be 'b'");
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_next_char_is_not_fails() {
+        let input = Span::new("abc");
+        let res = next_char_is_not('a')(input);
+        assert!(res.is_err(), "should not succeed if next char is 'a'");
     }
 }
