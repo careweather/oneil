@@ -8,7 +8,7 @@
 //!
 //! ```
 //! use oneil::parser::token::literal::{number, string};
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! // Parse a floating point number
 //! let input = Span::new("-42.5e-2");

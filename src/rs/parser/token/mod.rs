@@ -24,7 +24,7 @@
 //!     symbol::brace_left,
 //!     structure::end_of_line
 //! };
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! // Parse a simple if statement opening
 //! let input = Span::new("if {\n");

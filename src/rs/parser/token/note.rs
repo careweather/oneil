@@ -9,7 +9,7 @@
 //!
 //! ```
 //! use oneil::parser::token::note::{single_line_note, multi_line_note};
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! // Parse a single-line note
 //! let input = Span::new("~ This is a note\nrest");

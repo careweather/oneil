@@ -7,7 +7,7 @@
 //!
 //! ```
 //! use oneil::parser::token::symbol::{bang_equals, brace_left, brace_right};
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! // Parse a not-equals operator
 //! let input = Span::new("!= rest");

@@ -8,7 +8,7 @@
 //!
 //! ```
 //! use oneil::parser::token::keyword::{and, if_};
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! let input = Span::new("and true");
 //! let (rest, matched) = and(input).unwrap();

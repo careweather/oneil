@@ -8,7 +8,7 @@
 //!
 //! ```
 //! use oneil::parser::token::naming::{identifier, label};
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! // Parse an identifier
 //! let input = Span::new("my_var123 rest");
@@ -33,7 +33,7 @@ use super::{Result, Span, keyword, util::token};
 ///
 /// ```
 /// use oneil::parser::token::naming::identifier;
-/// use oneil::parser::util::Span;
+/// use oneil::parser::Span;
 ///
 /// // Basic identifier
 /// let input = Span::new("variable rest");
@@ -76,7 +76,7 @@ pub fn identifier(input: Span) -> Result<Span> {
 ///
 /// ```
 /// use oneil::parser::token::naming::label;
-/// use oneil::parser::util::Span;
+/// use oneil::parser::Span;
 ///
 /// // Basic label
 /// let input = Span::new("Test Case: rest");

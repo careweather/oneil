@@ -4,7 +4,7 @@
 //!
 //! ```
 //! use oneil::parser::expression::parse;
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! // Parse a simple arithmetic expression
 //! let input = Span::new("2 + 3 * 4");

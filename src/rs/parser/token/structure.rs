@@ -10,7 +10,7 @@
 //!
 //! ```
 //! use oneil::parser::token::structure::end_of_line;
-//! use oneil::parser::util::Span;
+//! use oneil::parser::Span;
 //!
 //! // Parse a comment followed by newline
 //! let input = Span::new("# This is a comment\nrest");
