@@ -18,9 +18,8 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{cut, map, map_res, opt, value},
-    multi::{fold_many0, many0, separated_list0},
-    sequence::tuple,
+    combinator::{cut, map, opt, value},
+    multi::{many0, separated_list0},
 };
 
 use crate::ast::{

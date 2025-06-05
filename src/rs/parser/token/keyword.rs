@@ -19,7 +19,12 @@
 //! assert_eq!(matched.fragment(), &"if");
 //! ```
 
-use nom::{Parser as _, bytes::complete::tag, character::complete::satisfy, combinator::peek};
+use nom::{
+    Parser as _,
+    bytes::complete::tag,
+    character::complete::satisfy,
+    combinator::{eof, peek},
+};
 
 use super::{Parser, Result, Span, util::token};
 
@@ -29,9 +34,12 @@ pub const KEYWORDS: &[&str] = &[
 ];
 
 fn keyword(kw_str: &str) -> impl Parser<Span> {
+    let next_char_is_not_ident_char =
+        peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')).map(|_| ());
+    let reached_end_of_file = eof.map(|_| ());
     token((
         tag(kw_str),
-        peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')),
+        next_char_is_not_ident_char.or(reached_end_of_file),
     ))
 }
 
@@ -206,15 +214,28 @@ mod tests {
 
     #[test]
     fn test_keyword_not_at_start() {
-        let input = Span::new("foo and bar");
-        let res = and(input);
-        assert!(res.is_err(), "should not parse 'and' if not at start");
+        let mut parser = keyword("key");
+        let input = Span::new("foo key bar");
+        let res = parser.parse(input);
+        assert!(res.is_err(), "should not parse 'key' if not at start");
     }
 
     #[test]
     fn test_keyword_prefix() {
-        let input = Span::new("anderson");
-        let res = and(input);
-        assert!(res.is_err(), "should not parse 'and' as prefix");
+        let mut parser = keyword("key");
+        let input = Span::new("keyword");
+        let res = parser.parse(input);
+        assert!(res.is_err(), "should not parse 'key' as prefix");
+    }
+
+    #[test]
+    fn test_keyword_matches_at_end_of_file() {
+        let mut parser = keyword("key");
+        let input = Span::new("key");
+        let (rest, matched) = parser
+            .parse(input)
+            .expect("should parse 'key' at end of file");
+        assert_eq!(matched.fragment(), &"key");
+        assert_eq!(rest.fragment(), &"");
     }
 }

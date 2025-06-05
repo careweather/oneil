@@ -21,9 +21,11 @@
 //! assert_eq!(matched.fragment(), &"My Test Case");
 //! ```
 
-use nom::{Parser as _, bytes::complete::take_while, character::complete::satisfy};
+use nom::{
+    Parser as _, bytes::complete::take_while, character::complete::satisfy, combinator::verify,
+};
 
-use super::{Result, Span, util::token};
+use super::{Result, Span, keyword, util::token};
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
 ///
@@ -56,10 +58,13 @@ use super::{Result, Span, util::token};
 /// assert!(identifier(input).is_err());
 /// ```
 pub fn identifier(input: Span) -> Result<Span> {
-    token((
-        satisfy(|c: char| c.is_alphabetic() || c == '_'),
-        take_while(|c: char| c.is_alphanumeric() || c == '_'),
-    ))
+    verify(
+        token((
+            satisfy(|c: char| c.is_alphabetic() || c == '_'),
+            take_while(|c: char| c.is_alphanumeric() || c == '_'),
+        )),
+        |identifier| !keyword::KEYWORDS.contains(&identifier.fragment()),
+    )
     .parse(input)
 }
 
