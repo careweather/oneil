@@ -2562,7 +2562,7 @@ def handler(model: Model, inpt: str):
         elif cmd == "load":
             model_name, model_designs, commands = parse_args(args)
 
-            loader(model_name, model_designs)
+            model = loader(model_name, model_designs)
 
             for command in commands:
                 print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
@@ -2570,9 +2570,9 @@ def handler(model: Model, inpt: str):
 
         elif cmd == "reload":
             if model.design == "default":
-                loader(model.name, [])
+                model = loader(model.name, [])
             else:
-                loader(model.name, [model.design])
+                model = loader(model.name, [model.design])
         elif cmd == "help":
             print(help_text)
             return
