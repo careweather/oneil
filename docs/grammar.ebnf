@@ -24,6 +24,9 @@ MultiLineNote = MultiLineNoteDelimiter, { NoteLine }, MultiLineNoteDelimiter ;
 MultiLineNoteDelimiter = "~~~", "~"*, LineBreak ;
 NoteLine = { Any character except LineBreak or MultiLineNoteDelimiter }, LineBreak ; (* can contain anything except the multi-note delimiter*)
 
+(* Sections *)
+Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | ParameterDecl | TestDecl } ;
+
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
 FromDecl = "from", ModulePath, "use", ModelName, [ ModelInputs ], "as", Identifier, EndOfLine ;
@@ -32,9 +35,6 @@ ModulePath = Identifier, { ".", Identifier } ;
 ModelInputs = "(", ModelInput, { ",", ModelInput }, ")" ;
 ModelInput = Identifier, "=", Expr ;
 ModelName = Identifier ;
-
-(* Sections *)
-SectionDecl = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | ParameterDecl | TestDecl } ;
 
 (* Parameters *)
 ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine, [ Note ] ;
