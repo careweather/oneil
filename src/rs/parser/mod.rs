@@ -5,6 +5,7 @@
 
 pub mod expression;
 pub mod token;
+pub mod unit;
 mod util;
 
 pub use util::{Result, Span};
