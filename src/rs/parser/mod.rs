@@ -3,6 +3,7 @@
 //! This module provides the parsing functionality for converting Oneil source
 //! code into an Abstract Syntax Tree (AST).
 
+mod config;
 pub mod token;
 mod util;
 
@@ -14,4 +15,5 @@ pub mod parameter;
 pub mod test;
 pub mod unit;
 
+pub use config::Config;
 pub use util::{Result, Span};
