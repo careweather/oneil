@@ -1,5 +1,20 @@
 use super::expression::Expr;
+use super::note::Note;
 use super::unit::UnitExpr;
+
+/// A parameter in an Oneil program
+///
+/// Parameters are used to define the values of variables in the model.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parameter {
+    name: String,
+    ident: String,
+    value: ParameterValue,
+    limits: Limits,
+    is_performance: bool,
+    trace_level: TraceLevel,
+    note: Option<Note>,
+}
 
 /// A value assigned to a parameter.
 ///

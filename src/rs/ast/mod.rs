@@ -12,6 +12,7 @@ pub mod literal;
 pub mod model;
 pub mod note;
 pub mod parameter;
+pub mod test;
 pub mod unit;
 
 pub use declaration::Decl;
@@ -19,5 +20,6 @@ pub use expression::Expr;
 pub use literal::Literal;
 pub use model::Model;
 pub use note::Note;
-pub use parameter::ParameterValue;
+pub use parameter::Parameter;
+pub use test::Test;
 pub use unit::UnitExpr;

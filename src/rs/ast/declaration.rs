@@ -1,6 +1,6 @@
 use super::expression::Expr;
-use super::note::Note;
-use super::parameter::{Limits, ParameterValue, TraceLevel};
+use super::parameter::Parameter;
+use super::test::Test;
 
 /// A declaration in an Oneil program
 ///
@@ -25,21 +25,8 @@ pub enum Decl {
         as_name: String,
     },
 
-    Parameter {
-        name: String,
-        ident: String,
-        value: ParameterValue,
-        limits: Limits,
-        is_performance: bool,
-        trace_level: TraceLevel,
-        note: Option<Note>,
-    },
-
-    Test {
-        trace_level: TraceLevel,
-        inputs: Vec<String>,
-        expr: Expr,
-    },
+    Parameter(Parameter),
+    Test(Test),
 }
 
 #[derive(Debug, Clone, PartialEq)]
