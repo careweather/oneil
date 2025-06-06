@@ -1,0 +1,492 @@
+Run on commit 9113c353a0e2f685 of file scatterometer.on (branch: 1.0.0)
+--------------------------------
+Oneil 0.13
+Type 'help' for a list of commands or see the README for more information.
+--------------------------------------------------------------------------------
+Loading model scatterometer.on...
+--------------------------------------------------------------------------------
+[94mModel: scatterometer[0m
+[38;5;208mDesign: default[0m
+Parameters: 209 (51 independent, 154 dependent, 4 constants)
+Tests: 31/34 ([1m[91mFAIL[0m)
+--------------------------------------------------------------------------------
+U_P: 39.06|92.11 %
+U_B: 38.37|51.4 %
+P_r: -188.3|-135.4 dBW
+S_N: -33.73|21.92 dB
+F: 11.72|91.12 
+K_p: 0.003452|8.108 
+R: 28.1|42.22 km
+U_D: 0.1475|0.6146 %
+U_C: 104200.0|6286000.0 %
+T_temp: 190.4|322.3 K
+T: 263.0|303.0 K
+([94mscatterometer[0m) >>> tree
+([94mscatterometer[0m) >>> summarize
+--------------------------------------------------------------------------------
+[94mModel: scatterometer[0m
+[38;5;208mDesign: default[0m
+Parameters: 209 (51 independent, 154 dependent, 4 constants)
+Tests: 31/34 ([1m[91mFAIL[0m)
+--------------------------------------------------------------------------------
+U_P: 39.06|92.11 %
+U_B: 38.37|51.4 %
+P_r: -188.3|-135.4 dBW
+S_N: -33.73|21.92 dB
+F: 11.72|91.12 
+K_p: 0.003452|8.108 
+R: 28.1|42.22 km
+U_D: 0.1475|0.6146 %
+U_C: 104200.0|6286000.0 %
+T_temp: 190.4|322.3 K
+T: 263.0|303.0 K
+([94mscatterometer[0m) >>> all
+ADC_Bits_pp: 0.1194|63.25 bits -- ADC Max output bits peak to peak (scatterometer)
+ADC_Vin_pp: 0.1154|61.17 mV -- DC Voltage In Pk to Pk (scatterometer)
+A_c: 789600000000000.0|1783000000000000.0 km^2 -- Measurement cell area (scatterometer)
+B: 2429.0 kHz -- Echo bandwidth (scatterometer)
+BRF: 0.04523 kHz -- Burst repetition frequency (scatterometer)
+B_Dc: 9.23|21.35 kHz -- Doppler bandwidth across a single measurement cell (scatterometer)
+B_Dx: 21.35 kHz -- Doppler bandwidth across the cross-track footprint (scatterometer)
+B_Dy: 138.5 kHz -- Doppler bandwidth across the along-track footprint (scatterometer)
+B_bp: 2.068 MHz -- Target bandpass filter width (scatterometer)
+B_f: 9766.0 Hz -- FFT bin width (scatterometer)
+B_n: 4.006 MHz -- Necessary bandwidth (scatterometer)
+B_r: 2.03 MHz -- Receive bandwidth (scatterometer)
+B_t: 2000.0 kHz -- Radar transmit bandwidth (scatterometer)
+B_x: -399.0 kHz -- Excess bandwidth (scatterometer)
+C: 0.4524|0.5678  -- Coverage fraction (scatterometer)
+C_I: 0.0  -- Coherent integration (scatterometer)
+C_e: 0.4546|0.5706  -- Equatorial coverage fraction (scatterometer)
+C_l: 1.0  -- Local coverage fraction (scatterometer)
+C_s: 0.9952  -- Simple coverage fraction (scatterometer)
+D_r: 0.2261  -- Duty cycle (scatterometer)
+Delta: 0.001953 V -- Quantization step size (scatterometer)
+DeltaT_f: 0.8063 us -- FFT Time Step (scatterometer)
+EIRP: 11980.0|18750.0 W -- Effective isotropic radiated power (scatterometer)
+F: 11.72|91.12  -- Flavor count (scatterometer)
+F_F: 1.0  -- Focus factor (scatterometer)
+F_a: 1.0  -- Spatial averaging factor (scatterometer)
+F_d: 11.09|52.16  -- Dwell flavors (scatterometer)
+F_f: 4.0  -- Flavor averaging factor (scatterometer)
+F_n: 1.622  -- Receiver noise factor (scatterometer)
+F_omega: 4.228|6.987  -- Scan factor (scatterometer)
+GMF: NSCAT | NSCAT -- Geophysical model function (scatterometer)
+G_egamma: 0.0 km -- Azimuthal geolocation error (scatterometer)
+G_er: 0.0 km -- Radial geolocation error (scatterometer)
+G_f: 199.7|312.5  -- Frontend gain (scatterometer)
+K_p: 0.003452|8.108  -- Normalized standard deviation (scatterometer)
+L: 5.546e+26|6.968e+27 m^4 -- Total loss (scatterometer)
+L_D: 1.197  -- Doppler loss (scatterometer)
+L_Rx: 4.865|6.193 dB -- Total loss after antenna input (scatterometer)
+L_a: 1.12  -- Atmospheric loss (scatterometer)
+L_in: 1.809e+26|1.674e+27 m^4 -- Total loss at antenna input (scatterometer)
+L_p: 1.613e+26|1.485e+27 m^4 -- Free-space path loss (scatterometer)
+L_r: 4.0|5.0 dB -- Receive loss (scatterometer)
+L_s: 2.874|3.922  -- Total system loss (scatterometer)
+L_sm: 1.001|1.007  -- Smear loss (scatterometer)
+L_sp: 1.02|1.1  -- Signal processing loss (scatterometer)
+L_t: 1.0  -- Transmit loss (scatterometer)
+L_tau: 1.0  -- Pulse loss (scatterometer)
+Mixer_Pout: -92.38|-37.89 dBmW -- Mixer Power (scatterometer)
+Mixer_Vpp: 0.01924|10.19 mV -- Mixer Vout Peak-to-Peak (scatterometer)
+Mixer_Vrms: 0.01361|7.209 mV -- Mixer Vout RMS (scatterometer)
+NESZ: 7.007e-05|0.0009741  -- Noise-equivalent Sigma Zero (scatterometer)
+N_b: 15.0  -- Number of co-processed resolution bins (scatterometer)
+N_f: 127.0  -- Number of FFTs (scatterometer)
+N_rs: 8905.0|15510.0  -- Number of samples in the time of flight (scatterometer)
+O_D: none | none -- Doppler compensation mode (scatterometer)
+O_c: LFM | LFM -- Compression mode (scatterometer)
+O_r: polar | polar -- Resolution mode (scatterometer)
+Omega: 84.37 deg -- Maximum latitude of swath (scatterometer)
+PRF: 90.45 Hz -- Pulse repetition frequency (scatterometer)
+P_N: -132.2|-130.7 dBmW -- Noise power (scatterometer)
+P_S: -164.5|-110.3 dBmW -- Received signal power (scatterometer)
+P_S_test: -100.0 dBmW -- Test Signal Power (scatterometer)
+P_max: 145.0|175.8 W -- Satellite peak power (scatterometer)
+P_qn: 3.179e-07 V^2 -- Quantization noise power (scatterometer)
+P_r: -188.3|-135.4 dBW -- Signal Power at antenna (scatterometer)
+P_rs: 4.0|5.5 W -- Scatterometer support power (scatterometer)
+P_s: 32.85|40.97 W -- Scatterometer power (scatterometer)
+P_s_: 31.21|38.92 W -- Orbital average scatterometer power (scatterometer)
+P_sp: 131.6|162.4 W -- Scatterometer peak power (scatterometer)
+P_t: 60.0 W -- Radar transmit power (scatterometer)
+Power_front: -84.38|-29.89 dBmW -- Front End Recieve Power (scatterometer)
+R: 28.1|42.22 km -- Average spatial resolution (scatterometer)
+R_I: 50.0 Ohm -- Impedance (scatterometer)
+R_IQ: 80.0 Mbps -- IQ datarate (scatterometer)
+R_T_: 8740.0|9105.0 bps -- Average data collection rate (scatterometer)
+R_c: 800.0 MHz/s -- Chirp rate (scatterometer)
+R_d: 9093.0 bps -- Radar data collection rate (scatterometer)
+R_d_: 8639.0 bps -- Average radar data collection rate (scatterometer)
+R_g: 152.1|748.8 km -- Ground range (scatterometer)
+R_s: 533.9|930.0 km -- Slant range (scatterometer)
+SNR: 30.11|41.54 dB -- Signal-to-noise ratio (scatterometer)
+SNR_test: 30.74|32.18 dB -- Test SNR (scatterometer)
+S_IQ: 32.0 b -- Sample size (scatterometer)
+S_N: -33.73|21.92 dB -- Signal to noise ratio (scatterometer)
+S_adc: 10.0 b -- ADC bit resolution (scatterometer)
+S_d: 0.4233|4.177 km -- Dwell step (scatterometer)
+S_df: 1.057 km -- Dwell flight step (scatterometer)
+S_ds: 0.6339|3.12 km -- Dwell scan step (scatterometer)
+S_f: 256.0  -- FFT size (scatterometer)
+S_int: 32.0 b -- Max integer size (scatterometer)
+S_sigma0: 4.0 B -- Pulse data size (scatterometer)
+S_sigma0IQ: 65.54 kB -- Pulse size (scatterometer)
+S_tau: 0.0312|0.3079 km -- Pulse step (scatterometer)
+S_tf: 0.07792 km -- Pulse flight step (scatterometer)
+S_ts: 0.04672|0.23 km -- Pulse scan step (scatterometer)
+T: 263.0|303.0 K -- Temperature (scatterometer)
+TB: 5000.0  -- Time-bandwidth product (scatterometer)
+T_S: 303.3|357.6 K -- Equilibrium sunlit temperature (scatterometer)
+T_d: 150.0 ms -- Dwell time (scatterometer)
+T_f: 3.562|6.205 ms -- Time of flight (scatterometer)
+T_s: 4e-07 s -- Sampling period (scatterometer)
+T_t: 212.0|287.8 K -- Equilibrium side sunlit temperature (scatterometer)
+T_tau: 11.06 ms -- Pulse repetition interval (scatterometer)
+T_temp: 190.4|322.3 K -- Temperature (scatterometer)
+T_u: 169.3|196.6 K -- Equilibrium umbra temperature (scatterometer)
+U: 0.95  -- Uptime (scatterometer)
+U_B: 38.37|51.4 % -- Instantaneous battery usage (scatterometer)
+U_C: 104200.0|6286000.0 % -- Communication usage (scatterometer)
+U_D: 0.1475|0.6146 % -- Data storage usage (scatterometer)
+U_P: 39.06|92.11 % -- Orbital average power usage (scatterometer)
+V_adc: -1.0|1.0 V -- ADC voltage limits (scatterometer)
+V_c: 147800000.0|3864000000.0 m^2/s -- Collection volume (scatterometer)
+W_s: 1193.0|1498.0 km -- Swath width (scatterometer)
+W_ss: 1193.0|1498.0 km -- Total scan swath (scatterometer)
+a: 22.08|577.1 km -- Footprint length (scatterometer)
+a_g: 22.08|46.33 km -- Azimuthal footprint length (scatterometer)
+a_r: 536.4|577.1 km -- Radial footprint length (scatterometer)
+a_rc: 536.4|577.1 km -- Composite footprint width (scatterometer)
+alpha_e: 1.367|6.727 deg -- Earth angle of swath (scatterometer)
+alpha_phi: 5.36 deg -- Elevation look Earth angle (scatterometer)
+atten: 0.0 dB -- Output Attenuator  (scatterometer)
+c_omega: 1631.0|1773.0 km -- Scan chord (scatterometer)
+capture_size: 2048.0  -- Capture size  (scatterometer)
+e_G: 0.0 km -- Geolocation error (scatterometer)
+e_gamma: 0.0 deg -- Azimuth look angle error (scatterometer)
+e_phi: 0.0 deg -- Elevation look angle error (scatterometer)
+eta_rcnv: 85.0|95.0 % -- Radar power conversion efficiency (scatterometer)
+eta_rpa: 50.0 % -- Radar power amplifier efficiency (scatterometer)
+eta_rsw: 0.9|0.99  -- Radar switching efficiency (scatterometer)
+f_Dx: -10.67|10.68 kHz -- Two-way echo doppler shift across the cross-track footprint (scatterometer)
+f_Dy: 76.05|214.5 kHz -- Two-way echo doppler shift across the along-track footprint (scatterometer)
+f_LO: 100.0 kHz -- LO frequency offset (scatterometer)
+f_adc: 2.5 MHz -- Sampling rate  (scatterometer)
+lambd_CF: 0.05702 m -- Wavelength of the transmitted center frequency (scatterometer)
+n_adc: 512.0  -- ADC step count (scatterometer)
+n_b: 6.0  -- Number of bursts in a dwell (scatterometer)
+n_bp: 263.5  -- Ideal digital bandpass filter bin count (scatterometer)
+n_d: 12.0  -- Number of looks in a dwell (scatterometer)
+n_f: 8.0  -- FFT power (scatterometer)
+n_fo: 2.0  -- FFT overlaps (scatterometer)
+n_l: 1.0  -- Number of looks in a burst (scatterometer)
+n_n: 1.0  -- Number of noise-only looks in a burst (scatterometer)
+n_p: 2.0  -- Number of pulses in a burst (scatterometer)
+n_rf: 1.0  -- Number of rf signals (scatterometer)
+n_s: 16380.0  -- Total samples  (scatterometer)
+numb_captures: 8.0  -- Number of captures (scatterometer)
+phi: 35.0 deg -- Elevation look angle (scatterometer)
+phi_e: 16.55|53.45 deg -- Look edge angle (scatterometer)
+phi_e2: 16.55|53.45 deg -- Look edge coordinate angle (scatterometer)
+phi_e2max: 53.45 deg -- Look edge max placeholder (scatterometer)
+phi_e2min: 16.55 deg -- Look edge min placeholder (scatterometer)
+phi_e2sign: 2.0  -- Look edge sign comparison (scatterometer)
+phi_et: 0.2889|0.9328  -- Minimum errorless look edge angle (scatterometer)
+phi_t: 35.0 deg -- Target elevation look angle (scatterometer)
+pol: 1.0  -- Polarizations (scatterometer)
+psi: 0.0|360.0 deg -- Azimuth look angle (scatterometer)
+q_netS: 96.91|527.0 W -- Direct sun net heat flux (scatterometer)
+q_netc: -476.3|-353.1 W -- Cooling net heat flux (scatterometer)
+q_nett: -352.0|-12.16 W -- Terminator net heat flux (scatterometer)
+q_netu: -435.4|-317.1 W -- Umbra net heat flux (scatterometer)
+q_outS: 481.0|1139.0 W -- Heat dissipation rate (scatterometer)
+q_outu: 46.72|104.0 W -- Heat dissipation rate (scatterometer)
+q_s: 16.53|24.04 W -- Scatterometer waste heat (scatterometer)
+r_Dx: 11.86|20.67 m -- Doppler resolution at the cross-track axis (scatterometer)
+r_Dy: 13.0|68.75 m -- Doppler resolution at the along-track axis (scatterometer)
+r_g: 22.08|46.33 km -- Azimuthal resolution cell width (scatterometer)
+r_r: 35.76|38.48 km -- Radial resolution cell width (scatterometer)
+r_rrd: 58.84 m -- Range resolution (scatterometer)
+r_s: 74.95 m -- Line-of-sight resolution (scatterometer)
+r_xx: 35.76|38.48 km -- X resolution cell width at the x axis (scatterometer)
+r_xy: 22.08|46.33 km -- X resolution cell width at the y axis (scatterometer)
+r_yx: 22.08|46.33 km -- Y resolution cell width in the x axis (scatterometer)
+r_yy: 35.76|38.48 km -- Y resolution cell width in the y axis (scatterometer)
+rho_A: 54.0 1/m -- Solar + antenna + emisive area density (scatterometer)
+rho_G: 3993.0|6249.0 1/m^3 -- Gain density (scatterometer)
+rho_S_: 1008.0|1697.0 W/m^3 -- Orbital average solar density (scatterometer)
+rho_qS: 1938.0|10540.0 W/m^3 -- Sunlit heat flux density (scatterometer)
+rho_qavg: -4604.0|1318.0 W/m^3 -- Average heat flux density (scatterometer)
+rho_qc: -9526.0|-7062.0 W/m^3 -- Cooling heat flux density (scatterometer)
+rho_qt: -7040.0|-243.2 W/m^3 -- Terminator heat flux density (scatterometer)
+rho_qu: -8709.0|-6343.0 W/m^3 -- Umbra heat flux density (scatterometer)
+sigma: 402300.0|3445000000.0 m^2 -- Radar cross section (scatterometer)
+sigma_0: 0.0005095|1.933  -- Normalized radar cross-section (scatterometer)
+sigma_0n: 13.0|17.5 dB -- Nadir normalized radar cross-section (scatterometer)
+t_Rx: 6.554 ms -- Receive window (scatterometer)
+t_Rx0: 3.501 ms -- Receive start time (scatterometer)
+t_dRx: 1.0 ms -- Receive delay (scatterometer)
+t_dTx: 1.0 ms -- Transmit delay (scatterometer)
+t_f: 102.4 us -- FFT Time (scatterometer)
+t_r: 1.0 us -- Emitted pulse rise time (scatterometer)
+t_s: 8.5e-07 s -- Switching time (scatterometer)
+t_sRF: 0.35 us -- RF switching time (scatterometer)
+t_ss: 0.5 us -- Software switching time (scatterometer)
+tau: 2.5 ms -- Pulse length (scatterometer)
+tau_e: 5.142 ms -- Echo length (scatterometer)
+tau_o: 0.0 s -- Pulse overlap (scatterometer)
+tau_o0: 0.0 s -- Early pulse overlap (scatterometer)
+tau_o1: 0.0 s -- Late pulse overlap (scatterometer)
+theta: 38.28 deg -- Incidence angle (scatterometer)
+theta_e: 17.92|60.17 deg -- Look edge incidence angle (scatterometer)
+theta_t: 8.0 deg -- Transition incidence angle (scatterometer)
+v_r: -5.312e-13|0.0 m/s -- Radial look speed (scatterometer)
+v_s: 2169.0|6114.0 m/s -- Line of sight velocity (scatterometer)
+v_sx: -304.4|304.4 m/s -- Two-way line of sight velocity in the cross-track direction (scatterometer)
+v_sy: 2169.0|6114.0 m/s -- Two-way line of sight velocity in the along-track direction (scatterometer)
+([94mscatterometer[0m) >>> dependents
+([94mscatterometer[0m) >>> independent
+scatterometer:
+    Target elevation look angle: phi_t = 35.0 deg
+    Azimuth look angle: psi = 0.0|360.0 deg
+    Pulse length: tau = 2.5 ms
+    Dwell time: T_d = 150.0 ms
+    Number of looks in a burst: n_l = 1.0 
+    Number of noise-only looks in a burst: n_n = 1.0 
+    RF switching time: t_sRF = 0.35 us
+    Emitted pulse rise time: t_r = 1.0 us
+    Software switching time: t_ss = 0.5 us
+    Receive delay: t_dRx = 1.0 ms
+    Transmit delay: t_dTx = 1.0 ms
+    FFT power: n_f = 8.0 
+    FFT overlaps: n_fo = 2.0 
+    Target bandpass filter width: B_bp = 2.068 MHz
+    Receive bandwidth: B_r = 2.03 MHz
+    Capture size : capture_size = 2048.0 
+    Number of captures: numb_captures = 8.0 
+    Sampling rate : f_adc = 2.5 MHz
+    ADC bit resolution: S_adc = 10.0 b
+    Max integer size: S_int = 32.0 b
+    ADC voltage limits: V_adc = -1.0|1.0 V
+    Impedance: R_I = 50.0 Ohm
+    Radar power amplifier efficiency: eta_rpa = 50.0 %
+    Radar power conversion efficiency: eta_rcnv = 85.0|95.0 %
+    Radar switching efficiency: eta_rsw = 0.9|0.99 
+    Polarizations: pol = 1.0 
+    Coherent integration: C_I = 0.0 
+    Number of rf signals: n_rf = 1.0 
+    Radar transmit power: P_t = 60.0 W
+    Compression mode: O_c = LFM | LFM
+    Output Attenuator : atten = 0.0 dB
+    Receiver noise factor: F_n = 1.6218 
+    Scatterometer support power: P_rs = 4.0|5.5 W
+    Number of co-processed resolution bins: N_b = 15.0 
+    Test Signal Power: P_S_test = -100.0 dBmW
+    Nadir normalized radar cross-section: sigma_0n = 13.0|17.5 dB
+    Transition incidence angle: theta_t = 8.0 deg
+    Geophysical model function: GMF = NSCAT | NSCAT
+    LO frequency offset: f_LO = 100.0 kHz
+    Resolution mode: O_r = polar | polar
+    Flavor averaging factor: F_f = 4.0 
+    Transmit loss: L_t = 1.0 
+    Atmospheric loss: L_a = 1.12 
+    Receive loss: L_r = 4.0|5.0 dB
+    Signal processing loss: L_sp = 1.02|1.1 
+    Doppler compensation mode: O_D = none | none
+    Focus factor: F_F = 1.0 
+    Uptime: U = 0.95 
+    Spatial averaging factor: F_a = 1.0 
+    Pulse data size: S_sigma0 = 4.0 B
+    Temperature: T = 263.0|303.0 K
+constants:
+    Speed of light: c = 299792460.0 m/s
+    Boltzmann constant: k = 1.380649e-23 m^2*kg/s^2/K
+    Standard temperature: T_s = 293.15 K
+    Reference temperature: T_0 = 290.0 K
+    Stefan-Boltzmann constant: sigma_b = 5.6703744e-08 W/m^2/K^4
+    Earth IR radiation at Earth's surface: q_I = 216.0|258.0 W/m^2
+    Earth radius: R_E = 6378136.6 m
+    Earth Surface Area : SA_E = 5.096e+20 km^2
+    Obliquity of Earth's rotation: epsilon = 0.40910518 
+    Earth albedo: a_E = 0.3 
+    Standard Earth gravity: g_E = 9.81 m/s^2
+    Earth temperature: T_P = 288.0 K
+    Reflection coefficient: Rho_S = 0.1|0.2 
+    Earth rotation period: T_E = 23.93447 hr
+    Earth ocean fraction: C_o = 0.708 
+    Angular diameter of the sun from Earth: omega = 0.001 
+    Solar luminosity in Earth orbit: L = 127000.0 
+    Solar irradiance in LEO: G_S = 1360.4|1361.4 W/m^2
+    CubeSat launch cost: C_U = 20.0|60.0 k$
+antenna:
+    Frequency: f = 5.25655|5.25855 GHz
+    1st beamwidth factor: alpha_1 = 5.45|6.1 
+    2nd beamwidth factor: alpha_2 = 0.98|1.18 
+    1st length: L_1 = 0.4 m
+    2nd length: L_2 = 1.0 m
+    Voltage standing wave ratio: VSWR = 1.1 
+    Radiation efficiency: eta_r = 0.7|0.9 
+    Shape factor: F = 1.0 
+    Aperture efficiency: eta_a = 0.185|0.225 
+    Complementary antenna multiple: M_fc = 1.0 
+    Supplementary antenna multiple: M_fs = 1.0 
+    Antenna thickness: t = 1.0 mm
+    Antenna density: rho = 2000000000000.0 g/cm^3
+    Deployable area factor: F_D = 1.0 
+radar_chain:
+    PMA3-63GLN+ Gain: Gain_PMA3 = 25.0 dB
+    PMA3-63GLN+ Noise Factor: NF_PMA3 = 0.9|1.34 dB
+    Antenna to LNA1 Loss: Loss_Antenna = 1.0|2.0 dB
+    LNA1 Loss: Loss_LNA1 = 3.5|3.6 dB
+    LNA2 Loss: Loss_LNA2 = 0.5|1.0 dB
+    LNA3 Loss: Loss_LNA3 = 10.0 dB
+    LNA4 Gain: Gain_LNA4 = 16.5 dB
+    LNA4 Noise Factor: NF_LNA4 = 1.1|1.4 dB
+    LNA4 Loss: Loss_LNA4 = 1.0 dB
+    Mixer Downconversion Loss: Mixer_Loss = 8.0 dB
+    Mixer Impedance: Mixer_Z = 320.0 Ohm
+    Baseband Amplifier Gain: G_bb = 6.0 
+    ADC Resolution bits: ADC_Res = 1024.0 bits
+    ADC Offset bits: ADC_Offset = 10.0 bits
+    ADC Absolute max range: ADC_Max = 1000.0 mV
+    ADC Numb Channels: ADC_Channels = 2.0 
+    ADC Sensitivity Bits: ADC_Min_Sensitivity = 6.0 bits
+    Front End Test Power: Test_PIN = -10.0 dBmW
+    Balloon Altitude: A_Balloon = 30.0 km
+    Slant_Angle: A_slant = 22.5 deg
+satellite:
+    Temperature: T = 249.0|305.0 K
+    Orbital average illumination efficiency: eta_i_ = 0.63661977 
+    Scanning rate: omega = 10.0 deg/s
+    Charging consecutiveness: F_c = 1.0 
+    Charging downtime: F_d = 0.0 
+    Polarization loss: L_p = 3.0 dB
+    Misalignment loss: L_m = 0.0|2.0 dB
+    Network session duration: t_n = 5.0|15.0 min
+    Station contact interval: T_g = 6.0|24.0 hr
+    Iridium beacon duration: t_bIr = 5.0|15.0 s
+    Iridium beacon repeat interval: T_bIr = 7.5|15.0 min
+    Battery power telemetry size: S_bt = 1.0 B
+    Battery power telemetry count: n_bt = 2.0 
+    Temperature telemetry size: S_t = 1.0 B
+    Temperature telemetry count: n_t = 10.0 
+    Vitals telemetry collection interval: T_v = 10.0 s
+    Sun sensor telemetry size: S_ss = 4.0 B
+    Sun sensor telemetry count: n_ss = 6.0 
+    Magnetometer telemetry size: S_m = 3.0 B
+    Magnetometer telemetry count: n_m = 1.0 
+    MRP size: S_mrp = 32.0 b
+    MRP count: n_mrp = 3.0 
+    Attitude determination telemetry collection interval: T_ad = 0.2|1.0 s
+    MCU file size: S_f = 1.0|30.0 kB
+    File collection period: T_f = 2.0 week
+    Separation system mass: m_s = 2.0 kg
+    Separation system cost: C_s = 100000.0 $
+    Form factor: F = plate | plate
+    Form factor units: U = 0.25 
+    Cubesat Unit cost: C_U = 40000.0|80000.0 $
+    Cubesat cost floor: C_Umin = 65000.0 $
+    Pocketqube cost: C_p = 28000.0 $
+    Plate cost: C_pl = 1300000.0 $
+    Deployment tumble about body x-axis: theta_x = -5.0 deg/s
+    Deployment tumble about body y-axis: theta_y = 0.0 deg/s
+    Deployment tumble about body z-axis: theta_z = 1.0 deg/s
+    Attitude determination and control error: e_adcs = 0.0 deg
+([94mscatterometer[0m) >>> test
+Test (scatterometer): RFIN_MIN.rc < P_r < RFIN_MAX.rc
+	Result: [91mfail[0m
+	RFIN_MIN: -133.9|-132.3 dBmW
+	P_r: -188.3|-135.4 dBW
+	RFIN_MAX: -83.19|-81.59 dBmW
+Test (scatterometer): theta > theta_t
+	Result: [92mpass[0m
+Test (scatterometer): R_s**2 < (R_E.c + h.o)**2 + R_E.c**2
+	Result: [92mpass[0m
+Test (scatterometer): 0.314159 < theta < 1.0472
+	Result: [92mpass[0m
+Test (scatterometer): R_s >= h.o
+	Result: [92mpass[0m
+Test (scatterometer): R_g < d_H.o/2
+	Result: [92mpass[0m
+Test (scatterometer): R_s < 2*R_E.c + h.o
+	Result: [92mpass[0m
+Test (scatterometer): W_s < d_H.o
+	Result: [92mpass[0m
+Test (scatterometer): U_P <= 1
+	Result: [92mpass[0m
+Test (scatterometer): U_B <= 1
+	Result: [92mpass[0m
+Test (scatterometer): tau < T_tau
+	Result: [92mpass[0m
+Test (scatterometer): F >= 3
+	Result: [92mpass[0m
+Test (scatterometer): r_xx <= W_s
+	Result: [92mpass[0m
+Test (scatterometer): r_xy <= W_s
+	Result: [92mpass[0m
+Test (scatterometer): r_r <= a_r
+	Result: [92mpass[0m
+Test (scatterometer): r_g <= a_g
+	Result: [92mpass[0m
+Test (scatterometer): r_r >= r_rrd or O_r != "footprint"
+	Result: [92mpass[0m
+Test (scatterometer): tau < tau_e
+	Result: [92mpass[0m
+Test (scatterometer): T_d < U*T.o
+	Result: [92mpass[0m
+Test (scatterometer): f_LO > B_r/2
+	Result: [91mfail[0m
+	If the LO frequency offset isn't high enough to separate the LO frequency from any possible received frequencies, higher noise will result.
+	f_LO: 100.0 kHz
+	B_r: 2.03 MHz
+Test (scatterometer): B_bp < f_adc
+	Result: [92mpass[0m
+Test (satellite): M_up > 0
+	Result: [92mpass[0m
+Test (satellite): M_dn > 0
+	Result: [92mpass[0m
+Test (satellite): t_n < T_n
+	Result: [92mpass[0m
+Test (satellite): t_bIr < T_bIr
+	Result: [92mpass[0m
+Test (satellite): T_n > T.o
+	Result: [92mpass[0m
+Test (satellite): B > 0
+	Result: [92mpass[0m
+Test (satellite): U_D < 1
+	Result: [92mpass[0m
+Test (satellite): U_C < 1
+	Result: [91mfail[0m
+	Data transfer usage must be less than 100%.
+	U_C: 114.5|6765.0 %
+Test (solar_cell): eta < 0.395
+	Result: [92mpass[0m
+Test (trill): 0.5*R*X <= B_Tx/2 <= 10*R*X
+	Result: [92mpass[0m
+Test (camera): S_d < S_max
+	Result: [92mpass[0m
+Test (orbit): G_a < G_S.c
+	Result: [92mpass[0m
+Test (orbit): d_H < 2*R_E.c
+	Result: [92mpass[0m
+([94mscatterometer[0m) >>> reload
+Loading model scatterometer.on...
+--------------------------------------------------------------------------------
+[94mModel: scatterometer[0m
+[38;5;208mDesign: default[0m
+Parameters: 209 (51 independent, 154 dependent, 4 constants)
+Tests: 31/34 ([1m[91mFAIL[0m)
+--------------------------------------------------------------------------------
+U_P: 39.06|92.11 %
+U_B: 38.37|51.4 %
+P_r: -188.3|-135.4 dBW
+S_N: -33.73|21.92 dB
+F: 11.72|91.12 
+K_p: 0.003452|8.108 
+R: 28.1|42.22 km
+U_D: 0.1475|0.6146 %
+U_C: 104200.0|6286000.0 %
+T_temp: 190.4|322.3 K
+T: 263.0|303.0 K
