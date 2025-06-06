@@ -3,7 +3,7 @@ use super::parameter::TraceLevel;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
-    trace_level: TraceLevel,
-    inputs: Vec<String>,
-    expr: Expr,
+    pub trace_level: TraceLevel,
+    pub inputs: Vec<String>,
+    pub expr: Expr,
 }

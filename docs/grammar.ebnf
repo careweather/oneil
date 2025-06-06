@@ -47,7 +47,7 @@ DiscreteLimits = "[", Expr, { ",", Expr }, "]" ;
 Assignment = Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
 
 (* Tests *)
-TestDecl = [ Trace ], "test", [ TestInputs ], ":", BooleanExpr, EndOfLine ;
+TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expr, EndOfLine ;
 TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
 
 (* Expressions *)
