@@ -1,5 +1,3 @@
-use super::literal::Literal;
-
 /// An expression in the Oneil language
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -48,4 +46,11 @@ pub enum BinaryOp {
 pub enum UnaryOp {
     Neg,
     Not,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Number(f64),
+    String(String),
+    Boolean(bool),
 }

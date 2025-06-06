@@ -23,8 +23,8 @@ use nom::{
 };
 
 use crate::ast::{
-    Expr, Literal,
-    expression::{BinaryOp, UnaryOp},
+    Expr,
+    expression::{BinaryOp, Literal, UnaryOp},
 };
 
 use super::{

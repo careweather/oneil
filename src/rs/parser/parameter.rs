@@ -133,8 +133,7 @@ fn piecewise_part(input: Span) -> Result<PiecewisePart> {
 mod tests {
     use super::*;
     use crate::ast::{
-        expression::{BinaryOp, Expr},
-        literal::Literal,
+        expression::{BinaryOp, Expr, Literal},
         unit::{UnitExpr, UnitOp},
     };
 

@@ -54,8 +54,7 @@ fn test_inputs(input: Span) -> Result<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::expression::Expr;
-    use crate::ast::literal::Literal;
+    use crate::ast::expression::{Expr, Literal};
 
     #[test]
     fn test_decl_basic() {
