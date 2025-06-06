@@ -1,11 +1,12 @@
 use nom::{IResult, Parser as NomParser, error::Error};
 use nom_locate::LocatedSpan;
 
+use super::config::Config;
+
 /// A span of text in the input string
 ///
-/// Currently just an alias for `LocatedSpan<&str>`, but it may be updated in
-/// the future
-pub type Span<'a> = LocatedSpan<&'a str>;
+/// The span also contains the configuration for the parser.
+pub type Span<'a> = LocatedSpan<&'a str, Config>;
 
 /// A result of a parser
 ///

@@ -4,14 +4,14 @@
 //!
 //! ```
 //! use oneil::parser::declaration::parse;
-//! use oneil::parser::Span;
+//! use oneil::parser::{Config, Span};
 //!
 //! // Parse an import declaration
-//! let input = Span::new("import foo\n");
+//! let input = Span::new_extra("import foo\n", Config::default());
 //! let (_, decl) = parse(input).unwrap();
 //!
 //! // Parse a use declaration
-//! let input = Span::new("use foo.bar as baz\n");
+//! let input = Span::new_extra("use foo.bar as baz\n", Config::default());
 //! let (_, decl) = parse(input).unwrap();
 //! ```
 
@@ -134,10 +134,11 @@ fn model_input(input: Span) -> Result<ModelInput> {
 mod tests {
     use super::*;
     use crate::ast::expression::{Expr, Literal};
+    use crate::parser::Config;
 
     #[test]
     fn test_import_decl() {
-        let input = Span::new("import foo\n");
+        let input = Span::new_extra("import foo\n", Config::default());
         let (rest, decl) = import_decl(input).unwrap();
         match decl {
             Decl::Import { path } => {
@@ -150,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_use_decl() {
-        let input = Span::new("use foo.bar as baz\n");
+        let input = Span::new_extra("use foo.bar as baz\n", Config::default());
         let (rest, decl) = use_decl(input).unwrap();
         match decl {
             Decl::Use {
@@ -169,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_use_decl_with_inputs() {
-        let input = Span::new("use foo.bar(x=1, y=2) as baz\n");
+        let input = Span::new_extra("use foo.bar(x=1, y=2) as baz\n", Config::default());
         let (rest, decl) = use_decl(input).unwrap();
         match decl {
             Decl::Use {
@@ -192,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_from_decl() {
-        let input = Span::new("from foo.bar use model as baz\n");
+        let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
         let (rest, decl) = from_decl(input).unwrap();
         match decl {
             Decl::From {
@@ -213,7 +214,10 @@ mod tests {
 
     #[test]
     fn test_from_decl_with_inputs() {
-        let input = Span::new("from foo.bar use model(x=1, y=2) as baz\n");
+        let input = Span::new_extra(
+            "from foo.bar use model(x=1, y=2) as baz\n",
+            Config::default(),
+        );
         let (rest, decl) = from_decl(input).unwrap();
         match decl {
             Decl::From {

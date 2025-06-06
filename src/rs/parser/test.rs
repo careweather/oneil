@@ -55,10 +55,11 @@ fn test_inputs(input: Span) -> Result<Vec<String>> {
 mod tests {
     use super::*;
     use crate::ast::expression::{Expr, Literal};
+    use crate::parser::Config;
 
     #[test]
     fn test_decl_basic() {
-        let input = Span::new("test: true\n");
+        let input = Span::new_extra("test: true\n", Config::default());
         let (rest, test) = test_decl(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::None);
         assert!(test.inputs.is_empty());
@@ -68,7 +69,7 @@ mod tests {
 
     #[test]
     fn test_decl_at_eof() {
-        let input = Span::new("test: true");
+        let input = Span::new_extra("test: true", Config::default());
         let (_, test) = test_decl(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::None);
         assert!(test.inputs.is_empty());
@@ -77,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_decl_with_trace() {
-        let input = Span::new("* test: true\n");
+        let input = Span::new_extra("* test: true\n", Config::default());
         let (rest, test) = test_decl(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::Trace);
         assert!(test.inputs.is_empty());
@@ -87,7 +88,7 @@ mod tests {
 
     #[test]
     fn test_decl_with_debug() {
-        let input = Span::new("** test: true\n");
+        let input = Span::new_extra("** test: true\n", Config::default());
         let (_, test) = test_decl(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::Debug);
         assert!(test.inputs.is_empty());
@@ -96,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_decl_with_inputs() {
-        let input = Span::new("test {x, y}: x > y\n");
+        let input = Span::new_extra("test {x, y}: x > y\n", Config::default());
         let (rest, test) = test_decl(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::None);
         assert_eq!(test.inputs, vec!["x", "y"]);
@@ -106,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_decl_full() {
-        let input = Span::new("** test {x, y, z}: x > y and y > z\n");
+        let input = Span::new_extra("** test {x, y, z}: x > y and y > z\n", Config::default());
         let (rest, test) = test_decl(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::Debug);
         assert_eq!(test.inputs, vec!["x", "y", "z"]);

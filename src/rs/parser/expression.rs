@@ -4,14 +4,14 @@
 //!
 //! ```
 //! use oneil::parser::expression::parse;
-//! use oneil::parser::Span;
+//! use oneil::parser::{Config, Span};
 //!
 //! // Parse a simple arithmetic expression
-//! let input = Span::new("2 + 3 * 4");
+//! let input = Span::new_extra("2 + 3 * 4", Config::default());
 //! let (_, expr) = parse(input).unwrap();
 //!
 //! // Parse a complex expression with multiple operators
-//! let input = Span::new("-(x + y)^2 < foo(a, b) and not c");
+//! let input = Span::new_extra("-(x + y)^2 < foo(a, b) and not c", Config::default());
 //! let (_, expr) = parse(input).unwrap();
 //! ```
 
@@ -200,45 +200,46 @@ fn function_call(input: Span) -> Result<Expr> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::Config;
 
     #[test]
     fn test_primary_expr_number() {
-        let input = Span::new("42");
+        let input = Span::new_extra("42", Config::default());
         let (_, expr) = primary_expr(input).unwrap();
         assert_eq!(expr, Expr::Literal(Literal::Number(42.0)));
     }
 
     #[test]
     fn test_primary_expr_string() {
-        let input = Span::new("\"hello\"");
+        let input = Span::new_extra("\"hello\"", Config::default());
         let (_, expr) = primary_expr(input).unwrap();
         assert_eq!(expr, Expr::Literal(Literal::String("hello".to_string())));
     }
 
     #[test]
     fn test_primary_expr_boolean_true() {
-        let input = Span::new("true");
+        let input = Span::new_extra("true", Config::default());
         let (_, expr) = primary_expr(input).unwrap();
         assert_eq!(expr, Expr::Literal(Literal::Boolean(true)));
     }
 
     #[test]
     fn test_primary_expr_boolean_false() {
-        let input = Span::new("false");
+        let input = Span::new_extra("false", Config::default());
         let (_, expr) = primary_expr(input).unwrap();
         assert_eq!(expr, Expr::Literal(Literal::Boolean(false)));
     }
 
     #[test]
     fn test_primary_expr_identifier() {
-        let input = Span::new("foo");
+        let input = Span::new_extra("foo", Config::default());
         let (_, expr) = primary_expr(input).unwrap();
         assert_eq!(expr, Expr::Variable("foo".to_string()));
     }
 
     #[test]
     fn test_function_call() {
-        let input = Span::new("foo(1, 2)");
+        let input = Span::new_extra("foo(1, 2)", Config::default());
         let (_, expr) = function_call(input).unwrap();
         match expr {
             Expr::FunctionCall { name, args } => {
@@ -251,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_neg_expr() {
-        let input = Span::new("-42");
+        let input = Span::new_extra("-42", Config::default());
         let (_, expr) = neg_expr(input).unwrap();
         assert_eq!(
             expr,
@@ -264,7 +265,7 @@ mod tests {
 
     #[test]
     fn test_exponential_expr() {
-        let input = Span::new("2^3");
+        let input = Span::new_extra("2^3", Config::default());
         let (_, expr) = exponential_expr(input).unwrap();
         match expr {
             Expr::BinaryOp {
@@ -276,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_multiplicative_expr() {
-        let input = Span::new("2*3");
+        let input = Span::new_extra("2*3", Config::default());
         let (_, expr) = multiplicative_expr(input).unwrap();
         match expr {
             Expr::BinaryOp {
@@ -288,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_additive_expr() {
-        let input = Span::new("2+3");
+        let input = Span::new_extra("2+3", Config::default());
         let (_, expr) = additive_expr(input).unwrap();
         match expr {
             Expr::BinaryOp {
@@ -300,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_comparison_expr() {
-        let input = Span::new("2<3");
+        let input = Span::new_extra("2<3", Config::default());
         let (_, expr) = comparison_expr(input).unwrap();
         match expr {
             Expr::BinaryOp {
@@ -313,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_not_expr() {
-        let input = Span::new("not true");
+        let input = Span::new_extra("not true", Config::default());
         let (_, expr) = not_expr(input).unwrap();
         match expr {
             Expr::UnaryOp {
@@ -325,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_and_expr() {
-        let input = Span::new("true and false");
+        let input = Span::new_extra("true and false", Config::default());
         let (_, expr) = and_expr(input).unwrap();
         match expr {
             Expr::BinaryOp {
@@ -337,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_or_expr() {
-        let input = Span::new("true or false");
+        let input = Span::new_extra("true or false", Config::default());
         let (_, expr) = or_expr(input).unwrap();
         match expr {
             Expr::BinaryOp {
@@ -349,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_complex_expr() {
-        let input = Span::new("-(2 + 3*4^2) < foo(5, 6) and not bar");
+        let input = Span::new_extra("-(2 + 3*4^2) < foo(5, 6) and not bar", Config::default());
         let (_, expr) = expr(input).unwrap();
         // The exact structure is complex but we just verify it parses
         assert!(matches!(

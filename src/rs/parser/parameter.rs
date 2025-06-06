@@ -136,10 +136,11 @@ mod tests {
         expression::{BinaryOp, Expr, Literal},
         unit::{UnitExpr, UnitOp},
     };
+    use crate::parser::Config;
 
     #[test]
     fn test_parse_simple_parameter() {
-        let input = Span::new("x: y = 42");
+        let input = Span::new_extra("x: y = 42", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         assert_eq!(param.name, "x");
         assert_eq!(param.ident, "y");
@@ -157,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_parse_parameter_with_continuous_limits() {
-        let input = Span::new("x(0, 100): y = 42");
+        let input = Span::new_extra("x(0, 100): y = 42", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         match param.limits {
             Some(Limits::Continuous { min, max }) => {
@@ -170,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_parse_parameter_with_discrete_limits() {
-        let input = Span::new("x[1, 2, 3]: y = 42");
+        let input = Span::new_extra("x[1, 2, 3]: y = 42", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         match param.limits {
             Some(Limits::Discrete { values }) => {
@@ -185,28 +186,28 @@ mod tests {
 
     #[test]
     fn test_parse_parameter_with_performance() {
-        let input = Span::new("$ x: y = 42");
+        let input = Span::new_extra("$ x: y = 42", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         assert!(param.is_performance);
     }
 
     #[test]
     fn test_parse_parameter_with_trace() {
-        let input = Span::new("* x: y = 42");
+        let input = Span::new_extra("* x: y = 42", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         assert_eq!(param.trace_level, TraceLevel::Trace);
     }
 
     #[test]
     fn test_parse_parameter_with_debug() {
-        let input = Span::new("** x: y = 42");
+        let input = Span::new_extra("** x: y = 42", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         assert_eq!(param.trace_level, TraceLevel::Debug);
     }
 
     #[test]
     fn test_parse_parameter_with_simple_units() {
-        let input = Span::new("x: y = 42 : kg");
+        let input = Span::new_extra("x: y = 42 : kg", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         match param.value {
             ParameterValue::Simple(expr, unit) => {
@@ -226,7 +227,7 @@ mod tests {
     #[test]
     fn test_parse_parameter_with_compound_units() {
         // Test compound unit
-        let input = Span::new("x: y = 42 : m/s^2");
+        let input = Span::new_extra("x: y = 42 : m/s^2", Config::default());
         let (_, param) = parameter_decl(input).unwrap();
         match param.value {
             ParameterValue::Simple(expr, unit) => {
@@ -246,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_parse_piecewise_parameter() {
-        let input = Span::new("x: y = {2*z if z > 0 \n {0 if z <= 0");
+        let input = Span::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
         let (rest, param) = parameter_decl(input).unwrap();
         println!("{:?}", rest);
         println!("{:?}", param);
@@ -293,7 +294,10 @@ mod tests {
 
     #[test]
     fn test_parse_piecewise_parameter_with_units() {
-        let input = Span::new("x: y = {2*z if z > 0 : m/s \n {0 if z <= 0 ");
+        let input = Span::new_extra(
+            "x: y = {2*z if z > 0 : m/s \n {0 if z <= 0 ",
+            Config::default(),
+        );
         let (_, param) = parameter_decl(input).unwrap();
         match param.value {
             ParameterValue::Piecewise(_, unit) => {
@@ -305,7 +309,10 @@ mod tests {
 
     #[test]
     fn test_parse_parameter_with_all_features() {
-        let input = Span::new("$ ** x(0, 100): y = {2*z if z > 0 : kg/m^2 \n {-z if z <= 0");
+        let input = Span::new_extra(
+            "$ ** x(0, 100): y = {2*z if z > 0 : kg/m^2 \n {-z if z <= 0",
+            Config::default(),
+        );
         let (_, param) = parameter_decl(input).unwrap();
 
         assert!(param.is_performance);

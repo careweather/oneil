@@ -4,14 +4,14 @@
 //!
 //! ```
 //! use oneil::parser::unit::parse;
-//! use oneil::parser::Span;
+//! use oneil::parser::{Config, Span};
 //!
 //! // Parse a simple unit
-//! let input = Span::new("kg");
+//! let input = Span::new_extra("kg", Config::default());
 //! let (_, unit) = parse(input).unwrap();
 //!
 //! // Parse a compound unit
-//! let input = Span::new("m/s^2");
+//! let input = Span::new_extra("m/s^2", Config::default());
 //! let (_, unit) = parse(input).unwrap();
 //! ```
 
@@ -83,10 +83,11 @@ fn unit_term(input: Span) -> Result<UnitExpr> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::Config;
 
     #[test]
     fn test_simple_unit() {
-        let input = Span::new("kg");
+        let input = Span::new_extra("kg", Config::default());
         let (_, unit) = parse(input).unwrap();
         assert_eq!(
             unit,
@@ -99,7 +100,7 @@ mod tests {
 
     #[test]
     fn test_unit_with_exponent() {
-        let input = Span::new("m^2");
+        let input = Span::new_extra("m^2", Config::default());
         let (_, unit) = parse(input).unwrap();
         assert_eq!(
             unit,
@@ -112,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_compound_unit_multiply() {
-        let input = Span::new("kg*m");
+        let input = Span::new_extra("kg*m", Config::default());
         let (_, unit) = parse(input).unwrap();
         assert!(matches!(
             unit,
@@ -125,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_compound_unit_divide() {
-        let input = Span::new("m/s");
+        let input = Span::new_extra("m/s", Config::default());
         let (_, unit) = parse(input).unwrap();
         assert!(matches!(
             unit,
@@ -138,7 +139,7 @@ mod tests {
 
     #[test]
     fn test_complex_unit() {
-        let input = Span::new("m^2*kg/s^2");
+        let input = Span::new_extra("m^2*kg/s^2", Config::default());
         let (_, unit) = parse(input).unwrap();
         assert!(matches!(
             unit,
@@ -151,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_parenthesized_unit() {
-        let input = Span::new("(kg*m)/s^2");
+        let input = Span::new_extra("(kg*m)/s^2", Config::default());
         let (_, unit) = parse(input).unwrap();
         assert!(matches!(
             unit,

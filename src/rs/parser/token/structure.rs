@@ -10,20 +10,20 @@
 //!
 //! ```
 //! use oneil::parser::token::structure::end_of_line;
-//! use oneil::parser::Span;
+//! use oneil::parser::{Config, Span};
 //!
 //! // Parse a comment followed by newline
-//! let input = Span::new("# This is a comment\nrest");
+//! let input = Span::new_extra("# This is a comment\nrest", Config::default());
 //! let (rest, matched) = end_of_line(input).unwrap();
 //! assert_eq!(rest.fragment(), &"rest");
 //!
 //! // Parse multiple blank lines
-//! let input = Span::new("\n\n\nrest");
+//! let input = Span::new_extra("\n\n\nrest", Config::default());
 //! let (rest, matched) = end_of_line(input).unwrap();
 //! assert_eq!(rest.fragment(), &"rest");
 //!
 //! // Parse end of file
-//! let input = Span::new("");
+//! let input = Span::new_extra("", Config::default());
 //! let (rest, matched) = end_of_line(input).unwrap();
 //! assert_eq!(rest.fragment(), &"");
 //! ```
@@ -67,17 +67,18 @@ pub fn end_of_line(input: Span) -> Result<Span> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::Config;
 
     #[test]
     fn test_end_of_file_empty() {
-        let input = Span::new("");
+        let input = Span::new_extra("", Config::default());
         let (rest, _) = end_of_file(input).expect("should parse end of file");
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
     fn test_end_of_file_not_empty() {
-        let input = Span::new("not empty");
+        let input = Span::new_extra("not empty", Config::default());
         let res = end_of_file(input);
         assert!(
             res.is_err(),
@@ -87,28 +88,28 @@ mod tests {
 
     #[test]
     fn test_comment_with_newline() {
-        let input = Span::new("# this is a comment\nrest");
+        let input = Span::new_extra("# this is a comment\nrest", Config::default());
         let (rest, _) = comment(input).expect("should parse comment");
         assert_eq!(rest.fragment(), &"rest");
     }
 
     #[test]
     fn test_comment_at_eof() {
-        let input = Span::new("# only comment");
+        let input = Span::new_extra("# only comment", Config::default());
         let (rest, _) = comment(input).expect("should parse comment at EOF");
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
     fn test_comment_invalid() {
-        let input = Span::new("not a comment");
+        let input = Span::new_extra("not a comment", Config::default());
         let res = comment(input);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_end_of_line_single_linebreak() {
-        let input = Span::new("\nrest");
+        let input = Span::new_extra("\nrest", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse linebreak");
         assert_eq!(rest.fragment(), &"rest");
         assert!(matched.trim().is_empty());
@@ -116,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_end_of_line_single_comment() {
-        let input = Span::new("# comment\nrest");
+        let input = Span::new_extra("# comment\nrest", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse comment as end_of_line");
         assert_eq!(rest.fragment(), &"rest");
         assert!(matched.contains("# comment"));
@@ -124,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_end_of_line_multiple() {
-        let input = Span::new("\n# foo\n\n# bar\nrest");
+        let input = Span::new_extra("\n# foo\n\n# bar\nrest", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse multiple end_of_line");
         assert_eq!(rest.fragment(), &"rest");
         assert!(matched.contains("# foo"));
@@ -133,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_end_of_line_eof() {
-        let input = Span::new("");
+        let input = Span::new_extra("", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse EOF as end_of_line");
         assert_eq!(rest.fragment(), &"");
         assert!(matched.is_empty() || matched.trim().is_empty());
@@ -141,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_end_of_line_multiple_with_eof() {
-        let input = Span::new("\n# comment\n\n");
+        let input = Span::new_extra("\n# comment\n\n", Config::default());
         let (rest, matched) =
             end_of_line(input).expect("should parse multiple end_of_line with EOF");
         assert_eq!(rest.fragment(), &"");

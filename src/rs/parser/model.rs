@@ -4,14 +4,14 @@
 //!
 //! ```
 //! use oneil::parser::model::parse;
-//! use oneil::parser::Span;
+//! use oneil::parser::{Config, Span};
 //!
 //! // Parse a simple model
-//! let input = Span::new("import foo\n");
+//! let input = Span::new_extra("import foo\n", Config::default());
 //! let (_, model) = parse(input).unwrap();
 //!
 //! // Parse a model with sections
-//! let input = Span::new("import foo\nsection bar\nimport baz\n");
+//! let input = Span::new_extra("import foo\nsection bar\nimport baz\n", Config::default());
 //! let (_, model) = parse(input).unwrap();
 //! ```
 
@@ -71,10 +71,11 @@ fn parse_section(input: Span) -> Result<Section> {
 mod tests {
     use super::*;
     use crate::ast::declaration::Decl;
+    use crate::parser::Config;
 
     #[test]
     fn test_empty_model() {
-        let input = Span::new("");
+        let input = Span::new_extra("", Config::default());
         let (rest, model) = parse(input).unwrap();
         assert!(model.note.is_none());
         assert!(model.decls.is_empty());
@@ -84,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_model_with_note() {
-        let input = Span::new("~ This is a note\n");
+        let input = Span::new_extra("~ This is a note\n", Config::default());
         let (rest, model) = parse(input).unwrap();
         assert!(model.note.is_some());
         assert!(model.decls.is_empty());
@@ -94,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_model_with_import() {
-        let input = Span::new("import foo\n");
+        let input = Span::new_extra("import foo\n", Config::default());
         let (rest, model) = parse(input).unwrap();
         assert!(model.note.is_none());
         assert_eq!(model.decls.len(), 1);
@@ -108,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_model_with_section() {
-        let input = Span::new("section foo\nimport bar\n");
+        let input = Span::new_extra("section foo\nimport bar\n", Config::default());
         let (rest, model) = parse(input).unwrap();
         assert!(model.note.is_none());
         assert!(model.decls.is_empty());
@@ -125,7 +126,10 @@ mod tests {
 
     #[test]
     fn test_model_with_multiple_sections() {
-        let input = Span::new("section foo\nimport bar\nsection baz\nimport qux\n");
+        let input = Span::new_extra(
+            "section foo\nimport bar\nsection baz\nimport qux\n",
+            Config::default(),
+        );
         let (rest, model) = parse(input).unwrap();
         assert!(model.note.is_none());
         assert!(model.decls.is_empty());

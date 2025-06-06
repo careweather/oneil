@@ -8,13 +8,13 @@
 //!
 //! ```
 //! use oneil::parser::token::keyword::{and, if_};
-//! use oneil::parser::Span;
+//! use oneil::parser::{Config, Span};
 //!
-//! let input = Span::new("and true");
+//! let input = Span::new_extra("and true", Config::default());
 //! let (rest, matched) = and(input).unwrap();
 //! assert_eq!(matched.fragment(), &"and");
 //!
-//! let input = Span::new("if x > 0");
+//! let input = Span::new_extra("if x > 0", Config::default());
 //! let (rest, matched) = if_(input).unwrap();
 //! assert_eq!(matched.fragment(), &"if");
 //! ```
@@ -106,11 +106,11 @@ pub fn use_(input: Span) -> Result<Span> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::token::Span;
+    use crate::parser::{config::Config, token::Span};
 
     #[test]
     fn test_and() {
-        let input = Span::new("and rest");
+        let input = Span::new_extra("and rest", Config::default());
         let (rest, matched) = and(input).expect("should parse 'and' keyword");
         assert_eq!(matched.fragment(), &"and");
         assert_eq!(rest.fragment(), &"rest");
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_as() {
-        let input = Span::new("as foo");
+        let input = Span::new_extra("as foo", Config::default());
         let (rest, matched) = as_(input).expect("should parse 'as' keyword");
         assert_eq!(matched.fragment(), &"as");
         assert_eq!(rest.fragment(), &"foo");
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_false() {
-        let input = Span::new("false true");
+        let input = Span::new_extra("false true", Config::default());
         let (rest, matched) = false_(input).expect("should parse 'false' keyword");
         assert_eq!(matched.fragment(), &"false");
         assert_eq!(rest.fragment(), &"true");
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_from() {
-        let input = Span::new("from bar");
+        let input = Span::new_extra("from bar", Config::default());
         let (rest, matched) = from(input).expect("should parse 'from' keyword");
         assert_eq!(matched.fragment(), &"from");
         assert_eq!(rest.fragment(), &"bar");
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_if() {
-        let input = Span::new("if baz");
+        let input = Span::new_extra("if baz", Config::default());
         let (rest, matched) = if_(input).expect("should parse 'if' keyword");
         assert_eq!(matched.fragment(), &"if");
         assert_eq!(rest.fragment(), &"baz");
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_import() {
-        let input = Span::new("import foo");
+        let input = Span::new_extra("import foo", Config::default());
         let (rest, matched) = import(input).expect("should parse 'import' keyword");
         assert_eq!(matched.fragment(), &"import");
         assert_eq!(rest.fragment(), &"foo");
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_not() {
-        let input = Span::new("not bar");
+        let input = Span::new_extra("not bar", Config::default());
         let (rest, matched) = not(input).expect("should parse 'not' keyword");
         assert_eq!(matched.fragment(), &"not");
         assert_eq!(rest.fragment(), &"bar");
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_or() {
-        let input = Span::new("or baz");
+        let input = Span::new_extra("or baz", Config::default());
         let (rest, matched) = or(input).expect("should parse 'or' keyword");
         assert_eq!(matched.fragment(), &"or");
         assert_eq!(rest.fragment(), &"baz");
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_true() {
-        let input = Span::new("true false");
+        let input = Span::new_extra("true false", Config::default());
         let (rest, matched) = true_(input).expect("should parse 'true' keyword");
         assert_eq!(matched.fragment(), &"true");
         assert_eq!(rest.fragment(), &"false");
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_section() {
-        let input = Span::new("section test");
+        let input = Span::new_extra("section test", Config::default());
         let (rest, matched) = section(input).expect("should parse 'section' keyword");
         assert_eq!(matched.fragment(), &"section");
         assert_eq!(rest.fragment(), &"test");
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_test() {
-        let input = Span::new("test use");
+        let input = Span::new_extra("test use", Config::default());
         let (rest, matched) = test(input).expect("should parse 'test' keyword");
         assert_eq!(matched.fragment(), &"test");
         assert_eq!(rest.fragment(), &"use");
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_use() {
-        let input = Span::new("use foo");
+        let input = Span::new_extra("use foo", Config::default());
         let (rest, matched) = use_(input).expect("should parse 'use' keyword");
         assert_eq!(matched.fragment(), &"use");
         assert_eq!(rest.fragment(), &"foo");
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_keyword_with_trailing_whitespace() {
-        let input = Span::new("and   foo");
+        let input = Span::new_extra("and   foo", Config::default());
         let (rest, matched) = and(input).expect("should parse 'and' with trailing whitespace");
         assert_eq!(matched.fragment(), &"and");
         assert_eq!(rest.fragment(), &"foo");
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_keyword_not_at_start() {
         let mut parser = keyword("key");
-        let input = Span::new("foo key bar");
+        let input = Span::new_extra("foo key bar", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err(), "should not parse 'key' if not at start");
     }
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn test_keyword_prefix() {
         let mut parser = keyword("key");
-        let input = Span::new("keyword");
+        let input = Span::new_extra("keyword", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err(), "should not parse 'key' as prefix");
     }
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_keyword_matches_at_end_of_file() {
         let mut parser = keyword("key");
-        let input = Span::new("key");
+        let input = Span::new_extra("key", Config::default());
         let (rest, matched) = parser
             .parse(input)
             .expect("should parse 'key' at end of file");

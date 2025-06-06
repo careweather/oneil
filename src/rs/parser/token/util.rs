@@ -33,24 +33,25 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::Config;
 
     #[test]
     fn test_inline_whitespace_spaces() {
-        let input = Span::new("   abc");
+        let input = Span::new_extra("   abc", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse leading spaces");
         assert_eq!(rest.fragment(), &"abc");
     }
 
     #[test]
     fn test_inline_whitespace_tabs() {
-        let input = Span::new("\t\tfoo");
+        let input = Span::new_extra("\t\tfoo", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse leading tabs");
         assert_eq!(rest.fragment(), &"foo");
     }
 
     #[test]
     fn test_inline_whitespace_none() {
-        let input = Span::new("bar");
+        let input = Span::new_extra("bar", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse no whitespace");
         assert_eq!(rest.fragment(), &"bar");
     }
@@ -59,7 +60,7 @@ mod tests {
     fn test_token_with_whitespace() {
         use nom::bytes::complete::tag;
         let mut parser = token(tag("foo"));
-        let input = Span::new("foo   bar");
+        let input = Span::new_extra("foo   bar", Config::default());
         let (rest, matched) = parser
             .parse(input)
             .expect("should parse token with trailing whitespace");
@@ -71,7 +72,7 @@ mod tests {
     fn test_token_no_match() {
         use nom::bytes::complete::tag;
         let mut parser = token(tag("baz"));
-        let input = Span::new("foo   bar");
+        let input = Span::new_extra("foo   bar", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err());
     }
