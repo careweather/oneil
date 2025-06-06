@@ -36,7 +36,11 @@ use super::{Result, Span, structure::end_of_line, util::inline_whitespace};
 /// The note can contain any characters except for a newline, and it must be
 /// followed by a newline to be considered valid.
 pub fn single_line_note(input: Span) -> Result<Span> {
-    terminated(recognize((char('~'), not_line_ending)), end_of_line).parse(input)
+    verify(
+        terminated(recognize((char('~'), not_line_ending)), end_of_line),
+        |span| multi_line_note_delimiter(*span).is_err(),
+    )
+    .parse(input)
 }
 
 fn multi_line_note_delimiter(input: Span) -> Result<Span> {
