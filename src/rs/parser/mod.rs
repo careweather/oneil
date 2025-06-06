@@ -5,6 +5,7 @@
 
 pub mod expression;
 pub mod note;
+pub mod parameter;
 pub mod test;
 pub mod token;
 pub mod unit;

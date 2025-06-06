@@ -76,7 +76,7 @@ ExponentialExpr = NegExpr, [ "^", , ExponentialExpr ] ;  (* right associative *)
 NegExpr = ( "-", NegExpr ) | PrimaryExpr ;
 PrimaryExpr = NumberLiteral | StringLiteral | BooleanLiteral | Identifier { ".", Identifier } | FunctionCall | ( "(", Expr, ")" ) ;
 
-PiecewiseExpr = PiecewisePart, [ ":", UnitExpr ], { EndOfLine, { EndOfLine }, PiecewisePart } ;
+PiecewiseExpr = PiecewisePart, [ ":", UnitExpr ], { EndOfLine, PiecewisePart } ;
 PiecewisePart = "{", Expr, "if", Expr ;
 
 (* Function Calls *)

@@ -7,13 +7,13 @@ use super::unit::UnitExpr;
 /// Parameters are used to define the values of variables in the model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    name: String,
-    ident: String,
-    value: ParameterValue,
-    limits: Limits,
-    is_performance: bool,
-    trace_level: TraceLevel,
-    note: Option<Note>,
+    pub name: String,
+    pub ident: String,
+    pub value: ParameterValue,
+    pub limits: Option<Limits>,
+    pub is_performance: bool,
+    pub trace_level: TraceLevel,
+    pub note: Option<Note>,
 }
 
 /// A value assigned to a parameter.
@@ -22,8 +22,8 @@ pub struct Parameter {
 /// that evaluate to different values based on conditions.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
-    Simple(Expr, UnitExpr),
-    Piecewise(PiecewiseExpr, UnitExpr),
+    Simple(Expr, Option<UnitExpr>),
+    Piecewise(PiecewiseExpr, Option<UnitExpr>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
