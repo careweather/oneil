@@ -4,6 +4,7 @@
 //! code into an Abstract Syntax Tree (AST).
 
 pub mod expression;
+pub mod note;
 pub mod token;
 pub mod unit;
 mod util;
