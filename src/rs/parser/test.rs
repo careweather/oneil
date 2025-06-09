@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn test_decl_basic() {
         let input = Span::new_extra("test: true\n", Config::default());
-        let (rest, test) = test_decl(input).unwrap();
+        let (rest, test) = parse(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::None);
         assert!(test.inputs.is_empty());
         assert_eq!(test.expr, Expr::Literal(Literal::Boolean(true)));
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_decl_at_eof() {
         let input = Span::new_extra("test: true", Config::default());
-        let (_, test) = test_decl(input).unwrap();
+        let (_, test) = parse(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::None);
         assert!(test.inputs.is_empty());
         assert_eq!(test.expr, Expr::Literal(Literal::Boolean(true)));
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn test_decl_with_trace() {
         let input = Span::new_extra("* test: true\n", Config::default());
-        let (rest, test) = test_decl(input).unwrap();
+        let (rest, test) = parse(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::Trace);
         assert!(test.inputs.is_empty());
         assert_eq!(test.expr, Expr::Literal(Literal::Boolean(true)));
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn test_decl_with_debug() {
         let input = Span::new_extra("** test: true\n", Config::default());
-        let (_, test) = test_decl(input).unwrap();
+        let (_, test) = parse(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::Debug);
         assert!(test.inputs.is_empty());
         assert_eq!(test.expr, Expr::Literal(Literal::Boolean(true)));
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_decl_with_inputs() {
         let input = Span::new_extra("test {x, y}: x > y\n", Config::default());
-        let (rest, test) = test_decl(input).unwrap();
+        let (rest, test) = parse(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::None);
         assert_eq!(test.inputs, vec!["x", "y"]);
         assert!(matches!(test.expr, Expr::BinaryOp { .. }));
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_decl_full() {
         let input = Span::new_extra("** test {x, y, z}: x > y and y > z\n", Config::default());
-        let (rest, test) = test_decl(input).unwrap();
+        let (rest, test) = parse(input).unwrap();
         assert_eq!(test.trace_level, TraceLevel::Debug);
         assert_eq!(test.inputs, vec!["x", "y", "z"]);
         assert!(matches!(test.expr, Expr::BinaryOp { .. }));

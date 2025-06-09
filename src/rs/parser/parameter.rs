@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn test_parse_simple_parameter() {
         let input = Span::new_extra("x: y = 42", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         assert_eq!(param.name, "x");
         assert_eq!(param.ident, "y");
         assert!(!param.is_performance);
@@ -208,7 +208,7 @@ mod tests {
     #[test]
     fn test_parse_parameter_with_continuous_limits() {
         let input = Span::new_extra("x(0, 100): y = 42", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         match param.limits {
             Some(Limits::Continuous { min, max }) => {
                 assert_eq!(min, Expr::Literal(Literal::Number(0.0)));
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn test_parse_parameter_with_discrete_limits() {
         let input = Span::new_extra("x[1, 2, 3]: y = 42", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         match param.limits {
             Some(Limits::Discrete { values }) => {
                 assert_eq!(values.len(), 3);
@@ -236,28 +236,28 @@ mod tests {
     #[test]
     fn test_parse_parameter_with_performance() {
         let input = Span::new_extra("$ x: y = 42", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         assert!(param.is_performance);
     }
 
     #[test]
     fn test_parse_parameter_with_trace() {
         let input = Span::new_extra("* x: y = 42", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         assert_eq!(param.trace_level, TraceLevel::Trace);
     }
 
     #[test]
     fn test_parse_parameter_with_debug() {
         let input = Span::new_extra("** x: y = 42", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         assert_eq!(param.trace_level, TraceLevel::Debug);
     }
 
     #[test]
     fn test_parse_parameter_with_simple_units() {
         let input = Span::new_extra("x: y = 42 : kg", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         match param.value {
             ParameterValue::Simple(expr, unit) => {
                 assert_eq!(expr, Expr::Literal(Literal::Number(42.0)));
@@ -275,9 +275,8 @@ mod tests {
 
     #[test]
     fn test_parse_parameter_with_compound_units() {
-        // Test compound unit
         let input = Span::new_extra("x: y = 42 : m/s^2", Config::default());
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         match param.value {
             ParameterValue::Simple(expr, unit) => {
                 assert_eq!(expr, Expr::Literal(Literal::Number(42.0)));
@@ -297,9 +296,7 @@ mod tests {
     #[test]
     fn test_parse_piecewise_parameter() {
         let input = Span::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
-        let (rest, param) = parameter_decl(input).unwrap();
-        println!("{:?}", rest);
-        println!("{:?}", param);
+        let (_, param) = parse(input).unwrap();
         match param.value {
             ParameterValue::Piecewise(piecewise, unit) => {
                 assert_eq!(piecewise.parts.len(), 2);
@@ -347,7 +344,7 @@ mod tests {
             "x: y = {2*z if z > 0 : m/s \n {0 if z <= 0 ",
             Config::default(),
         );
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
         match param.value {
             ParameterValue::Piecewise(_, unit) => {
                 assert!(unit.is_some());
@@ -362,7 +359,7 @@ mod tests {
             "$ ** x(0, 100): y = {2*z if z > 0 : kg/m^2 \n {-z if z <= 0",
             Config::default(),
         );
-        let (_, param) = parameter_decl(input).unwrap();
+        let (_, param) = parse(input).unwrap();
 
         assert!(param.is_performance);
         assert_eq!(param.trace_level, TraceLevel::Debug);

@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn test_single_line_note() {
         let input = Span::new_extra("~ This is a note\nrest", Config::default());
-        let (rest, note) = note(input).expect("should parse single line note");
+        let (rest, note) = parse(input).expect("should parse single line note");
         assert_eq!(note, Note("This is a note".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn test_single_line_note_at_eof() {
         let input = Span::new_extra("~ note", Config::default());
-        let (rest, note) = note(input).expect("should parse single line note at EOF");
+        let (rest, note) = parse(input).expect("should parse single line note at EOF");
         assert_eq!(note, Note("note".to_string()));
         assert_eq!(rest.fragment(), &"");
     }
@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn test_multi_line_note() {
         let input = Span::new_extra("~~~\nLine 1\nLine 2\n~~~\nrest", Config::default());
-        let (rest, note) = note(input).expect("should parse multi-line note");
+        let (rest, note) = parse(input).expect("should parse multi-line note");
         assert_eq!(note, Note("Line 1\nLine 2".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
@@ -118,7 +118,7 @@ mod tests {
     #[test]
     fn test_multi_line_note_extra_tildes() {
         let input = Span::new_extra("~~~~~\nfoo\nbar\n~~~~~\nrest", Config::default());
-        let (rest, note) = note(input).expect("should parse multi-line note with extra tildes");
+        let (rest, note) = parse(input).expect("should parse multi-line note with extra tildes");
         assert_eq!(note, Note("foo\nbar".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_multi_line_note_empty() {
         let input = Span::new_extra("~~~\n~~~\nrest", Config::default());
-        let (rest, note) = note(input).expect("should parse empty multi-line note");
+        let (rest, note) = parse(input).expect("should parse empty multi-line note");
         assert_eq!(note, Note("".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
@@ -134,16 +134,15 @@ mod tests {
     #[test]
     fn test_multi_line_note_unclosed() {
         let input = Span::new_extra("~~~\nUnclosed note\n", Config::default());
-        assert!(
-            note(input).is_err(),
-            "should not parse unclosed multi-line note"
-        );
+        let result = parse(input);
+        assert!(result.is_err(), "should not parse unclosed multi-line note");
     }
 
     #[test]
     fn test_invalid_note() {
         let input = Span::new_extra("not a note", Config::default());
-        assert!(note(input).is_err(), "should not parse invalid note");
+        let result = parse(input);
+        assert!(result.is_err(), "should not parse invalid note");
     }
 
     #[test]
