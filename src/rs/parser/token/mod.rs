@@ -24,10 +24,10 @@
 //!     symbol::brace_left,
 //!     structure::end_of_line
 //! };
-//! use oneil::parser::Span;
+//! use oneil::parser::{Config, Span};
 //!
 //! // Parse a simple if statement opening
-//! let input = Span::new("if {\n");
+//! let input = Span::new_extra("if {\n", Config::default());
 //! let (rest, _) = if_(input).unwrap();
 //! let (rest, _) = brace_left(rest).unwrap();
 //! let (rest, _) = end_of_line(rest).unwrap();
