@@ -26,6 +26,8 @@ use nom::{
     combinator::{eof, peek},
 };
 
+use crate::parser::token::error;
+
 use super::{Parser, Result, Span, util::token};
 
 /// Keywords that are valid in the Oneil language.
@@ -33,74 +35,77 @@ pub const KEYWORDS: &[&str] = &[
     "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
 ];
 
-fn keyword(kw_str: &str) -> impl Parser<Span> {
+fn keyword(kw_str: &str, error_kind: error::ExpectKeyword) -> impl Parser<Span, error::TokenError> {
     let next_char_is_not_ident_char =
         peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')).map(|_| ());
     let reached_end_of_file = eof.map(|_| ());
-    token((
-        tag(kw_str),
-        next_char_is_not_ident_char.or(reached_end_of_file),
-    ))
+    error::convert_err(
+        token((
+            tag(kw_str),
+            next_char_is_not_ident_char.or(reached_end_of_file),
+        )),
+        error::TokenErrorKind::Keyword(error_kind),
+    )
 }
 
 /// Parses the 'and' keyword token.
-pub fn and(input: Span) -> Result<Span> {
-    keyword("and").parse(input)
+pub fn and(input: Span) -> Result<Span, error::TokenError> {
+    keyword("and", error::ExpectKeyword::And).parse(input)
 }
 
 /// Parses the 'as' keyword token.
-pub fn as_(input: Span) -> Result<Span> {
-    keyword("as").parse(input)
+pub fn as_(input: Span) -> Result<Span, error::TokenError> {
+    keyword("as", error::ExpectKeyword::As).parse(input)
 }
 
 /// Parses the 'false' keyword token.
-pub fn false_(input: Span) -> Result<Span> {
-    keyword("false").parse(input)
+pub fn false_(input: Span) -> Result<Span, error::TokenError> {
+    keyword("false", error::ExpectKeyword::False).parse(input)
 }
 
 /// Parses the 'from' keyword token.
-pub fn from(input: Span) -> Result<Span> {
-    keyword("from").parse(input)
+pub fn from(input: Span) -> Result<Span, error::TokenError> {
+    keyword("from", error::ExpectKeyword::From).parse(input)
 }
 
 /// Parses the 'if' keyword token.
-pub fn if_(input: Span) -> Result<Span> {
-    keyword("if").parse(input)
+pub fn if_(input: Span) -> Result<Span, error::TokenError> {
+    keyword("if", error::ExpectKeyword::If).parse(input)
 }
 
 /// Parses the 'import' keyword token.
-pub fn import(input: Span) -> Result<Span> {
-    keyword("import").parse(input)
+pub fn import(input: Span) -> Result<Span, error::TokenError> {
+    keyword("import", error::ExpectKeyword::Import).parse(input)
 }
 
 /// Parses the 'not' keyword token.
-pub fn not(input: Span) -> Result<Span> {
-    keyword("not").parse(input)
+pub fn not(input: Span) -> Result<Span, error::TokenError> {
+    keyword("not", error::ExpectKeyword::Not).parse(input)
 }
 
 /// Parses the 'or' keyword token.
-pub fn or(input: Span) -> Result<Span> {
-    keyword("or").parse(input)
+pub fn or(input: Span) -> Result<Span, error::TokenError> {
+    keyword("or", error::ExpectKeyword::Or).parse(input)
 }
 
 /// Parses the 'true' keyword token.
-pub fn true_(input: Span) -> Result<Span> {
-    keyword("true").parse(input)
+pub fn true_(input: Span) -> Result<Span, error::TokenError> {
+    keyword("true", error::ExpectKeyword::True).parse(input)
 }
 
 /// Parses the 'section' keyword token.
-pub fn section(input: Span) -> Result<Span> {
-    keyword("section").parse(input)
+pub fn section(input: Span) -> Result<Span, error::TokenError> {
+    keyword("section", error::ExpectKeyword::Section).parse(input)
 }
 
 /// Parses the 'test' keyword token.
-pub fn test(input: Span) -> Result<Span> {
-    keyword("test").parse(input)
+pub fn test(input: Span) -> Result<Span, error::TokenError> {
+    keyword("test", error::ExpectKeyword::Test).parse(input)
 }
 
 /// Parses the 'use' keyword token.
-pub fn use_(input: Span) -> Result<Span> {
-    keyword("use").parse(input)
+pub fn use_(input: Span) -> Result<Span, error::TokenError> {
+    keyword("use", error::ExpectKeyword::Use).parse(input)
 }
 
 #[cfg(test)]
@@ -214,28 +219,28 @@ mod tests {
 
     #[test]
     fn test_keyword_not_at_start() {
-        let mut parser = keyword("key");
-        let input = Span::new_extra("foo key bar", Config::default());
+        let mut parser = keyword("and", error::ExpectKeyword::And);
+        let input = Span::new_extra("foo and bar", Config::default());
         let res = parser.parse(input);
-        assert!(res.is_err(), "should not parse 'key' if not at start");
+        assert!(res.is_err(), "should not parse 'and' if not at start");
     }
 
     #[test]
     fn test_keyword_prefix() {
-        let mut parser = keyword("key");
-        let input = Span::new_extra("keyword", Config::default());
+        let mut parser = keyword("and", error::ExpectKeyword::And);
+        let input = Span::new_extra("andrew", Config::default());
         let res = parser.parse(input);
-        assert!(res.is_err(), "should not parse 'key' as prefix");
+        assert!(res.is_err(), "should not parse 'and' as prefix");
     }
 
     #[test]
     fn test_keyword_matches_at_end_of_file() {
-        let mut parser = keyword("key");
-        let input = Span::new_extra("key", Config::default());
+        let mut parser = keyword("and", error::ExpectKeyword::And);
+        let input = Span::new_extra("and", Config::default());
         let (rest, matched) = parser
             .parse(input)
-            .expect("should parse 'key' at end of file");
-        assert_eq!(matched.fragment(), &"key");
+            .expect("should parse 'and' at end of file");
+        assert_eq!(matched.fragment(), &"and");
         assert_eq!(rest.fragment(), &"");
     }
 }

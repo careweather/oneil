@@ -12,8 +12,8 @@ pub type Span<'a> = LocatedSpan<&'a str, Config>;
 ///
 /// Currently just an alias for `IResult<Span<'a>, O, Error<Span<'a>>>`, but it
 /// may be updated in the future
-pub type Result<'a, O> = IResult<Span<'a>, O, Error<Span<'a>>>;
+pub type Result<'a, O, E = Error<Span<'a>>> = IResult<Span<'a>, O, E>;
 
-pub trait Parser<'a, O>: NomParser<Span<'a>, Output = O, Error = Error<Span<'a>>> {}
+pub trait Parser<'a, O, E = Error<Span<'a>>>: NomParser<Span<'a>, Output = O, Error = E> {}
 
-impl<'a, O, P> Parser<'a, O> for P where P: NomParser<Span<'a>, Output = O, Error = Error<Span<'a>>> {}
+impl<'a, O, E, P> Parser<'a, O, E> for P where P: NomParser<Span<'a>, Output = O, Error = E> {}

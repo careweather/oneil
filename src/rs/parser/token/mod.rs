@@ -35,10 +35,12 @@
 
 use super::util::{Parser, Result, Span};
 
+mod error;
+mod util;
+
 pub mod keyword;
 pub mod literal;
 pub mod naming;
 pub mod note;
 pub mod structure;
 pub mod symbol;
-mod util;
