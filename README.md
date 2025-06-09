@@ -33,10 +33,10 @@ Oneil has only been tested on Linux. Instructions for Oneil use assume you are o
 
 ## Quickstart
 
-Clone Oneil and install it.
+Clone Oneil and install it. 
 
 ``` { .sh }
-git clone git@github.com/careweather/oneil.git
+git clone git@github.com:careweather/oneil.git
 oneil/install.sh
 ```
 
