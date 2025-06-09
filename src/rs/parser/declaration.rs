@@ -18,7 +18,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{cut, map, opt},
+    combinator::{all_consuming, cut, map, opt},
     multi::separated_list1,
 };
 
@@ -38,7 +38,60 @@ use super::{
 };
 
 /// Parses a declaration
+///
+/// This function **may not consume the complete input**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::declaration::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\n", Config::default());
+/// let (rest, decl) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::declaration::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\nrest", Config::default());
+/// let (rest, decl) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"rest");
+/// ```
 pub fn parse(input: Span) -> Result<Decl> {
+    decl.parse(input)
+}
+
+/// Parses a declaration
+///
+/// This function **fails if the complete input is not consumed**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::declaration::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\n", Config::default());
+/// let (rest, decl) = parse_complete(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::declaration::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\nrest", Config::default());
+/// let result = parse_complete(input);
+/// assert_eq!(result.is_err(), true);
+/// ```
+pub fn parse_complete(input: Span) -> Result<Decl> {
+    all_consuming(decl).parse(input)
+}
+
+fn decl(input: Span) -> Result<Decl> {
     alt((
         import_decl,
         from_decl,
@@ -238,5 +291,67 @@ mod tests {
             _ => panic!("Expected from declaration with inputs"),
         }
         assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_import_success() {
+        let input = Span::new_extra("import foo\n", Config::default());
+        let (rest, decl) = parse_complete(input).unwrap();
+        match decl {
+            Decl::Import { path } => {
+                assert_eq!(path, "foo");
+            }
+            _ => panic!("Expected import declaration"),
+        }
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_use_success() {
+        let input = Span::new_extra("use foo.bar as baz\n", Config::default());
+        let (rest, decl) = parse_complete(input).unwrap();
+        match decl {
+            Decl::Use {
+                path,
+                inputs,
+                as_name,
+            } => {
+                assert_eq!(path, "foo.bar");
+                assert!(inputs.is_none());
+                assert_eq!(as_name, "baz");
+            }
+            _ => panic!("Expected use declaration"),
+        }
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_from_success() {
+        let input = Span::new_extra("from foo.bar use model(x=1) as baz\n", Config::default());
+        let (rest, decl) = parse_complete(input).unwrap();
+        match decl {
+            Decl::From {
+                path,
+                use_model,
+                inputs: Some(inputs),
+                as_name,
+            } => {
+                assert_eq!(path, "foo.bar");
+                assert_eq!(use_model, "model");
+                assert_eq!(inputs.len(), 1);
+                assert_eq!(inputs[0].name, "x");
+                assert_eq!(inputs[0].value, Expr::Literal(Literal::Number(1.0)));
+                assert_eq!(as_name, "baz");
+            }
+            _ => panic!("Expected from declaration"),
+        }
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_with_remaining_input() {
+        let input = Span::new_extra("import foo\nrest", Config::default());
+        let result = parse_complete(input);
+        assert!(result.is_err());
     }
 }

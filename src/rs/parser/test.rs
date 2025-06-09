@@ -1,7 +1,7 @@
 //! Parser for test declarations in an Oneil program.
 
 use nom::Parser;
-use nom::combinator::{cut, opt};
+use nom::combinator::{all_consuming, cut, opt};
 use nom::multi::separated_list1;
 
 use super::expression::parse as parse_expr;
@@ -15,8 +15,57 @@ use super::util::{Result, Span};
 use crate::ast::{parameter::TraceLevel, test::Test};
 
 /// Parse a test declaration, e.g. `* test {x, y}: x > y`.
+///
+/// This function **may not consume the complete input**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::test::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("test: true\n", Config::default());
+/// let (rest, test) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::test::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("test: true\nrest", Config::default());
+/// let (rest, test) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"rest");
+/// ```
 pub fn parse(input: Span) -> Result<Test> {
     test_decl(input)
+}
+
+/// Parse a test declaration
+///
+/// This function **fails if the complete input is not consumed**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::test::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("test: true\n", Config::default());
+/// let (rest, test) = parse_complete(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::test::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("test: true\nrest", Config::default());
+/// let result = parse_complete(input);
+/// assert_eq!(result.is_err(), true);
+/// ```
+pub fn parse_complete(input: Span) -> Result<Test> {
+    all_consuming(test_decl).parse(input)
 }
 
 fn test_decl(input: Span) -> Result<Test> {
@@ -113,5 +162,22 @@ mod tests {
         assert_eq!(test.inputs, vec!["x", "y", "z"]);
         assert!(matches!(test.expr, Expr::BinaryOp { .. }));
         assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_success() {
+        let input = Span::new_extra("test: true\n", Config::default());
+        let (rest, test) = parse_complete(input).unwrap();
+        assert_eq!(test.trace_level, TraceLevel::None);
+        assert!(test.inputs.is_empty());
+        assert_eq!(test.expr, Expr::Literal(Literal::Boolean(true)));
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_with_remaining_input() {
+        let input = Span::new_extra("test: true\nrest", Config::default());
+        let result = parse_complete(input);
+        assert!(result.is_err());
     }
 }

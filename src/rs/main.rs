@@ -20,7 +20,7 @@ fn main() {
 
                 let input = Span::new_extra(&file_content, Config::default());
                 // Assuming there's a function to parse the file content into an AST
-                let ast = parser::model::parse(input);
+                let ast = parser::model::parse_complete(input);
 
                 match ast {
                     Ok((_rest, ast)) => println!("{:?}", ast),

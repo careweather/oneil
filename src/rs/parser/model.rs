@@ -17,7 +17,7 @@
 
 use nom::{
     Parser as _,
-    combinator::{cut, opt},
+    combinator::{all_consuming, cut, opt},
     multi::many0,
 };
 
@@ -31,8 +31,57 @@ use super::{
 };
 
 /// Parses a model definition
+///
+/// This function **may not consume the complete input**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::model::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\n", Config::default());
+/// let (rest, model) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::model::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\n<rest>", Config::default());
+/// let (rest, model) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"<rest>");
+/// ```
 pub fn parse(input: Span) -> Result<Model> {
     model(input)
+}
+
+/// Parses a model definition
+///
+/// This function **fails if the complete input is not consumed**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::model::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\n", Config::default());
+/// let (rest, model) = parse_complete(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::model::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("import foo\nrest", Config::default());
+/// let result = parse_complete(input);
+/// assert_eq!(result.is_err(), true);
+/// ```
+pub fn parse_complete(input: Span) -> Result<Model> {
+    all_consuming(model).parse(input)
 }
 
 /// Parses a model definition
@@ -151,6 +200,49 @@ mod tests {
             _ => panic!("Expected import declaration"),
         }
 
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_empty_model_success() {
+        let input = Span::new_extra("\n", Config::default());
+        let (rest, model) = parse_complete(input).unwrap();
+        assert!(model.note.is_none());
+        assert!(model.decls.is_empty());
+        assert!(model.sections.is_empty());
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_with_declarations_success() {
+        let input = Span::new_extra("import foo\nimport bar\n", Config::default());
+        let (rest, model) = parse_complete(input).unwrap();
+        assert_eq!(model.decls.len(), 2);
+        match &model.decls[0] {
+            Decl::Import { path } => assert_eq!(path, "foo"),
+            _ => panic!("Expected import declaration"),
+        }
+        match &model.decls[1] {
+            Decl::Import { path } => assert_eq!(path, "bar"),
+            _ => panic!("Expected import declaration"),
+        }
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_with_remaining_input() {
+        let input = Span::new_extra("import foo\n<rest>", Config::default());
+        let result = parse_complete(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_empty_model() {
+        let input = Span::new_extra("", Config::default());
+        let (rest, model) = parse(input).unwrap();
+        assert!(model.note.is_none());
+        assert!(model.decls.is_empty());
+        assert!(model.sections.is_empty());
         assert_eq!(rest.fragment(), &"");
     }
 }

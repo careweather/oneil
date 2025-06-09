@@ -18,7 +18,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{cut, map, opt},
+    combinator::{all_consuming, cut, map, opt},
     multi::many0,
 };
 
@@ -34,8 +34,57 @@ use super::{
 };
 
 /// Parses a unit expression
+///
+/// This function **may not consume the complete input**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::unit::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("m/s^2", Config::default());
+/// let (rest, unit) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::unit::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("m/s^2 rest", Config::default());
+/// let (rest, unit) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"rest");
+/// ```
 pub fn parse(input: Span) -> Result<UnitExpr> {
     unit_expr(input)
+}
+
+/// Parses a unit expression
+///
+/// This function **fails if the complete input is not consumed**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::unit::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("m/s^2", Config::default());
+/// let (rest, unit) = parse_complete(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::unit::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("m/s^2 rest", Config::default());
+/// let result = parse_complete(input);
+/// assert_eq!(result.is_err(), true);
+/// ```
+pub fn parse_complete(input: Span) -> Result<UnitExpr> {
+    all_consuming(unit_expr).parse(input)
 }
 
 /// Parses a unit expression
@@ -161,5 +210,26 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn test_parse_complete_success() {
+        let input = Span::new_extra("kg", Config::default());
+        let (rest, unit) = parse_complete(input).unwrap();
+        assert_eq!(
+            unit,
+            UnitExpr::Unit {
+                identifier: "kg".to_string(),
+                exponent: None
+            }
+        );
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_with_remaining_input() {
+        let input = Span::new_extra("kg rest", Config::default());
+        let result = parse_complete(input);
+        assert!(result.is_err());
     }
 }

@@ -2,7 +2,7 @@
 
 use nom::Parser;
 use nom::branch::alt;
-use nom::combinator::{cut, opt};
+use nom::combinator::{all_consuming, cut, opt};
 use nom::multi::{many0, separated_list1};
 
 use super::expression::parse as parse_expr;
@@ -23,8 +23,57 @@ use crate::ast::parameter::{
 };
 
 /// Parse a parameter declaration, e.g. `$ * x(0,100): y = 2*z : kg`.
+///
+/// This function **may not consume the complete input**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::parameter::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("x: y = 42\n", Config::default());
+/// let (rest, param) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::parameter::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("x: y = 42\nrest", Config::default());
+/// let (rest, param) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"rest");
+/// ```
 pub fn parse(input: Span) -> Result<Parameter> {
     parameter_decl(input)
+}
+
+/// Parse a parameter declaration
+///
+/// This function **fails if the complete input is not consumed**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::parameter::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("x: y = 42\n", Config::default());
+/// let (rest, param) = parse_complete(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::parameter::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("x: y = 42\nrest", Config::default());
+/// let result = parse_complete(input);
+/// assert_eq!(result.is_err(), true);
+/// ```
+pub fn parse_complete(input: Span) -> Result<Parameter> {
+    all_consuming(parameter_decl).parse(input)
 }
 
 fn parameter_decl(input: Span) -> Result<Parameter> {
@@ -344,5 +393,30 @@ mod tests {
             }
             _ => panic!("Expected piecewise parameter value"),
         }
+    }
+
+    #[test]
+    fn test_parse_complete_success() {
+        let input = Span::new_extra("x: y = 42\n", Config::default());
+        let (rest, param) = parse_complete(input).unwrap();
+        assert_eq!(param.name, "x");
+        assert_eq!(param.ident, "y");
+        assert!(!param.is_performance);
+        assert_eq!(param.trace_level, TraceLevel::None);
+        match param.value {
+            ParameterValue::Simple(expr, unit) => {
+                assert_eq!(expr, Expr::Literal(Literal::Number(42.0)));
+                assert!(unit.is_none());
+            }
+            _ => panic!("Expected simple parameter value"),
+        }
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_with_remaining_input() {
+        let input = Span::new_extra("x: y = 42\nrest", Config::default());
+        let result = parse_complete(input);
+        assert!(result.is_err());
     }
 }

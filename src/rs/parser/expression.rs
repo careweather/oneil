@@ -18,7 +18,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{cut, map, opt, value},
+    combinator::{all_consuming, cut, map, opt, value},
     multi::{many0, separated_list0},
 };
 
@@ -56,8 +56,57 @@ fn left_associative_binary_op<'a>(
 }
 
 /// Parses an expression
+///
+/// This function **may not consume the complete input**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::expression::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("2 + 3 * 4", Config::default());
+/// let (rest, expr) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::expression::parse;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("2 + 3 * 4 rest", Config::default());
+/// let (rest, expr) = parse(input).unwrap();
+/// assert_eq!(rest.fragment(), &"rest");
+/// ```
 pub fn parse(input: Span) -> Result<Expr> {
     expr(input)
+}
+
+/// Parses an expression
+///
+/// This function **fails if the complete input is not consumed**.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::expression::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("2 + 3 * 4", Config::default());
+/// let (rest, expr) = parse_complete(input).unwrap();
+/// assert_eq!(rest.fragment(), &"");
+/// ```
+///
+/// ```
+/// use oneil::parser::expression::parse_complete;
+/// use oneil::parser::{Config, Span};
+///
+/// let input = Span::new_extra("2 + 3 * 4 rest", Config::default());
+/// let result = parse_complete(input);
+/// assert_eq!(result.is_err(), true);
+/// ```
+pub fn parse_complete(input: Span) -> Result<Expr> {
+    all_consuming(expr).parse(input)
 }
 
 /// Parses an expression
@@ -360,5 +409,20 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn test_parse_complete_success() {
+        let input = Span::new_extra("42", Config::default());
+        let (rest, expr) = parse_complete(input).unwrap();
+        assert_eq!(expr, Expr::Literal(Literal::Number(42.0)));
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn test_parse_complete_with_remaining_input() {
+        let input = Span::new_extra("42 rest", Config::default());
+        let result = parse_complete(input);
+        assert!(result.is_err());
     }
 }
