@@ -6,6 +6,14 @@ use std::{fs::File, io::Read};
 
 use crate::cli::{Cli, Commands, DevCommands};
 
+pub mod cli;
+
+use clap::Parser;
+use oneil::parser::{self, Config, Span};
+use std::{fs::File, io::Read};
+
+use crate::cli::{Cli, Commands, DevCommands};
+
 fn main() {
     let cli = Cli::parse();
 
