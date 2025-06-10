@@ -25,7 +25,12 @@ use nom::{
     Parser as _, bytes::complete::take_while, character::complete::satisfy, combinator::verify,
 };
 
-use super::{Result, Span, keyword, util::token};
+use super::{
+    Parser, Result, Span,
+    error::{self, TokenError},
+    keyword,
+    util::token,
+};
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
 ///
@@ -57,12 +62,15 @@ use super::{Result, Span, keyword, util::token};
 /// let input = Span::new_extra("123invalid", Config::default());
 /// assert!(identifier(input).is_err());
 /// ```
-pub fn identifier(input: Span) -> Result<Span> {
+pub fn identifier(input: Span) -> Result<Span, TokenError> {
     verify(
-        token((
-            satisfy(|c: char| c.is_alphabetic() || c == '_'),
-            take_while(|c: char| c.is_alphanumeric() || c == '_'),
-        )),
+        token(
+            (
+                satisfy(|c: char| c.is_alphabetic() || c == '_').map_err(error::from_nom),
+                take_while(|c: char| c.is_alphanumeric() || c == '_').map_err(error::from_nom),
+            ),
+            error::TokenErrorKind::ExpectIdentifier,
+        ),
         |identifier| !keyword::KEYWORDS.contains(&identifier.fragment()),
     )
     .parse(input)
@@ -100,11 +108,17 @@ pub fn identifier(input: Span) -> Result<Span> {
 /// let input = Span::new_extra("123Test", Config::default());
 /// assert!(label(input).is_err());
 /// ```
-pub fn label(input: Span) -> Result<Span> {
-    token((
-        satisfy(|c: char| c.is_alphabetic() || c == '_'),
-        take_while(|c: char| c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'),
-    ))
+pub fn label(input: Span) -> Result<Span, TokenError> {
+    token(
+        (
+            satisfy(|c: char| c.is_alphabetic() || c == '_').map_err(error::from_nom),
+            take_while(|c: char| {
+                c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
+            })
+            .map_err(error::from_nom),
+        ),
+        error::TokenErrorKind::ExpectLabel,
+    )
     .parse(input)
 }
 

@@ -29,33 +29,43 @@ use nom::combinator::{cut, recognize, verify};
 use nom::multi::many0;
 use nom::sequence::terminated;
 
-use super::{Result, Span, structure::end_of_line, util::inline_whitespace};
+use crate::parser::token::error;
+
+use super::{
+    Parser, Result, Span, error::TokenError, structure::end_of_line, util::inline_whitespace,
+};
 
 /// Parses a single-line note, which starts with `~` and ends with a newline.
 ///
 /// The note can contain any characters except for a newline, and it must be
 /// followed by a newline to be considered valid.
-pub fn single_line_note(input: Span) -> Result<Span> {
+pub fn single_line_note(input: Span) -> Result<Span, TokenError> {
     verify(
         terminated(recognize((char('~'), not_line_ending)), end_of_line),
         |span| multi_line_note_delimiter(*span).is_err(),
     )
+    .map_err(error::convert_to_kind(error::TokenErrorKind::Note(
+        error::NoteError::ExpectNote,
+    )))
     .parse(input)
 }
 
-fn multi_line_note_delimiter(input: Span) -> Result<Span> {
+fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
     recognize((
         inline_whitespace,
-        verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3),
+        verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3).map_err(error::from_nom),
         inline_whitespace,
     ))
     .parse(input)
 }
 
-fn multi_line_note_content(input: Span) -> Result<Span> {
-    recognize(many0(verify((not_line_ending, line_ending), |(s, _)| {
-        multi_line_note_delimiter.parse(*s).is_err()
-    })))
+fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
+    recognize(many0(
+        verify((not_line_ending, line_ending), |(s, _)| {
+            multi_line_note_delimiter.parse(*s).is_err()
+        })
+        .map_err(error::from_nom),
+    ))
     .parse(input)
 }
 
@@ -66,9 +76,7 @@ fn multi_line_note_content(input: Span) -> Result<Span> {
 /// line, and the note must be closed with a matching `~~~` delimiter.
 ///
 /// If the multi-line note is not closed properly, this parser will fail.
-pub fn multi_line_note(input: Span) -> Result<Span> {
-    // TODO(error): add a note in the error that this failure is due to an
-    //              unclosed multi-line note
+pub fn multi_line_note(input: Span) -> Result<Span, TokenError> {
     terminated(
         recognize((
             multi_line_note_delimiter,
@@ -76,9 +84,14 @@ pub fn multi_line_note(input: Span) -> Result<Span> {
                 line_ending,
                 multi_line_note_content,
                 multi_line_note_delimiter,
-            )),
+            ))
+            .map_err(error::convert_to_kind(error::TokenErrorKind::Note(
+                error::NoteError::UnclosedNote,
+            ))),
         )),
-        end_of_line,
+        cut(end_of_line).map_err(error::convert_to_kind(error::TokenErrorKind::Note(
+            error::NoteError::UnclosedNote,
+        ))),
     )
     .parse(input)
 }

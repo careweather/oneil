@@ -39,11 +39,14 @@ fn keyword(kw_str: &str, error_kind: error::ExpectKeyword) -> impl Parser<Span, 
     let next_char_is_not_ident_char =
         peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')).map(|_| ());
     let reached_end_of_file = eof.map(|_| ());
-    error::convert_err(
-        token((
-            tag(kw_str),
-            next_char_is_not_ident_char.or(reached_end_of_file),
-        )),
+    let keyword_error = error::with_kind(error::TokenErrorKind::Keyword(error_kind));
+    token(
+        (
+            tag(kw_str).map_err(keyword_error),
+            next_char_is_not_ident_char
+                .or(reached_end_of_file)
+                .map_err(error::from_nom),
+        ),
         error::TokenErrorKind::Keyword(error_kind),
     )
 }

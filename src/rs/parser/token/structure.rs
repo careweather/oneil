@@ -37,22 +37,29 @@ use nom::{
 
 use crate::parser::token::util::inline_whitespace;
 
-use super::{Result, Span};
+use super::{
+    Parser, Result, Span,
+    error::{self, TokenError},
+};
 
-fn linebreak(input: Span) -> Result<()> {
-    value((), line_ending).parse(input)
+fn linebreak(input: Span) -> Result<(), TokenError> {
+    value((), line_ending.map_err(error::from_nom)).parse(input)
 }
 
-fn end_of_file(input: Span) -> Result<()> {
-    value((), eof).parse(input)
+fn end_of_file(input: Span) -> Result<(), TokenError> {
+    value((), eof.map_err(error::from_nom)).parse(input)
 }
 
-fn comment(input: Span) -> Result<()> {
-    value((), (char('#'), not_line_ending, line_ending.or(eof))).parse(input)
+fn comment(input: Span) -> Result<(), TokenError> {
+    value(
+        (),
+        (char('#'), not_line_ending, line_ending.or(eof)).map_err(error::from_nom),
+    )
+    .parse(input)
 }
 
 /// Parses one or more linebreaks, comments, or end-of-file markers, including trailing whitespace.
-pub fn end_of_line(input: Span) -> Result<Span> {
+pub fn end_of_line(input: Span) -> Result<Span, TokenError> {
     recognize(
         (
             many1((linebreak.or(comment), inline_whitespace)),
@@ -61,6 +68,7 @@ pub fn end_of_line(input: Span) -> Result<Span> {
             .map(|_| ())
             .or(end_of_file),
     )
+    .map_err(error::convert_to_kind(error::TokenErrorKind::EndOfLine))
     .parse(input)
 }
 

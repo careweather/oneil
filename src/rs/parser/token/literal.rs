@@ -28,28 +28,51 @@ use nom::{
     combinator::{cut, opt},
 };
 
-use super::{Result, Span, util::token};
+use super::{
+    Parser, Result, Span,
+    error::{self, NumberError, TokenError, TokenErrorKind},
+    util::token,
+};
 
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
-pub fn number(input: Span) -> Result<Span> {
-    let sign1 = opt(char('+').or(char('-')));
-    let sign2 = opt(char('+').or(char('-')));
-    let e = char('e').or(char('E'));
-    token((
-        opt(sign1),
-        digit1,
-        opt((char('.'), cut(digit1))),
-        opt((e, cut((sign2, digit1)))),
-    ))
+pub fn number(input: Span) -> Result<Span, TokenError> {
+    fn number_error(e: NumberError) -> impl Fn(nom::error::Error<Span>) -> TokenError {
+        move |err| TokenError::new(TokenErrorKind::Number(e), err.input)
+    }
+
+    let opt_sign = opt(char('+').or(char('-'))).map_err(error::from_nom);
+    let digit = digit1.map_err(error::from_nom);
+
+    let opt_decimal = opt((
+        char('.').map_err(error::from_nom),
+        cut(digit1).map_err(number_error(NumberError::InvalidDecimalPart)),
+    ));
+
+    let opt_exponent = opt((
+        char('e').or(char('E')).map_err(error::from_nom),
+        opt(char('+').or(char('-'))).map_err(error::from_nom),
+        cut(digit1).map_err(number_error(NumberError::InvalidExponentPart)),
+    ));
+
+    token(
+        (opt_sign, digit, opt_decimal, opt_exponent),
+        error::TokenErrorKind::Number(NumberError::ExpectNumber),
+    )
     .parse(input)
 }
 
 /// Parses a string literal delimited by double quotes.
-pub fn string(input: Span) -> Result<Span> {
-    token((
-        char('"'),
-        cut((take_while(|c: char| c != '"' && c != '\n'), char('"'))),
-    ))
+pub fn string(input: Span) -> Result<Span, TokenError> {
+    token(
+        (
+            char('"').map_err(error::from_nom),
+            take_while(|c: char| c != '"' && c != '\n').map_err(error::from_nom),
+            cut(char('"')).map_err(error::with_kind(TokenErrorKind::String(
+                error::StringError::UnterminatedString,
+            ))),
+        ),
+        error::TokenErrorKind::String(error::StringError::ExpectString),
+    )
     .parse(input)
 }
 
