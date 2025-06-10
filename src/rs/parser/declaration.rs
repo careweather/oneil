@@ -18,8 +18,8 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{all_consuming, cut, map, opt},
-    multi::separated_list1,
+    combinator::{all_consuming, cut, flat_map, map, opt},
+    multi::{separated_list0, separated_list1},
 };
 
 use crate::ast::declaration::{Decl, ModelInput};
@@ -30,6 +30,7 @@ use super::{
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
+        error::{ExpectSymbol, TokenErrorKind},
         keyword::{as_, from, import, use_},
         naming::identifier,
         structure::end_of_line,
@@ -106,18 +107,28 @@ fn decl(input: Span) -> Result<Decl, ParserError> {
 
 /// Parses an import declaration
 fn import_decl(input: Span) -> Result<Decl, ParserError> {
-    (import, cut((identifier, end_of_line)))
-        .map(|(_, (path, _))| Decl::Import {
-            path: path.to_string(),
+    flat_map(import.convert_errors(), |import_span: Span| {
+        cut((identifier, end_of_line)).map_failure(move |e| {
+            let span = e.span;
+            ParserError::new(
+                ParserErrorKind::ImportDeclError {
+                    import_span,
+                    error: Box::new(e.into()),
+                },
+                span,
+            )
         })
-        .convert_errors()
-        .parse(input)
+    })
+    .map(|(path, _)| Decl::Import {
+        path: path.to_string(),
+    })
+    .convert_errors()
+    .parse(input)
 }
 
 /// Parses a from declaration
 fn from_decl(input: Span) -> Result<Decl, ParserError> {
-    (
-        from.convert_errors(),
+    flat_map(from.convert_errors(), |from_span: Span| {
         cut((
             module_path,
             use_.convert_errors(),
@@ -126,37 +137,54 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
             as_.convert_errors(),
             identifier.convert_errors(),
             end_of_line.convert_errors(),
-        )),
-    )
-        .map(
-            |(_, (path, _, use_model, inputs, _, as_name, _))| Decl::From {
-                path: path.to_string(),
-                use_model: use_model.to_string(),
-                inputs,
-                as_name: as_name.to_string(),
-            },
-        )
-        .parse(input)
+        ))
+        .map_failure(move |e| {
+            let span = e.span;
+            ParserError::new(
+                ParserErrorKind::FromDeclError {
+                    from_span,
+                    error: Box::new(e),
+                },
+                span,
+            )
+        })
+    })
+    .map(|(path, _, use_model, inputs, _, as_name, _)| Decl::From {
+        path: path.to_string(),
+        use_model: use_model.to_string(),
+        inputs,
+        as_name: as_name.to_string(),
+    })
+    .parse(input)
 }
 
 /// Parses a use declaration
 fn use_decl(input: Span) -> Result<Decl, ParserError> {
-    (
-        use_.convert_errors(),
+    flat_map(use_.convert_errors(), |use_span: Span| {
         cut((
             module_path,
             opt(model_inputs),
             as_.convert_errors(),
             identifier.convert_errors(),
             end_of_line.convert_errors(),
-        )),
-    )
-        .map(|(_, (path, inputs, _, as_name, _))| Decl::Use {
-            path: path.to_string(),
-            inputs,
-            as_name: as_name.to_string(),
+        ))
+        .map_failure(move |e| {
+            let span = e.span;
+            ParserError::new(
+                ParserErrorKind::UseDeclError {
+                    use_span,
+                    error: Box::new(e),
+                },
+                span,
+            )
         })
-        .parse(input)
+    })
+    .map(|(path, inputs, _, as_name, _)| Decl::Use {
+        path: path.to_string(),
+        inputs,
+        as_name: as_name.to_string(),
+    })
+    .parse(input)
 }
 
 /// Parses a module path (e.g., "foo.bar.baz")
@@ -175,25 +203,48 @@ fn module_path(input: Span) -> Result<String, ParserError> {
 
 /// Parses model inputs (e.g., "(x=1, y=2)")
 fn model_inputs(input: Span) -> Result<Vec<ModelInput>, ParserError> {
-    (
-        paren_left.convert_errors(),
+    flat_map(paren_left.convert_errors(), |paren_left_span: Span| {
         cut((
-            separated_list1(comma.convert_errors(), model_input),
+            separated_list0(comma.convert_errors(), model_input),
             paren_right.convert_errors(),
-        )),
-    )
-        .map(|(_, (inputs, _))| inputs)
-        .parse(input)
+        ))
+        .map_failure(move |e| match e.kind {
+            ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::ParenRight)) => {
+                let span = e.span;
+                ParserError::new(
+                    ParserErrorKind::UnclosedParen {
+                        paren_left_span,
+                        error: Box::new(e),
+                    },
+                    span,
+                )
+            }
+
+            _ => e,
+        })
+    })
+    .map(|(inputs, _)| inputs)
+    .parse(input)
 }
 
 /// Parses a single model input (e.g., "x=1")
 fn model_input(input: Span) -> Result<ModelInput, ParserError> {
     (
         identifier.convert_errors(),
-        equals.convert_errors(),
-        cut(parse_expr),
+        flat_map(equals.convert_errors(), |equals_span| {
+            cut(parse_expr).map_failure(move |e| {
+                let span = e.span;
+                ParserError::new(
+                    ParserErrorKind::ModelInputError {
+                        equals_span,
+                        error: Box::new(e),
+                    },
+                    span,
+                )
+            })
+        }),
     )
-        .map(|(name, _, value)| ModelInput {
+        .map(|(name, value)| ModelInput {
             name: name.to_string(),
             value,
         })

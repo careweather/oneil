@@ -150,7 +150,7 @@ where
 /// let span = Span::new_extra("1 + ", Config::default());
 /// let error = ParserError::new(ParserErrorKind::ExpectExpr, span);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParserError<'a> {
     /// The specific kind of error that occurred
     pub kind: ParserErrorKind<'a>,
@@ -187,7 +187,7 @@ impl<'a> ParserError<'a> {
 /// // An error for an invalid expression
 /// let error = ParserErrorKind::ExpectExpr;
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ParserErrorKind<'a> {
     /// Expected a declaration but found something else
     ExpectDecl,
@@ -201,6 +201,31 @@ pub enum ParserErrorKind<'a> {
     ExpectTest,
     /// Expected a unit but found something else
     ExpectUnit,
+    /// Found an invalid `from` declaration
+    FromDeclError {
+        from_span: Span<'a>,
+        error: Box<ParserError<'a>>,
+    },
+    /// Found an invalid `import` declaration
+    ImportDeclError {
+        import_span: Span<'a>,
+        error: Box<ParserError<'a>>,
+    },
+    /// Found an invalid model input
+    ModelInputError {
+        equals_span: Span<'a>,
+        error: Box<ParserError<'a>>,
+    },
+    /// Found an unclosed parenthesis
+    UnclosedParen {
+        paren_left_span: Span<'a>,
+        error: Box<ParserError<'a>>,
+    },
+    /// Found an invalid `use` declaration
+    UseDeclError {
+        use_span: Span<'a>,
+        error: Box<ParserError<'a>>,
+    },
     /// Found an invalid number with the given text
     InvalidNumber(&'a str),
     /// A token-level error occurred

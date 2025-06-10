@@ -18,7 +18,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{all_consuming, cut, map, map_res, opt, value},
+    combinator::{all_consuming, cut, flat_map, map, map_res, opt, value},
     multi::{many0, separated_list0, separated_list1},
 };
 
@@ -30,6 +30,7 @@ use crate::ast::{
 use super::{
     error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
     token::{
+        error::{ExpectSymbol, TokenErrorKind},
         keyword::{and, false_, not, or, true_},
         literal::{number, string},
         naming::identifier,
@@ -258,13 +259,7 @@ fn primary_expr(input: Span) -> Result<Expr, ParserError> {
         }),
         function_call,
         variable,
-        map(
-            (
-                paren_left.convert_errors(),
-                cut((expr, paren_right.convert_errors())),
-            ),
-            |(_, (e, _))| e,
-        ),
+        parenthesized_expr,
     ))
     .parse(input)
 }
@@ -292,6 +287,28 @@ fn variable(input: Span) -> Result<Expr, ParserError> {
         .convert_errors()
         .map(|ids| Expr::Variable(ids.into_iter().map(|id| id.to_string()).collect()))
         .parse(input)
+}
+
+/// Parses a parenthesized expression
+fn parenthesized_expr(input: Span) -> Result<Expr, ParserError> {
+    flat_map(paren_left.convert_errors(), |paren_left_span: Span| {
+        cut((expr, paren_right.convert_errors())).map_failure(move |e| match e.kind {
+            ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::ParenRight)) => {
+                let span = e.span;
+                ParserError::new(
+                    ParserErrorKind::UnclosedParen {
+                        paren_left_span,
+                        error: Box::new(e),
+                    },
+                    span,
+                )
+            }
+
+            _ => e,
+        })
+    })
+    .map(|(e, _)| e)
+    .parse(input)
 }
 
 #[cfg(test)]

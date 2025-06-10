@@ -24,7 +24,7 @@
 use nom::{
     Parser as _,
     bytes::complete::{tag, take_while},
-    character::complete::{char, digit1, one_of},
+    character::complete::{digit1, one_of},
     combinator::{cut, flat_map, opt},
 };
 
@@ -73,7 +73,7 @@ pub fn number(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses a string literal delimited by double quotes.
-pub fn string<'a>(input: Span<'a>) -> Result<Span<'a>, TokenError<'a>> {
+pub fn string(input: Span) -> Result<Span, TokenError> {
     let unterminated_string_error = |open_quote_span| {
         TokenErrorKind::String(StringError::UnterminatedString { open_quote_span })
     };
@@ -83,10 +83,10 @@ pub fn string<'a>(input: Span<'a>) -> Result<Span<'a>, TokenError<'a>> {
     let take_while = take_while::<_, _, nom::error::Error<Span>>;
 
     token(
-        flat_map(tag("\"").convert_errors(), |open_quote_span: Span<'a>| {
+        flat_map(tag("\"").convert_errors(), |open_quote_span: Span| {
             (
                 take_while(|c: char| c != '"' && c != '\n').convert_errors(),
-                cut(tag("\"")).map_failure(move |e: nom::error::Error<Span<'a>>| {
+                cut(tag("\"")).map_failure(move |e: nom::error::Error<Span>| {
                     TokenError::new(unterminated_string_error(open_quote_span), e.input)
                 }),
             )
