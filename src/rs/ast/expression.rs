@@ -40,6 +40,7 @@ pub enum BinaryOp {
     NotEq,
     And,
     Or,
+    MinMax,
 }
 
 #[derive(Debug, Clone, PartialEq)]

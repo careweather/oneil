@@ -34,9 +34,9 @@ use super::{
         literal::{number, string},
         naming::identifier,
         symbol::{
-            bang_equals, caret, comma, equals_equals, greater_than, greater_than_equals, less_than,
-            less_than_equals, minus, minus_minus, paren_left, paren_right, percent, plus, slash,
-            slash_slash, star,
+            bang_equals, bar, caret, comma, equals_equals, greater_than, greater_than_equals,
+            less_than, less_than_equals, minus, minus_minus, paren_left, paren_right, percent,
+            plus, slash, slash_slash, star,
         },
     },
     util::{Parser, Result, Span},
@@ -152,7 +152,29 @@ fn comparison_expr(input: Span) -> Result<Expr, ParserError> {
     ))
     .convert_errors();
 
-    (additive_expr, opt((op, cut(additive_expr))))
+    (minmax_expr, opt((op, cut(minmax_expr))))
+        .map(|(left, rest)| match rest {
+            Some((op, right)) => Expr::BinaryOp {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            },
+            None => left,
+        })
+        .parse(input)
+}
+
+/// Parses a min/max expression
+///
+/// Ex: `min_weight | max_weight`
+fn minmax_expr(input: Span) -> Result<Expr, ParserError> {
+    ((
+        additive_expr,
+        opt((
+            value(BinaryOp::MinMax, bar).convert_errors(),
+            cut(additive_expr),
+        )),
+    ))
         .map(|(left, rest)| match rest {
             Some((op, right)) => Expr::BinaryOp {
                 op,
@@ -365,6 +387,19 @@ mod tests {
                 op: BinaryOp::Add, ..
             } => (),
             _ => panic!("Expected addition"),
+        }
+    }
+
+    #[test]
+    fn test_minmax_expr() {
+        let input = Span::new_extra("min_weight | max_weight", Config::default());
+        let (_, expr) = parse(input).unwrap();
+        match expr {
+            Expr::BinaryOp {
+                op: BinaryOp::MinMax,
+                ..
+            } => (),
+            _ => panic!("Expected min/max operation"),
         }
     }
 

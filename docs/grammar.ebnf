@@ -57,6 +57,7 @@ TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
    3. Exponentiation ( ** ) - right associative
    4. Multiplication, division, floor division, modulo (*, /, //, %) - left associative
    5. Addition, subtraction (+, -) - left associative
+   6. Min/max (|) - non-associative
    6. Comparisons (<, >, <=, >=, ==, !=) - non-associative
    7. NOT - unary prefix
    8. AND - left associative
