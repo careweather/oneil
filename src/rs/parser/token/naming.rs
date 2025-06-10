@@ -109,9 +109,11 @@ pub fn identifier(input: Span) -> Result<Span, TokenError> {
 /// assert_eq!(matched.fragment(), &"Test\tCase");
 /// assert_eq!(rest.fragment(), &": rest");
 ///
-/// // Invalid label (starting with number) should fail
-/// let input = Span::new_extra("123Test", Config::default());
-/// assert!(label(input).is_err());
+/// // Label with numbers
+/// let input = Span::new_extra("123Test: rest", Config::default());
+/// let (rest, matched) = label(input).unwrap();
+/// assert_eq!(matched.fragment(), &"123Test");
+/// assert_eq!(rest.fragment(), &": rest");
 /// ```
 pub fn label(input: Span) -> Result<Span, TokenError> {
     // Needed for type inference
@@ -120,7 +122,7 @@ pub fn label(input: Span) -> Result<Span, TokenError> {
 
     token(
         (
-            satisfy(|c: char| c.is_alphabetic() || c == '_'),
+            satisfy(|c: char| c.is_alphanumeric() || c == '_'),
             take_while(|c: char| {
                 c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
             }),
@@ -153,16 +155,6 @@ mod tests {
     }
 
     #[test]
-    fn test_identifier_invalid() {
-        let input = Span::new_extra("123abc", Config::default());
-        let res = identifier(input);
-        assert!(
-            res.is_err(),
-            "should not parse identifier starting with digit"
-        );
-    }
-
-    #[test]
     fn test_identifier_only_underscore() {
         let input = Span::new_extra("_ rest", Config::default());
         let (rest, matched) = identifier(input).expect("should parse single underscore identifier");
@@ -183,6 +175,14 @@ mod tests {
         let input = Span::new_extra("foo bar\tbaz: rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with spaces and tabs");
         assert_eq!(matched.fragment(), &"foo bar\tbaz");
+        assert_eq!(rest.fragment(), &": rest");
+    }
+
+    #[test]
+    fn test_label_with_numbers() {
+        let input = Span::new_extra("123Test: rest", Config::default());
+        let (rest, matched) = label(input).expect("should parse label with numbers");
+        assert_eq!(matched.fragment(), &"123Test");
         assert_eq!(rest.fragment(), &": rest");
     }
 

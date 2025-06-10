@@ -246,4 +246,16 @@ mod tests {
         assert!(model.sections.is_empty());
         assert_eq!(rest.fragment(), &"");
     }
+
+    #[test]
+    fn test_parse_model_with_parameters() {
+        let input = Span::new_extra(
+            "1st parameter: x = 1\n2nd parameter: y = 2\n",
+            Config::default(),
+        );
+        let (rest, model) = parse(input).unwrap();
+        assert!(model.note.is_none());
+        assert_eq!(model.decls.len(), 2);
+        assert_eq!(rest.fragment(), &"");
+    }
 }
