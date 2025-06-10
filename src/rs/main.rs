@@ -23,7 +23,7 @@ fn main() {
                 let ast = parser::model::parse_complete(input);
 
                 match ast {
-                    Ok((_rest, ast)) => println!("{:?}", ast),
+                    Ok((_rest, ast)) => println!("{:#?}", ast),
                     Err(e) => eprintln!("Error printing AST: {:?}", e),
                 }
             }
