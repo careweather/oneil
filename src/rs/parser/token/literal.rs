@@ -23,9 +23,9 @@
 
 use nom::{
     Parser as _,
-    bytes::complete::take_while,
+    bytes::complete::{tag, take_while},
     character::complete::{char, digit1, one_of},
-    combinator::{cut, opt},
+    combinator::{cut, flat_map, opt},
 };
 
 use super::{
@@ -37,29 +37,33 @@ use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
 pub fn number(input: Span) -> Result<Span, TokenError> {
-    fn number_error(e: NumberError) -> impl Fn(nom::error::Error<Span>) -> TokenError {
+    fn number_error<'a>(
+        e: NumberError<'a>,
+    ) -> impl Fn(nom::error::Error<Span<'a>>) -> TokenError<'a> {
         move |err| TokenError::new(TokenErrorKind::Number(e), err.input)
     }
 
     // Needed for type inference
-    let char = char::<_, nom::error::Error<Span>>;
+    let tag = tag::<_, _, nom::error::Error<Span>>;
     let digit1 = digit1::<_, nom::error::Error<Span>>;
     let one_of = one_of::<_, _, nom::error::Error<Span>>;
 
-    let opt_sign = opt(char('+').or(char('-'))).convert_errors();
+    let opt_sign = opt(one_of("+-").convert_errors());
 
     let digit = digit1.convert_errors();
 
-    let opt_decimal = opt((
-        char('.').convert_errors(),
-        cut(digit1).map_failure(number_error(NumberError::InvalidDecimalPart)),
-    ));
+    let opt_decimal = opt(flat_map(tag(".").convert_errors(), |decimal_point_span| {
+        cut(digit1).map_failure(number_error(NumberError::InvalidDecimalPart {
+            decimal_point_span,
+        }))
+    }));
 
-    let opt_exponent = opt((
-        one_of("eE").convert_errors(),
-        opt(char('+').or(char('-'))).convert_errors(),
-        cut(digit1).map_failure(number_error(NumberError::InvalidExponentPart)),
-    ));
+    let opt_exponent = opt(flat_map(tag("e").or(tag("E")).convert_errors(), |e_span| {
+        (
+            opt(tag("+").or(tag("-")).convert_errors()),
+            cut(digit1).map_failure(number_error(NumberError::InvalidExponentPart { e_span })),
+        )
+    }));
 
     token(
         (opt_sign, digit, opt_decimal, opt_exponent),
@@ -69,21 +73,24 @@ pub fn number(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses a string literal delimited by double quotes.
-pub fn string(input: Span) -> Result<Span, TokenError> {
-    let unterminated_string_error = TokenErrorKind::String(StringError::UnterminatedString);
+pub fn string<'a>(input: Span<'a>) -> Result<Span<'a>, TokenError<'a>> {
+    let unterminated_string_error = |open_quote_span| {
+        TokenErrorKind::String(StringError::UnterminatedString { open_quote_span })
+    };
 
     // Needed for type inference
-    let char = char::<_, nom::error::Error<Span>>;
+    let tag = tag::<_, _, nom::error::Error<Span>>;
     let take_while = take_while::<_, _, nom::error::Error<Span>>;
 
     token(
-        (
-            char('"').convert_errors(),
-            take_while(|c: char| c != '"' && c != '\n').convert_errors(),
-            cut(char('"')).map_failure(|e: nom::error::Error<Span>| {
-                TokenError::new(unterminated_string_error, e.input)
-            }),
-        ),
+        flat_map(tag("\"").convert_errors(), |open_quote_span: Span<'a>| {
+            (
+                take_while(|c: char| c != '"' && c != '\n').convert_errors(),
+                cut(tag("\"")).map_failure(move |e: nom::error::Error<Span<'a>>| {
+                    TokenError::new(unterminated_string_error(open_quote_span), e.input)
+                }),
+            )
+        }),
         TokenErrorKind::String(StringError::ExpectString),
     )
     .parse(input)

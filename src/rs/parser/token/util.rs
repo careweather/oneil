@@ -32,7 +32,7 @@ pub fn inline_whitespace(input: Span) -> Result<(), TokenError> {
 /// This is useful for tokenizing where whitespace between tokens should be handled automatically.
 pub fn token<'a, O>(
     f: impl Parser<'a, O, TokenError<'a>>,
-    error_kind: TokenErrorKind,
+    error_kind: TokenErrorKind<'a>,
 ) -> impl Parser<'a, Span<'a>, TokenError<'a>> {
     terminated(recognize(f), inline_whitespace)
         .map_error(move |e| error::TokenError::new(error_kind, e.span))

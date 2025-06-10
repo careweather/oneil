@@ -204,7 +204,7 @@ pub enum ParserErrorKind<'a> {
     /// Found an invalid number with the given text
     InvalidNumber(&'a str),
     /// A token-level error occurred
-    TokenError(TokenErrorKind),
+    TokenError(TokenErrorKind<'a>),
     /// Found an unexpected token
     UnexpectedToken,
     /// A low-level nom parsing error

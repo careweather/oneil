@@ -25,7 +25,7 @@
 use nom::Parser as _;
 use nom::bytes::complete::take_while;
 use nom::character::complete::{char, line_ending, not_line_ending};
-use nom::combinator::{cut, recognize, verify};
+use nom::combinator::{consumed, cut, flat_map, recognize, value, verify};
 use nom::multi::many0;
 use nom::sequence::terminated;
 
@@ -87,20 +87,30 @@ fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
 ///
 /// If the multi-line note is not closed properly, this parser will fail.
 pub fn multi_line_note(input: Span) -> Result<Span, TokenError> {
-    let unclosed_note_kind = TokenErrorKind::Note(NoteError::UnclosedNote);
+    let unclosed_note_kind =
+        |note_start_span| TokenErrorKind::Note(NoteError::UnclosedNote { note_start_span });
     let expect_note_kind = TokenErrorKind::Note(NoteError::ExpectNote);
 
-    terminated(
-        recognize((
-            multi_line_note_delimiter,
-            cut((
-                line_ending,
-                multi_line_note_content,
-                multi_line_note_delimiter,
-            ))
-            .map_failure(|e| TokenError::new(unclosed_note_kind, e.span)),
-        )),
-        cut(end_of_line).map_failure(|e| TokenError::new(unclosed_note_kind, e.span)),
+    flat_map(
+        consumed(flat_map(multi_line_note_delimiter, |delimiter_span| {
+            value(
+                delimiter_span,
+                cut((
+                    line_ending,
+                    multi_line_note_content,
+                    multi_line_note_delimiter,
+                ))
+                .map_failure(move |e| TokenError::new(unclosed_note_kind(delimiter_span), e.span)),
+            )
+        })),
+        |(delimiter_span, content)| {
+            value(
+                content,
+                cut(end_of_line).map_failure(move |e| {
+                    TokenError::new(unclosed_note_kind(delimiter_span), e.span)
+                }),
+            )
+        },
     )
     .map_error(|e| TokenError::new(expect_note_kind, e.span))
     .parse(input)

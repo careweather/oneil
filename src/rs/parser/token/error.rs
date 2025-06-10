@@ -13,14 +13,14 @@ use super::Span;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TokenError<'a> {
     /// The specific kind of error that occurred
-    pub kind: TokenErrorKind,
+    pub kind: TokenErrorKind<'a>,
     /// The location in the source where the error occurred
     pub span: Span<'a>,
 }
 
 /// The different kinds of errors that can occur during token parsing.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TokenErrorKind {
+pub enum TokenErrorKind<'a> {
     /// Expected an end of line but found something else
     EndOfLine,
     /// Expected a label but found something else
@@ -30,11 +30,11 @@ pub enum TokenErrorKind {
     /// Expected a specific keyword
     Keyword(ExpectKeyword),
     /// Error while parsing a note
-    Note(NoteError),
+    Note(NoteError<'a>),
     /// Error while parsing a number
-    Number(NumberError),
+    Number(NumberError<'a>),
     /// Error while parsing a string
-    String(StringError),
+    String(StringError<'a>),
     /// Expected a specific symbol
     Symbol(ExpectSymbol),
     /// A low-level nom parsing error
@@ -131,36 +131,36 @@ pub enum ExpectSymbol {
 
 /// Errors that can occur while parsing notes.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum NoteError {
+pub enum NoteError<'a> {
     /// Expected a note but found something else
     ExpectNote,
     /// Found an unclosed note (missing terminator)
-    UnclosedNote,
+    UnclosedNote { note_start_span: Span<'a> },
 }
 
 /// Errors that can occur while parsing numbers.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum NumberError {
+pub enum NumberError<'a> {
     /// Expected a number but found something else
     ExpectNumber,
     /// Found an invalid decimal part in a number
-    InvalidDecimalPart,
+    InvalidDecimalPart { decimal_point_span: Span<'a> },
     /// Found an invalid exponent part in a number
-    InvalidExponentPart,
+    InvalidExponentPart { e_span: Span<'a> },
 }
 
 /// Errors that can occur while parsing strings.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum StringError {
+pub enum StringError<'a> {
     /// Expected a string but found something else
     ExpectString,
     /// Found an unterminated string (missing closing quote)
-    UnterminatedString,
+    UnterminatedString { open_quote_span: Span<'a> },
 }
 
 impl<'a> TokenError<'a> {
     /// Creates a new TokenError instance.
-    pub fn new(kind: TokenErrorKind, span: Span<'a>) -> Self {
+    pub fn new(kind: TokenErrorKind<'a>, span: Span<'a>) -> Self {
         Self { kind, span }
     }
 }
