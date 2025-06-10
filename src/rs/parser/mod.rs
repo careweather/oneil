@@ -4,7 +4,7 @@
 //! code into an Abstract Syntax Tree (AST).
 
 mod config;
-mod error;
+pub mod error;
 pub mod token;
 mod util;
 

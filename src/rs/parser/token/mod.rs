@@ -35,7 +35,6 @@
 
 use super::util::{Parser, Result, Span};
 
-// TODO: decide what needs to be public from this module
 pub mod error;
 mod util;
 

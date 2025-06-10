@@ -1,3 +1,24 @@
+//! Error handling for the Oneil language parser.
+//!
+//! This module provides a comprehensive error handling system for the parser,
+//! including:
+//!
+//! - A trait for consistent error handling across parser components
+//! - Error types that capture both the type of error and its location
+//! - Conversion functions between different error types
+//!
+//! The error system is built on top of nom's error handling, extending it with
+//! Oneil-specific error types and location tracking.
+//!
+//! # Error Handling Strategy
+//!
+//! The parser uses a two-level error handling approach:
+//!
+//! 1. Token-level errors (`TokenError`): For low-level parsing issues like
+//!    invalid characters or unterminated strings
+//! 2. Parser-level errors (`ParserError`): For higher-level issues like
+//!    invalid syntax or unexpected tokens
+
 use nom::{
     Parser,
     error::{FromExternalError, ParseError},
@@ -8,10 +29,29 @@ use super::{
     token::error::{TokenError, TokenErrorKind},
 };
 
+/// A trait for handling parser errors in a consistent way.
+///
+/// This trait extends nom's `Parser` trait with additional error handling capabilities,
+/// providing methods to:
+///
+/// - Convert between different error types
+/// - Handle both recoverable (Error) and unrecoverable (Failure) errors
+/// - Map errors while preserving the error type hierarchy
+///
+/// # Type Parameters
+///
+/// * `I` - The input type (usually `Span`)
+/// * `O` - The output type
+/// * `E` - The error type
 pub trait ErrorHandlingParser<I, O, E>: Parser<I, Output = O, Error = E>
 where
-    E: nom::error::ParseError<I>,
+    E: ParseError<I>,
 {
+    /// Maps recoverable errors while preserving unrecoverable errors.
+    ///
+    /// This is useful when you want to convert only the recoverable errors
+    /// to a different type, leaving the unrecoverable errors as-is. This uses `Into`
+    /// to convert the errors.
     fn map_error<E2>(
         mut self,
         convert_error: impl Fn(E) -> E2,
@@ -29,6 +69,11 @@ where
         }
     }
 
+    /// Maps unrecoverable errors while preserving recoverable errors.
+    ///
+    /// This is useful when you want to convert only the unrecoverable errors
+    /// to a different type, leaving the recoverable errors as-is. This uses `Into`
+    /// to convert the errors.
     fn map_failure<E2>(
         mut self,
         convert_failure: impl Fn(E) -> E2,
@@ -46,6 +91,10 @@ where
         }
     }
 
+    /// Maps both recoverable and unrecoverable errors independently.
+    ///
+    /// This is the most flexible error mapping function, allowing different
+    /// conversions for recoverable and unrecoverable errors.
     fn map_error_and_failure<E2>(
         mut self,
         convert_error: impl Fn(E) -> E2,
@@ -64,6 +113,10 @@ where
         }
     }
 
+    /// Converts errors to a new type that implements `From<E>`.
+    ///
+    /// This is a convenience method that uses `Into` for both recoverable and
+    /// unrecoverable errors.
     fn convert_errors<E2>(self) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
@@ -76,34 +129,85 @@ where
 impl<'a, I, O, E, P> ErrorHandlingParser<I, O, E> for P
 where
     P: Parser<I, Output = O, Error = E>,
-    E: nom::error::ParseError<I>,
+    E: ParseError<I>,
 {
 }
 
+/// An error that occurred during parsing.
+///
+/// This type represents high-level parsing errors, containing both the specific
+/// kind of error and the location where it occurred. It is used for errors that
+/// occur during the parsing of language constructs like declarations, expressions,
+/// and parameters.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::error::{ParserError, ParserErrorKind};
+/// use oneil::parser::{Config, Span};
+///
+/// // Create an error for an invalid expression
+/// let span = Span::new_extra("1 + ", Config::default());
+/// let error = ParserError::new(ParserErrorKind::ExpectExpr, span);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ParserError<'a> {
+    /// The specific kind of error that occurred
     pub kind: ParserErrorKind<'a>,
+    /// The location in the source where the error occurred
     pub span: Span<'a>,
 }
 
 impl<'a> ParserError<'a> {
+    /// Creates a new parser error with the given kind and location.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The specific kind of error that occurred
+    /// * `span` - The location in the source where the error occurred
     pub fn new(kind: ParserErrorKind<'a>, span: Span<'a>) -> Self {
         Self { kind, span }
     }
 }
 
+/// The different kinds of errors that can occur during parsing.
+///
+/// This enum represents all possible high-level parsing errors in the Oneil
+/// language. Each variant describes a specific type of error, such as an
+/// invalid declaration or an unexpected token.
+///
+/// # Examples
+///
+/// ```
+/// use oneil::parser::error::ParserErrorKind;
+///
+/// // An error for an invalid number literal
+/// let error = ParserErrorKind::InvalidNumber("123.4.5");
+///
+/// // An error for an invalid expression
+/// let error = ParserErrorKind::ExpectExpr;
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ParserErrorKind<'a> {
+    /// Expected a declaration but found something else
     ExpectDecl,
+    /// Expected an expression but found something else
     ExpectExpr,
+    /// Expected a note but found something else
     ExpectNote,
+    /// Expected a parameter but found something else
     ExpectParameter,
+    /// Expected a test but found something else
     ExpectTest,
+    /// Expected a unit but found something else
     ExpectUnit,
+    /// Found an invalid number with the given text
     InvalidNumber(&'a str),
+    /// A token-level error occurred
     TokenError(TokenErrorKind),
+    /// Found an unexpected token
     UnexpectedToken,
-
+    /// A low-level nom parsing error
     NomError(nom::error::ErrorKind),
 }
 
