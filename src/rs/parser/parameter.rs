@@ -103,6 +103,7 @@ fn parameter_decl(input: Span) -> Result<Parameter, ParserError> {
                 note,
             },
         )
+        .map_error(|e| ParserError::new(ParserErrorKind::ExpectParameter, e.span))
         .parse(input)
 }
 

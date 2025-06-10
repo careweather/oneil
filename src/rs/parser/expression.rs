@@ -112,7 +112,9 @@ pub fn parse_complete(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses an expression
 fn expr(input: Span) -> Result<Expr, ParserError> {
-    or_expr(input)
+    or_expr
+        .map_error(|e| ParserError::new(ParserErrorKind::ExpectExpr, e.span))
+        .parse(input)
 }
 
 /// Parses an OR expression (lowest precedence)

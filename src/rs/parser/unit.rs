@@ -25,7 +25,7 @@ use nom::{
 use crate::ast::unit::{UnitExpr, UnitOp};
 
 use super::{
-    error::{ErrorHandlingParser as _, ParserError},
+    error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
     token::{
         literal::number,
         naming::identifier,
@@ -104,6 +104,7 @@ fn unit_expr(input: Span) -> Result<UnitExpr, ParserError> {
                     right: Box::new(expr),
                 })
         })
+        .map_error(|e| ParserError::new(ParserErrorKind::ExpectUnit, e.span))
         .parse(input)
 }
 

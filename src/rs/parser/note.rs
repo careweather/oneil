@@ -5,7 +5,7 @@
 use nom::Parser;
 use nom::combinator::all_consuming;
 
-use super::error::{ErrorHandlingParser as _, ParserError};
+use super::error::{ErrorHandlingParser as _, ParserError, ParserErrorKind};
 use super::token::note::{multi_line_note, single_line_note};
 use super::util::{Result, Span};
 use crate::ast::note::Note;
@@ -86,7 +86,7 @@ fn note(input: Span) -> Result<Note, ParserError> {
 
     single_line_note
         .or(multi_line_note)
-        .errors_into()
+        .map_error(|e| ParserError::new(ParserErrorKind::ExpectNote, e.span))
         .parse(input)
 }
 

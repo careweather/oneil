@@ -4,7 +4,7 @@ use nom::Parser;
 use nom::combinator::{all_consuming, cut, opt};
 use nom::multi::separated_list1;
 
-use super::error::{ErrorHandlingParser as _, ParserError};
+use super::error::{ErrorHandlingParser as _, ParserError, ParserErrorKind};
 use super::expression::parse as parse_expr;
 use super::token::{
     keyword::test as test_keyword,
@@ -85,6 +85,7 @@ fn test_decl(input: Span) -> Result<Test, ParserError> {
             inputs: inputs.unwrap_or_default(),
             expr,
         })
+        .map_error(|e| ParserError::new(ParserErrorKind::ExpectTest, e.span))
         .parse(input)
 }
 

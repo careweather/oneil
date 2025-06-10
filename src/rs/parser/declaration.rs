@@ -15,7 +15,6 @@
 //! let (_, decl) = parse(input).unwrap();
 //! ```
 
-use clap::Parser;
 use nom::{
     Parser as _,
     branch::alt,
@@ -26,12 +25,11 @@ use nom::{
 use crate::ast::declaration::{Decl, ModelInput};
 
 use super::{
-    error::{ErrorHandlingParser as _, ParserError},
+    error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
     expression::parse as parse_expr,
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
-        error::TokenErrorKind,
         keyword::{as_, from, import, use_},
         naming::identifier,
         structure::end_of_line,
@@ -102,6 +100,7 @@ fn decl(input: Span) -> Result<Decl, ParserError> {
         map(parse_parameter, Decl::Parameter),
         map(parse_test, Decl::Test),
     ))
+    .map_error(|e| ParserError::new(ParserErrorKind::ExpectDecl, e.span))
     .parse(input)
 }
 

@@ -82,8 +82,8 @@ where
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ParserError<'a> {
-    kind: ParserErrorKind<'a>,
-    span: Span<'a>,
+    pub kind: ParserErrorKind<'a>,
+    pub span: Span<'a>,
 }
 
 impl<'a> ParserError<'a> {
@@ -94,6 +94,12 @@ impl<'a> ParserError<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ParserErrorKind<'a> {
+    ExpectDecl,
+    ExpectExpr,
+    ExpectNote,
+    ExpectParameter,
+    ExpectTest,
+    ExpectUnit,
     InvalidNumber(&'a str),
     TokenError(TokenErrorKind),
     NomError(nom::error::ErrorKind),
