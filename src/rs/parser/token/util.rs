@@ -9,13 +9,17 @@ use super::{
     Parser, Result, Span,
     error::{self, TokenError, TokenErrorKind},
 };
+use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses inline whitespace (spaces and tabs) and returns unit `()`.
 ///
 /// This function consumes any amount of whitespace (including none) and always succeeds.
 /// It's useful for handling optional whitespace between tokens.
 pub fn inline_whitespace(input: Span) -> Result<(), TokenError> {
-    value((), space0).map_err(error::from_nom).parse(input)
+    // Needed for type inference
+    let space0 = space0::<_, nom::error::Error<Span>>;
+
+    value((), space0).errors_into().parse(input)
 }
 
 /// Wraps a parser to handle trailing whitespace after the matched content.
@@ -30,22 +34,15 @@ pub fn token<'a, O>(
     f: impl Parser<'a, O, TokenError<'a>>,
     error_kind: TokenErrorKind,
 ) -> impl Parser<'a, Span<'a>, TokenError<'a>> {
-    let mut token_parser = terminated(recognize(f), inline_whitespace);
-    move |input| {
-        token_parser.parse(input).map_err(|e| match e {
-            // Note that we only use the error kind for the error case
-            // because any failures *should* be handled where the failures occur
-            nom::Err::Error(e) => nom::Err::Error(error::convert_to_kind(error_kind)(e)),
-            nom::Err::Failure(e) => nom::Err::Failure(e),
-            nom::Err::Incomplete(e) => nom::Err::Incomplete(e),
-        })
-    }
+    terminated(recognize(f), inline_whitespace)
+        .map_error(move |e| error::TokenError::new(error_kind, e.span))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::parser::Config;
+    use nom::bytes::complete::tag;
 
     #[test]
     fn test_inline_whitespace_spaces() {
@@ -70,11 +67,10 @@ mod tests {
 
     #[test]
     fn test_token_with_whitespace() {
-        use nom::bytes::complete::tag;
-        let mut parser = token(
-            tag("foo").map_err(error::from_nom),
-            TokenErrorKind::ExpectIdentifier,
-        );
+        // Needed for type inference
+        let tag = tag::<_, _, nom::error::Error<Span>>;
+
+        let mut parser = token(tag("foo").errors_into(), TokenErrorKind::ExpectIdentifier);
         let input = Span::new_extra("foo   bar", Config::default());
         let (rest, matched) = parser
             .parse(input)
@@ -85,11 +81,10 @@ mod tests {
 
     #[test]
     fn test_token_no_match() {
-        use nom::bytes::complete::tag;
-        let mut parser = token(
-            tag("baz").map_err(error::from_nom),
-            TokenErrorKind::ExpectIdentifier,
-        );
+        // Needed for type inference
+        let tag = tag::<_, _, nom::error::Error<Span>>;
+
+        let mut parser = token(tag("baz").errors_into(), TokenErrorKind::ExpectIdentifier);
         let input = Span::new_extra("foo   bar", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err());

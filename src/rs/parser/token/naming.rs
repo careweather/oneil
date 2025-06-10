@@ -26,11 +26,12 @@ use nom::{
 };
 
 use super::{
-    Parser, Result, Span,
+    Result, Span,
     error::{self, TokenError},
     keyword,
     util::token,
 };
+use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
 ///
@@ -63,11 +64,15 @@ use super::{
 /// assert!(identifier(input).is_err());
 /// ```
 pub fn identifier(input: Span) -> Result<Span, TokenError> {
+    // Needed for type inference
+    let satisfy = satisfy::<_, _, nom::error::Error<Span>>;
+    let take_while = take_while::<_, _, nom::error::Error<Span>>;
+
     verify(
         token(
             (
-                satisfy(|c: char| c.is_alphabetic() || c == '_').map_err(error::from_nom),
-                take_while(|c: char| c.is_alphanumeric() || c == '_').map_err(error::from_nom),
+                satisfy(|c: char| c.is_alphabetic() || c == '_').errors_into(),
+                take_while(|c: char| c.is_alphanumeric() || c == '_').errors_into(),
             ),
             error::TokenErrorKind::ExpectIdentifier,
         ),
@@ -109,14 +114,18 @@ pub fn identifier(input: Span) -> Result<Span, TokenError> {
 /// assert!(label(input).is_err());
 /// ```
 pub fn label(input: Span) -> Result<Span, TokenError> {
+    // Needed for type inference
+    let satisfy = satisfy::<_, _, nom::error::Error<Span>>;
+    let take_while = take_while::<_, _, nom::error::Error<Span>>;
+
     token(
         (
-            satisfy(|c: char| c.is_alphabetic() || c == '_').map_err(error::from_nom),
+            satisfy(|c: char| c.is_alphabetic() || c == '_'),
             take_while(|c: char| {
                 c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
-            })
-            .map_err(error::from_nom),
-        ),
+            }),
+        )
+            .errors_into(),
         error::TokenErrorKind::ExpectLabel,
     )
     .parse(input)

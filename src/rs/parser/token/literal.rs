@@ -24,15 +24,16 @@
 use nom::{
     Parser as _,
     bytes::complete::take_while,
-    character::complete::{char, digit1},
+    character::complete::{char, digit1, one_of},
     combinator::{cut, opt},
 };
 
 use super::{
-    Parser, Result, Span,
-    error::{self, NumberError, TokenError, TokenErrorKind},
+    Result, Span,
+    error::{NumberError, StringError, TokenError, TokenErrorKind},
     util::token,
 };
+use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
 pub fn number(input: Span) -> Result<Span, TokenError> {
@@ -40,38 +41,50 @@ pub fn number(input: Span) -> Result<Span, TokenError> {
         move |err| TokenError::new(TokenErrorKind::Number(e), err.input)
     }
 
-    let opt_sign = opt(char('+').or(char('-'))).map_err(error::from_nom);
-    let digit = digit1.map_err(error::from_nom);
+    // Needed for type inference
+    let char = char::<_, nom::error::Error<Span>>;
+    let digit1 = digit1::<_, nom::error::Error<Span>>;
+    let one_of = one_of::<_, _, nom::error::Error<Span>>;
+
+    let opt_sign = opt(char('+').or(char('-'))).errors_into();
+
+    let digit = digit1.errors_into();
 
     let opt_decimal = opt((
-        char('.').map_err(error::from_nom),
-        cut(digit1).map_err(number_error(NumberError::InvalidDecimalPart)),
+        char('.').errors_into(),
+        cut(digit1).map_failure(number_error(NumberError::InvalidDecimalPart)),
     ));
 
     let opt_exponent = opt((
-        char('e').or(char('E')).map_err(error::from_nom),
-        opt(char('+').or(char('-'))).map_err(error::from_nom),
-        cut(digit1).map_err(number_error(NumberError::InvalidExponentPart)),
+        one_of("eE").errors_into(),
+        opt(char('+').or(char('-'))).errors_into(),
+        cut(digit1).map_failure(number_error(NumberError::InvalidExponentPart)),
     ));
 
     token(
         (opt_sign, digit, opt_decimal, opt_exponent),
-        error::TokenErrorKind::Number(NumberError::ExpectNumber),
+        TokenErrorKind::Number(NumberError::ExpectNumber),
     )
     .parse(input)
 }
 
 /// Parses a string literal delimited by double quotes.
 pub fn string(input: Span) -> Result<Span, TokenError> {
+    let unterminated_string_error = TokenErrorKind::String(StringError::UnterminatedString);
+
+    // Needed for type inference
+    let char = char::<_, nom::error::Error<Span>>;
+    let take_while = take_while::<_, _, nom::error::Error<Span>>;
+
     token(
         (
-            char('"').map_err(error::from_nom),
-            take_while(|c: char| c != '"' && c != '\n').map_err(error::from_nom),
-            cut(char('"')).map_err(error::with_kind(TokenErrorKind::String(
-                error::StringError::UnterminatedString,
-            ))),
+            char('"').errors_into(),
+            take_while(|c: char| c != '"' && c != '\n').errors_into(),
+            cut(char('"')).map_failure(|e: nom::error::Error<Span>| {
+                TokenError::new(unterminated_string_error, e.input)
+            }),
         ),
-        error::TokenErrorKind::String(error::StringError::ExpectString),
+        TokenErrorKind::String(StringError::ExpectString),
     )
     .parse(input)
 }

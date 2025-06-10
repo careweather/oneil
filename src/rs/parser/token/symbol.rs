@@ -26,23 +26,48 @@
 
 use nom::{
     Parser as _,
-    bytes::complete::tag,
-    character::complete::{char, satisfy},
+    character::complete::satisfy,
     combinator::{eof, peek, value},
 };
 
 use super::{
     Parser, Result, Span,
-    error::{self, ExpectSymbol, TokenError, TokenErrorKind},
+    error::{ExpectSymbol, TokenError, TokenErrorKind},
     util::token,
 };
+use crate::parser::error::ErrorHandlingParser as _;
 
-fn next_char_is_not(c: char) -> impl Fn(Span) -> Result<()> {
-    move |input: Span| {
-        let next_char_is_not_c = peek(satisfy(|next_char: char| next_char != c)).map(|_| ());
-        let reached_end_of_file = eof.map(|_| ());
-        value((), next_char_is_not_c.or(reached_end_of_file)).parse(input)
+mod nom_wrappers {
+    use super::*;
+
+    /// A wrapper around `nom::character::complete::char` parser
+    ///
+    /// This allows the error type of the parser to be fixed
+    pub fn char<'a>(c: char) -> impl Parser<'a, char, TokenError<'a>> {
+        use nom::character::complete::char;
+        char(c)
     }
+
+    /// A wrapper around `nom::bytes::complete::tag` parser
+    ///
+    /// This allows the error type of the parser to be fixed
+    pub fn tag<'a>(s: &str) -> impl Parser<'a, Span<'a>, TokenError<'a>> {
+        use nom::bytes::complete::tag;
+        tag::<_, _, nom::error::Error<Span<'a>>>(s).errors_into()
+    }
+}
+
+use nom_wrappers::{char, tag};
+
+fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError<'a>> {
+    // Needed for type inference
+    let satisfy = satisfy::<_, _, nom::error::Error<Span<'a>>>;
+
+    let next_char_is_not_c = peek(satisfy(move |next_char: char| next_char != c)).map(|_| ());
+    let reached_end_of_file = eof.map(|_| ());
+    let mut parser = value((), next_char_is_not_c.or(reached_end_of_file)).errors_into();
+
+    move |input: Span<'a>| parser.parse(input)
 }
 
 /// Parses the '!=' symbol token.
@@ -107,9 +132,7 @@ pub fn dot(input: Span) -> Result<Span, TokenError> {
 /// Parses the '=' symbol token.
 pub fn equals(input: Span) -> Result<Span, TokenError> {
     token(
-        char('=')
-            .and(next_char_is_not('='))
-            .map_err(error::from_nom),
+        char('=').and(next_char_is_not('=')),
         TokenErrorKind::Symbol(ExpectSymbol::Equals),
     )
     .parse(input)
@@ -127,9 +150,7 @@ pub fn equals_equals(input: Span) -> Result<Span, TokenError> {
 /// Parses the '>' symbol token.
 pub fn greater_than(input: Span) -> Result<Span, TokenError> {
     token(
-        char('>')
-            .and(next_char_is_not('='))
-            .map_err(error::from_nom),
+        char('>').and(next_char_is_not('=')),
         TokenErrorKind::Symbol(ExpectSymbol::GreaterThan),
     )
     .parse(input)
@@ -147,9 +168,7 @@ pub fn greater_than_equals(input: Span) -> Result<Span, TokenError> {
 /// Parses the '<' symbol token.
 pub fn less_than(input: Span) -> Result<Span, TokenError> {
     token(
-        char('<')
-            .and(next_char_is_not('='))
-            .map_err(error::from_nom),
+        char('<').and(next_char_is_not('=')),
         TokenErrorKind::Symbol(ExpectSymbol::LessThan),
     )
     .parse(input)
@@ -167,9 +186,7 @@ pub fn less_than_equals(input: Span) -> Result<Span, TokenError> {
 /// Parses the '-' symbol token.
 pub fn minus(input: Span) -> Result<Span, TokenError> {
     token(
-        char('-')
-            .and(next_char_is_not('-'))
-            .map_err(error::from_nom),
+        char('-').and(next_char_is_not('-')),
         TokenErrorKind::Symbol(ExpectSymbol::Minus),
     )
     .parse(input)
@@ -203,9 +220,7 @@ pub fn plus(input: Span) -> Result<Span, TokenError> {
 /// Parses the '*' symbol token.
 pub fn star(input: Span) -> Result<Span, TokenError> {
     token(
-        char('*')
-            .and(next_char_is_not('*'))
-            .map_err(error::from_nom),
+        char('*').and(next_char_is_not('*')),
         TokenErrorKind::Symbol(ExpectSymbol::Star),
     )
     .parse(input)
@@ -219,9 +234,7 @@ pub fn star_star(input: Span) -> Result<Span, TokenError> {
 /// Parses the '/' symbol token.
 pub fn slash(input: Span) -> Result<Span, TokenError> {
     token(
-        char('/')
-            .and(next_char_is_not('/'))
-            .map_err(error::from_nom),
+        char('/').and(next_char_is_not('/')),
         TokenErrorKind::Symbol(ExpectSymbol::Slash),
     )
     .parse(input)
@@ -513,21 +526,25 @@ mod tests {
     #[test]
     fn test_next_char_is_not_succeeds() {
         let input = Span::new_extra("abc", Config::default());
-        let (rest, _) = next_char_is_not('b')(input).expect("next char should not be 'b'");
+        let (rest, _) = next_char_is_not('b')
+            .parse(input)
+            .expect("next char should not be 'b'");
         assert_eq!(rest.fragment(), &"abc");
     }
 
     #[test]
     fn test_next_char_is_not_succeeds_with_eof() {
         let input = Span::new_extra("", Config::default());
-        let (rest, _) = next_char_is_not('b')(input).expect("next char should not be 'b'");
+        let (rest, _) = next_char_is_not('b')
+            .parse(input)
+            .expect("next char should not be 'b'");
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
     fn test_next_char_is_not_fails() {
         let input = Span::new_extra("abc", Config::default());
-        let res = next_char_is_not('a')(input);
+        let res = next_char_is_not('a').parse(input);
         assert!(res.is_err(), "should not succeed if next char is 'a'");
     }
 }
