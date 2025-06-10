@@ -19,7 +19,7 @@ pub fn inline_whitespace(input: Span) -> Result<(), TokenError> {
     // Needed for type inference
     let space0 = space0::<_, nom::error::Error<Span>>;
 
-    value((), space0).errors_into().parse(input)
+    value((), space0).convert_errors().parse(input)
 }
 
 /// Wraps a parser to handle trailing whitespace after the matched content.
@@ -70,7 +70,10 @@ mod tests {
         // Needed for type inference
         let tag = tag::<_, _, nom::error::Error<Span>>;
 
-        let mut parser = token(tag("foo").errors_into(), TokenErrorKind::ExpectIdentifier);
+        let mut parser = token(
+            tag("foo").convert_errors(),
+            TokenErrorKind::ExpectIdentifier,
+        );
         let input = Span::new_extra("foo   bar", Config::default());
         let (rest, matched) = parser
             .parse(input)
@@ -84,7 +87,10 @@ mod tests {
         // Needed for type inference
         let tag = tag::<_, _, nom::error::Error<Span>>;
 
-        let mut parser = token(tag("baz").errors_into(), TokenErrorKind::ExpectIdentifier);
+        let mut parser = token(
+            tag("baz").convert_errors(),
+            TokenErrorKind::ExpectIdentifier,
+        );
         let input = Span::new_extra("foo   bar", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err());

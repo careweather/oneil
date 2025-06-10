@@ -119,19 +119,19 @@ fn expr(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses an OR expression (lowest precedence)
 fn or_expr(input: Span) -> Result<Expr, ParserError> {
-    let or = value(BinaryOp::Or, or).errors_into();
+    let or = value(BinaryOp::Or, or).convert_errors();
     left_associative_binary_op(and_expr, or).parse(input)
 }
 
 /// Parses an AND expression
 fn and_expr(input: Span) -> Result<Expr, ParserError> {
-    let and = value(BinaryOp::And, and).errors_into();
+    let and = value(BinaryOp::And, and).convert_errors();
     left_associative_binary_op(not_expr, and).parse(input)
 }
 
 /// Parses a NOT expression
 fn not_expr(input: Span) -> Result<Expr, ParserError> {
-    (not.errors_into(), cut(not_expr))
+    (not.convert_errors(), cut(not_expr))
         .map(|(_, expr)| Expr::UnaryOp {
             op: UnaryOp::Not,
             expr: Box::new(expr),
@@ -150,7 +150,7 @@ fn comparison_expr(input: Span) -> Result<Expr, ParserError> {
         value(BinaryOp::Eq, equals_equals),
         value(BinaryOp::NotEq, bang_equals),
     ))
-    .errors_into();
+    .convert_errors();
 
     (additive_expr, opt((op, cut(additive_expr))))
         .map(|(left, rest)| match rest {
@@ -171,7 +171,7 @@ fn additive_expr(input: Span) -> Result<Expr, ParserError> {
         value(BinaryOp::Sub, minus),
         value(BinaryOp::TrueSub, minus_minus),
     ))
-    .errors_into();
+    .convert_errors();
     left_associative_binary_op(multiplicative_expr, op).parse(input)
 }
 
@@ -183,13 +183,13 @@ fn multiplicative_expr(input: Span) -> Result<Expr, ParserError> {
         value(BinaryOp::TrueDiv, slash_slash),
         value(BinaryOp::Mod, percent),
     ))
-    .errors_into();
+    .convert_errors();
     left_associative_binary_op(exponential_expr, op).parse(input)
 }
 
 /// Parses an exponential expression (right associative)
 fn exponential_expr(input: Span) -> Result<Expr, ParserError> {
-    let op = value(BinaryOp::Pow, caret).errors_into();
+    let op = value(BinaryOp::Pow, caret).convert_errors();
     (neg_expr, opt((op, cut(exponential_expr))))
         .map(|(left, rest)| match rest {
             Some((op, right)) => Expr::BinaryOp {
@@ -204,7 +204,7 @@ fn exponential_expr(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses a negation expression
 fn neg_expr(input: Span) -> Result<Expr, ParserError> {
-    (minus.errors_into(), cut(neg_expr))
+    (minus.convert_errors(), cut(neg_expr))
         .map(|(_, expr)| Expr::UnaryOp {
             op: UnaryOp::Neg,
             expr: Box::new(expr),
@@ -216,32 +216,32 @@ fn neg_expr(input: Span) -> Result<Expr, ParserError> {
 /// Parses a primary expression (literals, identifiers, function calls, parenthesized expressions)
 fn primary_expr(input: Span) -> Result<Expr, ParserError> {
     alt((
-        map_res(number.errors_into(), |n| {
+        map_res(number.convert_errors(), |n| {
             let parse_result = n.fragment().parse::<f64>();
             match parse_result {
                 Ok(n) => Ok(Expr::Literal(Literal::Number(n))),
                 Err(_) => Err(ParserErrorKind::InvalidNumber(n.fragment())),
             }
         }),
-        map(string.errors_into(), |s| {
+        map(string.convert_errors(), |s| {
             // trim quotes from the string
             let s_contents = s.fragment()[1..s.len() - 1].to_string();
             Expr::Literal(Literal::String(s_contents))
         }),
-        map(true_.errors_into(), |_| {
+        map(true_.convert_errors(), |_| {
             Expr::Literal(Literal::Boolean(true))
         }),
-        map(false_.errors_into(), |_| {
+        map(false_.convert_errors(), |_| {
             Expr::Literal(Literal::Boolean(false))
         }),
         function_call,
-        map(identifier.errors_into(), |id| {
+        map(identifier.convert_errors(), |id| {
             Expr::Variable(id.to_string())
         }),
         map(
             (
-                paren_left.errors_into(),
-                cut((expr, paren_right.errors_into())),
+                paren_left.convert_errors(),
+                cut((expr, paren_right.convert_errors())),
             ),
             |(_, (e, _))| e,
         ),
@@ -252,11 +252,11 @@ fn primary_expr(input: Span) -> Result<Expr, ParserError> {
 /// Parses a function call
 fn function_call(input: Span) -> Result<Expr, ParserError> {
     (
-        identifier.errors_into(),
-        paren_left.errors_into(),
+        identifier.convert_errors(),
+        paren_left.convert_errors(),
         cut((
-            separated_list0(comma.errors_into(), expr),
-            paren_right.errors_into(),
+            separated_list0(comma.convert_errors(), expr),
+            paren_right.convert_errors(),
         )),
     )
         .map(|(name, _, (args, _))| Expr::FunctionCall {

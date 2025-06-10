@@ -53,7 +53,7 @@ mod nom_wrappers {
     /// This allows the error type of the parser to be fixed
     pub fn tag<'a>(s: &str) -> impl Parser<'a, Span<'a>, TokenError<'a>> {
         use nom::bytes::complete::tag;
-        tag::<_, _, nom::error::Error<Span<'a>>>(s).errors_into()
+        tag::<_, _, nom::error::Error<Span<'a>>>(s).convert_errors()
     }
 }
 
@@ -65,7 +65,7 @@ fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError<'a>> {
 
     let next_char_is_not_c = peek(satisfy(move |next_char: char| next_char != c)).map(|_| ());
     let reached_end_of_file = eof.map(|_| ());
-    let mut parser = value((), next_char_is_not_c.or(reached_end_of_file)).errors_into();
+    let mut parser = value((), next_char_is_not_c.or(reached_end_of_file)).convert_errors();
 
     move |input: Span<'a>| parser.parse(input)
 }

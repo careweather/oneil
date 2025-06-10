@@ -46,18 +46,18 @@ pub fn number(input: Span) -> Result<Span, TokenError> {
     let digit1 = digit1::<_, nom::error::Error<Span>>;
     let one_of = one_of::<_, _, nom::error::Error<Span>>;
 
-    let opt_sign = opt(char('+').or(char('-'))).errors_into();
+    let opt_sign = opt(char('+').or(char('-'))).convert_errors();
 
-    let digit = digit1.errors_into();
+    let digit = digit1.convert_errors();
 
     let opt_decimal = opt((
-        char('.').errors_into(),
+        char('.').convert_errors(),
         cut(digit1).map_failure(number_error(NumberError::InvalidDecimalPart)),
     ));
 
     let opt_exponent = opt((
-        one_of("eE").errors_into(),
-        opt(char('+').or(char('-'))).errors_into(),
+        one_of("eE").convert_errors(),
+        opt(char('+').or(char('-'))).convert_errors(),
         cut(digit1).map_failure(number_error(NumberError::InvalidExponentPart)),
     ));
 
@@ -78,8 +78,8 @@ pub fn string(input: Span) -> Result<Span, TokenError> {
 
     token(
         (
-            char('"').errors_into(),
-            take_while(|c: char| c != '"' && c != '\n').errors_into(),
+            char('"').convert_errors(),
+            take_while(|c: char| c != '"' && c != '\n').convert_errors(),
             cut(char('"')).map_failure(|e: nom::error::Error<Span>| {
                 TokenError::new(unterminated_string_error, e.input)
             }),

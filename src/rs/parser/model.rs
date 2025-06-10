@@ -88,7 +88,7 @@ pub fn parse_complete(input: Span) -> Result<Model, ParserError> {
 /// Parses a model definition
 fn model(input: Span) -> Result<Model, ParserError> {
     (
-        opt(end_of_line.errors_into()),
+        opt(end_of_line.convert_errors()),
         opt(parse_note),
         many0(parse_decl),
         many0(parse_section),
@@ -104,8 +104,8 @@ fn model(input: Span) -> Result<Model, ParserError> {
 /// Parses a section within a model
 fn parse_section(input: Span) -> Result<Section, ParserError> {
     (
-        section.errors_into(),
-        cut((identifier.errors_into(), end_of_line.errors_into())),
+        section.convert_errors(),
+        cut((identifier.convert_errors(), end_of_line.convert_errors())),
         opt(parse_note),
         many0(parse_decl),
     )

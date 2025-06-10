@@ -110,22 +110,22 @@ fn import_decl(input: Span) -> Result<Decl, ParserError> {
         .map(|(_, (path, _))| Decl::Import {
             path: path.to_string(),
         })
-        .errors_into()
+        .convert_errors()
         .parse(input)
 }
 
 /// Parses a from declaration
 fn from_decl(input: Span) -> Result<Decl, ParserError> {
     (
-        from.errors_into(),
+        from.convert_errors(),
         cut((
             module_path,
-            use_.errors_into(),
-            identifier.errors_into(),
+            use_.convert_errors(),
+            identifier.convert_errors(),
             opt(model_inputs),
-            as_.errors_into(),
-            identifier.errors_into(),
-            end_of_line.errors_into(),
+            as_.convert_errors(),
+            identifier.convert_errors(),
+            end_of_line.convert_errors(),
         )),
     )
         .map(
@@ -142,13 +142,13 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
 /// Parses a use declaration
 fn use_decl(input: Span) -> Result<Decl, ParserError> {
     (
-        use_.errors_into(),
+        use_.convert_errors(),
         cut((
             module_path,
             opt(model_inputs),
-            as_.errors_into(),
-            identifier.errors_into(),
-            end_of_line.errors_into(),
+            as_.convert_errors(),
+            identifier.convert_errors(),
+            end_of_line.convert_errors(),
         )),
     )
         .map(|(_, (path, inputs, _, as_name, _))| Decl::Use {
@@ -169,17 +169,17 @@ fn module_path(input: Span) -> Result<String, ParserError> {
                 .collect::<Vec<_>>()
                 .join(".")
         })
-        .errors_into()
+        .convert_errors()
         .parse(input)
 }
 
 /// Parses model inputs (e.g., "(x=1, y=2)")
 fn model_inputs(input: Span) -> Result<Vec<ModelInput>, ParserError> {
     (
-        paren_left.errors_into(),
+        paren_left.convert_errors(),
         cut((
-            separated_list1(comma.errors_into(), model_input),
-            paren_right.errors_into(),
+            separated_list1(comma.convert_errors(), model_input),
+            paren_right.convert_errors(),
         )),
     )
         .map(|(_, (inputs, _))| inputs)
@@ -189,8 +189,8 @@ fn model_inputs(input: Span) -> Result<Vec<ModelInput>, ParserError> {
 /// Parses a single model input (e.g., "x=1")
 fn model_input(input: Span) -> Result<ModelInput, ParserError> {
     (
-        identifier.errors_into(),
-        equals.errors_into(),
+        identifier.convert_errors(),
+        equals.convert_errors(),
         cut(parse_expr),
     )
         .map(|(name, _, value)| ModelInput {

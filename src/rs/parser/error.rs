@@ -64,7 +64,7 @@ where
         }
     }
 
-    fn errors_into<E2>(self) -> impl Parser<I, Output = O, Error = E2>
+    fn convert_errors<E2>(self) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
         E2: nom::error::ParseError<I> + From<E>,

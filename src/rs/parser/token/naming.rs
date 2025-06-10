@@ -71,8 +71,8 @@ pub fn identifier(input: Span) -> Result<Span, TokenError> {
     verify(
         token(
             (
-                satisfy(|c: char| c.is_alphabetic() || c == '_').errors_into(),
-                take_while(|c: char| c.is_alphanumeric() || c == '_').errors_into(),
+                satisfy(|c: char| c.is_alphabetic() || c == '_').convert_errors(),
+                take_while(|c: char| c.is_alphanumeric() || c == '_').convert_errors(),
             ),
             error::TokenErrorKind::ExpectIdentifier,
         ),
@@ -125,7 +125,7 @@ pub fn label(input: Span) -> Result<Span, TokenError> {
                 c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
             }),
         )
-            .errors_into(),
+            .convert_errors(),
         error::TokenErrorKind::ExpectLabel,
     )
     .parse(input)

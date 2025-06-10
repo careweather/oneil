@@ -95,7 +95,7 @@ fn unit_expr(input: Span) -> Result<UnitExpr, ParserError> {
         map(slash, |_| UnitOp::Divide),
     ));
 
-    (unit_term, many0((op.errors_into(), cut(unit_term))))
+    (unit_term, many0((op.convert_errors(), cut(unit_term))))
         .map(|(first, rest)| {
             rest.into_iter()
                 .fold(first, |acc, (op, expr)| UnitExpr::BinaryOp {
@@ -122,12 +122,12 @@ fn unit_term(input: Span) -> Result<UnitExpr, ParserError> {
             exponent,
         }
     })
-    .errors_into();
+    .convert_errors();
 
     let parse_parenthesized = map(
         (
-            paren_left.errors_into(),
-            cut((unit_expr, paren_right.errors_into())),
+            paren_left.convert_errors(),
+            cut((unit_expr, paren_right.convert_errors())),
         ),
         |(_, (expr, _))| expr,
     );

@@ -48,7 +48,7 @@ pub fn single_line_note(input: Span) -> Result<Span, TokenError> {
     // Needed for type inference
     verify(
         terminated(
-            recognize((char('~'), not_line_ending)).errors_into(),
+            recognize((char('~'), not_line_ending)).convert_errors(),
             end_of_line,
         ),
         |span| multi_line_note_delimiter(*span).is_err(),
@@ -63,7 +63,7 @@ fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
 
     recognize((
         inline_whitespace,
-        verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3).errors_into(),
+        verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3).convert_errors(),
         inline_whitespace,
     ))
     .parse(input)
@@ -75,7 +75,7 @@ fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
     recognize(many0(verify((not_line_ending, line_ending), |(s, _)| {
         multi_line_note_delimiter.parse(*s).is_err()
     })))
-    .errors_into()
+    .convert_errors()
     .parse(input)
 }
 

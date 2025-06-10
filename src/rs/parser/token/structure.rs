@@ -47,14 +47,14 @@ fn linebreak(input: Span) -> Result<(), TokenError> {
     // Needed for type inference
     let line_ending = line_ending::<_, nom::error::Error<Span>>;
 
-    value((), line_ending.errors_into()).parse(input)
+    value((), line_ending.convert_errors()).parse(input)
 }
 
 fn end_of_file(input: Span) -> Result<(), TokenError> {
     // Needed for type inference
     let eof = eof::<_, nom::error::Error<Span>>;
 
-    value((), eof.errors_into()).parse(input)
+    value((), eof.convert_errors()).parse(input)
 }
 
 fn comment(input: Span) -> Result<(), TokenError> {
@@ -63,7 +63,7 @@ fn comment(input: Span) -> Result<(), TokenError> {
 
     value(
         (),
-        (char('#'), not_line_ending, line_ending.or(eof)).errors_into(),
+        (char('#'), not_line_ending, line_ending.or(eof)).convert_errors(),
     )
     .parse(input)
 }
@@ -74,7 +74,7 @@ pub fn end_of_line(input: Span) -> Result<Span, TokenError> {
 
     recognize(
         (
-            many1((linebreak.or(comment), inline_whitespace)).errors_into(),
+            many1((linebreak.or(comment), inline_whitespace)).convert_errors(),
             opt(end_of_file),
         )
             .map(|_| ())

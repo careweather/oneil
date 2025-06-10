@@ -72,12 +72,12 @@ pub fn parse_complete(input: Span) -> Result<Test, ParserError> {
 fn test_decl(input: Span) -> Result<Test, ParserError> {
     (
         opt(trace_level),
-        test_keyword.errors_into(),
+        test_keyword.convert_errors(),
         cut((
             opt(test_inputs),
-            colon.errors_into(),
+            colon.convert_errors(),
             parse_expr,
-            end_of_line.errors_into(),
+            end_of_line.convert_errors(),
         )),
     )
         .map(|(trace_level, _, (inputs, _, expr, _))| Test {
@@ -94,7 +94,7 @@ fn trace_level(input: Span) -> Result<TraceLevel, ParserError> {
     let single_star = star.map(|_| TraceLevel::Trace);
     let double_star = star_star.map(|_| TraceLevel::Debug);
 
-    double_star.or(single_star).errors_into().parse(input)
+    double_star.or(single_star).convert_errors().parse(input)
 }
 
 /// Parse test inputs in curly braces, e.g. `{x, y, z}`.
@@ -104,7 +104,7 @@ fn test_inputs(input: Span) -> Result<Vec<String>, ParserError> {
         cut((separated_list1(comma, identifier), brace_right)),
     )
         .map(|(_, (inputs, _))| inputs.into_iter().map(|id| id.to_string()).collect())
-        .errors_into()
+        .convert_errors()
         .parse(input)
 }
 

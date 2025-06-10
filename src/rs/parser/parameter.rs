@@ -81,14 +81,14 @@ fn parameter_decl(input: Span) -> Result<Parameter, ParserError> {
     (
         opt(performance),
         opt(trace_level),
-        identifier.errors_into(),
+        identifier.convert_errors(),
         opt(limits),
         cut((
-            colon.errors_into(),
-            identifier.errors_into(),
-            equals.errors_into(),
+            colon.convert_errors(),
+            identifier.convert_errors(),
+            equals.convert_errors(),
             parameter_value,
-            end_of_line.errors_into(),
+            end_of_line.convert_errors(),
             opt(parse_note),
         )),
     )
@@ -109,7 +109,7 @@ fn parameter_decl(input: Span) -> Result<Parameter, ParserError> {
 
 /// Parse a performance indicator (`$`).
 fn performance(input: Span) -> Result<bool, ParserError> {
-    dollar.errors_into().map(|_| true).parse(input)
+    dollar.convert_errors().map(|_| true).parse(input)
 }
 
 /// Parse a trace level indicator (`*` or `**`).
@@ -117,7 +117,7 @@ fn trace_level(input: Span) -> Result<TraceLevel, ParserError> {
     let single_star = star.map(|_| TraceLevel::Trace);
     let double_star = star_star.map(|_| TraceLevel::Debug);
 
-    double_star.or(single_star).errors_into().parse(input)
+    double_star.or(single_star).convert_errors().parse(input)
 }
 
 /// Parse parameter limits (either continuous or discrete).
@@ -128,12 +128,12 @@ fn limits(input: Span) -> Result<Limits, ParserError> {
 /// Parse continuous limits in parentheses, e.g. `(0, 100)`.
 fn continuous_limits(input: Span) -> Result<Limits, ParserError> {
     (
-        paren_left.errors_into(),
+        paren_left.convert_errors(),
         cut((
             parse_expr,
-            comma.errors_into(),
+            comma.convert_errors(),
             parse_expr,
-            paren_right.errors_into(),
+            paren_right.convert_errors(),
         )),
     )
         .map(|(_, (min, _, max, _))| Limits::Continuous { min, max })
@@ -143,10 +143,10 @@ fn continuous_limits(input: Span) -> Result<Limits, ParserError> {
 /// Parse discrete limits in square brackets, e.g. `[1, 2, 3]`.
 fn discrete_limits(input: Span) -> Result<Limits, ParserError> {
     (
-        bracket_left.errors_into(),
+        bracket_left.convert_errors(),
         cut((
-            separated_list1(comma.errors_into(), parse_expr),
-            bracket_right.errors_into(),
+            separated_list1(comma.convert_errors(), parse_expr),
+            bracket_right.convert_errors(),
         )),
     )
         .map(|(_, (values, _))| Limits::Discrete { values })
@@ -160,7 +160,7 @@ fn parameter_value(input: Span) -> Result<ParameterValue, ParserError> {
 
 /// Parse a simple parameter value (expression with optional unit).
 fn simple_value(input: Span) -> Result<ParameterValue, ParserError> {
-    (parse_expr, opt((colon.errors_into(), cut(parse_unit))))
+    (parse_expr, opt((colon.convert_errors(), cut(parse_unit))))
         .map(|(expr, unit)| ParameterValue::Simple(expr, unit.map(|(_, u)| u)))
         .parse(input)
 }
@@ -169,8 +169,8 @@ fn simple_value(input: Span) -> Result<ParameterValue, ParserError> {
 fn piecewise_value(input: Span) -> Result<ParameterValue, ParserError> {
     (
         piecewise_part,
-        opt((colon.errors_into(), cut(parse_unit))),
-        many0((end_of_line.errors_into(), piecewise_part)),
+        opt((colon.convert_errors(), cut(parse_unit))),
+        many0((end_of_line.convert_errors(), piecewise_part)),
     )
         .map(|(first, unit, rest)| {
             let mut parts = Vec::with_capacity(1 + rest.len());
@@ -184,8 +184,8 @@ fn piecewise_value(input: Span) -> Result<ParameterValue, ParserError> {
 /// Parse a single piece of a piecewise expression, e.g. `{2*x if x > 0}`.
 fn piecewise_part(input: Span) -> Result<PiecewisePart, ParserError> {
     (
-        brace_left.errors_into(),
-        cut((parse_expr, if_.errors_into(), parse_expr)),
+        brace_left.convert_errors(),
+        cut((parse_expr, if_.convert_errors(), parse_expr)),
     )
         .map(|(_, (expr, _, if_expr))| PiecewisePart { expr, if_expr })
         .parse(input)
