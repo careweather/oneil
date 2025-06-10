@@ -17,7 +17,7 @@
 
 use nom::{
     Parser as _,
-    combinator::{all_consuming, cut, opt},
+    combinator::{all_consuming, cut, flat_map, opt},
     multi::many0,
 };
 
@@ -25,9 +25,14 @@ use crate::ast::model::{Model, Section};
 
 use super::{
     declaration::parse as parse_decl,
-    error::{ErrorHandlingParser as _, ParserError},
+    error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
     note::parse as parse_note,
-    token::{keyword::section, naming::identifier, structure::end_of_line},
+    token::{
+        error::{TokenError, TokenErrorKind},
+        keyword::section,
+        naming::label,
+        structure::end_of_line,
+    },
     util::{Result, Span},
 };
 
@@ -103,18 +108,25 @@ fn model(input: Span) -> Result<Model, ParserError> {
 
 /// Parses a section within a model
 fn parse_section(input: Span) -> Result<Section, ParserError> {
-    (
-        section.convert_errors(),
-        cut((identifier.convert_errors(), end_of_line.convert_errors())),
-        opt(parse_note),
-        many0(parse_decl),
-    )
-        .map(|(_, (label, _), note, decls)| Section {
-            label: label.to_string(),
-            note,
-            decls,
-        })
-        .parse(input)
+    flat_map(section.convert_errors(), |section_span: Span| {
+        (
+            cut((label, end_of_line)).map_failure(move |e: TokenError| match e.kind {
+                TokenErrorKind::ExpectLabel => ParserError::new(
+                    ParserErrorKind::SectionMissingLabel { section_span },
+                    e.span,
+                ),
+                _ => e.into(),
+            }),
+            opt(parse_note),
+            many0(parse_decl),
+        )
+    })
+    .map(|((label, _), note, decls)| Section {
+        label: label.to_string(),
+        note,
+        decls,
+    })
+    .parse(input)
 }
 
 #[cfg(test)]

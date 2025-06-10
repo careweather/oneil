@@ -216,6 +216,8 @@ pub enum ParserErrorKind<'a> {
         equals_span: Span<'a>,
         error: Box<ParserError<'a>>,
     },
+    /// Found an invalid section label
+    SectionMissingLabel { section_span: Span<'a> },
     /// Found an unclosed parenthesis
     UnclosedParen {
         paren_left_span: Span<'a>,
