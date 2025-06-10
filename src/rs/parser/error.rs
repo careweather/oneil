@@ -1,4 +1,9 @@
-use nom::Parser;
+use nom::{Parser, error::ParseError};
+
+use super::{
+    Span,
+    token::error::{TokenError, TokenErrorKind},
+};
 
 pub trait ErrorHandlingParser<I, O, E>: Parser<I, Output = O, Error = E>
 where
@@ -70,4 +75,53 @@ where
     P: Parser<I, Output = O, Error = E>,
     E: nom::error::ParseError<I>,
 {
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParserError<'a> {
+    kind: ParserErrorKind,
+    span: Span<'a>,
+}
+
+impl<'a> ParserError<'a> {
+    pub fn new(kind: ParserErrorKind, span: Span<'a>) -> Self {
+        Self { kind, span }
+    }
+}
+
+impl<'a> ParseError<Span<'a>> for ParserError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: nom::error::ErrorKind) -> Self {
+        Self {
+            kind: ParserErrorKind::NomError(kind),
+            span: input,
+        }
+    }
+
+    fn append(_input: Span<'a>, _kind: nom::error::ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ParserErrorKind {
+    TokenError(TokenErrorKind),
+    NomError(nom::error::ErrorKind),
+}
+
+impl<'a> From<TokenError<'a>> for ParserError<'a> {
+    fn from(e: TokenError<'a>) -> Self {
+        Self {
+            kind: ParserErrorKind::TokenError(e.kind),
+            span: e.span,
+        }
+    }
+}
+
+impl<'a> From<nom::error::Error<Span<'a>>> for ParserError<'a> {
+    fn from(e: nom::error::Error<Span<'a>>) -> Self {
+        Self {
+            kind: ParserErrorKind::NomError(e.code),
+            span: e.input,
+        }
+    }
 }
