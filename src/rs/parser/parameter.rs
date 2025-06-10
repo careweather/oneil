@@ -10,7 +10,7 @@ use super::expression::parse as parse_expr;
 use super::note::parse as parse_note;
 use super::token::{
     keyword::if_,
-    naming::identifier,
+    naming::{identifier, label},
     structure::end_of_line,
     symbol::{
         brace_left, bracket_left, bracket_right, colon, comma, dollar, equals, paren_left,
@@ -81,10 +81,10 @@ fn parameter_decl(input: Span) -> Result<Parameter, ParserError> {
     (
         opt(performance),
         opt(trace_level),
-        identifier.convert_errors(),
+        label.convert_errors(),
         opt(limits),
+        colon.convert_errors(),
         cut((
-            colon.convert_errors(),
             identifier.convert_errors(),
             equals.convert_errors(),
             parameter_value,
@@ -93,7 +93,7 @@ fn parameter_decl(input: Span) -> Result<Parameter, ParserError> {
         )),
     )
         .map(
-            |(performance, trace_level, name, limits, (_, ident, _, value, _, note))| Parameter {
+            |(performance, trace_level, name, limits, _, (ident, _, value, _, note))| Parameter {
                 name: name.to_string(),
                 ident: ident.to_string(),
                 value,
@@ -216,6 +216,13 @@ mod tests {
             }
             _ => panic!("Expected simple parameter value"),
         }
+    }
+
+    #[test]
+    fn test_parse_parameter_with_multiword_label() {
+        let input = Span::new_extra("Value of x: x = 42", Config::default());
+        let (_, param) = parse(input).expect("Parameter should parse");
+        assert_eq!(param.name, "Value of x");
     }
 
     #[test]
