@@ -1,4 +1,7 @@
-use nom::{Parser, error::ParseError};
+use nom::{
+    Parser,
+    error::{FromExternalError, ParseError},
+};
 
 use super::{
     Span,
@@ -79,14 +82,21 @@ where
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ParserError<'a> {
-    kind: ParserErrorKind,
+    kind: ParserErrorKind<'a>,
     span: Span<'a>,
 }
 
 impl<'a> ParserError<'a> {
-    pub fn new(kind: ParserErrorKind, span: Span<'a>) -> Self {
+    pub fn new(kind: ParserErrorKind<'a>, span: Span<'a>) -> Self {
         Self { kind, span }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ParserErrorKind<'a> {
+    InvalidNumber(&'a str),
+    TokenError(TokenErrorKind),
+    NomError(nom::error::ErrorKind),
 }
 
 impl<'a> ParseError<Span<'a>> for ParserError<'a> {
@@ -102,10 +112,14 @@ impl<'a> ParseError<Span<'a>> for ParserError<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum ParserErrorKind {
-    TokenError(TokenErrorKind),
-    NomError(nom::error::ErrorKind),
+impl<'a> FromExternalError<Span<'a>, ParserErrorKind<'a>> for ParserError<'a> {
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: nom::error::ErrorKind,
+        e: ParserErrorKind<'a>,
+    ) -> Self {
+        Self::new(e, input)
+    }
 }
 
 impl<'a> From<TokenError<'a>> for ParserError<'a> {

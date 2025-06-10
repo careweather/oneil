@@ -5,6 +5,7 @@ use nom::branch::alt;
 use nom::combinator::{all_consuming, cut, opt};
 use nom::multi::{many0, separated_list1};
 
+use super::error::{ErrorHandlingParser as _, ParserError, ParserErrorKind};
 use super::expression::parse as parse_expr;
 use super::note::parse as parse_note;
 use super::token::{
@@ -45,7 +46,7 @@ use crate::ast::parameter::{
 /// let (rest, param) = parse(input).unwrap();
 /// assert_eq!(rest.fragment(), &"rest");
 /// ```
-pub fn parse(input: Span) -> Result<Parameter> {
+pub fn parse(input: Span) -> Result<Parameter, ParserError> {
     parameter_decl(input)
 }
 
@@ -72,22 +73,22 @@ pub fn parse(input: Span) -> Result<Parameter> {
 /// let result = parse_complete(input);
 /// assert_eq!(result.is_err(), true);
 /// ```
-pub fn parse_complete(input: Span) -> Result<Parameter> {
+pub fn parse_complete(input: Span) -> Result<Parameter, ParserError> {
     all_consuming(parameter_decl).parse(input)
 }
 
-fn parameter_decl(input: Span) -> Result<Parameter> {
+fn parameter_decl(input: Span) -> Result<Parameter, ParserError> {
     (
         opt(performance),
         opt(trace_level),
-        identifier,
+        identifier.errors_into(),
         opt(limits),
         cut((
-            colon,
-            identifier,
-            equals,
+            colon.errors_into(),
+            identifier.errors_into(),
+            equals.errors_into(),
             parameter_value,
-            end_of_line,
+            end_of_line.errors_into(),
             opt(parse_note),
         )),
     )
@@ -106,61 +107,69 @@ fn parameter_decl(input: Span) -> Result<Parameter> {
 }
 
 /// Parse a performance indicator (`$`).
-fn performance(input: Span) -> Result<bool> {
-    dollar.map(|_| true).parse(input)
+fn performance(input: Span) -> Result<bool, ParserError> {
+    dollar.errors_into().map(|_| true).parse(input)
 }
 
 /// Parse a trace level indicator (`*` or `**`).
-fn trace_level(input: Span) -> Result<TraceLevel> {
+fn trace_level(input: Span) -> Result<TraceLevel, ParserError> {
     let single_star = star.map(|_| TraceLevel::Trace);
     let double_star = star_star.map(|_| TraceLevel::Debug);
 
-    double_star.or(single_star).parse(input)
+    double_star.or(single_star).errors_into().parse(input)
 }
 
 /// Parse parameter limits (either continuous or discrete).
-fn limits(input: Span) -> Result<Limits> {
+fn limits(input: Span) -> Result<Limits, ParserError> {
     alt((continuous_limits, discrete_limits)).parse(input)
 }
 
 /// Parse continuous limits in parentheses, e.g. `(0, 100)`.
-fn continuous_limits(input: Span) -> Result<Limits> {
+fn continuous_limits(input: Span) -> Result<Limits, ParserError> {
     (
-        paren_left,
-        cut((parse_expr, comma, parse_expr, paren_right)),
+        paren_left.errors_into(),
+        cut((
+            parse_expr,
+            comma.errors_into(),
+            parse_expr,
+            paren_right.errors_into(),
+        )),
     )
         .map(|(_, (min, _, max, _))| Limits::Continuous { min, max })
         .parse(input)
 }
 
 /// Parse discrete limits in square brackets, e.g. `[1, 2, 3]`.
-fn discrete_limits(input: Span) -> Result<Limits> {
+fn discrete_limits(input: Span) -> Result<Limits, ParserError> {
     (
-        bracket_left,
-        cut((separated_list1(comma, parse_expr), bracket_right)),
+        bracket_left.errors_into(),
+        cut((
+            separated_list1(comma.errors_into(), parse_expr),
+            bracket_right.errors_into(),
+        )),
     )
         .map(|(_, (values, _))| Limits::Discrete { values })
         .parse(input)
 }
 
 /// Parse a parameter value (either simple or piecewise).
-fn parameter_value(input: Span) -> Result<ParameterValue> {
+fn parameter_value(input: Span) -> Result<ParameterValue, ParserError> {
     simple_value.or(piecewise_value).parse(input)
 }
 
 /// Parse a simple parameter value (expression with optional unit).
-fn simple_value(input: Span) -> Result<ParameterValue> {
-    (parse_expr, opt((colon, cut(parse_unit))))
+fn simple_value(input: Span) -> Result<ParameterValue, ParserError> {
+    (parse_expr, opt((colon.errors_into(), cut(parse_unit))))
         .map(|(expr, unit)| ParameterValue::Simple(expr, unit.map(|(_, u)| u)))
         .parse(input)
 }
 
 /// Parse a piecewise parameter value.
-fn piecewise_value(input: Span) -> Result<ParameterValue> {
+fn piecewise_value(input: Span) -> Result<ParameterValue, ParserError> {
     (
         piecewise_part,
-        opt((colon, cut(parse_unit))),
-        many0((end_of_line, piecewise_part)),
+        opt((colon.errors_into(), cut(parse_unit))),
+        many0((end_of_line.errors_into(), piecewise_part)),
     )
         .map(|(first, unit, rest)| {
             let mut parts = Vec::with_capacity(1 + rest.len());
@@ -172,8 +181,11 @@ fn piecewise_value(input: Span) -> Result<ParameterValue> {
 }
 
 /// Parse a single piece of a piecewise expression, e.g. `{2*x if x > 0}`.
-fn piecewise_part(input: Span) -> Result<PiecewisePart> {
-    (brace_left, cut((parse_expr, if_, parse_expr)))
+fn piecewise_part(input: Span) -> Result<PiecewisePart, ParserError> {
+    (
+        brace_left.errors_into(),
+        cut((parse_expr, if_.errors_into(), parse_expr)),
+    )
         .map(|(_, (expr, _, if_expr))| PiecewisePart { expr, if_expr })
         .parse(input)
 }

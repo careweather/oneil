@@ -15,6 +15,7 @@
 //! let (_, decl) = parse(input).unwrap();
 //! ```
 
+use clap::Parser;
 use nom::{
     Parser as _,
     branch::alt,
@@ -25,10 +26,12 @@ use nom::{
 use crate::ast::declaration::{Decl, ModelInput};
 
 use super::{
+    error::{ErrorHandlingParser as _, ParserError},
     expression::parse as parse_expr,
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
+        error::TokenErrorKind,
         keyword::{as_, from, import, use_},
         naming::identifier,
         structure::end_of_line,
@@ -60,7 +63,7 @@ use super::{
 /// let (rest, decl) = parse(input).unwrap();
 /// assert_eq!(rest.fragment(), &"rest");
 /// ```
-pub fn parse(input: Span) -> Result<Decl> {
+pub fn parse(input: Span) -> Result<Decl, ParserError> {
     decl.parse(input)
 }
 
@@ -87,11 +90,11 @@ pub fn parse(input: Span) -> Result<Decl> {
 /// let result = parse_complete(input);
 /// assert_eq!(result.is_err(), true);
 /// ```
-pub fn parse_complete(input: Span) -> Result<Decl> {
+pub fn parse_complete(input: Span) -> Result<Decl, ParserError> {
     all_consuming(decl).parse(input)
 }
 
-fn decl(input: Span) -> Result<Decl> {
+fn decl(input: Span) -> Result<Decl, ParserError> {
     alt((
         import_decl,
         from_decl,
@@ -103,26 +106,27 @@ fn decl(input: Span) -> Result<Decl> {
 }
 
 /// Parses an import declaration
-fn import_decl(input: Span) -> Result<Decl> {
+fn import_decl(input: Span) -> Result<Decl, ParserError> {
     (import, cut((identifier, end_of_line)))
         .map(|(_, (path, _))| Decl::Import {
             path: path.to_string(),
         })
+        .errors_into()
         .parse(input)
 }
 
 /// Parses a from declaration
-fn from_decl(input: Span) -> Result<Decl> {
+fn from_decl(input: Span) -> Result<Decl, ParserError> {
     (
-        from,
+        from.errors_into(),
         cut((
             module_path,
-            use_,
-            identifier,
+            use_.errors_into(),
+            identifier.errors_into(),
             opt(model_inputs),
-            as_,
-            identifier,
-            end_of_line,
+            as_.errors_into(),
+            identifier.errors_into(),
+            end_of_line.errors_into(),
         )),
     )
         .map(
@@ -137,10 +141,16 @@ fn from_decl(input: Span) -> Result<Decl> {
 }
 
 /// Parses a use declaration
-fn use_decl(input: Span) -> Result<Decl> {
+fn use_decl(input: Span) -> Result<Decl, ParserError> {
     (
-        use_,
-        cut((module_path, opt(model_inputs), as_, identifier, end_of_line)),
+        use_.errors_into(),
+        cut((
+            module_path,
+            opt(model_inputs),
+            as_.errors_into(),
+            identifier.errors_into(),
+            end_of_line.errors_into(),
+        )),
     )
         .map(|(_, (path, inputs, _, as_name, _))| Decl::Use {
             path: path.to_string(),
@@ -151,7 +161,7 @@ fn use_decl(input: Span) -> Result<Decl> {
 }
 
 /// Parses a module path (e.g., "foo.bar.baz")
-fn module_path(input: Span) -> Result<String> {
+fn module_path(input: Span) -> Result<String, ParserError> {
     separated_list1(dot, identifier)
         .map(|parts| {
             parts
@@ -160,22 +170,30 @@ fn module_path(input: Span) -> Result<String> {
                 .collect::<Vec<_>>()
                 .join(".")
         })
+        .errors_into()
         .parse(input)
 }
 
 /// Parses model inputs (e.g., "(x=1, y=2)")
-fn model_inputs(input: Span) -> Result<Vec<ModelInput>> {
+fn model_inputs(input: Span) -> Result<Vec<ModelInput>, ParserError> {
     (
-        paren_left,
-        cut((separated_list1(comma, model_input), paren_right)),
+        paren_left.errors_into(),
+        cut((
+            separated_list1(comma.errors_into(), model_input),
+            paren_right.errors_into(),
+        )),
     )
         .map(|(_, (inputs, _))| inputs)
         .parse(input)
 }
 
 /// Parses a single model input (e.g., "x=1")
-fn model_input(input: Span) -> Result<ModelInput> {
-    (identifier, equals, cut(parse_expr))
+fn model_input(input: Span) -> Result<ModelInput, ParserError> {
+    (
+        identifier.errors_into(),
+        equals.errors_into(),
+        cut(parse_expr),
+    )
         .map(|(name, _, value)| ModelInput {
             name: name.to_string(),
             value,

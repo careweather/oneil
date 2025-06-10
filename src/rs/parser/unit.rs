@@ -25,6 +25,7 @@ use nom::{
 use crate::ast::unit::{UnitExpr, UnitOp};
 
 use super::{
+    error::{ErrorHandlingParser as _, ParserError},
     token::{
         literal::number,
         naming::identifier,
@@ -56,7 +57,7 @@ use super::{
 /// let (rest, unit) = parse(input).unwrap();
 /// assert_eq!(rest.fragment(), &"rest");
 /// ```
-pub fn parse(input: Span) -> Result<UnitExpr> {
+pub fn parse(input: Span) -> Result<UnitExpr, ParserError> {
     unit_expr(input)
 }
 
@@ -83,18 +84,18 @@ pub fn parse(input: Span) -> Result<UnitExpr> {
 /// let result = parse_complete(input);
 /// assert_eq!(result.is_err(), true);
 /// ```
-pub fn parse_complete(input: Span) -> Result<UnitExpr> {
+pub fn parse_complete(input: Span) -> Result<UnitExpr, ParserError> {
     all_consuming(unit_expr).parse(input)
 }
 
 /// Parses a unit expression
-fn unit_expr(input: Span) -> Result<UnitExpr> {
+fn unit_expr(input: Span) -> Result<UnitExpr, ParserError> {
     let op = alt((
         map(star, |_| UnitOp::Multiply),
         map(slash, |_| UnitOp::Divide),
     ));
 
-    (unit_term, many0((op, cut(unit_term))))
+    (unit_term, many0((op.errors_into(), cut(unit_term))))
         .map(|(first, rest)| {
             rest.into_iter()
                 .fold(first, |acc, (op, expr)| UnitExpr::BinaryOp {
@@ -107,7 +108,7 @@ fn unit_expr(input: Span) -> Result<UnitExpr> {
 }
 
 /// Parses a unit term
-fn unit_term(input: Span) -> Result<UnitExpr> {
+fn unit_term(input: Span) -> Result<UnitExpr, ParserError> {
     let parse_unit = map((identifier, opt((caret, cut(number)))), |(id, exp)| {
         let exponent = exp.map(|(_, n)| {
             // TODO(error): Better error handling for float parsing
@@ -119,10 +120,14 @@ fn unit_term(input: Span) -> Result<UnitExpr> {
             identifier: id.to_string(),
             exponent,
         }
-    });
+    })
+    .errors_into();
 
     let parse_parenthesized = map(
-        (paren_left, cut((unit_expr, paren_right))),
+        (
+            paren_left.errors_into(),
+            cut((unit_expr, paren_right.errors_into())),
+        ),
         |(_, (expr, _))| expr,
     );
 

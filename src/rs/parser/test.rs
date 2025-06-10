@@ -4,6 +4,7 @@ use nom::Parser;
 use nom::combinator::{all_consuming, cut, opt};
 use nom::multi::separated_list1;
 
+use super::error::{ErrorHandlingParser as _, ParserError};
 use super::expression::parse as parse_expr;
 use super::token::{
     keyword::test as test_keyword,
@@ -37,7 +38,7 @@ use crate::ast::{parameter::TraceLevel, test::Test};
 /// let (rest, test) = parse(input).unwrap();
 /// assert_eq!(rest.fragment(), &"rest");
 /// ```
-pub fn parse(input: Span) -> Result<Test> {
+pub fn parse(input: Span) -> Result<Test, ParserError> {
     test_decl(input)
 }
 
@@ -64,15 +65,20 @@ pub fn parse(input: Span) -> Result<Test> {
 /// let result = parse_complete(input);
 /// assert_eq!(result.is_err(), true);
 /// ```
-pub fn parse_complete(input: Span) -> Result<Test> {
+pub fn parse_complete(input: Span) -> Result<Test, ParserError> {
     all_consuming(test_decl).parse(input)
 }
 
-fn test_decl(input: Span) -> Result<Test> {
+fn test_decl(input: Span) -> Result<Test, ParserError> {
     (
         opt(trace_level),
-        test_keyword,
-        cut((opt(test_inputs), colon, parse_expr, end_of_line)),
+        test_keyword.errors_into(),
+        cut((
+            opt(test_inputs),
+            colon.errors_into(),
+            parse_expr,
+            end_of_line.errors_into(),
+        )),
     )
         .map(|(trace_level, _, (inputs, _, expr, _))| Test {
             trace_level: trace_level.unwrap_or(TraceLevel::None),
@@ -83,20 +89,21 @@ fn test_decl(input: Span) -> Result<Test> {
 }
 
 /// Parse a trace level indicator (`*` or `**`).
-fn trace_level(input: Span) -> Result<TraceLevel> {
+fn trace_level(input: Span) -> Result<TraceLevel, ParserError> {
     let single_star = star.map(|_| TraceLevel::Trace);
     let double_star = star_star.map(|_| TraceLevel::Debug);
 
-    double_star.or(single_star).parse(input)
+    double_star.or(single_star).errors_into().parse(input)
 }
 
 /// Parse test inputs in curly braces, e.g. `{x, y, z}`.
-fn test_inputs(input: Span) -> Result<Vec<String>> {
+fn test_inputs(input: Span) -> Result<Vec<String>, ParserError> {
     (
         brace_left,
         cut((separated_list1(comma, identifier), brace_right)),
     )
         .map(|(_, (inputs, _))| inputs.into_iter().map(|id| id.to_string()).collect())
+        .errors_into()
         .parse(input)
 }
 

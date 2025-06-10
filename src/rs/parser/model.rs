@@ -25,6 +25,7 @@ use crate::ast::model::{Model, Section};
 
 use super::{
     declaration::parse as parse_decl,
+    error::{ErrorHandlingParser as _, ParserError},
     note::parse as parse_note,
     token::{keyword::section, naming::identifier, structure::end_of_line},
     util::{Result, Span},
@@ -53,7 +54,7 @@ use super::{
 /// let (rest, model) = parse(input).unwrap();
 /// assert_eq!(rest.fragment(), &"<rest>");
 /// ```
-pub fn parse(input: Span) -> Result<Model> {
+pub fn parse(input: Span) -> Result<Model, ParserError> {
     model(input)
 }
 
@@ -80,14 +81,14 @@ pub fn parse(input: Span) -> Result<Model> {
 /// let result = parse_complete(input);
 /// assert_eq!(result.is_err(), true);
 /// ```
-pub fn parse_complete(input: Span) -> Result<Model> {
+pub fn parse_complete(input: Span) -> Result<Model, ParserError> {
     all_consuming(model).parse(input)
 }
 
 /// Parses a model definition
-fn model(input: Span) -> Result<Model> {
+fn model(input: Span) -> Result<Model, ParserError> {
     (
-        opt(end_of_line),
+        opt(end_of_line.errors_into()),
         opt(parse_note),
         many0(parse_decl),
         many0(parse_section),
@@ -101,10 +102,10 @@ fn model(input: Span) -> Result<Model> {
 }
 
 /// Parses a section within a model
-fn parse_section(input: Span) -> Result<Section> {
+fn parse_section(input: Span) -> Result<Section, ParserError> {
     (
-        section,
-        cut((identifier, end_of_line)),
+        section.errors_into(),
+        cut((identifier.errors_into(), end_of_line.errors_into())),
         opt(parse_note),
         many0(parse_decl),
     )

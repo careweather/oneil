@@ -5,6 +5,7 @@
 use nom::Parser;
 use nom::combinator::all_consuming;
 
+use super::error::{ErrorHandlingParser as _, ParserError};
 use super::token::note::{multi_line_note, single_line_note};
 use super::util::{Result, Span};
 use crate::ast::note::Note;
@@ -39,7 +40,7 @@ use crate::ast::note::Note;
 /// assert_eq!(note, Note("Line 1\nLine 2".to_string()));
 /// assert_eq!(rest.fragment(), &"rest");
 /// ```
-pub fn parse(input: Span) -> Result<Note> {
+pub fn parse(input: Span) -> Result<Note, ParserError> {
     note(input)
 }
 
@@ -68,11 +69,11 @@ pub fn parse(input: Span) -> Result<Note> {
 /// let result = parse_complete(input);
 /// assert_eq!(result.is_err(), true);
 /// ```
-pub fn parse_complete(input: Span) -> Result<Note> {
+pub fn parse_complete(input: Span) -> Result<Note, ParserError> {
     all_consuming(note).parse(input)
 }
 
-fn note(input: Span) -> Result<Note> {
+fn note(input: Span) -> Result<Note, ParserError> {
     let single_line_note = single_line_note.map(|span| {
         let content = span.trim_start_matches('~').trim();
         Note(content.to_string())
@@ -83,7 +84,10 @@ fn note(input: Span) -> Result<Note> {
         Note(content.to_string())
     });
 
-    single_line_note.or(multi_line_note).parse(input)
+    single_line_note
+        .or(multi_line_note)
+        .errors_into()
+        .parse(input)
 }
 
 #[cfg(test)]

@@ -18,7 +18,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{all_consuming, cut, map, opt, value},
+    combinator::{all_consuming, cut, map, map_res, opt, value},
     multi::{many0, separated_list0},
 };
 
@@ -28,6 +28,7 @@ use crate::ast::{
 };
 
 use super::{
+    error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
     token::{
         keyword::{and, false_, not, or, true_},
         literal::{number, string},
@@ -42,9 +43,9 @@ use super::{
 };
 
 fn left_associative_binary_op<'a>(
-    operand: impl Parser<'a, Expr> + Copy,
-    operator: impl Parser<'a, BinaryOp>,
-) -> impl Parser<'a, Expr> {
+    operand: impl Parser<'a, Expr, ParserError<'a>> + Copy,
+    operator: impl Parser<'a, BinaryOp, ParserError<'a>>,
+) -> impl Parser<'a, Expr, ParserError<'a>> {
     (operand, many0((operator, cut(operand)))).map(|(first, rest)| {
         rest.into_iter()
             .fold(first, |acc, (op, expr)| Expr::BinaryOp {
@@ -78,7 +79,7 @@ fn left_associative_binary_op<'a>(
 /// let (rest, expr) = parse(input).unwrap();
 /// assert_eq!(rest.fragment(), &"rest");
 /// ```
-pub fn parse(input: Span) -> Result<Expr> {
+pub fn parse(input: Span) -> Result<Expr, ParserError> {
     expr(input)
 }
 
@@ -105,30 +106,30 @@ pub fn parse(input: Span) -> Result<Expr> {
 /// let result = parse_complete(input);
 /// assert_eq!(result.is_err(), true);
 /// ```
-pub fn parse_complete(input: Span) -> Result<Expr> {
+pub fn parse_complete(input: Span) -> Result<Expr, ParserError> {
     all_consuming(expr).parse(input)
 }
 
 /// Parses an expression
-fn expr(input: Span) -> Result<Expr> {
+fn expr(input: Span) -> Result<Expr, ParserError> {
     or_expr(input)
 }
 
 /// Parses an OR expression (lowest precedence)
-fn or_expr(input: Span) -> Result<Expr> {
-    let or = value(BinaryOp::Or, or);
+fn or_expr(input: Span) -> Result<Expr, ParserError> {
+    let or = value(BinaryOp::Or, or).errors_into();
     left_associative_binary_op(and_expr, or).parse(input)
 }
 
 /// Parses an AND expression
-fn and_expr(input: Span) -> Result<Expr> {
-    let and = value(BinaryOp::And, and);
+fn and_expr(input: Span) -> Result<Expr, ParserError> {
+    let and = value(BinaryOp::And, and).errors_into();
     left_associative_binary_op(not_expr, and).parse(input)
 }
 
 /// Parses a NOT expression
-fn not_expr(input: Span) -> Result<Expr> {
-    (not, cut(not_expr))
+fn not_expr(input: Span) -> Result<Expr, ParserError> {
+    (not.errors_into(), cut(not_expr))
         .map(|(_, expr)| Expr::UnaryOp {
             op: UnaryOp::Not,
             expr: Box::new(expr),
@@ -138,7 +139,7 @@ fn not_expr(input: Span) -> Result<Expr> {
 }
 
 /// Parses a comparison expression
-fn comparison_expr(input: Span) -> Result<Expr> {
+fn comparison_expr(input: Span) -> Result<Expr, ParserError> {
     let op = alt((
         value(BinaryOp::LessThanEq, less_than_equals),
         value(BinaryOp::GreaterThanEq, greater_than_equals),
@@ -146,7 +147,8 @@ fn comparison_expr(input: Span) -> Result<Expr> {
         value(BinaryOp::GreaterThan, greater_than),
         value(BinaryOp::Eq, equals_equals),
         value(BinaryOp::NotEq, bang_equals),
-    ));
+    ))
+    .errors_into();
 
     (additive_expr, opt((op, cut(additive_expr))))
         .map(|(left, rest)| match rest {
@@ -161,29 +163,31 @@ fn comparison_expr(input: Span) -> Result<Expr> {
 }
 
 /// Parses an additive expression
-fn additive_expr(input: Span) -> Result<Expr> {
+fn additive_expr(input: Span) -> Result<Expr, ParserError> {
     let op = alt((
         value(BinaryOp::Add, plus),
         value(BinaryOp::Sub, minus),
         value(BinaryOp::TrueSub, minus_minus),
-    ));
+    ))
+    .errors_into();
     left_associative_binary_op(multiplicative_expr, op).parse(input)
 }
 
 /// Parses a multiplicative expression
-fn multiplicative_expr(input: Span) -> Result<Expr> {
+fn multiplicative_expr(input: Span) -> Result<Expr, ParserError> {
     let op = alt((
         value(BinaryOp::Mul, star),
         value(BinaryOp::Div, slash),
         value(BinaryOp::TrueDiv, slash_slash),
         value(BinaryOp::Mod, percent),
-    ));
+    ))
+    .errors_into();
     left_associative_binary_op(exponential_expr, op).parse(input)
 }
 
 /// Parses an exponential expression (right associative)
-fn exponential_expr(input: Span) -> Result<Expr> {
-    let op = value(BinaryOp::Pow, caret);
+fn exponential_expr(input: Span) -> Result<Expr, ParserError> {
+    let op = value(BinaryOp::Pow, caret).errors_into();
     (neg_expr, opt((op, cut(exponential_expr))))
         .map(|(left, rest)| match rest {
             Some((op, right)) => Expr::BinaryOp {
@@ -197,8 +201,8 @@ fn exponential_expr(input: Span) -> Result<Expr> {
 }
 
 /// Parses a negation expression
-fn neg_expr(input: Span) -> Result<Expr> {
-    (minus, cut(neg_expr))
+fn neg_expr(input: Span) -> Result<Expr, ParserError> {
+    (minus.errors_into(), cut(neg_expr))
         .map(|(_, expr)| Expr::UnaryOp {
             op: UnaryOp::Neg,
             expr: Box::new(expr),
@@ -208,36 +212,50 @@ fn neg_expr(input: Span) -> Result<Expr> {
 }
 
 /// Parses a primary expression (literals, identifiers, function calls, parenthesized expressions)
-fn primary_expr(input: Span) -> Result<Expr> {
+fn primary_expr(input: Span) -> Result<Expr, ParserError> {
     alt((
-        map(number, |n| {
-            // TODO(error): Better error handling for float parsing
-            let parse_result = n
-                .fragment()
-                .parse::<f64>()
-                .expect("TODO: better error handling for float parsing");
-            Expr::Literal(Literal::Number(parse_result))
+        map_res(number.errors_into(), |n| {
+            let parse_result = n.fragment().parse::<f64>();
+            match parse_result {
+                Ok(n) => Ok(Expr::Literal(Literal::Number(n))),
+                Err(_) => Err(ParserErrorKind::InvalidNumber(n.fragment())),
+            }
         }),
-        map(string, |s| {
+        map(string.errors_into(), |s| {
             // trim quotes from the string
             let s_contents = s.fragment()[1..s.len() - 1].to_string();
             Expr::Literal(Literal::String(s_contents))
         }),
-        map(true_, |_| Expr::Literal(Literal::Boolean(true))),
-        map(false_, |_| Expr::Literal(Literal::Boolean(false))),
+        map(true_.errors_into(), |_| {
+            Expr::Literal(Literal::Boolean(true))
+        }),
+        map(false_.errors_into(), |_| {
+            Expr::Literal(Literal::Boolean(false))
+        }),
         function_call,
-        map(identifier, |id| Expr::Variable(id.to_string())),
-        map((paren_left, cut((expr, paren_right))), |(_, (e, _))| e),
+        map(identifier.errors_into(), |id| {
+            Expr::Variable(id.to_string())
+        }),
+        map(
+            (
+                paren_left.errors_into(),
+                cut((expr, paren_right.errors_into())),
+            ),
+            |(_, (e, _))| e,
+        ),
     ))
     .parse(input)
 }
 
 /// Parses a function call
-fn function_call(input: Span) -> Result<Expr> {
+fn function_call(input: Span) -> Result<Expr, ParserError> {
     (
-        identifier,
-        paren_left,
-        cut((separated_list0(comma, expr), paren_right)),
+        identifier.errors_into(),
+        paren_left.errors_into(),
+        cut((
+            separated_list0(comma.errors_into(), expr),
+            paren_right.errors_into(),
+        )),
     )
         .map(|(name, _, (args, _))| Expr::FunctionCall {
             name: name.to_string(),
