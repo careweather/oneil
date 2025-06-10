@@ -14,20 +14,6 @@ pub type Span<'a> = LocatedSpan<&'a str, Config>;
 /// may be updated in the future
 pub type Result<'a, O, E = Error<Span<'a>>> = IResult<Span<'a>, O, E>;
 
-pub trait Parser<'a, O, E = Error<Span<'a>>>: NomParser<Span<'a>, Output = O, Error = E> {
-    fn map_err<E2>(mut self, f: impl Fn(E) -> E2) -> impl Parser<'a, O, E2>
-    where
-        Self: Sized,
-        E2: nom::error::ParseError<Span<'a>>,
-    {
-        move |input| {
-            self.parse(input).map_err(|e| match e {
-                nom::Err::Error(e) => nom::Err::Error(f(e)),
-                nom::Err::Failure(e) => nom::Err::Failure(f(e)),
-                nom::Err::Incomplete(e) => nom::Err::Incomplete(e),
-            })
-        }
-    }
-}
+pub trait Parser<'a, O, E = Error<Span<'a>>>: NomParser<Span<'a>, Output = O, Error = E> {}
 
 impl<'a, O, E, P> Parser<'a, O, E> for P where P: NomParser<Span<'a>, Output = O, Error = E> {}
