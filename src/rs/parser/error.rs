@@ -102,15 +102,20 @@ pub enum ParserErrorKind<'a> {
     ExpectUnit,
     InvalidNumber(&'a str),
     TokenError(TokenErrorKind),
+    UnexpectedToken,
+
     NomError(nom::error::ErrorKind),
 }
 
 impl<'a> ParseError<Span<'a>> for ParserError<'a> {
     fn from_error_kind(input: Span<'a>, kind: nom::error::ErrorKind) -> Self {
-        Self {
-            kind: ParserErrorKind::NomError(kind),
-            span: input,
-        }
+        let kind = match kind {
+            // If `all_consuming` is used, we expect the parser to consume the entire input
+            nom::error::ErrorKind::Eof => ParserErrorKind::UnexpectedToken,
+            _ => ParserErrorKind::NomError(kind),
+        };
+
+        Self { kind, span: input }
     }
 
     fn append(_input: Span<'a>, _kind: nom::error::ErrorKind, other: Self) -> Self {
