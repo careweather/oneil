@@ -17,7 +17,7 @@ pub enum Expr {
         args: Vec<Expr>,
     },
 
-    Variable(String),
+    Variable(Vec<String>),
 
     Literal(Literal),
 }

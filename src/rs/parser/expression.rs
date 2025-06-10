@@ -19,7 +19,7 @@ use nom::{
     Parser as _,
     branch::alt,
     combinator::{all_consuming, cut, map, map_res, opt, value},
-    multi::{many0, separated_list0},
+    multi::{many0, separated_list0, separated_list1},
 };
 
 use crate::ast::{
@@ -34,7 +34,7 @@ use super::{
         literal::{number, string},
         naming::identifier,
         symbol::{
-            bang_equals, bar, caret, comma, equals_equals, greater_than, greater_than_equals,
+            bang_equals, bar, caret, comma, dot, equals_equals, greater_than, greater_than_equals,
             less_than, less_than_equals, minus, minus_minus, paren_left, paren_right, percent,
             plus, slash, slash_slash, star,
         },
@@ -257,9 +257,7 @@ fn primary_expr(input: Span) -> Result<Expr, ParserError> {
             Expr::Literal(Literal::Boolean(false))
         }),
         function_call,
-        map(identifier.convert_errors(), |id| {
-            Expr::Variable(id.to_string())
-        }),
+        variable,
         map(
             (
                 paren_left.convert_errors(),
@@ -285,6 +283,14 @@ fn function_call(input: Span) -> Result<Expr, ParserError> {
             name: name.to_string(),
             args: args,
         })
+        .parse(input)
+}
+
+/// Parses a variable name
+fn variable(input: Span) -> Result<Expr, ParserError> {
+    separated_list1(dot, identifier)
+        .convert_errors()
+        .map(|ids| Expr::Variable(ids.into_iter().map(|id| id.to_string()).collect()))
         .parse(input)
 }
 
@@ -322,10 +328,24 @@ mod tests {
     }
 
     #[test]
-    fn test_primary_expr_identifier() {
+    fn test_primary_expr_simple_identifier() {
         let input = Span::new_extra("foo", Config::default());
         let (_, expr) = parse(input).unwrap();
-        assert_eq!(expr, Expr::Variable("foo".to_string()));
+        assert_eq!(expr, Expr::Variable(vec!["foo".to_string()]));
+    }
+
+    #[test]
+    fn test_primary_expr_multiword_identifier() {
+        let input = Span::new_extra("foo.bar.baz", Config::default());
+        let (_, expr) = parse(input).unwrap();
+        assert_eq!(
+            expr,
+            Expr::Variable(vec![
+                "foo".to_string(),
+                "bar".to_string(),
+                "baz".to_string()
+            ])
+        );
     }
 
     #[test]
