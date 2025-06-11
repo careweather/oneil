@@ -135,7 +135,10 @@ pub enum NoteError<'a> {
     /// Expected a note but found something else
     ExpectNote,
     /// Found an unclosed note (missing terminator)
-    UnclosedNote { note_start_span: Span<'a> },
+    UnclosedNote {
+        /// The span containing the beginning delimiter
+        note_start_span: Span<'a>,
+    },
 }
 
 /// Errors that can occur while parsing numbers.
@@ -144,9 +147,15 @@ pub enum NumberError<'a> {
     /// Expected a number but found something else
     ExpectNumber,
     /// Found an invalid decimal part in a number
-    InvalidDecimalPart { decimal_point_span: Span<'a> },
+    InvalidDecimalPart {
+        /// The span containing the decimal point
+        decimal_point_span: Span<'a>,
+    },
     /// Found an invalid exponent part in a number
-    InvalidExponentPart { e_span: Span<'a> },
+    InvalidExponentPart {
+        /// The span containing the exponent 'e' character
+        e_span: Span<'a>,
+    },
 }
 
 /// Errors that can occur while parsing strings.
@@ -155,7 +164,10 @@ pub enum StringError<'a> {
     /// Expected a string but found something else
     ExpectString,
     /// Found an unterminated string (missing closing quote)
-    UnterminatedString { open_quote_span: Span<'a> },
+    UnterminatedString {
+        /// The span containing the opening quote
+        open_quote_span: Span<'a>,
+    },
 }
 
 impl<'a> TokenError<'a> {

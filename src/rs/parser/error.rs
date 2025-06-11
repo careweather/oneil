@@ -126,6 +126,10 @@ where
     }
 }
 
+/// Implements the ErrorHandlingParser trait for any type that implements Parser.
+///
+/// This blanket implementation allows any parser to use the error handling
+/// methods provided by ErrorHandlingParser.
 impl<'a, I, O, E, P> ErrorHandlingParser<I, O, E> for P
 where
     P: Parser<I, Output = O, Error = E>,
@@ -203,29 +207,42 @@ pub enum ParserErrorKind<'a> {
     ExpectUnit,
     /// Found an invalid `from` declaration
     FromDeclError {
+        /// The span containing the `from` keyword
         from_span: Span<'a>,
+        /// The underlying error that occurred while parsing the declaration
         error: Box<ParserError<'a>>,
     },
     /// Found an invalid `import` declaration
     ImportDeclError {
+        /// The span containing the `import` keyword
         import_span: Span<'a>,
+        /// The underlying error that occurred while parsing the declaration
         error: Box<ParserError<'a>>,
     },
     /// Found an invalid model input
     ModelInputError {
+        /// The span containing the equals sign
         equals_span: Span<'a>,
+        /// The underlying error that occurred while parsing the input
         error: Box<ParserError<'a>>,
     },
     /// Found an invalid section label
-    SectionMissingLabel { section_span: Span<'a> },
+    SectionMissingLabel {
+        /// The span containing the section keyword
+        section_span: Span<'a>,
+    },
     /// Found an unclosed parenthesis
     UnclosedParen {
+        /// The span containing the opening parenthesis
         paren_left_span: Span<'a>,
+        /// The underlying error that occurred while parsing the parenthesized expression
         error: Box<ParserError<'a>>,
     },
     /// Found an invalid `use` declaration
     UseDeclError {
+        /// The span containing the `use` keyword
         use_span: Span<'a>,
+        /// The underlying error that occurred while parsing the declaration
         error: Box<ParserError<'a>>,
     },
     /// Found an invalid number with the given text
@@ -264,6 +281,10 @@ impl<'a> FromExternalError<Span<'a>, ParserErrorKind<'a>> for ParserError<'a> {
     }
 }
 
+/// Implements conversion from TokenError to ParserError.
+///
+/// This allows token-level errors to be converted into parser-level errors
+/// while preserving the error information.
 impl<'a> From<TokenError<'a>> for ParserError<'a> {
     fn from(e: TokenError<'a>) -> Self {
         Self {
@@ -273,6 +294,10 @@ impl<'a> From<TokenError<'a>> for ParserError<'a> {
     }
 }
 
+/// Implements conversion from nom::error::Error to ParserError.
+///
+/// This allows nom's built-in errors to be converted into parser-level errors
+/// while preserving the error information.
 impl<'a> From<nom::error::Error<Span<'a>>> for ParserError<'a> {
     fn from(e: nom::error::Error<Span<'a>>) -> Self {
         Self {
