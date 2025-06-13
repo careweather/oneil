@@ -3,16 +3,16 @@
 //! # Examples
 //!
 //! ```
-//! use oneil::parser::model::parse;
+//! use oneil::parser::model::parse_complete;
 //! use oneil::parser::{Config, Span};
 //!
 //! // Parse a simple model
 //! let input = Span::new_extra("import foo\n", Config::default());
-//! let (_, model) = parse(input).unwrap();
+//! let (_, model) = parse_complete(input).unwrap();
 //!
 //! // Parse a model with sections
 //! let input = Span::new_extra("import foo\nsection bar\nimport baz\n", Config::default());
-//! let (_, model) = parse(input).unwrap();
+//! let (_, model) = parse_complete(input).unwrap();
 //! ```
 
 use nom::{
@@ -39,34 +39,7 @@ use super::{
     util::{Result, Span},
 };
 
-/// Parses a model definition
-///
-/// This function **may not consume the complete input**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil::parser::model::parse;
-/// use oneil::parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\n", Config::default());
-/// let (rest, model) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil::parser::model::parse;
-/// use oneil::parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\n<rest>", Config::default());
-/// let (rest, model) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"<rest>");
-/// ```
-pub fn parse(input: Span) -> Result<Model, ErrorsWithPartialResult<Model, ParserError>> {
-    model(input)
-}
-
-/// Parses a model definition
+/// Parses a model definition, consuming the complete input
 ///
 /// This function **fails if the complete input is not consumed**.
 ///
@@ -289,7 +262,7 @@ mod tests {
     #[test]
     fn test_empty_model() {
         let input = Span::new_extra("", Config::default());
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_none());
         assert!(model.decls.is_empty());
         assert!(model.sections.is_empty());
@@ -299,7 +272,7 @@ mod tests {
     #[test]
     fn test_model_with_note() {
         let input = Span::new_extra("~ This is a note\n", Config::default());
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_some());
         assert!(model.decls.is_empty());
         assert!(model.sections.is_empty());
@@ -309,7 +282,7 @@ mod tests {
     #[test]
     fn test_model_with_import() {
         let input = Span::new_extra("import foo\n", Config::default());
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_none());
         assert_eq!(model.decls.len(), 1);
         match &model.decls[0] {
@@ -323,7 +296,7 @@ mod tests {
     #[test]
     fn test_model_with_section() {
         let input = Span::new_extra("section foo\nimport bar\n", Config::default());
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_none());
         assert!(model.decls.is_empty());
         assert_eq!(model.sections.len(), 1);
@@ -343,7 +316,7 @@ mod tests {
             "section foo\nimport bar\nsection baz\nimport qux\n",
             Config::default(),
         );
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_none());
         assert!(model.decls.is_empty());
         assert_eq!(model.sections.len(), 2);
@@ -403,7 +376,7 @@ mod tests {
     #[test]
     fn test_parse_empty_model() {
         let input = Span::new_extra("", Config::default());
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_none());
         assert!(model.decls.is_empty());
         assert!(model.sections.is_empty());
@@ -416,7 +389,7 @@ mod tests {
             "1st parameter: x = 1\n2nd parameter: y = 2\n",
             Config::default(),
         );
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_none());
         assert_eq!(model.decls.len(), 2);
         assert_eq!(rest.fragment(), &"");
@@ -428,7 +401,7 @@ mod tests {
             "X: x = 1 + 2\nsection My Section\nimport foo\nimport bar\nY: y = 3 * 4",
             Config::default(),
         );
-        let (rest, model) = parse(input).unwrap();
+        let (rest, model) = parse_complete(input).unwrap();
         assert!(model.note.is_none());
         assert_eq!(model.decls.len(), 1);
         assert_eq!(model.sections.len(), 1);
@@ -459,7 +432,7 @@ mod tests {
             Config::default(),
         );
 
-        let result = parse(input);
+        let result = parse_complete(input);
         assert!(result.is_err());
 
         match result {
