@@ -103,7 +103,7 @@ pub fn multi_line_note(input: Span) -> Result<Span, TokenError> {
                 .map_failure(move |e| TokenError::new(unclosed_note_kind(delimiter_span), e.span)),
             )
         })),
-        |(delimiter_span, content)| {
+        |(content, delimiter_span)| {
             value(
                 content,
                 cut(end_of_line).map_failure(move |e| {
