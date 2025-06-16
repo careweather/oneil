@@ -25,7 +25,7 @@ use nom::{
     Parser as _,
     bytes::complete::{tag, take_while},
     character::complete::{digit1, one_of},
-    combinator::{cut, flat_map, opt},
+    combinator::{cut, opt},
 };
 
 use super::{
@@ -37,6 +37,7 @@ use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
 pub fn number(input: Span) -> Result<Span, TokenError> {
+    // A convenience function for creating a number error
     fn number_error<'a>(
         e: NumberError<'a>,
     ) -> impl Fn(nom::error::Error<Span<'a>>) -> TokenError<'a> {
@@ -52,18 +53,24 @@ pub fn number(input: Span) -> Result<Span, TokenError> {
 
     let digit = digit1.convert_errors();
 
-    let opt_decimal = opt(flat_map(tag(".").convert_errors(), |decimal_point_span| {
-        cut(digit1).map_failure(number_error(NumberError::InvalidDecimalPart {
-            decimal_point_span,
-        }))
-    }));
+    let opt_decimal = opt(|input| -> Result<_, TokenError> {
+        let (rest, decimal_point_span) = tag(".").convert_errors().parse(input)?;
+        let (rest, _) = cut(digit1)
+            .map_failure(number_error(NumberError::InvalidDecimalPart {
+                decimal_point_span,
+            }))
+            .parse(rest)?;
+        Ok((rest, ()))
+    });
 
-    let opt_exponent = opt(flat_map(tag("e").or(tag("E")).convert_errors(), |e_span| {
-        (
-            opt(tag("+").or(tag("-")).convert_errors()),
-            cut(digit1).map_failure(number_error(NumberError::InvalidExponentPart { e_span })),
-        )
-    }));
+    let opt_exponent = opt(|input| {
+        let (rest, e_span) = tag("e").or(tag("E")).convert_errors().parse(input)?;
+        let (rest, _) = opt(one_of("+-").convert_errors()).parse(rest)?;
+        let (rest, _) = cut(digit1)
+            .map_failure(number_error(NumberError::InvalidExponentPart { e_span }))
+            .parse(rest)?;
+        Ok((rest, ()))
+    });
 
     token(
         (opt_sign, digit, opt_decimal, opt_exponent),
@@ -83,14 +90,18 @@ pub fn string(input: Span) -> Result<Span, TokenError> {
     let take_while = take_while::<_, _, nom::error::Error<Span>>;
 
     token(
-        flat_map(tag("\"").convert_errors(), |open_quote_span: Span| {
-            (
-                take_while(|c: char| c != '"' && c != '\n').convert_errors(),
-                cut(tag("\"")).map_failure(move |e: nom::error::Error<Span>| {
+        |input| {
+            let (rest, open_quote_span) = tag("\"").convert_errors().parse(input)?;
+            let (rest, _) = take_while(|c: char| c != '"' && c != '\n')
+                .convert_errors()
+                .parse(rest)?;
+            let (rest, _) = cut(tag("\""))
+                .map_failure(move |e: nom::error::Error<Span>| {
                     TokenError::new(unterminated_string_error(open_quote_span), e.input)
-                }),
-            )
-        }),
+                })
+                .parse(rest)?;
+            Ok((rest, ()))
+        },
         TokenErrorKind::String(StringError::ExpectString),
     )
     .parse(input)

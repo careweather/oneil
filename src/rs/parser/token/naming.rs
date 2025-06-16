@@ -70,10 +70,15 @@ pub fn identifier(input: Span) -> Result<Span, TokenError> {
 
     verify(
         token(
-            (
-                satisfy(|c: char| c.is_alphabetic() || c == '_').convert_errors(),
-                take_while(|c: char| c.is_alphanumeric() || c == '_').convert_errors(),
-            ),
+            |input| {
+                let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_')
+                    .convert_errors()
+                    .parse(input)?;
+                let (rest, _) = take_while(|c: char| c.is_alphanumeric() || c == '_')
+                    .convert_errors()
+                    .parse(rest)?;
+                Ok((rest, ()))
+            },
             error::TokenErrorKind::ExpectIdentifier,
         ),
         |identifier| !keyword::KEYWORDS.contains(&identifier.fragment()),
@@ -121,13 +126,19 @@ pub fn label(input: Span) -> Result<Span, TokenError> {
     let take_while = take_while::<_, _, nom::error::Error<Span>>;
 
     token(
-        (
-            satisfy(|c: char| c.is_alphanumeric() || c == '_'),
-            take_while(|c: char| {
+        |input| {
+            let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_')
+                .convert_errors()
+                .parse(input)?;
+
+            let (rest, _) = take_while(|c: char| {
                 c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
-            }),
-        )
-            .convert_errors(),
+            })
+            .convert_errors()
+            .parse(rest)?;
+
+            Ok((rest, ()))
+        },
         error::TokenErrorKind::ExpectLabel,
     )
     .parse(input)

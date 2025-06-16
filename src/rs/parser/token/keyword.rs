@@ -36,14 +36,19 @@ pub const KEYWORDS: &[&str] = &[
 ];
 
 fn keyword(kw_str: &str, error_kind: error::ExpectKeyword) -> impl Parser<Span, error::TokenError> {
-    let next_char_is_not_ident_char =
-        peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')).map(|_| ());
-    let reached_end_of_file = eof.map(|_| ());
     token(
-        (
-            tag(kw_str),
-            next_char_is_not_ident_char.or(reached_end_of_file),
-        ),
+        move |input| {
+            let next_char_is_not_ident_char =
+                peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')).map(|_| ());
+
+            let reached_end_of_file = eof.map(|_| ());
+
+            let (input, _) = tag(kw_str)(input)?;
+            let (input, _) = next_char_is_not_ident_char
+                .or(reached_end_of_file)
+                .parse(input)?;
+            Ok((input, ()))
+        },
         error::TokenErrorKind::Keyword(error_kind),
     )
 }
