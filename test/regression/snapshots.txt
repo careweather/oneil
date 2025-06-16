@@ -1,0 +1,8 @@
+# This file stores snapshot details for the `get_snapshot.sh` and `test.sh` scripts
+# Use the format "<commit_hash> <file>"
+
+# v0.5.0
+7c306484c4079c0b87b80263e6e1c7bb74ca43f8 radar.on
+
+# v1.0.0
+9113c353a0e2f68583252134c3376f4e9a161d62 scatterometer.on
