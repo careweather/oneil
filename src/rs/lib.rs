@@ -11,4 +11,5 @@
 #![warn(missing_docs)]
 
 pub mod ast;
+pub mod module_loader;
 pub mod parser;
