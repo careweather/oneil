@@ -38,23 +38,16 @@ use crate::parser::error::ErrorHandlingParser as _;
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
 pub fn number(input: Span) -> Result<Span, TokenError> {
     // A convenience function for creating a number error
-    fn number_error<'a>(
-        e: NumberError<'a>,
-    ) -> impl Fn(nom::error::Error<Span<'a>>) -> TokenError<'a> {
-        move |err| TokenError::new(TokenErrorKind::Number(e), err.input)
+    fn number_error<'a>(e: NumberError<'a>) -> impl Fn(TokenError<'a>) -> TokenError<'a> {
+        move |err| TokenError::new(TokenErrorKind::Number(e), err.span)
     }
 
-    // Needed for type inference
-    let tag = tag::<_, _, nom::error::Error<Span>>;
-    let digit1 = digit1::<_, nom::error::Error<Span>>;
-    let one_of = one_of::<_, _, nom::error::Error<Span>>;
+    let opt_sign = opt(one_of("+-"));
 
-    let opt_sign = opt(one_of("+-").convert_errors());
-
-    let digit = digit1.convert_errors();
+    let digit = digit1;
 
     let opt_decimal = opt(|input| -> Result<_, TokenError> {
-        let (rest, decimal_point_span) = tag(".").convert_errors().parse(input)?;
+        let (rest, decimal_point_span) = tag(".").parse(input)?;
         let (rest, _) = cut(digit1)
             .map_failure(number_error(NumberError::InvalidDecimalPart {
                 decimal_point_span,
@@ -64,8 +57,8 @@ pub fn number(input: Span) -> Result<Span, TokenError> {
     });
 
     let opt_exponent = opt(|input| {
-        let (rest, e_span) = tag("e").or(tag("E")).convert_errors().parse(input)?;
-        let (rest, _) = opt(one_of("+-").convert_errors()).parse(rest)?;
+        let (rest, e_span) = tag("e").or(tag("E")).parse(input)?;
+        let (rest, _) = opt(one_of("+-")).parse(rest)?;
         let (rest, _) = cut(digit1)
             .map_failure(number_error(NumberError::InvalidExponentPart { e_span }))
             .parse(rest)?;
@@ -85,19 +78,13 @@ pub fn string(input: Span) -> Result<Span, TokenError> {
         TokenErrorKind::String(StringError::UnterminatedString { open_quote_span })
     };
 
-    // Needed for type inference
-    let tag = tag::<_, _, nom::error::Error<Span>>;
-    let take_while = take_while::<_, _, nom::error::Error<Span>>;
-
     token(
         |input| {
-            let (rest, open_quote_span) = tag("\"").convert_errors().parse(input)?;
-            let (rest, _) = take_while(|c: char| c != '"' && c != '\n')
-                .convert_errors()
-                .parse(rest)?;
+            let (rest, open_quote_span) = tag("\"").parse(input)?;
+            let (rest, _) = take_while(|c: char| c != '"' && c != '\n').parse(rest)?;
             let (rest, _) = cut(tag("\""))
-                .map_failure(move |e: nom::error::Error<Span>| {
-                    TokenError::new(unterminated_string_error(open_quote_span), e.input)
+                .map_failure(move |e: TokenError| {
+                    TokenError::new(unterminated_string_error(open_quote_span), e.span)
                 })
                 .parse(rest)?;
             Ok((rest, ()))

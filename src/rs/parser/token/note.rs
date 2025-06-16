@@ -42,15 +42,8 @@ use crate::parser::error::ErrorHandlingParser as _;
 /// The note can contain any characters except for a newline, and it must be
 /// followed by a newline to be considered valid.
 pub fn single_line_note(input: Span) -> Result<Span, TokenError> {
-    // Needed for type inference
-    let recognize = recognize::<_, nom::error::Error<Span>, _>;
-
-    // Needed for type inference
     verify(
-        terminated(
-            recognize((char('~'), not_line_ending)).convert_errors(),
-            end_of_line,
-        ),
+        terminated(recognize((char('~'), not_line_ending)), end_of_line),
         |span| multi_line_note_delimiter(*span).is_err(),
     )
     .map_error(|e| TokenError::new(TokenErrorKind::Note(NoteError::ExpectNote), e.span))
@@ -58,24 +51,20 @@ pub fn single_line_note(input: Span) -> Result<Span, TokenError> {
 }
 
 fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
-    // Needed for type inference
-    let take_while = take_while::<_, _, nom::error::Error<Span>>;
-
     recognize((
         inline_whitespace,
-        verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3).convert_errors(),
+        verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3),
         inline_whitespace,
     ))
     .parse(input)
 }
 
 fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
-    let not_line_ending = not_line_ending::<_, nom::error::Error<Span>>;
+    let not_line_ending = not_line_ending::<_, TokenError>;
 
     recognize(many0(verify((not_line_ending, line_ending), |(s, _)| {
         multi_line_note_delimiter.parse(*s).is_err()
     })))
-    .convert_errors()
     .parse(input)
 }
 

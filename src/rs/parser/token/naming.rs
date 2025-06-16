@@ -31,7 +31,6 @@ use super::{
     keyword,
     util::token,
 };
-use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
 ///
@@ -64,19 +63,12 @@ use crate::parser::error::ErrorHandlingParser as _;
 /// assert!(identifier(input).is_err());
 /// ```
 pub fn identifier(input: Span) -> Result<Span, TokenError> {
-    // Needed for type inference
-    let satisfy = satisfy::<_, _, nom::error::Error<Span>>;
-    let take_while = take_while::<_, _, nom::error::Error<Span>>;
-
     verify(
         token(
             |input| {
-                let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_')
-                    .convert_errors()
-                    .parse(input)?;
-                let (rest, _) = take_while(|c: char| c.is_alphanumeric() || c == '_')
-                    .convert_errors()
-                    .parse(rest)?;
+                let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_').parse(input)?;
+                let (rest, _) =
+                    take_while(|c: char| c.is_alphanumeric() || c == '_').parse(rest)?;
                 Ok((rest, ()))
             },
             error::TokenErrorKind::ExpectIdentifier,
@@ -121,20 +113,13 @@ pub fn identifier(input: Span) -> Result<Span, TokenError> {
 /// assert_eq!(rest.fragment(), &": rest");
 /// ```
 pub fn label(input: Span) -> Result<Span, TokenError> {
-    // Needed for type inference
-    let satisfy = satisfy::<_, _, nom::error::Error<Span>>;
-    let take_while = take_while::<_, _, nom::error::Error<Span>>;
-
     token(
         |input| {
-            let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_')
-                .convert_errors()
-                .parse(input)?;
+            let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
 
             let (rest, _) = take_while(|c: char| {
                 c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
             })
-            .convert_errors()
             .parse(rest)?;
 
             Ok((rest, ()))

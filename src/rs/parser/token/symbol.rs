@@ -26,7 +26,8 @@
 
 use nom::{
     Parser as _,
-    character::complete::satisfy,
+    bytes::complete::tag,
+    character::complete::{char, satisfy},
     combinator::{eof, peek, value},
 };
 
@@ -35,37 +36,11 @@ use super::{
     error::{ExpectSymbol, TokenError, TokenErrorKind},
     util::token,
 };
-use crate::parser::error::ErrorHandlingParser as _;
-
-mod nom_wrappers {
-    use super::*;
-
-    /// A wrapper around `nom::character::complete::char` parser
-    ///
-    /// This allows the error type of the parser to be fixed
-    pub fn char<'a>(c: char) -> impl Parser<'a, char, TokenError<'a>> {
-        use nom::character::complete::char;
-        char(c)
-    }
-
-    /// A wrapper around `nom::bytes::complete::tag` parser
-    ///
-    /// This allows the error type of the parser to be fixed
-    pub fn tag<'a>(s: &str) -> impl Parser<'a, Span<'a>, TokenError<'a>> {
-        use nom::bytes::complete::tag;
-        tag::<_, _, nom::error::Error<Span<'a>>>(s).convert_errors()
-    }
-}
-
-use nom_wrappers::{char, tag};
 
 fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError<'a>> {
-    // Needed for type inference
-    let satisfy = satisfy::<_, _, nom::error::Error<Span<'a>>>;
-
     let next_char_is_not_c = peek(satisfy(move |next_char: char| next_char != c)).map(|_| ());
     let reached_end_of_file = eof.map(|_| ());
-    let mut parser = value((), next_char_is_not_c.or(reached_end_of_file)).convert_errors();
+    let mut parser = value((), next_char_is_not_c.or(reached_end_of_file));
 
     move |input: Span<'a>| parser.parse(input)
 }

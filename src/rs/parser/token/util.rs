@@ -16,10 +16,7 @@ use crate::parser::error::ErrorHandlingParser as _;
 /// This function consumes any amount of whitespace (including none) and always succeeds.
 /// It's useful for handling optional whitespace between tokens.
 pub fn inline_whitespace(input: Span) -> Result<(), TokenError> {
-    // Needed for type inference
-    let space0 = space0::<_, nom::error::Error<Span>>;
-
-    value((), space0).convert_errors().parse(input)
+    value((), space0).parse(input)
 }
 
 /// Wraps a parser to handle trailing whitespace after the matched content.
@@ -67,13 +64,7 @@ mod tests {
 
     #[test]
     fn test_token_with_whitespace() {
-        // Needed for type inference
-        let tag = tag::<_, _, nom::error::Error<Span>>;
-
-        let mut parser = token(
-            tag("foo").convert_errors(),
-            TokenErrorKind::ExpectIdentifier,
-        );
+        let mut parser = token(tag("foo"), TokenErrorKind::ExpectIdentifier);
         let input = Span::new_extra("foo   bar", Config::default());
         let (rest, matched) = parser
             .parse(input)
@@ -84,13 +75,7 @@ mod tests {
 
     #[test]
     fn test_token_no_match() {
-        // Needed for type inference
-        let tag = tag::<_, _, nom::error::Error<Span>>;
-
-        let mut parser = token(
-            tag("baz").convert_errors(),
-            TokenErrorKind::ExpectIdentifier,
-        );
+        let mut parser = token(tag("baz"), TokenErrorKind::ExpectIdentifier);
         let input = Span::new_extra("foo   bar", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err());

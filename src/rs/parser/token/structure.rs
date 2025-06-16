@@ -44,28 +44,15 @@ use super::{
 };
 
 fn linebreak(input: Span) -> Result<(), TokenError> {
-    // Needed for type inference
-    let line_ending = line_ending::<_, nom::error::Error<Span>>;
-
-    value((), line_ending.convert_errors()).parse(input)
+    value((), line_ending).parse(input)
 }
 
 fn end_of_file(input: Span) -> Result<(), TokenError> {
-    // Needed for type inference
-    let eof = eof::<_, nom::error::Error<Span>>;
-
-    value((), eof.convert_errors()).parse(input)
+    value((), eof).parse(input)
 }
 
 fn comment(input: Span) -> Result<(), TokenError> {
-    // Needed for type inference
-    let char = char::<_, nom::error::Error<Span>>;
-
-    value(
-        (),
-        (char('#'), not_line_ending, line_ending.or(eof)).convert_errors(),
-    )
-    .parse(input)
+    value((), (char('#'), not_line_ending, line_ending.or(eof))).parse(input)
 }
 
 /// Parses one or more linebreaks, comments, or end-of-file markers, including trailing whitespace.
@@ -74,7 +61,7 @@ pub fn end_of_line(input: Span) -> Result<Span, TokenError> {
 
     recognize(
         (
-            many1((linebreak.or(comment), inline_whitespace)).convert_errors(),
+            many1((linebreak.or(comment), inline_whitespace)),
             opt(end_of_file),
         )
             .map(|_| ())
