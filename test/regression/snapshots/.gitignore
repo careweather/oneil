@@ -1,2 +1,1 @@
-*.out
-!*_snapshot.out
+*_failed_*.out
