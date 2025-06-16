@@ -65,7 +65,7 @@ get_snapshot() {
     echo "--------------------------------" >> "$output_file"
 
     # Run oneil and capture output
-    if yes "quit" | oneil "$file" all >> "$output_file" 2>&1; then
+    if yes "quit" | oneil regression-test "$file" >> "$output_file" 2>&1; then
         echo -e "${success_start}done${reset_color}"
         echo -e "$info_string output saved to: ${output_file}"
     else

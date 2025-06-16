@@ -2671,7 +2671,7 @@ Commands:
         Exit the program.
 """
 
-def loader(inp: str, designs: list[str], capture_errors: bool = True) -> Model:
+def loader(inp: str, designs: list[str], capture_errors: bool = True, quiet: bool = False) -> Model:
     model = None
 
     while not model:
@@ -2690,10 +2690,11 @@ def loader(inp: str, designs: list[str], capture_errors: bool = True) -> Model:
                     inp = ""
                     continue
             if os.path.exists(inp):
-                print("Loading model " + inp + "...")
+                if not quiet:
+                    print("Loading model " + inp + "...")
                 try:
                     model = Model(inp)
-                    model.build()
+                    model.build(quiet=quiet)
                 except OneilError as err:
                     if not capture_errors:
                         raise err
@@ -2761,27 +2762,49 @@ def parse_args(args: list[str]) -> tuple[str, list[str], list[str]]:
     input_designs = list(reversed(inputs[:-1]))
 
     return input_model, input_designs, commands
+
+def perform_regression_test(model_file):
+    if not os.path.exists(model_file):
+        print(f"{bcolors.error('ERROR')} Model file {model_file} not found.")
+        sys.exit(1)
+    
+    model = loader(model_file, [], quiet=True)
+    
+    handler(model, "all")
+    handler(model, "test")
+
+    return
     
 def main(args=sys.argv[1:]):
     try:
-        console.print_welcome_message()
+        # if the first argument is "regression-test", then we need to perform a regression test
+        # the second argument is the model file to test
+        if args[0] == "regression-test":
+            if len(args) != 2:
+                print("Usage: oneil regression-test <model_file>")
+                sys.exit(1)
+            
+            perform_regression_test(args[1])
+            return
+        else:
+            console.print_welcome_message()
 
-        # parse the files and commands
-        inp, designs, commands = parse_args(args)
+            # parse the files and commands
+            inp, designs, commands = parse_args(args)
 
-        # load the model
-        model = loader(inp, designs)
+            # load the model
+            model = loader(inp, designs)
 
-        # Handle commands after the first as cli commands.
-        for command in commands:
-            print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
-            handler(model, command)
+            # Handle commands after the first as cli commands.
+            for command in commands:
+                print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+                handler(model, command)
 
-        if len(args) > 2:
-            quit() 
+            if len(args) > 2:
+                quit() 
 
-        # run the interpeter on the model
-        interpreter(model)
+            # run the interpeter on the model
+            interpreter(model)
     except KeyboardInterrupt:
         # Handle when the user presses Ctrl+C
         print(f"\n\n{bcolors.ITALIC}Quitting...{bcolors.ENDC}")
