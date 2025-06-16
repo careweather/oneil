@@ -55,7 +55,7 @@ get_snapshot() {
     fi
 
     # Set up output file path
-    local output_file="${current_dir}/snapshots/${file%.on}_${veery_commit}.out"
+    local output_file="${current_dir}/snapshots/${veery_commit}_${file%.on}.out"
 
     # Create or clear the output file
     > "$output_file"

@@ -18,7 +18,7 @@ reset_color="\e[0m"
 error_string="[${error_start}ERROR${reset_color}]"
 info_string="[${info_start}INFO ${reset_color}]"
 
-oneil_commit=$(git rev-parse HEAD)
+oneil_commit=$(git rev-parse --short=8 HEAD)
 current_dir=$(pwd)
 model_dir="$1"
 
@@ -62,7 +62,7 @@ check_snapshot() {
     yes "quit" | oneil regression-test "$file" >> "$temp_output"
 
     # Get reference snapshot file
-    local ref_snapshot="${current_dir}/snapshots/${file%.on}_${veery_commit}.out"
+    local ref_snapshot="${current_dir}/snapshots/${veery_commit}_${file%.on}.out"
 
     if [ ! -f "$ref_snapshot" ]; then
         echo -e "${error_start}reference snapshot '${ref_snapshot}' not found${reset_color}"
@@ -78,13 +78,13 @@ check_snapshot() {
         git checkout "$original_branch" > /dev/null 2>&1
         return 0
     else
-        local diff_file="${current_dir}/snapshots/${file%.on}_${veery_commit}_failed_${oneil_commit}.out"
+        local diff_file="${current_dir}/snapshots/${veery_commit}_${file%.on}_failed_${oneil_commit}.out"
         mv "$temp_output" "$diff_file"
 
         echo -e "${error_start}MISMATCH detected${reset_color}"
         echo -e "$error_string differences found between current output and reference snapshot"
         echo -e "$error_string check differences with:"
-        echo -e "$error_string     diff $diff_file $ref_snapshot"
+        echo -e "$error_string     \$ diff $diff_file $ref_snapshot"
         git checkout "$original_branch" > /dev/null 2>&1
         return 1
     fi
