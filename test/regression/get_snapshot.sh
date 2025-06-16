@@ -33,18 +33,18 @@ mkdir -p "${current_dir}/snapshots"
 
 cd "$model_dir"
 
-# Get a snapshot of the current output of the interpreter for a given file on a given branch
+# Get a snapshot of the current output of the interpreter for a given file on a given commit
 get_snapshot() {
     local file="$1"
     local veery_commit="$2"
 
     local original_branch=$(git branch --show-current)
 
-    echo -e -n "$info_string getting snapshot for '${file}' on commit '${veery_commit}' ... "
+    echo -ne "$info_string getting snapshot for '${file}' on commit '${veery_commit}' ... "
 
     git checkout "$veery_commit" > /dev/null 2>&1
     if [ $? -ne 0 ]; then
-        echo -e "${error_start}failed to checkout branch${reset_color}"
+        echo -e "${error_start}failed to checkout commit${reset_color}"
         return 1
     fi
 
