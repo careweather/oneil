@@ -29,7 +29,7 @@ Oneil makes it easier than ever to build, debug, explore, and version-control mo
 
 ## Requirements
 
-Oneil has only been tested on Linux. Instructions for Oneil use assume you are on Linux.
+Oneil has only been tested on Linux. Instructions for Oneil assume you are on Linux.
 
 ## Quickstart
 

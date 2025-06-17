@@ -83,7 +83,6 @@ def parse_file(file_name, parent_model=None):
     with open(file_name, 'r') as f:
         final_line = 0
         for i, line in enumerate(f.readlines()):
-            unit_fx = lambda x:x
             final_line = i
             if line == '\n':
                 last_line_blank = True
@@ -184,7 +183,7 @@ def parse_file(file_name, parent_model=None):
                 try:
                     assert(re.search(r"^section\s+[\w\s]*$", line))
                 except:
-                    SyntaxError(file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
+                    SyntaxError(parent_model, file_name, i+1, line, "Sections must be of the form \"section <name>\" where <name> is only word characters and whitespace.")
                 
                 last_line_blank = False
                 section = line.replace("section", "").strip()
@@ -199,15 +198,18 @@ def parse_file(file_name, parent_model=None):
                 prev_line = 'test'
             elif re.search(r"^(\*{1,2}\s*)?\w+(\.\w+)?\s*=>?[^:]+(:.*)?$", line):
                 last_line_blank = False
+                unit_fx = lambda x:x
 
-                id, equation, arguments, units, unit_fx, pointer = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
+                id, equation, arguments, units, unit_fx, hrunits, pointer = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
                 isdiscrete = True if not pointer and isinstance(equation, str) else False
                 options = [equation] if not pointer and isinstance(equation, str) else None
-                design_overrides[id] = Parameter(equation, units, id, model=file_name.replace(".on", ""), line_no=i+1, line=line, name=f"{id} from {file_name}", options=options, section=section, pointer=pointer)
+                design_overrides[id] = Parameter(equation, units, id, hr_units=hrunits, model=file_name.replace(".on", ""), line_no=i+1, line=line, name=f"{id} from {file_name}", options=options, section=section, pointer=pointer)
                 
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
                 last_line_blank = False
+                unit_fx = lambda x:x
+                
                 parameter, unit_fx = parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section)
                 parameters.append(parameter)
                 prev_line = 'param'
@@ -287,7 +289,7 @@ def parse_body(body, line, line_number, file_name, imports):
         test=1
         try:
             units, unit_fx = un.parse(hrunits)
-        except:
+        except Exception as e:
             UnitError([], "", ["parse_parameter"]).throw(file_name, "(line " + str(line_number) + ") " + line + "- " + "Failed to parse units: " + hrunits)
     elif len(body) > 2:
         SyntaxError(None, file_name, line_number, line, "Parse parameter: too many colons.")
@@ -338,7 +340,9 @@ def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit
     cargs = []
     equation = ""
     condition = ""
+    if '{' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing { from piecewise definition.")
     assignment = assignment.strip().strip('{')
+    if 'if' not in assignment: SyntaxError(None, file_name, line_number, assignment, "Missing condition (\"if\") from piecewise definition.")
     equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     return (Parameter(equation, units, id + ":eqpiece", pointer=pointer), Parameter(condition, {}, id + ":condpiece")), eargs + cargs
@@ -703,7 +707,7 @@ class Error:
 class DesignError(Error):
     def __init__(self, model, filename):
         error = bcolors.FAIL + "DesignError" + bcolors.ENDC
-        print(error + " can't find design files:" + filename)
+        print(error + " can't find design files: " + filename)
         interpreter(model)
 
 class UnitError(Error):
@@ -738,11 +742,11 @@ class UnitError(Error):
         quit()
 
 class ParameterError(Error):
-    def __init__(self, parameter, source_message, source):
+    def __init__(self, parameter, source_message, source=[]):
         self.error_tag = bcolors.FAIL + "ParameterError" + bcolors.ENDC
         self.parameter = parameter
-        self.source = list(source)
         self.source_message = source_message
+        self.source = list(source)
         
     def throw(self, model, throw_message, debug=False):
         if model:
@@ -782,9 +786,20 @@ class SyntaxError(Error):
 
 class IDError(Error):
     def __init__(self, model, ID, message):
-        error = bcolors.FAIL + "IDError" + bcolors.ENDC
-        print(f"{error} ({ID}) in {model.name}: {message}")
-        interpreter(model)
+        self.error_tag = bcolors.FAIL + "IDError" + bcolors.ENDC
+        self.source_message = f"{self.error_tag} ({ID}) in {model.name}: {message}"
+        self.source_model = model
+
+    def throw(self, return_model, throw_message):
+        if throw_message:
+            print(throw_message)
+        if self.source_message:
+            print(self.source_message)
+        if return_model:
+            interpreter(return_model)
+        else:
+            loader([])
+
 
 class ImportError(Error):
     def __init__(self, model, filename, line_no, line, imprt):
@@ -1050,7 +1065,7 @@ class Parameter:
                     if not self.options[1] >= self.options[0]:
                         self.error = ParameterError(self, "Minimum limit > maximum limit.", ["Parameter.write()"])
                     if not (self.min >= self.options[0] and self.max <= self.options[1]):
-                        self.error = ParameterError(self, f"Values out of bounds [{self.options[0]}:{self.options[1]}]. Revise values or limits.", ["Parameter.write()"])
+                        self.error = ParameterError(self, f"Values out of bounds [{un.hr_vals_and_units(self.options,self.units,self.hr_units)}]. Revise values or limits.", ["Parameter.write()"])
 
     def write_one(self, value, minmax):
 
@@ -1128,6 +1143,12 @@ class Parameter:
 
     def short_print(self, sigfigs=4, indent=0, verbose=False, submodel_id=""):
         print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose, submodel_id=submodel_id))
+
+    def long_print(self, sigfigs=8, indent=0, pref=None):
+        output = " " * indent + self.name + ": "
+        output += self.id + " = "
+        output += self.human_readable(sigfigs, pref)
+        print(output)
 
     def hprint(self, sigfigs=4, indent=0, pref=None):
         output = ("\n" + self.name + "\n--------------------\n")
@@ -1604,8 +1625,10 @@ class Model:
         if design_filename:
             self.overwrite(design_filename)
 
-        #ERR ID error
-        self._check_namespace()
+        namespace = self._check_namespace()
+
+        if isinstance(namespace, Error):
+            namespace.throw(self, "Error in namespace check.")
 
         for key, param in self.parameters.items():
             if param.pointer:
@@ -1639,7 +1662,7 @@ class Model:
     
     # Checks that all of the arguments to each parameter are defined
     def _check_namespace(self, verbose=False):
-        undefined = []
+        undefined = {}
 
         # TODO: check for reserved symbols: `if arg in FUNCTIONS.values() or any([arg in v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS`
         
@@ -1653,7 +1676,7 @@ class Model:
                     # else:
                     #     raise ImportError("Submodel " + source + " not found in " + self.name + ".on")
                 elif arg not in self.constants and arg not in self.parameters:
-                    undefined.append(arg + " from " + param.id + " (line " + param.line +") in " + param.model)
+                    undefined[arg] = f"{arg} from {param.id} (line {param.line}) in {param.model}"
                 elif verbose:
                     # Report the submodule parameters of the same ID.
                     for key in self.submodels:
@@ -1661,7 +1684,9 @@ class Model:
 
         # Return a list of all args that aren't defined.
         if undefined:
-            raise NameError(self.name.capitalize() + " has the following undefined arguments:\n- " + "\n- ".join(undefined))
+            return IDError(self, f"{undefined.keys()}", self.name.capitalize() + " has undefined arguments:\n- " + "\n- ".join(undefined.values()))
+        else:
+            return
 
     # Recursively report all submodule paramaters with the same ID
     def _check_namespace_recursively(self, submodel, arg, param, trail=[]):
@@ -1993,6 +2018,7 @@ class Model:
     def eval(self, expression):
         # Make a dict of calculation parameters from the submodels
         submodel_parameters = {}
+        result = None
         expression_args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", expression) if x not in FUNCTIONS]
         
         for f, pf in FUNCTIONS.items():
@@ -2003,25 +2029,17 @@ class Model:
             
         for i, arg in enumerate(expression_args):
             if "." in arg:
-                parameter_ID, submodel_ID = arg.split(".")
+                result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                if submodel_ID in self.submodels:
-                    submodel = self.submodels[submodel_ID]
-                else:
-                    ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "Submodel ID \"" + submodel_ID + "\" not found.")
-                path = copy.copy(submodel['path'])
-                
-                prefix = '_'.join(path) + "_"
-                result = self._retrieve_parameter(parameter_ID, path)
-                if isinstance(result, ModelError):
-                    result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + str(submodel['path']) + ".")
+                if isinstance(result, Error):
+                    result.throw(self, "Error in eval().")
                 elif isinstance(result, Parameter):
-                    submodel_parameters[prefix + parameter_ID] = result
+                    submodel_parameters[prefixed_ID] = result
                 elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
                     return result
                 else:
-                    ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
-                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefix + parameter_ID), expression)
+                    ParameterError(expression, "Eval failed.", ["Model.eval()"]).throw(self, "(in interpreter) Eval failed.")
+                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
 
         eval_params = self.parameters | submodel_parameters | self.constants
 
@@ -2041,7 +2059,7 @@ class Model:
         elif isinstance(result, (int, float, str, np.int64, np.float64, np.float32, np.float16)):
             return result
         else:
-            ParameterError(self, expression, "Eval failed.").throw(self, "(in interpreter) Eval failed.")
+            ParameterError(expression, "Eval failed.", ["Model.eval()"]).throw(self, "(in interpreter) Eval failed.")
 
     def _test_recursively(self, log, path=[], test_inputs={}, trail=[], verbose=True):
         fails = 0
@@ -2058,26 +2076,16 @@ class Model:
                 if verbose: print("Test (" + self.name + "): " + run_expression)
                 for i, arg in enumerate(test.args):
                     if "." in arg:
-                        arg_ID, submodel_ID = arg.split(".")
+                        result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                        if submodel_ID in self.submodels:
-                            submodel = self.submodels[submodel_ID]
-                        else:
-                            ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model.test) Submodel ID \"" + submodel_ID + "\" not found.")
-
-                        path = copy.copy(submodel['path'])
-                        
-                        prefix = '_'.join(path) + "_"
-
-                        result = self._retrieve_parameter(arg_ID, path)
-                        if isinstance(result, ModelError):
-                            result.throw(self, "Couldn't find parameter " + arg_ID + ". Invalid in submodel path " + submodel['path'] + ".")
+                        if isinstance(result, Error):
+                            result.throw(self, "Error in _test_recursively().")
                         elif isinstance(result, Parameter):
-                            test_params[prefix + arg_ID] = result
+                            test_params[prefixed_ID] = result
                         else:
                             raise TypeError("Invalid result type: " + str(type(result)))
 
-                        run_expression = run_expression.replace(arg, prefix + arg_ID)
+                        run_expression = run_expression.replace(arg, prefixed_ID)
                     elif arg in test_inputs:
                         test_params[arg] = test_inputs[arg]
                     elif arg in FUNCTIONS.values() or any([arg==v for v in OPERATOR_OVERRIDES.values()]) or arg in self.constants or arg in BOOLEAN_OPERATORS:
@@ -2136,13 +2144,10 @@ class Model:
                         test_inputs[arg] = inp
                     elif isinstance(inp, str):
                         if '.' in inp:
-                            input_ID, source = inp.split('.')
-                            retrieval_path = copy.copy(self.submodels[source]['path'])
+                            result, _ = self.retrieve_parameter_from_submodel(inp)
 
-                            result = self._retrieve_parameter(input_ID, retrieval_path)
-                            if isinstance(result, ModelError):
-                                result.source_message = f"Couldn't find parameter {input_ID}. Invalid in submodel path {retrieval_path}."
-                                return result
+                            if isinstance(result, Error):
+                                result.throw(self, "Error in _test_recursively().")
                             elif isinstance(result, Parameter):
                                 test_inputs[arg] = result
                             else:
@@ -2223,6 +2228,19 @@ class Model:
         parameter_keys.sort()
         self.tree(parameter_keys, levels=0, verbose=True, turtles=False)
 
+    def independent(self, indent=0):
+        print(f"{' ' * indent}{self.name}:")
+        for param in self.parameters.values():
+            if param.independent:
+                param.long_print(indent=indent+4)
+        
+        for submodel_dict in self.submodels.values():
+            if 'model' in submodel_dict:
+                print(f"{' ' * indent}{submodel_dict['model'].name}:")
+                for param in submodel_dict['model'].parameters.values():
+                    if param.independent:
+                        param.long_print(indent=indent+4)
+
     def summarize(self, sigfigs=4, verbose=False):
         print("-" * 80)
         print(bcolors.OKBLUE + "Model: " + self.name + bcolors.ENDC)
@@ -2258,8 +2276,17 @@ class Model:
             for parameter_ID in parameter_IDs:
                 if parameter_ID in self.parameters:
                     parameter = self.parameters[parameter_ID]
+                elif "." in parameter_ID:
+                    result, _ = self.retrieve_parameter_from_submodel(parameter_ID)
+
+                    if isinstance(result, Error):
+                        result.throw(self, "Error in _calculate_parameters_recursively().")
+                    elif isinstance(result, Parameter):
+                        parameter = result
+                    else:
+                        raise TypeError("Invalid result type: " + str(type(result)))
                 else:
-                    IDError(self, parameter_ID, "Parameter not found in model.").throw(self, "Parameter not found in model.")
+                    IDError(self, parameter_ID, "Parameter not found in model.").throw(self, "Parameter not found in model.").throw(self, "Error in _calculate_parameters_recursively().")
 
                 if indent == 0:
                     parameter.hprint(sigfigs)
@@ -2383,34 +2410,33 @@ class Model:
                         self._calculate_parameters_recursively(calc_args, new_trail)
 
                     # Make a dict of calculation parameters from the submodels
-                    expression = parameter.equation
                     calc_args = []
                     for i, arg in enumerate(parameter.args):
                         if "." in arg:
-                            parameter_ID, submodel_ID = arg.split(".")
+                            result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
 
-                            if submodel_ID in self.submodels:
-                                submodel = self.submodels[submodel_ID]
-                            else:
-                                ModelError(submodel_ID, source=["interpreter eval"]).throw(self, "(in Model._calculate_recursively) Submodel ID \"" + submodel_ID + "\" not found.")
-
-                            path = copy.copy(submodel['path'])
-                            
-                            prefix = '_'.join(path) + "_"
-                            
-                            result = self._retrieve_parameter(parameter_ID, path)
-                            if isinstance(result, ModelError):
-                                result.throw(self, "Couldn't find parameter " + parameter_ID + ". Invalid in submodel path " + str(submodel['path']) + ".")
+                            if isinstance(result, Error):
+                                result.throw(self, "Error in _calculate_parameters_recursively().")
                             elif isinstance(result, Parameter):
-                                submodel_parameters[prefix + parameter_ID] = result
+                                submodel_parameters[prefixed_ID] = result
                             else:
-                                raise TypeError("Invalid result type: " + str(type(result)))
-
-                            calc_args.append(prefix + parameter_ID)
-                            if not parameter.callable:
-                                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefix + parameter_ID), expression)
+                                raise TypeError("Invalid result type: " + str(type(result)))    
+                            
+                            calc_args.append(prefixed_ID)                        
                         else:
                             calc_args.append(arg)
+
+                    # Substitute submodel params in the expression
+                    # This has to be done sorted or longer params could get accidentally replaced by a shorter params that match the beginning of the longer param
+                    expression = parameter.equation
+                    sorted_parameter_args = [arg for arg in parameter.args]
+                    sorted_parameter_args.sort(key=len, reverse=True)
+                    for i, arg in enumerate(sorted_parameter_args):
+                        if "." in arg:
+                            result, prefixed_ID = self.retrieve_parameter_from_submodel(arg)
+
+                            if not parameter.callable:
+                                expression = re.sub(r"(?<!\w)" + re.escape(arg), re.escape(prefixed_ID), expression)
 
                 # all_params = self.parameters | submodel_parameters | self.constants
 
@@ -2439,23 +2465,39 @@ class Model:
                 if parameter.error:
                     parameter.error.throw(self, "Failed to calculate parameter \"" + parameter.id + "\" (line " + str(parameter.line_no) + " from model " + str(parameter.model), debug=True)
 
+    def retrieve_parameter_from_submodel(self, ID):
+        parameter_ID, submodel_ID = ID.split(".")
+        path = []
+        prefixed_ID = ""
+        
+        if submodel_ID in self.submodels:
+            path = copy.copy(self.submodels[submodel_ID]['path'])
+            prefixed_ID = '_'.join(path) + "_" + parameter_ID
+            result = self._retrieve_parameter_recursively(parameter_ID, path)
+        else:
+            result = IDError(self, ID, f"Submodel ID \"{submodel_ID}\" not found.")
+
+        return result, prefixed_ID
+    
     # Recursively retrieve a parameter from a submodel or submodel of a submodel, etc.
-    def _retrieve_parameter(self, parameter_ID, path, trail=[]):
-        new_trail = copy.copy(trail)
-        new_trail.append(self.name)
+    def _retrieve_parameter_recursively(self, parameter_ID, path, trail=[]):
+        new_trail = copy.copy(trail).append(self.name)
+
         if path:
             submodel_name = path.pop(0)
             submodel = [model['model'] for k, model in self.submodels.items() if 'model' in model and model['model'].name == submodel_name]
             if submodel:
                 submodel = submodel[0]
-                return submodel._retrieve_parameter(parameter_ID, path, trail)
+                result = submodel._retrieve_parameter_recursively(parameter_ID, path, trail)
             else:
-                return ModelError(parameter_ID, "Submodel not found.", new_trail)
+                result = IDError(submodel, parameter_ID, f"Submodel name \"{submodel_name}\" not found while retrieving parameter ID \"{parameter_ID}\" from path ({', '.join(new_trail.append(submodel_name).append(path))}).")
         else:
             if parameter_ID in self.parameters:
-                return self.parameters[parameter_ID]
+                result = self.parameters[parameter_ID]
             else:
-                return ModelError(parameter_ID, "Parameter not found.", new_trail)
+                result = IDError(self, parameter_ID, f"Parameter ID \"{parameter_ID}\" not found in path ({self.name + (new_trail or '')}).")
+        
+        return result
 
     # Recursively retrieve a model from a submodel or submodel of a submodel, etc.
     def _retrieve_model(self, path, trail=[]):
@@ -2486,12 +2528,17 @@ class Model:
             else:
                 return ModelError(parameter_ID, "Submodel not found.", trail)
         else:
-            self.parameters[parameter_ID].write(parameter)
-            
-            if self.parameters[parameter_ID].error:
-                return self.parameters[parameter_ID].error
-            
-            return True
+            try:
+                self.parameters[parameter_ID].write(parameter)
+            except Exception as e:
+                if parameter_ID not in self.parameters:
+                    return IDError(self, parameter_ID, f"Parameter from design file {parameter.model} not found in model {self.name}.")
+                else:
+                    raise e
+            else:
+                return True
+            # if self.parameters[parameter_ID].error:
+            #     return self.parameters[parameter_ID].error
 
 def handler(model:Model, inpt):
     args = inpt.strip().split(" ")
@@ -2512,6 +2559,8 @@ def handler(model:Model, inpt):
         model.all()
     elif cmd == "dependents":
         model.dependents(args)
+    elif cmd == "independent":
+        model.independent()
     elif cmd == "design":
         if any([arg for arg in args if "." in arg and ".on" not in arg]):
             print("Only .on files are allowed.")
@@ -2528,7 +2577,10 @@ def handler(model:Model, inpt):
     elif cmd == "load":
         loader(inpt.split(" "))
     elif cmd == "reload":
-        loader(["reload", model.design + "@" + model.name])
+        if model.design == "default":
+            loader(["reload", model.name])
+        else:
+            loader(["reload", model.design + "@" + model.name])
     elif cmd == "help":
         print(help_text)
         interpreter(model)
@@ -2540,18 +2592,40 @@ def handler(model:Model, inpt):
         sys.exit()
     elif cmd == "exit":
         sys.exit()
-    elif inpt in model.parameters:
-        model.parameters[inpt].hprint()
-    elif ":" in inpt: 
-        if inpt.split(":")[0] in model.parameters:
+    elif ":" in inpt:
+        param_expr = inpt.split(":")[0].strip()
+        requested_units = inpt.split(":")[1].strip()
+        
+        if param_expr in model.parameters.keys():
             try:
-                model.parameters[inpt.split(":")[0]].hprint(pref=inpt.split(":")[1])
+                model.parameters[param_expr].hprint(pref=requested_units)
             except ValueError:
-                print(f"Requested units ({inpt.split(':')[1]}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[inpt.split(':')[0]].units)}).")
+                print(f"Requested units ({requested_units}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[param_expr].units)}).")
         else:
-            print(f"Parameter {inpt.split()[0]} not found.")
+            # Try to evaluate the expression on the left side
+            try:
+                result = model.eval(param_expr)
+                if isinstance(result, Parameter):
+                    try:
+                        result.hprint(pref=requested_units)
+                    except ValueError:
+                        print(f"Requested units ({requested_units}) do not match calculated expression units ({un._build_compound_unit_str(result.units)}).")
+                else:
+                    print(f"Result: {result} (unitless, cannot convert to {requested_units})")
+            except Exception as e:
+                print(f"Could not evaluate expression '{param_expr}': {str(e)}") 
     elif any([op in inpt for op in OPERATORS]):
         print(model.eval(inpt))
+    elif inpt in model.parameters:
+        model.parameters[inpt].hprint()
+    elif "." in inpt:
+        result, _ = model.retrieve_parameter_from_submodel(inpt)
+        if isinstance(result, Error):
+            result.throw(model, "")
+        elif isinstance(result, Parameter):
+            result.hprint()
+        else:
+            raise TypeError("Invalid result type: " + str(type(result)))
     else:
         print(f"Command {inpt} not found. Type 'help' for a list of commands.")
         interpreter(model)
@@ -2570,6 +2644,9 @@ Commands:
 
     dependents [param 1] [param 2] ... [param n]
         Print all parameters that depend on the specified parameters.
+
+    independent
+        Print all independent parameters.
 
     design [design 1] [design 2] ... [design n]
         Overwrite the current model with the specified designs.
