@@ -40,6 +40,12 @@ git clone git@github.com:careweather/oneil.git
 oneil/install.sh
 ```
 
+Note: Oneil uses pkg_resources, which is incuded in python for versions less than 3.12, but is depreciated in python 3.12. If running python 3.12 or higher, after running install.sh install the setuptools package
+
+``` {.sh }
+pip install setuptools
+```
+
 <!-- Add this back in when repo is public and test.>
 <!-- Install Oneil using pip (add @\<version-number\> if you need a specific version):
 
@@ -81,12 +87,13 @@ Alternatively, if you've cloned Oneil, you can install it using pip. You will ne
 * Numpy
 * Beautiful Table
 * Pytexit
+* setuptools (if running python 3.12 or higher)
 
 Install using the following commands:
 
 ``` { .sh }
 pip install path/to/oneil
-pip install numpy beautifultable pytexit 
+pip install numpy beautifultable pytexit setuptools
 ```
 
 ### Toolchain
