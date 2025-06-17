@@ -186,7 +186,6 @@ LEGACY_UNITS = {
     "nmi": ({"m": 1}, 1852.0, {"alt": ["nautical mile", "nautical miles"]}),
     "lb": ({"kg": 1}, 0.45359237, {"alt": ["lbs", "pound", "pounds"]}),
     "mph": ({"m": 1, "s": -1}, 0.44704, {"alt": ["mile per hour", "miles per hour"]}),
-
 }
 
 if invalid_units(LEGACY_UNITS):
@@ -467,7 +466,7 @@ def _find_derived_unit(base_units, value, pref=None):
                             exponent = get_exponent(index[1] + 1)
                             for k, v in LINEAR_UNITS[unit][0].items():
                                 computed_units[k] += v * exponent
-                            compound_multiplier /= LINEAR_UNITS[unit][1] ** (-exponent)
+                            compound_multiplier /= LINEAR_UNITS[unit][1] ** (exponent)
                         else:
                             for k, v in LINEAR_UNITS[unit][0].items():
                                 computed_units[k] += v

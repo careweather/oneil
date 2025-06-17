@@ -1,6 +1,6 @@
 # The Oneil Design Language
 
-Oneil is a design specification language for rapid, comprehensive system modeling.
+Oneil is a design specification language for streamlined deep tech system modeling.
 
 Traditional approaches to system engineering are too cumbersome for non-system engineers who don't have all day. Oneil makes it easy for everyone to contribute to the central source of system knowledge. With Oneil everyone can think like a system engineer and understand how their design impacts the whole.
 
@@ -33,11 +33,17 @@ Oneil has only been tested on Linux. Instructions for Oneil assume you are on Li
 
 ## Quickstart
 
-Clone Oneil and install it.
+Clone Oneil and install it. 
 
 ``` { .sh }
-git clone git@github.com/careweather/oneil.git
+git clone git@github.com:careweather/oneil.git
 oneil/install.sh
+```
+
+Note: Oneil uses pkg_resources, which is incuded in python for versions less than 3.12, but is depreciated in python 3.12. If running python 3.12 or higher, after running install.sh install the setuptools package
+
+``` {.sh }
+pip install setuptools
 ```
 
 <!-- Add this back in when repo is public and test.>
@@ -91,12 +97,13 @@ Alternatively, if you've cloned Oneil, you can install it using pip. You will ne
 * Numpy
 * Beautiful Table
 * Pytexit
+* setuptools (if running python 3.12 or higher)
 
 Install using the following commands:
 
 ``` { .sh }
 pip install path/to/oneil
-pip install numpy beautifultable pytexit 
+pip install numpy beautifultable pytexit setuptools
 ```
 
 ### Toolchain
