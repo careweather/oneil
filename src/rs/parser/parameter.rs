@@ -9,6 +9,7 @@ use super::error::{ErrorHandlingParser as _, ParserError, ParserErrorKind};
 use super::expression::parse as parse_expr;
 use super::note::parse as parse_note;
 use super::token::{
+    error::{ExpectSymbol, TokenErrorKind},
     keyword::if_,
     naming::{identifier, label},
     structure::end_of_line,
@@ -127,30 +128,54 @@ fn limits(input: Span) -> Result<Limits, ParserError> {
 
 /// Parse continuous limits in parentheses, e.g. `(0, 100)`.
 fn continuous_limits(input: Span) -> Result<Limits, ParserError> {
-    (
-        paren_left.convert_errors(),
-        cut((
-            parse_expr,
-            comma.convert_errors(),
-            parse_expr,
-            paren_right.convert_errors(),
-        )),
-    )
-        .map(|(_, (min, _, max, _))| Limits::Continuous { min, max })
-        .parse(input)
+    let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
+    let (rest, (min, _, max, _)) = cut((
+        parse_expr,
+        comma.convert_errors(),
+        parse_expr,
+        paren_right.convert_errors(),
+    ))
+    .map_failure(move |e| match e.kind {
+        ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::ParenRight)) => {
+            let span = e.span;
+            ParserError::new(
+                ParserErrorKind::UnclosedParen {
+                    paren_left_span,
+                    error: Box::new(e),
+                },
+                span,
+            )
+        }
+        _ => e,
+    })
+    .parse(rest)?;
+
+    Ok((rest, Limits::Continuous { min, max }))
 }
 
 /// Parse discrete limits in square brackets, e.g. `[1, 2, 3]`.
 fn discrete_limits(input: Span) -> Result<Limits, ParserError> {
-    (
-        bracket_left.convert_errors(),
-        cut((
-            separated_list1(comma.convert_errors(), parse_expr),
-            bracket_right.convert_errors(),
-        )),
-    )
-        .map(|(_, (values, _))| Limits::Discrete { values })
-        .parse(input)
+    let (rest, bracket_left_span) = bracket_left.convert_errors().parse(input)?;
+    let (rest, (values, _)) = cut((
+        separated_list1(comma.convert_errors(), parse_expr),
+        bracket_right.convert_errors(),
+    ))
+    .map_failure(move |e| match e.kind {
+        ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::BracketRight)) => {
+            let span = e.span;
+            ParserError::new(
+                ParserErrorKind::UnclosedBracket {
+                    bracket_left_span,
+                    error: Box::new(e),
+                },
+                span,
+            )
+        }
+        _ => e,
+    })
+    .parse(rest)?;
+
+    Ok((rest, Limits::Discrete { values }))
 }
 
 /// Parse a parameter value (either simple or piecewise).
@@ -181,7 +206,7 @@ fn piecewise_value(input: Span) -> Result<ParameterValue, ParserError> {
         .parse(input)
 }
 
-/// Parse a single piece of a piecewise expression, e.g. `{2*x if x > 0}`.
+/// Parse a single piece of a piecewise expression, e.g. `{2*x if x > 0`.
 fn piecewise_part(input: Span) -> Result<PiecewisePart, ParserError> {
     (
         brace_left.convert_errors(),

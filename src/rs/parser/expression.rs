@@ -18,7 +18,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{all_consuming, cut, flat_map, map, map_res, opt, value},
+    combinator::{all_consuming, cut, map, map_res, opt, value},
     multi::{many0, separated_list0, separated_list1},
 };
 
@@ -266,19 +266,29 @@ fn primary_expr(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses a function call
 fn function_call(input: Span) -> Result<Expr, ParserError> {
-    (
-        identifier.convert_errors(),
-        paren_left.convert_errors(),
-        cut((
-            separated_list0(comma.convert_errors(), expr),
-            paren_right.convert_errors(),
-        )),
-    )
-        .map(|(name, _, (args, _))| Expr::FunctionCall {
-            name: name.to_string(),
-            args: args,
+    let (rest, name) = identifier.convert_errors().parse(input)?;
+    let (rest, paren_left_span) = paren_left.convert_errors().parse(rest)?;
+    let (rest, args) = cut(separated_list0(comma.convert_errors(), expr)).parse(rest)?;
+    let (rest, _) = cut(paren_right)
+        .map_failure(move |e| {
+            let span = e.span;
+            ParserError::new(
+                ParserErrorKind::UnclosedParen {
+                    paren_left_span,
+                    error: Box::new(e.into()),
+                },
+                span,
+            )
         })
-        .parse(input)
+        .parse(rest)?;
+
+    Ok((
+        rest,
+        Expr::FunctionCall {
+            name: name.to_string(),
+            args,
+        },
+    ))
 }
 
 /// Parses a variable name
@@ -291,8 +301,9 @@ fn variable(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses a parenthesized expression
 fn parenthesized_expr(input: Span) -> Result<Expr, ParserError> {
-    flat_map(paren_left.convert_errors(), |paren_left_span: Span| {
-        cut((expr, paren_right.convert_errors())).map_failure(move |e| match e.kind {
+    let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
+    let (rest, (expr, _)) = cut((expr, paren_right.convert_errors()))
+        .map_failure(move |e| match e.kind {
             ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::ParenRight)) => {
                 let span = e.span;
                 ParserError::new(
@@ -303,12 +314,11 @@ fn parenthesized_expr(input: Span) -> Result<Expr, ParserError> {
                     span,
                 )
             }
-
             _ => e,
         })
-    })
-    .map(|(e, _)| e)
-    .parse(input)
+        .parse(rest)?;
+
+    Ok((rest, expr))
 }
 
 #[cfg(test)]

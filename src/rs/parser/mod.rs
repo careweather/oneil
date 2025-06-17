@@ -3,10 +3,12 @@
 //! This module provides the parsing functionality for converting Oneil source
 //! code into an Abstract Syntax Tree (AST).
 
-// TODO: rewrite parsers to make their intent more clear.  For example, use `let
-//       x = foo().parse(input)?; Ok(x + 1)` instead of `foo().map(|x| x + 1)`.
-
 // TODO: refactor the output to be use traits rather than a concrete type
+
+// TODO: add tests for the errors that are produced by the parser. Right now, we
+//       only test whether the parser succeeds on parsing valid input. We should
+//       also add tests later to ensure that the parser produces errors when
+//       parsing invalid input and that the errors are correct and clear.
 
 mod config;
 pub mod error;

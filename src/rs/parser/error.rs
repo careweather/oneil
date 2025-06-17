@@ -304,6 +304,13 @@ pub enum ParserErrorKind<'a> {
         /// The span containing the section keyword
         section_span: Span<'a>,
     },
+    /// Found an unclosed bracket
+    UnclosedBracket {
+        /// The span containing the opening bracket
+        bracket_left_span: Span<'a>,
+        /// The underlying error that occurred while parsing the bracketed expression
+        error: Box<ParserError<'a>>,
+    },
     /// Found an unclosed parenthesis
     UnclosedParen {
         /// The span containing the opening parenthesis
