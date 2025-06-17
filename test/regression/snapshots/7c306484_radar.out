@@ -1,0 +1,349 @@
+Run on commit 7c306484 of file radar.on
+--------------------------------
+ADC_Bits_pp: 35.1|180.7 bits -- ADC Max output bits peak to peak (radar)
+ADC_Vin_pp: 33.94|174.8 mV -- DC Voltage In Pk to Pk (radar)
+A_c: 2.641e+17|4.851e+17 km^2 -- Measurement cell area (radar)
+B: 56.08 kHz -- Echo bandwidth (radar)
+BRF: 0.005411 kHz -- Burst repetition frequency (radar)
+B_D: 50.04 kHz -- Doppler bandwidth across the combined footprint (radar)
+B_Dc: 50.04 kHz -- Doppler bandwidth across a single measurement cell (radar)
+B_bp: 100.0 kHz -- Target bandpass filter width (radar)
+B_f: 9766.0 Hz -- FFT bin width (radar)
+B_n: 0.0003115 MHz -- Necessary bandwidth (radar)
+B_r: 107.4 kHz -- Receive bandwidth (radar)
+B_t: 0.04897 kHz -- Radar transmit bandwidth (radar)
+B_x: 51.34 kHz -- Excess bandwidth (radar)
+C_I: 0.0  -- Coherent integration (radar)
+D_r: 0.3315  -- Duty cycle (radar)
+Delta: 0.001953 V -- Quantization step size (radar)
+DeltaT_f: 0.8063 us -- FFT Time Step (radar)
+EIRP: 36.19 W -- Effective isotropic radiated power (radar)
+F_n: 1.622  -- Receiver noise factor (radar)
+F_np: 0.008782|0.02599  -- Nadir-pointed pass factor (radar)
+F_omega: 1.0  -- Scan factor (radar)
+G_egamma: 8.727|120.1 km -- Azimuthal geolocation error (radar)
+G_er: 48.06|98.63 km -- Radial geolocation error (radar)
+G_f: 10.2  -- Frontend gain (radar)
+K_p: 0.4366|0.4463  -- Normalized standard deviation (radar)
+L: 2.832e+25|1.361e+26 m^4 -- Total loss (radar)
+L_D: 1.0  -- Doppler loss (radar)
+L_Rx: 4.086|5.414 dB -- Total loss after antenna input (radar)
+L_a: 1.12  -- Atmospheric loss (radar)
+L_g: 9.87e+24|3.494e+25 m^4 -- Two-way geometric spreading loss (radar)
+L_in: 1.105e+25|3.914e+25 m^4 -- Total loss at antenna input (radar)
+L_mult: 0.0 dB -- Multipath Loss (radar)
+L_p: 160.8|163.6 dB -- One-way radar free-space path loss (radar)
+L_pol: 1.0|3.0 dB -- Polarization Loss (radar)
+L_pt: 3.0|5.0 dB -- Pointing loss (radar)
+L_r: 4.0|5.0 dB -- Receive loss (radar)
+L_s: 2.87|3.896  -- Total system loss (radar)
+L_sm: 1.0  -- Smear loss (radar)
+L_sp: 1.02|1.1  -- Signal processing loss (radar)
+L_t: 1.0  -- Transmit loss (radar)
+L_tau: 1.0  -- Pulse loss (radar)
+M_dn: 10.5|17.25 dB -- Downlink Margin (radar)
+Mixer_Pout: -43.01|-28.77 dBmW -- Mixer Power (radar)
+Mixer_Vpp: 5.657|29.13 mV -- Mixer Vout Peak-to-Peak (radar)
+Mixer_Vrms: 4.0|20.6 mV -- Mixer Vout RMS (radar)
+NESZ: 27.68|183.2  -- Noise-equivalent Sigma Zero (radar)
+N_b: 15.0  -- Number of co-processed resolution bins (radar)
+N_f: 127.0  -- Number of FFTs (radar)
+N_rs: 8339.0|11440.0  -- Number of samples in the time of flight (radar)
+O_D: none | none -- Doppler compensation mode (radar)
+O_c: ICW | ICW -- Compression mode (radar)
+O_r: footprint | footprint -- Resolution mode (radar)
+Omega: 81.8 deg -- Maximum latitude of swath (radar)
+P: 10.55|22.02 W -- Satellite power (radar)
+PRF: 0.01623 kHz -- Pulse repetition frequency (radar)
+P_N: -132.2|-130.7 dBmW -- Noise power (radar)
+P_S: -114.3|-100.4 dBmW -- Received signal power (radar)
+P_S_test: -100.0 dBmW -- Test Signal Power (radar)
+P_dn: -94.5|-87.75 dBmW -- Downlink Recieved Power (radar)
+P_max: 24.99|28.22 W -- Satellite peak power (radar)
+P_qn: 3.179e-07 V^2 -- Quantization noise power (radar)
+P_r: -138.9|-126.3 dBW -- Signal Power at antenna (radar)
+P_rs: 4.0|5.5 W -- Scatterometer support power (radar)
+P_s: 6.501|8.575 W -- Scatterometer power (radar)
+P_s_: 0.6501|0.8575 W -- Orbital average radar power (radar)
+P_sp: 11.55|14.78 W -- Scatterometer peak power (radar)
+P_t: 35.5 dBmW -- Radar transmit power (radar)
+Power_front: -35.01|-20.77 dBmW -- Front End Recieve Power (radar)
+R: 513.9|696.5 km -- Average spatial resolution (radar)
+R_I: 50.0 Ohm -- Impedance (radar)
+R_IQ: 80.0 Mbps -- IQ datarate (radar)
+R_T_: 1382.0|1799.0 kB/day -- Average data collection rate (radar)
+R_c: 0.01507 MHz/s -- Chirp rate (radar)
+R_d: 1088.0 bps -- Radar data collection rate (radar)
+R_d_: 108.8 bps -- Average radar data collection rate (radar)
+R_g: 0.0|452.2 km -- Ground range (radar)
+R_r: 48.58 kbps -- Downlink loaded bit rate (radar)
+R_r_: 47.99|568.2 kB/day -- Radar Communications Throughput (radar)
+R_rc: 1.0 Mbps -- Downlink Bitrate (radar)
+R_s: 500.0|685.9 km -- Slant range (radar)
+SNR: -22.63|-14.42 dB -- Signal-to-noise ratio (radar)
+SNR_test: 30.74|32.18 dB -- Test SNR (radar)
+S_IQ: 32.0 b -- Sample size (radar)
+S_N: 16.41|31.82 dB -- Signal to noise ratio (radar)
+S_adc: 10.0 b -- ADC bit resolution (radar)
+S_d: 0.0 km -- Dwell step (radar)
+S_f: 256.0  -- FFT size (radar)
+S_int: 32.0 b -- Max integer size (radar)
+S_omega: 0.0 km -- Scan step (radar)
+S_p: 5465.0 kB -- Pass data volume (radar)
+S_rc: 1024.0 bit -- Downlink Packet Size (radar)
+S_rch: 56.0 bit -- Downlink Packet Overhead (radar)
+S_tau: 4.0 B -- Pulse data size (radar)
+T: 263.0|303.0 K -- Temperature (radar)
+TB: 0.1592  -- Time-bandwidth product (radar)
+T_P1: 4.971|133.9 hr -- Always-on battery life (radar)
+T_S: 257.2|317.7 K -- Equilibrium sunlit temperature (radar)
+T_T: 249.4|293.4 K -- Equilibrium terminator temperature (radar)
+T_d: 1.0 s -- Dwell time (radar)
+T_f: 3.336|4.576 ms -- Time of flight (radar)
+T_pkt: 21.08 ms -- Downlink Packet Duration (radar)
+T_s: 4e-07 s -- Sampling period (radar)
+T_t: 233.2|287.4 K -- Equilibrium side sunlit temperature (radar)
+T_tau: 9.805 ms -- Pulse repetition interval (radar)
+T_temp: 200.7|267.2 K -- Temperature (radar)
+T_u: 139.2|182.4 K -- Equilibrium umbra temperature (radar)
+U: 0.1  -- Uptime (radar)
+U_B: 19.83|24.75 % -- Instantaneous battery usage (radar)
+U_C: 209.7|3630.0 % -- Communication usage (radar)
+U_D: 0.00216|0.01124 % -- Data storage usage (radar)
+U_P: 13.99|62.4 % -- Orbital average power usage (radar)
+U_P1: 115.1|448.1 % -- Always-on orbital average power usage (radar)
+V_adc: -1.0|1.0 V -- ADC voltage limits (radar)
+V_c: 726100000.0|753700000.0 m^2/s -- Collection volume (radar)
+W_s: 1028.0|1067.0 km -- Swath width (radar)
+a: 458.6|789.0 km -- Footprint length (radar)
+a_g: 458.6|789.0 km -- Azimuthal footprint length (radar)
+a_r: 575.8|614.8 km -- Radial footprint length (radar)
+a_rc: 575.8|614.8 km -- Composite footprint width (radar)
+alpha_e: 0.0|4.062 deg -- Earth angle of swath (radar)
+alpha_phi: 6.824 deg -- Elevation look Earth angle (radar)
+atten: 0.0 dB -- Output Attenuator  (radar)
+capture_size: 2048.0  -- Capture size  (radar)
+e_G: 8.727|120.1 km -- Geolocation error (radar)
+e_gamma: 1.0|10.0 deg -- Azimuth look angle error (radar)
+e_phi: 1.0|10.0 deg -- Elevation look angle error (radar)
+eta_rcnv: 85.0|95.0 % -- Radar power conversion efficiency (radar)
+eta_rpa: 50.0 % -- Radar power amplifier efficiency (radar)
+eta_rsw: 0.9|0.99  -- Radar switching efficiency (radar)
+f_D: -11.01|14.01 kHz -- Doppler shift (radar)
+f_De: -22.03|28.02 kHz -- Two-way echo doppler shift (radar)
+f_LO: 100.0 kHz -- LO frequency offset (radar)
+f_adc: 2.5 MHz -- Sampling rate  (radar)
+lambd_CF: 0.05702 m -- Wavelength of the transmitted center frequency (radar)
+n_adc: 512.0  -- ADC step count (radar)
+n_b: 33.0  -- Number of bursts in a dwell (radar)
+n_bp: 11410.0  -- Ideal digital bandpass filter bin count (radar)
+n_d: 101.0  -- Number of looks in a dwell (radar)
+n_f: 8.0  -- FFT power (radar)
+n_fo: 2.0  -- FFT overlaps (radar)
+n_l: 2.0  -- Number of looks in a burst (radar)
+n_n: 1.0  -- Number of noise-only looks in a burst (radar)
+n_p: 3.0  -- Number of pulses in a burst (radar)
+n_rf: 1.0  -- Number of rf signals (radar)
+n_s: 16380.0  -- Total samples  (radar)
+numb_captures: 8.0  -- Number of captures (radar)
+omega: 0.0 rpm -- Scanning rate (radar)
+phi: 0.0|10.0 deg -- Elevation look angle (radar)
+phi_e: 0.0|41.2 deg -- Look edge angle (radar)
+phi_e2: -31.2|41.2 deg -- Look edge coordinate angle (radar)
+phi_e2max: 41.2 deg -- Look edge max placeholder (radar)
+phi_e2min: -31.2 deg -- Look edge min placeholder (radar)
+phi_e2sign: 0.0  -- Look edge sign comparison (radar)
+phi_et: 0.01745|0.7017  -- Minimum errorless look edge angle (radar)
+phi_t: 0.0 deg -- Target elevation look angle (radar)
+psi: 0.0|360.0 deg -- Azimuth look angle (radar)
+q_netS: -9.859|9.073 W -- Direct sun net heat flux (radar)
+q_netc: -15.53|-9.013 W -- Cooling net heat flux (radar)
+q_nett: -14.51|-1.818 W -- Terminator net heat flux (radar)
+q_netu: -22.97|-20.34 W -- Umbra net heat flux (radar)
+q_outS: 14.18|33.38 W -- Heat dissipation rate (radar)
+q_outu: 1.217|3.623 W -- Heat dissipation rate (radar)
+q_s: 0.3444|0.5295 W -- Scatterometer waste heat (radar)
+r_Dx: 1.665|2.285 m -- Doppler resolution at the cross-track axis (radar)
+r_Dy: 1.665|4.3 m -- Doppler resolution at the along-track axis (radar)
+r_g: 458.6|789.0 km -- Azimuthal resolution cell width (radar)
+r_r: 38.39|40.99 km -- Radial resolution cell width (radar)
+r_rrd: 3007000.0|3061000.0 m -- Range resolution (radar)
+r_s: 3061000.0 m -- Line-of-sight resolution (radar)
+r_xx: 575.8|614.8 km -- X resolution cell width at the x axis (radar)
+r_xy: 458.6|789.0 km -- X resolution cell width at the y axis (radar)
+r_yx: 458.6|789.0 km -- Y resolution cell width in the x axis (radar)
+r_yy: 575.8|614.8 km -- Y resolution cell width in the y axis (radar)
+sigma: 5269000000000.0|27280000000000.0 m^2 -- Radar cross section (radar)
+sigma_0: 13.0|17.5 dB -- Normalized radar cross-section (radar)
+t_Rx: 6.554 ms -- Receive window (radar)
+t_Rx0: 3.251 ms -- Receive start time (radar)
+t_dRx: 0.0 ms -- Receive delay (radar)
+t_dTx: 0.0 ms -- Transmit delay (radar)
+t_f: 102.4 us -- FFT Time (radar)
+t_r: 1.0 us -- Emitted pulse rise time (radar)
+t_rc: 20.0 ms -- Downlink Inter-Packet Delay (radar)
+t_s: 8.5e-07 s -- Switching time (radar)
+t_sRF: 0.35 us -- RF switching time (radar)
+t_ss: 0.5 us -- Software switching time (radar)
+tau: 3.25 ms -- Pulse length (radar)
+tau_e: 4.49 ms -- Echo length (radar)
+tau_o: 0.0 s -- Pulse overlap (radar)
+tau_o0: 0.0 s -- Early pulse overlap (radar)
+tau_o1: 0.0 s -- Late pulse overlap (radar)
+theta: 0.0|10.79 deg -- Incidence angle (radar)
+theta_e: 0.0|45.27 deg -- Look edge incidence angle (radar)
+theta_t: 8.0 deg -- Transition incidence angle (radar)
+v_r: -0.0 m/s -- Radial look speed (radar)
+v_s: 0.0|5018.0 m/s -- Line of sight velocity (radar)
+v_s2: -3946.0|5018.0 m/s -- Edge line of sight velocity (radar)
+Test (radar): RFIN_MIN.rc < P_r < RFIN_MAX.rc
+	Result: [92mpass[0m
+Test (radar): theta < theta_t
+	Result: [91mfail[0m
+	The range of actual incidence angles should be within the transition incidence angle for the model to be valid.
+	theta: 0.0|10.79 deg
+	theta_t: 8.0 deg
+Test (radar): M_dn > 1
+	Result: [92mpass[0m
+Test (radar): par_min(f.a + f_D) > par_min(f_a.a)
+	Result: [92mpass[0m
+Test (radar): par_max(f.a + f_D) < par_max(f_a.a)
+	Result: [92mpass[0m
+Test (radar): R_s**2 < (R_E.c + h.o)**2 + R_E.c**2
+	Result: [92mpass[0m
+Test (radar): R_s >= h.o
+	Result: [92mpass[0m
+Test (radar): R_g < d_H.o/2
+	Result: [92mpass[0m
+Test (radar): R_s < 2*R_E.c + h.o
+	Result: [92mpass[0m
+Test (radar): W_s < d_H.o
+	Result: [92mpass[0m
+Test (radar): U_P <= 1
+	Result: [92mpass[0m
+Test (radar): U_B <= 1
+	Result: [92mpass[0m
+Test (radar): tau < T_tau
+	Result: [92mpass[0m
+Test (radar): r_xx <= W_s
+	Result: [92mpass[0m
+Test (radar): r_xy <= W_s
+	Result: [92mpass[0m
+Test (radar): r_r <= a_r
+	Result: [92mpass[0m
+Test (radar): r_g <= a_g
+	Result: [92mpass[0m
+Test (radar): r_r >= r_rrd or O_r != "footprint"
+	Result: [92mpass[0m
+Test (radar): tau < tau_e
+	Result: [92mpass[0m
+Test (radar): T_d < U*T.o
+	Result: [92mpass[0m
+Test (radar): f_LO > B_r/2
+	Result: [92mpass[0m
+Test (radar): B_bp < f_adc
+	Result: [92mpass[0m
+Test (radar): par_max(f_a.a) - par_min(f_a.a) > B_n
+	Result: [92mpass[0m
+Test (satellite): M_up > 0
+	Result: [92mpass[0m
+Test (satellite): M_dn > 0
+	Result: [92mpass[0m
+Test (satellite): par_max(f_dn.t + f_DTrd) < par_max(f_dna.t)
+	Result: [92mpass[0m
+Test (satellite): par_min(f_dn.t + f_DTrd) > par_min(f_dna.t)
+	Result: [92mpass[0m
+Test (satellite): par_max(f_up.t + f_DTru) < par_max(f_upa.t)
+	Result: [91mfail[0m
+	f_up: 148.9|149.4 MHz
+	f_DTru: -3.508|3.519 kHz
+	f_upa: 149.1|149.2 MHz
+Test (satellite): par_min(f_up.t + f_DTru) > par_min(f_upa.t)
+	Result: [91mfail[0m
+	f_up: 148.9|149.4 MHz
+	f_DTru: -3.508|3.519 kHz
+	f_upa: 149.1|149.2 MHz
+Test (satellite): PFD < PFD_lim.t
+	Result: [92mpass[0m
+Test (satellite): t_n < T_n
+	Result: [92mpass[0m
+Test (satellite): t_bIr < T_bIr
+	Result: [92mpass[0m
+Test (satellite): T_n > T.o
+	Result: [92mpass[0m
+Test (satellite): B > 0
+	Result: [92mpass[0m
+Test (satellite): U_D < 1
+	Result: [92mpass[0m
+Test (satellite): U_C < 1
+	Result: [91mfail[0m
+	Data transfer usage must be less than 100%.
+	U_C: 114.0|6736.0 %
+Test (solar_cell): eta < 0.395
+	Result: [92mpass[0m
+Test (trill): 0.5*R*X <= B_TxFSK/2 <= 10*R*X
+	Result: [92mpass[0m
+Test (camera): S_d < S_max
+	Result: [92mpass[0m
+Test (orbit): G_a < G_S.c
+	Result: [92mpass[0m
+Test (orbit): d_H < 2*R_E.c
+	Result: [92mpass[0m
+Test (nest): t_op > t_b
+	Result: [92mpass[0m
+Test (nest): s3_I.j > I3_m
+	Result: [92mpass[0m
+Test (nest): s3_P.j > P3
+	Result: [92mpass[0m
+Test (nest): s2_I.j > I_max.r
+	Result: [92mpass[0m
+Test (nest): s2_P.j > P2
+	Result: [92mpass[0m
+Test (nest): max_w.r > W.d + W.y
+	Result: [92mpass[0m
+Test (nest): T_tn.r > Taz_tot
+	Result: [92mpass[0m
+Test (nest): T_tn.r > Tel_tot
+	Result: [92mpass[0m
+Test (nest): UT_w < w_op.y
+	Result: [92mpass[0m
+Test (nest): UT_w < w_op.d
+	Result: [92mpass[0m
+Test (trailer): t.j > f_s * W_tot
+	Result: [92mpass[0m
+Test (trailer): ys.s > f_s * sig_cmm
+	Result: [92mpass[0m
+Test (trailer): ys.s > f_s * sig_b
+	Result: [92mpass[0m
+Test (trailer): ys.s > f_s*tau_bs
+	Result: [92mpass[0m
+Test (trailer): ys_b > f_s*tau_b
+	Result: [92mpass[0m
+Test (trailer): ys_t > f_s * tau_bt
+	Result: [92mpass[0m
+Test (trailer): ys.s > f_s * tau_mt
+	Result: [92mpass[0m
+Test (trailer): ys_b > f_s* sig_bb
+	Result: [92mpass[0m
+Test (trailer): ys.y > f_s * sig_y
+	Result: [92mpass[0m
+Test (nest): t_op > t_b
+	Result: [92mpass[0m
+Test (nest): s3_I.j > I3_m
+	Result: [92mpass[0m
+Test (nest): s3_P.j > P3
+	Result: [92mpass[0m
+Test (nest): s2_I.j > I_max.r
+	Result: [92mpass[0m
+Test (nest): s2_P.j > P2
+	Result: [92mpass[0m
+Test (nest): max_w.r > W.d + W.y
+	Result: [92mpass[0m
+Test (nest): T_tn.r > Taz_tot
+	Result: [92mpass[0m
+Test (nest): T_tn.r > Tel_tot
+	Result: [92mpass[0m
+Test (nest): UT_w < w_op.y
+	Result: [92mpass[0m
+Test (nest): UT_w < w_op.d
+	Result: [92mpass[0m

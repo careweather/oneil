@@ -7,16 +7,12 @@ import copy
 from beautifultable import BeautifulTable
 import importlib
 from functools import partial
-import traceback, logging
 
 from . import bcolors
 from . import errors as err
 from . import console
 from . import units as un
 from .errors import OneilError
-
-# Configure logging to output to the console
-logging.basicConfig(level=logging.ERROR, format='%(message)s')
 
 np.seterr(all='raise')
 
@@ -60,7 +56,7 @@ def minus(x, y):
         return x - y
     
 
-def parse_file(file_name, parent_model=None):
+def parse_file(file_name):
     parameters = []
     submodels = {}
     imports = []
@@ -354,21 +350,27 @@ def convert_functions(assignment, imports, file_name, line_number):
     pattern = re.compile(r'(\w+)\(([^()]*)\)')
     results = pattern.findall(assignment)
 
-    # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
-    if results:
-        func, arg_str = results[0]
+    equation = assignment.strip("\n").strip()
 
-    if results and not func in FUNCTIONS:
-        equation = []
-        arguments = arg_str.split(",")
-        for i in imports:
-            if func in i.__dict__.keys():
-                equation = i.__dict__[func]
-                break
-        if not equation:
-            raise SyntaxError(file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
-    else:
-        equation = assignment.strip("\n").strip()
+    # If assignment has a function ("name(var1, var2, varn)") in it, replace it with the appropriate callable
+    if not results:
+        return equation, arguments
+
+    func, arg_str = results[0]
+    
+    if func in FUNCTIONS:
+        return equation, arguments
+        
+    equation = []
+    arguments = arg_str.split(",")
+    
+    for i in imports:
+        if func in i.__dict__.keys():
+            equation = i.__dict__[func]
+            break
+            
+    if not equation:
+        raise SyntaxError(file_name, line_number, assignment, "Parse parameter: invalid function: " + func)
 
     return equation, arguments
 
@@ -888,14 +890,14 @@ class Test:
             try:
                 self.refs = [l.strip() for l in line.split(':')[0].split('{')[1].split('}')[0].split(',')]
             except:
-                SyntaxError(model, line_no, line, "Invalid syntax for test references.")
+                raise SyntaxError(model, line_no, line, "Invalid syntax for test references.")
         else:
             self.refs = []
 
         self.expression = line.split(':')[1].strip()
 
         if not self.expression:
-            SyntaxError(model, line_no, line, "Empty test expression.")
+            raise SyntaxError(model, line_no, line, "Empty test expression.")
 
         for old, new in FUNCTIONS.items():
             if "." + old not in self.expression:
@@ -1716,15 +1718,15 @@ class Model:
         if isinstance(design_files, str):
             if not os.path.exists(design_files):
                 raise DesignError([design_files])
-            _, design_params, _, tests, design = parse_file(design_files, self)
+            _, design_params, _, tests, design = parse_file(design_files)
         elif isinstance(design_files, list):
             missing_files = [file for file in design_files if not os.path.exists(file)]
             if len(missing_files) > 0:
                 raise DesignError(missing_files)
-            _, design_params, _, tests, design = parse_file(design_files[0], self)
+            _, design_params, _, tests, design = parse_file(design_files[0])
             if len(design_files) > 1:
                 for design_file in design_files[1:]:
-                    _, overdesign_params, _, overtests, overdesign = parse_file(design_file, self)
+                    _, overdesign_params, _, overtests, overdesign = parse_file(design_file)
                     for ID, parameter in overdesign.items():
                         design[ID] = parameter
                     for ID, parameter in overdesign_params.items():
@@ -2560,7 +2562,7 @@ def handler(model: Model, inpt: str):
         elif cmd == "load":
             model_name, model_designs, commands = parse_args(args)
 
-            loader(model_name, model_designs)
+            model = loader(model_name, model_designs, capture_errors=False)
 
             for command in commands:
                 print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
@@ -2568,9 +2570,9 @@ def handler(model: Model, inpt: str):
 
         elif cmd == "reload":
             if model.design == "default":
-                loader(model.name, [])
+                model = loader(model.name, [], capture_errors=False)
             else:
-                loader(model.name, [model.design])
+                model = loader(model.name, [model.design], capture_errors=False)
         elif cmd == "help":
             print(help_text)
             return
@@ -2669,7 +2671,7 @@ Commands:
         Exit the program.
 """
 
-def loader(inp: str, designs: list[str]) -> Model:
+def loader(inp: str, designs: list[str], capture_errors: bool = True, quiet: bool = False) -> Model:
     model = None
 
     while not model:
@@ -2688,14 +2690,18 @@ def loader(inp: str, designs: list[str]) -> Model:
                     inp = ""
                     continue
             if os.path.exists(inp):
-                print("Loading model " + inp + "...")
+                if not quiet:
+                    print("Loading model " + inp + "...")
                 try:
                     model = Model(inp)
-                    model.build()
+                    model.build(quiet=quiet)
                 except OneilError as err:
-                    console.print_error(err)
-                    model = None
-                    inp = ""
+                    if not capture_errors:
+                        raise err
+                    else:
+                        console.print_error(err)
+                        model = None
+                        inp = ""
             else:
                 print("Model " + inp + " not found.")
                 inp = ""
@@ -2756,23 +2762,50 @@ def parse_args(args: list[str]) -> tuple[str, list[str], list[str]]:
     input_designs = list(reversed(inputs[:-1]))
 
     return input_model, input_designs, commands
+
+def perform_regression_test(model_file):
+    if not os.path.exists(model_file):
+        print(f"{bcolors.error('ERROR')} Model file {model_file} not found.")
+        sys.exit(1)
+    
+    model = loader(model_file, [], quiet=True)
+    
+    handler(model, "all")
+    handler(model, "test")
+
+    return
     
 def main(args=sys.argv[1:]):
-    console.print_welcome_message()
+    try:
+        # if the first argument is "regression-test", then we need to perform a regression test
+        # the second argument is the model file to test
+        if args[0] == "regression-test":
+            if len(args) != 2:
+                print("Usage: oneil regression-test <model_file>")
+                sys.exit(1)
+            
+            perform_regression_test(args[1])
+            return
+        else:
+            console.print_welcome_message()
 
-    # parse the files and commands
-    inp, designs, commands = parse_args(args)
+            # parse the files and commands
+            inp, designs, commands = parse_args(args)
 
-    # load the model
-    model = loader(inp, designs)
+            # load the model
+            model = loader(inp, designs)
 
-    # Handle commands after the first as cli commands.
-    for command in commands:
-        print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
-        handler(model, command)
+            # Handle commands after the first as cli commands.
+            for command in commands:
+                print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
+                handler(model, command)
 
-    if len(args) > 2:
-        quit() 
+            if len(args) > 2:
+                quit() 
 
-    # run the interpeter on the model
-    interpreter(model)
+            # run the interpeter on the model
+            interpreter(model)
+    except KeyboardInterrupt:
+        # Handle when the user presses Ctrl+C
+        print(f"\n\n{bcolors.ITALIC}Quitting...{bcolors.ENDC}")
+        sys.exit(0)
