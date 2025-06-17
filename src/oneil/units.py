@@ -186,7 +186,6 @@ LEGACY_UNITS = {
     "nmi": ({"m": 1}, 1852.0, {"alt": ["nautical mile", "nautical miles"]}),
     "lb": ({"kg": 1}, 0.45359237, {"alt": ["lbs", "pound", "pounds"]}),
     "mph": ({"m": 1, "s": -1}, 0.44704, {"alt": ["mile per hour", "miles per hour"]}),
-
 }
 
 if invalid_units(LEGACY_UNITS):

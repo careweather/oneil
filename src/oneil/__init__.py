@@ -2721,9 +2721,13 @@ def loader(args=[]):
         handler(model, "design " + design)
 
     # Handle commands after the first as cli commands.
+    
     for arg in args[2:]:
         print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + arg)
         handler(model, arg)
+
+    if len(args) > 2:
+        quit() 
     interpreter(model)
 
 loader_help = """"
