@@ -1,5 +1,12 @@
 //! Expression parsing for the Oneil language.
 //!
+//! These expressions can be used in a variety of contexts, including:
+//! - Parameter values
+//! - Parameter limits
+//! - Piecewise conditions
+//! - Tests
+//! - Model inputs
+//!
 //! # Examples
 //!
 //! ```
