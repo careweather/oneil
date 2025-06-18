@@ -37,7 +37,9 @@ Oneil is the programming language that is currently implemented in python in `sr
 ## Keep a specification that is up-to-date
 Ensure that there is a grammar and a specification that defines the language, and update it any time new things are added to the language. These kinds of documents are to be kept in the `docs/` directory.
 
-Also, keep a README known as `README.rs.md` that represents this new implementation in the top level.
+## Reference implementation description
+
+Details about the Oneil programming language can be found in `README.md` on the top level.
 
 ## Architectural Decision Records (ADRs)
 Whenever a decision needs to be documented, make a new ADR in `docs/decisions` using `template.md`. The ADR file should be named as
