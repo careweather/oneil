@@ -1,0 +1,101 @@
+(* Oneil Language Grammar in EBNF *)
+
+(* NOTE: Identifiers and keywords are assumed to be separated by whitespace, as
+         is standard. So, `importabc` is parsed as a single token, not `import`
+         followed by `abc`.
+         
+         In addition, inline whitespace (space and tabs) do not have any
+         significance other than seperating tokens. Therefore, all tokens may
+         optionally be separated by inline whitespace. *)
+
+(* Whitespace and Comments *)
+LineBreak = "\n" | "\r\n" ;  (* Each line break is a separate token *)
+Comment = "#", { Any character except LineBreak }, LineBreak ;
+EndOfLine = { LineBreak | Comment | ? end of file ? } ;
+
+(* Top Level Structure *)
+Model = [ EndOfLine ], [ Note ], { Declaration } { Section } ;
+Declaration = ImportDecl | UseDecl | ParameterDecl | TestDecl ;
+
+(* Notes *)
+Note = SingleLineNote | MultiLineNote ;
+SingleLineNote = "~", { Any character except LineBreak }, LineBreak ;
+MultiLineNote = MultiLineNoteDelimiter, { NoteLine }, MultiLineNoteDelimiter ;
+MultiLineNoteDelimiter = "~~~", "~"*, LineBreak ;
+NoteLine = { Any character except LineBreak or MultiLineNoteDelimiter }, LineBreak ; (* can contain anything except the multi-note delimiter*)
+
+(* Sections *)
+Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | ParameterDecl | TestDecl } ;
+
+(* Imports *)
+ImportDecl = "import", Identifier, EndOfLine ;
+FromDecl = "from", ModulePath, "use", ModelName, [ ModelInputs ], "as", Identifier, EndOfLine ;
+UseDecl = "use", ModulePath, [ ModelInputs ], "as", Identifier, EndOfLine ;
+ModulePath = Identifier, { ".", Identifier } ;
+ModelInputs = "(", ModelInput, { ",", ModelInput }, ")" ;
+ModelInput = Identifier, "=", Expr ;
+ModelName = Identifier ;
+
+(* Parameters *)
+ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine, [ Note ] ;
+Performance = "$" ;
+Trace = "*" | "**" ;
+Name = Label ;
+Limits = ContinuousLimits | DiscreteLimits ;
+ContinuousLimits = "(", Expr, ",", Expr, ")" ;
+DiscreteLimits = "[", Expr, { ",", Expr }, "]" ;
+Assignment = Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
+
+(* Tests *)
+TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expr, EndOfLine ;
+TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
+
+(* Expressions *)
+(* Expression Precedence (highest to lowest):
+   1. Parentheses, function calls
+   2. Unary minus (-)
+   3. Exponentiation ( ** ) - right associative
+   4. Multiplication, division, floor division, modulo (*, /, //, %) - left associative
+   5. Addition, subtraction (+, -) - left associative
+   6. Min/max (|) - non-associative
+   6. Comparisons (<, >, <=, >=, ==, !=) - non-associative
+   7. NOT - unary prefix
+   8. AND - left associative
+   9. OR - left associative
+*)
+Expr = OrExpr ;
+OrExpr = [ OrExpr, "or", ], AndExpr ;
+AndExpr = [ AndExpr, "and", ], NotExpr ;
+NotExpr = [ "not", ], NotExpr | ComparisonExpr ;
+ComparisonExpr = AdditiveExpr, ComparisonOp, AdditiveExpr ;
+ComparisonOp = "<" | ">" | "<=" | ">=" | "==" | "!=" ;
+AdditiveExpr = [ AdditiveExpr, AdditiveOp, ], MultiplicativeExpr ;
+AdditiveOp = "+" | "-" | "--" ;
+MultiplicativeExpr = [ MultiplicativeExpr, MultiplicativeOp, ], ExponentialExpr ;
+MultiplicativeOp = "*" | "/" | "//" | "%" ;
+ExponentialExpr = NegExpr, [ "^", , ExponentialExpr ] ;  (* right associative *)
+NegExpr = ( "-", NegExpr ) | PrimaryExpr ;
+PrimaryExpr = NumberLiteral | StringLiteral | BooleanLiteral | Identifier { ".", Identifier } | FunctionCall | ( "(", Expr, ")" ) ;
+
+PiecewiseExpr = PiecewisePart, [ ":", UnitExpr ], { EndOfLine, PiecewisePart } ;
+PiecewisePart = "{", Expr, "if", Expr ;
+
+(* Function Calls *)
+FunctionCall = Identifier, "(", [ Expr, { ",", Expr } ], ")" ;
+
+(* Units *)
+UnitExpr = [ UnitExpr, ( "*" | "/" ) ], UnitTerm ;
+UnitTerm = Identifier, [ "^", Number ] | "(" UnitExpr, ")" ;
+
+(* Basic Elements *)
+Identifier = Letter, { Letter | Digit | "_" } ;
+Label = Identifier, { "-" | Identifier } ;
+NumberLiteral = [ Sign ], ( Integer | Float | Scientific ) ;
+Integer = Digit, { Digit } ;
+Float = Integer , ".", Digit, { Digit } ;
+Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
+Sign = "+" | "-" ;
+Letter = "A" | ... | "Z" | "a" | ... | "z" ;
+Digit = "0" | "1" | ... | "9" ;
+StringLiteral = "\"", { Any character except LineBreak or "\" }, "\"", ;
+BooleanLiteral = "true" | "false" ;
