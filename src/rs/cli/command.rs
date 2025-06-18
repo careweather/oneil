@@ -5,7 +5,7 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(name = "oneil")]
 #[command(about = "Oneil language tooling", long_about = None)]
-pub struct Cli {
+pub struct CliCommand {
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -23,6 +23,12 @@ pub enum Commands {
 pub enum DevCommands {
     /// Print the AST of a file
     PrintAst {
+        /// Path to the Oneil source file
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+    },
+    /// Print the module collection of a file
+    PrintModules {
         /// Path to the Oneil source file
         #[arg(value_name = "FILE")]
         file: PathBuf,

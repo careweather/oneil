@@ -4,7 +4,7 @@ use clap::Parser;
 use oneil::parser::{self, Config, Span};
 use std::{fs::File, io::Read};
 
-use crate::cli::{Cli, Commands, DevCommands};
+use crate::cli::command::{CliCommand, Commands, DevCommands};
 
 pub mod cli;
 
@@ -15,7 +15,7 @@ use std::{fs::File, io::Read};
 use crate::cli::{Cli, Commands, DevCommands};
 
 fn main() {
-    let cli = Cli::parse();
+    let cli = CliCommand::parse();
 
     match cli.command {
         Commands::Dev { command } => match command {
