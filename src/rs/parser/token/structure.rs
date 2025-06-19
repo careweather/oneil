@@ -35,13 +35,10 @@ use nom::{
     multi::many0,
 };
 
-use crate::parser::error::ErrorHandlingParser as _;
-use crate::parser::token::util::inline_whitespace;
-
 use super::{
     Result, Span,
-    error::{TokenError, TokenErrorKind},
-    util::Token,
+    error::{ErrorHandlingParser, TokenError},
+    util::{Token, inline_whitespace},
 };
 
 fn linebreak(input: Span) -> Result<Span, TokenError> {
@@ -62,7 +59,7 @@ pub fn end_of_line(input: Span) -> Result<Token, TokenError> {
     let (rest, first_line_break) = linebreak
         .or(comment)
         .or(end_of_file)
-        .map_error(|e| TokenError::new(TokenErrorKind::EndOfLine, e.span))
+        .map_error(TokenError::expected_end_of_line)
         .parse(input)?;
 
     let (rest, rest_whitespace) = recognize((

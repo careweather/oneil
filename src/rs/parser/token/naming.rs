@@ -27,7 +27,7 @@ use nom::{
 
 use super::{
     Result, Span,
-    error::{self, TokenError},
+    error::TokenError,
     keyword,
     util::{Token, token},
 };
@@ -71,7 +71,7 @@ pub fn identifier(input: Span) -> Result<Token, TokenError> {
                     take_while(|c: char| c.is_alphanumeric() || c == '_').parse(rest)?;
                 Ok((rest, ()))
             },
-            error::TokenErrorKind::ExpectIdentifier,
+            TokenError::expected_identifier,
         ),
         |identifier| !keyword::KEYWORDS.contains(&identifier.lexeme()),
     )
@@ -125,7 +125,7 @@ pub fn label(input: Span) -> Result<Token, TokenError> {
 
             Ok((rest, ()))
         },
-        error::TokenErrorKind::ExpectLabel,
+        TokenError::expected_label,
     )
     .parse(input)
 }

@@ -33,11 +33,11 @@ use nom::{
 
 use super::{
     Parser, Result, Span,
-    error::{ExpectSymbol, TokenError, TokenErrorKind},
+    error::{ExpectSymbol, TokenError},
     util::{Token, token},
 };
 
-fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError<'a>> {
+fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError> {
     let next_char_is_not_c = peek(satisfy(move |next_char: char| next_char != c)).map(|_| ());
     let reached_end_of_file = eof.map(|_| ());
     let mut parser = value((), next_char_is_not_c.or(reached_end_of_file));
@@ -47,68 +47,84 @@ fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError<'a>> {
 
 /// Parses the '!=' symbol token.
 pub fn bang_equals(input: Span) -> Result<Token, TokenError> {
-    token(tag("!="), TokenErrorKind::Symbol(ExpectSymbol::BangEquals)).parse(input)
+    token(
+        tag("!="),
+        TokenError::expected_symbol(ExpectSymbol::BangEquals),
+    )
+    .parse(input)
 }
 
 /// Parses the '|' symbol token.
 pub fn bar(input: Span) -> Result<Token, TokenError> {
-    token(char('|'), TokenErrorKind::Symbol(ExpectSymbol::Bar)).parse(input)
+    token(char('|'), TokenError::expected_symbol(ExpectSymbol::Bar)).parse(input)
 }
 
 /// Parses the '{' symbol token.
 pub fn brace_left(input: Span) -> Result<Token, TokenError> {
-    token(char('{'), TokenErrorKind::Symbol(ExpectSymbol::BraceLeft)).parse(input)
+    token(
+        char('{'),
+        TokenError::expected_symbol(ExpectSymbol::BraceLeft),
+    )
+    .parse(input)
 }
 
 /// Parses the '}' symbol token.
 pub fn brace_right(input: Span) -> Result<Token, TokenError> {
-    token(char('}'), TokenErrorKind::Symbol(ExpectSymbol::BraceRight)).parse(input)
+    token(
+        char('}'),
+        TokenError::expected_symbol(ExpectSymbol::BraceRight),
+    )
+    .parse(input)
 }
 
 /// Parses the '[' symbol token.
 pub fn bracket_left(input: Span) -> Result<Token, TokenError> {
-    token(char('['), TokenErrorKind::Symbol(ExpectSymbol::BracketLeft)).parse(input)
+    token(
+        char('['),
+        TokenError::expected_symbol(ExpectSymbol::BracketLeft),
+    )
+    .parse(input)
 }
 
 /// Parses the ']' symbol token.
 pub fn bracket_right(input: Span) -> Result<Token, TokenError> {
     token(
         char(']'),
-        TokenErrorKind::Symbol(ExpectSymbol::BracketRight),
+        TokenError::expected_symbol(ExpectSymbol::BracketRight),
     )
     .parse(input)
 }
 
 /// Parses the '^' symbol token.
 pub fn caret(input: Span) -> Result<Token, TokenError> {
-    token(char('^'), TokenErrorKind::Symbol(ExpectSymbol::Caret)).parse(input)
+    token(char('^'), TokenError::expected_symbol(ExpectSymbol::Caret)).parse(input)
 }
 
 /// Parses the ':' symbol token.
 pub fn colon(input: Span) -> Result<Token, TokenError> {
-    token(char(':'), TokenErrorKind::Symbol(ExpectSymbol::Colon)).parse(input)
+    token(char(':'), TokenError::expected_symbol(ExpectSymbol::Colon)).parse(input)
 }
 
 /// Parses the ',' symbol token.
 pub fn comma(input: Span) -> Result<Token, TokenError> {
-    token(char(','), TokenErrorKind::Symbol(ExpectSymbol::Comma)).parse(input)
+    token(char(','), TokenError::expected_symbol(ExpectSymbol::Comma)).parse(input)
 }
 
 /// Parses the '$' symbol token.
 pub fn dollar(input: Span) -> Result<Token, TokenError> {
-    token(char('$'), TokenErrorKind::Symbol(ExpectSymbol::Dollar)).parse(input)
+    token(char('$'), TokenError::expected_symbol(ExpectSymbol::Dollar)).parse(input)
 }
 
 /// Parses the '.' symbol token.
 pub fn dot(input: Span) -> Result<Token, TokenError> {
-    token(char('.'), TokenErrorKind::Symbol(ExpectSymbol::Dot)).parse(input)
+    token(char('.'), TokenError::expected_symbol(ExpectSymbol::Dot)).parse(input)
 }
 
 /// Parses the '=' symbol token.
 pub fn equals(input: Span) -> Result<Token, TokenError> {
     token(
         char('=').and(next_char_is_not('=')),
-        TokenErrorKind::Symbol(ExpectSymbol::Equals),
+        TokenError::expected_symbol(ExpectSymbol::Equals),
     )
     .parse(input)
 }
@@ -117,7 +133,7 @@ pub fn equals(input: Span) -> Result<Token, TokenError> {
 pub fn equals_equals(input: Span) -> Result<Token, TokenError> {
     token(
         tag("=="),
-        TokenErrorKind::Symbol(ExpectSymbol::EqualsEquals),
+        TokenError::expected_symbol(ExpectSymbol::EqualsEquals),
     )
     .parse(input)
 }
@@ -126,7 +142,7 @@ pub fn equals_equals(input: Span) -> Result<Token, TokenError> {
 pub fn greater_than(input: Span) -> Result<Token, TokenError> {
     token(
         char('>').and(next_char_is_not('=')),
-        TokenErrorKind::Symbol(ExpectSymbol::GreaterThan),
+        TokenError::expected_symbol(ExpectSymbol::GreaterThan),
     )
     .parse(input)
 }
@@ -135,7 +151,7 @@ pub fn greater_than(input: Span) -> Result<Token, TokenError> {
 pub fn greater_than_equals(input: Span) -> Result<Token, TokenError> {
     token(
         tag(">="),
-        TokenErrorKind::Symbol(ExpectSymbol::GreaterThanEquals),
+        TokenError::expected_symbol(ExpectSymbol::GreaterThanEquals),
     )
     .parse(input)
 }
@@ -144,7 +160,7 @@ pub fn greater_than_equals(input: Span) -> Result<Token, TokenError> {
 pub fn less_than(input: Span) -> Result<Token, TokenError> {
     token(
         char('<').and(next_char_is_not('=')),
-        TokenErrorKind::Symbol(ExpectSymbol::LessThan),
+        TokenError::expected_symbol(ExpectSymbol::LessThan),
     )
     .parse(input)
 }
@@ -153,7 +169,7 @@ pub fn less_than(input: Span) -> Result<Token, TokenError> {
 pub fn less_than_equals(input: Span) -> Result<Token, TokenError> {
     token(
         tag("<="),
-        TokenErrorKind::Symbol(ExpectSymbol::LessThanEquals),
+        TokenError::expected_symbol(ExpectSymbol::LessThanEquals),
     )
     .parse(input)
 }
@@ -162,62 +178,86 @@ pub fn less_than_equals(input: Span) -> Result<Token, TokenError> {
 pub fn minus(input: Span) -> Result<Token, TokenError> {
     token(
         char('-').and(next_char_is_not('-')),
-        TokenErrorKind::Symbol(ExpectSymbol::Minus),
+        TokenError::expected_symbol(ExpectSymbol::Minus),
     )
     .parse(input)
 }
 
 /// Parses the '--' symbol token.
 pub fn minus_minus(input: Span) -> Result<Token, TokenError> {
-    token(tag("--"), TokenErrorKind::Symbol(ExpectSymbol::MinusMinus)).parse(input)
+    token(
+        tag("--"),
+        TokenError::expected_symbol(ExpectSymbol::MinusMinus),
+    )
+    .parse(input)
 }
 
 /// Parses the '(' symbol token.
 pub fn paren_left(input: Span) -> Result<Token, TokenError> {
-    token(char('('), TokenErrorKind::Symbol(ExpectSymbol::ParenLeft)).parse(input)
+    token(
+        char('('),
+        TokenError::expected_symbol(ExpectSymbol::ParenLeft),
+    )
+    .parse(input)
 }
 
 /// Parses the ')' symbol token.
 pub fn paren_right(input: Span) -> Result<Token, TokenError> {
-    token(char(')'), TokenErrorKind::Symbol(ExpectSymbol::ParenRight)).parse(input)
+    token(
+        char(')'),
+        TokenError::expected_symbol(ExpectSymbol::ParenRight),
+    )
+    .parse(input)
 }
 
 /// Parses the '%' symbol token.
 pub fn percent(input: Span) -> Result<Token, TokenError> {
-    token(char('%'), TokenErrorKind::Symbol(ExpectSymbol::Percent)).parse(input)
+    token(
+        char('%'),
+        TokenError::expected_symbol(ExpectSymbol::Percent),
+    )
+    .parse(input)
 }
 
 /// Parses the '+' symbol token.
 pub fn plus(input: Span) -> Result<Token, TokenError> {
-    token(char('+'), TokenErrorKind::Symbol(ExpectSymbol::Plus)).parse(input)
+    token(char('+'), TokenError::expected_symbol(ExpectSymbol::Plus)).parse(input)
 }
 
 /// Parses the '*' symbol token.
 pub fn star(input: Span) -> Result<Token, TokenError> {
     token(
         char('*').and(next_char_is_not('*')),
-        TokenErrorKind::Symbol(ExpectSymbol::Star),
+        TokenError::expected_symbol(ExpectSymbol::Star),
     )
     .parse(input)
 }
 
 /// Parses the '**' symbol token.
 pub fn star_star(input: Span) -> Result<Token, TokenError> {
-    token(tag("**"), TokenErrorKind::Symbol(ExpectSymbol::StarStar)).parse(input)
+    token(
+        tag("**"),
+        TokenError::expected_symbol(ExpectSymbol::StarStar),
+    )
+    .parse(input)
 }
 
 /// Parses the '/' symbol token.
 pub fn slash(input: Span) -> Result<Token, TokenError> {
     token(
         char('/').and(next_char_is_not('/')),
-        TokenErrorKind::Symbol(ExpectSymbol::Slash),
+        TokenError::expected_symbol(ExpectSymbol::Slash),
     )
     .parse(input)
 }
 
 /// Parses the '//' symbol token.
 pub fn slash_slash(input: Span) -> Result<Token, TokenError> {
-    token(tag("//"), TokenErrorKind::Symbol(ExpectSymbol::SlashSlash)).parse(input)
+    token(
+        tag("//"),
+        TokenError::expected_symbol(ExpectSymbol::SlashSlash),
+    )
+    .parse(input)
 }
 
 #[cfg(test)]

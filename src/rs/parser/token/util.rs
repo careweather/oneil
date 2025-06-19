@@ -2,9 +2,8 @@ use nom::{Parser as _, character::complete::space0, combinator::recognize};
 
 use super::{
     Parser, Result, Span,
-    error::{self, TokenError, TokenErrorKind},
+    error::{ErrorHandlingParser, TokenError},
 };
-use crate::parser::error::ErrorHandlingParser as _;
 
 pub struct Token<'a> {
     lexeme: Span<'a>,
@@ -70,12 +69,11 @@ pub fn inline_whitespace(input: Span) -> Result<Span, TokenError> {
 ///
 /// This is useful for tokenizing where whitespace between tokens should be handled automatically.
 pub fn token<'a, O>(
-    f: impl Parser<'a, O, TokenError<'a>>,
-    error_kind: TokenErrorKind<'a>,
-) -> impl Parser<'a, Token<'a>, TokenError<'a>> {
-    (recognize(f), inline_whitespace)
+    f: impl Parser<'a, O, TokenError>,
+    convert_error: impl Fn(TokenError) -> TokenError,
+) -> impl Parser<'a, Token<'a>, TokenError> {
+    (recognize(f).map_error(convert_error), inline_whitespace)
         .map(|(lexeme, whitespace)| Token::new(lexeme, whitespace))
-        .map_error(move |e| error::TokenError::new(error_kind, e.span))
 }
 
 #[cfg(test)]
@@ -107,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_token_with_whitespace() {
-        let mut parser = token(tag("foo"), TokenErrorKind::ExpectIdentifier);
+        let mut parser = token(tag("foo"), TokenError::expected_identifier);
         let input = Span::new_extra("foo   bar", Config::default());
         let (rest, matched) = parser
             .parse(input)
@@ -118,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_token_no_match() {
-        let mut parser = token(tag("baz"), TokenErrorKind::ExpectIdentifier);
+        let mut parser = token(tag("baz"), TokenError::expected_identifier);
         let input = Span::new_extra("foo   bar", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err());

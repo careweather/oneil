@@ -26,10 +26,9 @@ use nom::{
     combinator::{eof, peek},
 };
 
-use crate::parser::token::error;
-
 use super::{
     Parser, Result, Span,
+    error::{self, TokenError},
     util::{Token, token},
 };
 
@@ -55,7 +54,7 @@ fn keyword(
                 .parse(input)?;
             Ok((input, ()))
         },
-        error::TokenErrorKind::Keyword(error_kind),
+        TokenError::expected_keyword(error_kind),
     )
 }
 

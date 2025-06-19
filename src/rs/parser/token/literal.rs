@@ -30,18 +30,12 @@ use nom::{
 
 use super::{
     Result, Span,
-    error::{NumberError, StringError, TokenError, TokenErrorKind},
+    error::{ErrorHandlingParser, TokenError},
     util::{Token, token},
 };
-use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
 pub fn number(input: Span) -> Result<Token, TokenError> {
-    // A convenience function for creating a number error
-    fn number_error<'a>(e: NumberError<'a>) -> impl Fn(TokenError<'a>) -> TokenError<'a> {
-        move |err| TokenError::new(TokenErrorKind::Number(e), err.span)
-    }
-
     let opt_sign = opt(one_of("+-"));
 
     let digit = digit1;
@@ -49,9 +43,7 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
     let opt_decimal = opt(|input| -> Result<_, TokenError> {
         let (rest, decimal_point_span) = tag(".").parse(input)?;
         let (rest, _) = cut(digit1)
-            .map_failure(number_error(NumberError::InvalidDecimalPart {
-                decimal_point_span,
-            }))
+            .map_failure(TokenError::invalid_decimal_part(decimal_point_span))
             .parse(rest)?;
         Ok((rest, ()))
     });
@@ -60,36 +52,30 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
         let (rest, e_span) = tag("e").or(tag("E")).parse(input)?;
         let (rest, _) = opt(one_of("+-")).parse(rest)?;
         let (rest, _) = cut(digit1)
-            .map_failure(number_error(NumberError::InvalidExponentPart { e_span }))
+            .map_failure(TokenError::invalid_exponent_part(e_span))
             .parse(rest)?;
         Ok((rest, ()))
     });
 
     token(
         (opt_sign, digit, opt_decimal, opt_exponent),
-        TokenErrorKind::Number(NumberError::ExpectNumber),
+        TokenError::expected_number,
     )
     .parse(input)
 }
 
 /// Parses a string literal delimited by double quotes.
 pub fn string(input: Span) -> Result<Token, TokenError> {
-    let unterminated_string_error = |open_quote_span| {
-        TokenErrorKind::String(StringError::UnterminatedString { open_quote_span })
-    };
-
     token(
         |input| {
             let (rest, open_quote_span) = tag("\"").parse(input)?;
             let (rest, _) = take_while(|c: char| c != '"' && c != '\n').parse(rest)?;
             let (rest, _) = cut(tag("\""))
-                .map_failure(move |e: TokenError| {
-                    TokenError::new(unterminated_string_error(open_quote_span), e.span)
-                })
+                .map_failure(TokenError::unclosed_string(open_quote_span))
                 .parse(rest)?;
             Ok((rest, ()))
         },
-        TokenErrorKind::String(StringError::ExpectString),
+        TokenError::expected_string,
     )
     .parse(input)
 }
