@@ -6,14 +6,6 @@ use std::{fs::File, io::Read};
 
 use crate::cli::command::{CliCommand, Commands, DevCommands};
 
-pub mod cli;
-
-use clap::Parser;
-use oneil::parser::{self, Config, Span};
-use std::{fs::File, io::Read};
-
-use crate::cli::{Cli, Commands, DevCommands};
-
 fn main() {
     let cli = CliCommand::parse();
 
@@ -35,6 +27,7 @@ fn main() {
                     Err(e) => eprintln!("Error printing AST: {:?}", e),
                 }
             }
+            DevCommands::PrintModules { file } => todo!(),
         },
     }
 }
