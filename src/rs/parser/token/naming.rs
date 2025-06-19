@@ -13,12 +13,12 @@
 //! // Parse an identifier
 //! let input = Span::new_extra("my_var123 rest", Config::default());
 //! let (rest, matched) = identifier(input).unwrap();
-//! assert_eq!(matched.fragment(), &"my_var123");
+//! assert_eq!(matched.lexeme(), "my_var123");
 //!
 //! // Parse a label
 //! let input = Span::new_extra("My Test Case: rest", Config::default());
 //! let (rest, matched) = label(input).unwrap();
-//! assert_eq!(matched.fragment(), &"My Test Case");
+//! assert_eq!(matched.lexeme(), "My Test Case");
 //! ```
 
 use nom::{
@@ -29,7 +29,7 @@ use super::{
     Result, Span,
     error::{self, TokenError},
     keyword,
-    util::token,
+    util::{Token, token},
 };
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
@@ -43,26 +43,26 @@ use super::{
 /// // Basic identifier
 /// let input = Span::new_extra("variable rest", Config::default());
 /// let (rest, matched) = identifier(input).unwrap();
-/// assert_eq!(matched.fragment(), &"variable");
+/// assert_eq!(matched.lexeme(), "variable");
 /// assert_eq!(rest.fragment(), &"rest");
 ///
 /// // Identifier with underscore and numbers
 /// let input = Span::new_extra("my_var_123 rest", Config::default());
 /// let (rest, matched) = identifier(input).unwrap();
-/// assert_eq!(matched.fragment(), &"my_var_123");
+/// assert_eq!(matched.lexeme(), "my_var_123");
 /// assert_eq!(rest.fragment(), &"rest");
 ///
 /// // Identifier starting with underscore
 /// let input = Span::new_extra("_private rest", Config::default());
 /// let (rest, matched) = identifier(input).unwrap();
-/// assert_eq!(matched.fragment(), &"_private");
+/// assert_eq!(matched.lexeme(), "_private");
 /// assert_eq!(rest.fragment(), &"rest");
 ///
 /// // Invalid identifier (starting with number) should fail
 /// let input = Span::new_extra("123invalid", Config::default());
 /// assert!(identifier(input).is_err());
 /// ```
-pub fn identifier(input: Span) -> Result<Span, TokenError> {
+pub fn identifier(input: Span) -> Result<Token, TokenError> {
     verify(
         token(
             |input| {
@@ -73,7 +73,7 @@ pub fn identifier(input: Span) -> Result<Span, TokenError> {
             },
             error::TokenErrorKind::ExpectIdentifier,
         ),
-        |identifier| !keyword::KEYWORDS.contains(&identifier.fragment()),
+        |identifier| !keyword::KEYWORDS.contains(&identifier.lexeme()),
     )
     .parse(input)
 }
@@ -91,28 +91,29 @@ pub fn identifier(input: Span) -> Result<Span, TokenError> {
 /// // Basic label
 /// let input = Span::new_extra("Test Case: rest", Config::default());
 /// let (rest, matched) = label(input).unwrap();
-/// assert_eq!(matched.fragment(), &"Test Case");
+/// assert_eq!(matched.lexeme(), "Test Case");
 /// assert_eq!(rest.fragment(), &": rest");
 ///
 /// // Label with mixed characters
 /// let input = Span::new_extra("My_Test-Case: rest", Config::default());
 /// let (rest, matched) = label(input).unwrap();
-/// assert_eq!(matched.fragment(), &"My_Test-Case");
+/// assert_eq!(matched.lexeme(), "My_Test-Case");
 /// assert_eq!(rest.fragment(), &": rest");
 ///
 /// // Label with tabs
 /// let input = Span::new_extra("Test\tCase: rest", Config::default());
 /// let (rest, matched) = label(input).unwrap();
-/// assert_eq!(matched.fragment(), &"Test\tCase");
+/// assert_eq!(matched.lexeme(), "Test\tCase");
 /// assert_eq!(rest.fragment(), &": rest");
 ///
 /// // Label with numbers
 /// let input = Span::new_extra("123Test: rest", Config::default());
 /// let (rest, matched) = label(input).unwrap();
-/// assert_eq!(matched.fragment(), &"123Test");
+/// assert_eq!(matched.lexeme(), "123Test");
 /// assert_eq!(rest.fragment(), &": rest");
 /// ```
-pub fn label(input: Span) -> Result<Span, TokenError> {
+pub fn label(input: Span) -> Result<Token, TokenError> {
+    // TODO: verify that the label is not a keyword
     token(
         |input| {
             let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
@@ -138,7 +139,7 @@ mod tests {
     fn test_identifier_basic() {
         let input = Span::new_extra("foo rest", Config::default());
         let (rest, matched) = identifier(input).expect("should parse basic identifier");
-        assert_eq!(matched.fragment(), &"foo");
+        assert_eq!(matched.lexeme(), "foo");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -146,7 +147,7 @@ mod tests {
     fn test_identifier_underscore() {
         let input = Span::new_extra("_foo123 bar", Config::default());
         let (rest, matched) = identifier(input).expect("should parse identifier with underscore");
-        assert_eq!(matched.fragment(), &"_foo123");
+        assert_eq!(matched.lexeme(), "_foo123");
         assert_eq!(rest.fragment(), &"bar");
     }
 
@@ -154,7 +155,7 @@ mod tests {
     fn test_identifier_only_underscore() {
         let input = Span::new_extra("_ rest", Config::default());
         let (rest, matched) = identifier(input).expect("should parse single underscore identifier");
-        assert_eq!(matched.fragment(), &"_");
+        assert_eq!(matched.lexeme(), "_");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -162,7 +163,7 @@ mod tests {
     fn test_label_basic() {
         let input = Span::new_extra("foo-bar: rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with dash");
-        assert_eq!(matched.fragment(), &"foo-bar");
+        assert_eq!(matched.lexeme(), "foo-bar");
         assert_eq!(rest.fragment(), &": rest");
     }
 
@@ -170,7 +171,7 @@ mod tests {
     fn test_label_with_spaces_and_tabs() {
         let input = Span::new_extra("foo bar\tbaz: rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with spaces and tabs");
-        assert_eq!(matched.fragment(), &"foo bar\tbaz");
+        assert_eq!(matched.lexeme(), "foo bar\tbaz");
         assert_eq!(rest.fragment(), &": rest");
     }
 
@@ -178,7 +179,7 @@ mod tests {
     fn test_label_with_numbers() {
         let input = Span::new_extra("123Test: rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with numbers");
-        assert_eq!(matched.fragment(), &"123Test");
+        assert_eq!(matched.lexeme(), "123Test");
         assert_eq!(rest.fragment(), &": rest");
     }
 
@@ -193,7 +194,7 @@ mod tests {
     fn test_label_only_underscore() {
         let input = Span::new_extra("_: rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with only underscore");
-        assert_eq!(matched.fragment(), &"_");
+        assert_eq!(matched.lexeme(), "_");
         assert_eq!(rest.fragment(), &": rest");
     }
 
@@ -201,7 +202,7 @@ mod tests {
     fn test_label_with_multiple_dashes() {
         let input = Span::new_extra("foo-bar-baz: rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with multiple dashes");
-        assert_eq!(matched.fragment(), &"foo-bar-baz");
+        assert_eq!(matched.lexeme(), "foo-bar-baz");
         assert_eq!(rest.fragment(), &": rest");
     }
 
@@ -209,7 +210,7 @@ mod tests {
     fn test_label_with_trailing_whitespace() {
         let input = Span::new_extra("foo : rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with trailing whitespace");
-        assert_eq!(matched.fragment(), &"foo ");
+        assert_eq!(matched.lexeme(), "foo ");
         assert_eq!(rest.fragment(), &": rest");
     }
 }

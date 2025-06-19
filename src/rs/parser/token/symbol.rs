@@ -12,16 +12,16 @@
 //! // Parse a not-equals operator
 //! let input = Span::new_extra("!= rest", Config::default());
 //! let (rest, matched) = bang_equals(input).unwrap();
-//! assert_eq!(matched.fragment(), &"!=");
+//! assert_eq!(matched.lexeme(), "!=");
 //!
 //! // Parse braces
 //! let input = Span::new_extra("{ rest", Config::default());
 //! let (rest, matched) = brace_left(input).unwrap();
-//! assert_eq!(matched.fragment(), &"{");
+//! assert_eq!(matched.lexeme(), "{");
 //!
 //! let input = Span::new_extra("} rest", Config::default());
 //! let (rest, matched) = brace_right(input).unwrap();
-//! assert_eq!(matched.fragment(), &"}");
+//! assert_eq!(matched.lexeme(), "}");
 //! ```
 
 use nom::{
@@ -34,7 +34,7 @@ use nom::{
 use super::{
     Parser, Result, Span,
     error::{ExpectSymbol, TokenError, TokenErrorKind},
-    util::token,
+    util::{Token, token},
 };
 
 fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError<'a>> {
@@ -46,32 +46,32 @@ fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError<'a>> {
 }
 
 /// Parses the '!=' symbol token.
-pub fn bang_equals(input: Span) -> Result<Span, TokenError> {
+pub fn bang_equals(input: Span) -> Result<Token, TokenError> {
     token(tag("!="), TokenErrorKind::Symbol(ExpectSymbol::BangEquals)).parse(input)
 }
 
 /// Parses the '|' symbol token.
-pub fn bar(input: Span) -> Result<Span, TokenError> {
+pub fn bar(input: Span) -> Result<Token, TokenError> {
     token(char('|'), TokenErrorKind::Symbol(ExpectSymbol::Bar)).parse(input)
 }
 
 /// Parses the '{' symbol token.
-pub fn brace_left(input: Span) -> Result<Span, TokenError> {
+pub fn brace_left(input: Span) -> Result<Token, TokenError> {
     token(char('{'), TokenErrorKind::Symbol(ExpectSymbol::BraceLeft)).parse(input)
 }
 
 /// Parses the '}' symbol token.
-pub fn brace_right(input: Span) -> Result<Span, TokenError> {
+pub fn brace_right(input: Span) -> Result<Token, TokenError> {
     token(char('}'), TokenErrorKind::Symbol(ExpectSymbol::BraceRight)).parse(input)
 }
 
 /// Parses the '[' symbol token.
-pub fn bracket_left(input: Span) -> Result<Span, TokenError> {
+pub fn bracket_left(input: Span) -> Result<Token, TokenError> {
     token(char('['), TokenErrorKind::Symbol(ExpectSymbol::BracketLeft)).parse(input)
 }
 
 /// Parses the ']' symbol token.
-pub fn bracket_right(input: Span) -> Result<Span, TokenError> {
+pub fn bracket_right(input: Span) -> Result<Token, TokenError> {
     token(
         char(']'),
         TokenErrorKind::Symbol(ExpectSymbol::BracketRight),
@@ -80,32 +80,32 @@ pub fn bracket_right(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '^' symbol token.
-pub fn caret(input: Span) -> Result<Span, TokenError> {
+pub fn caret(input: Span) -> Result<Token, TokenError> {
     token(char('^'), TokenErrorKind::Symbol(ExpectSymbol::Caret)).parse(input)
 }
 
 /// Parses the ':' symbol token.
-pub fn colon(input: Span) -> Result<Span, TokenError> {
+pub fn colon(input: Span) -> Result<Token, TokenError> {
     token(char(':'), TokenErrorKind::Symbol(ExpectSymbol::Colon)).parse(input)
 }
 
 /// Parses the ',' symbol token.
-pub fn comma(input: Span) -> Result<Span, TokenError> {
+pub fn comma(input: Span) -> Result<Token, TokenError> {
     token(char(','), TokenErrorKind::Symbol(ExpectSymbol::Comma)).parse(input)
 }
 
 /// Parses the '$' symbol token.
-pub fn dollar(input: Span) -> Result<Span, TokenError> {
+pub fn dollar(input: Span) -> Result<Token, TokenError> {
     token(char('$'), TokenErrorKind::Symbol(ExpectSymbol::Dollar)).parse(input)
 }
 
 /// Parses the '.' symbol token.
-pub fn dot(input: Span) -> Result<Span, TokenError> {
+pub fn dot(input: Span) -> Result<Token, TokenError> {
     token(char('.'), TokenErrorKind::Symbol(ExpectSymbol::Dot)).parse(input)
 }
 
 /// Parses the '=' symbol token.
-pub fn equals(input: Span) -> Result<Span, TokenError> {
+pub fn equals(input: Span) -> Result<Token, TokenError> {
     token(
         char('=').and(next_char_is_not('=')),
         TokenErrorKind::Symbol(ExpectSymbol::Equals),
@@ -114,7 +114,7 @@ pub fn equals(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '==' symbol token.
-pub fn equals_equals(input: Span) -> Result<Span, TokenError> {
+pub fn equals_equals(input: Span) -> Result<Token, TokenError> {
     token(
         tag("=="),
         TokenErrorKind::Symbol(ExpectSymbol::EqualsEquals),
@@ -123,7 +123,7 @@ pub fn equals_equals(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '>' symbol token.
-pub fn greater_than(input: Span) -> Result<Span, TokenError> {
+pub fn greater_than(input: Span) -> Result<Token, TokenError> {
     token(
         char('>').and(next_char_is_not('=')),
         TokenErrorKind::Symbol(ExpectSymbol::GreaterThan),
@@ -132,7 +132,7 @@ pub fn greater_than(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '>=' symbol token.
-pub fn greater_than_equals(input: Span) -> Result<Span, TokenError> {
+pub fn greater_than_equals(input: Span) -> Result<Token, TokenError> {
     token(
         tag(">="),
         TokenErrorKind::Symbol(ExpectSymbol::GreaterThanEquals),
@@ -141,7 +141,7 @@ pub fn greater_than_equals(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '<' symbol token.
-pub fn less_than(input: Span) -> Result<Span, TokenError> {
+pub fn less_than(input: Span) -> Result<Token, TokenError> {
     token(
         char('<').and(next_char_is_not('=')),
         TokenErrorKind::Symbol(ExpectSymbol::LessThan),
@@ -150,7 +150,7 @@ pub fn less_than(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '<=' symbol token.
-pub fn less_than_equals(input: Span) -> Result<Span, TokenError> {
+pub fn less_than_equals(input: Span) -> Result<Token, TokenError> {
     token(
         tag("<="),
         TokenErrorKind::Symbol(ExpectSymbol::LessThanEquals),
@@ -159,7 +159,7 @@ pub fn less_than_equals(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '-' symbol token.
-pub fn minus(input: Span) -> Result<Span, TokenError> {
+pub fn minus(input: Span) -> Result<Token, TokenError> {
     token(
         char('-').and(next_char_is_not('-')),
         TokenErrorKind::Symbol(ExpectSymbol::Minus),
@@ -168,32 +168,32 @@ pub fn minus(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '--' symbol token.
-pub fn minus_minus(input: Span) -> Result<Span, TokenError> {
+pub fn minus_minus(input: Span) -> Result<Token, TokenError> {
     token(tag("--"), TokenErrorKind::Symbol(ExpectSymbol::MinusMinus)).parse(input)
 }
 
 /// Parses the '(' symbol token.
-pub fn paren_left(input: Span) -> Result<Span, TokenError> {
+pub fn paren_left(input: Span) -> Result<Token, TokenError> {
     token(char('('), TokenErrorKind::Symbol(ExpectSymbol::ParenLeft)).parse(input)
 }
 
 /// Parses the ')' symbol token.
-pub fn paren_right(input: Span) -> Result<Span, TokenError> {
+pub fn paren_right(input: Span) -> Result<Token, TokenError> {
     token(char(')'), TokenErrorKind::Symbol(ExpectSymbol::ParenRight)).parse(input)
 }
 
 /// Parses the '%' symbol token.
-pub fn percent(input: Span) -> Result<Span, TokenError> {
+pub fn percent(input: Span) -> Result<Token, TokenError> {
     token(char('%'), TokenErrorKind::Symbol(ExpectSymbol::Percent)).parse(input)
 }
 
 /// Parses the '+' symbol token.
-pub fn plus(input: Span) -> Result<Span, TokenError> {
+pub fn plus(input: Span) -> Result<Token, TokenError> {
     token(char('+'), TokenErrorKind::Symbol(ExpectSymbol::Plus)).parse(input)
 }
 
 /// Parses the '*' symbol token.
-pub fn star(input: Span) -> Result<Span, TokenError> {
+pub fn star(input: Span) -> Result<Token, TokenError> {
     token(
         char('*').and(next_char_is_not('*')),
         TokenErrorKind::Symbol(ExpectSymbol::Star),
@@ -202,12 +202,12 @@ pub fn star(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '**' symbol token.
-pub fn star_star(input: Span) -> Result<Span, TokenError> {
+pub fn star_star(input: Span) -> Result<Token, TokenError> {
     token(tag("**"), TokenErrorKind::Symbol(ExpectSymbol::StarStar)).parse(input)
 }
 
 /// Parses the '/' symbol token.
-pub fn slash(input: Span) -> Result<Span, TokenError> {
+pub fn slash(input: Span) -> Result<Token, TokenError> {
     token(
         char('/').and(next_char_is_not('/')),
         TokenErrorKind::Symbol(ExpectSymbol::Slash),
@@ -216,7 +216,7 @@ pub fn slash(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses the '//' symbol token.
-pub fn slash_slash(input: Span) -> Result<Span, TokenError> {
+pub fn slash_slash(input: Span) -> Result<Token, TokenError> {
     token(tag("//"), TokenErrorKind::Symbol(ExpectSymbol::SlashSlash)).parse(input)
 }
 
@@ -229,7 +229,7 @@ mod tests {
     fn test_bang_equals() {
         let input = Span::new_extra("!= rest", Config::default());
         let (rest, matched) = bang_equals(input).expect("should parse '!=' symbol");
-        assert_eq!(matched.fragment(), &"!=");
+        assert_eq!(matched.lexeme(), "!=");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -237,7 +237,7 @@ mod tests {
     fn test_bar() {
         let input = Span::new_extra("| rest", Config::default());
         let (rest, matched) = bar(input).expect("should parse '|' symbol");
-        assert_eq!(matched.fragment(), &"|");
+        assert_eq!(matched.lexeme(), "|");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -245,7 +245,7 @@ mod tests {
     fn test_brace_left() {
         let input = Span::new_extra("{ rest", Config::default());
         let (rest, matched) = brace_left(input).expect("should parse '{' symbol");
-        assert_eq!(matched.fragment(), &"{");
+        assert_eq!(matched.lexeme(), "{");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -253,7 +253,7 @@ mod tests {
     fn test_brace_right() {
         let input = Span::new_extra("} rest", Config::default());
         let (rest, matched) = brace_right(input).expect("should parse '}' symbol");
-        assert_eq!(matched.fragment(), &"}");
+        assert_eq!(matched.lexeme(), "}");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -261,7 +261,7 @@ mod tests {
     fn test_bracket_left() {
         let input = Span::new_extra("[ rest", Config::default());
         let (rest, matched) = bracket_left(input).expect("should parse '[' symbol");
-        assert_eq!(matched.fragment(), &"[");
+        assert_eq!(matched.lexeme(), "[");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -269,7 +269,7 @@ mod tests {
     fn test_bracket_right() {
         let input = Span::new_extra("] rest", Config::default());
         let (rest, matched) = bracket_right(input).expect("should parse ']' symbol");
-        assert_eq!(matched.fragment(), &"]");
+        assert_eq!(matched.lexeme(), "]");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -277,7 +277,7 @@ mod tests {
     fn test_caret() {
         let input = Span::new_extra("^ rest", Config::default());
         let (rest, matched) = caret(input).expect("should parse '^' symbol");
-        assert_eq!(matched.fragment(), &"^");
+        assert_eq!(matched.lexeme(), "^");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -285,7 +285,7 @@ mod tests {
     fn test_colon() {
         let input = Span::new_extra(": rest", Config::default());
         let (rest, matched) = colon(input).expect("should parse ':' symbol");
-        assert_eq!(matched.fragment(), &":");
+        assert_eq!(matched.lexeme(), ":");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -293,7 +293,7 @@ mod tests {
     fn test_comma() {
         let input = Span::new_extra(", rest", Config::default());
         let (rest, matched) = comma(input).expect("should parse ',' symbol");
-        assert_eq!(matched.fragment(), &",");
+        assert_eq!(matched.lexeme(), ",");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -301,7 +301,7 @@ mod tests {
     fn test_dollar() {
         let input = Span::new_extra("$ rest", Config::default());
         let (rest, matched) = dollar(input).expect("should parse '$' symbol");
-        assert_eq!(matched.fragment(), &"$");
+        assert_eq!(matched.lexeme(), "$");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -309,7 +309,7 @@ mod tests {
     fn test_dot() {
         let input = Span::new_extra(". rest", Config::default());
         let (rest, matched) = dot(input).expect("should parse '.' symbol");
-        assert_eq!(matched.fragment(), &".");
+        assert_eq!(matched.lexeme(), ".");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -317,7 +317,7 @@ mod tests {
     fn test_equals() {
         let input = Span::new_extra("= rest", Config::default());
         let (rest, matched) = equals(input).expect("should parse '=' symbol");
-        assert_eq!(matched.fragment(), &"=");
+        assert_eq!(matched.lexeme(), "=");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -332,7 +332,7 @@ mod tests {
     fn test_equals_equals() {
         let input = Span::new_extra("== rest", Config::default());
         let (rest, matched) = equals_equals(input).expect("should parse '==' symbol");
-        assert_eq!(matched.fragment(), &"==");
+        assert_eq!(matched.lexeme(), "==");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -340,7 +340,7 @@ mod tests {
     fn test_greater_than() {
         let input = Span::new_extra("> rest", Config::default());
         let (rest, matched) = greater_than(input).expect("should parse '>' symbol");
-        assert_eq!(matched.fragment(), &">");
+        assert_eq!(matched.lexeme(), ">");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -355,7 +355,7 @@ mod tests {
     fn test_greater_than_equals() {
         let input = Span::new_extra(">= rest", Config::default());
         let (rest, matched) = greater_than_equals(input).expect("should parse '>=' symbol");
-        assert_eq!(matched.fragment(), &">=");
+        assert_eq!(matched.lexeme(), ">=");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -363,7 +363,7 @@ mod tests {
     fn test_less_than() {
         let input = Span::new_extra("< rest", Config::default());
         let (rest, matched) = less_than(input).expect("should parse '<' symbol");
-        assert_eq!(matched.fragment(), &"<");
+        assert_eq!(matched.lexeme(), "<");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -378,7 +378,7 @@ mod tests {
     fn test_less_than_equals() {
         let input = Span::new_extra("<= rest", Config::default());
         let (rest, matched) = less_than_equals(input).expect("should parse '<=' symbol");
-        assert_eq!(matched.fragment(), &"<=");
+        assert_eq!(matched.lexeme(), "<=");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -386,7 +386,7 @@ mod tests {
     fn test_minus() {
         let input = Span::new_extra("- rest", Config::default());
         let (rest, matched) = minus(input).expect("should parse '-' symbol");
-        assert_eq!(matched.fragment(), &"-");
+        assert_eq!(matched.lexeme(), "-");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -401,7 +401,7 @@ mod tests {
     fn test_minus_minus() {
         let input = Span::new_extra("-- rest", Config::default());
         let (rest, matched) = minus_minus(input).expect("should parse '--' symbol");
-        assert_eq!(matched.fragment(), &"--");
+        assert_eq!(matched.lexeme(), "--");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -409,7 +409,7 @@ mod tests {
     fn test_paren_left() {
         let input = Span::new_extra("( rest", Config::default());
         let (rest, matched) = paren_left(input).expect("should parse '(' symbol");
-        assert_eq!(matched.fragment(), &"(");
+        assert_eq!(matched.lexeme(), "(");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -417,7 +417,7 @@ mod tests {
     fn test_paren_right() {
         let input = Span::new_extra(") rest", Config::default());
         let (rest, matched) = paren_right(input).expect("should parse ')' symbol");
-        assert_eq!(matched.fragment(), &")");
+        assert_eq!(matched.lexeme(), ")");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -425,7 +425,7 @@ mod tests {
     fn test_percent() {
         let input = Span::new_extra("% rest", Config::default());
         let (rest, matched) = percent(input).expect("should parse '%' symbol");
-        assert_eq!(matched.fragment(), &"%");
+        assert_eq!(matched.lexeme(), "%");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -433,7 +433,7 @@ mod tests {
     fn test_plus() {
         let input = Span::new_extra("+ rest", Config::default());
         let (rest, matched) = plus(input).expect("should parse '+' symbol");
-        assert_eq!(matched.fragment(), &"+");
+        assert_eq!(matched.lexeme(), "+");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -441,7 +441,7 @@ mod tests {
     fn test_star() {
         let input = Span::new_extra("* rest", Config::default());
         let (rest, matched) = star(input).expect("should parse '*' symbol");
-        assert_eq!(matched.fragment(), &"*");
+        assert_eq!(matched.lexeme(), "*");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -456,7 +456,7 @@ mod tests {
     fn test_star_star() {
         let input = Span::new_extra("** rest", Config::default());
         let (rest, matched) = star_star(input).expect("should parse '**' symbol");
-        assert_eq!(matched.fragment(), &"**");
+        assert_eq!(matched.lexeme(), "**");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -464,7 +464,7 @@ mod tests {
     fn test_slash() {
         let input = Span::new_extra("/ rest", Config::default());
         let (rest, matched) = slash(input).expect("should parse '/' symbol");
-        assert_eq!(matched.fragment(), &"/");
+        assert_eq!(matched.lexeme(), "/");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -479,7 +479,7 @@ mod tests {
     fn test_slash_slash() {
         let input = Span::new_extra("// rest", Config::default());
         let (rest, matched) = slash_slash(input).expect("should parse '//' symbol");
-        assert_eq!(matched.fragment(), &"//");
+        assert_eq!(matched.lexeme(), "//");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -487,7 +487,7 @@ mod tests {
     fn test_symbol_with_trailing_whitespace() {
         let input = Span::new_extra("+   rest", Config::default());
         let (rest, matched) = plus(input).expect("should parse '+' with trailing whitespace");
-        assert_eq!(matched.fragment(), &"+");
+        assert_eq!(matched.lexeme(), "+");
         assert_eq!(rest.fragment(), &"rest");
     }
 

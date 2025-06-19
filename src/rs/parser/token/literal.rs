@@ -13,12 +13,12 @@
 //! // Parse a floating point number
 //! let input = Span::new_extra("-42.5e-2", Config::default());
 //! let (rest, matched) = number(input).unwrap();
-//! assert_eq!(matched.fragment(), &"-42.5e-2");
+//! assert_eq!(matched.lexeme(), "-42.5e-2");
 //!
 //! // Parse a string literal
 //! let input = Span::new_extra("\"hello world\" rest", Config::default());
 //! let (rest, matched) = string(input).unwrap();
-//! assert_eq!(matched.fragment(), &"\"hello world\"");
+//! assert_eq!(matched.lexeme(), "\"hello world\"");
 //! ```
 
 use nom::{
@@ -31,12 +31,12 @@ use nom::{
 use super::{
     Result, Span,
     error::{NumberError, StringError, TokenError, TokenErrorKind},
-    util::token,
+    util::{Token, token},
 };
 use crate::parser::error::ErrorHandlingParser as _;
 
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
-pub fn number(input: Span) -> Result<Span, TokenError> {
+pub fn number(input: Span) -> Result<Token, TokenError> {
     // A convenience function for creating a number error
     fn number_error<'a>(e: NumberError<'a>) -> impl Fn(TokenError<'a>) -> TokenError<'a> {
         move |err| TokenError::new(TokenErrorKind::Number(e), err.span)
@@ -73,7 +73,7 @@ pub fn number(input: Span) -> Result<Span, TokenError> {
 }
 
 /// Parses a string literal delimited by double quotes.
-pub fn string(input: Span) -> Result<Span, TokenError> {
+pub fn string(input: Span) -> Result<Token, TokenError> {
     let unterminated_string_error = |open_quote_span| {
         TokenErrorKind::String(StringError::UnterminatedString { open_quote_span })
     };
@@ -103,7 +103,7 @@ mod tests {
     fn test_number_integer() {
         let input = Span::new_extra("42 rest", Config::default());
         let (rest, matched) = number(input).expect("should parse integer");
-        assert_eq!(matched.fragment(), &"42");
+        assert_eq!(matched.lexeme(), "42");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -111,7 +111,7 @@ mod tests {
     fn test_number_negative_integer() {
         let input = Span::new_extra("-17 rest", Config::default());
         let (rest, matched) = number(input).expect("should parse negative integer");
-        assert_eq!(matched.fragment(), &"-17");
+        assert_eq!(matched.lexeme(), "-17");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -119,7 +119,7 @@ mod tests {
     fn test_number_decimal() {
         let input = Span::new_extra("3.1415 rest", Config::default());
         let (rest, matched) = number(input).expect("should parse decimal");
-        assert_eq!(matched.fragment(), &"3.1415");
+        assert_eq!(matched.lexeme(), "3.1415");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -127,7 +127,7 @@ mod tests {
     fn test_number_exponent() {
         let input = Span::new_extra("2.5e10 rest", Config::default());
         let (rest, matched) = number(input).expect("should parse exponent");
-        assert_eq!(matched.fragment(), &"2.5e10");
+        assert_eq!(matched.lexeme(), "2.5e10");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -135,7 +135,7 @@ mod tests {
     fn test_number_negative_exponent() {
         let input = Span::new_extra("-1.2E-3 rest", Config::default());
         let (rest, matched) = number(input).expect("should parse negative exponent");
-        assert_eq!(matched.fragment(), &"-1.2E-3");
+        assert_eq!(matched.lexeme(), "-1.2E-3");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -150,7 +150,7 @@ mod tests {
     fn test_string_simple() {
         let input = Span::new_extra("\"hello\" rest", Config::default());
         let (rest, matched) = string(input).expect("should parse string");
-        assert_eq!(matched.fragment(), &"\"hello\"");
+        assert_eq!(matched.lexeme(), "\"hello\"");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -158,7 +158,7 @@ mod tests {
     fn test_string_with_spaces() {
         let input = Span::new_extra("\"foo bar\" baz", Config::default());
         let (rest, matched) = string(input).expect("should parse string with spaces");
-        assert_eq!(matched.fragment(), &"\"foo bar\"");
+        assert_eq!(matched.lexeme(), "\"foo bar\"");
         assert_eq!(rest.fragment(), &"baz");
     }
 
@@ -167,7 +167,7 @@ mod tests {
         let input = Span::new_extra("\"foo \\\" bar", Config::default());
         let (rest, matched) =
             string(input).expect("should parse string (escape sequences not supported)");
-        assert_eq!(matched.fragment(), &"\"foo \\\"");
+        assert_eq!(matched.lexeme(), "\"foo \\\"");
         assert_eq!(rest.fragment(), &"bar");
     }
 

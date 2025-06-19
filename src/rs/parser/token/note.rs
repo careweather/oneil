@@ -14,12 +14,12 @@
 //! // Parse a single-line note
 //! let input = Span::new_extra("~ This is a note\nrest", Config::default());
 //! let (rest, matched) = single_line_note(input).unwrap();
-//! assert_eq!(matched.fragment(), &"~ This is a note");
+//! assert_eq!(matched.lexeme(), "~ This is a note");
 //!
 //! // Parse a multi-line note
 //! let input = Span::new_extra("~~~\nLine 1\nLine 2\n~~~\nrest", Config::default());
 //! let (rest, matched) = multi_line_note(input).unwrap();
-//! assert_eq!(matched.fragment(), &"~~~\nLine 1\nLine 2\n~~~");
+//! assert_eq!(matched.lexeme(), "~~~\nLine 1\nLine 2\n~~~");
 //! ```
 
 use nom::Parser as _;
@@ -27,27 +27,35 @@ use nom::bytes::complete::take_while;
 use nom::character::complete::{char, line_ending, not_line_ending};
 use nom::combinator::{consumed, cut, flat_map, recognize, verify};
 use nom::multi::many0;
-use nom::sequence::terminated;
 
 use super::{
     Result, Span,
     error::{NoteError, TokenError, TokenErrorKind},
     structure::end_of_line,
-    util::inline_whitespace,
+    util::{Token, inline_whitespace},
 };
 use crate::parser::error::ErrorHandlingParser as _;
+
+fn end_of_line_span(input: Span) -> Result<Span, TokenError> {
+    recognize(end_of_line).parse(input)
+}
 
 /// Parses a single-line note, which starts with `~` and ends with a newline.
 ///
 /// The note can contain any characters except for a newline, and it must be
 /// followed by a newline to be considered valid.
-pub fn single_line_note(input: Span) -> Result<Span, TokenError> {
-    verify(
-        terminated(recognize((char('~'), not_line_ending)), end_of_line),
-        |span| multi_line_note_delimiter(*span).is_err(),
-    )
-    .map_error(|e| TokenError::new(TokenErrorKind::Note(NoteError::ExpectNote), e.span))
-    .parse(input)
+pub fn single_line_note(input: Span) -> Result<Token, TokenError> {
+    let (rest, matched) = recognize((char('~'), not_line_ending)).parse(input)?;
+    let (rest, whitespace) = end_of_line_span(rest)?;
+
+    if multi_line_note_delimiter(rest).is_ok() {
+        return Err(nom::Err::Error(TokenError::new(
+            TokenErrorKind::Note(NoteError::ExpectNote),
+            input,
+        )));
+    }
+
+    Ok((rest, Token::new(matched, whitespace)))
 }
 
 fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
@@ -75,7 +83,7 @@ fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
 /// line, and the note must be closed with a matching `~~~` delimiter.
 ///
 /// If the multi-line note is not closed properly, this parser will fail.
-pub fn multi_line_note(input: Span) -> Result<Span, TokenError> {
+pub fn multi_line_note(input: Span) -> Result<Token, TokenError> {
     let unclosed_note_kind =
         |note_start_span| TokenErrorKind::Note(NoteError::UnclosedNote { note_start_span });
     let expect_note_kind = TokenErrorKind::Note(NoteError::ExpectNote);
@@ -95,12 +103,13 @@ pub fn multi_line_note(input: Span) -> Result<Span, TokenError> {
         }),
         |(content, delimiter_span)| {
             move |input| {
-                let (rest, _) = cut(end_of_line)
+                let (rest, whitespace) = cut(end_of_line_span)
                     .map_failure(move |e| {
                         TokenError::new(unclosed_note_kind(delimiter_span), e.span)
                     })
                     .parse(input)?;
-                Ok((rest, content))
+
+                Ok((rest, Token::new(content, whitespace)))
             }
         },
     )
@@ -117,7 +126,7 @@ mod tests {
     fn test_single_line_note_with_newline() {
         let input = Span::new_extra("~ this is a note\nrest", Config::default());
         let (rest, matched) = single_line_note(input).expect("should parse single line note");
-        assert_eq!(matched.fragment(), &"~ this is a note");
+        assert_eq!(matched.lexeme(), "~ this is a note");
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -126,7 +135,7 @@ mod tests {
         let input = Span::new_extra("~ note", Config::default());
         let (rest, matched) =
             single_line_note(input).expect("should parse single line note at EOF");
-        assert_eq!(matched.fragment(), &"~ note");
+        assert_eq!(matched.lexeme(), "~ note");
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -137,8 +146,8 @@ mod tests {
             Config::default(),
         );
         let (rest, matched) = multi_line_note(input).expect("should parse multi-line note");
-        assert!(matched.fragment().contains("This is a multi-line note."));
-        assert!(matched.fragment().contains("Second line."));
+        assert!(matched.lexeme().contains("This is a multi-line note."));
+        assert!(matched.lexeme().contains("Second line."));
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -147,8 +156,8 @@ mod tests {
         let input = Span::new_extra("~~~~~\nfoo\nbar\n~~~~~\nrest", Config::default());
         let (rest, matched) =
             multi_line_note(input).expect("should parse multi-line note with extra tildes");
-        assert!(matched.fragment().contains("foo"));
-        assert!(matched.fragment().contains("bar"));
+        assert!(matched.lexeme().contains("foo"));
+        assert!(matched.lexeme().contains("bar"));
         assert_eq!(rest.fragment(), &"rest");
     }
 

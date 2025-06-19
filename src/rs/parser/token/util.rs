@@ -1,9 +1,4 @@
-use nom::{
-    Parser as _,
-    character::complete::space0,
-    combinator::{recognize, value},
-    sequence::terminated,
-};
+use nom::{Parser as _, character::complete::space0, combinator::recognize};
 
 use super::{
     Parser, Result, Span,
@@ -11,12 +6,59 @@ use super::{
 };
 use crate::parser::error::ErrorHandlingParser as _;
 
+pub struct Token<'a> {
+    lexeme: Span<'a>,
+    whitespace: Span<'a>,
+}
+
+impl<'a> Token<'a> {
+    pub fn new(lexeme: Span<'a>, whitespace: Span<'a>) -> Self {
+        Self { lexeme, whitespace }
+    }
+
+    pub fn lexeme(&self) -> &str {
+        self.lexeme.fragment()
+    }
+
+    pub fn lexeme_offset(&self) -> usize {
+        self.lexeme.location_offset()
+    }
+
+    pub fn lexeme_line(&self) -> u32 {
+        self.lexeme.location_line()
+    }
+
+    pub fn lexeme_column(&self) -> usize {
+        self.lexeme.get_column()
+    }
+
+    pub fn get_lexeme_end_offset(&self) -> usize {
+        let start = self.lexeme.location_offset();
+        let length = self.lexeme.fragment().len();
+        start + length
+    }
+
+    pub fn whitespace(&self) -> &str {
+        self.whitespace.fragment()
+    }
+
+    pub fn whitespace_offset(&self) -> usize {
+        self.whitespace.location_offset()
+    }
+
+    pub fn get_whitespace_end_offset(&self) -> usize {
+        let start = self.whitespace.location_offset();
+        let length = self.whitespace.fragment().len();
+        start + length
+    }
+}
+
 /// Parses inline whitespace (spaces and tabs) and returns unit `()`.
 ///
 /// This function consumes any amount of whitespace (including none) and always succeeds.
 /// It's useful for handling optional whitespace between tokens.
-pub fn inline_whitespace(input: Span) -> Result<(), TokenError> {
-    value((), space0).parse(input)
+pub fn inline_whitespace(input: Span) -> Result<Span, TokenError> {
+    space0.parse(input)
 }
 
 /// Wraps a parser to handle trailing whitespace after the matched content.
@@ -30,8 +72,9 @@ pub fn inline_whitespace(input: Span) -> Result<(), TokenError> {
 pub fn token<'a, O>(
     f: impl Parser<'a, O, TokenError<'a>>,
     error_kind: TokenErrorKind<'a>,
-) -> impl Parser<'a, Span<'a>, TokenError<'a>> {
-    terminated(recognize(f), inline_whitespace)
+) -> impl Parser<'a, Token<'a>, TokenError<'a>> {
+    (recognize(f), inline_whitespace)
+        .map(|(lexeme, whitespace)| Token::new(lexeme, whitespace))
         .map_error(move |e| error::TokenError::new(error_kind, e.span))
 }
 
@@ -69,7 +112,7 @@ mod tests {
         let (rest, matched) = parser
             .parse(input)
             .expect("should parse token with trailing whitespace");
-        assert_eq!(matched.fragment(), &"foo");
+        assert_eq!(matched.lexeme(), "foo");
         assert_eq!(rest.fragment(), &"bar");
     }
 

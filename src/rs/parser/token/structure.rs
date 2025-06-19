@@ -31,8 +31,8 @@
 use nom::{
     Parser as _,
     character::complete::{char, line_ending, not_line_ending},
-    combinator::{eof, opt, recognize, value},
-    multi::many1,
+    combinator::{eof, opt, recognize},
+    multi::many0,
 };
 
 use crate::parser::error::ErrorHandlingParser as _;
@@ -41,34 +41,38 @@ use crate::parser::token::util::inline_whitespace;
 use super::{
     Result, Span,
     error::{TokenError, TokenErrorKind},
+    util::Token,
 };
 
-fn linebreak(input: Span) -> Result<(), TokenError> {
-    value((), line_ending).parse(input)
+fn linebreak(input: Span) -> Result<Span, TokenError> {
+    line_ending.parse(input)
 }
 
-fn end_of_file(input: Span) -> Result<(), TokenError> {
-    value((), eof).parse(input)
+fn end_of_file(input: Span) -> Result<Span, TokenError> {
+    eof.parse(input)
 }
 
-fn comment(input: Span) -> Result<(), TokenError> {
-    value((), (char('#'), not_line_ending, line_ending.or(eof))).parse(input)
+fn comment(input: Span) -> Result<Span, TokenError> {
+    recognize((char('#'), not_line_ending, line_ending.or(eof))).parse(input)
 }
 
-/// Parses one or more linebreaks, comments, or end-of-file markers, including trailing whitespace.
-pub fn end_of_line(input: Span) -> Result<Span, TokenError> {
-    let end_of_line_kind = TokenErrorKind::EndOfLine;
+/// Parses one or more linebreaks, comments, or end-of-file markers, including
+/// trailing whitespace
+pub fn end_of_line(input: Span) -> Result<Token, TokenError> {
+    let (rest, first_line_break) = linebreak
+        .or(comment)
+        .or(end_of_file)
+        .map_error(|e| TokenError::new(TokenErrorKind::EndOfLine, e.span))
+        .parse(input)?;
 
-    recognize(
-        (
-            many1((linebreak.or(comment), inline_whitespace)),
-            opt(end_of_file),
-        )
-            .map(|_| ())
-            .or(end_of_file),
-    )
-    .map_error(|e| TokenError::new(end_of_line_kind, e.span))
-    .parse(input)
+    let (rest, rest_whitespace) = recognize((
+        inline_whitespace,
+        many0((linebreak.or(comment), inline_whitespace)),
+        opt(end_of_file),
+    ))
+    .parse(rest)?;
+
+    Ok((rest, Token::new(first_line_break, rest_whitespace)))
 }
 
 #[cfg(test)]
@@ -119,7 +123,8 @@ mod tests {
         let input = Span::new_extra("\nrest", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse linebreak");
         assert_eq!(rest.fragment(), &"rest");
-        assert!(matched.trim().is_empty());
+        assert_eq!(matched.lexeme(), "\n");
+        assert!(matched.whitespace().is_empty());
     }
 
     #[test]
@@ -127,7 +132,8 @@ mod tests {
         let input = Span::new_extra("# comment\nrest", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse comment as end_of_line");
         assert_eq!(rest.fragment(), &"rest");
-        assert!(matched.contains("# comment"));
+        assert_eq!(matched.lexeme(), "# comment\n");
+        assert!(matched.whitespace().is_empty());
     }
 
     #[test]
@@ -135,8 +141,9 @@ mod tests {
         let input = Span::new_extra("\n# foo\n\n# bar\nrest", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse multiple end_of_line");
         assert_eq!(rest.fragment(), &"rest");
-        assert!(matched.contains("# foo"));
-        assert!(matched.contains("# bar"));
+        assert_eq!(matched.lexeme(), "\n");
+        assert!(matched.whitespace().contains("# foo\n"));
+        assert!(matched.whitespace().contains("# bar\n"));
     }
 
     #[test]
@@ -144,7 +151,8 @@ mod tests {
         let input = Span::new_extra("", Config::default());
         let (rest, matched) = end_of_line(input).expect("should parse EOF as end_of_line");
         assert_eq!(rest.fragment(), &"");
-        assert!(matched.is_empty() || matched.trim().is_empty());
+        assert_eq!(matched.lexeme(), "");
+        assert_eq!(matched.whitespace(), "");
     }
 
     #[test]
@@ -153,6 +161,7 @@ mod tests {
         let (rest, matched) =
             end_of_line(input).expect("should parse multiple end_of_line with EOF");
         assert_eq!(rest.fragment(), &"");
-        assert!(matched.contains("# comment"));
+        assert_eq!(matched.lexeme(), "\n");
+        assert!(matched.whitespace().contains("# comment\n"));
     }
 }
