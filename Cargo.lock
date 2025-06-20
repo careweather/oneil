@@ -161,6 +161,13 @@ name = "oneil_ast"
 version = "0.15.0"
 
 [[package]]
+name = "oneil_module"
+version = "0.1.0"
+dependencies = [
+ "oneil_ast",
+]
+
+[[package]]
 name = "oneil_module_loader"
 version = "0.15.0"
 dependencies = [
