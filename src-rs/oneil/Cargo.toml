@@ -1,0 +1,13 @@
+[package]
+name = "oneil"
+description = "CLI tool for using the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+oneil_parser = { path = "../oneil_parser" }
+clap = { version = "4.5.1", features = ["derive"] }

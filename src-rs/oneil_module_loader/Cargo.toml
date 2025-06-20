@@ -1,0 +1,12 @@
+[package]
+name = "oneil_module_loader"
+description = "Module loader for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+oneil_ast = { path = "../oneil_ast" }
