@@ -1,6 +1,6 @@
 use super::declaration::Decl;
 use super::note::Note;
-use crate::parser::error::CanBeEmpty;
+use crate::parser::error::partial::CanBeEmpty;
 
 /// A model definition in an Oneil program
 ///

@@ -4,7 +4,7 @@ use nom::Parser;
 use nom::combinator::{all_consuming, cut, opt};
 use nom::multi::separated_list1;
 
-use super::error::{ErrorHandlingParser as _, ParserError, ParserErrorKind};
+use super::error::{ErrorHandlingParser, ParserError};
 use super::expression::parse as parse_expr;
 use super::token::{
     keyword::test as test_keyword,
@@ -70,23 +70,32 @@ pub fn parse_complete(input: Span) -> Result<Test, ParserError> {
 }
 
 fn test_decl(input: Span) -> Result<Test, ParserError> {
-    (
-        opt(trace_level),
-        test_keyword.convert_errors(),
-        cut((
-            opt(test_inputs),
-            colon.convert_errors(),
-            parse_expr,
-            end_of_line.convert_errors(),
-        )),
-    )
-        .map(|(trace_level, _, (inputs, _, expr, _))| Test {
-            trace_level: trace_level.unwrap_or(TraceLevel::None),
-            inputs: inputs.unwrap_or_default(),
-            expr,
-        })
-        .map_error(|e| ParserError::new(ParserErrorKind::ExpectTest, e.span))
-        .parse(input)
+    let (rest, trace_level) = opt(trace_level).parse(input)?;
+
+    let (rest, test_keyword_token) = test_keyword
+        .map_error(ParserError::expect_test)
+        .parse(rest)?;
+
+    let (rest, inputs) = opt(test_inputs).parse(rest)?;
+
+    let (rest, _) =
+        cut(colon.map_error(ParserError::test_missing_colon(test_keyword_token))).parse(rest)?;
+
+    let (rest, expr) =
+        cut(parse_expr.map_error(ParserError::test_missing_expr(test_keyword_token)))
+            .parse(rest)?;
+
+    let (rest, _) =
+        cut(end_of_line.map_error(ParserError::test_missing_end_of_line(test_keyword_token)))
+            .parse(rest)?;
+
+    let test = Test {
+        trace_level: trace_level.unwrap_or(TraceLevel::None),
+        inputs: inputs.unwrap_or_default(),
+        expr,
+    };
+
+    Ok((rest, test))
 }
 
 /// Parse a trace level indicator (`*` or `**`).
@@ -99,13 +108,21 @@ fn trace_level(input: Span) -> Result<TraceLevel, ParserError> {
 
 /// Parse test inputs in curly braces, e.g. `{x, y, z}`.
 fn test_inputs(input: Span) -> Result<Vec<String>, ParserError> {
-    (
-        brace_left,
-        cut((separated_list1(comma, identifier), brace_right)),
-    )
-        .map(|(_, (inputs, _))| inputs.into_iter().map(|id| id.to_string()).collect())
-        .convert_errors()
-        .parse(input)
+    let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
+
+    let (rest, inputs) = cut(separated_list1(comma, identifier)
+        .map_error(ParserError::test_missing_inputs(brace_left_token)))
+    .parse(rest)?;
+
+    let (rest, _) =
+        cut(brace_right.map_error(ParserError::unclosed_brace(brace_left_token))).parse(rest)?;
+
+    let inputs = inputs
+        .into_iter()
+        .map(|id| id.lexeme().to_string())
+        .collect();
+
+    Ok((rest, inputs))
 }
 
 #[cfg(test)]

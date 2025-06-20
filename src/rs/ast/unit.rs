@@ -12,7 +12,7 @@ pub enum UnitExpr {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnitOp {
     Multiply,
     Divide,

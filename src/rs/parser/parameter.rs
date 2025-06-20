@@ -5,11 +5,10 @@ use nom::branch::alt;
 use nom::combinator::{all_consuming, cut, opt};
 use nom::multi::{many0, separated_list1};
 
-use super::error::{ErrorHandlingParser as _, ParserError, ParserErrorKind};
+use super::error::{ErrorHandlingParser, ParserError};
 use super::expression::parse as parse_expr;
 use super::note::parse as parse_note;
 use super::token::{
-    error::{ExpectSymbol, TokenErrorKind},
     keyword::if_,
     naming::{identifier, label},
     structure::end_of_line,
@@ -78,34 +77,46 @@ pub fn parse_complete(input: Span) -> Result<Parameter, ParserError> {
     all_consuming(parameter_decl).parse(input)
 }
 
+// TODO: the "preamble" (performance, trace level, name) needs to be optional,
+//       but only in design files. Maybe we can use a config flag to indicate
+//       whether we're parsing a design file or a model file and adjust from there.
+//       For now, we'll just require the preamble in all cases.
 fn parameter_decl(input: Span) -> Result<Parameter, ParserError> {
-    (
-        opt(performance),
-        opt(trace_level),
-        label.convert_errors(),
-        opt(limits),
-        colon.convert_errors(),
-        cut((
-            identifier.convert_errors(),
-            equals.convert_errors(),
-            parameter_value,
-            end_of_line.convert_errors(),
-            opt(parse_note),
-        )),
-    )
-        .map(
-            |(performance, trace_level, name, limits, _, (ident, _, value, _, note))| Parameter {
-                name: name.to_string(),
-                ident: ident.to_string(),
-                value,
-                limits,
-                is_performance: performance.is_some(),
-                trace_level: trace_level.unwrap_or(TraceLevel::None),
-                note,
-            },
-        )
-        .map_error(|e| ParserError::new(ParserErrorKind::ExpectParameter, e.span))
-        .parse(input)
+    let (rest, performance) = opt(performance).parse(input)?;
+
+    let (rest, trace_level) = opt(trace_level).parse(rest)?;
+
+    let (rest, name) = label.map_error(ParserError::expect_parameter).parse(rest)?;
+
+    let (rest, limits) = opt(limits).parse(rest)?;
+
+    let (rest, _) = colon.map_error(ParserError::expect_parameter).parse(rest)?;
+
+    let (rest, ident) =
+        cut(identifier.map_error(ParserError::parameter_missing_identifier)).parse(rest)?;
+
+    let (rest, _) =
+        cut(equals.map_error(ParserError::parameter_missing_equals_sign(ident))).parse(rest)?;
+
+    let (rest, value) =
+        cut(parameter_value.map_error(ParserError::parameter_missing_value(ident))).parse(rest)?;
+
+    let (rest, _) = cut(end_of_line.map_error(ParserError::parameter_missing_end_of_line(ident)))
+        .parse(rest)?;
+
+    let (rest, note) = opt(parse_note).parse(rest)?;
+
+    let param = Parameter {
+        name: name.lexeme().to_string(),
+        ident: ident.lexeme().to_string(),
+        value,
+        limits,
+        is_performance: performance.is_some(),
+        trace_level: trace_level.unwrap_or(TraceLevel::None),
+        note,
+    };
+
+    Ok((rest, param))
 }
 
 /// Parse a performance indicator (`$`).
@@ -128,52 +139,33 @@ fn limits(input: Span) -> Result<Limits, ParserError> {
 
 /// Parse continuous limits in parentheses, e.g. `(0, 100)`.
 fn continuous_limits(input: Span) -> Result<Limits, ParserError> {
-    let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
-    let (rest, (min, _, max, _)) = cut((
-        parse_expr,
-        comma.convert_errors(),
-        parse_expr,
-        paren_right.convert_errors(),
-    ))
-    .map_failure(move |e| match e.kind {
-        ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::ParenRight)) => {
-            let span = e.span;
-            ParserError::new(
-                ParserErrorKind::UnclosedParen {
-                    paren_left_span,
-                    error: Box::new(e),
-                },
-                span,
-            )
-        }
-        _ => e,
-    })
-    .parse(rest)?;
+    let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
+
+    // TODO: in all parsers, change all `map_failure` to `map_error` and put
+    //       them inside the call to `cut` as shown here, so that other failures
+    //       don't get overwritten
+    let (rest, min) = cut(parse_expr.map_error(ParserError::limit_missing_min)).parse(rest)?;
+
+    let (rest, _) = cut(comma.map_error(ParserError::limit_missing_comma)).parse(rest)?;
+
+    let (rest, max) = cut(parse_expr.map_error(ParserError::limit_missing_max)).parse(rest)?;
+
+    let (rest, _) =
+        cut(paren_right.map_error(ParserError::unclosed_paren(paren_left_token))).parse(rest)?;
 
     Ok((rest, Limits::Continuous { min, max }))
 }
 
 /// Parse discrete limits in square brackets, e.g. `[1, 2, 3]`.
 fn discrete_limits(input: Span) -> Result<Limits, ParserError> {
-    let (rest, bracket_left_span) = bracket_left.convert_errors().parse(input)?;
-    let (rest, (values, _)) = cut((
-        separated_list1(comma.convert_errors(), parse_expr),
-        bracket_right.convert_errors(),
-    ))
-    .map_failure(move |e| match e.kind {
-        ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::BracketRight)) => {
-            let span = e.span;
-            ParserError::new(
-                ParserErrorKind::UnclosedBracket {
-                    bracket_left_span,
-                    error: Box::new(e),
-                },
-                span,
-            )
-        }
-        _ => e,
-    })
+    let (rest, bracket_left_token) = bracket_left.convert_errors().parse(input)?;
+
+    let (rest, values) = cut(separated_list1(comma.convert_errors(), parse_expr)
+        .map_error(ParserError::limit_missing_values))
     .parse(rest)?;
+
+    let (rest, _) = cut(bracket_right.map_error(ParserError::unclosed_bracket(bracket_left_token)))
+        .parse(rest)?;
 
     Ok((rest, Limits::Discrete { values }))
 }
@@ -185,35 +177,73 @@ fn parameter_value(input: Span) -> Result<ParameterValue, ParserError> {
 
 /// Parse a simple parameter value (expression with optional unit).
 fn simple_value(input: Span) -> Result<ParameterValue, ParserError> {
-    (parse_expr, opt((colon.convert_errors(), cut(parse_unit))))
-        .map(|(expr, unit)| ParameterValue::Simple(expr, unit.map(|(_, u)| u)))
-        .parse(input)
+    let (rest, expr) = parse_expr.parse(input)?;
+
+    let (rest, unit) = opt(|input| {
+        let (rest, colon_token) = colon.convert_errors().parse(input)?;
+
+        let (rest, unit) =
+            cut(parse_unit.map_error(ParserError::parameter_missing_unit(colon_token)))
+                .parse(rest)?;
+
+        Ok((rest, unit))
+    })
+    .parse(rest)?;
+
+    let value = ParameterValue::Simple(expr, unit);
+
+    Ok((rest, value))
 }
 
 /// Parse a piecewise parameter value.
 fn piecewise_value(input: Span) -> Result<ParameterValue, ParserError> {
-    (
-        piecewise_part,
-        opt((colon.convert_errors(), cut(parse_unit))),
-        many0((end_of_line.convert_errors(), piecewise_part)),
-    )
-        .map(|(first, unit, rest)| {
-            let mut parts = Vec::with_capacity(1 + rest.len());
-            parts.push(first);
-            parts.extend(rest.into_iter().map(|(_, part)| part));
-            ParameterValue::Piecewise(PiecewiseExpr { parts }, unit.map(|(_, u)| u))
-        })
-        .parse(input)
+    let (rest, first_part) = piecewise_part.parse(input)?;
+
+    let (rest, unit) = opt(|input| {
+        let (rest, colon_token) = colon.convert_errors().parse(input)?;
+
+        let (rest, unit) =
+            cut(parse_unit.map_error(ParserError::parameter_missing_unit(colon_token)))
+                .parse(rest)?;
+
+        Ok((rest, unit))
+    })
+    .parse(rest)?;
+
+    let (rest, rest_parts) = many0(|input| {
+        let (rest, _) = end_of_line.convert_errors().parse(input)?;
+        let (rest, part) = piecewise_part.parse(rest)?;
+        Ok((rest, part))
+    })
+    .parse(rest)?;
+
+    let mut parts = Vec::with_capacity(1 + rest_parts.len());
+    parts.push(first_part);
+    parts.extend(rest_parts);
+
+    let value = ParameterValue::Piecewise(PiecewiseExpr { parts }, unit);
+
+    Ok((rest, value))
 }
 
 /// Parse a single piece of a piecewise expression, e.g. `{2*x if x > 0`.
 fn piecewise_part(input: Span) -> Result<PiecewisePart, ParserError> {
-    (
-        brace_left.convert_errors(),
-        cut((parse_expr, if_.convert_errors(), parse_expr)),
-    )
-        .map(|(_, (expr, _, if_expr))| PiecewisePart { expr, if_expr })
-        .parse(input)
+    let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
+
+    let (rest, expr) =
+        cut(parse_expr.map_error(ParserError::piecewise_missing_expr(brace_left_token)))
+            .parse(rest)?;
+
+    let (rest, _) =
+        cut(if_.map_error(ParserError::piecewise_missing_if(brace_left_token))).parse(rest)?;
+
+    let (rest, if_expr) =
+        cut(parse_expr.map_error(ParserError::piecewise_missing_if_expr(brace_left_token)))
+            .parse(rest)?;
+
+    let part = PiecewisePart { expr, if_expr };
+
+    Ok((rest, part))
 }
 
 #[cfg(test)]

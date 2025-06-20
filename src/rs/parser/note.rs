@@ -5,8 +5,8 @@
 use nom::Parser;
 use nom::combinator::all_consuming;
 
-use super::error::{ErrorHandlingParser as _, ParserError, ParserErrorKind};
-use super::token::note::{multi_line_note, single_line_note};
+use super::error::{ErrorHandlingParser, ParserError};
+use super::token::note::{NoteKind, note as note_token};
 use super::util::{Result, Span};
 use crate::ast::note::Note;
 
@@ -74,20 +74,22 @@ pub fn parse_complete(input: Span) -> Result<Note, ParserError> {
 }
 
 fn note(input: Span) -> Result<Note, ParserError> {
-    let single_line_note = single_line_note.map(|span| {
-        let content = span.trim_start_matches('~').trim();
-        Note(content.to_string())
-    });
+    let (rest, (token, kind)) = note_token
+        .map_error(ParserError::expect_note)
+        .parse(input)?;
 
-    let multi_line_note = multi_line_note.map(|span| {
-        let content = span.fragment().trim_matches('~').trim();
-        Note(content.to_string())
-    });
+    let note = match kind {
+        NoteKind::SingleLine => {
+            let content = token.lexeme().trim_start_matches('~').trim();
+            Note(content.to_string())
+        }
+        NoteKind::MultiLine => {
+            let content = token.lexeme().trim_matches('~').trim();
+            Note(content.to_string())
+        }
+    };
 
-    single_line_note
-        .or(multi_line_note)
-        .map_error(|e| ParserError::new(ParserErrorKind::ExpectNote, e.span))
-        .parse(input)
+    Ok((rest, note))
 }
 
 #[cfg(test)]

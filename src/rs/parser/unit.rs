@@ -25,7 +25,7 @@ use nom::{
 use crate::ast::unit::{UnitExpr, UnitOp};
 
 use super::{
-    error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
+    error::{ErrorHandlingParser, ParserError},
     token::{
         literal::number,
         naming::identifier,
@@ -90,49 +90,80 @@ pub fn parse_complete(input: Span) -> Result<UnitExpr, ParserError> {
 
 /// Parses a unit expression
 fn unit_expr(input: Span) -> Result<UnitExpr, ParserError> {
-    let op = alt((
-        map(star, |_| UnitOp::Multiply),
-        map(slash, |_| UnitOp::Divide),
-    ));
+    let (rest, first_term) = unit_term.map_error(ParserError::expect_unit).parse(input)?;
 
-    (unit_term, many0((op.convert_errors(), cut(unit_term))))
-        .map(|(first, rest)| {
-            rest.into_iter()
-                .fold(first, |acc, (op, expr)| UnitExpr::BinaryOp {
-                    op,
-                    left: Box::new(acc),
-                    right: Box::new(expr),
-                })
-        })
-        .map_error(|e| ParserError::new(ParserErrorKind::ExpectUnit, e.span))
-        .parse(input)
+    let (rest, rest_terms) = many0(|input| {
+        let op = alt((
+            map(star, |_| UnitOp::Multiply),
+            map(slash, |_| UnitOp::Divide),
+        ));
+
+        let (rest, op) = op.convert_errors().parse(input)?;
+        let (rest, term) =
+            cut(unit_term.map_error(ParserError::unit_missing_second_term(op))).parse(rest)?;
+        Ok((rest, (op, term)))
+    })
+    .parse(rest)?;
+
+    let expr = rest_terms
+        .into_iter()
+        .fold(first_term, |acc, (op, expr)| UnitExpr::BinaryOp {
+            op,
+            left: Box::new(acc),
+            right: Box::new(expr),
+        });
+
+    Ok((rest, expr))
 }
 
 /// Parses a unit term
 fn unit_term(input: Span) -> Result<UnitExpr, ParserError> {
-    let parse_unit = map((identifier, opt((caret, cut(number)))), |(id, exp)| {
-        let exponent = exp.map(|(_, n)| {
-            // TODO(error): Better error handling for float parsing
-            n.fragment()
-                .parse::<f64>()
-                .expect("TODO: better error handling for float parsing")
+    let parse_unit = |input| {
+        let (rest, id) = identifier.convert_errors().parse(input)?;
+        let (rest, exp) = opt(|input| {
+            let (rest, caret_token) = caret.convert_errors().parse(input)?;
+            let (rest, exp) =
+                cut(number.map_error(ParserError::unit_missing_exponent(caret_token)))
+                    .parse(rest)?;
+            Ok((rest, exp))
+        })
+        .parse(rest)?;
+
+        let exp = exp.map(|n| {
+            let parse_result = n.lexeme().parse::<f64>();
+            parse_result.map_err(|_| n)
         });
-        UnitExpr::Unit {
-            identifier: id.to_string(),
-            exponent,
-        }
-    })
-    .convert_errors();
 
-    let parse_parenthesized = map(
-        (
-            paren_left.convert_errors(),
-            cut((unit_expr, paren_right.convert_errors())),
-        ),
-        |(_, (expr, _))| expr,
-    );
+        let exp = match exp {
+            Some(Ok(exp)) => Some(exp),
+            Some(Err(n)) => {
+                return Err(nom::Err::Failure(ParserError::invalid_number(n)()));
+            }
+            None => None,
+        };
 
-    parse_unit.or(parse_parenthesized).parse(input)
+        let expr = UnitExpr::Unit {
+            identifier: id.lexeme().to_string(),
+            exponent: exp,
+        };
+
+        Ok((rest, expr))
+    };
+
+    let parse_parenthesized = |input| {
+        let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
+
+        let (rest, expr) =
+            cut(unit_expr.map_error(ParserError::unit_paren_missing_expr(paren_left_token)))
+                .parse(rest)?;
+
+        let (rest, _) = cut(paren_right.map_error(ParserError::unclosed_paren(paren_left_token)))
+            .parse(rest)?;
+
+        Ok((rest, expr))
+    };
+
+    alt((parse_unit, parse_parenthesized)).parse(input)
 }
 
 #[cfg(test)]

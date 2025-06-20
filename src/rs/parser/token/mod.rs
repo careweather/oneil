@@ -37,6 +37,7 @@ use super::util::{Parser, Result, Span};
 
 pub mod error;
 mod util;
+pub use util::Token;
 
 pub mod keyword;
 pub mod literal;

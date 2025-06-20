@@ -28,14 +28,12 @@ use crate::ast::{
 
 use super::{
     declaration::parse as parse_decl,
-    error::{ErrorHandlingParser as _, ErrorsWithPartialResult, ParserError, ParserErrorKind},
-    note::parse as parse_note,
-    token::{
-        error::{TokenError, TokenErrorKind},
-        keyword::section,
-        naming::label,
-        structure::end_of_line,
+    error::{
+        ErrorHandlingParser, ExpectKind, ParserError, ParserErrorKind,
+        partial::ErrorsWithPartialResult,
     },
+    note::parse as parse_note,
+    token::{Token, keyword::section, naming::label, structure::end_of_line},
     util::{Result, Span},
 };
 
@@ -118,9 +116,9 @@ fn parse_decls(input: Span) -> (Span, Vec<Decl>, Vec<ParserError>) {
     fn parse_decls_recur<'a>(
         input: Span<'a>,
         mut acc_decls: Vec<Decl>,
-        mut acc_errors: Vec<ParserError<'a>>,
+        mut acc_errors: Vec<ParserError>,
         last_was_error: bool,
-    ) -> (Span<'a>, Vec<Decl>, Vec<ParserError<'a>>) {
+    ) -> (Span<'a>, Vec<Decl>, Vec<ParserError>) {
         let result = parse_decl(input);
 
         match result {
@@ -145,7 +143,7 @@ fn parse_decls(input: Span) -> (Span, Vec<Decl>, Vec<ParserError>) {
                 // if we were simply unable to find a declaration, rather than
                 // if we found a declaration, but it was invalid.
                 let is_possible_part_of_previous_decl =
-                    last_was_error && e.kind == ParserErrorKind::ExpectDecl;
+                    last_was_error && e.kind == ParserErrorKind::Expect(ExpectKind::Decl);
 
                 if !is_possible_part_of_previous_decl {
                     acc_errors.push(e);
@@ -170,8 +168,8 @@ fn parse_sections(input: Span) -> (Span, Vec<Section>, Vec<ParserError>) {
     fn parse_sections_recur<'a>(
         input: Span<'a>,
         mut acc_sections: Vec<Section>,
-        mut acc_errors: Vec<ParserError<'a>>,
-    ) -> (Span<'a>, Vec<Section>, Vec<ParserError<'a>>) {
+        mut acc_errors: Vec<ParserError>,
+    ) -> (Span<'a>, Vec<Section>, Vec<ParserError>) {
         let section_result = parse_section(input);
 
         match section_result {
@@ -219,23 +217,21 @@ fn parse_section(input: Span) -> Option<(Span, Section, Vec<ParserError>)> {
     errors.extend(decl_errors);
 
     let label = label.map_or("<FAILED TO PARSE SECTION LABEL>".to_string(), |label| {
-        label.to_string()
+        label.lexeme().to_string()
     });
 
     Some((rest, Section { label, note, decls }, errors))
 }
 
-fn parse_section_header(input: Span) -> Result<Span, ParserError> {
+fn parse_section_header(input: Span) -> Result<Token, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
-    let (rest, (label, _)) = cut((label, end_of_line))
-        .convert_errors()
-        .map_failure(move |e: TokenError| match e.kind {
-            TokenErrorKind::ExpectLabel => ParserError::new(
-                ParserErrorKind::SectionMissingLabel { section_span },
-                e.span,
-            ),
-            _ => e.into(),
-        })
+
+    let (rest, label) = cut(label)
+        .map_failure(ParserError::section_missing_label(section_span))
+        .parse(rest)?;
+
+    let (rest, _) = cut(end_of_line)
+        .map_failure(ParserError::section_missing_end_of_line(section_span))
         .parse(rest)?;
 
     Ok((rest, label))
@@ -246,6 +242,7 @@ fn skip_to_next_line(input: Span) -> Span {
     let (rest, _) = take_while::<_, _, nom::error::Error<_>>(|c| c != '\n')
         .parse(input)
         .expect("should never fail");
+
     let (rest, _) = end_of_line
         .parse(rest)
         .expect("should always parse either a line break or EOF");

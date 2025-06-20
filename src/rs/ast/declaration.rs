@@ -13,14 +13,14 @@ pub enum Decl {
     },
 
     From {
-        path: String,
+        path: Vec<String>,
         use_model: String,
         inputs: Option<Vec<ModelInput>>,
         as_name: String,
     },
 
     Use {
-        path: String,
+        path: Vec<String>,
         inputs: Option<Vec<ModelInput>>,
         as_name: String,
     },

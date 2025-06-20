@@ -22,7 +22,7 @@ pub enum Expr {
     Literal(Literal),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -43,7 +43,7 @@ pub enum BinaryOp {
     MinMax,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum UnaryOp {
     Neg,
     Not,

@@ -25,12 +25,11 @@ use nom::{
 use crate::ast::declaration::{Decl, ModelInput};
 
 use super::{
-    error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
+    error::{ErrorHandlingParser, ParserError},
     expression::parse as parse_expr,
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
-        error::{ExpectSymbol, TokenErrorKind},
         keyword::{as_, from, import, use_},
         naming::identifier,
         structure::end_of_line,
@@ -101,65 +100,67 @@ fn decl(input: Span) -> Result<Decl, ParserError> {
         map(parse_parameter, Decl::Parameter),
         map(parse_test, Decl::Test),
     ))
-    .map_error(|e| ParserError::new(ParserErrorKind::ExpectDecl, e.span))
+    .map_error(ParserError::expect_decl)
     .parse(input)
 }
 
 /// Parses an import declaration
 fn import_decl(input: Span) -> Result<Decl, ParserError> {
-    let (rest, import_span) = import.convert_errors().parse(input)?;
-    let (rest, (path, _)) = cut((identifier, end_of_line))
-        .map_failure(move |e| {
-            let span = e.span;
-            ParserError::new(
-                ParserErrorKind::ImportDeclError {
-                    import_span,
-                    error: Box::new(e.into()),
-                },
-                span,
-            )
-        })
+    let (rest, import_token) = import.convert_errors().parse(input)?;
+
+    let (rest, path) = cut(identifier)
+        .map_failure(ParserError::import_missing_path(import_token))
+        .parse(rest)?;
+
+    let (rest, _) = cut(end_of_line)
+        .map_failure(ParserError::import_missing_end_of_line(import_token))
         .parse(rest)?;
 
     Ok((
         rest,
         Decl::Import {
-            path: path.to_string(),
+            path: path.lexeme().to_string(),
         },
     ))
 }
 
 /// Parses a from declaration
 fn from_decl(input: Span) -> Result<Decl, ParserError> {
-    let (rest, from_span) = from.convert_errors().parse(input)?;
-    let (rest, (path, _, use_model, inputs, _, as_name, _)) = cut((
-        module_path,
-        use_.convert_errors(),
-        identifier.convert_errors(),
-        opt(model_inputs),
-        as_.convert_errors(),
-        identifier.convert_errors(),
-        end_of_line.convert_errors(),
-    ))
-    .map_failure(move |e| {
-        let span = e.span;
-        ParserError::new(
-            ParserErrorKind::FromDeclError {
-                from_span,
-                error: Box::new(e),
-            },
-            span,
-        )
-    })
-    .parse(rest)?;
+    let (rest, from_token) = from.convert_errors().parse(input)?;
+
+    let (rest, path) = cut(module_path)
+        .map_failure(ParserError::from_missing_path(from_token))
+        .parse(rest)?;
+
+    let (rest, use_token) = cut(use_)
+        .map_failure(ParserError::from_missing_use(from_token))
+        .parse(rest)?;
+
+    let (rest, use_model) = cut(identifier)
+        .map_failure(ParserError::from_missing_use_model(from_token, use_token))
+        .parse(rest)?;
+
+    let (rest, inputs) = opt(model_inputs).parse(rest)?;
+
+    let (rest, as_token) = cut(as_)
+        .map_failure(ParserError::from_missing_as(from_token))
+        .parse(rest)?;
+
+    let (rest, as_name) = cut(identifier)
+        .map_failure(ParserError::from_missing_as_name(as_token))
+        .parse(rest)?;
+
+    let (rest, _) = cut(end_of_line)
+        .map_failure(ParserError::from_missing_end_of_line(from_token))
+        .parse(rest)?;
 
     Ok((
         rest,
         Decl::From {
-            path: path.to_string(),
-            use_model: use_model.to_string(),
+            path,
+            use_model: use_model.lexeme().to_string(),
             inputs,
-            as_name: as_name.to_string(),
+            as_name: as_name.lexeme().to_string(),
         },
     ))
 }
@@ -167,72 +168,56 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
 /// Parses a use declaration
 fn use_decl(input: Span) -> Result<Decl, ParserError> {
     let (rest, use_span) = use_.convert_errors().parse(input)?;
-    let (rest, (path, inputs, _, as_name, _)) = cut((
-        module_path,
-        opt(model_inputs),
-        as_.convert_errors(),
-        identifier.convert_errors(),
-        end_of_line.convert_errors(),
-    ))
-    .map_failure(move |e| {
-        let span = e.span;
-        ParserError::new(
-            ParserErrorKind::UseDeclError {
-                use_span,
-                error: Box::new(e),
-            },
-            span,
-        )
-    })
-    .parse(rest)?;
+
+    let (rest, path) = cut(module_path)
+        .map_failure(ParserError::use_missing_path(use_span))
+        .parse(rest)?;
+
+    let (rest, inputs) = opt(model_inputs).parse(rest)?;
+
+    let (rest, as_token) = cut(as_)
+        .map_failure(ParserError::use_missing_as(use_span))
+        .parse(rest)?;
+
+    let (rest, as_name) = cut(identifier)
+        .map_failure(ParserError::use_missing_as_name(as_token))
+        .parse(rest)?;
+
+    let (rest, _) = cut(end_of_line)
+        .map_failure(ParserError::use_missing_end_of_line(use_span))
+        .parse(rest)?;
 
     Ok((
         rest,
         Decl::Use {
-            path: path.to_string(),
+            path,
             inputs,
-            as_name: as_name.to_string(),
+            as_name: as_name.lexeme().to_string(),
         },
     ))
 }
 
 /// Parses a module path (e.g., "foo.bar.baz")
-fn module_path(input: Span) -> Result<String, ParserError> {
+fn module_path(input: Span) -> Result<Vec<String>, ParserError> {
     let (rest, parts) = separated_list1(dot, identifier)
         .convert_errors()
         .parse(input)?;
 
-    Ok((
-        rest,
-        parts
-            .into_iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join("."),
-    ))
+    let parts = parts
+        .into_iter()
+        .map(|part| part.lexeme().to_string())
+        .collect();
+
+    Ok((rest, parts))
 }
 
 /// Parses model inputs (e.g., "(x=1, y=2)")
 fn model_inputs(input: Span) -> Result<Vec<ModelInput>, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
-    let (rest, (inputs, _)) = cut((
-        separated_list0(comma.convert_errors(), model_input),
-        paren_right.convert_errors(),
-    ))
-    .map_failure(move |e| match e.kind {
-        ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::ParenRight)) => {
-            let span = e.span;
-            ParserError::new(
-                ParserErrorKind::UnclosedParen {
-                    paren_left_span,
-                    error: Box::new(e),
-                },
-                span,
-            )
-        }
-        _ => e,
-    })
-    .parse(rest)?;
+    let (rest, inputs) = separated_list0(comma.convert_errors(), model_input).parse(rest)?;
+    let (rest, _) = paren_right
+        .map_failure(ParserError::unclosed_paren(paren_left_span))
+        .parse(rest)?;
 
     Ok((rest, inputs))
 }
@@ -242,22 +227,13 @@ fn model_input(input: Span) -> Result<ModelInput, ParserError> {
     let (rest, name) = identifier.convert_errors().parse(input)?;
     let (rest, equals_span) = equals.convert_errors().parse(rest)?;
     let (rest, value) = cut(parse_expr)
-        .map_failure(move |e| {
-            let span = e.span;
-            ParserError::new(
-                ParserErrorKind::ModelInputError {
-                    equals_span,
-                    error: Box::new(e),
-                },
-                span,
-            )
-        })
+        .map_failure(ParserError::model_input_missing_value(name, equals_span))
         .parse(rest)?;
 
     Ok((
         rest,
         ModelInput {
-            name: name.to_string(),
+            name: name.lexeme().to_string(),
             value,
         },
     ))
@@ -292,7 +268,7 @@ mod tests {
                 inputs,
                 as_name,
             } => {
-                assert_eq!(path, "foo.bar");
+                assert_eq!(path, ["foo", "bar"]);
                 assert!(inputs.is_none());
                 assert_eq!(as_name, "baz");
             }
@@ -311,7 +287,7 @@ mod tests {
                 inputs: Some(inputs),
                 as_name,
             } => {
-                assert_eq!(path, "foo.bar");
+                assert_eq!(path, ["foo", "bar"]);
                 assert_eq!(inputs.len(), 2);
                 assert_eq!(inputs[0].name, "x");
                 assert_eq!(inputs[0].value, Expr::Literal(Literal::Number(1.0)));
@@ -335,7 +311,7 @@ mod tests {
                 inputs,
                 as_name,
             } => {
-                assert_eq!(path, "foo.bar");
+                assert_eq!(path, ["foo", "bar"]);
                 assert_eq!(use_model, "model");
                 assert!(inputs.is_none());
                 assert_eq!(as_name, "baz");
@@ -359,7 +335,7 @@ mod tests {
                 inputs: Some(inputs),
                 as_name,
             } => {
-                assert_eq!(path, "foo.bar");
+                assert_eq!(path, ["foo", "bar"]);
                 assert_eq!(use_model, "model");
                 assert_eq!(inputs.len(), 2);
                 assert_eq!(inputs[0].name, "x");
@@ -396,7 +372,7 @@ mod tests {
                 inputs,
                 as_name,
             } => {
-                assert_eq!(path, "foo.bar");
+                assert_eq!(path, ["foo", "bar"]);
                 assert!(inputs.is_none());
                 assert_eq!(as_name, "baz");
             }
@@ -416,7 +392,7 @@ mod tests {
                 inputs: Some(inputs),
                 as_name,
             } => {
-                assert_eq!(path, "foo.bar");
+                assert_eq!(path, ["foo", "bar"]);
                 assert_eq!(use_model, "model");
                 assert_eq!(inputs.len(), 1);
                 assert_eq!(inputs[0].name, "x");

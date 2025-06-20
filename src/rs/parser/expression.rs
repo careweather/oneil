@@ -35,9 +35,8 @@ use crate::ast::{
 };
 
 use super::{
-    error::{ErrorHandlingParser as _, ParserError, ParserErrorKind},
+    error::{ErrorHandlingParser, ParserError},
     token::{
-        error::{ExpectSymbol, TokenErrorKind},
         keyword::{and, false_, not, or, true_},
         literal::{number, string},
         naming::identifier,
@@ -51,17 +50,30 @@ use super::{
 };
 
 fn left_associative_binary_op<'a>(
-    operand: impl Parser<'a, Expr, ParserError<'a>> + Copy,
-    operator: impl Parser<'a, BinaryOp, ParserError<'a>>,
-) -> impl Parser<'a, Expr, ParserError<'a>> {
-    (operand, many0((operator, cut(operand)))).map(|(first, rest)| {
-        rest.into_iter()
-            .fold(first, |acc, (op, expr)| Expr::BinaryOp {
+    mut operand: impl Parser<'a, Expr, ParserError> + Copy,
+    mut operator: impl Parser<'a, BinaryOp, ParserError>,
+) -> impl Parser<'a, Expr, ParserError> {
+    move |input| {
+        let (rest, first_operand) = operand.parse(input)?;
+        let (rest, rest_operands) = many0(|input| {
+            let (rest, operator) = operator.parse(input)?;
+            let (rest, operand) = cut(operand)
+                .map_error(ParserError::binary_op_missing_second_operand(operator))
+                .parse(rest)?;
+            Ok((rest, (operator, operand)))
+        })
+        .parse(rest)?;
+
+        let expr = rest_operands
+            .into_iter()
+            .fold(first_operand, |acc, (op, expr)| Expr::BinaryOp {
                 op,
                 left: Box::new(acc),
                 right: Box::new(expr),
-            })
-    })
+            });
+
+        Ok((rest, expr))
+    }
 }
 
 /// Parses an expression
@@ -120,9 +132,7 @@ pub fn parse_complete(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses an expression
 fn expr(input: Span) -> Result<Expr, ParserError> {
-    or_expr
-        .map_error(|e| ParserError::new(ParserErrorKind::ExpectExpr, e.span))
-        .parse(input)
+    or_expr.map_error(ParserError::expect_expr).parse(input)
 }
 
 /// Parses an OR expression (lowest precedence)
@@ -139,18 +149,32 @@ fn and_expr(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses a NOT expression
 fn not_expr(input: Span) -> Result<Expr, ParserError> {
-    (not.convert_errors(), cut(not_expr))
-        .map(|(_, expr)| Expr::UnaryOp {
-            op: UnaryOp::Not,
-            expr: Box::new(expr),
-        })
-        .or(comparison_expr)
-        .parse(input)
+    alt((
+        |input| {
+            let not = value(UnaryOp::Not, not);
+
+            let (rest, op) = not.convert_errors().parse(input)?;
+
+            let (rest, expr) = cut(not_expr)
+                .map_error(ParserError::unary_op_missing_operand(op))
+                .parse(rest)?;
+
+            Ok((
+                rest,
+                Expr::UnaryOp {
+                    op: UnaryOp::Not,
+                    expr: Box::new(expr),
+                },
+            ))
+        },
+        comparison_expr,
+    ))
+    .parse(input)
 }
 
 /// Parses a comparison expression
 fn comparison_expr(input: Span) -> Result<Expr, ParserError> {
-    let op = alt((
+    let mut op = alt((
         value(BinaryOp::LessThanEq, less_than_equals),
         value(BinaryOp::GreaterThanEq, greater_than_equals),
         value(BinaryOp::LessThan, less_than),
@@ -160,38 +184,52 @@ fn comparison_expr(input: Span) -> Result<Expr, ParserError> {
     ))
     .convert_errors();
 
-    (minmax_expr, opt((op, cut(minmax_expr))))
-        .map(|(left, rest)| match rest {
-            Some((op, right)) => Expr::BinaryOp {
-                op,
-                left: Box::new(left),
-                right: Box::new(right),
-            },
-            None => left,
-        })
-        .parse(input)
+    let (rest, first_operand) = minmax_expr.parse(input)?;
+    let (rest, second_operand) = opt(|input| {
+        let (rest, operator) = op.parse(input)?;
+        let (rest, operand) = cut(minmax_expr)
+            .map_error(ParserError::binary_op_missing_second_operand(operator))
+            .parse(rest)?;
+        Ok((rest, (operator, operand)))
+    })
+    .parse(rest)?;
+
+    let expr = match second_operand {
+        Some((op, second_operand)) => Expr::BinaryOp {
+            op,
+            left: Box::new(first_operand),
+            right: Box::new(second_operand),
+        },
+        None => first_operand,
+    };
+
+    Ok((rest, expr))
 }
 
 /// Parses a min/max expression
 ///
 /// Ex: `min_weight | max_weight`
 fn minmax_expr(input: Span) -> Result<Expr, ParserError> {
-    ((
-        additive_expr,
-        opt((
-            value(BinaryOp::MinMax, bar).convert_errors(),
-            cut(additive_expr),
-        )),
-    ))
-        .map(|(left, rest)| match rest {
-            Some((op, right)) => Expr::BinaryOp {
-                op,
-                left: Box::new(left),
-                right: Box::new(right),
-            },
-            None => left,
-        })
-        .parse(input)
+    let (rest, first_operand) = additive_expr.parse(input)?;
+    let (rest, second_operand) = opt(|input| {
+        let (rest, operator) = value(BinaryOp::MinMax, bar).convert_errors().parse(input)?;
+        let (rest, operand) = cut(additive_expr)
+            .map_error(ParserError::binary_op_missing_second_operand(operator))
+            .parse(rest)?;
+        Ok((rest, (operator, operand)))
+    })
+    .parse(rest)?;
+
+    let expr = match second_operand {
+        Some((op, second_operand)) => Expr::BinaryOp {
+            op,
+            left: Box::new(first_operand),
+            right: Box::new(second_operand),
+        },
+        None => first_operand,
+    };
+
+    Ok((rest, expr))
 }
 
 /// Parses an additive expression
@@ -202,6 +240,7 @@ fn additive_expr(input: Span) -> Result<Expr, ParserError> {
         value(BinaryOp::TrueSub, minus_minus),
     ))
     .convert_errors();
+
     left_associative_binary_op(multiplicative_expr, op).parse(input)
 }
 
@@ -214,48 +253,71 @@ fn multiplicative_expr(input: Span) -> Result<Expr, ParserError> {
         value(BinaryOp::Mod, percent),
     ))
     .convert_errors();
+
     left_associative_binary_op(exponential_expr, op).parse(input)
 }
 
 /// Parses an exponential expression (right associative)
 fn exponential_expr(input: Span) -> Result<Expr, ParserError> {
-    let op = value(BinaryOp::Pow, caret).convert_errors();
-    (neg_expr, opt((op, cut(exponential_expr))))
-        .map(|(left, rest)| match rest {
-            Some((op, right)) => Expr::BinaryOp {
-                op,
-                left: Box::new(left),
-                right: Box::new(right),
-            },
-            None => left,
-        })
-        .parse(input)
+    let mut op = value(BinaryOp::Pow, caret).convert_errors();
+
+    let (rest, first_operand) = neg_expr.parse(input)?;
+    let (rest, second_operand) = opt(|input| {
+        let (rest, operator) = op.parse(input)?;
+        let (rest, operand) = cut(exponential_expr)
+            .map_error(ParserError::binary_op_missing_second_operand(operator))
+            .parse(rest)?;
+        Ok((rest, (operator, operand)))
+    })
+    .parse(rest)?;
+
+    let expr = match second_operand {
+        Some((op, second_operand)) => Expr::BinaryOp {
+            op,
+            left: Box::new(first_operand),
+            right: Box::new(second_operand),
+        },
+        None => first_operand,
+    };
+
+    Ok((rest, expr))
 }
 
 /// Parses a negation expression
 fn neg_expr(input: Span) -> Result<Expr, ParserError> {
-    (minus.convert_errors(), cut(neg_expr))
-        .map(|(_, expr)| Expr::UnaryOp {
-            op: UnaryOp::Neg,
-            expr: Box::new(expr),
-        })
-        .or(primary_expr)
-        .parse(input)
+    alt((
+        |input| {
+            let minus = value(UnaryOp::Neg, minus);
+            let (rest, op) = minus.convert_errors().parse(input)?;
+            let (rest, expr) = cut(neg_expr)
+                .map_error(ParserError::unary_op_missing_operand(op))
+                .parse(rest)?;
+            Ok((
+                rest,
+                Expr::UnaryOp {
+                    op: UnaryOp::Neg,
+                    expr: Box::new(expr),
+                },
+            ))
+        },
+        primary_expr,
+    ))
+    .parse(input)
 }
 
 /// Parses a primary expression (literals, identifiers, function calls, parenthesized expressions)
 fn primary_expr(input: Span) -> Result<Expr, ParserError> {
     alt((
         map_res(number.convert_errors(), |n| {
-            let parse_result = n.fragment().parse::<f64>();
+            let parse_result = n.lexeme().parse::<f64>();
             match parse_result {
                 Ok(n) => Ok(Expr::Literal(Literal::Number(n))),
-                Err(_) => Err(ParserErrorKind::InvalidNumber(n.fragment())),
+                Err(_) => Err(ParserError::invalid_number(n)),
             }
         }),
         map(string.convert_errors(), |s| {
             // trim quotes from the string
-            let s_contents = s.fragment()[1..s.len() - 1].to_string();
+            let s_contents = s.lexeme()[1..s.lexeme().len() - 1].to_string();
             Expr::Literal(Literal::String(s_contents))
         }),
         map(true_.convert_errors(), |_| {
@@ -275,24 +337,15 @@ fn primary_expr(input: Span) -> Result<Expr, ParserError> {
 fn function_call(input: Span) -> Result<Expr, ParserError> {
     let (rest, name) = identifier.convert_errors().parse(input)?;
     let (rest, paren_left_span) = paren_left.convert_errors().parse(rest)?;
-    let (rest, args) = cut(separated_list0(comma.convert_errors(), expr)).parse(rest)?;
+    let (rest, args) = separated_list0(comma.convert_errors(), expr).parse(rest)?;
     let (rest, _) = cut(paren_right)
-        .map_failure(move |e| {
-            let span = e.span;
-            ParserError::new(
-                ParserErrorKind::UnclosedParen {
-                    paren_left_span,
-                    error: Box::new(e.into()),
-                },
-                span,
-            )
-        })
+        .map_failure(ParserError::unclosed_paren(paren_left_span))
         .parse(rest)?;
 
     Ok((
         rest,
         Expr::FunctionCall {
-            name: name.to_string(),
+            name: name.lexeme().to_string(),
             args,
         },
     ))
@@ -300,29 +353,25 @@ fn function_call(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses a variable name
 fn variable(input: Span) -> Result<Expr, ParserError> {
-    separated_list1(dot, identifier)
+    let (rest, ids) = separated_list1(dot, identifier)
         .convert_errors()
-        .map(|ids| Expr::Variable(ids.into_iter().map(|id| id.to_string()).collect()))
-        .parse(input)
+        .parse(input)?;
+
+    let expr = Expr::Variable(ids.into_iter().map(|id| id.lexeme().to_string()).collect());
+
+    Ok((rest, expr))
 }
 
 /// Parses a parenthesized expression
 fn parenthesized_expr(input: Span) -> Result<Expr, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
-    let (rest, (expr, _)) = cut((expr, paren_right.convert_errors()))
-        .map_failure(move |e| match e.kind {
-            ParserErrorKind::TokenError(TokenErrorKind::Symbol(ExpectSymbol::ParenRight)) => {
-                let span = e.span;
-                ParserError::new(
-                    ParserErrorKind::UnclosedParen {
-                        paren_left_span,
-                        error: Box::new(e),
-                    },
-                    span,
-                )
-            }
-            _ => e,
-        })
+
+    let (rest, expr) = cut(expr)
+        .map_failure(ParserError::paren_missing_expression(paren_left_span))
+        .parse(rest)?;
+
+    let (rest, _) = cut(paren_right)
+        .map_failure(ParserError::unclosed_paren(paren_left_span))
         .parse(rest)?;
 
     Ok((rest, expr))

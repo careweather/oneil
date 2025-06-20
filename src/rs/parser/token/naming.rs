@@ -114,6 +114,7 @@ pub fn identifier(input: Span) -> Result<Token, TokenError> {
 /// ```
 pub fn label(input: Span) -> Result<Token, TokenError> {
     // TODO: verify that the label is not a keyword
+    // TODO: labels also accept apostrophes
     token(
         |input| {
             let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;

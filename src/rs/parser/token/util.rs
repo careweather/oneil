@@ -5,6 +5,7 @@ use super::{
     error::{ErrorHandlingParser, TokenError},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'a> {
     lexeme: Span<'a>,
     whitespace: Span<'a>,
