@@ -1,0 +1,25 @@
+# Submodule 2: Statistical and data processing functions
+
+# Statistical constants
+Mean weight: mean_weight = 1.0
+Standard deviation factor: std_factor = 0.5
+
+# Variables
+X: x = 1
+Y: y = 2
+Z: z = 3
+
+# Statistical functions
+Mean: mean = (x + y + z) / 3
+Variance: variance = (x - mean) ^ 2 + (y - mean) ^ 2 + (z - mean) ^ 2
+Standard deviation: std_dev = sqrt(variance)
+
+# Data processing functions
+Normalize: normalize = (x - mean) / std
+Scale: scale = (x - min_val) / (max_val - min_val)
+Round: round = floor(x + 0.5)
+
+# Aggregation functions
+Sum: sum = x + y + z
+Count: count = 3
+Product: product = x * y * z

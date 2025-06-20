@@ -172,6 +172,7 @@ name = "oneil_module_loader"
 version = "0.15.0"
 dependencies = [
  "oneil_ast",
+ "oneil_module",
 ]
 
 [[package]]

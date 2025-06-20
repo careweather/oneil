@@ -1,0 +1,15 @@
+use submodule1
+use submodule2
+
+X: x = 2 + 1
+
+Y: y = x + 2
+
+# A section
+section My Section
+
+import pyfile
+use submodule3
+
+Z: z = x - Y
+
