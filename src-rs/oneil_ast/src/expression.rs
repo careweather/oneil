@@ -17,7 +17,7 @@ pub enum Expr {
         args: Vec<Expr>,
     },
 
-    Variable(Vec<String>),
+    Variable(Variable),
 
     Literal(Literal),
 }
@@ -47,6 +47,15 @@ pub enum BinaryOp {
 pub enum UnaryOp {
     Neg,
     Not,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Variable {
+    Identifier(String),
+    Accessor {
+        parent: String,
+        component: Box<Variable>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

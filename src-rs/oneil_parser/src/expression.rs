@@ -26,10 +26,10 @@ use nom::{
     Parser as _,
     branch::alt,
     combinator::{all_consuming, cut, map, map_res, opt, value},
-    multi::{many0, separated_list0, separated_list1},
+    multi::{many0, separated_list0},
 };
 
-use oneil_ast::expression::{BinaryOp, Expr, Literal, UnaryOp};
+use oneil_ast::expression::{BinaryOp, Expr, Literal, UnaryOp, Variable};
 
 use crate::{
     error::{ErrorHandlingParser, ParserError},
@@ -350,13 +350,24 @@ fn function_call(input: Span) -> Result<Expr, ParserError> {
 
 /// Parses a variable name
 fn variable(input: Span) -> Result<Expr, ParserError> {
-    let (rest, ids) = separated_list1(dot, identifier)
-        .convert_errors()
-        .parse(input)?;
+    let (rest, first_id) = identifier.convert_errors().parse(input)?;
+    let (rest, rest_ids) = many0(|input| {
+        let (rest, dot_token) = dot.convert_errors().parse(input)?;
+        let (rest, id) = cut(identifier.map_error(ParserError::variable_missing_parent(dot_token)))
+            .parse(rest)?;
+        Ok((rest, id))
+    })
+    .parse(rest)?;
 
-    let expr = Expr::Variable(ids.into_iter().map(|id| id.lexeme().to_string()).collect());
+    let expr = rest_ids.into_iter().fold(
+        Variable::Identifier(first_id.lexeme().to_string()),
+        |acc, id| Variable::Accessor {
+            parent: id.lexeme().to_string(),
+            component: Box::new(acc),
+        },
+    );
 
-    Ok((rest, expr))
+    Ok((rest, Expr::Variable(expr)))
 }
 
 /// Parses a parenthesized expression
@@ -411,7 +422,10 @@ mod tests {
     fn test_primary_expr_simple_identifier() {
         let input = Span::new_extra("foo", Config::default());
         let (_, expr) = parse(input).unwrap();
-        assert_eq!(expr, Expr::Variable(vec!["foo".to_string()]));
+        assert_eq!(
+            expr,
+            Expr::Variable(Variable::Identifier("foo".to_string()))
+        );
     }
 
     #[test]
@@ -420,11 +434,13 @@ mod tests {
         let (_, expr) = parse(input).unwrap();
         assert_eq!(
             expr,
-            Expr::Variable(vec![
-                "foo".to_string(),
-                "bar".to_string(),
-                "baz".to_string()
-            ])
+            Expr::Variable(Variable::Accessor {
+                parent: "baz".to_string(),
+                component: Box::new(Variable::Accessor {
+                    parent: "bar".to_string(),
+                    component: Box::new(Variable::Identifier("foo".to_string())),
+                }),
+            })
         );
     }
 

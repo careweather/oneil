@@ -593,6 +593,18 @@ impl ParserError {
             offset: error.offset,
         }
     }
+
+    /// Creates a new ParserError for a missing parent in a variable accessor
+    pub fn variable_missing_parent(dot_token: Token) -> impl Fn(TokenError) -> Self {
+        move |error| Self {
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Expr(
+                ExprKind::VariableMissingParent {
+                    dot_offset: dot_token.lexeme_offset(),
+                },
+            )),
+            offset: error.offset,
+        }
+    }
 }
 
 /// The different kinds of errors that can occur during parsing.
@@ -768,6 +780,11 @@ pub enum ExprKind {
         operator: UnaryOp,
         /// The offset of the operator
         operator_offset: usize,
+    },
+    /// Found a missing parent in a variable accessor
+    VariableMissingParent {
+        /// The offset of the dot
+        dot_offset: usize,
     },
 }
 
