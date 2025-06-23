@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use oneil_ast as ast;
 use oneil_module::{
-    Dependency, DocumentationMap, ExternalImportMap, Ident, ImportIndex, Module, ModuleCollection,
-    ModulePath, ModuleReference, PythonPath, SectionData, SectionItem, SectionLabel, Symbol,
-    SymbolMap, TestIndex, Tests,
+    Dependency, DocumentationMap, ExternalImportMap, Identifier, ImportIndex, Module,
+    ModuleCollection, ModulePath, ModuleReference, PythonPath, SectionData, SectionItem,
+    SectionLabel, Symbol, SymbolMap, TestIndex, Tests,
 };
 
 use crate::{
@@ -206,8 +206,13 @@ fn process_section(
             }
             ast::Decl::Parameter(parameter) => {
                 // TODO: figure out if these clones are necessary
-                let ident = Ident::new(parameter.name.clone());
-                let symbol = Symbol::Parameter(parameter);
+                let ident = Identifier::new(parameter.name.clone());
+                let dependencies = HashSet::new();
+                let dependencies = get_dependencies_for_parameter(&parameter, dependencies);
+                let symbol = Symbol::Parameter {
+                    dependencies,
+                    parameter,
+                };
                 symbols.add_symbol(ident.clone(), symbol);
                 section_items.push(SectionItem::Parameter(ident));
             }
@@ -271,4 +276,47 @@ where
 
     (module_collection, module_errors)
 }
+
+fn get_dependencies_for_parameter(
+    parameter: &ast::Parameter,
+    mut dependencies: HashSet<Identifier>,
+) -> HashSet<Identifier> {
+    match &parameter.value {
+        ast::parameter::ParameterValue::Simple(expr, unit_expr) => {
+            get_dependencies_for_expr(expr, dependencies)
+        }
+        ast::parameter::ParameterValue::Piecewise(piecewise_expr, unit_expr) => {
+            for part in &piecewise_expr.parts {
+                dependencies = get_dependencies_for_expr(&part.expr, dependencies);
+            }
+            dependencies
+        }
+    }
+}
+
+fn get_dependencies_for_expr(
+    expr: &ast::Expr,
+    mut dependencies: HashSet<Identifier>,
+) -> HashSet<Identifier> {
+    match expr {
+        oneil_ast::Expr::BinaryOp { op: _, left, right } => {
+            dependencies = get_dependencies_for_expr(left, dependencies);
+            dependencies = get_dependencies_for_expr(right, dependencies);
+            dependencies
+        }
+        oneil_ast::Expr::UnaryOp { op: _, expr } => {
+            dependencies = get_dependencies_for_expr(expr, dependencies);
+            dependencies
+        }
+        oneil_ast::Expr::FunctionCall { name: _, args } => {
+            for arg in args {
+                dependencies = get_dependencies_for_expr(arg, dependencies);
+            }
+            dependencies
+        }
+        oneil_ast::Expr::Literal(_literal) => dependencies,
+        oneil_ast::Expr::Variable(items) => todo!("figure out how this should best be handled"),
+    }
+}
+
 // TODO: write tests for the module loader

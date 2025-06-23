@@ -1,14 +1,14 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
 use oneil_ast as ast;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Ident(String);
+pub struct Identifier(String);
 
-impl Ident {
+impl Identifier {
     pub fn new(ident: String) -> Self {
         Self(ident)
     }
@@ -66,11 +66,11 @@ impl SectionLabel {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleReference {
     path: ModulePath,
-    subcomponents: Vec<Ident>,
+    subcomponents: Vec<Identifier>,
 }
 
 impl ModuleReference {
-    pub fn new(path: ModulePath, subcomponents: Vec<Ident>) -> Self {
+    pub fn new(path: ModulePath, subcomponents: Vec<Identifier>) -> Self {
         Self {
             path,
             subcomponents,
@@ -99,8 +99,8 @@ impl ImportIndex {
 #[derive(Debug, Clone, PartialEq)]
 pub enum SectionItem {
     Test(TestIndex),
-    Parameter(Ident),
-    InternalImport(Ident),
+    Parameter(Identifier),
+    InternalImport(Identifier),
     ExternalImport(ImportIndex),
 }
 
@@ -134,27 +134,21 @@ impl SectionData {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Symbol {
     Parameter {
-        dependencies: Vec<ParameterDependency>,
+        dependencies: HashSet<Identifier>,
         parameter: ast::Parameter,
     },
     Import(ModuleReference),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ParameterDependency {
-    dependency: Dependency,
-    parameter: ast::Parameter,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SymbolMap(HashMap<Ident, Symbol>);
+pub struct SymbolMap(HashMap<Identifier, Symbol>);
 
 impl SymbolMap {
     pub fn new() -> Self {
         Self(HashMap::new())
     }
 
-    pub fn add_symbol(&mut self, ident: Ident, symbol: Symbol) {
+    pub fn add_symbol(&mut self, ident: Identifier, symbol: Symbol) {
         self.0.insert(ident, symbol);
     }
 }
