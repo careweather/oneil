@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use oneil_ast as ast;
 use oneil_module::{
     Dependency, DocumentationMap, ExternalImportMap, Identifier, ImportIndex, Module,
-    ModuleCollection, ModulePath, ModuleReference, PythonPath, SectionData, SectionItem,
+    ModuleCollection, ModulePath, ModuleReference, PythonPath, Reference, SectionData, SectionItem,
     SectionLabel, Symbol, SymbolMap, TestIndex, Tests,
 };
 
@@ -279,13 +279,13 @@ where
 
 fn get_dependencies_for_parameter(
     parameter: &ast::Parameter,
-    mut dependencies: HashSet<Identifier>,
-) -> HashSet<Identifier> {
+    mut dependencies: HashSet<Reference>,
+) -> HashSet<Reference> {
     match &parameter.value {
-        ast::parameter::ParameterValue::Simple(expr, unit_expr) => {
+        ast::parameter::ParameterValue::Simple(expr, _unit_expr) => {
             get_dependencies_for_expr(expr, dependencies)
         }
-        ast::parameter::ParameterValue::Piecewise(piecewise_expr, unit_expr) => {
+        ast::parameter::ParameterValue::Piecewise(piecewise_expr, _unit_expr) => {
             for part in &piecewise_expr.parts {
                 dependencies = get_dependencies_for_expr(&part.expr, dependencies);
             }
@@ -296,8 +296,8 @@ fn get_dependencies_for_parameter(
 
 fn get_dependencies_for_expr(
     expr: &ast::Expr,
-    mut dependencies: HashSet<Identifier>,
-) -> HashSet<Identifier> {
+    mut dependencies: HashSet<Reference>,
+) -> HashSet<Reference> {
     match expr {
         oneil_ast::Expr::BinaryOp { op: _, left, right } => {
             dependencies = get_dependencies_for_expr(left, dependencies);
@@ -315,7 +315,23 @@ fn get_dependencies_for_expr(
             dependencies
         }
         oneil_ast::Expr::Literal(_literal) => dependencies,
-        oneil_ast::Expr::Variable(items) => todo!("figure out how this should best be handled"),
+        oneil_ast::Expr::Variable(accessors) => {
+            let reference = get_reference_for_variable(accessors);
+            dependencies.insert(reference);
+            dependencies
+        }
+    }
+}
+
+fn get_reference_for_variable(variable: &ast::expression::Variable) -> Reference {
+    match variable {
+        ast::expression::Variable::Identifier(ident) => {
+            Reference::Identifier(Identifier::new(ident.clone()))
+        }
+        ast::expression::Variable::Accessor { parent, component } => Reference::Accessor {
+            parent: Identifier::new(parent.clone()),
+            component: Box::new(get_reference_for_variable(component)),
+        },
     }
 }
 
