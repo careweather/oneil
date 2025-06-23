@@ -19,7 +19,7 @@ use nom::{
     Parser as _,
     branch::alt,
     combinator::{all_consuming, cut, map, opt},
-    multi::{separated_list0, separated_list1},
+    multi::{many0, separated_list0},
 };
 
 use oneil_ast::declaration::{Decl, ModelInput};
@@ -128,7 +128,7 @@ fn import_decl(input: Span) -> Result<Decl, ParserError> {
 fn from_decl(input: Span) -> Result<Decl, ParserError> {
     let (rest, from_token) = from.convert_errors().parse(input)?;
 
-    let (rest, path) = cut(module_path)
+    let (rest, (model_name, mut subcomponents)) = cut(module_path)
         .map_failure(ParserError::from_missing_path(from_token))
         .parse(rest)?;
 
@@ -139,6 +139,7 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
     let (rest, use_model) = cut(identifier)
         .map_failure(ParserError::from_missing_use_model(from_token, use_token))
         .parse(rest)?;
+    subcomponents.push(use_model.lexeme().to_string());
 
     let (rest, inputs) = opt(model_inputs).parse(rest)?;
 
@@ -156,11 +157,11 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
 
     Ok((
         rest,
-        Decl::From {
-            path,
-            use_model: use_model.lexeme().to_string(),
+        Decl::UseModel {
+            model_name,
+            subcomponents,
             inputs,
-            as_name: as_name.lexeme().to_string(),
+            as_name: Some(as_name.lexeme().to_string()),
         },
     ))
 }
@@ -169,7 +170,7 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
 fn use_decl(input: Span) -> Result<Decl, ParserError> {
     let (rest, use_span) = use_.convert_errors().parse(input)?;
 
-    let (rest, path) = cut(module_path)
+    let (rest, (model_name, subcomponents)) = cut(module_path)
         .map_failure(ParserError::use_missing_path(use_span))
         .parse(rest)?;
 
@@ -189,26 +190,28 @@ fn use_decl(input: Span) -> Result<Decl, ParserError> {
 
     Ok((
         rest,
-        Decl::Use {
-            path,
+        Decl::UseModel {
+            model_name,
+            subcomponents,
             inputs,
-            as_name: as_name.lexeme().to_string(),
+            as_name: Some(as_name.lexeme().to_string()),
         },
     ))
 }
 
 /// Parses a module path (e.g., "foo.bar.baz")
-fn module_path(input: Span) -> Result<Vec<String>, ParserError> {
-    let (rest, parts) = separated_list1(dot, identifier)
-        .convert_errors()
-        .parse(input)?;
+fn module_path(input: Span) -> Result<(String, Vec<String>), ParserError> {
+    let (rest, path) = identifier.convert_errors().parse(input)?;
+    let (rest, subcomponents) = many0(|input| {
+        let (rest, dot_token) = dot.convert_errors().parse(input)?;
+        let (rest, subcomponent) =
+            cut(identifier.map_error(ParserError::module_path_missing_subcomponent(dot_token)))
+                .parse(rest)?;
+        Ok((rest, subcomponent.lexeme().to_string()))
+    })
+    .parse(rest)?;
 
-    let parts = parts
-        .into_iter()
-        .map(|part| part.lexeme().to_string())
-        .collect();
-
-    Ok((rest, parts))
+    Ok((rest, (path.lexeme().to_string(), subcomponents)))
 }
 
 /// Parses model inputs (e.g., "(x=1, y=2)")
@@ -263,14 +266,16 @@ mod tests {
         let input = Span::new_extra("use foo.bar as baz\n", Config::default());
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::Use {
-                path,
+            Decl::UseModel {
+                model_name,
+                subcomponents,
                 inputs,
                 as_name,
             } => {
-                assert_eq!(path, ["foo", "bar"]);
+                assert_eq!(model_name, "foo");
+                assert_eq!(subcomponents, ["bar"]);
                 assert!(inputs.is_none());
-                assert_eq!(as_name, "baz");
+                assert_eq!(as_name, Some("baz".to_string()));
             }
             _ => panic!("Expected use declaration"),
         }
@@ -282,18 +287,20 @@ mod tests {
         let input = Span::new_extra("use foo.bar(x=1, y=2) as baz\n", Config::default());
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::Use {
-                path,
+            Decl::UseModel {
+                model_name,
+                subcomponents,
                 inputs: Some(inputs),
                 as_name,
             } => {
-                assert_eq!(path, ["foo", "bar"]);
+                assert_eq!(model_name, "foo");
+                assert_eq!(subcomponents, ["bar"]);
                 assert_eq!(inputs.len(), 2);
                 assert_eq!(inputs[0].name, "x");
                 assert_eq!(inputs[0].value, Expr::Literal(Literal::Number(1.0)));
                 assert_eq!(inputs[1].name, "y");
                 assert_eq!(inputs[1].value, Expr::Literal(Literal::Number(2.0)));
-                assert_eq!(as_name, "baz");
+                assert_eq!(as_name, Some("baz".to_string()));
             }
             _ => panic!("Expected use declaration with inputs"),
         }
@@ -305,16 +312,16 @@ mod tests {
         let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::From {
-                path,
-                use_model,
+            Decl::UseModel {
+                model_name,
+                subcomponents,
                 inputs,
                 as_name,
             } => {
-                assert_eq!(path, ["foo", "bar"]);
-                assert_eq!(use_model, "model");
+                assert_eq!(model_name, "foo");
+                assert_eq!(subcomponents, ["bar", "model"]);
                 assert!(inputs.is_none());
-                assert_eq!(as_name, "baz");
+                assert_eq!(as_name, Some("baz".to_string()));
             }
             _ => panic!("Expected from declaration"),
         }
@@ -329,20 +336,20 @@ mod tests {
         );
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::From {
-                path,
-                use_model,
+            Decl::UseModel {
+                model_name,
+                subcomponents,
                 inputs: Some(inputs),
                 as_name,
             } => {
-                assert_eq!(path, ["foo", "bar"]);
-                assert_eq!(use_model, "model");
+                assert_eq!(model_name, "foo");
+                assert_eq!(subcomponents, ["bar", "model"]);
                 assert_eq!(inputs.len(), 2);
                 assert_eq!(inputs[0].name, "x");
                 assert_eq!(inputs[0].value, Expr::Literal(Literal::Number(1.0)));
                 assert_eq!(inputs[1].name, "y");
                 assert_eq!(inputs[1].value, Expr::Literal(Literal::Number(2.0)));
-                assert_eq!(as_name, "baz");
+                assert_eq!(as_name, Some("baz".to_string()));
             }
             _ => panic!("Expected from declaration with inputs"),
         }
@@ -367,14 +374,16 @@ mod tests {
         let input = Span::new_extra("use foo.bar as baz\n", Config::default());
         let (rest, decl) = parse_complete(input).unwrap();
         match decl {
-            Decl::Use {
-                path,
+            Decl::UseModel {
+                model_name,
+                subcomponents,
                 inputs,
                 as_name,
             } => {
-                assert_eq!(path, ["foo", "bar"]);
+                assert_eq!(model_name, "foo");
+                assert_eq!(subcomponents, ["bar"]);
                 assert!(inputs.is_none());
-                assert_eq!(as_name, "baz");
+                assert_eq!(as_name, Some("baz".to_string()));
             }
             _ => panic!("Expected use declaration"),
         }
@@ -386,18 +395,18 @@ mod tests {
         let input = Span::new_extra("from foo.bar use model(x=1) as baz\n", Config::default());
         let (rest, decl) = parse_complete(input).unwrap();
         match decl {
-            Decl::From {
-                path,
-                use_model,
+            Decl::UseModel {
+                model_name,
+                subcomponents,
                 inputs: Some(inputs),
                 as_name,
             } => {
-                assert_eq!(path, ["foo", "bar"]);
-                assert_eq!(use_model, "model");
+                assert_eq!(model_name, "foo");
+                assert_eq!(subcomponents, ["bar", "model"]);
                 assert_eq!(inputs.len(), 1);
                 assert_eq!(inputs[0].name, "x");
                 assert_eq!(inputs[0].value, Expr::Literal(Literal::Number(1.0)));
-                assert_eq!(as_name, "baz");
+                assert_eq!(as_name, Some("baz".to_string()));
             }
             _ => panic!("Expected from declaration"),
         }

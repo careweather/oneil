@@ -278,6 +278,16 @@ impl ParserError {
         }
     }
 
+    /// Creates a new ParserError for a missing subcomponent in a module path
+    pub fn module_path_missing_subcomponent(dot_token: Token) -> impl Fn(TokenError) -> Self {
+        move |error| Self {
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Decl(DeclKind::ModulePath {
+                dot_offset: dot_token.lexeme_offset(),
+            })),
+            offset: error.offset,
+        }
+    }
+
     /// Creates a new ParserError for a binary operation missing its second operand
     pub fn binary_op_missing_second_operand(operator: BinaryOp) -> impl Fn(Self) -> Self {
         move |error| Self {
@@ -692,6 +702,11 @@ pub enum DeclKind {
         identifier_offset: usize,
         /// The offset of the equals sign
         equals_offset: usize,
+    },
+    /// Found an incomplete module path
+    ModulePath {
+        /// The offset of the dot
+        dot_offset: usize,
     },
 }
 

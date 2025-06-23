@@ -176,58 +176,31 @@ fn process_section(
                 // TODO: make this the right index
                 section_items.push(SectionItem::ExternalImport(ImportIndex::new(0)));
             }
-            ast::Decl::From {
-                path,
-                use_model,
+            ast::Decl::UseModel {
+                model_name,
+                subcomponents,
                 inputs,
                 as_name,
             } => {
-                let (path, rest) = path
-                    .split_first()
-                    .expect("TODO: in AST, store path and 'child accessors' seperately");
-                let use_path = ModulePath::new(module_path.join(&path));
+                let use_path = ModulePath::new(module_path.join(&model_name));
 
                 // TODO: figure out what to do with inputs - maybe turn them into tests?
 
-                let ident = Ident::new(as_name.clone());
+                let symbol_name = as_name
+                    .as_ref()
+                    .unwrap_or(subcomponents.last().unwrap_or(&model_name));
+                let symbol_name = Identifier::new(symbol_name.clone());
 
-                // TODO: try not to clone the idents
-                let mut subcomponents = rest
+                let subcomponents = subcomponents
                     .into_iter()
-                    .map(|s| Ident::new(s.clone()))
-                    .collect::<Vec<_>>();
-                subcomponents.push(Ident::new(use_model));
-
-                let symbol = Symbol::Import(ModuleReference::new(use_path.clone(), subcomponents));
-                symbols.add_symbol(ident.clone(), symbol);
-
-                // TODO: I think this needs more information to be useful
-                section_items.push(SectionItem::InternalImport(ident));
-
-                dependencies.push(Dependency::Module(use_path));
-            }
-            ast::Decl::Use {
-                path,
-                inputs,
-                as_name,
-            } => {
-                let (path, rest) = path
-                    .split_first()
-                    .expect("TODO: in AST, store path and 'child accessors' seperately");
-                let use_path = ModulePath::new(module_path.join(&path));
-
-                let ident = Ident::new(as_name.clone());
-
-                let subcomponents = rest
-                    .into_iter()
-                    .map(|s| Ident::new(s.clone()))
+                    .map(|s| Identifier::new(s))
                     .collect::<Vec<_>>();
 
                 let symbol = Symbol::Import(ModuleReference::new(use_path.clone(), subcomponents));
-                symbols.add_symbol(ident.clone(), symbol);
+                symbols.add_symbol(symbol_name.clone(), symbol);
 
                 // TODO: I think this needs more information to be useful
-                section_items.push(SectionItem::InternalImport(ident));
+                section_items.push(SectionItem::InternalImport(symbol_name));
 
                 dependencies.push(Dependency::Module(use_path));
             }

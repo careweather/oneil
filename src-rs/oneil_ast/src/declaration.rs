@@ -12,17 +12,11 @@ pub enum Decl {
         path: String,
     },
 
-    From {
-        path: Vec<String>,
-        use_model: String,
+    UseModel {
+        model_name: String,
+        subcomponents: Vec<String>,
         inputs: Option<Vec<ModelInput>>,
-        as_name: String,
-    },
-
-    Use {
-        path: Vec<String>,
-        inputs: Option<Vec<ModelInput>>,
-        as_name: String,
+        as_name: Option<String>,
     },
 
     Parameter(Parameter),
