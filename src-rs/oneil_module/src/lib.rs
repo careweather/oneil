@@ -163,15 +163,38 @@ impl SymbolMap {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Tests(Vec<ast::Test>);
+pub struct Tests {
+    model_tests: Vec<ast::Test>,
+    dependency_tests: HashMap<ModulePath, TestInputs>,
+}
 
 impl Tests {
     pub fn new() -> Self {
-        Self(vec![])
+        Self {
+            model_tests: vec![],
+            dependency_tests: HashMap::new(),
+        }
     }
 
-    pub fn add_test(&mut self, test: ast::Test) {
-        self.0.push(test);
+    pub fn add_model_test(&mut self, test: ast::Test) {
+        self.model_tests.push(test);
+    }
+
+    pub fn add_dependency_test(&mut self, module_path: ModulePath, inputs: TestInputs) {
+        self.dependency_tests.insert(module_path, inputs);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TestInputs(HashMap<Identifier, ast::Expr>);
+
+impl TestInputs {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn add_input(&mut self, ident: Identifier, expr: ast::Expr) {
+        self.0.insert(ident, expr);
     }
 }
 

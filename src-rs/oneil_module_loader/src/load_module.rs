@@ -4,7 +4,7 @@ use oneil_ast as ast;
 use oneil_module::{
     Dependency, DocumentationMap, ExternalImportMap, Identifier, ImportIndex, Module,
     ModuleCollection, ModulePath, ModuleReference, PythonPath, Reference, SectionData, SectionItem,
-    SectionLabel, Symbol, SymbolMap, TestIndex, Tests,
+    SectionLabel, Symbol, SymbolMap, TestIndex, TestInputs, Tests,
 };
 
 use crate::{
@@ -184,7 +184,20 @@ fn process_section(
             } => {
                 let use_path = ModulePath::new(module_path.join(&model_name));
 
-                // TODO: figure out what to do with inputs - maybe turn them into tests?
+                let test_inputs = inputs
+                    .map(|inputs| {
+                        inputs
+                            .into_iter()
+                            .fold(TestInputs::new(), |mut test_inputs, input| {
+                                let ident = Identifier::new(input.name);
+                                let expr = input.value;
+                                test_inputs.add_input(ident, expr);
+                                test_inputs
+                            })
+                    })
+                    .unwrap_or(TestInputs::new());
+
+                tests.add_dependency_test(use_path.clone(), test_inputs);
 
                 let symbol_name = as_name
                     .as_ref()
@@ -217,7 +230,7 @@ fn process_section(
                 section_items.push(SectionItem::Parameter(ident));
             }
             ast::Decl::Test(test) => {
-                tests.add_test(test);
+                tests.add_model_test(test);
                 // TODO: Figure out what the right index is for this
                 section_items.push(SectionItem::Test(TestIndex::new(0)));
             }
@@ -244,6 +257,7 @@ fn load_dependencies<F>(
 where
     F: FileParser,
 {
+    // TODO: is there a better way to design this stack
     module_stack.push(module_path.clone());
 
     for dependency in dependencies {
