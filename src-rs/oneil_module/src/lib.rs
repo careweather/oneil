@@ -33,7 +33,7 @@ impl AsRef<Path> for ModulePath {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PythonPath(PathBuf);
 
 impl PythonPath {
@@ -42,8 +42,26 @@ impl PythonPath {
     }
 }
 
+impl AsRef<Path> for PythonPath {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Dependency {
+    Python(PythonPath),
+    Module(ModulePath),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SectionLabel(String);
+
+impl SectionLabel {
+    pub fn new(label: String) -> Self {
+        Self(label)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleReference {
@@ -92,24 +110,40 @@ pub struct DocumentationMap {
     sub_sections: HashMap<SectionLabel, SectionData>,
 }
 
+impl DocumentationMap {
+    pub fn new(top_section: SectionData, sub_sections: HashMap<SectionLabel, SectionData>) -> Self {
+        Self {
+            top_section,
+            sub_sections,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SectionData {
     note: Option<ast::Note>,
     items: Vec<SectionItem>,
 }
 
+impl SectionData {
+    pub fn new(note: Option<ast::Note>, items: Vec<SectionItem>) -> Self {
+        Self { note, items }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Symbol {
-    Parameter(ast::Parameter),
+    Parameter {
+        dependencies: Vec<ParameterDependency>,
+        parameter: ast::Parameter,
+    },
     Import(ModuleReference),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Module {
-    symbols: SymbolMap,
-    tests: Tests,
-    external_imports: ExternalImportMap,
-    documentation_map: DocumentationMap,
+pub enum ParameterDependency {
+    dependency: Dependency,
+    parameter: ast::Parameter,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -151,19 +185,57 @@ impl ExternalImportMap {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Module {
+    path: ModulePath,
+    symbols: SymbolMap,
+    tests: Tests,
+    external_imports: ExternalImportMap,
+    documentation_map: DocumentationMap,
+    dependencies: Vec<Dependency>,
+}
+
 impl Module {
     pub fn new(
+        path: ModulePath,
         symbols: SymbolMap,
         tests: Tests,
         external_imports: ExternalImportMap,
         documentation_map: DocumentationMap,
+        dependencies: Vec<Dependency>,
     ) -> Self {
         Self {
+            path,
             symbols,
             tests,
             external_imports,
             documentation_map,
+            dependencies,
         }
+    }
+
+    pub fn get_dependencies(&self) -> &[Dependency] {
+        &self.dependencies
+    }
+
+    pub fn get_path(&self) -> &ModulePath {
+        &self.path
+    }
+
+    pub fn get_symbols(&self) -> &SymbolMap {
+        &self.symbols
+    }
+
+    pub fn get_tests(&self) -> &Tests {
+        &self.tests
+    }
+
+    pub fn get_external_imports(&self) -> &ExternalImportMap {
+        &self.external_imports
+    }
+
+    pub fn get_documentation_map(&self) -> &DocumentationMap {
+        &self.documentation_map
     }
 }
 

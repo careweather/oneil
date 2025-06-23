@@ -1,4 +1,4 @@
-use oneil_module::ModulePath;
+use oneil_module::{ModulePath, PythonPath};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,10 +20,22 @@ impl<E> ModuleLoaderError<E> {
     pub fn resolution_error(e: ResolutionError) -> Self {
         Self::ResolutionError(e)
     }
+
+    pub fn resolution_error_from_python_path(path: PythonPath) -> Self {
+        Self::ResolutionError(ResolutionError::python_file_not_found(path))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ResolutionError {}
+pub enum ResolutionError {
+    PythonFileNotFound(PythonPath),
+}
+
+impl ResolutionError {
+    pub fn python_file_not_found(path: PythonPath) -> Self {
+        Self::PythonFileNotFound(path)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleErrorCollection<E> {
