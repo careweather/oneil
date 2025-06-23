@@ -56,4 +56,8 @@ impl<E> ModuleErrorCollection<E> {
     pub fn has_error_for(&self, module_path: &ModulePath) -> bool {
         self.module_errors.contains_key(module_path)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.module_errors.is_empty()
+    }
 }

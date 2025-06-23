@@ -16,7 +16,7 @@ use crate::{
 pub fn load_module<F>(
     module_path: ModulePath,
     module_stack: ModuleStack,
-    mut module_collection: ModuleCollection,
+    module_collection: ModuleCollection,
     mut module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
 ) -> (ModuleCollection, ModuleErrorCollection<F::ParseError>)
@@ -43,6 +43,7 @@ where
     let file_ast = match file_ast {
         Ok(ast) => ast,
         Err(e) => {
+            // TODO: we might be able to return a partial module here
             module_errors.add_error(&module_path, ModuleLoaderError::parse_error(e));
             return (module_collection, module_errors);
         }
@@ -50,7 +51,7 @@ where
 
     let (module, module_processing_errors) = process_model(file_ast, &module_path);
 
-    let (module_collection, module_errors) = load_dependencies(
+    let (mut module_collection, mut module_errors) = load_dependencies(
         &module_path,
         module.get_dependencies(),
         module_stack,
@@ -59,8 +60,7 @@ where
         file_parser,
     );
 
-    todo!("verify that symbols are valid");
-    todo!("return the constructed module");
+    // TODO: check for circular dependencies within module parameters
 
     if module_processing_errors.is_empty() {
         module_collection.add_module(&module_path, module);

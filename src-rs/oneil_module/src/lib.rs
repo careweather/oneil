@@ -244,14 +244,14 @@ impl Module {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleCollection {
-    initial_module: Option<ModulePath>,
+    initial_modules: Vec<ModulePath>,
     modules: HashMap<ModulePath, Module>,
 }
 
 impl ModuleCollection {
-    pub fn new() -> Self {
+    pub fn new(initial_modules: Vec<ModulePath>) -> Self {
         Self {
-            initial_module: None,
+            initial_modules,
             modules: HashMap::new(),
         }
     }
