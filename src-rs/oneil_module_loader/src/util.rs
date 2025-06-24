@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use oneil_ast as ast;
-use oneil_module::ModulePath;
 
 pub trait FileLoader {
     type ParseError;
@@ -10,24 +9,30 @@ pub trait FileLoader {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleStack {
-    stack: Vec<ModulePath>,
+pub struct Stack<T>
+where
+    T: PartialEq + Clone,
+{
+    stack: Vec<T>,
 }
 
-impl ModuleStack {
+impl<T> Stack<T>
+where
+    T: PartialEq + Clone,
+{
     pub fn new() -> Self {
         Self { stack: vec![] }
     }
 
-    pub fn push(&mut self, path: ModulePath) {
+    pub fn push(&mut self, path: T) {
         self.stack.push(path);
     }
 
-    pub fn pop(&mut self) -> Option<ModulePath> {
+    pub fn pop(&mut self) -> Option<T> {
         self.stack.pop()
     }
 
-    pub fn check_for_cyclical_dependency(&self, path: &ModulePath) -> Option<Vec<ModulePath>> {
+    pub fn check_for_cyclical_dependency(&self, path: &T) -> Option<Vec<T>> {
         // Get the index of the last occurence of the path in the stack, if any exists
         let last_index = self.stack.iter().rposition(|p| p == path);
 

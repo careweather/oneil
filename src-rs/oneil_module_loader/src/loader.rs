@@ -3,14 +3,14 @@ use oneil_module::{Dependency, ModuleCollection, ModulePath};
 use crate::{
     FileLoader, builder,
     error::{ModuleErrorCollection, ModuleLoaderError, ResolutionError},
-    util::ModuleStack,
+    util::Stack,
 };
 
 // TODO: track dependent modules along with dependencies
 
 pub fn load_module<F>(
     module_path: ModulePath,
-    module_stack: &mut ModuleStack,
+    module_stack: &mut Stack<ModulePath>,
     module_collection: ModuleCollection,
     mut module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
@@ -70,7 +70,7 @@ where
 fn load_dependencies<F>(
     module_path: &ModulePath,
     dependencies: &[Dependency],
-    module_stack: &mut ModuleStack,
+    module_stack: &mut Stack<ModulePath>,
     module_collection: ModuleCollection,
     module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,

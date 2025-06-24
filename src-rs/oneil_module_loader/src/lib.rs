@@ -9,7 +9,7 @@ mod util;
 use oneil_module::{ModuleCollection, ModulePath};
 use std::path::Path;
 
-use crate::{error::ModuleErrorCollection, util::ModuleStack};
+use crate::{error::ModuleErrorCollection, util::Stack};
 
 pub use crate::util::FileLoader;
 
@@ -21,7 +21,7 @@ where
     F: FileLoader,
 {
     let module_path = ModulePath::new(module_path.as_ref().to_path_buf());
-    let mut module_stack = ModuleStack::new();
+    let mut module_stack = Stack::new();
     let module_collection = ModuleCollection::new(vec![module_path.clone()]);
     let module_errors = ModuleErrorCollection::new();
 
@@ -57,7 +57,7 @@ where
     let (module_collection, module_errors) = module_paths.into_iter().fold(
         (module_collection, module_errors),
         |(module_collection, module_errors), module_path| {
-            let mut module_stack = ModuleStack::new();
+            let mut module_stack = Stack::new();
             let (module_collection, module_errors) = loader::load_module(
                 module_path,
                 &mut module_stack,
