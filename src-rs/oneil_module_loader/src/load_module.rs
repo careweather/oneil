@@ -11,7 +11,7 @@ use crate::{
 
 pub fn load_module<F>(
     module_path: ModulePath,
-    module_stack: ModuleStack,
+    module_stack: &mut ModuleStack,
     module_collection: ModuleCollection,
     mut module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
@@ -71,44 +71,52 @@ where
 fn load_dependencies<F>(
     module_path: &ModulePath,
     dependencies: &[Dependency],
-    mut module_stack: ModuleStack,
-    mut module_collection: ModuleCollection,
-    mut module_errors: ModuleErrorCollection<F::ParseError>,
+    module_stack: &mut ModuleStack,
+    module_collection: ModuleCollection,
+    module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
 ) -> (ModuleCollection, ModuleErrorCollection<F::ParseError>)
 where
     F: FileParser,
 {
-    // TODO: is there a better way to design this stack
+    // Push the current module onto the stack
     module_stack.push(module_path.clone());
 
-    for dependency in dependencies {
-        match dependency {
-            Dependency::Python(python_path) => {
-                if !file_parser.file_exists(&python_path) {
-                    module_errors.add_error(
-                        module_path,
-                        ModuleLoaderError::resolution_error(
-                            ResolutionError::python_file_not_found(python_path.clone()),
-                        ),
-                    );
-                }
+    let (module_collection, module_errors) = dependencies.iter().fold(
+        (module_collection, module_errors),
+        |(module_collection, mut module_errors), dependency| {
+            match dependency {
+                Dependency::Python(python_path) => {
+                    if !file_parser.file_exists(&python_path) {
+                        module_errors.add_error(
+                            module_path,
+                            ModuleLoaderError::resolution_error(
+                                ResolutionError::python_file_not_found(python_path.clone()),
+                            ),
+                        );
+                    }
 
-                // TODO: should we validate that it's valid python?
+                    // TODO: should we validate that it's valid python?
+
+                    (module_collection, module_errors)
+                }
+                Dependency::Module(module_path) => {
+                    let (module_collection, module_errors) = load_module(
+                        module_path.clone(),
+                        module_stack,
+                        module_collection,
+                        module_errors,
+                        file_parser,
+                    );
+
+                    (module_collection, module_errors)
+                }
             }
-            Dependency::Module(module_path) => {
-                let (dependency_collection, dependency_errors) = load_module(
-                    module_path.clone(),
-                    module_stack.clone(),
-                    module_collection,
-                    module_errors,
-                    file_parser,
-                );
-                module_collection = dependency_collection;
-                module_errors = dependency_errors;
-            }
-        }
-    }
+        },
+    );
+
+    // Pop the current module off the stack
+    module_stack.pop();
 
     (module_collection, module_errors)
 }

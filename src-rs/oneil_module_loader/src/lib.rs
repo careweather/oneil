@@ -22,13 +22,13 @@ where
     F: FileParser,
 {
     let module_path = ModulePath::new(module_path.as_ref().to_path_buf());
-    let module_stack = ModuleStack::new();
+    let mut module_stack = ModuleStack::new();
     let module_collection = ModuleCollection::new(vec![module_path.clone()]);
     let module_errors = ModuleErrorCollection::new();
 
     let (module_collection, module_errors) = load_module::load_module(
         module_path,
-        module_stack,
+        &mut module_stack,
         module_collection,
         module_errors,
         file_parser,
@@ -58,10 +58,10 @@ where
     let (module_collection, module_errors) = module_paths.into_iter().fold(
         (module_collection, module_errors),
         |(module_collection, module_errors), module_path| {
-            let module_stack = ModuleStack::new();
+            let mut module_stack = ModuleStack::new();
             let (module_collection, module_errors) = load_module::load_module(
                 module_path,
-                module_stack,
+                &mut module_stack,
                 module_collection,
                 module_errors,
                 file_parser,
