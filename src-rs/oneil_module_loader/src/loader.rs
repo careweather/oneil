@@ -1,10 +1,9 @@
 use oneil_module::{Dependency, ModuleCollection, ModulePath};
 
 use crate::{
-    builder,
+    FileParser, builder,
     error::{ModuleErrorCollection, ModuleLoaderError, ResolutionError},
     module_stack::ModuleStack,
-    traits::FileParser,
 };
 
 // TODO: track dependent modules along with dependencies
@@ -120,5 +119,3 @@ where
 
     (module_collection, module_errors)
 }
-
-// TODO: write tests for the module loader
