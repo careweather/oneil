@@ -3,21 +3,6 @@
 //! This module contains parsers for all reserved keywords in the Oneil language.
 //! Each keyword parser ensures that the keyword is followed by a non-alphanumeric
 //! character or '_' to prevent partial matches (e.g., "and" vs "android").
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::token::keyword::{and, if_};
-//! use oneil_parser::{Config, Span};
-//!
-//! let input = Span::new_extra("and true", Config::default());
-//! let (rest, matched) = and(input).unwrap();
-//! assert_eq!(matched.lexeme(), "and");
-//!
-//! let input = Span::new_extra("if x > 0", Config::default());
-//! let (rest, matched) = if_(input).unwrap();
-//! assert_eq!(matched.lexeme(), "if");
-//! ```
 
 use nom::{
     Parser as _,

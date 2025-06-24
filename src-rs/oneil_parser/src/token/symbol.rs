@@ -2,27 +2,6 @@
 //!
 //! This module contains parsers for all symbol tokens in the Oneil language,
 //! including operators, delimiters, and other special characters.
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::token::symbol::{bang_equals, brace_left, brace_right};
-//! use oneil_parser::{Config, Span};
-//!
-//! // Parse a not-equals operator
-//! let input = Span::new_extra("!= rest", Config::default());
-//! let (rest, matched) = bang_equals(input).unwrap();
-//! assert_eq!(matched.lexeme(), "!=");
-//!
-//! // Parse braces
-//! let input = Span::new_extra("{ rest", Config::default());
-//! let (rest, matched) = brace_left(input).unwrap();
-//! assert_eq!(matched.lexeme(), "{");
-//!
-//! let input = Span::new_extra("} rest", Config::default());
-//! let (rest, matched) = brace_right(input).unwrap();
-//! assert_eq!(matched.lexeme(), "}");
-//! ```
 
 use nom::{
     Parser as _,

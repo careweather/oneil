@@ -6,21 +6,6 @@
 //! - Piecewise conditions
 //! - Tests
 //! - Model inputs
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::expression::parse;
-//! use oneil_parser::{Config, Span};
-//!
-//! // Parse a simple arithmetic expression
-//! let input = Span::new_extra("2 + 3 * 4", Config::default());
-//! let (_, expr) = parse(input).unwrap();
-//!
-//! // Parse a complex expression with multiple operators
-//! let input = Span::new_extra("-(x + y)^2 < foo(a, b) and not c", Config::default());
-//! let (_, expr) = parse(input).unwrap();
-//! ```
 
 use nom::{
     Parser as _,

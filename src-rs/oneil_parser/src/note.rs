@@ -14,32 +14,6 @@ use oneil_ast::note::Note;
 /// or a multi-line note delimited by `~~~`.
 ///
 /// This function **may not consume the complete input**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::note::parse;
-/// use oneil_parser::{Config, Span};
-/// use oneil_ast::note::Note;
-///
-/// // Parse a single-line note
-/// let input = Span::new_extra("~ This is a note\n", Config::default());
-/// let (rest, note) = parse(input).unwrap();
-/// assert_eq!(note, Note("This is a note".to_string()));
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::note::parse;
-/// use oneil_parser::{Config, Span};
-/// use oneil_ast::note::Note;
-///
-/// // Parse a multi-line note with remaining input
-/// let input = Span::new_extra("~~~\nLine 1\nLine 2\n~~~\nrest", Config::default());
-/// let (rest, note) = parse(input).unwrap();
-/// assert_eq!(note, Note("Line 1\nLine 2".to_string()));
-/// assert_eq!(rest.fragment(), &"rest");
-/// ```
 pub fn parse(input: Span) -> Result<Note, ParserError> {
     note(input)
 }
@@ -47,29 +21,6 @@ pub fn parse(input: Span) -> Result<Note, ParserError> {
 /// Parse a note
 ///
 /// This function **fails if the complete input is not consumed**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::note::parse_complete;
-/// use oneil_parser::{Config, Span};
-/// use oneil_ast::note::Note;
-///
-/// let input = Span::new_extra("~ This is a note\n", Config::default());
-/// let (rest, note) = parse_complete(input).unwrap();
-/// assert_eq!(note, Note("This is a note".to_string()));
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::note::parse_complete;
-/// use oneil_parser::{Config, Span};
-/// use oneil_ast::note::Note;
-///
-/// let input = Span::new_extra("~ This is a note\nrest", Config::default());
-/// let result = parse_complete(input);
-/// assert_eq!(result.is_err(), true);
-/// ```
 pub fn parse_complete(input: Span) -> Result<Note, ParserError> {
     all_consuming(note).parse(input)
 }

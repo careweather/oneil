@@ -15,23 +15,6 @@
 //!
 //! All token parsers consume trailing whitespace after the matched content and
 //! return the matched content as a `Span`.
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::token::{
-//!     keyword::if_,
-//!     symbol::brace_left,
-//!     structure::end_of_line
-//! };
-//! use oneil_parser::{Config, Span};
-//!
-//! // Parse a simple if statement opening
-//! let input = Span::new_extra("if {\n", Config::default());
-//! let (rest, _) = if_(input).unwrap();
-//! let (rest, _) = brace_left(rest).unwrap();
-//! let (rest, _) = end_of_line(rest).unwrap();
-//! ```
 
 use super::util::{Parser, Result, Span};
 

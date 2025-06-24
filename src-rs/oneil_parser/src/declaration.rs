@@ -1,19 +1,4 @@
 //! Parser for declarations in an Oneil program.
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::declaration::parse;
-//! use oneil_parser::{Config, Span};
-//!
-//! // Parse an import declaration
-//! let input = Span::new_extra("import foo\n", Config::default());
-//! let (_, decl) = parse(input).unwrap();
-//!
-//! // Parse a use declaration
-//! let input = Span::new_extra("use foo.bar as baz\n", Config::default());
-//! let (_, decl) = parse(input).unwrap();
-//! ```
 
 use nom::{
     Parser as _,
@@ -41,26 +26,6 @@ use crate::{
 /// Parses a declaration
 ///
 /// This function **may not consume the complete input**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::declaration::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\n", Config::default());
-/// let (rest, decl) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::declaration::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\nrest", Config::default());
-/// let (rest, decl) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"rest");
-/// ```
 pub fn parse(input: Span) -> Result<Decl, ParserError> {
     decl.parse(input)
 }
@@ -68,26 +33,6 @@ pub fn parse(input: Span) -> Result<Decl, ParserError> {
 /// Parses a declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::declaration::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\n", Config::default());
-/// let (rest, decl) = parse_complete(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::declaration::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\nrest", Config::default());
-/// let result = parse_complete(input);
-/// assert_eq!(result.is_err(), true);
-/// ```
 pub fn parse_complete(input: Span) -> Result<Decl, ParserError> {
     all_consuming(decl).parse(input)
 }

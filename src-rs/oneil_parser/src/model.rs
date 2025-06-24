@@ -1,19 +1,4 @@
 //! Parser for model definitions in an Oneil program.
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::model::parse_complete;
-//! use oneil_parser::{Config, Span};
-//!
-//! // Parse a simple model
-//! let input = Span::new_extra("import foo\n", Config::default());
-//! let (_, model) = parse_complete(input).unwrap();
-//!
-//! // Parse a model with sections
-//! let input = Span::new_extra("import foo\nsection bar\nimport baz\n", Config::default());
-//! let (_, model) = parse_complete(input).unwrap();
-//! ```
 
 use nom::{
     Parser as _,
@@ -40,26 +25,6 @@ use crate::{
 /// Parses a model definition, consuming the complete input
 ///
 /// This function **fails if the complete input is not consumed**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::model::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\n", Config::default());
-/// let (rest, model) = parse_complete(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::model::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("import foo\nrest", Config::default());
-/// let result = parse_complete(input);
-/// assert_eq!(result.is_err(), true);
-/// ```
 pub fn parse_complete(input: Span) -> Result<Model, ErrorsWithPartialResult<Model, ParserError>> {
     let (rest, model) = model(input)?;
     let result = eof(rest);

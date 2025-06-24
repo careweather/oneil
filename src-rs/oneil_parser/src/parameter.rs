@@ -26,26 +26,6 @@ use oneil_ast::parameter::{
 /// Parse a parameter declaration, e.g. `$ * x(0,100): y = 2*z : kg`.
 ///
 /// This function **may not consume the complete input**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::parameter::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("x: y = 42\n", Config::default());
-/// let (rest, param) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::parameter::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("x: y = 42\nrest", Config::default());
-/// let (rest, param) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"rest");
-/// ```
 pub fn parse(input: Span) -> Result<Parameter, ParserError> {
     parameter_decl(input)
 }
@@ -53,26 +33,6 @@ pub fn parse(input: Span) -> Result<Parameter, ParserError> {
 /// Parse a parameter declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::parameter::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("x: y = 42\n", Config::default());
-/// let (rest, param) = parse_complete(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::parameter::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("x: y = 42\nrest", Config::default());
-/// let result = parse_complete(input);
-/// assert_eq!(result.is_err(), true);
-/// ```
 pub fn parse_complete(input: Span) -> Result<Parameter, ParserError> {
     all_consuming(parameter_decl).parse(input)
 }

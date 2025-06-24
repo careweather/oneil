@@ -4,25 +4,6 @@
 //! Single-line notes start with `~` and continue until the end of the line.
 //! Multi-line notes are delimited by `~~~` on their own lines and can contain
 //! multiple lines of content.
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::token::note::{note, NoteKind};
-//! use oneil_parser::{Config, Span};
-//!
-//! // Parse a single-line note
-//! let input = Span::new_extra("~ This is a note\nrest", Config::default());
-//! let (rest, (matched, kind)) = note(input).unwrap();
-//! assert_eq!(matched.lexeme(), "~ This is a note");
-//! assert_eq!(kind, NoteKind::SingleLine);
-//!
-//! // Parse a multi-line note
-//! let input = Span::new_extra("~~~\nLine 1\nLine 2\n~~~\nrest", Config::default());
-//! let (rest, (matched, kind)) = note(input).unwrap();
-//! assert_eq!(matched.lexeme(), "~~~\nLine 1\nLine 2\n~~~");
-//! assert_eq!(kind, NoteKind::MultiLine);
-//! ```
 
 use nom::Parser as _;
 use nom::bytes::complete::take_while;

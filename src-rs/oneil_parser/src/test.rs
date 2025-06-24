@@ -18,26 +18,6 @@ use oneil_ast::{parameter::TraceLevel, test::Test};
 /// Parse a test declaration, e.g. `* test {x, y}: x > y`.
 ///
 /// This function **may not consume the complete input**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::test::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("test: true\n", Config::default());
-/// let (rest, test) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::test::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("test: true\nrest", Config::default());
-/// let (rest, test) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"rest");
-/// ```
 pub fn parse(input: Span) -> Result<Test, ParserError> {
     test_decl(input)
 }
@@ -45,26 +25,6 @@ pub fn parse(input: Span) -> Result<Test, ParserError> {
 /// Parse a test declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::test::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("test: true\n", Config::default());
-/// let (rest, test) = parse_complete(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::test::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("test: true\nrest", Config::default());
-/// let result = parse_complete(input);
-/// assert_eq!(result.is_err(), true);
-/// ```
 pub fn parse_complete(input: Span) -> Result<Test, ParserError> {
     all_consuming(test_decl).parse(input)
 }

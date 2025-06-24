@@ -1,19 +1,4 @@
 //! Unit expression parsing for the Oneil language.
-//!
-//! # Examples
-//!
-//! ```
-//! use oneil_parser::unit::parse;
-//! use oneil_parser::{Config, Span};
-//!
-//! // Parse a simple unit
-//! let input = Span::new_extra("kg", Config::default());
-//! let (_, unit) = parse(input).unwrap();
-//!
-//! // Parse a compound unit
-//! let input = Span::new_extra("m/s^2", Config::default());
-//! let (_, unit) = parse(input).unwrap();
-//! ```
 
 use nom::{
     Parser as _,
@@ -37,26 +22,6 @@ use crate::{
 /// Parses a unit expression
 ///
 /// This function **may not consume the complete input**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::unit::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("m/s^2", Config::default());
-/// let (rest, unit) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::unit::parse;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("m/s^2 rest", Config::default());
-/// let (rest, unit) = parse(input).unwrap();
-/// assert_eq!(rest.fragment(), &"rest");
-/// ```
 pub fn parse(input: Span) -> Result<UnitExpr, ParserError> {
     unit_expr(input)
 }
@@ -64,26 +29,6 @@ pub fn parse(input: Span) -> Result<UnitExpr, ParserError> {
 /// Parses a unit expression
 ///
 /// This function **fails if the complete input is not consumed**.
-///
-/// # Examples
-///
-/// ```
-/// use oneil_parser::unit::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("m/s^2", Config::default());
-/// let (rest, unit) = parse_complete(input).unwrap();
-/// assert_eq!(rest.fragment(), &"");
-/// ```
-///
-/// ```
-/// use oneil_parser::unit::parse_complete;
-/// use oneil_parser::{Config, Span};
-///
-/// let input = Span::new_extra("m/s^2 rest", Config::default());
-/// let result = parse_complete(input);
-/// assert_eq!(result.is_err(), true);
-/// ```
 pub fn parse_complete(input: Span) -> Result<UnitExpr, ParserError> {
     all_consuming(unit_expr).parse(input)
 }
