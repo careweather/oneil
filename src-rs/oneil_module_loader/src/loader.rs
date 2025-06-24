@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use oneil_module::{Dependency, ModuleCollection, ModulePath};
 
 use crate::{
@@ -69,7 +71,7 @@ where
 
 fn load_dependencies<F>(
     module_path: &ModulePath,
-    dependencies: &[Dependency],
+    dependencies: &HashSet<Dependency>,
     module_stack: &mut Stack<ModulePath>,
     module_collection: ModuleCollection,
     module_errors: ModuleErrorCollection<F::ParseError>,

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use oneil_ast as ast;
 use oneil_module::{
@@ -15,7 +15,7 @@ pub struct ModuleBuilder {
     external_imports: ExternalImportMap,
     section_notes: HashMap<SectionLabel, ast::Note>,
     section_items: HashMap<SectionLabel, Vec<SectionDecl>>,
-    dependencies: Vec<Dependency>,
+    dependencies: HashSet<Dependency>,
 }
 
 impl ModuleBuilder {
@@ -27,7 +27,7 @@ impl ModuleBuilder {
             external_imports: ExternalImportMap::new(),
             section_notes: HashMap::new(),
             section_items: HashMap::new(),
-            dependencies: vec![],
+            dependencies: HashSet::new(),
         }
     }
 
@@ -68,7 +68,7 @@ impl ModuleBuilder {
     }
 
     pub fn add_dependency(&mut self, dependency: Dependency) {
-        self.dependencies.push(dependency);
+        self.dependencies.insert(dependency);
     }
 
     pub fn into_module(self) -> Module {

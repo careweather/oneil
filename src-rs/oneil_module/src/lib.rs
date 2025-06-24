@@ -42,7 +42,7 @@ impl AsRef<Path> for ModulePath {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PythonPath(PathBuf);
 
 impl PythonPath {
@@ -57,7 +57,7 @@ impl AsRef<Path> for PythonPath {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Dependency {
     Python(PythonPath),
     Module(ModulePath),
@@ -221,7 +221,8 @@ pub struct Module {
     tests: Tests,
     external_imports: ExternalImportMap,
     documentation_map: DocumentationMap,
-    dependencies: Vec<Dependency>,
+    dependencies: HashSet<Dependency>,
+    dependent_modules: HashSet<ModulePath>,
 }
 
 impl Module {
@@ -231,7 +232,7 @@ impl Module {
         tests: Tests,
         external_imports: ExternalImportMap,
         documentation_map: DocumentationMap,
-        dependencies: Vec<Dependency>,
+        dependencies: HashSet<Dependency>,
     ) -> Self {
         Self {
             path,
@@ -240,11 +241,8 @@ impl Module {
             external_imports,
             documentation_map,
             dependencies,
+            dependent_modules: HashSet::new(),
         }
-    }
-
-    pub fn get_dependencies(&self) -> &[Dependency] {
-        &self.dependencies
     }
 
     pub fn get_path(&self) -> &ModulePath {
@@ -265,6 +263,18 @@ impl Module {
 
     pub fn get_documentation_map(&self) -> &DocumentationMap {
         &self.documentation_map
+    }
+
+    pub fn get_dependencies(&self) -> &HashSet<Dependency> {
+        &self.dependencies
+    }
+
+    pub fn get_dependent_modules(&self) -> &HashSet<ModulePath> {
+        &self.dependent_modules
+    }
+
+    pub fn add_dependent_module(&mut self, module_path: ModulePath) {
+        self.dependent_modules.insert(module_path);
     }
 }
 
