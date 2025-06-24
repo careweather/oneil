@@ -11,14 +11,14 @@ use std::path::Path;
 
 use crate::{error::ModuleErrorCollection, util::ModuleStack};
 
-pub use crate::util::FileParser;
+pub use crate::util::FileLoader;
 
 pub fn load_module<F>(
     module_path: impl AsRef<Path>,
     file_parser: &F,
 ) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorCollection<F::ParseError>)>
 where
-    F: FileParser,
+    F: FileLoader,
 {
     let module_path = ModulePath::new(module_path.as_ref().to_path_buf());
     let mut module_stack = ModuleStack::new();
@@ -45,7 +45,7 @@ pub fn load_module_list<F>(
     file_parser: &F,
 ) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorCollection<F::ParseError>)>
 where
-    F: FileParser,
+    F: FileLoader,
 {
     let module_paths: Vec<_> = module_paths
         .into_iter()

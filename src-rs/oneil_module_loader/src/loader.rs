@@ -1,7 +1,7 @@
 use oneil_module::{Dependency, ModuleCollection, ModulePath};
 
 use crate::{
-    FileParser, builder,
+    FileLoader, builder,
     error::{ModuleErrorCollection, ModuleLoaderError, ResolutionError},
     util::ModuleStack,
 };
@@ -16,7 +16,7 @@ pub fn load_module<F>(
     file_parser: &F,
 ) -> (ModuleCollection, ModuleErrorCollection<F::ParseError>)
 where
-    F: FileParser,
+    F: FileLoader,
 {
     // Check for cyclical dependencies in modules
     let cyclical_dependency = module_stack.check_for_cyclical_dependency(&module_path);
@@ -76,7 +76,7 @@ fn load_dependencies<F>(
     file_parser: &F,
 ) -> (ModuleCollection, ModuleErrorCollection<F::ParseError>)
 where
-    F: FileParser,
+    F: FileLoader,
 {
     // Push the current module onto the stack
     module_stack.push(module_path.clone());
