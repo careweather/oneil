@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use oneil_module::{Dependency, ModuleCollection, ModulePath};
+use oneil_module::{Dependency, ModuleGraph, ModulePath};
 
 use crate::{
     FileLoader, builder,
@@ -11,10 +11,10 @@ use crate::{
 pub fn load_module<F>(
     module_path: ModulePath,
     module_stack: &mut Stack<ModulePath>,
-    module_collection: ModuleCollection,
+    module_collection: ModuleGraph,
     mut module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
-) -> (ModuleCollection, ModuleErrorCollection<F::ParseError>)
+) -> (ModuleGraph, ModuleErrorCollection<F::ParseError>)
 where
     F: FileLoader,
 {
@@ -71,10 +71,10 @@ fn load_dependencies<F>(
     module_path: &ModulePath,
     dependencies: &HashSet<Dependency>,
     module_stack: &mut Stack<ModulePath>,
-    module_collection: ModuleCollection,
+    module_collection: ModuleGraph,
     module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
-) -> (ModuleCollection, ModuleErrorCollection<F::ParseError>)
+) -> (ModuleGraph, ModuleErrorCollection<F::ParseError>)
 where
     F: FileLoader,
 {

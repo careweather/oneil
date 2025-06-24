@@ -6,7 +6,7 @@ mod error;
 mod loader;
 mod util;
 
-use oneil_module::{ModuleCollection, ModulePath};
+use oneil_module::{ModuleGraph, ModulePath};
 use std::path::Path;
 
 use crate::{error::ModuleErrorCollection, util::Stack};
@@ -16,13 +16,13 @@ pub use crate::util::FileLoader;
 pub fn load_module<F>(
     module_path: impl AsRef<Path>,
     file_parser: &F,
-) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorCollection<F::ParseError>)>
+) -> Result<ModuleGraph, (ModuleGraph, ModuleErrorCollection<F::ParseError>)>
 where
     F: FileLoader,
 {
     let module_path = ModulePath::new(module_path.as_ref().to_path_buf());
     let mut module_stack = Stack::new();
-    let module_collection = ModuleCollection::new(vec![module_path.clone()]);
+    let module_collection = ModuleGraph::new(vec![module_path.clone()]);
     let module_errors = ModuleErrorCollection::new();
 
     let (module_collection, module_errors) = loader::load_module(
@@ -43,7 +43,7 @@ where
 pub fn load_module_list<F>(
     module_paths: Vec<impl AsRef<Path>>,
     file_parser: &F,
-) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorCollection<F::ParseError>)>
+) -> Result<ModuleGraph, (ModuleGraph, ModuleErrorCollection<F::ParseError>)>
 where
     F: FileLoader,
 {
@@ -51,7 +51,7 @@ where
         .into_iter()
         .map(|p| ModulePath::new(p.as_ref().to_path_buf()))
         .collect();
-    let module_collection = ModuleCollection::new(module_paths.clone());
+    let module_collection = ModuleGraph::new(module_paths.clone());
     let module_errors = ModuleErrorCollection::new();
 
     let (module_collection, module_errors) = module_paths.into_iter().fold(
