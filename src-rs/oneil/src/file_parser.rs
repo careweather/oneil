@@ -1,29 +1,43 @@
 use std::path::Path;
 
-use oneil::{
-    ast, module_loader,
-    parser::{self, Span},
-};
+use oneil_ast as ast;
+use oneil_parser as parser;
+use oneil_parser::error as parser_error;
 
-pub struct FileParser;
+type OneilParserError =
+    parser_error::ErrorsWithPartialResult<ast::Model, parser_error::ParserError>;
 
-impl<'a> module_loader::load_module::FileParser for FileParser {
-    type ParseError = oneil::parser::error::ErrorsWithPartialResult<
-        ast::Model,
-        oneil::parser::error::ParserError<'a>,
-    >;
+#[derive(Debug)]
+pub enum LoadingError {
+    InvalidFile(std::io::Error),
+    Parser(OneilParserError),
+}
 
-    fn parse(self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError> {
+impl From<std::io::Error> for LoadingError {
+    fn from(error: std::io::Error) -> Self {
+        LoadingError::InvalidFile(error)
+    }
+}
+
+impl From<OneilParserError> for LoadingError {
+    fn from(error: OneilParserError) -> Self {
+        LoadingError::Parser(error)
+    }
+}
+
+#[derive(Debug)]
+pub struct FileLoader;
+
+impl<'a> oneil_module_loader::FileLoader for FileLoader {
+    type ParseError = LoadingError;
+
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError> {
         let file_content = std::fs::read_to_string(path)?;
-        let input = Span::new_extra(&file_content, parser::Config::default());
-        // Assuming there's a function to parse the file content into an AST
-        let ast = parser::model::parse_complete(input);
+        let ast = parser::parse_model(&file_content, None)?;
+        Ok(ast)
+    }
 
-        match ast {
-            Ok((_rest, ast)) => Ok(ast),
-            Err(nom::Err::Incomplete(needed)) => unreachable!(),
-            Err(nom::Err::Error(e)) => Err(e),
-            Err(nom::Err::Failure(e)) => Err(e),
-        }
+    fn file_exists(&self, path: impl AsRef<Path>) -> bool {
+        path.as_ref().exists()
     }
 }

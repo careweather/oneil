@@ -9,5 +9,7 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
+oneil_ast = { path = "../oneil_ast" }
+oneil_module_loader = { path = "../oneil_module_loader" }
 oneil_parser = { path = "../oneil_parser" }
 clap = { version = "4.5.1", features = ["derive"] }
