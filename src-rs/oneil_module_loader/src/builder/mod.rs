@@ -213,12 +213,17 @@ fn extract_parameter_dependencies(parameter: &ast::Parameter) -> HashSet<Referen
         }
         ast::parameter::ParameterValue::Piecewise(piecewise_expr, _unit_expr) => {
             // Extract the dependencies from each part of the piecewise expression
-            piecewise_expr
-                .parts
-                .iter()
-                .fold(dependencies, |dependencies, part| {
-                    extract_expr_dependencies(&part.expr, dependencies)
-                })
+            let dependencies =
+                piecewise_expr
+                    .parts
+                    .iter()
+                    .fold(dependencies, |dependencies, part| {
+                        let dependencies = extract_expr_dependencies(&part.expr, dependencies);
+                        let dependencies = extract_expr_dependencies(&part.if_expr, dependencies);
+                        dependencies
+                    });
+
+            dependencies
         }
     }
 }
