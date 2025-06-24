@@ -36,6 +36,7 @@ mod parser_trait;
 pub use parser_trait::ErrorHandlingParser;
 
 pub mod partial;
+pub use partial::ErrorsWithPartialResult;
 
 /// An error that occurred during parsing.
 ///
