@@ -1,6 +1,7 @@
 // TODO: uncomment this once the library is more organized and stable
 // #![warn(missing_docs)]
 
+mod builder;
 mod error;
 mod load_module;
 mod module_stack;

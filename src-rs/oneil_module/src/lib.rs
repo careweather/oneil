@@ -64,11 +64,18 @@ pub enum Dependency {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SectionLabel(String);
+pub enum SectionLabel {
+    TopLevel,
+    Subsection(String),
+}
 
 impl SectionLabel {
-    pub fn new(label: String) -> Self {
-        Self(label)
+    pub fn new_top_level() -> Self {
+        Self::TopLevel
+    }
+
+    pub fn new_subsection(label: String) -> Self {
+        Self::Subsection(label)
     }
 }
 
@@ -97,33 +104,27 @@ impl TestIndex {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ImportIndex(usize);
-
-impl ImportIndex {
-    pub fn new(index: usize) -> Self {
-        Self(index)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum SectionItem {
+pub enum SectionDecl {
     Test(TestIndex),
     Parameter(Identifier),
     InternalImport(Identifier),
-    ExternalImport(ImportIndex),
+    ExternalImport(PythonPath),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DocumentationMap {
-    top_section: SectionData,
-    sub_sections: HashMap<SectionLabel, SectionData>,
+    section_notes: HashMap<SectionLabel, ast::Note>,
+    section_decls: HashMap<SectionLabel, Vec<SectionDecl>>,
 }
 
 impl DocumentationMap {
-    pub fn new(top_section: SectionData, sub_sections: HashMap<SectionLabel, SectionData>) -> Self {
+    pub fn new(
+        section_notes: HashMap<SectionLabel, ast::Note>,
+        section_decls: HashMap<SectionLabel, Vec<SectionDecl>>,
+    ) -> Self {
         Self {
-            top_section,
-            sub_sections,
+            section_notes,
+            section_decls,
         }
     }
 }
@@ -131,11 +132,11 @@ impl DocumentationMap {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SectionData {
     note: Option<ast::Note>,
-    items: Vec<SectionItem>,
+    items: Vec<SectionDecl>,
 }
 
 impl SectionData {
-    pub fn new(note: Option<ast::Note>, items: Vec<SectionItem>) -> Self {
+    pub fn new(note: Option<ast::Note>, items: Vec<SectionDecl>) -> Self {
         Self { note, items }
     }
 }
@@ -176,8 +177,10 @@ impl Tests {
         }
     }
 
-    pub fn add_model_test(&mut self, test: ast::Test) {
+    pub fn add_model_test(&mut self, test: ast::Test) -> TestIndex {
+        let test_index = self.model_tests.len();
         self.model_tests.push(test);
+        TestIndex::new(test_index)
     }
 
     pub fn add_dependency_test(&mut self, module_path: ModulePath, inputs: TestInputs) {
@@ -265,6 +268,7 @@ impl Module {
     }
 }
 
+// TODO: rename to ModuleGraph
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleCollection {
     initial_modules: Vec<ModulePath>,
