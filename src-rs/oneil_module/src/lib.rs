@@ -297,6 +297,17 @@ impl ModuleCollection {
         self.modules.insert(module_path.clone(), module);
     }
 
+    pub fn add_dependent_module(
+        &mut self,
+        module_path: &ModulePath,
+        dependent_module_path: ModulePath,
+    ) {
+        self.modules
+            .get_mut(module_path)
+            .unwrap()
+            .add_dependent_module(dependent_module_path);
+    }
+
     pub fn has_loaded_for(&self, module_path: &ModulePath) -> bool {
         self.modules.contains_key(module_path)
     }

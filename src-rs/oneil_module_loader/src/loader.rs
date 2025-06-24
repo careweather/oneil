@@ -8,8 +8,6 @@ use crate::{
     util::Stack,
 };
 
-// TODO: track dependent modules along with dependencies
-
 pub fn load_module<F>(
     module_path: ModulePath,
     module_stack: &mut Stack<ModulePath>,
@@ -101,14 +99,17 @@ where
 
                     (module_collection, module_errors)
                 }
-                Dependency::Module(module_path) => {
-                    let (module_collection, module_errors) = load_module(
-                        module_path.clone(),
+                Dependency::Module(dependency_path) => {
+                    let (mut module_collection, module_errors) = load_module(
+                        dependency_path.clone(),
                         module_stack,
                         module_collection,
                         module_errors,
                         file_parser,
                     );
+
+                    // Add the current module as a dependent of the dependency module
+                    module_collection.add_dependent_module(module_path, dependency_path.clone());
 
                     (module_collection, module_errors)
                 }
