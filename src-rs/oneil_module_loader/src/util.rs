@@ -1,4 +1,13 @@
+use std::path::Path;
+
+use oneil_ast as ast;
 use oneil_module::ModulePath;
+
+pub trait FileParser {
+    type ParseError;
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError>;
+    fn file_exists(&self, path: impl AsRef<Path>) -> bool;
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleStack {

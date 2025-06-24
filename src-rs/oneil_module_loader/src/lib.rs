@@ -4,15 +4,14 @@
 mod builder;
 mod error;
 mod loader;
-mod module_stack;
-mod traits;
+mod util;
 
 use oneil_module::{ModuleCollection, ModulePath};
 use std::path::Path;
 
-use crate::{error::ModuleErrorCollection, module_stack::ModuleStack};
+use crate::{error::ModuleErrorCollection, util::ModuleStack};
 
-pub use crate::traits::FileParser;
+pub use crate::util::FileParser;
 
 pub fn load_module<F>(
     module_path: impl AsRef<Path>,

@@ -3,7 +3,7 @@ use oneil_module::{Dependency, ModuleCollection, ModulePath};
 use crate::{
     FileParser, builder,
     error::{ModuleErrorCollection, ModuleLoaderError, ResolutionError},
-    module_stack::ModuleStack,
+    util::ModuleStack,
 };
 
 // TODO: track dependent modules along with dependencies
