@@ -1,15 +1,24 @@
+use std::ops::Deref;
+
 use crate::path::{ModulePath, PythonPath};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalImportList(Vec<PythonPath>);
 
 impl ExternalImportList {
-    pub fn new() -> Self {
-        Self(vec![])
+    pub fn new(imports: Vec<PythonPath>) -> Self {
+        Self(imports)
     }
 
-    pub fn add_import(&mut self, import_path: PythonPath) {
-        self.0.push(import_path);
+    pub fn empty() -> Self {
+        Self::new(vec![])
+    }
+}
+
+impl Deref for ExternalImportList {
+    type Target = Vec<PythonPath>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

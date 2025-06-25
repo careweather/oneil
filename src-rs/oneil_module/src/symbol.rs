@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::ops::Deref;
 
 use crate::reference::{Identifier, ModuleReference, Reference};
 use oneil_ast as ast;
@@ -17,11 +18,18 @@ pub enum Symbol {
 pub struct SymbolMap(HashMap<Identifier, Symbol>);
 
 impl SymbolMap {
-    pub fn new() -> Self {
-        Self(HashMap::new())
+    pub fn new(symbols: HashMap<Identifier, Symbol>) -> Self {
+        Self(symbols)
     }
 
-    pub fn add_symbol(&mut self, ident: Identifier, symbol: Symbol) {
-        self.0.insert(ident, symbol);
+    pub fn empty() -> Self {
+        Self::new(HashMap::new())
+    }
+}
+
+impl Deref for SymbolMap {
+    type Target = HashMap<Identifier, Symbol>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

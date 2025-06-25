@@ -6,13 +6,20 @@ use oneil_module::{
     SectionDecl, SectionLabel, Symbol, SymbolMap, TestIndex, TestInputs, Tests,
 };
 
-/// An internal struct for making module-building easier with an API that is
-/// tailored to the needs of this module
+/// A builder pattern implementation for constructing Module instances.
+///
+/// This struct provides a mutable API for incrementally building up a Module's components
+/// (symbols, tests, imports, etc). Once construction is complete, the builder can be
+/// converted into an immutable Module via `into_module()`.
+///
+/// This approach allows for a more ergonomic module construction process compared to
+/// working directly with the immutable Module type.
 pub struct ModuleBuilder {
     module_path: ModulePath,
-    symbols: SymbolMap,
-    tests: Tests,
-    external_imports: ExternalImportList,
+    symbols: HashMap<Identifier, Symbol>,
+    model_tests: Vec<ast::Test>,
+    dependency_tests: HashMap<ModulePath, TestInputs>,
+    external_imports: Vec<PythonPath>,
     section_notes: HashMap<SectionLabel, ast::Note>,
     section_items: HashMap<SectionLabel, Vec<SectionDecl>>,
     dependencies: HashSet<Dependency>,
@@ -22,9 +29,10 @@ impl ModuleBuilder {
     pub fn new(module_path: ModulePath) -> Self {
         Self {
             module_path,
-            symbols: SymbolMap::new(),
-            tests: Tests::new(),
-            external_imports: ExternalImportList::new(),
+            symbols: HashMap::new(),
+            model_tests: Vec::new(),
+            dependency_tests: HashMap::new(),
+            external_imports: Vec::new(),
             section_notes: HashMap::new(),
             section_items: HashMap::new(),
             dependencies: HashSet::new(),
@@ -32,19 +40,21 @@ impl ModuleBuilder {
     }
 
     pub fn add_symbol(&mut self, name: Identifier, symbol: Symbol) {
-        self.symbols.add_symbol(name, symbol);
+        self.symbols.insert(name, symbol);
     }
 
     pub fn add_model_test(&mut self, test: ast::Test) -> TestIndex {
-        self.tests.add_model_test(test)
+        let test_index = self.model_tests.len();
+        self.model_tests.push(test);
+        TestIndex::new(test_index)
     }
 
     pub fn add_dependency_test(&mut self, path: ModulePath, inputs: TestInputs) {
-        self.tests.add_dependency_test(path, inputs);
+        self.dependency_tests.insert(path, inputs);
     }
 
     pub fn add_external_import(&mut self, external_import: PythonPath) {
-        self.external_imports.add_import(external_import);
+        self.external_imports.push(external_import);
     }
 
     pub fn add_section_note(&mut self, section_label: SectionLabel, note: ast::Note) {
@@ -81,7 +91,8 @@ impl From<ModuleBuilder> for Module {
         let ModuleBuilder {
             module_path,
             symbols,
-            tests,
+            model_tests,
+            dependency_tests,
             external_imports,
             section_notes,
             section_items,
@@ -89,6 +100,10 @@ impl From<ModuleBuilder> for Module {
         } = builder;
 
         let documentation_map = DocumentationMap::new(section_notes, section_items);
+
+        let tests = Tests::new(model_tests, dependency_tests);
+        let symbols = SymbolMap::new(symbols);
+        let external_imports = ExternalImportList::new(external_imports);
 
         Module::new(
             module_path,
@@ -98,5 +113,37 @@ impl From<ModuleBuilder> for Module {
             documentation_map,
             dependencies,
         )
+    }
+}
+
+/// A builder pattern implementation for constructing test inputs.
+///
+/// Provides a mutable interface for incrementally building test inputs,
+/// which are then converted into an immutable TestInputs struct when complete.
+///
+/// This builder is used internally to simplify test input construction.
+pub struct TestInputsBuilder {
+    inputs: HashMap<Identifier, ast::Expr>,
+}
+
+impl TestInputsBuilder {
+    pub fn new() -> Self {
+        Self {
+            inputs: HashMap::new(),
+        }
+    }
+
+    pub fn add_input(&mut self, name: Identifier, expr: ast::Expr) {
+        self.inputs.insert(name, expr);
+    }
+
+    pub fn into_test_inputs(self) -> TestInputs {
+        self.into()
+    }
+}
+
+impl From<TestInputsBuilder> for TestInputs {
+    fn from(builder: TestInputsBuilder) -> Self {
+        TestInputs::new(builder.inputs)
     }
 }

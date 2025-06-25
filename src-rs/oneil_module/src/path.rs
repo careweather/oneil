@@ -8,7 +8,7 @@ impl ModulePath {
         Self(path)
     }
 
-    pub fn join(&self, other: &str) -> PathBuf {
+    pub fn join_as_path(&self, other: &str) -> PathBuf {
         self.0.join(other)
     }
 }

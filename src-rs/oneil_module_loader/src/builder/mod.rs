@@ -7,7 +7,7 @@ use oneil_module::{
 };
 
 mod util;
-use util::ModuleBuilder;
+use util::{ModuleBuilder, TestInputsBuilder};
 
 pub fn build_model_module(model: ast::Model, module_path: &ModulePath) -> Module {
     let module_builder = ModuleBuilder::new(module_path.clone());
@@ -96,7 +96,7 @@ fn process_import_decl(
     mut builder: ModuleBuilder,
 ) -> ModuleBuilder {
     // Build the import path from the current module path and the given path
-    let import_path = module_path.join(&path);
+    let import_path = module_path.join_as_path(&path);
     let import_path = PythonPath::new(import_path);
 
     // Add the dependency and external import to the builder
@@ -116,7 +116,7 @@ fn process_use_model_decl(
     mut builder: ModuleBuilder,
 ) -> ModuleBuilder {
     // Build the use path from the current module path and the given model name
-    let use_path = module_path.join(&model_name);
+    let use_path = module_path.join_as_path(&model_name);
     let use_path = ModulePath::new(use_path);
 
     // Build the test inputs
@@ -124,14 +124,15 @@ fn process_use_model_decl(
         .map(|inputs| {
             inputs
                 .into_iter()
-                .fold(TestInputs::new(), |mut test_inputs, input| {
+                .fold(TestInputsBuilder::new(), |mut test_inputs, input| {
                     let ident = Identifier::new(input.name);
                     let expr = input.value;
                     test_inputs.add_input(ident, expr);
                     test_inputs
                 })
+                .into_test_inputs()
         })
-        .unwrap_or(TestInputs::new());
+        .unwrap_or(TestInputs::empty());
 
     // Compute the symbol name
     let symbol_name = as_name

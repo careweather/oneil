@@ -12,21 +12,26 @@ pub struct Tests {
 }
 
 impl Tests {
-    pub fn new() -> Self {
+    pub fn new(
+        model_tests: Vec<ast::Test>,
+        dependency_tests: HashMap<ModulePath, TestInputs>,
+    ) -> Self {
         Self {
-            model_tests: vec![],
-            dependency_tests: HashMap::new(),
+            model_tests,
+            dependency_tests,
         }
     }
 
-    pub fn add_model_test(&mut self, test: ast::Test) -> TestIndex {
-        let test_index = self.model_tests.len();
-        self.model_tests.push(test);
-        TestIndex::new(test_index)
+    pub fn empty() -> Self {
+        Self::new(vec![], HashMap::new())
     }
 
-    pub fn add_dependency_test(&mut self, module_path: ModulePath, inputs: TestInputs) {
-        self.dependency_tests.insert(module_path, inputs);
+    pub fn model_tests(&self) -> &Vec<ast::Test> {
+        &self.model_tests
+    }
+
+    pub fn dependency_tests(&self) -> &HashMap<ModulePath, TestInputs> {
+        &self.dependency_tests
     }
 }
 
@@ -34,12 +39,12 @@ impl Tests {
 pub struct TestInputs(HashMap<Identifier, ast::Expr>);
 
 impl TestInputs {
-    pub fn new() -> Self {
-        Self(HashMap::new())
+    pub fn new(inputs: HashMap<Identifier, ast::Expr>) -> Self {
+        Self(inputs)
     }
 
-    pub fn add_input(&mut self, ident: Identifier, expr: ast::Expr) {
-        self.0.insert(ident, expr);
+    pub fn empty() -> Self {
+        Self::new(HashMap::new())
     }
 }
 

@@ -44,4 +44,12 @@ impl DocumentationMap {
             section_decls,
         }
     }
+
+    pub fn section_notes(&self, section_label: &SectionLabel) -> Option<&ast::Note> {
+        self.section_notes.get(section_label)
+    }
+
+    pub fn section_decls(&self, section_label: &SectionLabel) -> Option<&Vec<SectionDecl>> {
+        self.section_decls.get(section_label)
+    }
 }

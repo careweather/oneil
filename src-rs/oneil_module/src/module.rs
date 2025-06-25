@@ -37,35 +37,35 @@ impl Module {
         }
     }
 
-    pub fn get_path(&self) -> &ModulePath {
+    pub fn path(&self) -> &ModulePath {
         &self.path
     }
 
-    pub fn get_symbols(&self) -> &SymbolMap {
+    pub fn symbols(&self) -> &SymbolMap {
         &self.symbols
     }
 
-    pub fn get_tests(&self) -> &Tests {
+    pub fn tests(&self) -> &Tests {
         &self.tests
     }
 
-    pub fn get_external_imports(&self) -> &ExternalImportList {
+    pub fn external_imports(&self) -> &ExternalImportList {
         &self.external_imports
     }
 
-    pub fn get_documentation_map(&self) -> &DocumentationMap {
+    pub fn documentation_map(&self) -> &DocumentationMap {
         &self.documentation_map
     }
 
-    pub fn get_dependencies(&self) -> &HashSet<Dependency> {
+    pub fn dependencies(&self) -> &HashSet<Dependency> {
         &self.dependencies
     }
 
-    pub fn get_dependent_modules(&self) -> &HashSet<ModulePath> {
+    pub fn dependent_modules(&self) -> &HashSet<ModulePath> {
         &self.dependent_modules
     }
 
-    pub fn add_dependent_module(&mut self, module_path: ModulePath) {
+    pub fn dependent_module(&mut self, module_path: ModulePath) {
         self.dependent_modules.insert(module_path);
     }
 }
@@ -96,10 +96,18 @@ impl ModuleGraph {
         self.modules
             .get_mut(module_path)
             .unwrap()
-            .add_dependent_module(dependent_module_path);
+            .dependent_module(dependent_module_path);
     }
 
     pub fn has_loaded_for(&self, module_path: &ModulePath) -> bool {
         self.modules.contains_key(module_path)
+    }
+
+    pub fn module(&self, module_path: &ModulePath) -> Option<&Module> {
+        self.modules.get(module_path)
+    }
+
+    pub fn initial_modules(&self) -> &Vec<ModulePath> {
+        &self.initial_modules
     }
 }
