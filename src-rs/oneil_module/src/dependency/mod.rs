@@ -2,6 +2,8 @@ use std::ops::Deref;
 
 use crate::path::{ModulePath, PythonPath};
 
+pub mod graph;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExternalImportList(Vec<PythonPath>);
 
