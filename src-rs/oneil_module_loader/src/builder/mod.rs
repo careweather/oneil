@@ -290,147 +290,267 @@ mod tests {
     use oneil_ast::{
         declaration::ModelInput,
         expression::{BinaryOp, Literal, UnaryOp, Variable},
-        model::Section,
-        parameter::{Limits, ParameterValue, PiecewiseExpr, PiecewisePart},
+        parameter::{Limits, ParameterValue},
     };
-    use oneil_module::{ExternalImportMap, SymbolMap, Tests};
-    use std::path::PathBuf;
+    use oneil_module::{DocumentationMap, ExternalImportList, SymbolMap, TestIndex};
+    use std::{collections::HashMap, path::PathBuf};
 
     #[test]
-    fn test_build_model_module_simple() {
+    fn test_build_model_module_empty() {
         let module_path = ModulePath::new(PathBuf::from("test_module"));
         let model = ast::Model {
-            note: Some(ast::Note("Test model".to_string())),
-            decls: vec![ast::Decl::Parameter(ast::Parameter {
-                name: "Test Param".to_string(),
-                ident: "test_param".to_string(),
-                value: ParameterValue::Simple(ast::Expr::Literal(Literal::Number(42.0)), None),
-                limits: None,
-                is_performance: false,
-                trace_level: ast::parameter::TraceLevel::None,
-                note: None,
-            })],
-            sections: vec![Section {
-                label: "Test Section".to_string(),
-                note: Some(ast::Note("Test section".to_string())),
-                decls: vec![],
-            }],
+            note: None,
+            decls: vec![],
+            sections: vec![],
         };
 
         let module = build_model_module(model, &module_path);
 
-        todo!()
-        // assert_eq!(module.get_path(), &module_path);
-        // assert_eq!(module.get_symbols().len(), 1);
-        // assert_eq!(
-        //     module.get_symbols().get("test_param"),
-        //     Some(&Symbol::Parameter {
-        //         dependencies: HashSet::new(),
-        //         parameter: ast::Parameter {
-        //             name: "Test Param".to_string(),
-        //             ident: "test_param".to_string(),
-        //         },
-        //     })
-        // );
-    }
+        // Module path checks
+        assert_eq!(module.path(), &module_path);
 
-    #[test]
-    fn test_process_import_decl() {
-        let section_label = SectionLabel::new_top_level();
-        let module_path = ModulePath::new(PathBuf::from("parent_module"));
-        let path = "child_module".to_string();
-        let builder = ModuleBuilder::new(module_path.clone());
+        // Symbol checks
+        assert!(module.symbols().is_empty());
 
-        let result = process_import_decl(section_label, &module_path, path, builder);
-        let module = result.into_module();
+        // Test checks
+        assert!(module.tests().model_tests().is_empty());
+        assert!(module.tests().dependency_tests().is_empty());
 
-        assert_eq!(module.get_dependencies().len(), 1);
-        // Test that external imports were added
-        assert!(module.get_external_imports() != &ExternalImportMap::new());
-    }
+        // External import checks
+        assert!(module.external_imports().is_empty());
 
-    #[test]
-    fn test_process_use_model_decl() {
-        let section_label = SectionLabel::new_top_level();
-        let module_path = ModulePath::new(PathBuf::from("parent_module"));
-        let model_name = "test_model".to_string();
-        let subcomponents = vec!["comp1".to_string(), "comp2".to_string()];
-        let inputs = Some(vec![ModelInput {
-            name: "input1".to_string(),
-            value: ast::Expr::Literal(Literal::Number(10.0)),
-        }]);
-        let as_name = Some("alias".to_string());
-        let builder = ModuleBuilder::new(module_path.clone());
-
-        let result = process_use_model_decl(
-            section_label,
-            &module_path,
-            model_name,
-            subcomponents,
-            inputs,
-            as_name,
-            builder,
+        // Documentation map checks
+        assert_eq!(
+            module.documentation_map(),
+            &DocumentationMap::new(HashMap::new(), HashMap::new())
         );
-        let module = result.into_module();
-
-        // Test that symbols were added
-        assert!(module.get_symbols() != &SymbolMap::new());
-        assert_eq!(module.get_dependencies().len(), 1);
-        // Test that dependency tests were added
-        assert!(module.get_tests() != &Tests::new());
     }
 
     #[test]
-    fn test_process_use_model_decl_without_as_name() {
-        let section_label = SectionLabel::new_top_level();
-        let module_path = ModulePath::new(PathBuf::from("parent_module"));
-        let model_name = "test_model".to_string();
-        let subcomponents = vec!["comp1".to_string(), "comp2".to_string()];
-        let builder = ModuleBuilder::new(module_path.clone());
+    fn test_build_model_module_with_note() {
+        let module_path = ModulePath::new(PathBuf::from("test_module"));
+        let model = ast::Model {
+            note: Some(ast::Note("Test model".to_string())),
+            decls: vec![],
+            sections: vec![],
+        };
 
-        let result = process_use_model_decl(
-            section_label,
-            &module_path,
-            model_name.clone(),
-            subcomponents.clone(),
-            None,
-            None,
-            builder,
+        let module = build_model_module(model, &module_path);
+
+        // Module path checks
+        assert_eq!(module.path(), &module_path);
+
+        // Symbol checks
+        assert!(module.symbols().is_empty());
+
+        // Test checks
+        assert!(module.tests().model_tests().is_empty());
+        assert!(module.tests().dependency_tests().is_empty());
+
+        // External import checks
+        assert!(module.external_imports().is_empty());
+
+        // Documentation map checks
+        assert_eq!(
+            module.documentation_map(),
+            &DocumentationMap::new(
+                HashMap::from([(
+                    SectionLabel::new_top_level(),
+                    ast::Note("Test model".to_string()),
+                )]),
+                HashMap::new(),
+            )
         );
-        let module = result.into_module();
-
-        // Test that symbols were added (should use last subcomponent as name)
-        assert!(module.get_symbols() != &SymbolMap::new());
     }
 
     #[test]
-    fn test_process_parameter_decl_simple() {
-        let section_label = SectionLabel::new_top_level();
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
+    fn test_build_model_module_with_imports() {
+        let module_path = ModulePath::new(PathBuf::from("test_module"));
+        let model = ast::Model {
+            note: None,
+            decls: vec![
+                ast::Decl::Import {
+                    path: "math_functions".to_string(),
+                },
+                ast::Decl::Import {
+                    path: "physics_functions".to_string(),
+                },
+            ],
+            sections: vec![],
+        };
+
+        let module = build_model_module(model, &module_path);
+
+        // Module path checks
+        assert_eq!(module.path(), &module_path);
+
+        // Symbol checks
+        assert_eq!(module.symbols(), &SymbolMap::empty());
+
+        // Test checks
+        assert!(module.tests().model_tests().is_empty());
+        assert!(module.tests().dependency_tests().is_empty());
+
+        // External import checks
+        assert_eq!(
+            module.external_imports(),
+            &ExternalImportList::new(vec![
+                PythonPath::new("math_functions".into()),
+                PythonPath::new("physics_functions".into()),
+            ])
+        );
+
+        // Documentation map checks
+        assert_eq!(
+            module
+                .documentation_map()
+                .section_decls(&SectionLabel::new_top_level()),
+            Some(&vec![
+                SectionDecl::ExternalImport(PythonPath::new("math_functions".into())),
+                SectionDecl::ExternalImport(PythonPath::new("physics_functions".into())),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_build_model_module_with_use_models() {
+        let module_path = ModulePath::new(PathBuf::from("test_module"));
+        let model = ast::Model {
+            note: None,
+            decls: vec![
+                ast::Decl::UseModel {
+                    model_name: "submodel1".to_string(),
+                    subcomponents: vec!["comp1".to_string()],
+                    inputs: None,
+                    as_name: None,
+                },
+                ast::Decl::UseModel {
+                    model_name: "submodel2".to_string(),
+                    subcomponents: vec!["comp1".to_string(), "comp2".to_string()],
+                    inputs: Some(vec![ModelInput {
+                        name: "input1".to_string(),
+                        value: ast::Expr::Literal(Literal::Number(10.0)),
+                    }]),
+                    as_name: Some("alias".to_string()),
+                },
+                ast::Decl::UseModel {
+                    model_name: "submodel3".to_string(),
+                    subcomponents: vec![],
+                    inputs: None,
+                    as_name: None,
+                },
+            ],
+            sections: vec![],
+        };
+
+        let module = build_model_module(model, &module_path);
+
+        // Module path checks
+        assert_eq!(module.path(), &module_path);
+
+        // Symbol checks
+        assert_eq!(module.symbols().len(), 3);
+
+        assert_eq!(
+            module.symbols().get(&Identifier::new("comp1".to_string())),
+            Some(&Symbol::Import(ModuleReference::new(
+                ModulePath::new(PathBuf::from("submodel1")),
+                Some(Reference::identifier(Identifier::new("comp1".to_string()))),
+            )))
+        );
+
+        assert_eq!(
+            module.symbols().get(&Identifier::new("alias".to_string())),
+            Some(&Symbol::Import(ModuleReference::new(
+                ModulePath::new(PathBuf::from("submodel2")),
+                Some(Reference::accessor(
+                    Identifier::new("comp1".to_string()),
+                    Reference::identifier(Identifier::new("comp2".to_string())),
+                )),
+            )))
+        );
+
+        assert_eq!(
+            module
+                .symbols()
+                .get(&Identifier::new("submodel3".to_string())),
+            Some(&Symbol::Import(ModuleReference::new(
+                ModulePath::new(PathBuf::from("submodel3")),
+                None,
+            )))
+        );
+
+        // Test checks
+        assert!(module.tests().model_tests().is_empty());
+        assert_eq!(module.tests().dependency_tests().len(), 3);
+
+        assert_eq!(
+            module
+                .tests()
+                .dependency_tests()
+                .get(&ModulePath::new(PathBuf::from("submodel1"))),
+            Some(&TestInputs::empty())
+        );
+
+        assert_eq!(
+            module
+                .tests()
+                .dependency_tests()
+                .get(&ModulePath::new(PathBuf::from("submodel2"))),
+            Some(&TestInputs::new(HashMap::from([(
+                Identifier::new("input1".to_string()),
+                ast::Expr::Literal(Literal::Number(10.0)),
+            )])))
+        );
+
+        assert_eq!(
+            module
+                .tests()
+                .dependency_tests()
+                .get(&ModulePath::new(PathBuf::from("submodel3"))),
+            Some(&TestInputs::empty())
+        );
+
+        // External import checks
+        assert_eq!(module.external_imports(), &ExternalImportList::empty());
+
+        // Documentation map checks
+        let top_section_decls = vec![
+            SectionDecl::InternalImport(Identifier::new("comp1".to_string())),
+            SectionDecl::InternalImport(Identifier::new("alias".to_string())),
+            SectionDecl::InternalImport(Identifier::new("submodel3".to_string())),
+        ];
+
+        assert_eq!(
+            module.documentation_map(),
+            &DocumentationMap::new(
+                HashMap::new(),
+                HashMap::from([(SectionLabel::new_top_level(), top_section_decls,)])
+            )
+        );
+    }
+
+    #[test]
+    fn test_build_model_module_with_parameters() {
+        let module_path = ModulePath::new(PathBuf::from("test_module"));
+
+        let param1 = ast::Parameter {
+            name: "Parameter 1".to_string(),
+            ident: "param1".to_string(),
             value: ParameterValue::Simple(ast::Expr::Literal(Literal::Number(42.0)), None),
             limits: None,
             is_performance: false,
             trace_level: ast::parameter::TraceLevel::None,
             note: None,
         };
-        let builder = ModuleBuilder::new(ModulePath::new(PathBuf::from("test")));
 
-        let result = process_parameter_decl(section_label, parameter, builder);
-        let module = result.into_module();
-
-        // Test that symbols were added
-        assert!(module.get_symbols() != &SymbolMap::new());
-    }
-
-    #[test]
-    fn test_process_parameter_decl_with_continuous_limits() {
-        let section_label = SectionLabel::new_top_level();
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(ast::Expr::Literal(Literal::Number(42.0)), None),
+        let param2 = ast::Parameter {
+            name: "Parameter 2".to_string(),
+            ident: "param2".to_string(),
+            value: ParameterValue::Simple(
+                ast::Expr::Variable(Variable::Identifier("param1".to_string())),
+                None,
+            ),
             limits: Some(Limits::Continuous {
                 min: ast::Expr::Literal(Literal::Number(0.0)),
                 max: ast::Expr::Literal(Literal::Number(100.0)),
@@ -439,86 +559,331 @@ mod tests {
             trace_level: ast::parameter::TraceLevel::None,
             note: None,
         };
-        let builder = ModuleBuilder::new(ModulePath::new(PathBuf::from("test")));
 
-        let result = process_parameter_decl(section_label, parameter, builder);
-        let module = result.into_module();
-
-        // Test that symbols were added
-        assert!(module.get_symbols() != &SymbolMap::new());
-    }
-
-    #[test]
-    fn test_process_parameter_decl_with_discrete_limits() {
-        let section_label = SectionLabel::new_top_level();
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(ast::Expr::Literal(Literal::Number(42.0)), None),
-            limits: Some(Limits::Discrete {
-                values: vec![
-                    ast::Expr::Literal(Literal::Number(1.0)),
-                    ast::Expr::Literal(Literal::Number(2.0)),
-                    ast::Expr::Literal(Literal::Number(3.0)),
-                ],
-            }),
-            is_performance: false,
-            trace_level: ast::parameter::TraceLevel::None,
+        let model = ast::Model {
             note: None,
+            decls: vec![
+                ast::Decl::Parameter(param1.clone()),
+                ast::Decl::Parameter(param2.clone()),
+            ],
+            sections: vec![],
         };
-        let builder = ModuleBuilder::new(ModulePath::new(PathBuf::from("test")));
 
-        let result = process_parameter_decl(section_label, parameter, builder);
-        let module = result.into_module();
+        let module = build_model_module(model, &module_path);
 
-        // Test that symbols were added
-        assert!(module.get_symbols() != &SymbolMap::new());
+        // Module path checks
+        assert_eq!(module.path(), &module_path);
+
+        // Symbol checks
+        assert_eq!(module.symbols().len(), 2);
+
+        assert_eq!(
+            module.symbols().get(&Identifier::new("param1".to_string())),
+            Some(&Symbol::Parameter {
+                parameter: param1,
+                dependencies: HashSet::new(),
+            })
+        );
+
+        assert_eq!(
+            module.symbols().get(&Identifier::new("param2".to_string())),
+            Some(&Symbol::Parameter {
+                parameter: param2,
+                dependencies: HashSet::from([Reference::Identifier(Identifier::new(
+                    "param1".to_string()
+                )),]),
+            })
+        );
+
+        // Test checks
+        assert!(module.tests().model_tests().is_empty());
+        assert!(module.tests().dependency_tests().is_empty());
+
+        // External import checks
+        assert!(module.external_imports().is_empty());
+
+        // Documentation map checks
+        let top_section_decls = vec![
+            SectionDecl::Parameter(Identifier::new("param1".to_string())),
+            SectionDecl::Parameter(Identifier::new("param2".to_string())),
+        ];
+
+        assert_eq!(
+            module.documentation_map(),
+            &DocumentationMap::new(
+                HashMap::new(),
+                HashMap::from([(SectionLabel::new_top_level(), top_section_decls,)])
+            )
+        );
     }
 
     #[test]
-    fn test_process_parameter_decl_piecewise() {
-        let section_label = SectionLabel::new_top_level();
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Piecewise(
-                PiecewiseExpr {
-                    parts: vec![PiecewisePart {
-                        expr: ast::Expr::Literal(Literal::Number(10.0)),
-                        if_expr: ast::Expr::Literal(Literal::Number(1.0)),
-                    }],
-                },
-                None,
-            ),
-            limits: None,
-            is_performance: false,
+    fn test_build_model_module_with_tests() {
+        let module_path = ModulePath::new(PathBuf::from("test_module"));
+
+        let test1 = ast::Test {
             trace_level: ast::parameter::TraceLevel::None,
-            note: None,
-        };
-        let builder = ModuleBuilder::new(ModulePath::new(PathBuf::from("test")));
-
-        let result = process_parameter_decl(section_label, parameter, builder);
-        let module = result.into_module();
-
-        // Test that symbols were added
-        assert!(module.get_symbols() != &SymbolMap::new());
-    }
-
-    #[test]
-    fn test_process_test_decl() {
-        let builder = ModuleBuilder::new(ModulePath::new(PathBuf::from("test")));
-        let section_label = SectionLabel::new_top_level();
-        let test = ast::Test {
-            trace_level: ast::parameter::TraceLevel::None,
-            inputs: vec!["x".to_string(), "y".to_string()],
+            inputs: vec![],
             expr: ast::Expr::Literal(Literal::Boolean(true)),
         };
 
-        let result = process_test_decl(builder, section_label, test);
-        let module = result.into_module();
+        let test2 = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec!["x".to_string()],
+            expr: ast::Expr::BinaryOp {
+                op: BinaryOp::GreaterThan,
+                left: Box::new(ast::Expr::Literal(Literal::Number(1.0))),
+                right: Box::new(ast::Expr::Literal(Literal::Number(2.0))),
+            },
+        };
 
-        // Test that model tests were added
-        assert!(module.get_tests() != &Tests::new());
+        let model = ast::Model {
+            note: None,
+            decls: vec![
+                ast::Decl::Test(test1.clone()),
+                ast::Decl::Test(test2.clone()),
+            ],
+            sections: vec![],
+        };
+
+        let module = build_model_module(model, &module_path);
+
+        // Module path checks
+        assert_eq!(module.path(), &module_path);
+
+        // Symbol checks
+        assert!(module.symbols().is_empty());
+
+        // Test checks
+        assert_eq!(module.tests().model_tests().len(), 2);
+        assert!(module.tests().model_tests().contains(&test1.clone()));
+        assert!(module.tests().model_tests().contains(&test2.clone()));
+        assert!(module.tests().dependency_tests().is_empty());
+
+        // External import checks
+        assert!(module.external_imports().is_empty());
+
+        // Documentation map checks
+        let test1_index = module
+            .tests()
+            .model_tests()
+            .iter()
+            .position(|t| t == &test1)
+            .unwrap();
+        let test2_index = module
+            .tests()
+            .model_tests()
+            .iter()
+            .position(|t| t == &test2)
+            .unwrap();
+
+        assert_eq!(
+            module
+                .documentation_map()
+                .section_decls(&SectionLabel::new_top_level()),
+            Some(&vec![
+                SectionDecl::Test(TestIndex::new(test1_index)),
+                SectionDecl::Test(TestIndex::new(test2_index)),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_build_model_module_with_sections() {
+        let module_path = ModulePath::new(PathBuf::from("test_module"));
+
+        let param1 = ast::Parameter {
+            name: "Parameter 1".to_string(),
+            ident: "param1".to_string(),
+            value: ParameterValue::Simple(ast::Expr::Literal(Literal::Number(42.0)), None),
+            note: None,
+            limits: None,
+            is_performance: false,
+            trace_level: ast::parameter::TraceLevel::None,
+        };
+
+        let param2 = ast::Parameter {
+            name: "Parameter 2".to_string(),
+            ident: "param2".to_string(),
+            value: ParameterValue::Simple(ast::Expr::Literal(Literal::Number(42.0)), None),
+            note: None,
+            limits: None,
+            is_performance: false,
+            trace_level: ast::parameter::TraceLevel::None,
+        };
+
+        let test1 = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec![],
+            expr: ast::Expr::Literal(Literal::Boolean(true)),
+        };
+
+        let test2 = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec!["x".to_string()],
+            expr: ast::Expr::BinaryOp {
+                op: BinaryOp::GreaterThan,
+                left: Box::new(ast::Expr::Literal(Literal::Number(1.0))),
+                right: Box::new(ast::Expr::Literal(Literal::Number(2.0))),
+            },
+        };
+
+        let model = ast::Model {
+            note: Some(ast::Note("Main model".to_string())),
+            decls: vec![
+                ast::Decl::Import {
+                    path: "math_functions".to_string(),
+                },
+                ast::Decl::UseModel {
+                    model_name: "submodel1".to_string(),
+                    subcomponents: vec![],
+                    inputs: None,
+                    as_name: None,
+                },
+                ast::Decl::Parameter(param1.clone()),
+                ast::Decl::Test(test1.clone()),
+            ],
+            sections: vec![ast::model::Section {
+                label: "section1".to_string(),
+                note: Some(ast::Note("Section 1".to_string())),
+                decls: vec![
+                    ast::Decl::Import {
+                        path: "physics_functions".to_string(),
+                    },
+                    ast::Decl::UseModel {
+                        model_name: "submodel2".to_string(),
+                        subcomponents: vec![],
+                        inputs: None,
+                        as_name: None,
+                    },
+                    ast::Decl::Parameter(param2.clone()),
+                    ast::Decl::Test(test2.clone()),
+                ],
+            }],
+        };
+
+        let module = build_model_module(model, &module_path);
+
+        // Module path checks
+        assert_eq!(module.path(), &module_path);
+
+        // Symbol checks
+        assert_eq!(module.symbols().len(), 4);
+        assert_eq!(
+            module.symbols().get(&Identifier::new("param1".to_string())),
+            Some(&Symbol::Parameter {
+                parameter: param1,
+                dependencies: HashSet::new(),
+            })
+        );
+
+        assert_eq!(
+            module.symbols().get(&Identifier::new("param2".to_string())),
+            Some(&Symbol::Parameter {
+                parameter: param2,
+                dependencies: HashSet::new(),
+            })
+        );
+
+        assert_eq!(
+            module
+                .symbols()
+                .get(&Identifier::new("submodel1".to_string())),
+            Some(&Symbol::Import(ModuleReference::new(
+                ModulePath::new(PathBuf::from("submodel1")),
+                None,
+            )))
+        );
+
+        assert_eq!(
+            module
+                .symbols()
+                .get(&Identifier::new("submodel2".to_string())),
+            Some(&Symbol::Import(ModuleReference::new(
+                ModulePath::new(PathBuf::from("submodel2")),
+                None,
+            )))
+        );
+
+        // Test checks
+        assert_eq!(module.tests().model_tests().len(), 2);
+        assert!(module.tests().model_tests().contains(&test1.clone()));
+        assert!(module.tests().model_tests().contains(&test2.clone()));
+        assert_eq!(module.tests().dependency_tests().len(), 2);
+        assert!(
+            module
+                .tests()
+                .dependency_tests()
+                .get(&ModulePath::new(PathBuf::from("submodel1")))
+                .is_some()
+        );
+        assert!(
+            module
+                .tests()
+                .dependency_tests()
+                .get(&ModulePath::new(PathBuf::from("submodel2")))
+                .is_some()
+        );
+
+        // External import checks
+        assert_eq!(module.external_imports().len(), 2);
+        assert!(
+            module
+                .external_imports()
+                .contains(&PythonPath::new(PathBuf::from("math_functions")))
+        );
+        assert!(
+            module
+                .external_imports()
+                .contains(&PythonPath::new(PathBuf::from("physics_functions")))
+        );
+
+        // Documentation map checks
+        let doc_map = module.documentation_map();
+
+        let test1_index = module
+            .tests()
+            .model_tests()
+            .iter()
+            .position(|t| t == &test1)
+            .unwrap();
+
+        let test2_index = module
+            .tests()
+            .model_tests()
+            .iter()
+            .position(|t| t == &test2)
+            .unwrap();
+
+        assert_eq!(
+            doc_map.section_notes(&SectionLabel::new_top_level()),
+            Some(&ast::Note("Main model".to_string()))
+        );
+
+        assert_eq!(
+            doc_map.section_decls(&SectionLabel::new_top_level()),
+            Some(&vec![
+                SectionDecl::ExternalImport(PythonPath::new(PathBuf::from("math_functions"))),
+                SectionDecl::InternalImport(Identifier::new("submodel1".to_string())),
+                SectionDecl::Parameter(Identifier::new("param1".to_string())),
+                SectionDecl::Test(TestIndex::new(test1_index)),
+            ])
+        );
+
+        assert_eq!(
+            doc_map.section_notes(&SectionLabel::new_subsection("section1".to_string())),
+            Some(&ast::Note("Section 1".to_string()))
+        );
+
+        assert_eq!(
+            doc_map.section_decls(&SectionLabel::new_subsection("section1".to_string())),
+            Some(&vec![
+                SectionDecl::ExternalImport(PythonPath::new(PathBuf::from("physics_functions"))),
+                SectionDecl::InternalImport(Identifier::new("submodel2".to_string())),
+                SectionDecl::Parameter(Identifier::new("param2".to_string())),
+                SectionDecl::Test(TestIndex::new(test2_index)),
+            ])
+        );
     }
 
     #[test]
