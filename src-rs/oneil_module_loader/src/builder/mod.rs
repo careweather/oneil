@@ -139,14 +139,20 @@ fn process_use_model_decl(
         .unwrap_or(subcomponents.last().unwrap_or(&model_name));
     let symbol_name = Identifier::new(symbol_name.clone());
 
-    // Convert the subcomponent names to identifiers
-    let subcomponents = subcomponents
-        .into_iter()
-        .map(|s| Identifier::new(s))
-        .collect::<Vec<_>>();
+    // Convert the subcomponent names to a reference
+    let reference = subcomponents.into_iter().rfold(None, |acc, s| {
+        let ident = Identifier::new(s);
+        match acc {
+            None => Some(Reference::Identifier(ident)),
+            Some(reference) => Some(Reference::Accessor {
+                parent: ident,
+                component: Box::new(reference),
+            }),
+        }
+    });
 
     // Build the symbol
-    let symbol = Symbol::Import(ModuleReference::new(use_path.clone(), subcomponents));
+    let symbol = Symbol::Import(ModuleReference::new(use_path.clone(), reference));
 
     // Add the symbol, dependency, and dependency test to the builder
     builder.add_symbol(symbol_name.clone(), symbol);

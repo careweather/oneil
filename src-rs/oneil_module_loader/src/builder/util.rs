@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ast as ast;
 use oneil_module::{
-    Dependency, DocumentationMap, ExternalImportMap, Identifier, Module, ModulePath, PythonPath,
+    Dependency, DocumentationMap, ExternalImportList, Identifier, Module, ModulePath, PythonPath,
     SectionDecl, SectionLabel, Symbol, SymbolMap, TestIndex, TestInputs, Tests,
 };
 
@@ -12,7 +12,7 @@ pub struct ModuleBuilder {
     module_path: ModulePath,
     symbols: SymbolMap,
     tests: Tests,
-    external_imports: ExternalImportMap,
+    external_imports: ExternalImportList,
     section_notes: HashMap<SectionLabel, ast::Note>,
     section_items: HashMap<SectionLabel, Vec<SectionDecl>>,
     dependencies: HashSet<Dependency>,
@@ -24,7 +24,7 @@ impl ModuleBuilder {
             module_path,
             symbols: SymbolMap::new(),
             tests: Tests::new(),
-            external_imports: ExternalImportMap::new(),
+            external_imports: ExternalImportList::new(),
             section_notes: HashMap::new(),
             section_items: HashMap::new(),
             dependencies: HashSet::new(),

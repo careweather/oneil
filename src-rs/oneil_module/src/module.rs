@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::dependency::{Dependency, ExternalImportMap};
+use crate::dependency::{Dependency, ExternalImportList};
 use crate::documentation::DocumentationMap;
 use crate::path::ModulePath;
 use crate::symbol::SymbolMap;
@@ -11,7 +11,7 @@ pub struct Module {
     path: ModulePath,
     symbols: SymbolMap,
     tests: Tests,
-    external_imports: ExternalImportMap,
+    external_imports: ExternalImportList,
     documentation_map: DocumentationMap,
     dependencies: HashSet<Dependency>,
     dependent_modules: HashSet<ModulePath>,
@@ -22,7 +22,7 @@ impl Module {
         path: ModulePath,
         symbols: SymbolMap,
         tests: Tests,
-        external_imports: ExternalImportMap,
+        external_imports: ExternalImportList,
         documentation_map: DocumentationMap,
         dependencies: HashSet<Dependency>,
     ) -> Self {
@@ -49,7 +49,7 @@ impl Module {
         &self.tests
     }
 
-    pub fn get_external_imports(&self) -> &ExternalImportMap {
+    pub fn get_external_imports(&self) -> &ExternalImportList {
         &self.external_imports
     }
 

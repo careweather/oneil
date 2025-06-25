@@ -1,9 +1,9 @@
 use crate::path::{ModulePath, PythonPath};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ExternalImportMap(Vec<PythonPath>);
+pub struct ExternalImportList(Vec<PythonPath>);
 
-impl ExternalImportMap {
+impl ExternalImportList {
     pub fn new() -> Self {
         Self(vec![])
     }

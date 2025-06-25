@@ -1,15 +1,6 @@
 use crate::path::ModulePath;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Reference {
-    Identifier(Identifier),
-    Accessor {
-        parent: Identifier,
-        component: Box<Reference>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier(String);
 
 impl Identifier {
@@ -18,17 +9,23 @@ impl Identifier {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Reference {
+    Identifier(Identifier),
+    Accessor {
+        parent: Identifier,
+        component: Box<Reference>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleReference {
     path: ModulePath,
-    subcomponents: Vec<Identifier>,
+    reference: Option<Reference>,
 }
 
 impl ModuleReference {
-    pub fn new(path: ModulePath, subcomponents: Vec<Identifier>) -> Self {
-        Self {
-            path,
-            subcomponents,
-        }
+    pub fn new(path: ModulePath, reference: Option<Reference>) -> Self {
+        Self { path, reference }
     }
 }
