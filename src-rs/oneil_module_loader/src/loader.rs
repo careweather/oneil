@@ -47,12 +47,12 @@ where
     };
 
     // Process the AST into a module
-    let module = builder::build_model_module(file_ast, &module_path);
+    let module = builder::build_module(file_ast, &module_path);
 
     // Load module dependencies
     let (mut module_collection, module_errors) = load_dependencies(
         &module_path,
-        todo!(),
+        &module.dependencies(),
         module_stack,
         module_collection,
         module_errors,

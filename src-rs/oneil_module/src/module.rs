@@ -13,6 +13,7 @@ pub struct Module {
     tests: Tests,
     external_imports: ExternalImportList,
     documentation_map: DocumentationMap,
+    dependencies: HashSet<Dependency>,
 }
 
 impl Module {
@@ -22,6 +23,7 @@ impl Module {
         tests: Tests,
         external_imports: ExternalImportList,
         documentation_map: DocumentationMap,
+        dependencies: HashSet<Dependency>,
     ) -> Self {
         Self {
             path,
@@ -29,6 +31,7 @@ impl Module {
             tests,
             external_imports,
             documentation_map,
+            dependencies,
         }
     }
 
@@ -50,6 +53,10 @@ impl Module {
 
     pub fn documentation_map(&self) -> &DocumentationMap {
         &self.documentation_map
+    }
+
+    pub fn dependencies(&self) -> &HashSet<Dependency> {
+        &self.dependencies
     }
 }
 

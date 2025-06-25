@@ -2,14 +2,14 @@ use std::collections::HashSet;
 
 use oneil_ast as ast;
 use oneil_module::{
-    Identifier, Module, ModulePath, ModuleReference, PythonPath, Reference, SectionDecl,
-    SectionLabel, Symbol, TestInputs,
+    Dependency, Identifier, Module, ModulePath, ModuleReference, PythonPath, Reference,
+    SectionDecl, SectionLabel, Symbol, TestInputs,
 };
 
 mod util;
 use util::{ModuleBuilder, TestInputsBuilder};
 
-pub fn build_model_module(model: ast::Model, module_path: &ModulePath) -> Module {
+pub fn build_module(model: ast::Model, module_path: &ModulePath) -> Module {
     let module_builder = ModuleBuilder::new(module_path.clone());
 
     // Build the top-level section
@@ -100,6 +100,7 @@ fn process_import_decl(
     let import_path = PythonPath::new(import_path);
 
     // Add the dependency and external import to the builder
+    builder.add_dependency(Dependency::Python(import_path.clone()));
     builder.add_external_import(import_path.clone());
     builder.add_section_decl(section_label, SectionDecl::ExternalImport(import_path));
     builder
@@ -156,6 +157,7 @@ fn process_use_model_decl(
 
     // Add the symbol, dependency, and dependency test to the builder
     builder.add_symbol(symbol_name.clone(), symbol);
+    builder.add_dependency(Dependency::Module(use_path.clone()));
     builder.add_dependency_test(use_path, test_inputs);
     builder.add_section_decl(section_label, SectionDecl::InternalImport(symbol_name));
     builder
@@ -296,7 +298,7 @@ mod tests {
             sections: vec![],
         };
 
-        let module = build_model_module(model, &module_path);
+        let module = build_module(model, &module_path);
 
         // Module path checks
         assert_eq!(module.path(), &module_path);
@@ -316,6 +318,9 @@ mod tests {
             module.documentation_map(),
             &DocumentationMap::new(HashMap::new(), HashMap::new())
         );
+
+        // Dependency checks
+        assert!(module.dependencies().is_empty());
     }
 
     #[test]
@@ -327,7 +332,7 @@ mod tests {
             sections: vec![],
         };
 
-        let module = build_model_module(model, &module_path);
+        let module = build_module(model, &module_path);
 
         // Module path checks
         assert_eq!(module.path(), &module_path);
@@ -353,6 +358,9 @@ mod tests {
                 HashMap::new(),
             )
         );
+
+        // Dependency checks
+        assert!(module.dependencies().is_empty());
     }
 
     #[test]
@@ -371,7 +379,7 @@ mod tests {
             sections: vec![],
         };
 
-        let module = build_model_module(model, &module_path);
+        let module = build_module(model, &module_path);
 
         // Module path checks
         assert_eq!(module.path(), &module_path);
@@ -401,6 +409,25 @@ mod tests {
                 SectionDecl::ExternalImport(PythonPath::new("math_functions".into())),
                 SectionDecl::ExternalImport(PythonPath::new("physics_functions".into())),
             ])
+        );
+
+        // Dependency checks
+        assert_eq!(module.dependencies().len(), 2);
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Python(PythonPath::new(
+                    "math_functions".into()
+                )))
+        );
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Python(PythonPath::new(
+                    "physics_functions".into()
+                )))
         );
     }
 
@@ -435,7 +462,7 @@ mod tests {
             sections: vec![],
         };
 
-        let module = build_model_module(model, &module_path);
+        let module = build_module(model, &module_path);
 
         // Module path checks
         assert_eq!(module.path(), &module_path);
@@ -520,6 +547,33 @@ mod tests {
                 HashMap::from([(SectionLabel::new_top_level(), top_section_decls,)])
             )
         );
+
+        // Dependency checks
+        assert_eq!(module.dependencies().len(), 3);
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Module(ModulePath::new(PathBuf::from(
+                    "submodel1"
+                ))))
+        );
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Module(ModulePath::new(PathBuf::from(
+                    "submodel2"
+                ))))
+        );
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Module(ModulePath::new(PathBuf::from(
+                    "submodel3"
+                ))))
+        );
     }
 
     #[test]
@@ -561,7 +615,7 @@ mod tests {
             sections: vec![],
         };
 
-        let module = build_model_module(model, &module_path);
+        let module = build_module(model, &module_path);
 
         // Module path checks
         assert_eq!(module.path(), &module_path);
@@ -599,6 +653,9 @@ mod tests {
                 HashMap::from([(SectionLabel::new_top_level(), top_section_decls,)])
             )
         );
+
+        // Dependency checks
+        assert!(module.dependencies().is_empty());
     }
 
     #[test]
@@ -630,7 +687,7 @@ mod tests {
             sections: vec![],
         };
 
-        let module = build_model_module(model, &module_path);
+        let module = build_module(model, &module_path);
 
         // Module path checks
         assert_eq!(module.path(), &module_path);
@@ -670,6 +727,9 @@ mod tests {
                 SectionDecl::Test(TestIndex::new(test2_index)),
             ])
         );
+
+        // Dependency checks
+        assert!(module.dependencies().is_empty());
     }
 
     #[test]
@@ -746,7 +806,7 @@ mod tests {
             }],
         };
 
-        let module = build_model_module(model, &module_path);
+        let module = build_module(model, &module_path);
 
         // Module path checks
         assert_eq!(module.path(), &module_path);
@@ -861,6 +921,41 @@ mod tests {
                 SectionDecl::Parameter(Identifier::new("param2".to_string())),
                 SectionDecl::Test(TestIndex::new(test2_index)),
             ])
+        );
+
+        // Dependency checks
+        assert_eq!(module.dependencies().len(), 4);
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Module(ModulePath::new(PathBuf::from(
+                    "submodel1"
+                ))))
+        );
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Module(ModulePath::new(PathBuf::from(
+                    "submodel2"
+                ))))
+        );
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Python(PythonPath::new(
+                    "math_functions".into()
+                )))
+        );
+
+        assert!(
+            module
+                .dependencies()
+                .contains(&Dependency::Python(PythonPath::new(
+                    "physics_functions".into()
+                )))
         );
     }
 
