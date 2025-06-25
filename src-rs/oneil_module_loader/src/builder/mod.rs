@@ -96,7 +96,7 @@ fn process_import_decl(
     mut builder: ModuleBuilder,
 ) -> ModuleBuilder {
     // Build the import path from the current module path and the given path
-    let import_path = module_path.join_as_path(&path);
+    let import_path = module_path.get_sibling_path(&path);
     let import_path = PythonPath::new(import_path);
 
     // Add the dependency and external import to the builder
@@ -116,7 +116,7 @@ fn process_use_model_decl(
     mut builder: ModuleBuilder,
 ) -> ModuleBuilder {
     // Build the use path from the current module path and the given model name
-    let use_path = module_path.join_as_path(&model_name);
+    let use_path = module_path.get_sibling_path(&model_name);
     let use_path = ModulePath::new(use_path);
 
     // Build the test inputs

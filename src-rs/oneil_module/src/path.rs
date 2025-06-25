@@ -4,12 +4,36 @@ use std::path::{Path, PathBuf};
 pub struct ModulePath(PathBuf);
 
 impl ModulePath {
-    pub fn new(path: PathBuf) -> Self {
-        Self(path)
+    pub fn new(mut path: PathBuf) -> Self {
+        match path.extension() {
+            Some(ext) if ext == "on" => Self(path),
+            Some(ext) => panic!(
+                "Module paths must not have an extension other than .on: '{:?}'",
+                ext
+            ),
+            None => {
+                path.set_extension("on");
+                Self(path)
+            }
+        }
     }
 
-    pub fn join_as_path(&self, other: &str) -> PathBuf {
-        self.0.join(other)
+    /// Returns a path for a sibling module relative to the current module's path.
+    ///
+    /// Given a path to another module, this function returns a new path that represents
+    /// that module as a sibling of the current module (i.e., in the same directory).
+    ///
+    /// For example, given that the path of `self` is `foo/bar/baz` and `other` is `qux`,
+    /// the returned path will be `foo/bar/qux`.
+    pub fn get_sibling_path(&self, other: impl AsRef<Path>) -> PathBuf {
+        let parent = self.0.parent();
+
+        let sibling_path = match parent {
+            Some(parent) => parent.join(other.as_ref()),
+            None => PathBuf::from(other.as_ref()),
+        };
+
+        sibling_path
     }
 }
 
@@ -23,8 +47,18 @@ impl AsRef<Path> for ModulePath {
 pub struct PythonPath(PathBuf);
 
 impl PythonPath {
-    pub fn new(path: PathBuf) -> Self {
-        Self(path)
+    pub fn new(mut path: PathBuf) -> Self {
+        match path.extension() {
+            Some(ext) if ext == "py" => Self(path),
+            Some(ext) => panic!(
+                "Python paths must not have an extension other than .py: '{:?}'",
+                ext
+            ),
+            None => {
+                path.set_extension("py");
+                Self(path)
+            }
+        }
     }
 }
 
