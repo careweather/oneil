@@ -169,7 +169,7 @@ fn process_parameter_decl(
     mut builder: ModuleBuilder,
 ) -> ModuleBuilder {
     // Build the symbol name
-    let ident = Identifier::new(parameter.name.clone());
+    let ident = Identifier::new(parameter.ident.clone());
 
     // Extract the dependencies
     let dependencies = extract_parameter_dependencies(&parameter);
