@@ -13,8 +13,6 @@ pub struct Module {
     tests: Tests,
     external_imports: ExternalImportList,
     documentation_map: DocumentationMap,
-    dependencies: HashSet<Dependency>,
-    dependent_modules: HashSet<ModulePath>,
 }
 
 impl Module {
@@ -24,7 +22,6 @@ impl Module {
         tests: Tests,
         external_imports: ExternalImportList,
         documentation_map: DocumentationMap,
-        dependencies: HashSet<Dependency>,
     ) -> Self {
         Self {
             path,
@@ -32,8 +29,6 @@ impl Module {
             tests,
             external_imports,
             documentation_map,
-            dependencies,
-            dependent_modules: HashSet::new(),
         }
     }
 
@@ -55,18 +50,6 @@ impl Module {
 
     pub fn documentation_map(&self) -> &DocumentationMap {
         &self.documentation_map
-    }
-
-    pub fn dependencies(&self) -> &HashSet<Dependency> {
-        &self.dependencies
-    }
-
-    pub fn dependent_modules(&self) -> &HashSet<ModulePath> {
-        &self.dependent_modules
-    }
-
-    pub fn dependent_module(&mut self, module_path: ModulePath) {
-        self.dependent_modules.insert(module_path);
     }
 }
 
@@ -93,10 +76,7 @@ impl ModuleGraph {
         module_path: &ModulePath,
         dependent_module_path: ModulePath,
     ) {
-        self.modules
-            .get_mut(module_path)
-            .unwrap()
-            .dependent_module(dependent_module_path);
+        todo!("This may be replaced with a builder")
     }
 
     pub fn has_loaded_for(&self, module_path: &ModulePath) -> bool {

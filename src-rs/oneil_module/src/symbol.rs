@@ -1,16 +1,12 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::ops::Deref;
 
-use crate::reference::{Identifier, ModuleReference, Reference};
+use crate::reference::{Identifier, ModuleReference};
 use oneil_ast as ast;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Symbol {
-    Parameter {
-        dependencies: HashSet<Reference>,
-        parameter: ast::Parameter,
-    },
+    Parameter(ast::Parameter),
     Import(ModuleReference),
 }
 

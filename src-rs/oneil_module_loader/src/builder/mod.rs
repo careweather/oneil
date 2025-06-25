@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use oneil_ast as ast;
 use oneil_module::{
-    Dependency, Identifier, Module, ModulePath, ModuleReference, PythonPath, Reference,
-    SectionDecl, SectionLabel, Symbol, TestInputs,
+    Identifier, Module, ModulePath, ModuleReference, PythonPath, Reference, SectionDecl,
+    SectionLabel, Symbol, TestInputs,
 };
 
 mod util;
@@ -100,7 +100,6 @@ fn process_import_decl(
     let import_path = PythonPath::new(import_path);
 
     // Add the dependency and external import to the builder
-    builder.add_dependency(Dependency::Python(import_path.clone()));
     builder.add_external_import(import_path.clone());
     builder.add_section_decl(section_label, SectionDecl::ExternalImport(import_path));
     builder
@@ -157,7 +156,6 @@ fn process_use_model_decl(
 
     // Add the symbol, dependency, and dependency test to the builder
     builder.add_symbol(symbol_name.clone(), symbol);
-    builder.add_dependency(Dependency::Module(use_path.clone()));
     builder.add_dependency_test(use_path, test_inputs);
     builder.add_section_decl(section_label, SectionDecl::InternalImport(symbol_name));
     builder
@@ -168,15 +166,9 @@ fn process_parameter_decl(
     parameter: oneil_ast::Parameter,
     mut builder: ModuleBuilder,
 ) -> ModuleBuilder {
-    // Build the symbol name
+    // Build the symbol
     let ident = Identifier::new(parameter.ident.clone());
-
-    // Extract the dependencies
-    let dependencies = extract_parameter_dependencies(&parameter);
-    let symbol = Symbol::Parameter {
-        dependencies,
-        parameter,
-    };
+    let symbol = Symbol::Parameter(parameter);
 
     // Add the symbol to the builder
     builder.add_symbol(ident.clone(), symbol);
@@ -579,20 +571,12 @@ mod tests {
 
         assert_eq!(
             module.symbols().get(&Identifier::new("param1".to_string())),
-            Some(&Symbol::Parameter {
-                parameter: param1,
-                dependencies: HashSet::new(),
-            })
+            Some(&Symbol::Parameter(param1))
         );
 
         assert_eq!(
             module.symbols().get(&Identifier::new("param2".to_string())),
-            Some(&Symbol::Parameter {
-                parameter: param2,
-                dependencies: HashSet::from([Reference::Identifier(Identifier::new(
-                    "param1".to_string()
-                )),]),
-            })
+            Some(&Symbol::Parameter(param2))
         );
 
         // Test checks
@@ -771,18 +755,12 @@ mod tests {
         assert_eq!(module.symbols().len(), 4);
         assert_eq!(
             module.symbols().get(&Identifier::new("param1".to_string())),
-            Some(&Symbol::Parameter {
-                parameter: param1,
-                dependencies: HashSet::new(),
-            })
+            Some(&Symbol::Parameter(param1))
         );
 
         assert_eq!(
             module.symbols().get(&Identifier::new("param2".to_string())),
-            Some(&Symbol::Parameter {
-                parameter: param2,
-                dependencies: HashSet::new(),
-            })
+            Some(&Symbol::Parameter(param2))
         );
 
         assert_eq!(

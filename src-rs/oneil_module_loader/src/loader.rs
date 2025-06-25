@@ -52,7 +52,7 @@ where
     // Load module dependencies
     let (mut module_collection, module_errors) = load_dependencies(
         &module_path,
-        module.dependencies(),
+        todo!(),
         module_stack,
         module_collection,
         module_errors,
