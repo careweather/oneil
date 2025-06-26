@@ -162,7 +162,7 @@ version = "0.15.0"
 
 [[package]]
 name = "oneil_module"
-version = "0.1.0"
+version = "0.15.0"
 dependencies = [
  "oneil_ast",
 ]
