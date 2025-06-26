@@ -1,0 +1,64 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# General Project Rules
+
+## Stick to Rust idioms
+Use idiomatic Rust: ownership, borrowing, lifetimes, enums, and pattern matching. Avoid unnecessary unsafe code unless absolutely required.
+
+## Prefer functional
+Prefer a functional coding style to an imperative coding style. Sometimes an imperative style can keep the code readable, but in the case that it doesn't, use the functional style.
+
+## One module = one concern
+Organize the project as separate modules (e.g., lexer, parser, etc.).
+
+## Prefer enums over trait objects
+Use enums with variants instead of trait objects where performance and clarity are important (e.g., for AST nodes).
+
+## Clear and simple error handling
+Use `Result<T, E>` for all fallible operations. Define clear custom error types per module.
+
+## Avoid premature optimization
+Prioritize clarity and correctness in early stages; optimize only when there's a proven bottleneck.
+
+## Comments
+Write a documentation comment for every function. If the function is public-facing, ensure that the documentation comments include doc tests as well.
+
+## Good tests
+Write tests to test the code. This includes both unit tests and integration tests.
+
+
+# Oneil Rules
+
+Oneil is the programming language that is currently implemented in python in `src/oneil`. The goal of this project is to rewrite it in Rust.
+
+## Keep a specification that is up-to-date
+Ensure that there is a grammar and a specification that defines the language, and update it any time new things are added to the language. These kinds of documents are to be kept in the `docs/` directory.
+
+## Reference implementation description
+
+Details about the Oneil programming language can be found in `README.md` on the top level.
+
+## Architectural Decision Records (ADRs)
+Whenever a decision needs to be documented, make a new ADR in `docs/decisions` using `template.md`. The ADR file should be named as
+`<yyyy>-<mm>-<dd>-<adr-name>.md`.
+
+An "ADR" may also be referred to as a "decision".
+
+## Build the language in layers
+Start with lexer, then parser, then AST. We'll build further features from there.
+
+## Use recursive descent
+Use a recursive descent strategy for parsing, and prefer hand-written parsers unless performance demands otherwise.
+
+## AST should be expressive but minimal
+Avoid unnecessary intermediate nodes; keep the tree clean and navigable.
+
+## Avoid dynamic typing unless designed
+If it’s statically typed, enforce type rules early and clearly in the pipeline.
+
+## Have a minimal working subset
+Define a "minimal viable language" and implement that before expanding.
+

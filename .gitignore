@@ -6,3 +6,6 @@ __pycache__/
 .netrwhist
 .justfile
 examples/real-world
+
+# cargo
+/target

@@ -31,7 +31,7 @@ Oneil makes it easier than ever to build, debug, explore, and version-control mo
 
 Oneil has only been tested on Linux. Instructions for Oneil assume you are on Linux.
 
-## Quickstart
+## Python Quickstart
 
 Clone Oneil and install it.
 
@@ -73,7 +73,6 @@ To see all the results of the model:
 ...
 <param n>: <min>|<max> <unit>
 ```
-
 ### Development
 
 If you are developing Oneil, you will want to install Oneil in "editable" mode. To do this, use the `-e` flag.
@@ -83,6 +82,118 @@ oneil/install.sh -e
 ```
 
 This will allow you to modify Oneil's python code and run it with `oneil` without having to re-run `oneil/install.sh` for every change.
+
+## Rust Quickstart
+
+To run the Rust version of Oneil locally:
+
+1. [Install Rust and Cargo](https://www.rust-lang.org/tools/install) if you haven't already.
+
+2. Clone the repository and navigate to the Rust project directory:
+```sh
+git clone git@github.com/careweather/oneil.git
+cd oneil/rust
+```
+
+<!-- TODO: not ready yet
+3. Build and run the project:
+```sh
+cargo run -- path/to/your/model.on
+```
+-->
+
+<!-- TODO: when ready, add instructions for installation -->
+
+### Development
+
+For development, you can use these Cargo commands:
+
+- Run tests:
+  ```sh
+  cargo test
+  ```
+
+- Check for compilation errors without producing an executable:
+  ```sh
+  cargo check
+  ```
+
+- Format code:
+  ```sh
+  cargo fmt
+  ```
+
+- Run linter:
+  ```sh
+  cargo clippy
+  ```
+
+You can also run the following developer commands built into Oneil:
+- Print the AST that is constructed from an Oneil file:
+  ```sh
+  cargo run dev print-ast path/to/model.on
+  ```
+
+In addition, you will want to install the
+[rust-analyzer](https://marketplace.cursorapi.com/items?itemName=rust-lang.rust-analyzer)
+VS Code extension in order to help you develop in Rust.
+
+### Model Syntax Updates for Rust Version
+
+The Rust version of Oneil has two syntax updates from the Python version.
+
+1. **Instead of being delimited by indentation, notes are delimited with
+   tildes.** For example:
+
+   ```oneil
+   # Before
+       This is a single line note
+
+       This is
+       a multi-line
+       note.
+
+   # After
+   ~ This is a single line note
+
+   ~~~
+   This is
+   a multi-line
+   note.
+   ~~~
+   ```
+   
+   This will need to be updated in any old model code. A script has been written
+   in `tools/convert_notes.py` that can do this automatically. It can be used as
+   follows:
+
+   ```sh
+   python3 tools/convert_notes.py <FILE1> [FILE2 ...]
+   ```
+
+   Each file that is passed in will be overwritten with the updated code
+   in-place. In addition, a backup file with the extension `.bak` will be
+   created with the old code. This file can be deleted once it has been verified
+   that the conversion worked correctly.
+
+2. Discrete parameter string values are now enclosed in quotes. For example:
+   
+   ```oneil
+   # Before
+   X[foo, bar, baz]: x = foo
+   Y: y = { 1 if x == foo
+          { 2 if x == bar
+          { 3 if x == baz
+
+   # After
+   X["foo", "bar", "baz"]: x = "foo"
+   Y: y = { 1 if x == "foo"
+          { 2 if x == "bar"
+          { 3 if x == "baz"
+   ```
+
+   This change does not have an automatic fix (yet, at least), and must be done
+   by hand.
 
 ## Manual Install
 
