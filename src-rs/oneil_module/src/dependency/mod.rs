@@ -34,3 +34,9 @@ pub enum Dependency {
 }
 
 pub type ParameterDependency = Reference;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TestDependency {
+    TestInput(Reference),
+    Other(Reference),
+}

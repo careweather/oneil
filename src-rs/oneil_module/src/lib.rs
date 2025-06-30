@@ -7,7 +7,9 @@ pub mod symbol;
 pub mod test;
 
 // Re-export commonly used types
-pub use dependency::{Dependency, ExternalImportList, ParameterDependency, graph::DependencyGraph};
+pub use dependency::{
+    Dependency, ExternalImportList, ParameterDependency, TestDependency, graph::DependencyGraph,
+};
 pub use documentation::{DocumentationMap, SectionDecl, SectionLabel};
 pub use module::{Module, ModuleGraph};
 pub use path::{ModulePath, PythonPath};

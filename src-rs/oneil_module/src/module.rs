@@ -1,12 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::dependency::ParameterDependency;
-use crate::dependency::{Dependency, ExternalImportList};
-use crate::documentation::DocumentationMap;
-use crate::path::ModulePath;
-use crate::reference::Identifier;
-use crate::symbol::SymbolMap;
-use crate::test::Tests;
+use crate::{
+    dependency::{Dependency, ExternalImportList, ParameterDependency, TestDependency},
+    documentation::DocumentationMap,
+    path::ModulePath,
+    reference::Identifier,
+    symbol::SymbolMap,
+    test::{TestIndex, Tests},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
@@ -17,6 +18,7 @@ pub struct Module {
     documentation_map: DocumentationMap,
     dependencies: HashSet<Dependency>,
     parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
+    test_dependencies: HashMap<TestIndex, HashSet<TestDependency>>,
 }
 
 impl Module {
@@ -28,6 +30,7 @@ impl Module {
         documentation_map: DocumentationMap,
         dependencies: HashSet<Dependency>,
         parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
+        test_dependencies: HashMap<TestIndex, HashSet<TestDependency>>,
     ) -> Self {
         Self {
             path,
@@ -37,6 +40,7 @@ impl Module {
             documentation_map,
             dependencies,
             parameter_dependencies,
+            test_dependencies,
         }
     }
 
@@ -66,6 +70,10 @@ impl Module {
 
     pub fn parameter_dependencies(&self) -> &HashMap<Identifier, HashSet<ParameterDependency>> {
         &self.parameter_dependencies
+    }
+
+    pub fn test_dependencies(&self) -> &HashMap<TestIndex, HashSet<TestDependency>> {
+        &self.test_dependencies
     }
 }
 

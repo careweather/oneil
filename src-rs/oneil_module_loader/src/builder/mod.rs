@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use oneil_ast as ast;
 use oneil_module::{
-    Dependency, Identifier, Module, ModulePath, ModuleReference, ParameterDependency, PythonPath,
-    Reference, SectionDecl, SectionLabel, Symbol, TestInputs,
+    Dependency, Identifier, Module, ModulePath, ModuleReference, PythonPath, Reference,
+    SectionDecl, SectionLabel, Symbol, TestDependency, TestInputs,
 };
 
 mod util;
@@ -191,8 +191,14 @@ fn process_test_decl(
     section_label: SectionLabel,
     test: oneil_ast::Test,
 ) -> ModuleBuilder {
+    // Get the test dependencies
+    let expr = get_test_expr(&test);
+    let dependencies = extract_expr_dependencies(expr, HashSet::new());
+    let dependencies = sort_test_dependencies(&test, dependencies);
+
     // Add the test to the builder
     let test_index = builder.add_model_test(test);
+    builder.add_test_dependencies(test_index.clone(), dependencies);
     builder.add_section_decl(section_label, SectionDecl::Test(test_index));
     builder
 }
@@ -231,10 +237,14 @@ fn get_parameter_exprs(parameter: &ast::Parameter) -> Vec<&ast::Expr> {
     exprs
 }
 
+fn get_test_expr(test: &ast::Test) -> &ast::Expr {
+    &test.expr
+}
+
 fn extract_expr_dependencies(
     expr: &ast::Expr,
-    dependencies: HashSet<ParameterDependency>,
-) -> HashSet<ParameterDependency> {
+    dependencies: HashSet<Reference>,
+) -> HashSet<Reference> {
     match expr {
         oneil_ast::Expr::BinaryOp { op: _, left, right } => {
             // Extract the dependencies from the left and right expressions
@@ -266,6 +276,25 @@ fn extract_expr_dependencies(
             dependencies
         }
     }
+}
+
+fn sort_test_dependencies(
+    test: &ast::Test,
+    dependencies: HashSet<Reference>,
+) -> HashSet<TestDependency> {
+    dependencies
+        .into_iter()
+        .map(|dependency| match dependency {
+            // TODO: `&ident.as_str().to_string()` feels like an unnecessary clone
+            Reference::Identifier(ref ident)
+            | Reference::Accessor {
+                parent: ref ident, ..
+            } if test.inputs.contains(&ident.as_str().to_string()) => {
+                TestDependency::TestInput(dependency)
+            }
+            _ => TestDependency::Other(dependency),
+        })
+        .collect()
 }
 
 fn get_reference_for_variable(variable: &ast::expression::Variable) -> Reference {
@@ -1028,5 +1057,165 @@ mod tests {
                 }),
             }
         );
+    }
+
+    #[test]
+    fn test_get_test_expr() {
+        let test_expr = ast::Expr::Literal(Literal::Number(42.0));
+        let test = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec![],
+            expr: test_expr.clone(),
+        };
+
+        let result = get_test_expr(&test);
+        assert_eq!(result, &test_expr);
+    }
+
+    #[test]
+    fn test_get_test_expr_with_complex_expression() {
+        let test_expr = ast::Expr::BinaryOp {
+            op: BinaryOp::Add,
+            left: Box::new(ast::Expr::Literal(Literal::Number(1.0))),
+            right: Box::new(ast::Expr::Literal(Literal::Number(2.0))),
+        };
+        let test = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec!["x".to_string()],
+            expr: test_expr.clone(),
+        };
+
+        let result = get_test_expr(&test);
+        assert_eq!(result, &test_expr);
+    }
+
+    #[test]
+    fn test_sort_test_dependencies_empty() {
+        let test = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec![],
+            expr: ast::Expr::Literal(Literal::Boolean(true)),
+        };
+        let dependencies = HashSet::new();
+
+        let result = sort_test_dependencies(&test, dependencies);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_sort_test_dependencies_no_test_inputs() {
+        let test = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec![],
+            expr: ast::Expr::Literal(Literal::Boolean(true)),
+        };
+        let mut dependencies = HashSet::new();
+        dependencies.insert(Reference::Identifier(Identifier::new("param1".to_string())));
+        dependencies.insert(Reference::Identifier(Identifier::new("param2".to_string())));
+
+        let result = sort_test_dependencies(&test, dependencies);
+        assert_eq!(result.len(), 2);
+
+        // All dependencies should be TestDependency::Other since they're not in test inputs
+        for dependency in result {
+            match dependency {
+                TestDependency::Other(_) => (),
+                TestDependency::TestInput(_) => panic!("Expected Other, got TestInput"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_sort_test_dependencies_with_test_inputs() {
+        let test = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec!["input1".to_string(), "input2".to_string()],
+            expr: ast::Expr::Literal(Literal::Boolean(true)),
+        };
+        let mut dependencies = HashSet::new();
+        dependencies.insert(Reference::Identifier(Identifier::new("input1".to_string())));
+        dependencies.insert(Reference::Identifier(Identifier::new("param1".to_string())));
+        dependencies.insert(Reference::Identifier(Identifier::new("input2".to_string())));
+
+        let result = sort_test_dependencies(&test, dependencies);
+        assert_eq!(result.len(), 3);
+
+        let mut test_input_count = 0;
+        let mut other_count = 0;
+
+        for dependency in result {
+            match dependency {
+                TestDependency::TestInput(ref reference) => {
+                    test_input_count += 1;
+                    match reference {
+                        Reference::Identifier(ident) => {
+                            assert!(test.inputs.contains(&ident.as_str().to_string()));
+                        }
+                        _ => panic!("Unexpected reference type in TestInput"),
+                    }
+                }
+                TestDependency::Other(ref reference) => {
+                    other_count += 1;
+                    match reference {
+                        Reference::Identifier(ident) => {
+                            assert!(!test.inputs.contains(&ident.as_str().to_string()));
+                        }
+                        _ => panic!("Unexpected reference type in Other"),
+                    }
+                }
+            }
+        }
+
+        assert_eq!(test_input_count, 2);
+        assert_eq!(other_count, 1);
+    }
+
+    #[test]
+    fn test_sort_test_dependencies_with_accessor_references() {
+        let test = ast::Test {
+            trace_level: ast::parameter::TraceLevel::None,
+            inputs: vec!["parent".to_string()],
+            expr: ast::Expr::Literal(Literal::Boolean(true)),
+        };
+        let mut dependencies = HashSet::new();
+        dependencies.insert(Reference::Accessor {
+            parent: Identifier::new("parent".to_string()),
+            component: Box::new(Reference::Identifier(Identifier::new("child".to_string()))),
+        });
+        dependencies.insert(Reference::Identifier(Identifier::new(
+            "other_param".to_string(),
+        )));
+
+        let result = sort_test_dependencies(&test, dependencies);
+        assert_eq!(result.len(), 2);
+
+        let mut test_input_count = 0;
+        let mut other_count = 0;
+
+        for dependency in result {
+            match dependency {
+                TestDependency::TestInput(ref reference) => {
+                    test_input_count += 1;
+                    match reference {
+                        Reference::Accessor { parent, .. } => {
+                            assert!(test.inputs.contains(&parent.as_str().to_string()));
+                        }
+                        _ => panic!("Unexpected reference type in TestInput"),
+                    }
+                }
+                TestDependency::Other(ref reference) => {
+                    other_count += 1;
+                    match reference {
+                        Reference::Identifier(ident) => {
+                            assert!(!test.inputs.contains(&ident.as_str().to_string()));
+                        }
+                        _ => panic!("Unexpected reference type in Other"),
+                    }
+                }
+            }
+        }
+
+        assert_eq!(test_input_count, 1);
+        assert_eq!(other_count, 1);
     }
 }

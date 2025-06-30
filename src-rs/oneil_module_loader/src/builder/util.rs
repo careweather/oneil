@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use oneil_ast as ast;
 use oneil_module::{
     Dependency, DocumentationMap, ExternalImportList, Identifier, Module, ModulePath,
-    ParameterDependency, PythonPath, SectionDecl, SectionLabel, Symbol, SymbolMap, TestIndex,
-    TestInputs, Tests,
+    ParameterDependency, PythonPath, SectionDecl, SectionLabel, Symbol, SymbolMap, TestDependency,
+    TestIndex, TestInputs, Tests,
 };
 
 /// A builder pattern implementation for constructing Module instances.
@@ -25,6 +25,7 @@ pub struct ModuleBuilder {
     section_items: HashMap<SectionLabel, Vec<SectionDecl>>,
     dependencies: HashSet<Dependency>,
     parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
+    test_dependencies: HashMap<TestIndex, HashSet<TestDependency>>,
 }
 
 impl ModuleBuilder {
@@ -39,6 +40,7 @@ impl ModuleBuilder {
             section_items: HashMap::new(),
             dependencies: HashSet::new(),
             parameter_dependencies: HashMap::new(),
+            test_dependencies: HashMap::new(),
         }
     }
 
@@ -92,6 +94,14 @@ impl ModuleBuilder {
         self.parameter_dependencies.insert(parameter, dependencies);
     }
 
+    pub fn add_test_dependencies(
+        &mut self,
+        test_index: TestIndex,
+        dependencies: HashSet<TestDependency>,
+    ) {
+        self.test_dependencies.insert(test_index, dependencies);
+    }
+
     pub fn symbols(&self) -> &HashMap<Identifier, Symbol> {
         &self.symbols
     }
@@ -111,6 +121,7 @@ impl ModuleBuilder {
             section_items,
             dependencies,
             parameter_dependencies,
+            test_dependencies,
         } = self;
 
         let documentation_map = DocumentationMap::new(section_notes, section_items);
@@ -127,6 +138,7 @@ impl ModuleBuilder {
             documentation_map,
             dependencies,
             parameter_dependencies,
+            test_dependencies,
         );
 
         module
