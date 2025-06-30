@@ -95,6 +95,10 @@ impl ModuleCollection {
         self.modules.get(module_path)
     }
 
+    pub fn modules(&self) -> &HashMap<ModulePath, Module> {
+        &self.modules
+    }
+
     pub fn initial_modules(&self) -> &Vec<ModulePath> {
         &self.initial_modules
     }

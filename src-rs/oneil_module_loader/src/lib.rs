@@ -2,6 +2,7 @@
 // #![warn(missing_docs)]
 
 mod builder;
+mod dep_checker;
 mod error;
 mod loader;
 mod util;
@@ -37,6 +38,9 @@ where
     );
 
     let module_collection = module_collection.into_module_collection();
+
+    let _result = dep_checker::check_dependencies(&module_collection);
+
     if module_errors.is_empty() {
         Ok(module_collection)
     } else {
@@ -74,6 +78,9 @@ where
     );
 
     let module_collection = module_collection.into_module_collection();
+
+    let _result = dep_checker::check_dependencies(&module_collection);
+
     if module_errors.is_empty() {
         Ok(module_collection)
     } else {
