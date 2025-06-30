@@ -1,4 +1,7 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 /// A graph of dependencies between nodes
 ///
@@ -16,8 +19,8 @@ pub struct DependencyGraph<T>
 where
     T: Eq + Hash + Clone,
 {
-    dependencies: HashMap<T, Vec<T>>,
-    dependent_nodes: HashMap<T, Vec<T>>,
+    dependencies: HashMap<T, HashSet<T>>,
+    dependent_nodes: HashMap<T, HashSet<T>>,
 }
 
 impl<T> DependencyGraph<T>
@@ -25,7 +28,7 @@ where
     T: Eq + Hash + Clone,
 {
     /// Create a new dependency graph
-    pub fn new(dependencies: HashMap<T, Vec<T>>) -> Self {
+    pub fn new(dependencies: HashMap<T, HashSet<T>>) -> Self {
         let dependent_nodes = Self::construct_dependent_nodes(&dependencies);
         Self {
             dependencies,
@@ -33,36 +36,36 @@ where
         }
     }
 
-    fn construct_dependent_nodes(dependencies: &HashMap<T, Vec<T>>) -> HashMap<T, Vec<T>> {
+    fn construct_dependent_nodes(dependencies: &HashMap<T, HashSet<T>>) -> HashMap<T, HashSet<T>> {
         let mut dependent_nodes = HashMap::new();
         for (node, dependencies) in dependencies {
             for dependency in dependencies {
                 dependent_nodes
                     .entry(dependency.clone())
-                    .or_insert(vec![])
-                    .push(node.clone());
+                    .or_insert(HashSet::new())
+                    .insert(node.clone());
             }
         }
         dependent_nodes
     }
 
     /// Get the dependencies map
-    pub fn dependencies(&self) -> &HashMap<T, Vec<T>> {
+    pub fn dependencies(&self) -> &HashMap<T, HashSet<T>> {
         &self.dependencies
     }
 
     /// Get the dependent nodes map
-    pub fn dependent_nodes(&self) -> &HashMap<T, Vec<T>> {
+    pub fn dependent_nodes(&self) -> &HashMap<T, HashSet<T>> {
         &self.dependent_nodes
     }
 
     /// Get the dependencies of a node
-    pub fn get_dependencies_for(&self, node: &T) -> Option<&Vec<T>> {
+    pub fn get_dependencies_for(&self, node: &T) -> Option<&HashSet<T>> {
         self.dependencies.get(node)
     }
 
     /// Get the dependents of a node
-    pub fn get_dependent_nodes_for(&self, node: &T) -> Option<&Vec<T>> {
+    pub fn get_dependent_nodes_for(&self, node: &T) -> Option<&HashSet<T>> {
         self.dependent_nodes.get(node)
     }
 }
