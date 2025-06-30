@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
-use crate::path::{ModulePath, PythonPath};
+use crate::{
+    path::{ModulePath, PythonPath},
+    reference::Reference,
+};
 
 pub mod graph;
 
@@ -29,3 +32,5 @@ pub enum Dependency {
     Python(PythonPath),
     Module(ModulePath),
 }
+
+pub type ParameterDependency = Reference;

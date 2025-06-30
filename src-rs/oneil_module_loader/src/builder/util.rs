@@ -2,8 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ast as ast;
 use oneil_module::{
-    Dependency, DocumentationMap, ExternalImportList, Identifier, Module, ModulePath, PythonPath,
-    SectionDecl, SectionLabel, Symbol, SymbolMap, TestIndex, TestInputs, Tests,
+    Dependency, DocumentationMap, ExternalImportList, Identifier, Module, ModulePath,
+    ParameterDependency, PythonPath, SectionDecl, SectionLabel, Symbol, SymbolMap, TestIndex,
+    TestInputs, Tests,
 };
 
 /// A builder pattern implementation for constructing Module instances.
@@ -23,6 +24,7 @@ pub struct ModuleBuilder {
     section_notes: HashMap<SectionLabel, ast::Note>,
     section_items: HashMap<SectionLabel, Vec<SectionDecl>>,
     dependencies: HashSet<Dependency>,
+    parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
 }
 
 impl ModuleBuilder {
@@ -36,6 +38,7 @@ impl ModuleBuilder {
             section_notes: HashMap::new(),
             section_items: HashMap::new(),
             dependencies: HashSet::new(),
+            parameter_dependencies: HashMap::new(),
         }
     }
 
@@ -81,13 +84,23 @@ impl ModuleBuilder {
         self.dependencies.insert(dependency);
     }
 
-    pub fn into_module(self) -> Module {
-        self.into()
+    pub fn add_parameter_dependencies(
+        &mut self,
+        parameter: Identifier,
+        dependencies: HashSet<ParameterDependency>,
+    ) {
+        self.parameter_dependencies.insert(parameter, dependencies);
     }
-}
 
-impl From<ModuleBuilder> for Module {
-    fn from(builder: ModuleBuilder) -> Self {
+    pub fn symbols(&self) -> &HashMap<Identifier, Symbol> {
+        &self.symbols
+    }
+
+    pub fn tests(&self) -> &Vec<ast::Test> {
+        &self.model_tests
+    }
+
+    pub fn into_module(self) -> Module {
         let ModuleBuilder {
             module_path,
             symbols,
@@ -97,7 +110,8 @@ impl From<ModuleBuilder> for Module {
             section_notes,
             section_items,
             dependencies,
-        } = builder;
+            parameter_dependencies,
+        } = self;
 
         let documentation_map = DocumentationMap::new(section_notes, section_items);
 
@@ -112,9 +126,16 @@ impl From<ModuleBuilder> for Module {
             external_imports,
             documentation_map,
             dependencies,
+            parameter_dependencies,
         );
 
         module
+    }
+}
+
+impl From<ModuleBuilder> for Module {
+    fn from(builder: ModuleBuilder) -> Self {
+        builder.into_module()
     }
 }
 

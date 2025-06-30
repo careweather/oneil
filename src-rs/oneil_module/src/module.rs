@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::dependency::ParameterDependency;
 use crate::dependency::{Dependency, ExternalImportList};
 use crate::documentation::DocumentationMap;
 use crate::path::ModulePath;
+use crate::reference::Identifier;
 use crate::symbol::SymbolMap;
 use crate::test::Tests;
 
@@ -14,6 +16,7 @@ pub struct Module {
     external_imports: ExternalImportList,
     documentation_map: DocumentationMap,
     dependencies: HashSet<Dependency>,
+    parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
 }
 
 impl Module {
@@ -24,6 +27,7 @@ impl Module {
         external_imports: ExternalImportList,
         documentation_map: DocumentationMap,
         dependencies: HashSet<Dependency>,
+        parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
     ) -> Self {
         Self {
             path,
@@ -32,6 +36,7 @@ impl Module {
             external_imports,
             documentation_map,
             dependencies,
+            parameter_dependencies,
         }
     }
 
@@ -57,6 +62,10 @@ impl Module {
 
     pub fn dependencies(&self) -> &HashSet<Dependency> {
         &self.dependencies
+    }
+
+    pub fn parameter_dependencies(&self) -> &HashMap<Identifier, HashSet<ParameterDependency>> {
+        &self.parameter_dependencies
     }
 }
 

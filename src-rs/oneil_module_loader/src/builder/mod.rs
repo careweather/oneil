@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use oneil_ast as ast;
 use oneil_module::{
-    Dependency, Identifier, Module, ModulePath, ModuleReference, PythonPath, Reference,
-    SectionDecl, SectionLabel, Symbol, TestInputs,
+    Dependency, Identifier, Module, ModulePath, ModuleReference, ParameterDependency, PythonPath,
+    Reference, SectionDecl, SectionLabel, Symbol, TestInputs,
 };
 
 mod util;
@@ -168,12 +168,20 @@ fn process_parameter_decl(
     parameter: oneil_ast::Parameter,
     mut builder: ModuleBuilder,
 ) -> ModuleBuilder {
+    // Get the parameter dependencies
+    let exprs = get_parameter_exprs(&parameter);
+    let dependencies = exprs.iter().fold(HashSet::new(), |dependencies, expr| {
+        let dependencies = extract_expr_dependencies(expr, dependencies);
+        dependencies
+    });
+
     // Build the symbol
     let ident = Identifier::new(parameter.ident.clone());
     let symbol = Symbol::Parameter(parameter);
 
     // Add the symbol to the builder
     builder.add_symbol(ident.clone(), symbol);
+    builder.add_parameter_dependencies(ident.clone(), dependencies);
     builder.add_section_decl(section_label, SectionDecl::Parameter(ident));
     builder
 }
@@ -189,50 +197,44 @@ fn process_test_decl(
     builder
 }
 
-fn extract_parameter_dependencies(parameter: &ast::Parameter) -> HashSet<Reference> {
-    let dependencies = HashSet::new();
+fn get_parameter_exprs(parameter: &ast::Parameter) -> Vec<&ast::Expr> {
+    let mut exprs = vec![];
 
-    // Extract the dependencies from the limits
-    let dependencies = match &parameter.limits {
+    // Extract the limit expressions
+    match &parameter.limits {
         Some(ast::parameter::Limits::Continuous { min, max }) => {
-            let dependencies = extract_expr_dependencies(min, dependencies);
-            let dependencies = extract_expr_dependencies(max, dependencies);
-            dependencies
+            exprs.push(min);
+            exprs.push(max);
         }
         Some(ast::parameter::Limits::Discrete { values }) => {
-            values.iter().fold(dependencies, |dependencies, value| {
-                extract_expr_dependencies(value, dependencies)
-            })
+            values.iter().for_each(|value| {
+                exprs.push(value);
+            });
         }
-        None => dependencies,
+        None => (),
     };
 
-    // Extract the dependencies from the parameter value
+    // Extract the parameter value expression
     match &parameter.value {
         ast::parameter::ParameterValue::Simple(expr, _unit_expr) => {
-            extract_expr_dependencies(expr, dependencies)
+            exprs.push(expr);
         }
         ast::parameter::ParameterValue::Piecewise(piecewise_expr, _unit_expr) => {
-            // Extract the dependencies from each part of the piecewise expression
-            let dependencies =
-                piecewise_expr
-                    .parts
-                    .iter()
-                    .fold(dependencies, |dependencies, part| {
-                        let dependencies = extract_expr_dependencies(&part.expr, dependencies);
-                        let dependencies = extract_expr_dependencies(&part.if_expr, dependencies);
-                        dependencies
-                    });
-
-            dependencies
+            // Extract the piecewise parts
+            piecewise_expr.parts.iter().for_each(|part| {
+                exprs.push(&part.expr);
+                exprs.push(&part.if_expr);
+            });
         }
     }
+
+    exprs
 }
 
 fn extract_expr_dependencies(
     expr: &ast::Expr,
-    dependencies: HashSet<Reference>,
-) -> HashSet<Reference> {
+    dependencies: HashSet<ParameterDependency>,
+) -> HashSet<ParameterDependency> {
     match expr {
         oneil_ast::Expr::BinaryOp { op: _, left, right } => {
             // Extract the dependencies from the left and right expressions
@@ -283,7 +285,7 @@ mod tests {
     use super::*;
     use oneil_ast::{
         declaration::ModelInput,
-        expression::{BinaryOp, Literal, UnaryOp, Variable},
+        expression::{BinaryOp, Literal, Variable},
         parameter::{Limits, ParameterValue},
     };
     use oneil_module::{DocumentationMap, ExternalImportList, SymbolMap, TestIndex};
@@ -957,148 +959,6 @@ mod tests {
                     "physics_functions".into()
                 )))
         );
-    }
-
-    #[test]
-    fn test_extract_parameter_dependencies_simple() {
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(ast::Expr::Literal(Literal::Number(42.0)), None),
-            limits: None,
-            is_performance: false,
-            trace_level: ast::parameter::TraceLevel::None,
-            note: None,
-        };
-
-        let dependencies = extract_parameter_dependencies(&parameter);
-        assert_eq!(dependencies.len(), 0);
-    }
-
-    #[test]
-    fn test_extract_parameter_dependencies_with_variable() {
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(
-                ast::Expr::Variable(Variable::Identifier("other_param".to_string())),
-                None,
-            ),
-            limits: None,
-            is_performance: false,
-            trace_level: ast::parameter::TraceLevel::None,
-            note: None,
-        };
-
-        let dependencies = extract_parameter_dependencies(&parameter);
-        assert_eq!(dependencies.len(), 1);
-        assert!(
-            dependencies.contains(&Reference::Identifier(Identifier::new(
-                "other_param".to_string()
-            )))
-        );
-    }
-
-    #[test]
-    fn test_extract_parameter_dependencies_with_binary_op() {
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(
-                ast::Expr::BinaryOp {
-                    op: BinaryOp::Add,
-                    left: Box::new(ast::Expr::Variable(Variable::Identifier("a".to_string()))),
-                    right: Box::new(ast::Expr::Variable(Variable::Identifier("b".to_string()))),
-                },
-                None,
-            ),
-            limits: None,
-            is_performance: false,
-            trace_level: ast::parameter::TraceLevel::None,
-            note: None,
-        };
-
-        let dependencies = extract_parameter_dependencies(&parameter);
-        assert_eq!(dependencies.len(), 2);
-        assert!(dependencies.contains(&Reference::Identifier(Identifier::new("a".to_string()))));
-        assert!(dependencies.contains(&Reference::Identifier(Identifier::new("b".to_string()))));
-    }
-
-    #[test]
-    fn test_extract_parameter_dependencies_with_unary_op() {
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(
-                ast::Expr::UnaryOp {
-                    op: UnaryOp::Neg,
-                    expr: Box::new(ast::Expr::Variable(Variable::Identifier("x".to_string()))),
-                },
-                None,
-            ),
-            limits: None,
-            is_performance: false,
-            trace_level: ast::parameter::TraceLevel::None,
-            note: None,
-        };
-
-        let dependencies = extract_parameter_dependencies(&parameter);
-        assert_eq!(dependencies.len(), 1);
-        assert!(dependencies.contains(&Reference::Identifier(Identifier::new("x".to_string()))));
-    }
-
-    #[test]
-    fn test_extract_parameter_dependencies_with_function_call() {
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(
-                ast::Expr::FunctionCall {
-                    name: "sin".to_string(),
-                    args: vec![
-                        ast::Expr::Variable(Variable::Identifier("angle".to_string())),
-                        ast::Expr::Literal(Literal::Number(3.14)),
-                    ],
-                },
-                None,
-            ),
-            limits: None,
-            is_performance: false,
-            trace_level: ast::parameter::TraceLevel::None,
-            note: None,
-        };
-
-        let dependencies = extract_parameter_dependencies(&parameter);
-        assert_eq!(dependencies.len(), 1);
-        assert!(
-            dependencies.contains(&Reference::Identifier(Identifier::new("angle".to_string())))
-        );
-    }
-
-    #[test]
-    fn test_extract_parameter_dependencies_with_accessor() {
-        let parameter = ast::Parameter {
-            name: "test_param".to_string(),
-            ident: "test_param".to_string(),
-            value: ParameterValue::Simple(
-                ast::Expr::Variable(Variable::Accessor {
-                    parent: "model".to_string(),
-                    component: Box::new(Variable::Identifier("param".to_string())),
-                }),
-                None,
-            ),
-            limits: None,
-            is_performance: false,
-            trace_level: ast::parameter::TraceLevel::None,
-            note: None,
-        };
-
-        let dependencies = extract_parameter_dependencies(&parameter);
-        assert_eq!(dependencies.len(), 1);
-        assert!(dependencies.contains(&Reference::Accessor {
-            parent: Identifier::new("model".to_string()),
-            component: Box::new(Reference::Identifier(Identifier::new("param".to_string()))),
-        }));
     }
 
     #[test]
