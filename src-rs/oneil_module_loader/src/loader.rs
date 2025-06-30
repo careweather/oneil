@@ -1,20 +1,23 @@
 use std::collections::HashSet;
 
-use oneil_module::{Dependency, ModuleGraph, ModulePath};
+use oneil_module::{Dependency, ModulePath};
 
 use crate::{
     FileLoader, builder,
     error::{ModuleErrorCollection, ModuleLoaderError, ResolutionError},
-    util::Stack,
+    util::{ModuleCollectionBuilder, Stack},
 };
 
 pub fn load_module<F>(
     module_path: ModulePath,
     module_stack: &mut Stack<ModulePath>,
-    module_collection: ModuleGraph,
+    module_collection: ModuleCollectionBuilder,
     mut module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
-) -> (ModuleGraph, ModuleErrorCollection<F::ParseError>)
+) -> (
+    ModuleCollectionBuilder,
+    ModuleErrorCollection<F::ParseError>,
+)
 where
     F: FileLoader,
 {
@@ -71,10 +74,13 @@ fn load_dependencies<F>(
     module_path: &ModulePath,
     dependencies: &HashSet<Dependency>,
     module_stack: &mut Stack<ModulePath>,
-    module_collection: ModuleGraph,
+    module_collection: ModuleCollectionBuilder,
     module_errors: ModuleErrorCollection<F::ParseError>,
     file_parser: &F,
-) -> (ModuleGraph, ModuleErrorCollection<F::ParseError>)
+) -> (
+    ModuleCollectionBuilder,
+    ModuleErrorCollection<F::ParseError>,
+)
 where
     F: FileLoader,
 {
@@ -100,16 +106,13 @@ where
                     (module_collection, module_errors)
                 }
                 Dependency::Module(dependency_path) => {
-                    let (mut module_collection, module_errors) = load_module(
+                    let (module_collection, module_errors) = load_module(
                         dependency_path.clone(),
                         module_stack,
                         module_collection,
                         module_errors,
                         file_parser,
                     );
-
-                    // Add the current module as a dependent of the dependency module
-                    module_collection.add_dependent_module(module_path, dependency_path.clone());
 
                     (module_collection, module_errors)
                 }

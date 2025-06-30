@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use oneil_ast as ast;
+use oneil_module::{Module, ModuleCollection, ModulePath};
 
 pub trait FileLoader {
     type ParseError;
@@ -43,5 +44,43 @@ where
             }
             None => None,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModuleCollectionBuilder {
+    initial_modules: Vec<ModulePath>,
+    modules: HashMap<ModulePath, Module>,
+}
+
+impl ModuleCollectionBuilder {
+    pub fn new(initial_modules: Vec<ModulePath>) -> Self {
+        Self {
+            initial_modules,
+            modules: HashMap::new(),
+        }
+    }
+
+    pub fn add_module(&mut self, module_path: &ModulePath, module: Module) {
+        self.modules.insert(module_path.clone(), module);
+    }
+
+    pub fn has_loaded_for(&self, module_path: &ModulePath) -> bool {
+        self.modules.contains_key(module_path)
+    }
+
+    pub fn into_module_collection(self) -> ModuleCollection {
+        let ModuleCollectionBuilder {
+            initial_modules,
+            modules,
+        } = self;
+
+        ModuleCollection::new(initial_modules, modules)
+    }
+}
+
+impl From<ModuleCollectionBuilder> for ModuleCollection {
+    fn from(builder: ModuleCollectionBuilder) -> Self {
+        builder.into_module_collection()
     }
 }

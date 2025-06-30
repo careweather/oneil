@@ -11,7 +11,7 @@ pub use dependency::{
     Dependency, ExternalImportList, ParameterDependency, TestDependency, graph::DependencyGraph,
 };
 pub use documentation::{DocumentationMap, SectionDecl, SectionLabel};
-pub use module::{Module, ModuleGraph};
+pub use module::{Module, ModuleCollection};
 pub use path::{ModulePath, PythonPath};
 pub use reference::{Identifier, ModuleReference, Reference};
 pub use symbol::{Symbol, SymbolMap};

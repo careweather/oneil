@@ -78,33 +78,17 @@ impl Module {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleGraph {
+pub struct ModuleCollection {
     initial_modules: Vec<ModulePath>,
     modules: HashMap<ModulePath, Module>,
 }
 
-impl ModuleGraph {
-    pub fn new(initial_modules: Vec<ModulePath>) -> Self {
+impl ModuleCollection {
+    pub fn new(initial_modules: Vec<ModulePath>, modules: HashMap<ModulePath, Module>) -> Self {
         Self {
             initial_modules,
-            modules: HashMap::new(),
+            modules,
         }
-    }
-
-    pub fn add_module(&mut self, module_path: &ModulePath, module: Module) {
-        self.modules.insert(module_path.clone(), module);
-    }
-
-    pub fn add_dependent_module(
-        &mut self,
-        module_path: &ModulePath,
-        dependent_module_path: ModulePath,
-    ) {
-        todo!("This may be replaced with a builder")
-    }
-
-    pub fn has_loaded_for(&self, module_path: &ModulePath) -> bool {
-        self.modules.contains_key(module_path)
     }
 
     pub fn module(&self, module_path: &ModulePath) -> Option<&Module> {
