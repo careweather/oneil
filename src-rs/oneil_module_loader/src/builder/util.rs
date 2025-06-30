@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use oneil_ast as ast;
 use oneil_module::{
     Dependency, DocumentationMap, ExternalImportList, Identifier, Module, ModulePath,
-    ParameterDependency, PythonPath, SectionDecl, SectionLabel, Symbol, SymbolMap, TestDependency,
-    TestIndex, TestInputs, Tests,
+    ParameterDependency, PythonPath, SectionDecl, SectionLabel, Symbol, SymbolMap, TestCollection,
+    TestDependency, TestIndex, TestInputs, test::Test,
 };
 
 /// A builder pattern implementation for constructing Module instances.
@@ -18,7 +18,7 @@ use oneil_module::{
 pub struct ModuleBuilder {
     module_path: ModulePath,
     symbols: HashMap<Identifier, Symbol>,
-    model_tests: Vec<ast::Test>,
+    model_tests: Vec<Test>,
     dependency_tests: HashMap<ModulePath, TestInputs>,
     external_imports: Vec<PythonPath>,
     section_notes: HashMap<SectionLabel, ast::Note>,
@@ -48,7 +48,7 @@ impl ModuleBuilder {
         self.symbols.insert(name, symbol);
     }
 
-    pub fn add_model_test(&mut self, test: ast::Test) -> TestIndex {
+    pub fn add_model_test(&mut self, test: Test) -> TestIndex {
         let test_index = self.model_tests.len();
         self.model_tests.push(test);
         TestIndex::new(test_index)
@@ -106,7 +106,7 @@ impl ModuleBuilder {
         &self.symbols
     }
 
-    pub fn tests(&self) -> &Vec<ast::Test> {
+    pub fn tests(&self) -> &Vec<Test> {
         &self.model_tests
     }
 
@@ -126,7 +126,7 @@ impl ModuleBuilder {
 
         let documentation_map = DocumentationMap::new(section_notes, section_items);
 
-        let tests = Tests::new(model_tests, dependency_tests);
+        let tests = TestCollection::new(model_tests, dependency_tests);
         let symbols = SymbolMap::new(symbols);
         let external_imports = ExternalImportList::new(external_imports);
 

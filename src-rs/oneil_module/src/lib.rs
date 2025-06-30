@@ -15,4 +15,4 @@ pub use module::{Module, ModuleCollection};
 pub use path::{ModulePath, PythonPath};
 pub use reference::{Identifier, ModuleReference, Reference};
 pub use symbol::{Symbol, SymbolMap};
-pub use test::{TestIndex, TestInputs, Tests};
+pub use test::{TestIndex, TestInputs, TestCollection};

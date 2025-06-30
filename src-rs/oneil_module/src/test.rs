@@ -6,16 +6,13 @@ use crate::path::ModulePath;
 use crate::reference::Identifier;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Tests {
-    model_tests: Vec<ast::Test>,
+pub struct TestCollection {
+    model_tests: Vec<Test>,
     dependency_tests: HashMap<ModulePath, TestInputs>,
 }
 
-impl Tests {
-    pub fn new(
-        model_tests: Vec<ast::Test>,
-        dependency_tests: HashMap<ModulePath, TestInputs>,
-    ) -> Self {
+impl TestCollection {
+    pub fn new(model_tests: Vec<Test>, dependency_tests: HashMap<ModulePath, TestInputs>) -> Self {
         Self {
             model_tests,
             dependency_tests,
@@ -26,12 +23,32 @@ impl Tests {
         Self::new(vec![], HashMap::new())
     }
 
-    pub fn model_tests(&self) -> &Vec<ast::Test> {
+    pub fn model_tests(&self) -> &Vec<Test> {
         &self.model_tests
     }
 
     pub fn dependency_tests(&self) -> &HashMap<ModulePath, TestInputs> {
         &self.dependency_tests
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Test {
+    inputs: Vec<Identifier>,
+    body: ast::Test,
+}
+
+impl Test {
+    pub fn new(inputs: Vec<Identifier>, body: ast::Test) -> Self {
+        Self { inputs, body }
+    }
+
+    pub fn inputs(&self) -> &Vec<Identifier> {
+        &self.inputs
+    }
+
+    pub fn body(&self) -> &ast::Test {
+        &self.body
     }
 }
 

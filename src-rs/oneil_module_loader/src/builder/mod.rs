@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use oneil_ast as ast;
 use oneil_module::{
     Dependency, Identifier, Module, ModulePath, ModuleReference, PythonPath, Reference,
-    SectionDecl, SectionLabel, Symbol, TestDependency, TestInputs,
+    SectionDecl, SectionLabel, Symbol, TestDependency, TestInputs, test::Test,
 };
 
 mod util;
@@ -196,8 +196,15 @@ fn process_test_decl(
     let dependencies = extract_expr_dependencies(expr, HashSet::new());
     let dependencies = sort_test_dependencies(&test, dependencies);
 
+    // Get the test inputs
+    let inputs = test
+        .inputs
+        .iter()
+        .map(|input| Identifier::new(input.clone()))
+        .collect();
+
     // Add the test to the builder
-    let test_index = builder.add_model_test(test);
+    let test_index = builder.add_model_test(Test::new(inputs, test));
     builder.add_test_dependencies(test_index.clone(), dependencies);
     builder.add_section_decl(section_label, SectionDecl::Test(test_index));
     builder
@@ -727,9 +734,11 @@ mod tests {
         assert!(module.symbols().is_empty());
 
         // Test checks
+        let test1 = Test::new(vec![], test1);
+        let test2 = Test::new(vec![Identifier::new("x".to_string())], test2);
         assert_eq!(module.tests().model_tests().len(), 2);
-        assert!(module.tests().model_tests().contains(&test1.clone()));
-        assert!(module.tests().model_tests().contains(&test2.clone()));
+        assert!(module.tests().model_tests().contains(&test1));
+        assert!(module.tests().model_tests().contains(&test2));
         assert!(module.tests().dependency_tests().is_empty());
 
         // External import checks
@@ -875,9 +884,11 @@ mod tests {
         );
 
         // Test checks
+        let test1 = Test::new(vec![], test1);
+        let test2 = Test::new(vec![Identifier::new("x".to_string())], test2);
         assert_eq!(module.tests().model_tests().len(), 2);
-        assert!(module.tests().model_tests().contains(&test1.clone()));
-        assert!(module.tests().model_tests().contains(&test2.clone()));
+        assert!(module.tests().model_tests().contains(&test1));
+        assert!(module.tests().model_tests().contains(&test2));
         assert_eq!(module.tests().dependency_tests().len(), 2);
         assert!(
             module

@@ -6,14 +6,14 @@ use crate::{
     path::ModulePath,
     reference::Identifier,
     symbol::SymbolMap,
-    test::{TestIndex, Tests},
+    test::{TestCollection, TestIndex},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     path: ModulePath,
     symbols: SymbolMap,
-    tests: Tests,
+    tests: TestCollection,
     external_imports: ExternalImportList,
     documentation_map: DocumentationMap,
     dependencies: HashSet<Dependency>,
@@ -25,7 +25,7 @@ impl Module {
     pub fn new(
         path: ModulePath,
         symbols: SymbolMap,
-        tests: Tests,
+        tests: TestCollection,
         external_imports: ExternalImportList,
         documentation_map: DocumentationMap,
         dependencies: HashSet<Dependency>,
@@ -52,7 +52,7 @@ impl Module {
         &self.symbols
     }
 
-    pub fn tests(&self) -> &Tests {
+    pub fn tests(&self) -> &TestCollection {
         &self.tests
     }
 
