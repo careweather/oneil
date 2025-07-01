@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use oneil_ast as ast;
 use oneil_parser as parser;
@@ -26,10 +26,14 @@ impl From<OneilParserError> for LoadingError {
 }
 
 #[derive(Debug)]
+pub struct DoesNotExistError(PathBuf);
+
+#[derive(Debug)]
 pub struct FileLoader;
 
 impl<'a> oneil_module_loader::FileLoader for FileLoader {
     type ParseError = LoadingError;
+    type PythonError = DoesNotExistError;
 
     fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError> {
         let file_content = std::fs::read_to_string(path)?;
@@ -37,7 +41,13 @@ impl<'a> oneil_module_loader::FileLoader for FileLoader {
         Ok(ast)
     }
 
-    fn file_exists(&self, path: impl AsRef<Path>) -> bool {
-        path.as_ref().exists()
+    fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError> {
+        let path = path.as_ref();
+
+        if path.exists() {
+            Ok(())
+        } else {
+            Err(DoesNotExistError(path.to_path_buf()))
+        }
     }
 }

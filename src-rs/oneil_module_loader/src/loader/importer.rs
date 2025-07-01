@@ -2,13 +2,17 @@ use std::collections::HashSet;
 
 use oneil_module::reference::{ModulePath, PythonPath};
 
-use crate::util::builder::ModuleCollectionBuilder;
+use crate::{FileLoader, util::builder::ModuleCollectionBuilder};
 
-pub fn validate_imports(
+pub fn validate_imports<F>(
     module_path: &ModulePath,
     builder: ModuleCollectionBuilder,
     imports: Vec<oneil_ast::declaration::Import>,
-) -> (HashSet<PythonPath>, ModuleCollectionBuilder) {
+    file_loader: &F,
+) -> (HashSet<PythonPath>, ModuleCollectionBuilder)
+where
+    F: FileLoader,
+{
     // TODO: check for duplicate imports
     imports.into_iter().fold(
         (HashSet::new(), builder),
@@ -16,21 +20,17 @@ pub fn validate_imports(
             let python_path = module_path.get_sibling_path(&import.path);
             let python_path = PythonPath::new(python_path);
 
-            let result = validate_python_import(&python_path);
+            let result = file_loader.validate_python_import(&python_path);
             match result {
                 Ok(()) => {
                     python_imports.insert(python_path);
                     (python_imports, builder)
                 }
                 Err(error) => {
-                    builder.add_error(module_path.clone(), error);
+                    builder.add_error(module_path.clone(), todo!("pass error along"));
                     (python_imports, builder)
                 }
             }
         },
     )
-}
-
-fn validate_python_import(python_path: &PythonPath) -> Result<(), ()> {
-    todo!()
 }

@@ -6,8 +6,9 @@ pub mod builder;
 
 pub trait FileLoader {
     type ParseError;
+    type PythonError;
     fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError>;
-    fn file_exists(&self, path: impl AsRef<Path>) -> bool;
+    fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError>;
 }
 
 pub struct Stack<T: PartialEq> {

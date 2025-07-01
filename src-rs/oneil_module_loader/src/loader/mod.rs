@@ -10,7 +10,7 @@ pub fn load_module<F>(
     module_path: ModulePath,
     mut builder: ModuleCollectionBuilder,
     load_stack: &mut Stack<ModulePath>,
-    file_parser: &F,
+    file_loader: &F,
 ) -> ModuleCollectionBuilder
 where
     F: FileLoader,
@@ -28,7 +28,7 @@ where
     builder.mark_module_as_visited(&module_path);
 
     // parse model ast
-    let model_ast = file_parser
+    let model_ast = file_loader
         .parse_ast(module_path)
         .unwrap_or(todo!("failed to parse model ast"));
 
@@ -36,10 +36,11 @@ where
     let (imports, use_models, parameters, tests) = split_model_ast(model_ast);
 
     // validate imports
-    let (python_imports, builder) = importer::validate_imports(&module_path, builder, imports);
+    let (python_imports, builder) =
+        importer::validate_imports(&module_path, builder, imports, file_loader);
 
     // load use models and resolve them
-    let builder = load_use_models(module_path, load_stack, file_parser, use_models, builder);
+    let builder = load_use_models(module_path, load_stack, file_loader, use_models, builder);
 
     // resolve submodels
     let (submodels, submodel_tests, builder) =
@@ -95,7 +96,7 @@ fn split_model_ast(
 fn load_use_models<F>(
     module_path: ModulePath,
     load_stack: &mut Stack<ModulePath>,
-    file_parser: &F,
+    file_loader: &F,
     use_models: Vec<ast::declaration::UseModel>,
     builder: ModuleCollectionBuilder,
 ) -> ModuleCollectionBuilder
@@ -109,6 +110,6 @@ where
         let use_model_path = ModulePath::new(use_model_path);
 
         // load the use model (and its submodels)
-        load_module(use_model_path.clone(), builder, load_stack, file_parser)
+        load_module(use_model_path.clone(), builder, load_stack, file_loader)
     })
 }
