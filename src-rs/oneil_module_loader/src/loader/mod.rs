@@ -103,13 +103,19 @@ fn load_use_models<F>(
 where
     F: FileLoader,
 {
+    load_stack.push(module_path.clone());
+
     // TODO: check for duplicate use models
-    use_models.into_iter().fold(builder, |builder, use_model| {
+    let builder = use_models.into_iter().fold(builder, |builder, use_model| {
         // get the use model path
         let use_model_path = module_path.get_sibling_path(&use_model.model_name);
         let use_model_path = ModulePath::new(use_model_path);
 
         // load the use model (and its submodels)
         load_module(use_model_path.clone(), builder, load_stack, file_loader)
-    })
+    });
+
+    load_stack.pop();
+
+    builder
 }
