@@ -219,7 +219,7 @@ fn skip_to_next_line(input: Span) -> Span {
 mod tests {
     use super::*;
     use crate::Config;
-    use oneil_ast::declaration::Decl;
+    use oneil_ast::declaration::{Decl, Import};
 
     #[test]
     fn test_empty_model() {
@@ -248,7 +248,7 @@ mod tests {
         assert!(model.note.is_none());
         assert_eq!(model.decls.len(), 1);
         match &model.decls[0] {
-            Decl::Import { path } => assert_eq!(path, "foo"),
+            Decl::Import(Import { path }) => assert_eq!(path, "foo"),
             _ => panic!("Expected import declaration"),
         }
         assert!(model.sections.is_empty());
@@ -266,7 +266,7 @@ mod tests {
         assert_eq!(section.label, "foo");
         assert_eq!(section.decls.len(), 1);
         match &section.decls[0] {
-            Decl::Import { path } => assert_eq!(path, "bar"),
+            Decl::Import(Import { path }) => assert_eq!(path, "bar"),
             _ => panic!("Expected import declaration"),
         }
         assert_eq!(rest.fragment(), &"");
@@ -287,7 +287,7 @@ mod tests {
         assert_eq!(section1.label, "foo");
         assert_eq!(section1.decls.len(), 1);
         match &section1.decls[0] {
-            Decl::Import { path } => assert_eq!(path, "bar"),
+            Decl::Import(Import { path }) => assert_eq!(path, "bar"),
             _ => panic!("Expected import declaration"),
         }
 
@@ -295,7 +295,7 @@ mod tests {
         assert_eq!(section2.label, "baz");
         assert_eq!(section2.decls.len(), 1);
         match &section2.decls[0] {
-            Decl::Import { path } => assert_eq!(path, "qux"),
+            Decl::Import(Import { path }) => assert_eq!(path, "qux"),
             _ => panic!("Expected import declaration"),
         }
 
@@ -318,11 +318,11 @@ mod tests {
         let (rest, model) = parse_complete(input).unwrap();
         assert_eq!(model.decls.len(), 2);
         match &model.decls[0] {
-            Decl::Import { path } => assert_eq!(path, "foo"),
+            Decl::Import(Import { path }) => assert_eq!(path, "foo"),
             _ => panic!("Expected import declaration"),
         }
         match &model.decls[1] {
-            Decl::Import { path } => assert_eq!(path, "bar"),
+            Decl::Import(Import { path }) => assert_eq!(path, "bar"),
             _ => panic!("Expected import declaration"),
         }
         assert_eq!(rest.fragment(), &"");

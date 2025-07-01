@@ -7,7 +7,7 @@ use nom::{
     multi::{many0, separated_list0},
 };
 
-use oneil_ast::declaration::{Decl, ModelInput};
+use oneil_ast::declaration::{Decl, Import, ModelInput, UseModel};
 
 use crate::{
     error::{ErrorHandlingParser, ParserError},
@@ -63,9 +63,9 @@ fn import_decl(input: Span) -> Result<Decl, ParserError> {
 
     Ok((
         rest,
-        Decl::Import {
+        Decl::Import(Import {
             path: path.lexeme().to_string(),
-        },
+        }),
     ))
 }
 
@@ -102,12 +102,12 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
 
     Ok((
         rest,
-        Decl::UseModel {
+        Decl::UseModel(UseModel {
             model_name,
             subcomponents,
             inputs,
             as_name: Some(as_name.lexeme().to_string()),
-        },
+        }),
     ))
 }
 
@@ -135,12 +135,12 @@ fn use_decl(input: Span) -> Result<Decl, ParserError> {
 
     Ok((
         rest,
-        Decl::UseModel {
+        Decl::UseModel(UseModel {
             model_name,
             subcomponents,
             inputs,
             as_name: Some(as_name.lexeme().to_string()),
-        },
+        }),
     ))
 }
 
@@ -198,7 +198,7 @@ mod tests {
         let input = Span::new_extra("import foo\n", Config::default());
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::Import { path } => {
+            Decl::Import(Import { path }) => {
                 assert_eq!(path, "foo");
             }
             _ => panic!("Expected import declaration"),
@@ -211,12 +211,12 @@ mod tests {
         let input = Span::new_extra("use foo.bar as baz\n", Config::default());
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::UseModel {
+            Decl::UseModel(UseModel {
                 model_name,
                 subcomponents,
                 inputs,
                 as_name,
-            } => {
+            }) => {
                 assert_eq!(model_name, "foo");
                 assert_eq!(subcomponents, ["bar"]);
                 assert!(inputs.is_none());
@@ -232,12 +232,12 @@ mod tests {
         let input = Span::new_extra("use foo.bar(x=1, y=2) as baz\n", Config::default());
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::UseModel {
+            Decl::UseModel(UseModel {
                 model_name,
                 subcomponents,
                 inputs: Some(inputs),
                 as_name,
-            } => {
+            }) => {
                 assert_eq!(model_name, "foo");
                 assert_eq!(subcomponents, ["bar"]);
                 assert_eq!(inputs.len(), 2);
@@ -257,12 +257,12 @@ mod tests {
         let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::UseModel {
+            Decl::UseModel(UseModel {
                 model_name,
                 subcomponents,
                 inputs,
                 as_name,
-            } => {
+            }) => {
                 assert_eq!(model_name, "foo");
                 assert_eq!(subcomponents, ["bar", "model"]);
                 assert!(inputs.is_none());
@@ -281,12 +281,12 @@ mod tests {
         );
         let (rest, decl) = parse(input).unwrap();
         match decl {
-            Decl::UseModel {
+            Decl::UseModel(UseModel {
                 model_name,
                 subcomponents,
                 inputs: Some(inputs),
                 as_name,
-            } => {
+            }) => {
                 assert_eq!(model_name, "foo");
                 assert_eq!(subcomponents, ["bar", "model"]);
                 assert_eq!(inputs.len(), 2);
@@ -306,7 +306,7 @@ mod tests {
         let input = Span::new_extra("import foo\n", Config::default());
         let (rest, decl) = parse_complete(input).unwrap();
         match decl {
-            Decl::Import { path } => {
+            Decl::Import(Import { path }) => {
                 assert_eq!(path, "foo");
             }
             _ => panic!("Expected import declaration"),
@@ -319,12 +319,12 @@ mod tests {
         let input = Span::new_extra("use foo.bar as baz\n", Config::default());
         let (rest, decl) = parse_complete(input).unwrap();
         match decl {
-            Decl::UseModel {
+            Decl::UseModel(UseModel {
                 model_name,
                 subcomponents,
                 inputs,
                 as_name,
-            } => {
+            }) => {
                 assert_eq!(model_name, "foo");
                 assert_eq!(subcomponents, ["bar"]);
                 assert!(inputs.is_none());
@@ -340,12 +340,12 @@ mod tests {
         let input = Span::new_extra("from foo.bar use model(x=1) as baz\n", Config::default());
         let (rest, decl) = parse_complete(input).unwrap();
         match decl {
-            Decl::UseModel {
+            Decl::UseModel(UseModel {
                 model_name,
                 subcomponents,
                 inputs: Some(inputs),
                 as_name,
-            } => {
+            }) => {
                 assert_eq!(model_name, "foo");
                 assert_eq!(subcomponents, ["bar", "model"]);
                 assert_eq!(inputs.len(), 1);

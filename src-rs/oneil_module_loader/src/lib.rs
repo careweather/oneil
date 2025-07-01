@@ -1,89 +1,45 @@
-// TODO: uncomment this once the library is more organized and stable
-// #![warn(missing_docs)]
+use std::path::Path;
 
-mod builder;
-mod dep_checker;
+use oneil_module::{module::ModuleCollection, reference::ModulePath};
+
+use crate::util::{Stack, builder::ModuleCollectionBuilder};
+
 mod error;
 mod loader;
 mod util;
-
-use oneil_module::{ModuleCollection, ModulePath};
-use std::path::Path;
-
-use crate::{
-    error::ModuleErrorCollection,
-    util::{ModuleCollectionBuilder, Stack},
-};
 
 pub use crate::util::FileLoader;
 
 pub fn load_module<F>(
     module_path: impl AsRef<Path>,
     file_parser: &F,
-) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorCollection<F::ParseError>)>
+) -> Result<ModuleCollection, (ModuleCollection, ())>
 where
     F: FileLoader,
 {
-    let module_path = ModulePath::new(module_path.as_ref().to_path_buf());
-    let mut module_stack = Stack::new();
-    let module_collection = ModuleCollectionBuilder::new(vec![module_path.clone()]);
-    let module_errors = ModuleErrorCollection::new();
-
-    let (module_collection, module_errors) = loader::load_module(
-        module_path,
-        &mut module_stack,
-        module_collection,
-        module_errors,
-        file_parser,
-    );
-
-    let module_collection = module_collection.into_module_collection();
-
-    let _result = dep_checker::check_dependencies(&module_collection);
-
-    if module_errors.is_empty() {
-        Ok(module_collection)
-    } else {
-        Err((module_collection, module_errors))
-    }
+    load_module_list(&[module_path], file_parser)
 }
 
 pub fn load_module_list<F>(
-    module_paths: Vec<impl AsRef<Path>>,
+    module_paths: &[impl AsRef<Path>],
     file_parser: &F,
-) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorCollection<F::ParseError>)>
+) -> Result<ModuleCollection, (ModuleCollection, ())>
 where
     F: FileLoader,
 {
-    let module_paths: Vec<_> = module_paths
-        .into_iter()
+    let initial_module_paths: Vec<_> = module_paths
+        .iter()
         .map(|p| ModulePath::new(p.as_ref().to_path_buf()))
         .collect();
-    let module_collection = ModuleCollectionBuilder::new(module_paths.clone());
-    let module_errors = ModuleErrorCollection::new();
 
-    let (module_collection, module_errors) = module_paths.into_iter().fold(
-        (module_collection, module_errors),
-        |(module_collection, module_errors), module_path| {
-            let mut module_stack = Stack::new();
-            let (module_collection, module_errors) = loader::load_module(
-                module_path,
-                &mut module_stack,
-                module_collection,
-                module_errors,
-                file_parser,
-            );
-            (module_collection, module_errors)
-        },
-    );
+    let builder = ModuleCollectionBuilder::new(initial_module_paths);
 
-    let module_collection = module_collection.into_module_collection();
+    module_paths.iter().fold(builder, |builder, module_path| {
+        let module_path = ModulePath::new(module_path.as_ref().to_path_buf());
+        let mut load_stack = Stack::new();
 
-    let _result = dep_checker::check_dependencies(&module_collection);
+        loader::load_module(module_path, builder, &mut load_stack, file_parser)
+    });
 
-    if module_errors.is_empty() {
-        Ok(module_collection)
-    } else {
-        Err((module_collection, module_errors))
-    }
+    todo!()
 }

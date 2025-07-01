@@ -8,19 +8,25 @@ use super::test::Test;
 /// parameters, and tests.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
-    Import {
-        path: String,
-    },
+    Import(Import),
 
-    UseModel {
-        model_name: String,
-        subcomponents: Vec<String>,
-        inputs: Option<Vec<ModelInput>>,
-        as_name: Option<String>,
-    },
+    UseModel(UseModel),
 
     Parameter(Parameter),
     Test(Test),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Import {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UseModel {
+    pub model_name: String,
+    pub subcomponents: Vec<String>,
+    pub inputs: Option<Vec<ModelInput>>,
+    pub as_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

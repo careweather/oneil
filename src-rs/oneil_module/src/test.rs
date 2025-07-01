@@ -1,79 +1,55 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
-use oneil_ast as ast;
-
-use crate::path::ModulePath;
-use crate::reference::Identifier;
+use crate::{
+    expr::Expr,
+    reference::{Identifier, ModulePath},
+};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TestCollection {
-    model_tests: Vec<Test>,
-    dependency_tests: HashMap<ModulePath, TestInputs>,
+pub struct ModelTest {}
+
+impl ModelTest {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
-impl TestCollection {
-    pub fn new(model_tests: Vec<Test>, dependency_tests: HashMap<ModulePath, TestInputs>) -> Self {
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubmodelTest {
+    submodel_path: ModulePath,
+    inputs: SubmodelTestInputs,
+}
+
+impl SubmodelTest {
+    pub fn new(submodel_path: ModulePath, inputs: SubmodelTestInputs) -> Self {
         Self {
-            model_tests,
-            dependency_tests,
+            submodel_path,
+            inputs,
         }
     }
 
-    pub fn empty() -> Self {
-        Self::new(vec![], HashMap::new())
+    pub fn submodel_path(&self) -> &ModulePath {
+        &self.submodel_path
     }
 
-    pub fn model_tests(&self) -> &Vec<Test> {
-        &self.model_tests
-    }
-
-    pub fn dependency_tests(&self) -> &HashMap<ModulePath, TestInputs> {
-        &self.dependency_tests
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Test {
-    inputs: Vec<Identifier>,
-    body: ast::Test,
-}
-
-impl Test {
-    pub fn new(inputs: Vec<Identifier>, body: ast::Test) -> Self {
-        Self { inputs, body }
-    }
-
-    pub fn inputs(&self) -> &Vec<Identifier> {
+    pub fn inputs(&self) -> &SubmodelTestInputs {
         &self.inputs
     }
-
-    pub fn body(&self) -> &ast::Test {
-        &self.body
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TestInputs(HashMap<Identifier, ast::Expr>);
+pub struct SubmodelTestInputs(HashMap<Identifier, Expr>);
 
-impl TestInputs {
-    pub fn new(inputs: HashMap<Identifier, ast::Expr>) -> Self {
+impl SubmodelTestInputs {
+    pub fn new(inputs: HashMap<Identifier, Expr>) -> Self {
         Self(inputs)
-    }
-
-    pub fn empty() -> Self {
-        Self::new(HashMap::new())
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TestIndex(usize);
+impl Deref for SubmodelTestInputs {
+    type Target = HashMap<Identifier, Expr>;
 
-impl TestIndex {
-    pub fn new(index: usize) -> Self {
-        Self(index)
-    }
-
-    pub fn index(&self) -> usize {
-        self.0
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

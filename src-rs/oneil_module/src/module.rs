@@ -1,105 +1,77 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    dependency::{Dependency, ExternalImportList, ParameterDependency, TestDependency},
-    documentation::DocumentationMap,
-    path::ModulePath,
-    reference::Identifier,
-    symbol::SymbolMap,
-    test::{TestCollection, TestIndex},
+    parameter::{Parameter, ParameterCollection},
+    reference::{Identifier, ModulePath, PythonPath},
+    test::{ModelTest, SubmodelTest},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
-    path: ModulePath,
-    symbols: SymbolMap,
-    tests: TestCollection,
-    external_imports: ExternalImportList,
-    documentation_map: DocumentationMap,
-    dependencies: HashSet<Dependency>,
-    parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
-    test_dependencies: HashMap<TestIndex, HashSet<TestDependency>>,
+    python_imports: HashSet<PythonPath>,
+    submodels: HashMap<Identifier, ModulePath>,
+    parameters: ParameterCollection,
+    model_tests: Vec<ModelTest>,
+    submodel_tests: Vec<SubmodelTest>,
 }
 
 impl Module {
     pub fn new(
-        path: ModulePath,
-        symbols: SymbolMap,
-        tests: TestCollection,
-        external_imports: ExternalImportList,
-        documentation_map: DocumentationMap,
-        dependencies: HashSet<Dependency>,
-        parameter_dependencies: HashMap<Identifier, HashSet<ParameterDependency>>,
-        test_dependencies: HashMap<TestIndex, HashSet<TestDependency>>,
+        python_imports: HashSet<PythonPath>,
+        submodels: HashMap<Identifier, ModulePath>,
+        parameters: ParameterCollection,
+        model_tests: Vec<ModelTest>,
+        submodel_tests: Vec<SubmodelTest>,
     ) -> Self {
         Self {
-            path,
-            symbols,
-            tests,
-            external_imports,
-            documentation_map,
-            dependencies,
-            parameter_dependencies,
-            test_dependencies,
+            python_imports,
+            submodels,
+            parameters,
+            model_tests,
+            submodel_tests,
         }
     }
 
-    pub fn path(&self) -> &ModulePath {
-        &self.path
+    pub fn get_python_imports(&self) -> &HashSet<PythonPath> {
+        &self.python_imports
     }
 
-    pub fn symbols(&self) -> &SymbolMap {
-        &self.symbols
+    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&ModulePath> {
+        self.submodels.get(identifier)
     }
 
-    pub fn tests(&self) -> &TestCollection {
-        &self.tests
+    pub fn get_parameter(&self, identifier: &Identifier) -> Option<&Parameter> {
+        self.parameters.get(identifier)
     }
 
-    pub fn external_imports(&self) -> &ExternalImportList {
-        &self.external_imports
+    pub fn get_model_tests(&self) -> &Vec<ModelTest> {
+        &self.model_tests
     }
 
-    pub fn documentation_map(&self) -> &DocumentationMap {
-        &self.documentation_map
-    }
-
-    pub fn dependencies(&self) -> &HashSet<Dependency> {
-        &self.dependencies
-    }
-
-    pub fn parameter_dependencies(&self) -> &HashMap<Identifier, HashSet<ParameterDependency>> {
-        &self.parameter_dependencies
-    }
-
-    pub fn test_dependencies(&self) -> &HashMap<TestIndex, HashSet<TestDependency>> {
-        &self.test_dependencies
+    pub fn get_submodel_tests(&self) -> &Vec<SubmodelTest> {
+        &self.submodel_tests
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleCollection {
-    initial_modules: Vec<ModulePath>,
+    initial_modules: HashSet<ModulePath>,
     modules: HashMap<ModulePath, Module>,
 }
 
 impl ModuleCollection {
-    pub fn new(initial_modules: Vec<ModulePath>, modules: HashMap<ModulePath, Module>) -> Self {
+    pub fn new(initial_modules: HashSet<ModulePath>, modules: HashMap<ModulePath, Module>) -> Self {
         Self {
             initial_modules,
             modules,
         }
     }
 
-    pub fn module(&self, module_path: &ModulePath) -> Option<&Module> {
-        self.modules.get(module_path)
-    }
-
-    pub fn modules(&self) -> &HashMap<ModulePath, Module> {
-        &self.modules
-    }
-
-    pub fn initial_modules(&self) -> &Vec<ModulePath> {
-        &self.initial_modules
+    /// Returns all python imports from modules in the collection
+    pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
+        self.modules
+            .values()
+            .flat_map(|module| module.python_imports.iter())
+            .collect()
     }
 }
