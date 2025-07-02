@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use oneil_module::reference::{ModulePath, PythonPath};
 
-use crate::{FileLoader, util::builder::ModuleCollectionBuilder};
+use crate::{FileLoader, error::LoadError, util::builder::ModuleCollectionBuilder};
 
 pub fn validate_imports<F>(
     module_path: &ModulePath,
@@ -30,7 +30,7 @@ where
                     (python_imports, builder)
                 }
                 Err(error) => {
-                    builder.add_error(module_path.clone(), todo!("pass error along"));
+                    builder.add_error(module_path.clone(), LoadError::python_error(error));
                     (python_imports, builder)
                 }
             }

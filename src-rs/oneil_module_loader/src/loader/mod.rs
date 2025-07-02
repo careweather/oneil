@@ -19,6 +19,9 @@ where
     F: FileLoader,
 {
     // check for circular dependencies
+    //
+    // this happens before we check if the module has been visited because if
+    // there is a circular dependency, it will have already been visited
     if let Some(circular_dependency) = load_stack.find_circular_dependency(&module_path) {
         builder.add_error(
             module_path,
@@ -34,9 +37,15 @@ where
     builder.mark_module_as_visited(&module_path);
 
     // parse model ast
-    let model_ast = file_loader
-        .parse_ast(module_path)
-        .unwrap_or(todo!("failed to parse model ast"));
+    let model_ast = file_loader.parse_ast(module_path.clone());
+
+    let model_ast = match model_ast {
+        Ok(model_ast) => model_ast,
+        Err(error) => {
+            builder.add_error(module_path, LoadError::ParseError(error));
+            return builder;
+        }
+    };
 
     // split model ast into imports, use models, parameters, and tests
     let (imports, use_models, parameters, tests) = split_model_ast(model_ast);
@@ -46,21 +55,31 @@ where
         importer::validate_imports(&module_path, builder, imports, file_loader);
 
     // load use models and resolve them
-    let builder = load_use_models(module_path, load_stack, file_loader, use_models, builder);
-
-    let modules = builder.get_modules();
+    let mut builder = load_use_models(
+        module_path.clone(),
+        load_stack,
+        file_loader,
+        &use_models,
+        builder,
+    );
 
     // resolve submodels
-    let (submodels, submodel_tests) =
-        resolver::resolve_submodels_and_tests(use_models, &module_path, modules);
+    let (submodels, submodel_tests, resolution_errors) = resolver::resolve_submodels_and_tests(
+        use_models,
+        &module_path,
+        builder.get_modules(),
+        &builder.get_modules_with_errors(),
+    );
+
+    builder.add_error_list(module_path, resolution_errors);
 
     // resolve parameters
-    let parameters = resolver::resolve_parameters(parameters, &submodels, modules)
+    let parameters = resolver::resolve_parameters(parameters, &submodels, builder.get_modules())
         .unwrap_or(todo!("failed to resolve parameters"));
 
     // resolve submodel tests and build tests
-    let model_tests = resolver::resolve_model_tests(tests, modules);
-    let submodel_tests = resolver::resolve_submodel_tests(submodel_tests, modules);
+    let model_tests = resolver::resolve_model_tests(tests, builder.get_modules());
+    let submodel_tests = resolver::resolve_submodel_tests(submodel_tests, builder.get_modules());
 
     // build module
     let module = Module::new(
@@ -106,7 +125,7 @@ fn load_use_models<F>(
     module_path: ModulePath,
     load_stack: &mut Stack<ModulePath>,
     file_loader: &F,
-    use_models: Vec<ast::declaration::UseModel>,
+    use_models: &Vec<ast::declaration::UseModel>,
     builder: ModuleCollectionBuilder<F::ParseError, F::PythonError>,
 ) -> ModuleCollectionBuilder<F::ParseError, F::PythonError>
 where
@@ -121,7 +140,7 @@ where
         let use_model_path = ModulePath::new(use_model_path);
 
         // load the use model (and its submodels)
-        load_module(use_model_path.clone(), builder, load_stack, file_loader)
+        load_module(use_model_path, builder, load_stack, file_loader)
     });
 
     load_stack.pop();

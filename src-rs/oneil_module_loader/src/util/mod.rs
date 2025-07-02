@@ -5,8 +5,8 @@ use oneil_ast as ast;
 pub mod builder;
 
 pub trait FileLoader {
-    type ParseError;
-    type PythonError;
+    type ParseError: std::fmt::Debug;
+    type PythonError: std::fmt::Debug;
     fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError>;
     fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError>;
 }

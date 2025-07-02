@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use oneil_module::reference::{Identifier, ModulePath};
 
@@ -18,6 +18,10 @@ impl<Ps, Py> ModuleErrorMap<Ps, Py> {
 
     pub fn add_error(&mut self, module_path: ModulePath, error: LoadError<Ps, Py>) {
         self.errors.entry(module_path).or_insert(vec![]).push(error);
+    }
+
+    pub fn get_modules_with_errors(&self) -> HashSet<&ModulePath> {
+        self.errors.keys().collect()
     }
 
     pub fn is_empty(&self) -> bool {

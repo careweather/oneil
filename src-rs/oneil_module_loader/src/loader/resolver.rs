@@ -8,41 +8,48 @@ use oneil_module::{
     test::{ModelTest, SubmodelTest},
 };
 
-use crate::util::{
-    Stack,
-    builder::{ModuleCollectionBuilder, ParameterCollectionBuilder},
+use crate::{
+    error::{ResolutionError, ResolutionErrorSource},
+    util::{Stack, builder::ParameterCollectionBuilder},
 };
 
 pub fn resolve_submodels_and_tests(
     use_models: Vec<ast::declaration::UseModel>,
     module_path: &ModulePath,
     modules: &HashMap<ModulePath, Module>,
+    modules_with_errors: &HashSet<&ModulePath>,
 ) -> (
     HashMap<Identifier, ModulePath>,
     Vec<(ModulePath, Vec<ast::declaration::ModelInput>)>,
+    Vec<ResolutionError>,
 ) {
     use_models.into_iter().fold(
-        (HashMap::new(), Vec::new()),
-        |(mut submodels, mut submodel_tests), use_model| {
+        (HashMap::new(), Vec::new(), Vec::new()),
+        |(mut submodels, mut submodel_tests, mut resolution_errors), use_model| {
             // get the use model path
             let use_model_path = module_path.get_sibling_path(&use_model.model_name);
             let use_model_path = ModulePath::new(use_model_path);
 
+            // get the submodel name
+            let submodel_name = use_model.as_name.as_ref().unwrap_or(
+                use_model
+                    .subcomponents
+                    .last()
+                    .unwrap_or(&use_model.model_name),
+            );
+
             // resolve the use model path
-            let resolved_use_model_path =
-                resolve_module_path(use_model_path.clone(), &use_model.subcomponents, modules);
+            let resolved_use_model_path = resolve_module_path(
+                use_model_path.clone(),
+                &use_model.subcomponents,
+                modules,
+                modules_with_errors,
+            );
 
             // insert the use model path into the submodels map if it was resolved successfully
             // otherwise, add the error to the builder
             match resolved_use_model_path {
                 Ok(resolved_use_model_path) => {
-                    let submodel_name = use_model.as_name.as_ref().unwrap_or(
-                        use_model
-                            .subcomponents
-                            .last()
-                            .unwrap_or(&use_model.model_name),
-                    );
-
                     submodels.insert(
                         Identifier::new(submodel_name),
                         resolved_use_model_path.clone(),
@@ -55,11 +62,12 @@ pub fn resolve_submodels_and_tests(
                     submodel_tests.push((resolved_use_model_path, inputs));
                 }
                 Err(error) => {
-                    todo!(" figure out this error")
+                    resolution_errors
+                        .push(ResolutionError::new(Identifier::new(submodel_name), error));
                 }
             }
 
-            (submodels, submodel_tests)
+            (submodels, submodel_tests, resolution_errors)
         },
     )
 }
@@ -589,29 +597,36 @@ fn resolve_module_path(
     module_path: ModulePath,
     subcomponents: &[String],
     modules: &HashMap<ModulePath, Module>,
-) -> Result<ModulePath, ()> {
-    assert!(
-        modules.contains_key(&module_path),
-        "module path {:?} has not been visited",
-        module_path
-    );
+    modules_with_errors: &HashSet<&ModulePath>,
+) -> Result<ModulePath, ResolutionErrorSource> {
+    // if the module that we are trying to resolve has had an error, this
+    // operation should fail
+    if modules_with_errors.contains(&module_path) {
+        return Err(ResolutionErrorSource::submodel_had_error(module_path));
+    }
 
+    // if there are no more subcomponents, we have resolved the module path
     if subcomponents.is_empty() {
         return Ok(module_path);
     }
 
-    let module = modules.get(&module_path).ok_or(todo!(
-        "I think the module had errors? Not sure how to handle this yet {:?}",
-        module_path
-    ))?;
+    //
+    let module = modules
+        .get(&module_path)
+        .expect("module should have been visited already");
 
-    let submodel_name = Identifier::new(subcomponents[0]);
+    let submodel_name = Identifier::new(subcomponents[0].clone());
     let submodel_path = module
         .get_submodel(&submodel_name)
         .ok_or(todo!("resolution error"))?
         .clone();
 
-    resolve_module_path(submodel_path, &subcomponents[1..], modules)
+    resolve_module_path(
+        submodel_path,
+        &subcomponents[1..],
+        modules,
+        modules_with_errors,
+    )
 }
 
 fn resolve_variable(

@@ -48,8 +48,22 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
         &self.modules
     }
 
+    pub fn get_modules_with_errors(&self) -> HashSet<&ModulePath> {
+        self.errors.get_modules_with_errors()
+    }
+
     pub fn add_error(&mut self, module_path: ModulePath, error: LoadError<Ps, Py>) {
         self.errors.add_error(module_path, error);
+    }
+
+    pub fn add_error_list<I, J>(&mut self, module_path: ModulePath, errors: I)
+    where
+        I: IntoIterator<Item = J>,
+        J: Into<LoadError<Ps, Py>>,
+    {
+        for error in errors {
+            self.add_error(module_path.clone(), error.into());
+        }
     }
 
     pub fn add_module(&mut self, module_path: ModulePath, module: Module) {
