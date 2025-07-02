@@ -2,7 +2,10 @@ use std::{collections::HashSet, path::Path};
 
 use oneil_module::{module::ModuleCollection, reference::ModulePath};
 
-use crate::util::{Stack, builder::ModuleCollectionBuilder};
+use crate::{
+    error::collection::ModuleErrorMap,
+    util::{Stack, builder::ModuleCollectionBuilder},
+};
 
 mod error;
 mod loader;
@@ -13,7 +16,13 @@ pub use crate::util::FileLoader;
 pub fn load_module<F>(
     module_path: impl AsRef<Path>,
     file_parser: &F,
-) -> Result<ModuleCollection, (ModuleCollection, ())>
+) -> Result<
+    ModuleCollection,
+    (
+        ModuleCollection,
+        ModuleErrorMap<F::ParseError, F::PythonError>,
+    ),
+>
 where
     F: FileLoader,
 {
@@ -23,7 +32,13 @@ where
 pub fn load_module_list<F>(
     module_paths: &[impl AsRef<Path>],
     file_parser: &F,
-) -> Result<ModuleCollection, (ModuleCollection, ())>
+) -> Result<
+    ModuleCollection,
+    (
+        ModuleCollection,
+        ModuleErrorMap<F::ParseError, F::PythonError>,
+    ),
+>
 where
     F: FileLoader,
 {

@@ -6,17 +6,23 @@ use oneil_module::{
     reference::{Identifier, ModulePath},
 };
 
-use crate::error::collection::{ModuleErrorMap, ParameterErrorMap};
+use crate::{
+    FileLoader,
+    error::{
+        LoadError,
+        collection::{ModuleErrorMap, ParameterErrorMap},
+    },
+};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleCollectionBuilder {
+pub struct ModuleCollectionBuilder<Ps, Py> {
     initial_modules: HashSet<ModulePath>,
     modules: HashMap<ModulePath, Module>,
     visited_modules: HashSet<ModulePath>,
-    errors: ModuleErrorMap,
+    errors: ModuleErrorMap<Ps, Py>,
 }
 
-impl ModuleCollectionBuilder {
+impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
     pub fn new(initial_modules: HashSet<ModulePath>) -> Self {
         Self {
             initial_modules,
@@ -38,7 +44,11 @@ impl ModuleCollectionBuilder {
         self.modules.get(module_path)
     }
 
-    pub fn add_error(&mut self, module_path: ModulePath, error: ()) {
+    pub fn get_modules(&self) -> &HashMap<ModulePath, Module> {
+        &self.modules
+    }
+
+    pub fn add_error(&mut self, module_path: ModulePath, error: LoadError<Ps, Py>) {
         self.errors.add_error(module_path, error);
     }
 
@@ -47,15 +57,15 @@ impl ModuleCollectionBuilder {
     }
 }
 
-impl TryInto<ModuleCollection> for ModuleCollectionBuilder {
-    type Error = (ModuleCollection, ());
+impl<Ps, Py> TryInto<ModuleCollection> for ModuleCollectionBuilder<Ps, Py> {
+    type Error = (ModuleCollection, ModuleErrorMap<Ps, Py>);
 
-    fn try_into(self) -> Result<ModuleCollection, (ModuleCollection, ())> {
+    fn try_into(self) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorMap<Ps, Py>)> {
         let module_collection = ModuleCollection::new(self.initial_modules, self.modules);
         if self.errors.is_empty() {
             Ok(module_collection)
         } else {
-            Err((module_collection, ()))
+            Err((module_collection, self.errors))
         }
     }
 }

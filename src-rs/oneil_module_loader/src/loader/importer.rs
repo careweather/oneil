@@ -6,10 +6,13 @@ use crate::{FileLoader, util::builder::ModuleCollectionBuilder};
 
 pub fn validate_imports<F>(
     module_path: &ModulePath,
-    builder: ModuleCollectionBuilder,
+    builder: ModuleCollectionBuilder<F::ParseError, F::PythonError>,
     imports: Vec<oneil_ast::declaration::Import>,
     file_loader: &F,
-) -> (HashSet<PythonPath>, ModuleCollectionBuilder)
+) -> (
+    HashSet<PythonPath>,
+    ModuleCollectionBuilder<F::ParseError, F::PythonError>,
+)
 where
     F: FileLoader,
 {

@@ -1,23 +1,29 @@
 use oneil_ast as ast;
 use oneil_module::{module::Module, reference::ModulePath};
 
-use crate::util::{FileLoader, Stack, builder::ModuleCollectionBuilder};
+use crate::{
+    error::LoadError,
+    util::{FileLoader, Stack, builder::ModuleCollectionBuilder},
+};
 
 mod importer;
 mod resolver;
 
 pub fn load_module<F>(
     module_path: ModulePath,
-    mut builder: ModuleCollectionBuilder,
+    mut builder: ModuleCollectionBuilder<F::ParseError, F::PythonError>,
     load_stack: &mut Stack<ModulePath>,
     file_loader: &F,
-) -> ModuleCollectionBuilder
+) -> ModuleCollectionBuilder<F::ParseError, F::PythonError>
 where
     F: FileLoader,
 {
     // check for circular dependencies
-    if load_stack.contains(&module_path) {
-        builder.add_error(module_path, todo!("circular dependency error"));
+    if let Some(circular_dependency) = load_stack.find_circular_dependency(&module_path) {
+        builder.add_error(
+            module_path,
+            LoadError::module_circular_dependency(circular_dependency),
+        );
         return builder;
     }
 
@@ -42,17 +48,19 @@ where
     // load use models and resolve them
     let builder = load_use_models(module_path, load_stack, file_loader, use_models, builder);
 
+    let modules = builder.get_modules();
+
     // resolve submodels
-    let (submodels, submodel_tests, builder) =
-        resolver::resolve_submodels_and_tests(use_models, &module_path, builder);
+    let (submodels, submodel_tests) =
+        resolver::resolve_submodels_and_tests(use_models, &module_path, modules);
 
     // resolve parameters
-    let parameters = resolver::resolve_parameters(parameters, &submodels, builder)
+    let parameters = resolver::resolve_parameters(parameters, &submodels, modules)
         .unwrap_or(todo!("failed to resolve parameters"));
 
     // resolve submodel tests and build tests
-    let model_tests = resolver::resolve_model_tests(tests, builder);
-    let submodel_tests = resolver::resolve_submodel_tests(submodel_tests, builder);
+    let model_tests = resolver::resolve_model_tests(tests, modules);
+    let submodel_tests = resolver::resolve_submodel_tests(submodel_tests, modules);
 
     // build module
     let module = Module::new(
@@ -99,8 +107,8 @@ fn load_use_models<F>(
     load_stack: &mut Stack<ModulePath>,
     file_loader: &F,
     use_models: Vec<ast::declaration::UseModel>,
-    builder: ModuleCollectionBuilder,
-) -> ModuleCollectionBuilder
+    builder: ModuleCollectionBuilder<F::ParseError, F::PythonError>,
+) -> ModuleCollectionBuilder<F::ParseError, F::PythonError>
 where
     F: FileLoader,
 {

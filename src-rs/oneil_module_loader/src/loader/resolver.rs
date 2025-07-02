@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ast as ast;
 use oneil_module::{
+    module::Module,
     parameter::{Parameter as ModuleParameter, ParameterCollection, ParameterValue, PiecewiseExpr},
     reference::{Identifier, ModulePath},
     test::{ModelTest, SubmodelTest},
@@ -15,22 +16,21 @@ use crate::util::{
 pub fn resolve_submodels_and_tests(
     use_models: Vec<ast::declaration::UseModel>,
     module_path: &ModulePath,
-    builder: ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> (
     HashMap<Identifier, ModulePath>,
     Vec<(ModulePath, Vec<ast::declaration::ModelInput>)>,
-    ModuleCollectionBuilder,
 ) {
     use_models.into_iter().fold(
-        (HashMap::new(), Vec::new(), builder),
-        |(mut submodels, mut submodel_tests, mut builder), use_model| {
+        (HashMap::new(), Vec::new()),
+        |(mut submodels, mut submodel_tests), use_model| {
             // get the use model path
             let use_model_path = module_path.get_sibling_path(&use_model.model_name);
             let use_model_path = ModulePath::new(use_model_path);
 
             // resolve the use model path
             let resolved_use_model_path =
-                resolve_module_path(use_model_path.clone(), &use_model.subcomponents, &builder);
+                resolve_module_path(use_model_path.clone(), &use_model.subcomponents, modules);
 
             // insert the use model path into the submodels map if it was resolved successfully
             // otherwise, add the error to the builder
@@ -55,12 +55,11 @@ pub fn resolve_submodels_and_tests(
                     submodel_tests.push((resolved_use_model_path, inputs));
                 }
                 Err(error) => {
-                    builder.add_error(use_model_path, error);
-                    todo!("make this more accurate")
+                    todo!(" figure out this error")
                 }
             }
 
-            (submodels, submodel_tests, builder)
+            (submodels, submodel_tests)
         },
     )
 }
@@ -68,7 +67,7 @@ pub fn resolve_submodels_and_tests(
 pub fn resolve_parameters(
     parameters: Vec<ast::Parameter>,
     submodels: &HashMap<Identifier, ModulePath>,
-    builder: ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> Result<ParameterCollection, ()> {
     // TODO: verify that no duplicate parameters are defined
 
@@ -96,7 +95,7 @@ pub fn resolve_parameters(
             &parameter_map,
             &dependencies,
             submodels,
-            &builder,
+            modules,
             &mut parameter_stack,
             resolved_parameters,
             visited,
@@ -209,7 +208,7 @@ fn resolve_parameter(
     parameter_map: &HashMap<Identifier, oneil_ast::Parameter>,
     dependencies: &HashMap<&Identifier, HashSet<Identifier>>,
     submodels: &HashMap<Identifier, ModulePath>,
-    builder: &ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
     parameter_stack: &mut Stack<Identifier>,
     mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: HashSet<Identifier>,
@@ -253,7 +252,7 @@ fn resolve_parameter(
             parameter_map,
             dependencies,
             submodels,
-            builder,
+            modules,
             parameter_stack,
             resolved_parameters,
             visited,
@@ -278,9 +277,9 @@ fn resolve_parameter(
 
     let ident = Identifier::new(ident);
     let value =
-        convert_parameter_value_to_module_expr(value, &resolved_parameters, submodels, builder);
+        convert_parameter_value_to_module_expr(value, &resolved_parameters, submodels, modules);
     let limits =
-        convert_limits_to_module_limits(limits.as_ref(), &resolved_parameters, submodels, builder);
+        convert_limits_to_module_limits(limits.as_ref(), &resolved_parameters, submodels, modules);
     let trace_level = convert_trace_level_to_module_trace_level(trace_level);
 
     let parameter = ModuleParameter::new(
@@ -301,7 +300,7 @@ fn convert_parameter_value_to_module_expr(
     value: &ast::parameter::ParameterValue,
     resolved_parameters: &ParameterCollectionBuilder,
     submodels: &HashMap<Identifier, ModulePath>,
-    builder: &ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> ParameterValue {
     let local_variables = HashSet::new();
 
@@ -312,7 +311,7 @@ fn convert_parameter_value_to_module_expr(
                 &local_variables,
                 resolved_parameters,
                 submodels,
-                builder,
+                modules,
             );
             let unit = unit.as_ref().map(convert_unit_to_module_unit);
             ParameterValue::simple(expr, unit)
@@ -328,14 +327,14 @@ fn convert_parameter_value_to_module_expr(
                         &local_variables,
                         resolved_parameters,
                         submodels,
-                        builder,
+                        modules,
                     );
                     let if_expr = convert_expr_to_module_expr(
                         &part.if_expr,
                         &local_variables,
                         resolved_parameters,
                         submodels,
-                        builder,
+                        modules,
                     );
                     PiecewiseExpr::new(expr, if_expr)
                 })
@@ -350,7 +349,7 @@ fn convert_limits_to_module_limits(
     limits: Option<&ast::parameter::Limits>,
     resolved_parameters: &ParameterCollectionBuilder,
     submodels: &HashMap<Identifier, ModulePath>,
-    builder: &ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> oneil_module::parameter::Limits {
     let local_variables = HashSet::new();
     match limits {
@@ -360,14 +359,14 @@ fn convert_limits_to_module_limits(
                 &local_variables,
                 resolved_parameters,
                 submodels,
-                builder,
+                modules,
             );
             let max = convert_expr_to_module_expr(
                 max,
                 &local_variables,
                 resolved_parameters,
                 submodels,
-                builder,
+                modules,
             );
             oneil_module::parameter::Limits::continuous(min, max)
         }
@@ -380,7 +379,7 @@ fn convert_limits_to_module_limits(
                         &local_variables,
                         resolved_parameters,
                         submodels,
-                        builder,
+                        modules,
                     )
                 })
                 .collect();
@@ -406,7 +405,7 @@ fn convert_expr_to_module_expr(
     local_variables: &HashSet<Identifier>,
     resolved_parameters: &ParameterCollectionBuilder,
     submodels: &HashMap<Identifier, ModulePath>,
-    builder: &ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> oneil_module::expr::Expr {
     match value {
         ast::Expr::BinaryOp { op, left, right } => {
@@ -415,14 +414,14 @@ fn convert_expr_to_module_expr(
                 local_variables,
                 resolved_parameters,
                 submodels,
-                builder,
+                modules,
             );
             let right = convert_expr_to_module_expr(
                 right,
                 local_variables,
                 resolved_parameters,
                 submodels,
-                builder,
+                modules,
             );
             let op = convert_binary_op_to_module_op(op);
             oneil_module::expr::Expr::binary_op(op, left, right)
@@ -433,7 +432,7 @@ fn convert_expr_to_module_expr(
                 local_variables,
                 resolved_parameters,
                 submodels,
-                builder,
+                modules,
             );
             let op = convert_unary_op_to_module_op(op);
             oneil_module::expr::Expr::unary_op(op, expr)
@@ -448,7 +447,7 @@ fn convert_expr_to_module_expr(
                         local_variables,
                         resolved_parameters,
                         submodels,
-                        builder,
+                        modules,
                     )
                 })
                 .collect();
@@ -459,7 +458,7 @@ fn convert_expr_to_module_expr(
             local_variables,
             resolved_parameters,
             submodels,
-            builder,
+            modules,
         ),
         ast::Expr::Literal(literal) => {
             let literal = convert_literal_to_module_literal(literal);
@@ -574,14 +573,14 @@ fn convert_unit_recursive(
 
 pub fn resolve_model_tests(
     tests: Vec<ast::Test>,
-    builder: ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> Vec<ModelTest> {
     todo!()
 }
 
 pub fn resolve_submodel_tests(
     submodel_tests: Vec<(ModulePath, Vec<ast::declaration::ModelInput>)>,
-    builder: ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> Vec<SubmodelTest> {
     todo!()
 }
@@ -589,10 +588,10 @@ pub fn resolve_submodel_tests(
 fn resolve_module_path(
     module_path: ModulePath,
     subcomponents: &[String],
-    builder: &ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> Result<ModulePath, ()> {
     assert!(
-        builder.module_has_been_visited(&module_path),
+        modules.contains_key(&module_path),
         "module path {:?} has not been visited",
         module_path
     );
@@ -601,7 +600,7 @@ fn resolve_module_path(
         return Ok(module_path);
     }
 
-    let module = builder.get_module(&module_path).ok_or(todo!(
+    let module = modules.get(&module_path).ok_or(todo!(
         "I think the module had errors? Not sure how to handle this yet {:?}",
         module_path
     ))?;
@@ -612,7 +611,7 @@ fn resolve_module_path(
         .ok_or(todo!("resolution error"))?
         .clone();
 
-    resolve_module_path(submodel_path, &subcomponents[1..], builder)
+    resolve_module_path(submodel_path, &subcomponents[1..], modules)
 }
 
 fn resolve_variable(
@@ -620,7 +619,7 @@ fn resolve_variable(
     local_variables: &HashSet<Identifier>,
     resolved_parameters: &ParameterCollectionBuilder,
     submodels: &HashMap<Identifier, ModulePath>,
-    builder: &ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> oneil_module::expr::Expr {
     match variable {
         ast::expression::Variable::Identifier(identifier) => {
@@ -639,7 +638,7 @@ fn resolve_variable(
                 .get(&parent_identifier)
                 .unwrap_or(todo!("submodel not found {:?}", parent_identifier));
 
-            resolve_variable_recursive(submodel_path, component, builder)
+            resolve_variable_recursive(submodel_path, component, modules)
         }
     }
 }
@@ -647,10 +646,10 @@ fn resolve_variable(
 fn resolve_variable_recursive(
     submodel_path: &ModulePath,
     variable: &ast::expression::Variable,
-    builder: &ModuleCollectionBuilder,
+    modules: &HashMap<ModulePath, Module>,
 ) -> oneil_module::expr::Expr {
-    let module = builder
-        .get_module(submodel_path)
+    let module = modules
+        .get(submodel_path)
         .unwrap_or(todo!("submodel not found {:?}", submodel_path));
 
     match variable {
@@ -674,7 +673,7 @@ fn resolve_variable_recursive(
                 submodel_path
             ));
 
-            resolve_variable_recursive(submodel_path, component, builder)
+            resolve_variable_recursive(submodel_path, component, modules)
         }
     }
 }
