@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_module::reference::{Identifier, ModulePath};
 
-use crate::error::LoadError;
+use crate::error::{LoadError, ResolutionError, ResolutionErrorSource};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleErrorMap<Ps, Py> {
@@ -31,7 +31,7 @@ impl<Ps, Py> ModuleErrorMap<Ps, Py> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParameterErrorMap {
-    errors: HashMap<Identifier, ()>,
+    errors: HashMap<Identifier, ResolutionErrorSource>,
 }
 
 impl ParameterErrorMap {
@@ -41,11 +41,21 @@ impl ParameterErrorMap {
         }
     }
 
-    pub fn add_error(&mut self, identifier: Identifier, error: ()) {
+    pub fn add_error(&mut self, identifier: Identifier, error: ResolutionErrorSource) {
         self.errors.insert(identifier, error);
     }
 
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
+    }
+}
+
+impl From<ParameterErrorMap> for Vec<ResolutionError> {
+    fn from(error: ParameterErrorMap) -> Self {
+        error
+            .errors
+            .into_iter()
+            .map(|(ident, error)| ResolutionError::new(ident, error))
+            .collect()
     }
 }

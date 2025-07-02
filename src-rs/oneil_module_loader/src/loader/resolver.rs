@@ -76,7 +76,7 @@ pub fn resolve_parameters(
     parameters: Vec<ast::Parameter>,
     submodels: &HashMap<Identifier, ModulePath>,
     modules: &HashMap<ModulePath, Module>,
-) -> Result<ParameterCollection, ()> {
+) -> Result<ParameterCollection, (ParameterCollection, Vec<ResolutionError>)> {
     // TODO: verify that no duplicate parameters are defined
 
     let parameter_map: HashMap<Identifier, ast::Parameter> = parameters

@@ -6,12 +6,9 @@ use oneil_module::{
     reference::{Identifier, ModulePath},
 };
 
-use crate::{
-    FileLoader,
-    error::{
-        LoadError,
-        collection::{ModuleErrorMap, ParameterErrorMap},
-    },
+use crate::error::{
+    LoadError, ResolutionError, ResolutionErrorSource,
+    collection::{ModuleErrorMap, ParameterErrorMap},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,10 +35,6 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
 
     pub fn mark_module_as_visited(&mut self, module_path: &ModulePath) {
         self.visited_modules.insert(module_path.clone());
-    }
-
-    pub fn get_module(&self, module_path: &ModulePath) -> Option<&Module> {
-        self.modules.get(module_path)
     }
 
     pub fn get_modules(&self) -> &HashMap<ModulePath, Module> {
@@ -102,7 +95,7 @@ impl ParameterCollectionBuilder {
         self.parameters.insert(identifier, parameter);
     }
 
-    pub fn add_error(&mut self, identifier: Identifier, error: ()) {
+    pub fn add_error(&mut self, identifier: Identifier, error: ResolutionErrorSource) {
         self.errors.add_error(identifier, error);
     }
 
@@ -112,13 +105,16 @@ impl ParameterCollectionBuilder {
 }
 
 impl TryInto<ParameterCollection> for ParameterCollectionBuilder {
-    type Error = ();
+    type Error = (ParameterCollection, Vec<ResolutionError>);
 
-    fn try_into(self) -> Result<ParameterCollection, ()> {
+    fn try_into(self) -> Result<ParameterCollection, (ParameterCollection, Vec<ResolutionError>)> {
         if self.errors.is_empty() {
             Ok(ParameterCollection::new(self.parameters))
         } else {
-            Err(())
+            Err((
+                ParameterCollection::new(self.parameters),
+                self.errors.into(),
+            ))
         }
     }
 }

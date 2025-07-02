@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use oneil_module::reference::{Identifier, ModulePath};
 
 pub mod collection;
