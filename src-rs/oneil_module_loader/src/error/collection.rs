@@ -17,6 +17,10 @@ impl ModuleErrorMap {
     pub fn add_error(&mut self, module_path: ModulePath, error: ()) {
         self.errors.entry(module_path).or_insert(vec![]).push(error);
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use oneil_module::{module::ModuleCollection, reference::ModulePath};
 
@@ -27,19 +27,19 @@ pub fn load_module_list<F>(
 where
     F: FileLoader,
 {
-    let initial_module_paths: Vec<_> = module_paths
+    let initial_module_paths: HashSet<_> = module_paths
         .iter()
         .map(|p| ModulePath::new(p.as_ref().to_path_buf()))
         .collect();
 
     let builder = ModuleCollectionBuilder::new(initial_module_paths);
 
-    module_paths.iter().fold(builder, |builder, module_path| {
+    let builder = module_paths.iter().fold(builder, |builder, module_path| {
         let module_path = ModulePath::new(module_path.as_ref().to_path_buf());
         let mut load_stack = Stack::new();
 
         loader::load_module(module_path, builder, &mut load_stack, file_parser)
     });
 
-    todo!()
+    builder.try_into()
 }

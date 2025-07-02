@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use oneil_module::{
-    module::Module,
+    module::{Module, ModuleCollection},
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModulePath},
 };
@@ -10,14 +10,14 @@ use crate::error::collection::{ModuleErrorMap, ParameterErrorMap};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleCollectionBuilder {
-    initial_modules: Vec<ModulePath>,
+    initial_modules: HashSet<ModulePath>,
     modules: HashMap<ModulePath, Module>,
     visited_modules: HashSet<ModulePath>,
     errors: ModuleErrorMap,
 }
 
 impl ModuleCollectionBuilder {
-    pub fn new(initial_modules: Vec<ModulePath>) -> Self {
+    pub fn new(initial_modules: HashSet<ModulePath>) -> Self {
         Self {
             initial_modules,
             modules: HashMap::new(),
@@ -44,6 +44,19 @@ impl ModuleCollectionBuilder {
 
     pub fn add_module(&mut self, module_path: ModulePath, module: Module) {
         self.modules.insert(module_path, module);
+    }
+}
+
+impl TryInto<ModuleCollection> for ModuleCollectionBuilder {
+    type Error = (ModuleCollection, ());
+
+    fn try_into(self) -> Result<ModuleCollection, (ModuleCollection, ())> {
+        let module_collection = ModuleCollection::new(self.initial_modules, self.modules);
+        if self.errors.is_empty() {
+            Ok(module_collection)
+        } else {
+            Err((module_collection, ()))
+        }
     }
 }
 
