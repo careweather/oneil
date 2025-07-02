@@ -1,15 +1,19 @@
 use std::collections::{HashMap, HashSet};
 
-use oneil_module::{module::Module, reference::ModulePath};
+use oneil_module::{
+    module::Module,
+    parameter::{Parameter, ParameterCollection},
+    reference::{Identifier, ModulePath},
+};
 
-use crate::error::collection::LoadErrorMap;
+use crate::error::collection::{ModuleErrorMap, ParameterErrorMap};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleCollectionBuilder {
     initial_modules: Vec<ModulePath>,
     modules: HashMap<ModulePath, Module>,
     visited_modules: HashSet<ModulePath>,
-    errors: LoadErrorMap,
+    errors: ModuleErrorMap,
 }
 
 impl ModuleCollectionBuilder {
@@ -18,7 +22,7 @@ impl ModuleCollectionBuilder {
             initial_modules,
             modules: HashMap::new(),
             visited_modules: HashSet::new(),
-            errors: LoadErrorMap::new(),
+            errors: ModuleErrorMap::new(),
         }
     }
 
@@ -40,5 +44,44 @@ impl ModuleCollectionBuilder {
 
     pub fn add_module(&mut self, module_path: ModulePath, module: Module) {
         self.modules.insert(module_path, module);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParameterCollectionBuilder {
+    parameters: HashMap<Identifier, Parameter>,
+    errors: ParameterErrorMap,
+}
+
+impl ParameterCollectionBuilder {
+    pub fn new() -> Self {
+        Self {
+            parameters: HashMap::new(),
+            errors: ParameterErrorMap::new(),
+        }
+    }
+
+    pub fn add_parameter(&mut self, identifier: Identifier, parameter: Parameter) {
+        self.parameters.insert(identifier, parameter);
+    }
+
+    pub fn add_error(&mut self, identifier: Identifier, error: ()) {
+        self.errors.add_error(identifier, error);
+    }
+
+    pub fn has_parameter(&self, identifier: &Identifier) -> bool {
+        self.parameters.contains_key(identifier)
+    }
+}
+
+impl TryInto<ParameterCollection> for ParameterCollectionBuilder {
+    type Error = ();
+
+    fn try_into(self) -> Result<ParameterCollection, ()> {
+        if self.errors.is_empty() {
+            Ok(ParameterCollection::new(self.parameters))
+        } else {
+            Err(())
+        }
     }
 }

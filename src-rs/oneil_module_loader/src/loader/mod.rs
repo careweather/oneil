@@ -47,7 +47,8 @@ where
         resolver::resolve_submodels_and_tests(use_models, &module_path, builder);
 
     // resolve parameters
-    let parameters = resolver::resolve_parameters(parameters, builder);
+    let parameters = resolver::resolve_parameters(parameters, &submodels, builder)
+        .unwrap_or(todo!("failed to resolve parameters"));
 
     // resolve submodel tests and build tests
     let model_tests = resolver::resolve_model_tests(tests, builder);
