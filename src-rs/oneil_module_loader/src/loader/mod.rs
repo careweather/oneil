@@ -71,13 +71,20 @@ where
         &builder.get_modules_with_errors(),
     );
 
-    builder.add_error_list(module_path, resolution_errors);
+    builder.add_error_list(module_path.clone(), resolution_errors);
 
     // resolve parameters
-    let parameters = resolver::resolve_parameters(parameters, &submodels, builder.get_modules())
-        .unwrap_or(todo!("failed to resolve parameters"));
+    let (parameters, resolution_errors) =
+        resolver::resolve_parameters(parameters, &submodels, builder.get_modules());
+
+    let parameters_with_errors = resolution_errors
+        .iter()
+        .map(|error| error.identifier().clone());
+
+    builder.add_error_list(module_path.clone(), resolution_errors);
 
     // resolve submodel tests and build tests
+    todo!("pass in the parameters that failed to resolve");
     let model_tests = resolver::resolve_model_tests(tests, builder.get_modules());
     let submodel_tests = resolver::resolve_submodel_tests(submodel_tests, builder.get_modules());
 

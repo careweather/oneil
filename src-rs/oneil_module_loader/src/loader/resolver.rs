@@ -76,7 +76,7 @@ pub fn resolve_parameters(
     parameters: Vec<ast::Parameter>,
     submodels: &HashMap<Identifier, ModulePath>,
     modules: &HashMap<ModulePath, Module>,
-) -> Result<ParameterCollection, (ParameterCollection, Vec<ResolutionError>)> {
+) -> (ParameterCollection, Vec<ResolutionError>) {
     // TODO: verify that no duplicate parameters are defined
 
     let parameter_map: HashMap<Identifier, ast::Parameter> = parameters
@@ -88,29 +88,41 @@ pub fn resolve_parameters(
     // that is defined within the current module
     let dependencies = get_all_parameter_internal_dependencies(&parameter_map);
 
-    // TODO: resolve the parameters (resolve dependencies first, think evaluation order)
-    let mut resolved_parameters = ParameterCollectionBuilder::new();
-    let mut visited = HashSet::new();
-    for parameter_identifier in parameter_map.keys() {
-        if visited.contains(parameter_identifier) {
-            continue;
-        }
+    let resolved_parameters = ParameterCollectionBuilder::new();
+    let visited = HashSet::new();
 
-        let mut parameter_stack = Stack::new();
+    let (resolved_parameters, _visited) = parameter_map.keys().fold(
+        (resolved_parameters, visited),
+        |(resolved_parameters, visited), parameter_identifier| {
+            let mut parameter_stack = Stack::new();
 
-        (resolved_parameters, visited) = resolve_parameter(
-            parameter_identifier,
-            &parameter_map,
-            &dependencies,
-            submodels,
-            modules,
-            &mut parameter_stack,
-            resolved_parameters,
-            visited,
-        );
+            let (mut resolved_parameters, visited, result) = resolve_parameter(
+                parameter_identifier,
+                &parameter_map,
+                &dependencies,
+                submodels,
+                modules,
+                &mut parameter_stack,
+                resolved_parameters,
+                visited,
+            );
+
+            match result {
+                Ok(()) => (resolved_parameters, visited),
+                Err(error) => {
+                    resolved_parameters.add_error(parameter_identifier.clone(), error);
+                    (resolved_parameters, visited)
+                }
+            }
+        },
+    );
+
+    let resolved_parameters = resolved_parameters.try_into();
+
+    match resolved_parameters {
+        Ok(resolved_parameters) => (resolved_parameters, Vec::new()),
+        Err((resolved_parameters, resolution_errors)) => (resolved_parameters, resolution_errors),
     }
-
-    resolved_parameters.try_into()
 }
 
 fn get_all_parameter_internal_dependencies<'a>(
@@ -220,14 +232,23 @@ fn resolve_parameter(
     parameter_stack: &mut Stack<Identifier>,
     mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: HashSet<Identifier>,
-) -> (ParameterCollectionBuilder, HashSet<Identifier>) {
-    // TODO: this is actually not true - if a parameter references an undefined value,
-    //       this should be marked as an error
-    assert!(
-        parameter_map.contains_key(parameter_identifier),
-        "parameter '{:?}' not found",
-        parameter_identifier
-    );
+) -> (
+    ParameterCollectionBuilder,
+    HashSet<Identifier>,
+    // this may be a resolution error source that does not yet have an identifier
+    // resolution errors with an identifier are stored in the parameter collection builder
+    Result<(), ResolutionErrorSource>,
+) {
+    // check that the parameter exists
+    if !parameter_map.contains_key(parameter_identifier) {
+        return (
+            resolved_parameters,
+            visited,
+            Err(ResolutionErrorSource::undefined_parameter(
+                parameter_identifier.clone(),
+            )),
+        );
+    }
 
     assert!(
         dependencies.contains_key(parameter_identifier),
@@ -236,15 +257,23 @@ fn resolve_parameter(
     );
 
     // check for circular dependencies
-    if parameter_stack.contains(parameter_identifier) {
-        resolved_parameters.add_error(parameter_identifier.clone(), todo!("circular dependency"));
-        return (resolved_parameters, visited);
+    if let Some(circular_dependency) =
+        parameter_stack.find_circular_dependency(parameter_identifier)
+    {
+        return (
+            resolved_parameters,
+            visited,
+            Err(ResolutionErrorSource::circular_dependency(
+                circular_dependency,
+            )),
+        );
     }
 
     // check if the parameter has already been visited
     if visited.contains(parameter_identifier) {
-        return (resolved_parameters, visited);
+        return (resolved_parameters, visited, Ok(()));
     }
+    visited.insert(parameter_identifier.clone());
 
     // resolve the parameter dependencies
     let parameter_dependencies = dependencies.get(parameter_identifier).unwrap();
@@ -253,19 +282,28 @@ fn resolve_parameter(
     parameter_stack.push(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    for dependency in parameter_dependencies {
-        // TODO: don't bail immediately, bail after all the dependencies have been resolved
-        (resolved_parameters, visited) = resolve_parameter(
-            dependency,
-            parameter_map,
-            dependencies,
-            submodels,
-            modules,
-            parameter_stack,
-            resolved_parameters,
-            visited,
-        );
-    }
+    (resolved_parameters, visited) = parameter_dependencies.iter().fold(
+        (resolved_parameters, visited),
+        |(resolved_parameters, visited), dependency| {
+            let (mut resolved_parameters, visited, result) = resolve_parameter(
+                dependency,
+                parameter_map,
+                dependencies,
+                submodels,
+                modules,
+                parameter_stack,
+                resolved_parameters,
+                visited,
+            );
+            match result {
+                Ok(()) => (resolved_parameters, visited),
+                Err(error) => {
+                    resolved_parameters.add_error(parameter_identifier.clone(), error);
+                    (resolved_parameters, visited)
+                }
+            }
+        },
+    );
 
     // remove the parameter from the stack
     parameter_stack.pop();
@@ -301,7 +339,7 @@ fn resolve_parameter(
 
     resolved_parameters.add_parameter(parameter_identifier.clone(), parameter);
 
-    (resolved_parameters, visited)
+    (resolved_parameters, visited, Ok(()))
 }
 
 fn convert_parameter_value_to_module_expr(

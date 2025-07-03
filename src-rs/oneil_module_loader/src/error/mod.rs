@@ -31,13 +31,21 @@ pub enum ModuleError {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolutionError {
-    pub identifier: Identifier,
-    pub error: ResolutionErrorSource,
+    identifier: Identifier,
+    error: ResolutionErrorSource,
 }
 
 impl ResolutionError {
     pub fn new(identifier: Identifier, error: ResolutionErrorSource) -> Self {
         Self { identifier, error }
+    }
+
+    pub fn identifier(&self) -> &Identifier {
+        &self.identifier
+    }
+
+    pub fn error(&self) -> &ResolutionErrorSource {
+        &self.error
     }
 }
 
@@ -49,11 +57,21 @@ impl<Ps, Py> From<ResolutionError> for LoadError<Ps, Py> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ResolutionErrorSource {
+    CircularDependency(Vec<Identifier>),
     SubmodelHadError(ModulePath),
+    UndefinedParameter(Identifier),
 }
 
 impl ResolutionErrorSource {
+    pub fn circular_dependency(circular_dependency: Vec<Identifier>) -> Self {
+        Self::CircularDependency(circular_dependency)
+    }
+
     pub fn submodel_had_error(submodel_path: ModulePath) -> Self {
         Self::SubmodelHadError(submodel_path)
+    }
+
+    pub fn undefined_parameter(parameter_identifier: Identifier) -> Self {
+        Self::UndefinedParameter(parameter_identifier)
     }
 }
