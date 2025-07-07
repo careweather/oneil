@@ -1,6 +1,6 @@
 //! Test utilities for the module loader
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::FileLoader;
 
@@ -55,7 +55,17 @@ impl FileLoader for TestPythonValidator {
     }
 }
 
-pub struct TestModelParser;
+pub struct TestModelParser(HashMap<PathBuf, oneil_ast::Model>);
+
+impl TestModelParser {
+    pub fn new(models: impl IntoIterator<Item = (PathBuf, oneil_ast::Model)>) -> Self {
+        Self(models.into_iter().collect())
+    }
+
+    pub fn empty() -> Self {
+        Self(HashMap::new())
+    }
+}
 
 impl FileLoader for TestModelParser {
     type ParseError = ();
@@ -63,9 +73,10 @@ impl FileLoader for TestModelParser {
 
     fn parse_ast(
         &self,
-        _path: impl AsRef<std::path::Path>,
+        path: impl AsRef<std::path::Path>,
     ) -> Result<oneil_ast::Model, Self::ParseError> {
-        todo!()
+        let path = path.as_ref().to_path_buf();
+        self.0.get(&path).cloned().ok_or(())
     }
 
     fn validate_python_import(
