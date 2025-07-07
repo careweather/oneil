@@ -33,6 +33,11 @@ impl<Ps, Py> ModuleErrorMap<Ps, Py> {
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
+
+    #[cfg(test)]
+    pub fn get_imports_with_errors(&self) -> HashSet<&PythonPath> {
+        self.import_errors.keys().collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

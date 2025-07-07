@@ -11,6 +11,9 @@ mod error;
 mod loader;
 mod util;
 
+#[cfg(test)]
+mod test;
+
 pub use crate::util::FileLoader;
 
 pub fn load_module<F>(

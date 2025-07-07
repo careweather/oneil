@@ -56,6 +56,11 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
     pub fn add_module(&mut self, module_path: ModulePath, module: Module) {
         self.modules.insert(module_path, module);
     }
+
+    #[cfg(test)]
+    pub fn get_imports_with_errors(&self) -> HashSet<&PythonPath> {
+        self.errors.get_imports_with_errors()
+    }
 }
 
 impl<Ps, Py> TryInto<ModuleCollection> for ModuleCollectionBuilder<Ps, Py> {
