@@ -3,7 +3,7 @@ use std::{
     ops::Deref,
 };
 
-use crate::{expr::Expr, reference::Identifier, unit::CompositeUnit};
+use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier, unit::CompositeUnit};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParameterCollection {
@@ -110,18 +110,5 @@ impl Limits {
 
     pub fn discrete(values: Vec<Expr>) -> Self {
         Self::Discrete { values }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TraceLevel {
-    None,
-    Trace,
-    Debug,
-}
-
-impl Default for TraceLevel {
-    fn default() -> Self {
-        Self::None
     }
 }

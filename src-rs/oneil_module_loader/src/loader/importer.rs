@@ -1,8 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use oneil_module::reference::{ModulePath, PythonPath};
 
-use crate::{FileLoader, error::LoadError, util::builder::ModuleCollectionBuilder};
+use crate::{
+    FileLoader, error::resolution::ImportResolutionError, util::builder::ModuleCollectionBuilder,
+};
 
 pub fn validate_imports<F>(
     module_path: &ModulePath,
@@ -11,6 +13,7 @@ pub fn validate_imports<F>(
     file_loader: &F,
 ) -> (
     HashSet<PythonPath>,
+    HashMap<PythonPath, ImportResolutionError>,
     ModuleCollectionBuilder<F::ParseError, F::PythonError>,
 )
 where
@@ -18,8 +21,8 @@ where
 {
     // TODO: check for duplicate imports
     imports.into_iter().fold(
-        (HashSet::new(), builder),
-        |(mut python_imports, mut builder), import| {
+        (HashSet::new(), HashMap::new(), builder),
+        |(mut python_imports, mut import_resolution_errors, mut builder), import| {
             let python_path = module_path.get_sibling_path(&import.path);
             let python_path = PythonPath::new(python_path);
 
@@ -27,11 +30,12 @@ where
             match result {
                 Ok(()) => {
                     python_imports.insert(python_path);
-                    (python_imports, builder)
+                    (python_imports, import_resolution_errors, builder)
                 }
                 Err(error) => {
-                    builder.add_error(module_path.clone(), LoadError::python_error(error));
-                    (python_imports, builder)
+                    builder.add_python_error(python_path.clone(), error);
+                    import_resolution_errors.insert(python_path, ImportResolutionError::new());
+                    (python_imports, import_resolution_errors, builder)
                 }
             }
         },

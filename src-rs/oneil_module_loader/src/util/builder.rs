@@ -3,11 +3,11 @@ use std::collections::{HashMap, HashSet};
 use oneil_module::{
     module::{Module, ModuleCollection},
     parameter::{Parameter, ParameterCollection},
-    reference::{Identifier, ModulePath},
+    reference::{Identifier, ModulePath, PythonPath},
 };
 
 use crate::error::{
-    LoadError, ResolutionError, ResolutionErrorSource,
+    LoadError, ParameterResolutionError,
     collection::{ModuleErrorMap, ParameterErrorMap},
 };
 
@@ -45,18 +45,12 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
         self.errors.get_modules_with_errors()
     }
 
-    pub fn add_error(&mut self, module_path: ModulePath, error: LoadError<Ps, Py>) {
+    pub fn add_module_error(&mut self, module_path: ModulePath, error: LoadError<Ps>) {
         self.errors.add_error(module_path, error);
     }
 
-    pub fn add_error_list<I, J>(&mut self, module_path: ModulePath, errors: I)
-    where
-        I: IntoIterator<Item = J>,
-        J: Into<LoadError<Ps, Py>>,
-    {
-        for error in errors {
-            self.add_error(module_path.clone(), error.into());
-        }
+    pub fn add_python_error(&mut self, python_path: PythonPath, error: Py) {
+        self.errors.add_import_error(python_path, error);
     }
 
     pub fn add_module(&mut self, module_path: ModulePath, module: Module) {
@@ -95,19 +89,43 @@ impl ParameterCollectionBuilder {
         self.parameters.insert(identifier, parameter);
     }
 
-    pub fn add_error(&mut self, identifier: Identifier, error: ResolutionErrorSource) {
+    pub fn add_error(&mut self, identifier: Identifier, error: ParameterResolutionError) {
         self.errors.add_error(identifier, error);
     }
 
-    pub fn has_parameter(&self, identifier: &Identifier) -> bool {
-        self.parameters.contains_key(identifier)
+    pub fn add_error_list<I>(&mut self, identifier: Identifier, errors: I)
+    where
+        I: IntoIterator<Item = ParameterResolutionError>,
+    {
+        for error in errors {
+            self.add_error(identifier.clone(), error);
+        }
+    }
+
+    pub fn get_defined_parameters(&self) -> &HashMap<Identifier, Parameter> {
+        &self.parameters
+    }
+
+    pub fn get_parameters_with_errors(&self) -> HashSet<&Identifier> {
+        self.errors.get_parameters_with_errors()
     }
 }
 
 impl TryInto<ParameterCollection> for ParameterCollectionBuilder {
-    type Error = (ParameterCollection, Vec<ResolutionError>);
+    type Error = (
+        ParameterCollection,
+        HashMap<Identifier, Vec<ParameterResolutionError>>,
+    );
 
-    fn try_into(self) -> Result<ParameterCollection, (ParameterCollection, Vec<ResolutionError>)> {
+    fn try_into(
+        self,
+    ) -> Result<
+        ParameterCollection,
+        (
+            ParameterCollection,
+            HashMap<Identifier, Vec<ParameterResolutionError>>,
+        ),
+    > {
         if self.errors.is_empty() {
             Ok(ParameterCollection::new(self.parameters))
         } else {

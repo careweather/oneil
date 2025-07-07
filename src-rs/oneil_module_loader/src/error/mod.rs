@@ -1,16 +1,23 @@
-use oneil_module::reference::{Identifier, ModulePath};
+use oneil_module::reference::ModulePath;
 
 pub mod collection;
+pub mod resolution;
+pub mod util;
+
+pub use resolution::{
+    ModelTestResolutionError, ParameterResolutionError, ResolutionErrors, SubmodelResolutionError,
+    SubmodelTestInputResolutionError, VariableResolutionError,
+};
+pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_errors};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum LoadError<Ps, Py> {
+pub enum LoadError<Ps> {
     ModuleError(ModuleError),
-    ResolutionError(ResolutionError),
+    ResolutionErrors(resolution::ResolutionErrors),
     ParseError(Ps),
-    PythonError(Py),
 }
 
-impl<Ps, Py> LoadError<Ps, Py> {
+impl<Ps> LoadError<Ps> {
     pub fn module_circular_dependency(circular_dependency: Vec<ModulePath>) -> Self {
         Self::ModuleError(ModuleError::CircularDependency(circular_dependency))
     }
@@ -19,59 +26,12 @@ impl<Ps, Py> LoadError<Ps, Py> {
         Self::ParseError(parse_error)
     }
 
-    pub fn python_error(python_error: Py) -> Self {
-        Self::PythonError(python_error)
+    pub fn resolution_errors(resolution_errors: resolution::ResolutionErrors) -> Self {
+        Self::ResolutionErrors(resolution_errors)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModuleError {
     CircularDependency(Vec<ModulePath>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResolutionError {
-    identifier: Identifier,
-    error: ResolutionErrorSource,
-}
-
-impl ResolutionError {
-    pub fn new(identifier: Identifier, error: ResolutionErrorSource) -> Self {
-        Self { identifier, error }
-    }
-
-    pub fn identifier(&self) -> &Identifier {
-        &self.identifier
-    }
-
-    pub fn error(&self) -> &ResolutionErrorSource {
-        &self.error
-    }
-}
-
-impl<Ps, Py> From<ResolutionError> for LoadError<Ps, Py> {
-    fn from(error: ResolutionError) -> Self {
-        Self::ResolutionError(error)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ResolutionErrorSource {
-    CircularDependency(Vec<Identifier>),
-    SubmodelHadError(ModulePath),
-    UndefinedParameter(Identifier),
-}
-
-impl ResolutionErrorSource {
-    pub fn circular_dependency(circular_dependency: Vec<Identifier>) -> Self {
-        Self::CircularDependency(circular_dependency)
-    }
-
-    pub fn submodel_had_error(submodel_path: ModulePath) -> Self {
-        Self::SubmodelHadError(submodel_path)
-    }
-
-    pub fn undefined_parameter(parameter_identifier: Identifier) -> Self {
-        Self::UndefinedParameter(parameter_identifier)
-    }
 }

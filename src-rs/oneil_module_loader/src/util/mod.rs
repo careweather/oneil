@@ -3,6 +3,7 @@ use std::path::Path;
 use oneil_ast as ast;
 
 pub mod builder;
+pub mod info;
 
 pub trait FileLoader {
     type ParseError: std::fmt::Debug;
@@ -26,10 +27,6 @@ impl<T: PartialEq + Clone> Stack<T> {
 
     pub fn pop(&mut self) -> Option<T> {
         self.items.pop()
-    }
-
-    pub fn contains(&self, item: &T) -> bool {
-        self.items.contains(item)
     }
 
     pub fn find_circular_dependency(&self, item: &T) -> Option<Vec<T>> {

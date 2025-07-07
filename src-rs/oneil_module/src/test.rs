@@ -1,35 +1,52 @@
-use std::{collections::HashMap, ops::Deref};
-
-use crate::{
-    expr::Expr,
-    reference::{Identifier, ModulePath},
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
 };
 
+use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TestIndex(usize);
+
+impl TestIndex {
+    pub fn new(index: usize) -> Self {
+        Self(index)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelTest {}
+pub struct ModelTest {
+    trace_level: TraceLevel,
+    inputs: HashSet<Identifier>,
+    test_expr: Expr,
+}
 
 impl ModelTest {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(trace_level: TraceLevel, inputs: HashSet<Identifier>, test_expr: Expr) -> Self {
+        Self {
+            trace_level,
+            inputs,
+            test_expr,
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubmodelTest {
-    submodel_path: ModulePath,
+    submodel_name: Identifier,
     inputs: SubmodelTestInputs,
 }
 
 impl SubmodelTest {
-    pub fn new(submodel_path: ModulePath, inputs: SubmodelTestInputs) -> Self {
+    pub fn new(submodel_name: Identifier, inputs: SubmodelTestInputs) -> Self {
         Self {
-            submodel_path,
+            submodel_name,
             inputs,
         }
     }
 
-    pub fn submodel_path(&self) -> &ModulePath {
-        &self.submodel_path
+    pub fn submodel_name(&self) -> &Identifier {
+        &self.submodel_name
     }
 
     pub fn inputs(&self) -> &SubmodelTestInputs {

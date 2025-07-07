@@ -1,9 +1,15 @@
+use std::collections::HashSet;
+
 use oneil_ast as ast;
-use oneil_module::{module::Module, reference::ModulePath};
+use oneil_module::{
+    module::Module,
+    parameter::Parameter,
+    reference::{Identifier, ModulePath},
+};
 
 use crate::{
-    error::LoadError,
-    util::{FileLoader, Stack, builder::ModuleCollectionBuilder},
+    error::{LoadError, ResolutionErrors},
+    util::{FileLoader, Stack, builder::ModuleCollectionBuilder, info::InfoMap},
 };
 
 mod importer;
@@ -23,7 +29,7 @@ where
     // this happens before we check if the module has been visited because if
     // there is a circular dependency, it will have already been visited
     if let Some(circular_dependency) = load_stack.find_circular_dependency(&module_path) {
-        builder.add_error(
+        builder.add_module_error(
             module_path,
             LoadError::module_circular_dependency(circular_dependency),
         );
@@ -39,10 +45,11 @@ where
     // parse model ast
     let model_ast = file_loader.parse_ast(module_path.clone());
 
+    // TODO: this might be able to recover and produce a partial module?
     let model_ast = match model_ast {
         Ok(model_ast) => model_ast,
         Err(error) => {
-            builder.add_error(module_path, LoadError::ParseError(error));
+            builder.add_module_error(module_path, LoadError::ParseError(error));
             return builder;
         }
     };
@@ -51,7 +58,7 @@ where
     let (imports, use_models, parameters, tests) = split_model_ast(model_ast);
 
     // validate imports
-    let (python_imports, builder) =
+    let (python_imports, import_resolution_errors, builder) =
         importer::validate_imports(&module_path, builder, imports, file_loader);
 
     // load use models and resolve them
@@ -63,30 +70,53 @@ where
         builder,
     );
 
-    // resolve submodels
-    let (submodels, submodel_tests, resolution_errors) = resolver::resolve_submodels_and_tests(
-        use_models,
-        &module_path,
-        builder.get_modules(),
-        &builder.get_modules_with_errors(),
+    let module_info: InfoMap<&ModulePath, &Module> = InfoMap::new(
+        builder.get_modules().into_iter().collect(),
+        builder.get_modules_with_errors(),
     );
 
-    builder.add_error_list(module_path.clone(), resolution_errors);
+    // resolve submodels
+    let (submodels, submodel_tests, submodel_resolution_errors) =
+        resolver::resolve_submodels_and_tests(use_models, &module_path, &module_info);
+
+    let submodels_with_errors: HashSet<&Identifier> = submodel_resolution_errors.keys().collect();
+
+    let submodel_info: InfoMap<&Identifier, &ModulePath> =
+        InfoMap::new(submodels.iter().collect(), submodels_with_errors);
 
     // resolve parameters
-    let (parameters, resolution_errors) =
-        resolver::resolve_parameters(parameters, &submodels, builder.get_modules());
+    let (parameters, parameter_resolution_errors) =
+        resolver::resolve_parameters(parameters, &submodel_info, &module_info);
 
-    let parameters_with_errors = resolution_errors
-        .iter()
-        .map(|error| error.identifier().clone());
+    let parameters_with_errors: HashSet<&Identifier> = parameter_resolution_errors.keys().collect();
 
-    builder.add_error_list(module_path.clone(), resolution_errors);
+    let parameter_info: InfoMap<&Identifier, &Parameter> =
+        InfoMap::new(parameters.iter().collect(), parameters_with_errors);
 
-    // resolve submodel tests and build tests
-    todo!("pass in the parameters that failed to resolve");
-    let model_tests = resolver::resolve_model_tests(tests, builder.get_modules());
-    let submodel_tests = resolver::resolve_submodel_tests(submodel_tests, builder.get_modules());
+    // resolve model tests
+    let (model_tests, model_test_resolution_errors) =
+        resolver::resolve_model_tests(tests, &parameter_info, &submodel_info, &module_info);
+
+    // resolve submodel tests
+    let (submodel_tests, submodel_test_resolution_errors) = resolver::resolve_submodel_tests(
+        submodel_tests,
+        &parameter_info,
+        &submodel_info,
+        &module_info,
+    );
+
+    let resolution_errors = ResolutionErrors::new(
+        import_resolution_errors,
+        submodel_resolution_errors,
+        parameter_resolution_errors,
+        model_test_resolution_errors,
+        submodel_test_resolution_errors,
+    );
+
+    if !resolution_errors.is_empty() {
+        let resolution_errors = LoadError::resolution_errors(resolution_errors);
+        builder.add_module_error(module_path.clone(), resolution_errors);
+    }
 
     // build module
     let module = Module::new(

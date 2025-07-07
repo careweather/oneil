@@ -1,3 +1,4 @@
+pub mod debug_info;
 pub mod expr;
 pub mod module;
 pub mod parameter;

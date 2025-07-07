@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModulePath, PythonPath},
-    test::{ModelTest, SubmodelTest},
+    test::{ModelTest, SubmodelTest, TestIndex},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -11,7 +11,7 @@ pub struct Module {
     python_imports: HashSet<PythonPath>,
     submodels: HashMap<Identifier, ModulePath>,
     parameters: ParameterCollection,
-    model_tests: Vec<ModelTest>,
+    model_tests: HashMap<TestIndex, ModelTest>,
     submodel_tests: Vec<SubmodelTest>,
 }
 
@@ -20,7 +20,7 @@ impl Module {
         python_imports: HashSet<PythonPath>,
         submodels: HashMap<Identifier, ModulePath>,
         parameters: ParameterCollection,
-        model_tests: Vec<ModelTest>,
+        model_tests: HashMap<TestIndex, ModelTest>,
         submodel_tests: Vec<SubmodelTest>,
     ) -> Self {
         Self {
@@ -44,7 +44,7 @@ impl Module {
         self.parameters.get(identifier)
     }
 
-    pub fn get_model_tests(&self) -> &Vec<ModelTest> {
+    pub fn get_model_tests(&self) -> &HashMap<TestIndex, ModelTest> {
         &self.model_tests
     }
 
