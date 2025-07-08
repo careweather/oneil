@@ -186,7 +186,6 @@ mod tests {
 
     use super::*;
     use oneil_ast::{
-        Parameter,
         declaration::ModelInput,
         expression::{BinaryOp, Expr, Literal, Variable},
         parameter::TraceLevel,
