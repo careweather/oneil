@@ -480,167 +480,182 @@ mod tests {
                 ModulePath::new("main"),
             ])
         );
+
+        // check the modules
+        let modules = result.get_modules();
+        assert_eq!(modules.len(), 2);
+        assert!(modules.contains_key(&ModulePath::new("main")));
+        assert!(modules.contains_key(&ModulePath::new("sub")));
     }
 
-    // #[test]
-    // fn test_load_module_already_visited() {
-    //     let module_path = ModulePath::new("test.on");
-    //     let initial_modules = HashSet::from([module_path.clone()]);
-    //     let mut builder = ModuleCollectionBuilder::new(initial_modules);
-    //     let mut load_stack = Stack::new();
+    #[test]
+    fn test_load_module_already_visited() {
+        // create initial context
+        let module_path = ModulePath::new("test.on");
+        let initial_modules = HashSet::from([module_path.clone()]);
+        let mut builder = ModuleCollectionBuilder::new(initial_modules);
+        let mut load_stack = Stack::new();
 
-    //     // Mark the module as already visited
-    //     builder.mark_module_as_visited(&module_path);
+        // mark the module as already visited
+        builder.mark_module_as_visited(&module_path);
 
-    //     let file_loader =
-    //         TestFileParser::new(vec![(PathBuf::from("test.on"), create_test_model())]);
+        // load the module
+        let file_loader =
+            TestFileParser::new(vec![(PathBuf::from("test.on"), create_empty_model())]);
 
-    //     let result = load_module(module_path, builder, &mut load_stack, &file_loader);
+        let result = load_module(module_path, builder, &mut load_stack, &file_loader);
 
-    //     // Should not have loaded the module again
-    //     let modules = result.get_modules();
-    //     assert!(modules.is_empty());
-    // }
+        // check the errors
+        let errors = result.get_module_errors();
+        assert!(errors.is_empty());
 
-    // #[test]
-    // fn test_load_use_models_empty() {
-    //     let module_path = ModulePath::new("parent.on");
-    //     let mut load_stack = Stack::new();
-    //     let file_loader = TestFileParser::empty();
-    //     let use_models = vec![];
-    //     let builder = ModuleCollectionBuilder::new(HashSet::new());
+        // check the modules
+        let modules = result.get_modules();
+        assert!(modules.is_empty());
+    }
 
-    //     let result = load_use_models(
-    //         module_path,
-    //         &mut load_stack,
-    //         &file_loader,
-    //         &use_models,
-    //         builder,
-    //     );
+    #[test]
+    fn test_load_use_models_empty() {
+        // create initial context
+        let module_path = ModulePath::new("parent.on");
+        let mut load_stack = Stack::new();
+        let file_loader = TestFileParser::empty();
+        let use_models = vec![];
+        let builder = ModuleCollectionBuilder::new(HashSet::new());
 
-    //     // Should have no modules loaded
-    //     let modules = result.get_modules();
-    //     assert!(modules.is_empty());
-    // }
+        // load the use models
+        let result = load_use_models(
+            module_path,
+            &mut load_stack,
+            &file_loader,
+            &use_models,
+            builder,
+        );
 
-    // #[test]
-    // fn test_load_use_models_with_existing_models() {
-    //     let module_path = ModulePath::new("parent.on");
-    //     let mut load_stack = Stack::new();
-    //     let file_loader = TestFileParser::new(vec![
-    //         (PathBuf::from("child1.on"), create_empty_model()),
-    //         (
-    //             PathBuf::from("child2.on"),
-    //             create_use_model_only_model_no_imports(),
-    //         ),
-    //     ]);
+        // check the errors
+        let errors = result.get_module_errors();
+        assert!(errors.is_empty());
 
-    //     let use_models = vec![
-    //         UseModel {
-    //             model_name: "child1.on".to_string(),
-    //             subcomponents: vec![],
-    //             inputs: None,
-    //             as_name: None,
-    //         },
-    //         UseModel {
-    //             model_name: "child2.on".to_string(),
-    //             subcomponents: vec![],
-    //             inputs: None,
-    //             as_name: None,
-    //         },
-    //     ];
+        // check the modules
+        let modules = result.get_modules();
+        assert!(modules.is_empty());
+    }
 
-    //     let builder = ModuleCollectionBuilder::new(HashSet::new());
+    #[test]
+    fn test_load_use_models_with_existing_models() {
+        // create initial context
+        let module_path = ModulePath::new("parent");
+        let mut load_stack = Stack::new();
+        let file_loader = TestFileParser::new(vec![
+            (PathBuf::from("child1.on"), create_empty_model()),
+            (PathBuf::from("child2.on"), create_empty_model()),
+        ]);
 
-    //     let result = load_use_models(
-    //         module_path,
-    //         &mut load_stack,
-    //         &file_loader,
-    //         &use_models,
-    //         builder,
-    //     );
+        let use_models = vec![
+            UseModel {
+                model_name: "child1".to_string(),
+                subcomponents: vec![],
+                inputs: None,
+                as_name: None,
+            },
+            UseModel {
+                model_name: "child2".to_string(),
+                subcomponents: vec![],
+                inputs: None,
+                as_name: None,
+            },
+        ];
 
-    //     // Should have loaded both child modules
-    //     let modules = result.get_modules();
-    //     assert_eq!(modules.len(), 2);
-    //     assert!(modules.contains_key(&ModulePath::new("child1.on")));
-    //     assert!(modules.contains_key(&ModulePath::new("child2.on")));
-    // }
+        let builder = ModuleCollectionBuilder::new(HashSet::new());
 
-    // #[test]
-    // fn test_load_use_models_with_parse_errors() {
-    //     let module_path = ModulePath::new("parent.on");
-    //     let mut load_stack = Stack::new();
-    //     let file_loader = TestFileParser::empty(); // No models available
+        // load the use models
+        let result = load_use_models(
+            module_path,
+            &mut load_stack,
+            &file_loader,
+            &use_models,
+            builder,
+        );
 
-    //     let use_models = vec![UseModel {
-    //         model_name: "nonexistent.on".to_string(),
-    //         subcomponents: vec![],
-    //         inputs: None,
-    //         as_name: None,
-    //     }];
+        // check the errors
+        let errors = result.get_module_errors();
+        assert!(errors.is_empty());
 
-    //     let builder = ModuleCollectionBuilder::new(HashSet::new());
+        // check the modules
+        let modules = result.get_modules();
+        assert_eq!(modules.len(), 2);
+        assert!(modules.contains_key(&ModulePath::new("child1")));
+        assert!(modules.contains_key(&ModulePath::new("child2")));
+    }
 
-    //     let result = load_use_models(
-    //         module_path,
-    //         &mut load_stack,
-    //         &file_loader,
-    //         &use_models,
-    //         builder,
-    //     );
+    #[test]
+    fn test_load_use_models_with_parse_errors() {
+        // create initial context
+        let module_path = ModulePath::new("parent");
+        let mut load_stack = Stack::new();
+        let file_loader = TestFileParser::empty(); // No models available
 
-    //     // Should have parse errors for the nonexistent module
-    //     let modules_with_errors = result.get_modules_with_errors();
-    //     assert_eq!(modules_with_errors.len(), 1);
-    //     assert!(modules_with_errors.contains(&&ModulePath::new("nonexistent.on")));
-    // }
+        let use_models = vec![UseModel {
+            model_name: "nonexistent".to_string(),
+            subcomponents: vec![],
+            inputs: None,
+            as_name: None,
+        }];
 
-    // #[test]
-    // fn test_load_module_complex_dependency_chain() {
-    //     let module_path = ModulePath::new("root.on");
-    //     let initial_modules = HashSet::from([module_path.clone()]);
-    //     let builder = ModuleCollectionBuilder::new(initial_modules);
-    //     let mut load_stack = Stack::new();
+        let builder = ModuleCollectionBuilder::new(HashSet::new());
 
-    //     // Create a dependency chain: root.on -> level1.on -> level2.on
-    //     let root_model = Model {
-    //         note: None,
-    //         decls: vec![Decl::UseModel(UseModel {
-    //             model_name: "level1.on".to_string(),
-    //             subcomponents: vec![],
-    //             inputs: None,
-    //             as_name: None,
-    //         })],
-    //         sections: vec![],
-    //     };
+        // load the use models
+        let result = load_use_models(
+            module_path,
+            &mut load_stack,
+            &file_loader,
+            &use_models,
+            builder,
+        );
 
-    //     let level1_model = Model {
-    //         note: None,
-    //         decls: vec![Decl::UseModel(UseModel {
-    //             model_name: "level2.on".to_string(),
-    //             subcomponents: vec![],
-    //             inputs: None,
-    //             as_name: None,
-    //         })],
-    //         sections: vec![],
-    //     };
+        // check the errors
+        let errors = result.get_module_errors();
+        assert_eq!(errors.len(), 1);
 
-    //     let level2_model = create_empty_model();
+        let error = errors.get(&ModulePath::new("nonexistent")).unwrap();
+        assert_eq!(error, &LoadError::ParseError(()));
 
-    //     let file_loader = TestFileParser::new(vec![
-    //         (PathBuf::from("root.on"), root_model),
-    //         (PathBuf::from("level1.on"), level1_model),
-    //         (PathBuf::from("level2.on"), level2_model),
-    //     ]);
+        // check the modules
+        let modules = result.get_modules();
+        assert!(modules.is_empty());
+    }
 
-    //     let result = load_module(module_path, builder, &mut load_stack, &file_loader);
+    #[test]
+    fn test_load_module_complex_dependency_chain() {
+        // create initial context
+        let module_path = ModulePath::new("root");
+        let initial_modules = HashSet::from([module_path.clone()]);
+        let builder = ModuleCollectionBuilder::new(initial_modules);
+        let mut load_stack = Stack::new();
 
-    //     // Should have loaded all three modules
-    //     let modules = result.get_modules();
-    //     assert_eq!(modules.len(), 3);
-    //     assert!(modules.contains_key(&ModulePath::new("root.on")));
-    //     assert!(modules.contains_key(&ModulePath::new("level1.on")));
-    //     assert!(modules.contains_key(&ModulePath::new("level2.on")));
-    // }
+        // create a dependency chain: root.on -> level1.on -> level2.on
+        let root_model = create_test_model(&["level1"]);
+        let level1_model = create_test_model(&["level2"]);
+        let level2_model = create_empty_model();
+
+        let file_loader = TestFileParser::new(vec![
+            (PathBuf::from("root.on"), root_model),
+            (PathBuf::from("level1.on"), level1_model),
+            (PathBuf::from("level2.on"), level2_model),
+        ]);
+
+        // load the module
+        let result = load_module(module_path, builder, &mut load_stack, &file_loader);
+
+        // check the errors
+        let errors = result.get_module_errors();
+        assert!(errors.is_empty());
+
+        // check the modules
+        let modules = result.get_modules();
+        assert_eq!(modules.len(), 3);
+        assert!(modules.contains_key(&ModulePath::new("root")));
+        assert!(modules.contains_key(&ModulePath::new("level1")));
+        assert!(modules.contains_key(&ModulePath::new("level2")));
+    }
 }
