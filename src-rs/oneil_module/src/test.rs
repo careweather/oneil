@@ -29,6 +29,18 @@ impl ModelTest {
             test_expr,
         }
     }
+
+    pub fn trace_level(&self) -> &TraceLevel {
+        &self.trace_level
+    }
+
+    pub fn inputs(&self) -> &HashSet<Identifier> {
+        &self.inputs
+    }
+
+    pub fn test_expr(&self) -> &Expr {
+        &self.test_expr
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
