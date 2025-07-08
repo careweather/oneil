@@ -54,6 +54,14 @@ impl Parameter {
             trace_level,
         }
     }
+
+    /// Returns a reference to the set of parameter dependencies.
+    ///
+    /// Dependencies are the identifiers of other parameters that this parameter
+    /// depends on for its value calculation.
+    pub fn dependencies(&self) -> &HashSet<Identifier> {
+        &self.dependencies
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
