@@ -28,14 +28,12 @@ where
     }
 
     pub fn get(&self, key: impl Borrow<K>) -> InfoResult<&V> {
-        match self.map.get(key.borrow()) {
-            Some(value) => InfoResult::Found(value),
-            None => {
-                if self.with_errors.contains(key.borrow()) {
-                    InfoResult::HasError
-                } else {
-                    InfoResult::NotFound
-                }
+        if self.with_errors.contains(key.borrow()) {
+            InfoResult::HasError
+        } else {
+            match self.map.get(key.borrow()) {
+                Some(value) => InfoResult::Found(value),
+                None => InfoResult::NotFound,
             }
         }
     }

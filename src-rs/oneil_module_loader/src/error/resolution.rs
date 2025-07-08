@@ -60,10 +60,6 @@ impl SubmodelResolutionError {
         Self::ModuleHasError(module_path)
     }
 
-    pub fn undefined_submodel(identifier: Identifier) -> Self {
-        Self::UndefinedSubmodel(None, identifier)
-    }
-
     pub fn undefined_submodel_in_submodel(
         parent_module_path: ModulePath,
         identifier: Identifier,
