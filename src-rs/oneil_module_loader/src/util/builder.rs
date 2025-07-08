@@ -7,7 +7,7 @@ use oneil_module::{
 };
 
 use crate::error::{
-    LoadError, ParameterResolutionError,
+    CircularDependencyError, LoadError, ParameterResolutionError,
     collection::{ModuleErrorMap, ParameterErrorMap},
 };
 
@@ -46,10 +46,21 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
     }
 
     pub fn add_module_error(&mut self, module_path: ModulePath, error: LoadError<Ps>) {
-        self.errors.add_error(module_path, error);
+        self.errors.add_module_error(module_path, error);
     }
 
-    pub fn add_python_error(&mut self, python_path: PythonPath, error: Py) {
+    pub fn add_circular_dependency_error(
+        &mut self,
+        module_path: ModulePath,
+        circular_dependency: Vec<ModulePath>,
+    ) {
+        self.errors.add_circular_dependency_error(
+            module_path,
+            CircularDependencyError::new(circular_dependency),
+        );
+    }
+
+    pub fn add_import_error(&mut self, python_path: PythonPath, error: Py) {
         self.errors.add_import_error(python_path, error);
     }
 
@@ -60,6 +71,18 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
     #[cfg(test)]
     pub fn get_imports_with_errors(&self) -> HashSet<&PythonPath> {
         self.errors.get_imports_with_errors()
+    }
+
+    #[cfg(test)]
+    pub fn get_module_errors(&self) -> &HashMap<ModulePath, LoadError<Ps>> {
+        self.errors.get_module_errors()
+    }
+
+    #[cfg(test)]
+    pub fn get_circular_dependency_errors(
+        &self,
+    ) -> &HashMap<ModulePath, Vec<CircularDependencyError>> {
+        self.errors.get_circular_dependency_errors()
     }
 }
 

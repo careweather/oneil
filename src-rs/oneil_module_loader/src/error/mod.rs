@@ -12,16 +12,11 @@ pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoadError<Ps> {
-    ModuleError(ModuleError),
-    ResolutionErrors(resolution::ResolutionErrors),
     ParseError(Ps),
+    ResolutionErrors(resolution::ResolutionErrors),
 }
 
 impl<Ps> LoadError<Ps> {
-    pub fn module_circular_dependency(circular_dependency: Vec<ModulePath>) -> Self {
-        Self::ModuleError(ModuleError::CircularDependency(circular_dependency))
-    }
-
     pub fn parse_error(parse_error: Ps) -> Self {
         Self::ParseError(parse_error)
     }
@@ -32,6 +27,10 @@ impl<Ps> LoadError<Ps> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ModuleError {
-    CircularDependency(Vec<ModulePath>),
+pub struct CircularDependencyError(Vec<ModulePath>);
+
+impl CircularDependencyError {
+    pub fn new(circular_dependency: Vec<ModulePath>) -> Self {
+        Self(circular_dependency)
+    }
 }

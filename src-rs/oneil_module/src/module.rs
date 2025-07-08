@@ -51,6 +51,14 @@ impl Module {
     pub fn get_submodel_tests(&self) -> &Vec<SubmodelTest> {
         &self.submodel_tests
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.python_imports.is_empty()
+            && self.submodels.is_empty()
+            && self.parameters.is_empty()
+            && self.model_tests.is_empty()
+            && self.submodel_tests.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

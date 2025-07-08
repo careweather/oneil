@@ -59,7 +59,7 @@ where
                     (python_imports, import_resolution_errors, builder)
                 }
                 Err(error) => {
-                    builder.add_python_error(python_path.clone(), error);
+                    builder.add_import_error(python_path.clone(), error);
                     import_resolution_errors.insert(python_path, ImportResolutionError::new());
                     (python_imports, import_resolution_errors, builder)
                 }

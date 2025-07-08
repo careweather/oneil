@@ -55,19 +55,25 @@ impl FileLoader for TestPythonValidator {
     }
 }
 
-pub struct TestModelParser(HashMap<PathBuf, oneil_ast::Model>);
+pub struct TestFileParser {
+    models: HashMap<PathBuf, oneil_ast::Model>,
+}
 
-impl TestModelParser {
+impl TestFileParser {
     pub fn new(models: impl IntoIterator<Item = (PathBuf, oneil_ast::Model)>) -> Self {
-        Self(models.into_iter().collect())
+        Self {
+            models: models.into_iter().collect(),
+        }
     }
 
     pub fn empty() -> Self {
-        Self(HashMap::new())
+        Self {
+            models: HashMap::new(),
+        }
     }
 }
 
-impl FileLoader for TestModelParser {
+impl FileLoader for TestFileParser {
     type ParseError = ();
     type PythonError = ();
 
@@ -76,13 +82,13 @@ impl FileLoader for TestModelParser {
         path: impl AsRef<std::path::Path>,
     ) -> Result<oneil_ast::Model, Self::ParseError> {
         let path = path.as_ref().to_path_buf();
-        self.0.get(&path).cloned().ok_or(())
+        self.models.get(&path).cloned().ok_or(())
     }
 
     fn validate_python_import(
         &self,
         _path: impl AsRef<std::path::Path>,
     ) -> Result<(), Self::PythonError> {
-        panic!("TestModelParser does not support validating python imports");
+        Ok(())
     }
 }
