@@ -31,7 +31,7 @@ pub struct DoesNotExistError(PathBuf);
 #[derive(Debug)]
 pub struct FileLoader;
 
-impl<'a> oneil_module_loader::FileLoader for FileLoader {
+impl<'a> oneil_model_loader::FileLoader for FileLoader {
     type ParseError = LoadingError;
     type PythonError = DoesNotExistError;
 

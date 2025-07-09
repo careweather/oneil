@@ -1,0 +1,12 @@
+
+[package]
+name = "oneil_ir"
+description = "Intermediate representation for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+oneil_ast = { path = "../oneil_ast" }

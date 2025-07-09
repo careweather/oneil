@@ -1,5 +1,5 @@
 use clap::Parser;
-use oneil_module_loader::FileLoader;
+use oneil_model_loader::FileLoader;
 
 use crate::command::{CliCommand, Commands, DevCommands};
 
@@ -16,7 +16,7 @@ fn main() {
                 println!("{:#?}", ast);
             }
             DevCommands::PrintModules { file } => {
-                let module = oneil_module_loader::load_module(file, &file_parser::FileLoader);
+                let module = oneil_model_loader::load_module(file, &file_parser::FileLoader);
                 println!("{:#?}", module);
             }
         },
