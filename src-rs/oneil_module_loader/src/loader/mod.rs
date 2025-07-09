@@ -491,7 +491,7 @@ mod tests {
     #[test]
     fn test_load_module_already_visited() {
         // create initial context
-        let module_path = ModulePath::new("test.on");
+        let module_path = ModulePath::new("test");
         let initial_modules = HashSet::from([module_path.clone()]);
         let mut builder = ModuleCollectionBuilder::new(initial_modules);
         let mut load_stack = Stack::new();
@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn test_load_use_models_empty() {
         // create initial context
-        let module_path = ModulePath::new("parent.on");
+        let module_path = ModulePath::new("parent");
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::empty();
         let use_models = vec![];

@@ -21,7 +21,6 @@ impl ModulePath {
         let mut path = path.as_ref().to_path_buf();
 
         match path.extension() {
-            Some(ext) if ext == "on" => Self(path),
             Some(ext) => panic!(
                 "Module paths must not have an extension other than .on: '{:?}'",
                 ext
@@ -65,7 +64,6 @@ pub struct PythonPath(PathBuf);
 impl PythonPath {
     pub fn new(mut path: PathBuf) -> Self {
         match path.extension() {
-            Some(ext) if ext == "py" => Self(path),
             Some(ext) => panic!(
                 "Python paths must not have an extension other than .py: '{:?}'",
                 ext

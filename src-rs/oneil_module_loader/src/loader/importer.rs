@@ -78,7 +78,7 @@ mod tests {
     use crate::test::TestPythonValidator;
 
     fn get_module_path() -> ModulePath {
-        ModulePath::new(PathBuf::from("test_module.on"))
+        ModulePath::new(PathBuf::from("test_module"))
     }
 
     fn get_empty_builder() -> ModuleCollectionBuilder<(), ()> {
@@ -112,7 +112,7 @@ mod tests {
             validate_imports(&module_path, builder, imports, &file_loader);
 
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python.py"))));
+        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python"))));
         assert!(errors.is_empty());
     }
 
@@ -130,7 +130,7 @@ mod tests {
 
         assert!(valid_imports.is_empty());
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent.py"))));
+        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent"))));
     }
 
     #[test]
@@ -153,9 +153,9 @@ mod tests {
         eprintln!("valid_imports: {:?}", valid_imports);
         eprintln!("errors: {:?}", errors);
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python.py"))));
+        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python"))));
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent.py"))));
+        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent"))));
     }
 
     #[test]
@@ -179,9 +179,9 @@ mod tests {
             validate_imports(&module_path, builder, imports, &file_loader);
 
         assert_eq!(valid_imports.len(), 3);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python1.py"))));
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python2.py"))));
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python3.py"))));
+        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python1"))));
+        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python2"))));
+        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python3"))));
         assert!(errors.is_empty());
     }
 
@@ -204,8 +204,8 @@ mod tests {
 
         assert!(valid_imports.is_empty());
         assert_eq!(errors.len(), 2);
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent1.py"))));
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent2.py"))));
+        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent1"))));
+        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent2"))));
     }
 
     #[test]
@@ -223,14 +223,14 @@ mod tests {
         assert!(
             builder
                 .get_imports_with_errors()
-                .contains(&PythonPath::new(PathBuf::from("nonexistent.py")))
+                .contains(&PythonPath::new(PathBuf::from("nonexistent")))
         );
     }
 
     #[test]
     fn test_validate_imports_path_conversion() {
         let file_loader = TestPythonValidator::validate_some(vec!["subdir/my_python.py".into()]);
-        let module_path = ModulePath::new(PathBuf::from("subdir/test_module.on"));
+        let module_path = ModulePath::new(PathBuf::from("subdir/test_module"));
         let builder = get_empty_builder();
         let imports = vec![Import {
             path: "my_python".to_string(),
@@ -241,6 +241,6 @@ mod tests {
 
         // The import should be converted to a Python path relative to the module
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("subdir/my_python.py"))));
+        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("subdir/my_python"))));
     }
 }
