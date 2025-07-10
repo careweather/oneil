@@ -129,6 +129,16 @@ impl Parameter {
         }
     }
 
+    /// Returns a reference to the identifier for this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the identifier for this parameter.
+    ///
+    pub fn identifier(&self) -> &Identifier {
+        &self.ident
+    }
+
     /// Returns a reference to the set of parameter dependencies.
     ///
     /// Dependencies are the identifiers of other parameters that this parameter
