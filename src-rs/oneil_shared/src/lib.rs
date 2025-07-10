@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use oneil_ir::reference::{Identifier, ModelPath};
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModelMap<T>(HashMap<ModelPath, HashMap<Identifier, T>>);
 
 impl<T> ModelMap<T> {
@@ -24,6 +25,7 @@ impl<T> ModelMap<T> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModelMapBuilder<T>(HashMap<ModelPath, HashMap<Identifier, T>>);
 
 impl<T> ModelMapBuilder<T> {
