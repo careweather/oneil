@@ -1,0 +1,12 @@
+
+[package]
+name = "oneil_shared"
+description = "Shared tools for Oneil language libraries"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+oneil_ir = { path = "../oneil_ir" }

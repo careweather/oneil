@@ -184,6 +184,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil_shared"
+version = "0.15.0"
+dependencies = [
+ "oneil_ir",
+]
+
+[[package]]
+name = "oneil_unit"
+version = "0.15.0"
+
+[[package]]
+name = "oneil_unit_checker"
+version = "0.15.0"
+dependencies = [
+ "oneil_ir",
+ "oneil_shared",
+ "oneil_unit",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"

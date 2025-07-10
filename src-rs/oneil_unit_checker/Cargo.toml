@@ -1,0 +1,13 @@
+[package]
+name = "oneil_unit_checker"
+description = "Unit checker for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+oneil_ir = { path = "../oneil_ir" }
+oneil_shared = { path = "../oneil_shared" }
+oneil_unit = { path = "../oneil_unit" }
