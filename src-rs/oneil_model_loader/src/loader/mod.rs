@@ -224,6 +224,17 @@ fn split_model_ast(
         }
     }
 
+    for section in model_ast.sections {
+        for decl in section.decls {
+            match decl {
+                ast::declaration::Decl::Import(import) => imports.push(import),
+                ast::declaration::Decl::UseModel(use_model) => use_models.push(use_model),
+                ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter),
+                ast::declaration::Decl::Test(test) => tests.push(test),
+            }
+        }
+    }
+
     (imports, use_models, parameters, tests)
 }
 
@@ -292,6 +303,7 @@ mod tests {
     use oneil_ast::{
         Model,
         declaration::{Decl, UseModel},
+        model::Section,
     };
     use std::collections::{HashMap, HashSet};
     use std::path::PathBuf;
@@ -657,5 +669,51 @@ mod tests {
         assert!(models.contains_key(&ModelPath::new("root")));
         assert!(models.contains_key(&ModelPath::new("level1")));
         assert!(models.contains_key(&ModelPath::new("level2")));
+    }
+
+    #[test]
+    fn test_load_model_with_sections() {
+        // create initial context
+        let model_path = ModelPath::new("test");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let builder = ModelCollectionBuilder::new(initial_models);
+        let mut load_stack = Stack::new();
+
+        // create a model with sections
+        let submodel = create_empty_model();
+
+        let model = Model {
+            note: None,
+            decls: vec![],
+            sections: vec![Section {
+                label: "section1".to_string(),
+                decls: vec![Decl::UseModel(UseModel {
+                    model_name: "submodel".to_string(),
+                    subcomponents: vec![],
+                    inputs: None,
+                    as_name: None,
+                })],
+                note: None,
+            }],
+        };
+
+        let file_loader = TestFileParser::new(vec![
+            (PathBuf::from("test.on"), model),
+            (PathBuf::from("submodel.on"), submodel),
+        ]);
+
+        // load the model
+        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
+
+        // check the errors
+        let errors = result.get_model_errors();
+        eprintln!("{:?}", errors);
+        assert!(errors.is_empty());
+
+        // check the models
+        let models = result.get_models();
+        assert_eq!(models.len(), 2);
+        assert!(models.contains_key(&ModelPath::new("test")));
+        assert!(models.contains_key(&ModelPath::new("submodel")));
     }
 }
