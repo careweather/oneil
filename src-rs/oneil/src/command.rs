@@ -27,8 +27,8 @@ pub enum DevCommands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
     },
-    /// Print the module collection of a file
-    PrintModules {
+    /// Print the intermediate representation of a file
+    PrintIr {
         /// Path to the Oneil source file
         #[arg(value_name = "FILE")]
         file: PathBuf,

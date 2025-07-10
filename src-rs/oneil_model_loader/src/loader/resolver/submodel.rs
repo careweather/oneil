@@ -1,12 +1,12 @@
-//! Submodel resolution for the Oneil module loader
+//! Submodel resolution for the Oneil model loader
 //!
-//! This module provides functionality for resolving submodels in Oneil modules.
+//! This module provides functionality for resolving submodels in Oneil models.
 //! Submodel resolution involves processing `use` and `from` declarations to
-//! establish relationships between modules and their submodels.
+//! establish relationships between models and their submodels.
 //!
 //! # Overview
 //!
-//! Submodels in Oneil allow modules to reference and use other modules as
+//! Submodels in Oneil allow models to reference and use other models as
 //! components. This is achieved through two main declaration types:
 //!
 //! ## Use Declarations
@@ -17,24 +17,24 @@
 //!
 //! ## From Declarations
 //! ```oneil
-//! from parent_module use submodel as alias
-//! from parent_module use submodel(x=1, y=2) as alias
+//! from parent_model use submodel as alias
+//! from parent_model use submodel(x=1, y=2) as alias
 //! ```
 //!
 //! # Resolution Process
 //!
 //! The resolution process involves:
-//! 1. **Path Construction**: Building the module path from the declaration
-//! 2. **Module Loading**: Ensuring the target module is loaded and available
+//! 1. **Path Construction**: Building the model path from the declaration
+//! 2. **Model Loading**: Ensuring the target model is loaded and available
 //! 3. **Subcomponent Navigation**: Traversing nested subcomponents if specified
 //! 4. **Alias Assignment**: Mapping the resolved path to the specified alias
 //! 5. **Test Input Collection**: Gathering any test inputs for later resolution
 //!
 //! # Error Handling
 //!
-//! The module provides comprehensive error handling for various failure scenarios:
-//! - **Module Loading Errors**: When the target module fails to load
-//! - **Undefined Submodels**: When a submodel doesn't exist in the target module
+//! The model provides comprehensive error handling for various failure scenarios:
+//! - **Model Loading Errors**: When the target model fails to load
+//! - **Undefined Submodels**: When a submodel doesn't exist in the target model
 //! - **Nested Resolution Errors**: When subcomponents in the path don't exist
 //!
 //! # Examples
@@ -60,9 +60,9 @@
 use std::collections::HashMap;
 
 use oneil_ast as ast;
-use oneil_ir::reference::{Identifier, ModulePath};
+use oneil_ir::reference::{Identifier, ModelPath};
 
-use crate::{error::SubmodelResolutionError, loader::resolver::ModuleInfo, util::info::InfoResult};
+use crate::{error::SubmodelResolutionError, loader::resolver::ModelInfo, util::info::InfoResult};
 
 /// Resolves submodels and their associated tests from use model declarations.
 ///
@@ -72,30 +72,30 @@ use crate::{error::SubmodelResolutionError, loader::resolver::ModuleInfo, util::
 /// # Arguments
 ///
 /// * `use_models` - A vector of use model declarations to resolve
-/// * `module_path` - The path of the current module being processed
-/// * `module_info` - Information about all available modules and their loading status
+/// * `model_path` - The path of the current model being processed
+/// * `model_info` - Information about all available models and their loading status
 ///
 /// # Returns
 ///
 /// A tuple containing:
-/// * `HashMap<Identifier, ModulePath>` - Successfully resolved submodels mapped to their paths
+/// * `HashMap<Identifier, ModelPath>` - Successfully resolved submodels mapped to their paths
 /// * `Vec<(Identifier, Vec<ModelInput>)>` - Submodel test inputs for later resolution
 /// * `HashMap<Identifier, SubmodelResolutionError>` - Any resolution errors that occurred
 ///
 /// # Error Handling
 ///
 /// The function handles various error conditions gracefully:
-/// - **Module loading failures**: If a referenced module failed to load
-/// - **Undefined submodels**: If a submodel doesn't exist in the target module
-/// - **Invalid paths**: If the module path cannot be resolved
+/// - **Model loading failures**: If a referenced model failed to load
+/// - **Undefined submodels**: If a submodel doesn't exist in the target model
+/// - **Invalid paths**: If the model path cannot be resolved
 ///
 /// All errors are collected and returned rather than causing the function to fail.
 pub fn resolve_submodels_and_tests(
     use_models: Vec<ast::declaration::UseModel>,
-    module_path: &ModulePath,
-    module_info: &ModuleInfo,
+    model_path: &ModelPath,
+    model_info: &ModelInfo,
 ) -> (
-    HashMap<Identifier, ModulePath>,
+    HashMap<Identifier, ModelPath>,
     Vec<(Identifier, Vec<ast::declaration::ModelInput>)>,
     HashMap<Identifier, SubmodelResolutionError>,
 ) {
@@ -103,8 +103,8 @@ pub fn resolve_submodels_and_tests(
         (HashMap::new(), Vec::new(), HashMap::new()),
         |(mut submodels, mut submodel_tests, mut resolution_errors), use_model| {
             // get the use model path
-            let use_model_path = module_path.get_sibling_path(&use_model.model_name);
-            let use_model_path = ModulePath::new(use_model_path);
+            let use_model_path = model_path.get_sibling_path(&use_model.model_name);
+            let use_model_path = ModelPath::new(use_model_path);
 
             // get the submodel name
             let submodel_name = use_model.as_name.as_ref().unwrap_or(
@@ -116,11 +116,8 @@ pub fn resolve_submodels_and_tests(
             let submodel_name = Identifier::new(submodel_name);
 
             // resolve the use model path
-            let resolved_use_model_path = resolve_module_path(
-                use_model_path.clone(),
-                &use_model.subcomponents,
-                module_info,
-            );
+            let resolved_use_model_path =
+                resolve_model_path(use_model_path.clone(), &use_model.subcomponents, model_info);
 
             // insert the use model path into the submodels map if it was resolved successfully
             // otherwise, add the error to the builder
@@ -144,71 +141,71 @@ pub fn resolve_submodels_and_tests(
     )
 }
 
-/// Recursively resolves a module path by traversing subcomponents.
+/// Recursively resolves a model path by traversing subcomponents.
 ///
-/// This internal function handles the recursive resolution of module paths
+/// This internal function handles the recursive resolution of model paths
 /// when dealing with nested submodels (e.g., `parent.submodel1.submodel2`).
 /// It traverses the subcomponent chain and validates that each level exists.
 ///
 /// # Arguments
 ///
-/// * `parent_module_path` - The path of the parent module (None for root resolution)
-/// * `module_path` - The current module path being resolved
+/// * `parent_model_path` - The path of the parent model (None for root resolution)
+/// * `model_path` - The current model path being resolved
 /// * `subcomponents` - The remaining subcomponents to traverse
-/// * `module_info` - Information about all available modules
+/// * `model_info` - Information about all available models
 ///
 /// # Returns
 ///
-/// * `Ok(ModulePath)` - The fully resolved module path
+/// * `Ok(ModelPath)` - The fully resolved model path
 /// * `Err(SubmodelResolutionError)` - An error if resolution fails
 ///
 /// # Examples
 ///
 /// For a path like `weather.atmosphere.temperature`:
-/// 1. First call: `resolve_module_path(None, "weather", ["atmosphere", "temperature"], ...)`
-/// 2. Second call: `resolve_module_path(Some("weather"), "atmosphere", ["temperature"], ...)`
-/// 3. Third call: `resolve_module_path(Some("atmosphere"), "temperature", [], ...)`
+/// 1. First call: `resolve_model_path(None, "weather", ["atmosphere", "temperature"], ...)`
+/// 2. Second call: `resolve_model_path(Some("weather"), "atmosphere", ["temperature"], ...)`
+/// 3. Third call: `resolve_model_path(Some("atmosphere"), "temperature", [], ...)`
 /// 4. Returns: `Ok("temperature")`
 ///
 /// # Error Conditions
 ///
-/// * **Module has error**: If the target module failed to load
-/// * **Undefined submodel**: If a subcomponent doesn't exist in the parent module
-/// * **Invalid module**: If the module doesn't exist in module_info
+/// * **Model has error**: If the target model failed to load
+/// * **Undefined submodel**: If a subcomponent doesn't exist in the parent model
+/// * **Invalid model**: If the model doesn't exist in model_info
 ///
 /// # Safety
 ///
-/// This function assumes that modules referenced in `module_info` have been
+/// This function assumes that models referenced in `model_info` have been
 /// properly loaded and validated. If this assumption is violated, the function
-/// will panic, indicating a bug in the module loading process.
-fn resolve_module_path(
-    module_path: ModulePath,
+/// will panic, indicating a bug in the model loading process.
+fn resolve_model_path(
+    model_path: ModelPath,
     subcomponents: &[String],
-    module_info: &ModuleInfo,
-) -> Result<ModulePath, SubmodelResolutionError> {
-    // if the module that we are trying to resolve has had an error, this
+    model_info: &ModelInfo,
+) -> Result<ModelPath, SubmodelResolutionError> {
+    // if the model that we are trying to resolve has had an error, this
     // operation should fail
-    let module = match module_info.get(&module_path) {
-        InfoResult::Found(module) => module,
-        InfoResult::HasError => return Err(SubmodelResolutionError::module_has_error(module_path)),
-        InfoResult::NotFound => panic!("module should have been visited already"),
+    let model = match model_info.get(&model_path) {
+        InfoResult::Found(model) => model,
+        InfoResult::HasError => return Err(SubmodelResolutionError::model_has_error(model_path)),
+        InfoResult::NotFound => panic!("model should have been visited already"),
     };
 
-    // if there are no more subcomponents, we have resolved the module path
+    // if there are no more subcomponents, we have resolved the model path
     if subcomponents.is_empty() {
-        return Ok(module_path);
+        return Ok(model_path);
     }
 
     let submodel_name = Identifier::new(subcomponents[0].clone());
-    let submodel_path = module
+    let submodel_path = model
         .get_submodel(&submodel_name)
         .ok_or(SubmodelResolutionError::undefined_submodel_in_submodel(
-            module_path.clone(),
+            model_path.clone(),
             submodel_name,
         ))?
         .clone();
 
-    resolve_module_path(submodel_path, &subcomponents[1..], module_info)
+    resolve_model_path(submodel_path, &subcomponents[1..], model_info)
 }
 
 #[cfg(test)]
@@ -216,22 +213,22 @@ mod tests {
     use super::*;
     use oneil_ast::declaration::{ModelInput, UseModel};
     use oneil_ast::expression::{Expr, Literal};
-    use oneil_ir::module::Module;
+    use oneil_ir::model::Model;
     use std::collections::HashSet;
 
-    /// Creates a test module with specified submodels
-    fn create_test_module(submodels: Vec<(&str, ModulePath)>) -> Module {
+    /// Creates a test model with specified submodels
+    fn create_test_model(submodels: Vec<(&str, ModelPath)>) -> Model {
         let mut submodel_map = HashMap::new();
         for (name, path) in submodels {
             submodel_map.insert(Identifier::new(name), path);
         }
 
-        Module::new(
-            HashSet::new(),                                                    // python_imports
-            submodel_map,                                                      // submodels
+        Model::new(
+            HashSet::new(),                                                // python_imports
+            submodel_map,                                                  // submodels
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()), // parameters
-            HashMap::new(),                                                    // model_tests
-            Vec::new(),                                                        // submodel_tests
+            HashMap::new(),                                                // model_tests
+            Vec::new(),                                                    // submodel_tests
         )
     }
 
@@ -248,19 +245,19 @@ mod tests {
             },
         ];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let temperature_id = Identifier::new("temp");
-        let temperature_path = ModulePath::new("/temperature");
-        let temperature_submodel = create_test_module(vec![]);
-        let module_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let temperature_path = ModelPath::new("/temperature");
+        let temperature_submodel = create_test_model(vec![]);
+        let model_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert!(errors.is_empty());
@@ -299,19 +296,19 @@ mod tests {
             },
         ];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let sensor_id = Identifier::new("sensor");
-        let sensor_path = ModulePath::new("/sensor");
-        let sensor_submodel = create_test_module(vec![]);
-        let module_map = HashMap::from([(&sensor_path, &sensor_submodel)]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let sensor_path = ModelPath::new("/sensor");
+        let sensor_submodel = create_test_model(vec![]);
+        let model_map = HashMap::from([(&sensor_path, &sensor_submodel)]);
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert!(errors.is_empty());
@@ -346,29 +343,28 @@ mod tests {
             as_name: Some("temp".to_string()),
         }];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let temperature_id = Identifier::new("temp");
-        let temperature_path = ModulePath::new("/temperature");
-        let temperature_submodel = create_test_module(vec![]);
-        let atmosphere_path = ModulePath::new("/atmosphere");
-        let atmosphere_module =
-            create_test_module(vec![("temperature", ModulePath::new("/temperature"))]);
-        let weather_path = ModulePath::new("/weather");
-        let weather_module =
-            create_test_module(vec![("atmosphere", ModulePath::new("/atmosphere"))]);
-        let module_map = HashMap::from([
-            (&weather_path, &weather_module),
-            (&atmosphere_path, &atmosphere_module),
+        let temperature_path = ModelPath::new("/temperature");
+        let temperature_submodel = create_test_model(vec![]);
+        let atmosphere_path = ModelPath::new("/atmosphere");
+        let atmosphere_model =
+            create_test_model(vec![("temperature", ModelPath::new("/temperature"))]);
+        let weather_path = ModelPath::new("/weather");
+        let weather_model = create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let model_map = HashMap::from([
+            (&weather_path, &weather_model),
+            (&atmosphere_path, &atmosphere_model),
             (&temperature_path, &temperature_submodel),
         ]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert!(errors.is_empty());
@@ -398,19 +394,19 @@ mod tests {
             },
         ];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let temperature_id = Identifier::new("temperature");
-        let temperature_path = ModulePath::new("/temperature");
-        let temperature_submodel = create_test_module(vec![]);
-        let module_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let temperature_path = ModelPath::new("/temperature");
+        let temperature_submodel = create_test_model(vec![]);
+        let model_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert!(errors.is_empty());
@@ -440,27 +436,27 @@ mod tests {
             },
         ];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let atmosphere_id = Identifier::new("atmosphere");
-        let atmosphere_path = ModulePath::new("/atmosphere");
-        let atmosphere_submodel = create_test_module(vec![]);
-        let weather_path = ModulePath::new("/weather");
+        let atmosphere_path = ModelPath::new("/atmosphere");
+        let atmosphere_submodel = create_test_model(vec![]);
+        let weather_path = ModelPath::new("/weather");
         let weather_submodel =
-            create_test_module(vec![("atmosphere", ModulePath::new("/atmosphere"))]);
+            create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
 
-        // create the module map
-        let module_map = HashMap::from([
+        // create the model map
+        let model_map = HashMap::from([
             (&weather_path, &weather_submodel),
             (&atmosphere_path, &atmosphere_submodel),
         ]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert!(errors.is_empty());
@@ -478,41 +474,41 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_module_with_error() {
+    fn test_resolve_model_with_error() {
         // build the use model list
         let use_models = vec![
-            // use error_module as error
+            // use error_model as error
             UseModel {
-                model_name: "error_module".to_string(),
+                model_name: "error_model".to_string(),
                 subcomponents: vec![],
                 inputs: None,
                 as_name: Some("error".to_string()),
             },
         ];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let error_id = Identifier::new("error");
-        let error_path = ModulePath::new("/error_module");
-        let error_submodel = create_test_module(vec![]);
-        let module_map = HashMap::from([(&error_path, &error_submodel)]);
-        let module_info = ModuleInfo::new(module_map, HashSet::from([&error_path]));
+        let error_path = ModelPath::new("/error_model");
+        let error_submodel = create_test_model(vec![]);
+        let model_map = HashMap::from([(&error_path, &error_submodel)]);
+        let model_info = ModelInfo::new(model_map, HashSet::from([&error_path]));
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert_eq!(errors.len(), 1);
         let error = errors.get(&error_id).unwrap();
 
         match error {
-            SubmodelResolutionError::ModuleHasError(path) => {
+            SubmodelResolutionError::ModelHasError(path) => {
                 assert_eq!(path, &error_path);
             }
-            _ => panic!("Expected ModuleHasError, got {:?}", error),
+            _ => panic!("Expected ModelHasError, got {:?}", error),
         }
 
         // submodel tests
@@ -532,19 +528,19 @@ mod tests {
             as_name: Some("weather".to_string()),
         }];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let weather_id = Identifier::new("weather");
-        let weather_path = ModulePath::new("/weather");
-        let weather_module = create_test_module(vec![]); // No submodels
-        let module_map = HashMap::from([(&weather_path, &weather_module)]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let weather_path = ModelPath::new("/weather");
+        let weather_model = create_test_model(vec![]); // No submodels
+        let model_map = HashMap::from([(&weather_path, &weather_model)]);
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert_eq!(errors.len(), 1);
@@ -576,25 +572,24 @@ mod tests {
             as_name: Some("undefined".to_string()),
         }];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let undefined_id = Identifier::new("undefined");
-        let atmosphere_path = ModulePath::new("/atmosphere");
-        let atmosphere_module = create_test_module(vec![]); // No submodels
-        let weather_path = ModulePath::new("/weather");
-        let weather_module =
-            create_test_module(vec![("atmosphere", ModulePath::new("/atmosphere"))]);
-        let module_map = HashMap::from([
-            (&weather_path, &weather_module),
-            (&atmosphere_path, &atmosphere_module),
+        let atmosphere_path = ModelPath::new("/atmosphere");
+        let atmosphere_model = create_test_model(vec![]); // No submodels
+        let weather_path = ModelPath::new("/weather");
+        let weather_model = create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let model_map = HashMap::from([
+            (&weather_path, &weather_model),
+            (&atmosphere_path, &atmosphere_model),
         ]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert_eq!(errors.len(), 1);
@@ -638,25 +633,25 @@ mod tests {
             },
         ];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let temperature_id = Identifier::new("temp");
-        let temperature_path = ModulePath::new("/temperature");
-        let temperature_module = create_test_module(vec![]);
+        let temperature_path = ModelPath::new("/temperature");
+        let temperature_model = create_test_model(vec![]);
         let pressure_id = Identifier::new("press");
-        let pressure_path = ModulePath::new("/pressure");
-        let pressure_module = create_test_module(vec![]);
-        let module_map = HashMap::from([
-            (&temperature_path, &temperature_module),
-            (&pressure_path, &pressure_module),
+        let pressure_path = ModelPath::new("/pressure");
+        let pressure_model = create_test_model(vec![]);
+        let model_map = HashMap::from([
+            (&temperature_path, &temperature_model),
+            (&pressure_path, &pressure_model),
         ]);
-        let module_info = ModuleInfo::new(module_map, HashSet::new());
+        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert!(errors.is_empty());
@@ -697,48 +692,48 @@ mod tests {
                 inputs: None,
                 as_name: Some("temp".to_string()),
             },
-            // use error_module as error
+            // use error_model as error
             UseModel {
-                model_name: "error_module".to_string(),
+                model_name: "error_model".to_string(),
                 subcomponents: vec![],
                 inputs: None,
                 as_name: Some("error".to_string()),
             },
         ];
 
-        // create the current module path
-        let module_path = ModulePath::new("/parent_module");
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
 
-        // create the module map
+        // create the model map
         let temperature_id = Identifier::new("temp");
-        let temperature_path = ModulePath::new("/temperature");
-        let temperature_module = create_test_module(vec![]);
+        let temperature_path = ModelPath::new("/temperature");
+        let temperature_model = create_test_model(vec![]);
         let error_id = Identifier::new("error");
-        let error_path = ModulePath::new("/error_module");
-        let error_module = create_test_module(vec![]);
+        let error_path = ModelPath::new("/error_model");
+        let error_model = create_test_model(vec![]);
 
-        // create module info with one valid module and one error module
-        let module_map = HashMap::from([
-            (&temperature_path, &temperature_module),
-            (&error_path, &error_module),
+        // create model info with one valid model and one error model
+        let model_map = HashMap::from([
+            (&temperature_path, &temperature_model),
+            (&error_path, &error_model),
         ]);
-        let mut module_with_errors = HashSet::new();
-        module_with_errors.insert(&error_path);
-        let module_info = ModuleInfo::new(module_map, module_with_errors);
+        let mut model_with_errors = HashSet::new();
+        model_with_errors.insert(&error_path);
+        let model_info = ModelInfo::new(model_map, model_with_errors);
 
         // resolve the submodels and tests
         let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &module_path, &module_info);
+            resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
         // error tests
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&error_id).unwrap();
         match error {
-            SubmodelResolutionError::ModuleHasError(path) => {
+            SubmodelResolutionError::ModelHasError(path) => {
                 assert_eq!(path, &error_path);
             }
-            _ => panic!("Expected ModuleHasError, got {:?}", error),
+            _ => panic!("Expected ModelHasError, got {:?}", error),
         }
 
         // submodel tests

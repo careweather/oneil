@@ -1,4 +1,4 @@
-//! Test utilities for the module loader.
+//! Test utilities for the model loader.
 //!
 //! This module provides test utilities that implement the `FileLoader` trait for
 //! testing purposes. These utilities allow tests to control the behavior of
@@ -11,8 +11,8 @@
 //!
 //! # Usage
 //!
-//! These test utilities are primarily used in the module's own tests to verify
-//! the behavior of the module loading system under various conditions, such as
+//! These test utilities are primarily used in the model's own tests to verify
+//! the behavior of the model loading system under various conditions, such as
 //! successful imports, failed imports, and different AST structures.
 
 use std::{collections::HashMap, path::PathBuf};
@@ -128,7 +128,7 @@ impl FileLoader for TestPythonValidator {
 
 /// A test file loader that provides predefined AST models.
 ///
-/// This type is used for testing module loading logic with controlled AST data.
+/// This type is used for testing model loading logic with controlled AST data.
 /// It maintains a map of file paths to AST models and returns the appropriate
 /// model when a file is requested for parsing.
 pub struct TestFileParser {

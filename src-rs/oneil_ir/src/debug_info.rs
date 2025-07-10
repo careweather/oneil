@@ -1,13 +1,13 @@
-//! Debug information and tracing capabilities for Oneil modules.
+//! Debug information and tracing capabilities for Oneil model IR.
 //!
 //! This module provides the data structures for controlling debug output
-//! and tracing during module evaluation and testing. Trace levels allow
+//! and tracing during model evaluation and testing. Trace levels allow
 //! fine-grained control over the amount of debugging information produced.
 
-/// Trace levels for controlling debug output in Oneil modules.
+/// Trace levels for controlling debug output in Oneil models.
 ///
 /// `TraceLevel` determines how much debugging information is output
-/// during module evaluation, parameter calculation, and test execution.
+/// during model evaluation, parameter calculation, and test execution.
 /// Higher trace levels produce more detailed output.
 ///
 /// Trace levels are used throughout the Oneil system to provide

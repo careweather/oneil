@@ -1,7 +1,7 @@
 //! Reference types for identifiers, paths, and imports in Oneil.
 //!
 //! This module provides the fundamental types for referencing entities in Oneil,
-//! including identifiers for variables and parameters, module paths for file
+//! including identifiers for variables and parameters, model paths for file
 //! references, and Python paths for external imports.
 
 use std::path::{Path, PathBuf};
@@ -57,29 +57,29 @@ impl Identifier {
     }
 }
 
-/// A path to an Oneil module file.
+/// A path to an Oneil model file.
 ///
-/// `ModulePath` represents the file system path to an Oneil module (`.on` file).
-/// It automatically handles file extensions, ensuring that all module paths
+/// `ModelPath` represents the file system path to an Oneil model (`.on` file).
+/// It automatically handles file extensions, ensuring that all model paths
 /// have the correct `.on` extension.
 ///
-/// Module paths are used for:
+/// Model paths are used for:
 /// - Importing submodels from other files
-/// - Resolving module dependencies
-/// - File system operations on Oneil modules
+/// - Resolving model dependencies
+/// - File system operations on Oneil models
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ModulePath(PathBuf);
+pub struct ModelPath(PathBuf);
 
 // TODO: maybe allow to convert from a list of strings (without extension) or
 //       from a path (with extension). Same for PythonPath.
-impl ModulePath {
-    /// Creates a new module path from a path or path-like type.
+impl ModelPath {
+    /// Creates a new model path from a path or path-like type.
     ///
     /// This constructor automatically ensures the path has a `.on` extension.
     ///
     /// # Arguments
     ///
-    /// * `path` - The path to the module file
+    /// * `path` - The path to the model file
     ///
     /// # Panics
     ///
@@ -88,23 +88,23 @@ impl ModulePath {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::reference::ModulePath;
+    /// use oneil_ir::reference::ModelPath;
     /// use std::path::PathBuf;
     ///
     /// // Path without extension gets .on added
-    /// let path1 = ModulePath::new("math");
+    /// let path1 = ModelPath::new("math");
     /// assert_eq!(path1.as_ref().to_string_lossy(), "math.on");
     ///
     /// // Path with an extension panics
-    /// // ModulePath::new("file.on"); // This would panic
-    /// // ModulePath::new("file.txt"); // This would panic
+    /// // ModelPath::new("file.on"); // This would panic
+    /// // ModelPath::new("file.txt"); // This would panic
     /// ```
     pub fn new(path: impl AsRef<Path>) -> Self {
         let mut path = path.as_ref().to_path_buf();
 
         match path.extension() {
             Some(ext) => panic!(
-                "Module paths must not have an extension other than .on: '{:?}'",
+                "Model paths must not have an extension other than .on: '{:?}'",
                 ext
             ),
             None => {
@@ -117,25 +117,25 @@ impl ModulePath {
     // TODO: this might be a bit confusing because it returns a path without the
     //       extension. Maybe we should return a path with the extension? See
     //       the TODO above for more thoughts.
-    /// Returns a path for a sibling module relative to the current module's path.
+    /// Returns a path for a sibling model relative to the current model's path.
     ///
-    /// Given a path to another module, this function returns a new path that represents
-    /// that module as a sibling of the current module (i.e., in the same directory).
+    /// Given a path to another model, this function returns a new path that represents
+    /// that model as a sibling of the current model (i.e., in the same directory).
     ///
     /// # Arguments
     ///
-    /// * `sibling_name` - The name or path of the sibling module
+    /// * `sibling_name` - The name or path of the sibling model
     ///
     /// # Returns
     ///
-    /// A `PathBuf` representing the sibling module's path.
+    /// A `PathBuf` representing the sibling model's path.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::reference::ModulePath;
+    /// use oneil_ir::reference::ModelPath;
     ///
-    /// let current = ModulePath::new("models/geometry/circle");
+    /// let current = ModelPath::new("models/geometry/circle");
     /// let sibling = current.get_sibling_path("square");
     ///
     /// // Result: "models/geometry/square" (without .on extension)
@@ -158,7 +158,7 @@ impl ModulePath {
     }
 }
 
-impl AsRef<Path> for ModulePath {
+impl AsRef<Path> for ModelPath {
     fn as_ref(&self) -> &Path {
         self.0.as_path()
     }
@@ -171,7 +171,7 @@ impl AsRef<Path> for ModulePath {
 /// have the correct `.py` extension.
 ///
 /// Python paths are used for:
-/// - Importing external Python functionality into Oneil modules
+/// - Importing external Python functionality into Oneil models
 /// - Resolving Python module dependencies
 /// - File system operations on Python modules
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -1,9 +1,9 @@
-//! Resolution error types for the Oneil module loader.
+//! Resolution error types for the Oneil model loader.
 //!
 //! This module defines error types that can occur during the resolution phase of
-//! module loading. Resolution errors occur when references cannot be resolved to
+//! model loading. Resolution errors occur when references cannot be resolved to
 //! their actual definitions, such as when a submodel reference points to a
-//! non-existent module or when a parameter reference cannot be found.
+//! non-existent model or when a parameter reference cannot be found.
 //!
 //! # Error Categories
 //!
@@ -22,11 +22,11 @@
 use std::collections::HashMap;
 
 use oneil_ir::{
-    reference::{Identifier, ModulePath, PythonPath},
+    reference::{Identifier, ModelPath, PythonPath},
     test::TestIndex,
 };
 
-/// A collection of all resolution errors that occurred during module loading.
+/// A collection of all resolution errors that occurred during model loading.
 ///
 /// This struct aggregates errors from all resolution phases, including import validation,
 /// submodel resolution, parameter resolution, and test resolution. It provides methods
@@ -105,45 +105,45 @@ impl ImportResolutionError {
 /// Represents an error that occurred during submodel resolution.
 ///
 /// This error type is used when a `use model` declaration cannot be resolved to
-/// its corresponding module. This can happen when the referenced module has errors
-/// or when the submodel identifier is not defined in the referenced module.
+/// its corresponding model. This can happen when the referenced model has errors
+/// or when the submodel identifier is not defined in the referenced model.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubmodelResolutionError {
-    /// The referenced module has errors, preventing submodel resolution.
-    ModuleHasError(ModulePath),
-    /// The submodel identifier is not defined in the referenced module.
-    UndefinedSubmodel(Option<ModulePath>, Identifier),
+    /// The referenced model has errors, preventing submodel resolution.
+    ModelHasError(ModelPath),
+    /// The submodel identifier is not defined in the referenced model.
+    UndefinedSubmodel(Option<ModelPath>, Identifier),
 }
 
 impl SubmodelResolutionError {
-    /// Creates a new error indicating that the referenced module has errors.
+    /// Creates a new error indicating that the referenced model has errors.
     ///
     /// # Arguments
     ///
-    /// * `module_path` - The path of the module that has errors
+    /// * `model_path` - The path of the model that has errors
     ///
     /// # Returns
     ///
-    /// A new `SubmodelResolutionError::ModuleHasError` variant.
-    pub fn module_has_error(module_path: ModulePath) -> Self {
-        Self::ModuleHasError(module_path)
+    /// A new `SubmodelResolutionError::ModelHasError` variant.
+    pub fn model_has_error(model_path: ModelPath) -> Self {
+        Self::ModelHasError(model_path)
     }
 
-    /// Creates a new error indicating that the submodel is undefined in the referenced module.
+    /// Creates a new error indicating that the submodel is undefined in the referenced model.
     ///
     /// # Arguments
     ///
-    /// * `parent_module_path` - The path of the parent module that contains the submodel reference
+    /// * `parent_model_path` - The path of the parent model that contains the submodel reference
     /// * `identifier` - The identifier of the undefined submodel
     ///
     /// # Returns
     ///
     /// A new `SubmodelResolutionError::UndefinedSubmodel` variant.
     pub fn undefined_submodel_in_submodel(
-        parent_module_path: ModulePath,
+        parent_model_path: ModelPath,
         identifier: Identifier,
     ) -> Self {
-        Self::UndefinedSubmodel(Some(parent_module_path), identifier)
+        Self::UndefinedSubmodel(Some(parent_model_path), identifier)
     }
 }
 
@@ -260,30 +260,30 @@ impl From<VariableResolutionError> for SubmodelTestInputResolutionError {
 /// the failure to resolve a simple identifier to its definition.
 #[derive(Debug, Clone, PartialEq)]
 pub enum VariableResolutionError {
-    /// The module that should contain the variable has errors.
-    ModuleHasError(ModulePath),
+    /// The model that should contain the variable has errors.
+    ModelHasError(ModelPath),
     /// The parameter that should contain the variable has errors.
     ParameterHasError(Identifier),
-    /// The submodel that should contain the variable has errors.
-    SubmodelHasError(Identifier),
+    /// The resolution of a submodel that is referenced by a variable has failed.
+    SubmodelResolutionFailed(Identifier),
     /// The parameter is not defined in the current context.
-    UndefinedParameter(Option<ModulePath>, Identifier),
+    UndefinedParameter(Option<ModelPath>, Identifier),
     /// The submodel is not defined in the current context.
-    UndefinedSubmodel(Option<ModulePath>, Identifier),
+    UndefinedSubmodel(Option<ModelPath>, Identifier),
 }
 
 impl VariableResolutionError {
-    /// Creates a new error indicating that the module has errors.
+    /// Creates a new error indicating that the model has errors.
     ///
     /// # Arguments
     ///
-    /// * `module_path` - The path of the module that has errors
+    /// * `model_path` - The path of the model that has errors
     ///
     /// # Returns
     ///
-    /// A new `VariableResolutionError::ModuleHasError` variant.
-    pub fn module_has_error(module_path: ModulePath) -> Self {
-        Self::ModuleHasError(module_path)
+    /// A new `VariableResolutionError::ModelHasError` variant.
+    pub fn model_has_error(model_path: ModelPath) -> Self {
+        Self::ModelHasError(model_path)
     }
 
     /// Creates a new error indicating that the parameter has errors.
@@ -299,7 +299,8 @@ impl VariableResolutionError {
         Self::ParameterHasError(identifier)
     }
 
-    /// Creates a new error indicating that the submodel has errors.
+    /// Creates a new error indicating that resolution of a submodel that is
+    /// referenced by a variable has failed.
     ///
     /// # Arguments
     ///
@@ -307,9 +308,9 @@ impl VariableResolutionError {
     ///
     /// # Returns
     ///
-    /// A new `VariableResolutionError::SubmodelHasError` variant.
-    pub fn submodel_has_error(identifier: Identifier) -> Self {
-        Self::SubmodelHasError(identifier)
+    /// A new `VariableResolutionError::SubmodelResolutionFailed` variant.
+    pub fn submodel_resolution_failed(identifier: Identifier) -> Self {
+        Self::SubmodelResolutionFailed(identifier)
     }
 
     /// Creates a new error indicating that the parameter is undefined.
@@ -336,7 +337,7 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::UndefinedParameter` variant.
     pub fn undefined_parameter_in_submodel(
-        submodel_path: ModulePath,
+        submodel_path: ModelPath,
         identifier: Identifier,
     ) -> Self {
         Self::UndefinedParameter(Some(submodel_path), identifier)
@@ -355,20 +356,20 @@ impl VariableResolutionError {
         Self::UndefinedSubmodel(None, identifier)
     }
 
-    /// Creates a new error indicating that the submodel is undefined in a specific parent module.
+    /// Creates a new error indicating that the submodel is undefined in a specific parent model.
     ///
     /// # Arguments
     ///
-    /// * `parent_module_path` - The path of the parent module where the submodel should be defined
+    /// * `parent_model_path` - The path of the parent model where the submodel should be defined
     /// * `identifier` - The identifier of the undefined submodel
     ///
     /// # Returns
     ///
     /// A new `VariableResolutionError::UndefinedSubmodel` variant.
     pub fn undefined_submodel_in_submodel(
-        parent_module_path: ModulePath,
+        parent_model_path: ModelPath,
         identifier: Identifier,
     ) -> Self {
-        Self::UndefinedSubmodel(Some(parent_module_path), identifier)
+        Self::UndefinedSubmodel(Some(parent_model_path), identifier)
     }
 }

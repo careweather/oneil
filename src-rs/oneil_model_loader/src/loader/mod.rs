@@ -1,10 +1,10 @@
-//! Module loading and resolution functionality for Oneil programs.
+//! Model loading and resolution functionality for Oneil programs.
 //!
-//! This module provides the core functionality for loading Oneil modules from files,
-//! resolving dependencies, and building module collections. It handles:
+//! This module provides the core functionality for loading Oneil models from files,
+//! resolving dependencies, and building model collections. It handles:
 //!
 //! - Circular dependency detection
-//! - Module parsing and AST processing
+//! - Model parsing and AST processing
 //! - Import validation
 //! - Submodel resolution
 //! - Parameter resolution
@@ -15,42 +15,42 @@ use std::collections::HashSet;
 
 use oneil_ast as ast;
 use oneil_ir::{
-    module::Module,
+    model::Model,
     parameter::Parameter,
-    reference::{Identifier, ModulePath},
+    reference::{Identifier, ModelPath},
 };
 
 use crate::{
     error::{LoadError, ResolutionErrors},
-    util::{FileLoader, Stack, builder::ModuleCollectionBuilder, info::InfoMap},
+    util::{FileLoader, Stack, builder::ModelCollectionBuilder, info::InfoMap},
 };
 
 mod importer;
 mod resolver;
 
-/// Loads a module and all its dependencies, building a complete module collection.
+/// Loads a model and all its dependencies, building a complete model collection.
 ///
-/// This function is the main entry point for module loading. It performs the following steps:
+/// This function is the main entry point for model loading. It performs the following steps:
 ///
-/// 1. **Circular dependency detection**: Checks if loading this module would create a circular dependency
-/// 2. **Module visitation tracking**: Prevents loading the same module multiple times
-/// 3. **AST parsing**: Parses the module file into an AST using the provided file loader
+/// 1. **Circular dependency detection**: Checks if loading this model would create a circular dependency
+/// 2. **Model visitation tracking**: Prevents loading the same model multiple times
+/// 3. **AST parsing**: Parses the model file into an AST using the provided file loader
 /// 4. **Declaration splitting**: Separates imports, use models, parameters, and tests from the AST
 /// 5. **Import validation**: Validates Python imports and collects any validation errors
 /// 6. **Use model loading**: Recursively loads all referenced use models
-/// 7. **Resolution**: Resolves submodels, parameters, and tests using the loaded module information
-/// 8. **Module construction**: Builds the final module and adds it to the collection
+/// 7. **Resolution**: Resolves submodels, parameters, and tests using the loaded model information
+/// 8. **Model construction**: Builds the final model and adds it to the collection
 ///
 /// # Arguments
 ///
-/// * `module_path` - The path to the module to load
-/// * `builder` - The module collection builder that accumulates modules and errors
+/// * `model_path` - The path to the model to load
+/// * `builder` - The model collection builder that accumulates models and errors
 /// * `load_stack` - A stack tracking the current loading path for circular dependency detection
 /// * `file_loader` - The file loader implementation for parsing and validation
 ///
 /// # Returns
 ///
-/// Returns the updated module collection builder containing all loaded modules and any errors.
+/// Returns the updated model collection builder containing all loaded models and any errors.
 ///
 /// # Errors
 ///
@@ -62,46 +62,46 @@ mod resolver;
 ///
 /// # Circular Dependency Detection
 ///
-/// The function detects circular dependencies by maintaining a loading stack. If a module
+/// The function detects circular dependencies by maintaining a loading stack. If a model
 /// appears in the stack while it's being loaded, a circular dependency is detected:
 ///
-/// # Module Visitation
+/// # Model Visitation
 ///
-/// To prevent loading the same module multiple times, the function tracks visited modules
-/// in the builder. If a module has already been visited, it returns early without
-/// re-processing the module.
-pub fn load_module<F>(
-    module_path: ModulePath,
-    mut builder: ModuleCollectionBuilder<F::ParseError, F::PythonError>,
-    load_stack: &mut Stack<ModulePath>,
+/// To prevent loading the same model multiple times, the function tracks visited models
+/// in the builder. If a model has already been visited, it returns early without
+/// re-processing the model.
+pub fn load_model<F>(
+    model_path: ModelPath,
+    mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
+    load_stack: &mut Stack<ModelPath>,
     file_loader: &F,
-) -> ModuleCollectionBuilder<F::ParseError, F::PythonError>
+) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
 where
     F: FileLoader,
 {
     // check for circular dependencies
     //
-    // this happens before we check if the module has been visited because if
+    // this happens before we check if the model has been visited because if
     // there is a circular dependency, it will have already been visited
-    if let Some(circular_dependency) = load_stack.find_circular_dependency(&module_path) {
-        builder.add_circular_dependency_error(module_path, circular_dependency);
+    if let Some(circular_dependency) = load_stack.find_circular_dependency(&model_path) {
+        builder.add_circular_dependency_error(model_path, circular_dependency);
         return builder;
     }
 
-    // check if module is already been visited, then mark as visited if not
-    if builder.module_has_been_visited(&module_path) {
+    // check if model is already been visited, then mark as visited if not
+    if builder.model_has_been_visited(&model_path) {
         return builder;
     }
-    builder.mark_module_as_visited(&module_path);
+    builder.mark_model_as_visited(&model_path);
 
     // parse model ast
-    let model_ast = file_loader.parse_ast(module_path.clone());
+    let model_ast = file_loader.parse_ast(model_path.clone());
 
-    // TODO: this might be able to recover and produce a partial module?
+    // TODO: this might be able to recover and produce a partial model?
     let model_ast = match model_ast {
         Ok(model_ast) => model_ast,
         Err(error) => {
-            builder.add_module_error(module_path, LoadError::ParseError(error));
+            builder.add_model_error(model_path, LoadError::ParseError(error));
             return builder;
         }
     };
@@ -111,34 +111,34 @@ where
 
     // validate imports
     let (python_imports, import_resolution_errors, builder) =
-        importer::validate_imports(&module_path, builder, imports, file_loader);
+        importer::validate_imports(&model_path, builder, imports, file_loader);
 
     // load use models and resolve them
     let mut builder = load_use_models(
-        module_path.clone(),
+        model_path.clone(),
         load_stack,
         file_loader,
         &use_models,
         builder,
     );
 
-    let module_info: InfoMap<&ModulePath, &Module> = InfoMap::new(
-        builder.get_modules().into_iter().collect(),
-        builder.get_modules_with_errors(),
+    let model_info: InfoMap<&ModelPath, &Model> = InfoMap::new(
+        builder.get_models().into_iter().collect(),
+        builder.get_models_with_errors(),
     );
 
     // resolve submodels
     let (submodels, submodel_tests, submodel_resolution_errors) =
-        resolver::resolve_submodels_and_tests(use_models, &module_path, &module_info);
+        resolver::resolve_submodels_and_tests(use_models, &model_path, &model_info);
 
     let submodels_with_errors: HashSet<&Identifier> = submodel_resolution_errors.keys().collect();
 
-    let submodel_info: InfoMap<&Identifier, &ModulePath> =
+    let submodel_info: InfoMap<&Identifier, &ModelPath> =
         InfoMap::new(submodels.iter().collect(), submodels_with_errors);
 
     // resolve parameters
     let (parameters, parameter_resolution_errors) =
-        resolver::resolve_parameters(parameters, &submodel_info, &module_info);
+        resolver::resolve_parameters(parameters, &submodel_info, &model_info);
 
     let parameters_with_errors: HashSet<&Identifier> = parameter_resolution_errors.keys().collect();
 
@@ -147,14 +147,14 @@ where
 
     // resolve model tests
     let (model_tests, model_test_resolution_errors) =
-        resolver::resolve_model_tests(tests, &parameter_info, &submodel_info, &module_info);
+        resolver::resolve_model_tests(tests, &parameter_info, &submodel_info, &model_info);
 
     // resolve submodel tests
     let (submodel_tests, submodel_test_resolution_errors) = resolver::resolve_submodel_tests(
         submodel_tests,
         &parameter_info,
         &submodel_info,
-        &module_info,
+        &model_info,
     );
 
     let resolution_errors = ResolutionErrors::new(
@@ -167,11 +167,11 @@ where
 
     if !resolution_errors.is_empty() {
         let resolution_errors = LoadError::resolution_errors(resolution_errors);
-        builder.add_module_error(module_path.clone(), resolution_errors);
+        builder.add_model_error(model_path.clone(), resolution_errors);
     }
 
-    // build module
-    let module = Module::new(
+    // build model
+    let model = Model::new(
         python_imports,
         submodels,
         parameters,
@@ -179,8 +179,8 @@ where
         submodel_tests,
     );
 
-    // add module to builder
-    builder.add_module(module_path, module);
+    // add model to builder
+    builder.add_model(model_path, model);
 
     builder
 }
@@ -189,7 +189,7 @@ where
 ///
 /// This function processes the declarations in a model AST and categorizes them into
 /// separate collections for imports, use models, parameters, and tests. This separation
-/// is necessary for the different processing steps in module loading.
+/// is necessary for the different processing steps in model loading.
 ///
 /// # Arguments
 ///
@@ -227,54 +227,54 @@ fn split_model_ast(
     (imports, use_models, parameters, tests)
 }
 
-/// Recursively loads all use models referenced by a module.
+/// Recursively loads all use models referenced by a model.
 ///
-/// This function processes all use model declarations in a module and recursively
+/// This function processes all use model declarations in a model and recursively
 /// loads each referenced model. It maintains the loading stack for circular
-/// dependency detection and accumulates all loaded modules in the builder.
+/// dependency detection and accumulates all loaded models in the builder.
 ///
 /// # Arguments
 ///
-/// * `module_path` - The path of the current module (used for resolving relative paths)
+/// * `model_path` - The path of the current model (used for resolving relative paths)
 /// * `load_stack` - The loading stack for circular dependency detection
 /// * `file_loader` - The file loader for parsing referenced models
 /// * `use_models` - The use model declarations to process
-/// * `builder` - The module collection builder to accumulate results
+/// * `builder` - The model collection builder to accumulate results
 ///
 /// # Returns
 ///
-/// Returns the updated module collection builder containing all loaded use models.
+/// Returns the updated model collection builder containing all loaded use models.
 ///
 /// # Circular Dependency Handling
 ///
-/// The function pushes the current module path onto the load stack before processing
+/// The function pushes the current model path onto the load stack before processing
 /// use models and pops it after processing is complete. This ensures that circular
 /// dependencies are properly detected during the recursive loading process.
 ///
 /// # Path Resolution
 ///
-/// Use model paths are resolved relative to the current module path using
-/// `module_path.get_sibling_path(&use_model.model_name)`.
+/// Use model paths are resolved relative to the current model path using
+/// `model_path.get_sibling_path(&use_model.model_name)`.
 fn load_use_models<F>(
-    module_path: ModulePath,
-    load_stack: &mut Stack<ModulePath>,
+    model_path: ModelPath,
+    load_stack: &mut Stack<ModelPath>,
     file_loader: &F,
     use_models: &Vec<ast::declaration::UseModel>,
-    builder: ModuleCollectionBuilder<F::ParseError, F::PythonError>,
-) -> ModuleCollectionBuilder<F::ParseError, F::PythonError>
+    builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
+) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
 where
     F: FileLoader,
 {
-    load_stack.push(module_path.clone());
+    load_stack.push(model_path.clone());
 
     // TODO: check for duplicate use models
     let builder = use_models.into_iter().fold(builder, |builder, use_model| {
         // get the use model path
-        let use_model_path = module_path.get_sibling_path(&use_model.model_name);
-        let use_model_path = ModulePath::new(use_model_path);
+        let use_model_path = model_path.get_sibling_path(&use_model.model_name);
+        let use_model_path = ModelPath::new(use_model_path);
 
         // load the use model (and its submodels)
-        load_module(use_model_path, builder, load_stack, file_loader)
+        load_model(use_model_path, builder, load_stack, file_loader)
     });
 
     load_stack.pop();
@@ -365,60 +365,60 @@ mod tests {
     }
 
     #[test]
-    fn test_load_module_success() {
+    fn test_load_model_success() {
         // create initial context
-        let module_path = ModulePath::new("test");
-        let initial_modules = HashSet::from([module_path.clone()]);
-        let builder = ModuleCollectionBuilder::new(initial_modules);
+        let model_path = ModelPath::new("test");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let builder = ModelCollectionBuilder::new(initial_models);
         let mut load_stack = Stack::new();
 
         let file_loader =
             TestFileParser::new(vec![(PathBuf::from("test.on"), create_test_model(&[]))]);
 
-        // load the module
-        let result = load_module(module_path.clone(), builder, &mut load_stack, &file_loader);
+        // load the model
+        let result = load_model(model_path.clone(), builder, &mut load_stack, &file_loader);
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert!(errors.is_empty());
 
-        // check the modules
-        let modules = result.get_modules();
-        assert_eq!(modules.len(), 1);
-        assert!(modules.contains_key(&module_path));
+        // check the models
+        let models = result.get_models();
+        assert_eq!(models.len(), 1);
+        assert!(models.contains_key(&model_path));
     }
 
     #[test]
-    fn test_load_module_parse_error() {
+    fn test_load_model_parse_error() {
         // create initial context
-        let module_path = ModulePath::new("nonexistent");
-        let initial_modules = HashSet::from([module_path.clone()]);
-        let builder = ModuleCollectionBuilder::new(initial_modules);
+        let model_path = ModelPath::new("nonexistent");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let builder = ModelCollectionBuilder::new(initial_models);
         let mut load_stack = Stack::new();
 
         let file_loader = TestFileParser::empty();
 
-        // load the module
-        let result = load_module(module_path.clone(), builder, &mut load_stack, &file_loader);
+        // load the model
+        let result = load_model(model_path.clone(), builder, &mut load_stack, &file_loader);
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert_eq!(errors.len(), 1);
 
-        let error = errors.get(&module_path).unwrap();
+        let error = errors.get(&model_path).unwrap();
         assert_eq!(error, &LoadError::ParseError(()));
 
-        // check the modules
-        let modules = result.get_modules();
-        assert!(modules.is_empty());
+        // check the models
+        let models = result.get_models();
+        assert!(models.is_empty());
     }
 
     #[test]
-    fn test_load_module_circular_dependency() {
+    fn test_load_model_circular_dependency() {
         // create initial context
-        let module_path = ModulePath::new("main");
-        let initial_modules = HashSet::from([module_path.clone()]);
-        let builder = ModuleCollectionBuilder::new(initial_modules);
+        let model_path = ModelPath::new("main");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let builder = ModelCollectionBuilder::new(initial_models);
         let mut load_stack = Stack::new();
 
         // create a circular dependency: main.on -> sub.on -> main.on
@@ -427,21 +427,21 @@ mod tests {
             (PathBuf::from("sub.on"), create_test_model(&["main"])),
         ]);
 
-        // load the module
-        let result = load_module(module_path, builder, &mut load_stack, &file_loader);
+        // load the model
+        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert_eq!(errors.len(), 2);
 
-        let main_errors = errors.get(&ModulePath::new("main")).unwrap();
+        let main_errors = errors.get(&ModelPath::new("main")).unwrap();
         assert_eq!(
             main_errors,
             &LoadError::resolution_errors(ResolutionErrors::new(
                 HashMap::new(),
                 HashMap::from([(
                     Identifier::new("sub"),
-                    SubmodelResolutionError::module_has_error(ModulePath::new("sub"))
+                    SubmodelResolutionError::model_has_error(ModelPath::new("sub"))
                 )]),
                 HashMap::new(),
                 HashMap::new(),
@@ -449,14 +449,14 @@ mod tests {
             ))
         );
 
-        let sub_errors = errors.get(&ModulePath::new("sub")).unwrap();
+        let sub_errors = errors.get(&ModelPath::new("sub")).unwrap();
         assert_eq!(
             sub_errors,
             &LoadError::resolution_errors(ResolutionErrors::new(
                 HashMap::new(),
                 HashMap::from([(
                     Identifier::new("main"),
-                    SubmodelResolutionError::module_has_error(ModulePath::new("main"))
+                    SubmodelResolutionError::model_has_error(ModelPath::new("main"))
                 )]),
                 HashMap::new(),
                 HashMap::new(),
@@ -469,63 +469,63 @@ mod tests {
         assert_eq!(circular_dependency_errors.len(), 1);
 
         let circular_dependency_error = circular_dependency_errors
-            .get(&ModulePath::new("main"))
+            .get(&ModelPath::new("main"))
             .unwrap();
         assert_eq!(circular_dependency_error.len(), 1);
         assert_eq!(
             circular_dependency_error[0],
             CircularDependencyError::new(vec![
-                ModulePath::new("main"),
-                ModulePath::new("sub"),
-                ModulePath::new("main"),
+                ModelPath::new("main"),
+                ModelPath::new("sub"),
+                ModelPath::new("main"),
             ])
         );
 
-        // check the modules
-        let modules = result.get_modules();
-        assert_eq!(modules.len(), 2);
-        assert!(modules.contains_key(&ModulePath::new("main")));
-        assert!(modules.contains_key(&ModulePath::new("sub")));
+        // check the models
+        let models = result.get_models();
+        assert_eq!(models.len(), 2);
+        assert!(models.contains_key(&ModelPath::new("main")));
+        assert!(models.contains_key(&ModelPath::new("sub")));
     }
 
     #[test]
-    fn test_load_module_already_visited() {
+    fn test_load_model_already_visited() {
         // create initial context
-        let module_path = ModulePath::new("test");
-        let initial_modules = HashSet::from([module_path.clone()]);
-        let mut builder = ModuleCollectionBuilder::new(initial_modules);
+        let model_path = ModelPath::new("test");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let mut builder = ModelCollectionBuilder::new(initial_models);
         let mut load_stack = Stack::new();
 
-        // mark the module as already visited
-        builder.mark_module_as_visited(&module_path);
+        // mark the model as already visited
+        builder.mark_model_as_visited(&model_path);
 
-        // load the module
+        // load the model
         let file_loader =
             TestFileParser::new(vec![(PathBuf::from("test.on"), create_empty_model())]);
 
-        let result = load_module(module_path, builder, &mut load_stack, &file_loader);
+        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert!(errors.is_empty());
 
-        // check the modules
-        let modules = result.get_modules();
-        assert!(modules.is_empty());
+        // check the models
+        let models = result.get_models();
+        assert!(models.is_empty());
     }
 
     #[test]
     fn test_load_use_models_empty() {
         // create initial context
-        let module_path = ModulePath::new("parent");
+        let model_path = ModelPath::new("parent");
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::empty();
         let use_models = vec![];
-        let builder = ModuleCollectionBuilder::new(HashSet::new());
+        let builder = ModelCollectionBuilder::new(HashSet::new());
 
         // load the use models
         let result = load_use_models(
-            module_path,
+            model_path,
             &mut load_stack,
             &file_loader,
             &use_models,
@@ -533,18 +533,18 @@ mod tests {
         );
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert!(errors.is_empty());
 
-        // check the modules
-        let modules = result.get_modules();
-        assert!(modules.is_empty());
+        // check the models
+        let models = result.get_models();
+        assert!(models.is_empty());
     }
 
     #[test]
     fn test_load_use_models_with_existing_models() {
         // create initial context
-        let module_path = ModulePath::new("parent");
+        let model_path = ModelPath::new("parent");
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::new(vec![
             (PathBuf::from("child1.on"), create_empty_model()),
@@ -566,11 +566,11 @@ mod tests {
             },
         ];
 
-        let builder = ModuleCollectionBuilder::new(HashSet::new());
+        let builder = ModelCollectionBuilder::new(HashSet::new());
 
         // load the use models
         let result = load_use_models(
-            module_path,
+            model_path,
             &mut load_stack,
             &file_loader,
             &use_models,
@@ -578,20 +578,20 @@ mod tests {
         );
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert!(errors.is_empty());
 
-        // check the modules
-        let modules = result.get_modules();
-        assert_eq!(modules.len(), 2);
-        assert!(modules.contains_key(&ModulePath::new("child1")));
-        assert!(modules.contains_key(&ModulePath::new("child2")));
+        // check the models
+        let models = result.get_models();
+        assert_eq!(models.len(), 2);
+        assert!(models.contains_key(&ModelPath::new("child1")));
+        assert!(models.contains_key(&ModelPath::new("child2")));
     }
 
     #[test]
     fn test_load_use_models_with_parse_errors() {
         // create initial context
-        let module_path = ModulePath::new("parent");
+        let model_path = ModelPath::new("parent");
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::empty(); // No models available
 
@@ -602,11 +602,11 @@ mod tests {
             as_name: None,
         }];
 
-        let builder = ModuleCollectionBuilder::new(HashSet::new());
+        let builder = ModelCollectionBuilder::new(HashSet::new());
 
         // load the use models
         let result = load_use_models(
-            module_path,
+            model_path,
             &mut load_stack,
             &file_loader,
             &use_models,
@@ -614,23 +614,23 @@ mod tests {
         );
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert_eq!(errors.len(), 1);
 
-        let error = errors.get(&ModulePath::new("nonexistent")).unwrap();
+        let error = errors.get(&ModelPath::new("nonexistent")).unwrap();
         assert_eq!(error, &LoadError::ParseError(()));
 
-        // check the modules
-        let modules = result.get_modules();
-        assert!(modules.is_empty());
+        // check the models
+        let models = result.get_models();
+        assert!(models.is_empty());
     }
 
     #[test]
-    fn test_load_module_complex_dependency_chain() {
+    fn test_load_model_complex_dependency_chain() {
         // create initial context
-        let module_path = ModulePath::new("root");
-        let initial_modules = HashSet::from([module_path.clone()]);
-        let builder = ModuleCollectionBuilder::new(initial_modules);
+        let model_path = ModelPath::new("root");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let builder = ModelCollectionBuilder::new(initial_models);
         let mut load_stack = Stack::new();
 
         // create a dependency chain: root.on -> level1.on -> level2.on
@@ -644,18 +644,18 @@ mod tests {
             (PathBuf::from("level2.on"), level2_model),
         ]);
 
-        // load the module
-        let result = load_module(module_path, builder, &mut load_stack, &file_loader);
+        // load the model
+        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
 
         // check the errors
-        let errors = result.get_module_errors();
+        let errors = result.get_model_errors();
         assert!(errors.is_empty());
 
-        // check the modules
-        let modules = result.get_modules();
-        assert_eq!(modules.len(), 3);
-        assert!(modules.contains_key(&ModulePath::new("root")));
-        assert!(modules.contains_key(&ModulePath::new("level1")));
-        assert!(modules.contains_key(&ModulePath::new("level2")));
+        // check the models
+        let models = result.get_models();
+        assert_eq!(models.len(), 3);
+        assert!(models.contains_key(&ModelPath::new("root")));
+        assert!(models.contains_key(&ModelPath::new("level1")));
+        assert!(models.contains_key(&ModelPath::new("level2")));
     }
 }

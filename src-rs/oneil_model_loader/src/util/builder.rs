@@ -1,13 +1,13 @@
-//! Builder types for constructing module and parameter collections.
+//! Builder types for constructing model and parameter collections.
 //!
-//! This module provides builder types that facilitate the construction of module and
+//! This module provides builder types that facilitate the construction of model and
 //! parameter collections while collecting errors that occur during the building process.
 //! The builders allow for incremental construction and error collection, making it
 //! easier to handle partial failures gracefully.
 //!
 //! # Key Types
 //!
-//! - `ModuleCollectionBuilder`: Builds module collections while collecting loading errors
+//! - `ModelCollectionBuilder`: Builds model collections while collecting loading errors
 //! - `ParameterCollectionBuilder`: Builds parameter collections while collecting resolution errors
 //!
 //! # Error Handling
@@ -20,128 +20,128 @@
 use std::collections::{HashMap, HashSet};
 
 use oneil_ir::{
-    module::{Module, ModuleCollection},
+    model::{Model, ModelCollection},
     parameter::{Parameter, ParameterCollection},
-    reference::{Identifier, ModulePath, PythonPath},
+    reference::{Identifier, ModelPath, PythonPath},
 };
 
 use crate::error::{
     CircularDependencyError, LoadError, ParameterResolutionError,
-    collection::{ModuleErrorMap, ParameterErrorMap},
+    collection::{ModelErrorMap, ParameterErrorMap},
 };
 
-/// A builder for constructing module collections while collecting loading errors.
+/// A builder for constructing model collections while collecting loading errors.
 ///
-/// This builder facilitates the incremental construction of module collections
+/// This builder facilitates the incremental construction of model collections
 /// while collecting various types of errors that can occur during the loading
-/// process. It tracks visited modules to prevent duplicate loading and provides
-/// methods for adding modules and different types of errors.
+/// process. It tracks visited models to prevent duplicate loading and provides
+/// methods for adding models and different types of errors.
 ///
 /// # Error Types
 ///
-/// - **Module errors**: Parse and resolution errors for specific modules
+/// - **Model errors**: Parse and resolution errors for specific models
 /// - **Circular dependency errors**: Detected circular dependencies
 /// - **Import errors**: Python import validation errors
 ///
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleCollectionBuilder<Ps, Py> {
-    initial_modules: HashSet<ModulePath>,
-    modules: HashMap<ModulePath, Module>,
-    visited_modules: HashSet<ModulePath>,
-    errors: ModuleErrorMap<Ps, Py>,
+pub struct ModelCollectionBuilder<Ps, Py> {
+    initial_models: HashSet<ModelPath>,
+    models: HashMap<ModelPath, Model>,
+    visited_models: HashSet<ModelPath>,
+    errors: ModelErrorMap<Ps, Py>,
 }
 
-impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
-    /// Creates a new module collection builder.
+impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
+    /// Creates a new model collection builder.
     ///
     /// # Arguments
     ///
-    /// * `initial_modules` - The set of initial module paths that should be loaded
+    /// * `initial_models` - The set of initial model paths that should be loaded
     ///
     /// # Returns
     ///
-    /// A new `ModuleCollectionBuilder` with the specified initial modules.
-    pub fn new(initial_modules: HashSet<ModulePath>) -> Self {
+    /// A new `ModelCollectionBuilder` with the specified initial models.
+    pub fn new(initial_models: HashSet<ModelPath>) -> Self {
         Self {
-            initial_modules,
-            modules: HashMap::new(),
-            visited_modules: HashSet::new(),
-            errors: ModuleErrorMap::new(),
+            initial_models: initial_models,
+            models: HashMap::new(),
+            visited_models: HashSet::new(),
+            errors: ModelErrorMap::new(),
         }
     }
 
-    /// Checks if a module has already been visited during loading.
+    /// Checks if a model has already been visited during loading.
     ///
-    /// This method is used to prevent loading the same module multiple times,
+    /// This method is used to prevent loading the same model multiple times,
     /// which is important for both performance and circular dependency detection.
     ///
     /// # Arguments
     ///
-    /// * `module_path` - The path of the module to check
+    /// * `model_path` - The path of the model to check
     ///
     /// # Returns
     ///
-    /// Returns `true` if the module has been visited, `false` otherwise.
-    pub fn module_has_been_visited(&self, module_path: &ModulePath) -> bool {
-        self.visited_modules.contains(module_path)
+    /// Returns `true` if the model has been visited, `false` otherwise.
+    pub fn model_has_been_visited(&self, model_path: &ModelPath) -> bool {
+        self.visited_models.contains(model_path)
     }
 
-    /// Marks a module as visited during loading.
+    /// Marks a model as visited during loading.
     ///
-    /// This method should be called when a module is about to be processed to
-    /// prevent it from being loaded again if it's referenced by other modules.
+    /// This method should be called when a model is about to be processed to
+    /// prevent it from being loaded again if it's referenced by other models.
     ///
     /// # Arguments
     ///
-    /// * `module_path` - The path of the module to mark as visited
-    pub fn mark_module_as_visited(&mut self, module_path: &ModulePath) {
-        self.visited_modules.insert(module_path.clone());
+    /// * `model_path` - The path of the model to mark as visited
+    pub fn mark_model_as_visited(&mut self, model_path: &ModelPath) {
+        self.visited_models.insert(model_path.clone());
     }
 
-    /// Returns a reference to the map of loaded modules.
+    /// Returns a reference to the map of loaded models.
     ///
     /// # Returns
     ///
-    /// A reference to the map of module paths to loaded modules.
-    pub fn get_modules(&self) -> &HashMap<ModulePath, Module> {
-        &self.modules
+    /// A reference to the map of model paths to loaded models.
+    pub fn get_models(&self) -> &HashMap<ModelPath, Model> {
+        &self.models
     }
 
-    /// Returns a set of module paths that have errors.
+    /// Returns a set of model paths that have errors.
     ///
-    /// This includes modules with parse/resolution errors and modules with circular
+    /// This includes models with parse/resolution errors and models with circular
     /// dependency errors.
     ///
     /// # Returns
     ///
-    /// A set of module paths that have any type of error.
-    pub fn get_modules_with_errors(&self) -> HashSet<&ModulePath> {
-        self.errors.get_modules_with_errors()
+    /// A set of model paths that have any type of error.
+    pub fn get_models_with_errors(&self) -> HashSet<&ModelPath> {
+        self.errors.get_models_with_errors()
     }
 
-    /// Adds a module error for the specified module.
+    /// Adds a model error for the specified model.
     ///
     /// # Arguments
     ///
-    /// * `module_path` - The path of the module that has an error
+    /// * `model_path` - The path of the model that has an error
     /// * `error` - The loading error that occurred
-    pub fn add_module_error(&mut self, module_path: ModulePath, error: LoadError<Ps>) {
-        self.errors.add_module_error(module_path, error);
+    pub fn add_model_error(&mut self, model_path: ModelPath, error: LoadError<Ps>) {
+        self.errors.add_model_error(model_path, error);
     }
 
-    /// Adds a circular dependency error for the specified module.
+    /// Adds a circular dependency error for the specified model.
     ///
     /// # Arguments
     ///
-    /// * `module_path` - The path of the module that has a circular dependency
+    /// * `model_path` - The path of the model that has a circular dependency
     /// * `circular_dependency` - The circular dependency path
     pub fn add_circular_dependency_error(
         &mut self,
-        module_path: ModulePath,
-        circular_dependency: Vec<ModulePath>,
+        model_path: ModelPath,
+        circular_dependency: Vec<ModelPath>,
     ) {
         self.errors.add_circular_dependency_error(
-            module_path,
+            model_path,
             CircularDependencyError::new(circular_dependency),
         );
     }
@@ -156,14 +156,14 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
         self.errors.add_import_error(python_path, error);
     }
 
-    /// Adds a successfully loaded module to the collection.
+    /// Adds a successfully loaded model to the collection.
     ///
     /// # Arguments
     ///
-    /// * `module_path` - The path of the module
-    /// * `module` - The loaded module
-    pub fn add_module(&mut self, module_path: ModulePath, module: Module) {
-        self.modules.insert(module_path, module);
+    /// * `model_path` - The path of the model
+    /// * `model` - The loaded model
+    pub fn add_model(&mut self, model_path: ModelPath, model: Model) {
+        self.models.insert(model_path, model);
     }
 
     #[cfg(test)]
@@ -172,37 +172,37 @@ impl<Ps, Py> ModuleCollectionBuilder<Ps, Py> {
     }
 
     #[cfg(test)]
-    pub fn get_module_errors(&self) -> &HashMap<ModulePath, LoadError<Ps>> {
-        self.errors.get_module_errors()
+    pub fn get_model_errors(&self) -> &HashMap<ModelPath, LoadError<Ps>> {
+        self.errors.get_model_errors()
     }
 
     #[cfg(test)]
     pub fn get_circular_dependency_errors(
         &self,
-    ) -> &HashMap<ModulePath, Vec<CircularDependencyError>> {
+    ) -> &HashMap<ModelPath, Vec<CircularDependencyError>> {
         self.errors.get_circular_dependency_errors()
     }
 }
 
-impl<Ps, Py> TryInto<ModuleCollection> for ModuleCollectionBuilder<Ps, Py> {
-    type Error = (ModuleCollection, ModuleErrorMap<Ps, Py>);
+impl<Ps, Py> TryInto<ModelCollection> for ModelCollectionBuilder<Ps, Py> {
+    type Error = (ModelCollection, ModelErrorMap<Ps, Py>);
 
-    /// Attempts to convert the builder into a module collection.
+    /// Attempts to convert the builder into a model collection.
     ///
-    /// If there are no errors, returns `Ok(ModuleCollection)`. If there are errors,
-    /// returns `Err((ModuleCollection, ModuleErrorMap))` where the collection contains
-    /// all successfully loaded modules and the error map contains all collected errors.
+    /// If there are no errors, returns `Ok(ModelCollection)`. If there are errors,
+    /// returns `Err((ModelCollection, ModelErrorMap))` where the collection contains
+    /// all successfully loaded models and the error map contains all collected errors.
     ///
     /// # Returns
     ///
     /// Returns `Ok(collection)` if no errors occurred, or `Err((partial_collection, errors))`
     /// if there were errors during loading.
-    fn try_into(self) -> Result<ModuleCollection, (ModuleCollection, ModuleErrorMap<Ps, Py>)> {
-        let module_collection = ModuleCollection::new(self.initial_modules, self.modules);
+    fn try_into(self) -> Result<ModelCollection, (ModelCollection, ModelErrorMap<Ps, Py>)> {
+        let model_collection = ModelCollection::new(self.initial_models, self.models);
         if self.errors.is_empty() {
-            Ok(module_collection)
+            Ok(model_collection)
         } else {
-            Err((module_collection, self.errors))
+            Err((model_collection, self.errors))
         }
     }
 }

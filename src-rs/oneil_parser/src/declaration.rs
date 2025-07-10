@@ -73,7 +73,7 @@ fn import_decl(input: Span) -> Result<Decl, ParserError> {
 fn from_decl(input: Span) -> Result<Decl, ParserError> {
     let (rest, from_token) = from.convert_errors().parse(input)?;
 
-    let (rest, (model_name, mut subcomponents)) = cut(module_path)
+    let (rest, (model_name, mut subcomponents)) = cut(model_path)
         .map_failure(ParserError::from_missing_path(from_token))
         .parse(rest)?;
 
@@ -115,7 +115,7 @@ fn from_decl(input: Span) -> Result<Decl, ParserError> {
 fn use_decl(input: Span) -> Result<Decl, ParserError> {
     let (rest, use_span) = use_.convert_errors().parse(input)?;
 
-    let (rest, (model_name, subcomponents)) = cut(module_path)
+    let (rest, (model_name, subcomponents)) = cut(model_path)
         .map_failure(ParserError::use_missing_path(use_span))
         .parse(rest)?;
 
@@ -144,13 +144,13 @@ fn use_decl(input: Span) -> Result<Decl, ParserError> {
     ))
 }
 
-/// Parses a module path (e.g., "foo.bar.baz")
-fn module_path(input: Span) -> Result<(String, Vec<String>), ParserError> {
+/// Parses a model path (e.g., "foo.bar.baz")
+fn model_path(input: Span) -> Result<(String, Vec<String>), ParserError> {
     let (rest, path) = identifier.convert_errors().parse(input)?;
     let (rest, subcomponents) = many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
         let (rest, subcomponent) =
-            cut(identifier.map_error(ParserError::module_path_missing_subcomponent(dot_token)))
+            cut(identifier.map_error(ParserError::model_path_missing_subcomponent(dot_token)))
                 .parse(rest)?;
         Ok((rest, subcomponent.lexeme().to_string()))
     })

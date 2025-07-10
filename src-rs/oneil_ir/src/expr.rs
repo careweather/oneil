@@ -5,7 +5,7 @@
 //! system is designed to be extensible and type-safe, supporting both built-in
 //! functions and imported Python functions.
 
-use crate::reference::{Identifier, ModulePath};
+use crate::reference::{Identifier, ModelPath};
 
 /// Abstract syntax tree for mathematical and logical expressions.
 ///
@@ -201,21 +201,21 @@ impl Expr {
     ///
     /// # Arguments
     ///
-    /// * `module` - The module path where the variable is defined
-    /// * `ident` - The identifier of the variable in that module
+    /// * `model` - The model path where the variable is defined
+    /// * `ident` - The identifier of the variable in that model
     ///
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{expr::Expr, reference::{Identifier, ModulePath}};
+    /// use oneil_ir::{expr::Expr, reference::{Identifier, ModelPath}};
     ///
     /// let expr = Expr::external_variable(
-    ///     ModulePath::new("math"),
+    ///     ModelPath::new("math"),
     ///     Identifier::new("pi")
     /// );
     /// ```
-    pub fn external_variable(module: ModulePath, ident: Identifier) -> Self {
-        Self::Variable(Variable::External { module, ident })
+    pub fn external_variable(model: ModelPath, ident: Identifier) -> Self {
+        Self::Variable(Variable::External { model, ident })
     }
 
     /// Creates a literal expression.
@@ -480,19 +480,19 @@ pub enum BuiltinFunction {
 ///
 /// Variables can refer to different scopes:
 /// - **Local**: Variables defined in the current scope
-/// - **Parameter**: Parameters defined in the current module
-/// - **External**: Parameters defined in other modules
+/// - **Parameter**: Parameters defined in the current model
+/// - **External**: Parameters defined in other models
 #[derive(Debug, Clone, PartialEq)]
 pub enum Variable {
     /// Local variable in the current scope.
     Local(Identifier),
-    /// Parameter defined in the current module.
+    /// Parameter defined in the current model.
     Parameter(Identifier),
-    /// Parameter defined in another module.
+    /// Parameter defined in another model.
     External {
-        /// The module where the parameter is defined.
-        module: ModulePath,
-        /// The identifier of the parameter in that module.
+        /// The model where the parameter is defined.
+        model: ModelPath,
+        /// The identifier of the parameter in that model.
         ident: Identifier,
     },
 }

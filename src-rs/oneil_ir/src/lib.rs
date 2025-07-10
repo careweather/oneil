@@ -1,26 +1,28 @@
-//! # Oneil Module
+//! # Oneil Model
 //!
 //! This crate provides the core data structures and abstractions for representing
-//! modules in the Oneil programming language. It defines the fundamental building
+//! models in the Oneil programming language. It defines the fundamental building
 //! blocks for modeling systems, including parameters, expressions, tests, and
-//! module organization.
+//! model organization.
+//!
+//! "IR" stands for "Intermediate Representation".
 //!
 //! ## Overview
 //!
 //! The `oneil_ir` crate is responsible for:
 //!
-//! - **Module Structure**: Defining how Oneil modules are organized and composed
+//! - **Model Structure**: Defining how Oneil models are organized and composed
 //! - **Parameter Management**: Handling parameter definitions, dependencies, and values
 //! - **Expression System**: Providing a rich expression language for calculations
 //! - **Testing Framework**: Supporting model and submodel testing capabilities
 //! - **Unit System**: Managing physical units and dimensional analysis
-//! - **Reference System**: Handling identifiers, module paths, and Python imports
+//! - **Reference System**: Handling identifiers, model paths, and Python imports
 //!
 //! ## Key Components
 //!
-//! ### Modules
-//! - [`module::Module`] - Represents a single Oneil module with parameters, tests, and submodels
-//! - [`module::ModuleCollection`] - Manages collections of modules and their relationships
+//! ### Models
+//! - [`model::Model`] - Represents a single Oneil model with parameters, tests, and submodels
+//! - [`model::ModelCollection`] - Manages collections of models and their relationships
 //!
 //! ### Parameters
 //! - [`parameter::Parameter`] - Individual parameter definitions with dependencies and constraints
@@ -45,7 +47,7 @@
 //!
 //! ```rust
 //! use oneil_ir::{
-//!     module::Module, parameter::{Parameter, ParameterCollection, ParameterValue, Limits},
+//!     model::Model, parameter::{Parameter, ParameterCollection, ParameterValue, Limits},
 //!     expr::{Expr, Literal}, reference::Identifier, unit::CompositeUnit,
 //!     debug_info::TraceLevel
 //! };
@@ -63,10 +65,10 @@
 //!     TraceLevel::None,
 //! );
 //!
-//! // Create a module
+//! // Create a model
 //! let mut params = HashMap::new();
 //! params.insert(Identifier::new("my_param"), param);
-//! let module = Module::new(
+//! let model = Model::new(
 //!     HashSet::new(), // no Python imports
 //!     HashMap::new(),  // no submodels
 //!     ParameterCollection::new(params),
@@ -90,7 +92,7 @@
 
 pub mod debug_info;
 pub mod expr;
-pub mod module;
+pub mod model;
 pub mod parameter;
 pub mod reference;
 pub mod test;

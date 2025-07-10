@@ -1,56 +1,56 @@
-//! Module structures and collections for the Oneil programming language.
+//! Model structures and collections for the Oneil programming language.
 //!
-//! This module defines the core data structures for representing Oneil modules,
-//! including their parameters, tests, submodels, and Python imports. Modules
-//! are the primary organizational unit in Oneil, containing all the components
-//! needed to define a model or submodel.
+//! This module defines the core data structures for representing Oneil models
+//! as an intermediate representation (IR), including their parameters, tests, submodels,
+//! and Python imports. Models are the primary organizational unit in Oneil,
+//! containing all the components needed to define a model or submodel.
 
 use std::collections::{HashMap, HashSet};
 
 use crate::{
     parameter::{Parameter, ParameterCollection},
-    reference::{Identifier, ModulePath, PythonPath},
+    reference::{Identifier, ModelPath, PythonPath},
     test::{ModelTest, SubmodelTest, TestIndex},
 };
 
-/// Represents a single Oneil module containing parameters, tests, submodels, and imports.
+/// Represents a single Oneil model containing parameters, tests, submodels, and imports.
 ///
-/// A module is the fundamental building block in Oneil, representing either a complete
-/// model or a reusable submodel. Each module can contain:
+/// A model is the fundamental building block in Oneil, representing either a complete
+/// model or a reusable submodel. Each model can contain:
 ///
 /// - **Parameters**: Named values with expressions and constraints
-/// - **Tests**: Validation rules for the module's behavior
-/// - **Submodels**: References to other modules that this module depends on
+/// - **Tests**: Validation rules for the model's behavior
+/// - **Submodels**: References to other models that this model depends on
 /// - **Python Imports**: External Python modules that provide additional functionality
 ///
-/// Modules are immutable by design, following functional programming principles.
+/// Models are immutable by design, following functional programming principles.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Module {
+pub struct Model {
     python_imports: HashSet<PythonPath>,
-    submodels: HashMap<Identifier, ModulePath>,
+    submodels: HashMap<Identifier, ModelPath>,
     parameters: ParameterCollection,
     model_tests: HashMap<TestIndex, ModelTest>,
     submodel_tests: Vec<SubmodelTest>,
 }
 
-impl Module {
-    /// Creates a new module with the specified components.
+impl Model {
+    /// Creates a new model with the specified components.
     ///
     /// # Arguments
     ///
     /// * `python_imports` - Set of Python modules to import
-    /// * `submodels` - Mapping of submodel identifiers to their module paths
-    /// * `parameters` - Collection of parameters defined in this module
+    /// * `submodels` - Mapping of submodel identifiers to their model paths
+    /// * `parameters` - Collection of parameters defined in this model
     /// * `model_tests` - Tests for the entire model
     /// * `submodel_tests` - Tests for individual submodels
     ///
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{module::Module, parameter::ParameterCollection};
+    /// use oneil_ir::{model::Model, parameter::ParameterCollection};
     /// use std::collections::{HashMap, HashSet};
     ///
-    /// let module = Module::new(
+    /// let model = Model::new(
     ///     HashSet::new(), // no Python imports
     ///     HashMap::new(),  // no submodels
     ///     ParameterCollection::new(HashMap::new()),
@@ -60,7 +60,7 @@ impl Module {
     /// ```
     pub fn new(
         python_imports: HashSet<PythonPath>,
-        submodels: HashMap<Identifier, ModulePath>,
+        submodels: HashMap<Identifier, ModelPath>,
         parameters: ParameterCollection,
         model_tests: HashMap<TestIndex, ModelTest>,
         submodel_tests: Vec<SubmodelTest>,
@@ -74,9 +74,9 @@ impl Module {
         }
     }
 
-    /// Returns a reference to the set of Python imports for this module.
+    /// Returns a reference to the set of Python imports for this model.
     ///
-    /// Python imports allow modules to use external Python functionality
+    /// Python imports allow models to use external Python functionality
     /// for complex calculations or data processing.
     pub fn get_python_imports(&self) -> &HashSet<PythonPath> {
         &self.python_imports
@@ -84,7 +84,7 @@ impl Module {
 
     /// Looks up a submodel by its identifier.
     ///
-    /// Returns `Some(ModulePath)` if the submodel exists, `None` otherwise.
+    /// Returns `Some(ModelPath)` if the submodel exists, `None` otherwise.
     ///
     /// # Arguments
     ///
@@ -93,13 +93,13 @@ impl Module {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{module::Module, reference::{Identifier, ModulePath}, parameter::ParameterCollection};
+    /// use oneil_ir::{model::Model, reference::{Identifier, ModelPath}, parameter::ParameterCollection};
     /// use std::collections::{HashMap, HashSet};
     ///
     /// let mut submodels = HashMap::new();
-    /// submodels.insert(Identifier::new("sub"), ModulePath::new("submodule"));
+    /// submodels.insert(Identifier::new("sub"), ModelPath::new("submodel"));
     ///
-    /// let module = Module::new(
+    /// let model = Model::new(
     ///     HashSet::new(),
     ///     submodels,
     ///     ParameterCollection::new(HashMap::new()),
@@ -107,10 +107,10 @@ impl Module {
     ///     Vec::new(),
     /// );
     ///
-    /// assert!(module.get_submodel(&Identifier::new("sub")).is_some());
-    /// assert!(module.get_submodel(&Identifier::new("nonexistent")).is_none());
+    /// assert!(model.get_submodel(&Identifier::new("sub")).is_some());
+    /// assert!(model.get_submodel(&Identifier::new("nonexistent")).is_none());
     /// ```
-    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&ModulePath> {
+    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&ModelPath> {
         self.submodels.get(identifier)
     }
 
@@ -125,15 +125,15 @@ impl Module {
         self.parameters.get(identifier)
     }
 
-    /// Returns a reference to all model tests in this module.
+    /// Returns a reference to all model tests in this model.
     ///
-    /// Model tests validate the behavior of the entire module and are
+    /// Model tests validate the behavior of the entire model and are
     /// indexed by test indices for easy lookup.
     pub fn get_model_tests(&self) -> &HashMap<TestIndex, ModelTest> {
         &self.model_tests
     }
 
-    /// Returns a reference to all submodel tests in this module.
+    /// Returns a reference to all submodel tests in this model.
     ///
     /// Submodel tests validate the behavior of individual submodels
     /// and are stored in a vector since they don't need indexed access.
@@ -141,18 +141,18 @@ impl Module {
         &self.submodel_tests
     }
 
-    /// Checks if this module is empty (contains no components).
+    /// Checks if this model is empty (contains no components).
     ///
-    /// A module is considered empty if it has no Python imports, submodels,
+    /// A model is considered empty if it has no Python imports, submodels,
     /// parameters, model tests, or submodel tests.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{module::Module, parameter::ParameterCollection};
+    /// use oneil_ir::{model::Model, parameter::ParameterCollection};
     /// use std::collections::{HashMap, HashSet};
     ///
-    /// let empty_module = Module::new(
+    /// let empty_model = Model::new(
     ///     HashSet::new(),
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
@@ -160,7 +160,7 @@ impl Module {
     ///     Vec::new(),
     /// );
     ///
-    /// assert!(empty_module.is_empty());
+    /// assert!(empty_model.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
         self.python_imports.is_empty()
@@ -171,37 +171,37 @@ impl Module {
     }
 }
 
-/// A collection of modules that can be managed together.
+/// A collection of models that can be managed together.
 ///
-/// `ModuleCollection` provides a way to organize and manage multiple modules,
-/// particularly useful for handling module dependencies and resolving imports.
-/// It maintains a set of initial modules (entry points) and a mapping of all
-/// available modules.
+/// `ModelCollection` provides a way to organize and manage multiple models,
+/// particularly useful for handling model dependencies and resolving imports.
+/// It maintains a set of initial models (entry points) and a mapping of all
+/// available models.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleCollection {
-    initial_modules: HashSet<ModulePath>,
-    modules: HashMap<ModulePath, Module>,
+pub struct ModelCollection {
+    initial_models: HashSet<ModelPath>,
+    models: HashMap<ModelPath, Model>,
 }
 
-impl ModuleCollection {
-    /// Creates a new module collection with the specified initial modules and module mapping.
+impl ModelCollection {
+    /// Creates a new model collection with the specified initial models and model mapping.
     ///
     /// # Arguments
     ///
-    /// * `initial_modules` - Set of module paths that serve as entry points
-    /// * `modules` - Mapping of module paths to their corresponding modules
+    /// * `initial_models` - Set of model paths that serve as entry points
+    /// * `models` - Mapping of model paths to their corresponding models
     ///
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{module::{ModuleCollection, Module}, reference::ModulePath, parameter::ParameterCollection};
+    /// use oneil_ir::{model::{ModelCollection, Model}, reference::ModelPath, parameter::ParameterCollection};
     /// use std::collections::{HashMap, HashSet};
     ///
-    /// let mut initial_modules = HashSet::new();
-    /// initial_modules.insert(ModulePath::new("main"));
+    /// let mut initial_models = HashSet::new();
+    /// initial_models.insert(ModelPath::new("main"));
     ///
-    /// let mut modules = HashMap::new();
-    /// modules.insert(ModulePath::new("main"), Module::new(
+    /// let mut models = HashMap::new();
+    /// models.insert(ModelPath::new("main"), Model::new(
     ///     HashSet::new(),
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
@@ -209,39 +209,39 @@ impl ModuleCollection {
     ///     Vec::new(),
     /// ));
     ///
-    /// let collection = ModuleCollection::new(initial_modules, modules);
+    /// let collection = ModelCollection::new(initial_models, models);
     /// ```
-    pub fn new(initial_modules: HashSet<ModulePath>, modules: HashMap<ModulePath, Module>) -> Self {
+    pub fn new(initial_models: HashSet<ModelPath>, models: HashMap<ModelPath, Model>) -> Self {
         Self {
-            initial_modules,
-            modules,
+            initial_models,
+            models,
         }
     }
 
-    /// Returns all Python imports from all modules in the collection.
+    /// Returns all Python imports from all modelss in the collection.
     ///
-    /// This method aggregates Python imports from all modules, which is useful
+    /// This method aggregates Python imports from all models, which is useful
     /// for dependency analysis and ensuring all required Python modules are available.
     ///
     /// # Returns
     ///
-    /// A set of references to all Python paths imported across all modules.
+    /// A set of references to all Python paths imported across all models.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{module::{ModuleCollection, Module}, reference::{ModulePath, PythonPath}, parameter::ParameterCollection};
+    /// use oneil_ir::{model::{ModelCollection, Model}, reference::{ModelPath, PythonPath}, parameter::ParameterCollection};
     /// use std::collections::{HashMap, HashSet};
     /// use std::path::PathBuf;
     ///
-    /// let mut initial_modules = HashSet::new();
-    /// initial_modules.insert(ModulePath::new("main"));
+    /// let mut initial_models = HashSet::new();
+    /// initial_models.insert(ModelPath::new("main"));
     ///
     /// let mut python_imports = HashSet::new();
     /// python_imports.insert(PythonPath::new(PathBuf::from("math")));
     ///
-    /// let mut modules = HashMap::new();
-    /// modules.insert(ModulePath::new("main"), Module::new(
+    /// let mut models = HashMap::new();
+    /// models.insert(ModelPath::new("main"), Model::new(
     ///     python_imports,
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
@@ -249,14 +249,14 @@ impl ModuleCollection {
     ///     Vec::new(),
     /// ));
     ///
-    /// let collection = ModuleCollection::new(initial_modules, modules);
+    /// let collection = ModelCollection::new(initial_models, models);
     /// let imports = collection.get_python_imports();
     /// assert_eq!(imports.len(), 1);
     /// ```
     pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
-        self.modules
+        self.models
             .values()
-            .flat_map(|module| module.python_imports.iter())
+            .flat_map(|model| model.python_imports.iter())
             .collect()
     }
 }

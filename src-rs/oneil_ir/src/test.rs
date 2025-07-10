@@ -1,7 +1,7 @@
-//! Testing for Oneil modules.
+//! Testing for Oneil model IR.
 //!
 //! This module provides the data structures for defining and managing tests
-//! in Oneil modules.
+//! in Oneil models.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -12,7 +12,7 @@ use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier};
 
 /// An index for identifying model tests.
 ///
-/// `TestIndex` provides a unique identifier for model tests within a module.
+/// `TestIndex` provides a unique identifier for model tests within a model.
 /// It wraps a `usize` value and provides a type-safe way to reference tests.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TestIndex(usize);
@@ -36,16 +36,16 @@ impl TestIndex {
     }
 }
 
-/// A test within a module.
+/// A test within a model.
 ///
-/// `ModelTest` represents a test that validates the output of a module. It
+/// `ModelTest` represents a test that validates the output of a model. It
 /// includes:
 ///
 /// - **Trace Level**: How much debugging information to output during test execution
 /// - **Inputs**: Set of parameter identifiers that serve as test inputs
 /// - **Test Expression**: The expression that defines the expected behavior
 ///
-/// Model tests are used to ensure that the module produces correct
+/// Model tests are used to ensure that the model produces correct
 /// results given specific input values.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelTest {
@@ -152,7 +152,7 @@ impl ModelTest {
 /// A test for validating the behavior of a specific submodel.
 ///
 /// `SubmodelTest` represents testing done for a single submodel within a
-/// module. It includes:
+/// model. It includes:
 ///
 /// - **Submodel Name**: The identifier of the submodel being tested
 /// - **Inputs**: Mapping of test input identifiers to their values

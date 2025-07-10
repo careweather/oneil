@@ -1,5 +1,5 @@
-use submodule1 as s1
-use submodule2 as s2
+use submodel1 as s1
+use submodel2 as s2
 
 X: x = 2 + 1
 
@@ -9,7 +9,7 @@ Y: y = x + 2
 section My Section
 
 import pyfile
-use submodule3 as s3
+use submodel3 as s3
 
 Z: z = x - Y
 

@@ -1,23 +1,23 @@
-//! Utility types and traits for the Oneil module loader.
+//! Utility types and traits for the Oneil model loader.
 //!
-//! This module provides utility types and traits that are used throughout the module
+//! This module provides utility types and traits that are used throughout the model
 //! loading process. It includes:
 //!
 //! - `FileLoader` trait: Defines the interface for file parsing and validation
 //! - `Stack` type: A generic stack implementation with circular dependency detection
-//! - Builder types: For constructing module and parameter collections
-//! - Info types: For passing information about modules, submodels, and parameters
+//! - Builder types: For constructing model and parameter collections
+//! - Info types: For passing information about models, submodels, and parameters
 //!
 //! # File Loading
 //!
 //! The `FileLoader` trait provides a flexible interface for parsing Oneil files and
-//! validating Python imports. This allows the module loader to work with different
+//! validating Python imports. This allows the model loader to work with different
 //! parsing implementations.
 //!
 //! # Circular Dependency Detection
 //!
 //! The `Stack` type provides circular dependency detection by tracking the loading
-//! path and detecting when a module appears twice in the path.
+//! path and detecting when a model appears twice in the path.
 
 use std::path::Path;
 
@@ -26,11 +26,11 @@ use oneil_ast as ast;
 pub mod builder;
 pub mod info;
 
-/// Trait for loading and parsing Oneil module files.
+/// Trait for loading and parsing Oneil model files.
 ///
-/// This trait defines the interface that the module loader uses to parse Oneil files
+/// This trait defines the interface that the model loader uses to parse Oneil files
 /// and validate Python imports. Implementations of this trait handle the actual file
-/// I/O and parsing logic, allowing the module loader to work with different parsing
+/// I/O and parsing logic, allowing the model loader to work with different parsing
 /// implementations.
 ///
 /// # Associated Types
@@ -61,7 +61,7 @@ pub trait FileLoader {
 
     /// Validates a Python import.
     ///
-    /// This method should validate that the Python module at the given path can be
+    /// This method should validate that the Python model at the given path can be
     /// imported. The implementation is responsible for checking that the Python file
     /// exists, is valid Python, and can be imported successfully.
     ///
@@ -77,8 +77,8 @@ pub trait FileLoader {
 
 /// A generic stack implementation with circular dependency detection.
 ///
-/// This stack is used during module loading to track the current loading path and
-/// detect circular dependencies. When a module appears twice in the loading path,
+/// This stack is used during model loading to track the current loading path and
+/// detect circular dependencies. When a model appears twice in the loading path,
 /// a circular dependency is detected.
 #[derive(Debug, Clone)]
 pub struct Stack<T: PartialEq + Clone> {

@@ -165,9 +165,6 @@ version = "0.15.0"
 [[package]]
 name = "oneil_ir"
 version = "0.15.0"
-dependencies = [
- "oneil_ast",
-]
 
 [[package]]
 name = "oneil_model_loader"

@@ -279,10 +279,10 @@ impl ParserError {
         }
     }
 
-    /// Creates a new ParserError for a missing subcomponent in a module path
-    pub fn module_path_missing_subcomponent(dot_token: Token) -> impl Fn(TokenError) -> Self {
+    /// Creates a new ParserError for a missing subcomponent in a model path
+    pub fn model_path_missing_subcomponent(dot_token: Token) -> impl Fn(TokenError) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Decl(DeclKind::ModulePath {
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Decl(DeclKind::ModelPath {
                 dot_offset: dot_token.lexeme_offset(),
             })),
             offset: error.offset,
@@ -716,8 +716,8 @@ pub enum DeclKind {
         /// The offset of the equals sign
         equals_offset: usize,
     },
-    /// Found an incomplete module path
-    ModulePath {
+    /// Found an incomplete model path
+    ModelPath {
         /// The offset of the dot
         dot_offset: usize,
     },

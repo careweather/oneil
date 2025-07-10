@@ -1,8 +1,8 @@
-//! Parameter resolution module for the Oneil module loader.
+//! Parameter resolution model for the Oneil model loader.
 //!
-//! This module handles the resolution of parameters within a Oneil module. It performs
+//! This module handles the resolution of parameters within a Oneil model. It performs
 //! dependency analysis, circular dependency detection, and converts AST parameters into
-//! resolved module parameters.
+//! resolved model parameters.
 //!
 //! # Overview
 //!
@@ -15,8 +15,8 @@
 //!
 //! # Key Concepts
 //!
-//! - **Internal Dependencies**: Dependencies on parameters defined within the same module
-//! - **External Dependencies**: Dependencies on parameters from other modules (handled elsewhere)
+//! - **Internal Dependencies**: Dependencies on parameters defined within the same model
+//! - **External Dependencies**: Dependencies on parameters from other models (handled elsewhere)
 //! - **Circular Dependencies**: When parameter A depends on parameter B, which depends on A
 //!
 
@@ -31,13 +31,13 @@ use oneil_ir::{
 use crate::{
     error::{self, ParameterResolutionError},
     loader::resolver::{
-        ModuleInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
+        ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
         trace_level::resolve_trace_level, unit::resolve_unit,
     },
     util::{Stack, builder::ParameterCollectionBuilder, info::InfoMap},
 };
 
-/// Resolves a collection of AST parameters into resolved module parameters.
+/// Resolves a collection of AST parameters into resolved model parameters.
 ///
 /// This function performs the complete parameter resolution process:
 /// - Analyzes dependencies between parameters
@@ -49,7 +49,7 @@ use crate::{
 ///
 /// * `parameters` - Vector of AST parameters to resolve
 /// * `submodel_info` - Information about available submodels
-/// * `module_info` - Information about available modules
+/// * `model_info` - Information about available models
 ///
 /// # Returns
 ///
@@ -67,7 +67,7 @@ use crate::{
 pub fn resolve_parameters(
     parameters: Vec<ast::Parameter>,
     submodel_info: &SubmodelInfo,
-    module_info: &ModuleInfo,
+    model_info: &ModelInfo,
 ) -> (
     ParameterCollection,
     HashMap<Identifier, Vec<ParameterResolutionError>>,
@@ -80,7 +80,7 @@ pub fn resolve_parameters(
         .collect();
 
     // note that an 'internal dependency' is a dependency on a parameter
-    // that is defined within the current module
+    // that is defined within the current model
     let dependencies = get_all_parameter_internal_dependencies(&parameter_map);
 
     let resolved_parameters = ParameterCollectionBuilder::new();
@@ -96,7 +96,7 @@ pub fn resolve_parameters(
                 &parameter_map,
                 &dependencies,
                 submodel_info,
-                module_info,
+                model_info,
                 &mut parameter_stack,
                 resolved_parameters,
                 visited,
@@ -115,7 +115,7 @@ pub fn resolve_parameters(
 /// Analyzes all parameters to extract their internal dependencies.
 ///
 /// Creates a mapping from parameter identifier to the set of other parameters
-/// it depends on within the same module.
+/// it depends on within the same model.
 ///
 /// # Arguments
 ///
@@ -147,7 +147,7 @@ fn get_all_parameter_internal_dependencies<'a>(
 /// Extracts internal dependencies from a single parameter.
 ///
 /// Analyzes the parameter's value and limits to find references to other
-/// parameters within the same module.
+/// parameters within the same model.
 ///
 /// # Arguments
 ///
@@ -196,7 +196,7 @@ fn get_parameter_internal_dependencies(parameter: &ast::Parameter) -> HashSet<Id
 /// Extracts internal dependencies from an expression.
 ///
 /// Recursively traverses the expression tree to find variable references
-/// that correspond to parameters within the same module.
+/// that correspond to parameters within the same model.
 ///
 /// # Arguments
 ///
@@ -238,7 +238,7 @@ fn get_expr_internal_dependencies(
                 component: _,
             } => {
                 // an accessor implies that the dependency is on a parameter
-                // outside of the current module, so it doesn't count as an
+                // outside of the current model, so it doesn't count as an
                 // internal dependency
                 dependencies
             }
@@ -260,7 +260,7 @@ fn get_expr_internal_dependencies(
 /// * `parameter_map` - Map of all available parameters
 /// * `dependencies` - Dependency graph for all parameters
 /// * `submodel_info` - Information about available submodels
-/// * `module_info` - Information about available modules
+/// * `model_info` - Information about available models
 /// * `parameter_stack` - Stack for tracking resolution order (for circular dependency detection)
 /// * `resolved_parameters` - Builder for collecting resolved parameters
 /// * `visited` - Set of already visited parameters
@@ -276,7 +276,7 @@ fn resolve_parameter(
     parameter_map: &HashMap<Identifier, oneil_ast::Parameter>,
     dependencies: &HashMap<&Identifier, HashSet<Identifier>>,
     submodel_info: &SubmodelInfo,
-    module_info: &ModuleInfo,
+    model_info: &ModelInfo,
     parameter_stack: &mut Stack<Identifier>,
     mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: HashSet<Identifier>,
@@ -330,7 +330,7 @@ fn resolve_parameter(
                 parameter_map,
                 dependencies,
                 submodel_info,
-                module_info,
+                model_info,
                 parameter_stack,
                 resolved_parameters,
                 visited,
@@ -363,14 +363,13 @@ fn resolve_parameter(
         defined_parameters_with_errors,
     );
 
-    let value =
-        resolve_parameter_value(value, &defined_parameters_info, submodel_info, module_info);
+    let value = resolve_parameter_value(value, &defined_parameters_info, submodel_info, model_info);
 
     let limits = resolve_limits(
         limits.as_ref(),
         &defined_parameters_info,
         submodel_info,
-        module_info,
+        model_info,
     );
 
     let trace_level = resolve_trace_level(trace_level);
@@ -403,14 +402,14 @@ fn resolve_parameter(
 /// Resolves a parameter value expression.
 ///
 /// Handles both simple and piecewise parameter values, resolving expressions
-/// and converting them to the appropriate module types.
+/// and converting them to the appropriate model types.
 ///
 /// # Arguments
 ///
 /// * `value` - The AST parameter value to resolve
 /// * `defined_parameters_info` - Information about already resolved parameters
 /// * `submodel_info` - Information about available submodels
-/// * `module_info` - Information about available modules
+/// * `model_info` - Information about available models
 ///
 /// # Returns
 ///
@@ -419,7 +418,7 @@ fn resolve_parameter_value(
     value: &ast::parameter::ParameterValue,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
-    module_info: &ModuleInfo,
+    model_info: &ModelInfo,
 ) -> Result<ParameterValue, Vec<ParameterResolutionError>> {
     let local_variables = HashSet::new();
 
@@ -430,7 +429,7 @@ fn resolve_parameter_value(
                 &local_variables,
                 defined_parameters_info,
                 submodel_info,
-                module_info,
+                model_info,
             )
             .map_err(error::convert_errors)?;
 
@@ -446,7 +445,7 @@ fn resolve_parameter_value(
                     &local_variables,
                     defined_parameters_info,
                     submodel_info,
-                    module_info,
+                    model_info,
                 )
                 .map_err(error::convert_errors);
 
@@ -455,7 +454,7 @@ fn resolve_parameter_value(
                     &local_variables,
                     defined_parameters_info,
                     submodel_info,
-                    module_info,
+                    model_info,
                 )
                 .map_err(error::convert_errors);
 
@@ -476,14 +475,14 @@ fn resolve_parameter_value(
 /// Resolves parameter limits.
 ///
 /// Handles both continuous (min/max) and discrete limits, resolving expressions
-/// and converting them to the appropriate module types.
+/// and converting them to the appropriate model types.
 ///
 /// # Arguments
 ///
 /// * `limits` - Optional AST parameter limits to resolve
 /// * `defined_parameters_info` - Information about already resolved parameters
 /// * `submodel_info` - Information about available submodels
-/// * `module_info` - Information about available modules
+/// * `model_info` - Information about available models
 ///
 /// # Returns
 ///
@@ -492,7 +491,7 @@ fn resolve_limits(
     limits: Option<&ast::parameter::Limits>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
-    module_info: &ModuleInfo,
+    model_info: &ModelInfo,
 ) -> Result<oneil_ir::parameter::Limits, Vec<ParameterResolutionError>> {
     let local_variables = HashSet::new();
     match limits {
@@ -502,7 +501,7 @@ fn resolve_limits(
                 &local_variables,
                 defined_parameters_info,
                 submodel_info,
-                module_info,
+                model_info,
             )
             .map_err(error::convert_errors);
 
@@ -511,7 +510,7 @@ fn resolve_limits(
                 &local_variables,
                 defined_parameters_info,
                 submodel_info,
-                module_info,
+                model_info,
             )
             .map_err(error::convert_errors);
 
@@ -526,7 +525,7 @@ fn resolve_limits(
                     &local_variables,
                     defined_parameters_info,
                     submodel_info,
-                    module_info,
+                    model_info,
                 )
                 .map_err(error::convert_errors)
             });
@@ -588,11 +587,11 @@ mod tests {
         }
     }
 
-    // Helper function to create mock module and submodel info
-    fn create_mock_info<'a>() -> (SubmodelInfo<'a>, ModuleInfo<'a>) {
+    // Helper function to create mock model and submodel info
+    fn create_mock_info<'a>() -> (SubmodelInfo<'a>, ModelInfo<'a>) {
         let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
-        let module_info = ModuleInfo::new(HashMap::new(), HashSet::new());
-        (submodel_info, module_info)
+        let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
+        (submodel_info, model_info)
     }
 
     #[test]
@@ -600,12 +599,11 @@ mod tests {
         // create the parameters
         let parameters = vec![];
 
-        // create the submodel and module info
-        let (submodel_info, module_info) = create_mock_info();
+        // create the submodel and model info
+        let (submodel_info, model_info) = create_mock_info();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &submodel_info, &module_info);
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
         // test the errors
         assert!(errors.is_empty());
@@ -622,12 +620,11 @@ mod tests {
             create_simple_parameter("b", 20.0),
         ];
 
-        // create the submodel and module info
-        let (submodel_info, module_info) = create_mock_info();
+        // create the submodel and model info
+        let (submodel_info, model_info) = create_mock_info();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &submodel_info, &module_info);
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
         // test the errors
         assert!(errors.is_empty());
@@ -650,12 +647,11 @@ mod tests {
             create_dependent_parameter("b", "a"),
         ];
 
-        // create the submodel and module info
-        let (submodel_info, module_info) = create_mock_info();
+        // create the submodel and model info
+        let (submodel_info, model_info) = create_mock_info();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &submodel_info, &module_info);
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
         // test the errors
         assert!(errors.is_empty());
@@ -678,12 +674,11 @@ mod tests {
             create_dependent_parameter("b", "a"),
         ];
 
-        // create the submodel and module info
-        let (submodel_info, module_info) = create_mock_info();
+        // create the submodel and model info
+        let (submodel_info, model_info) = create_mock_info();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &submodel_info, &module_info);
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
         // test the errors
         assert!(!errors.is_empty());
@@ -852,14 +847,14 @@ mod tests {
             ast::Expr::Literal(ast::expression::Literal::Number(42.0)),
             None,
         );
-        let (submodel_info, module_info) = create_mock_info();
+        let (submodel_info, model_info) = create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
         let result = resolve_parameter_value(
             &value,
             &defined_parameters_info,
             &submodel_info,
-            &module_info,
+            &model_info,
         );
 
         assert!(result.is_ok());
@@ -869,10 +864,10 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_none() {
-        let (submodel_info, module_info) = create_mock_info();
+        let (submodel_info, model_info) = create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
-        let result = resolve_limits(None, &defined_parameters_info, &submodel_info, &module_info);
+        let result = resolve_limits(None, &defined_parameters_info, &submodel_info, &model_info);
 
         assert!(result.is_ok());
         let limits = result.unwrap();
@@ -885,14 +880,14 @@ mod tests {
             min: ast::Expr::Literal(ast::expression::Literal::Number(0.0)),
             max: ast::Expr::Literal(ast::expression::Literal::Number(100.0)),
         };
-        let (submodel_info, module_info) = create_mock_info();
+        let (submodel_info, model_info) = create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
         let result = resolve_limits(
             Some(&limits),
             &defined_parameters_info,
             &submodel_info,
-            &module_info,
+            &model_info,
         );
 
         assert!(result.is_ok());
@@ -909,14 +904,14 @@ mod tests {
                 ast::Expr::Literal(ast::expression::Literal::Number(3.0)),
             ],
         };
-        let (submodel_info, module_info) = create_mock_info();
+        let (submodel_info, model_info) = create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
         let result = resolve_limits(
             Some(&limits),
             &defined_parameters_info,
             &submodel_info,
-            &module_info,
+            &model_info,
         );
 
         assert!(result.is_ok());

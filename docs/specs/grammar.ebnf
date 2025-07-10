@@ -29,9 +29,9 @@ Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | Parame
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-FromDecl = "from", ModulePath, "use", ModelName, [ ModelInputs ], "as", Identifier, EndOfLine ;
-UseDecl = "use", ModulePath, [ ModelInputs ], "as", Identifier, EndOfLine ;
-ModulePath = Identifier, { ".", Identifier } ;
+FromDecl = "from", ModelPath, "use", ModelName, [ ModelInputs ], "as", Identifier, EndOfLine ;
+UseDecl = "use", ModelPath, [ ModelInputs ], "as", Identifier, EndOfLine ;
+ModelPath = Identifier, { ".", Identifier } ;
 ModelInputs = "(", ModelInput, { ",", ModelInput }, ")" ;
 ModelInput = Identifier, "=", Expr ;
 ModelName = Identifier ;

@@ -1,14 +1,14 @@
-//! Expression resolution for the Oneil module loader
+//! Expression resolution for the Oneil model loader
 //!
-//! This module provides functionality for resolving AST expressions into module expressions.
+//! This module provides functionality for resolving AST expressions into model expressions.
 //! Expression resolution involves converting abstract syntax tree expressions into
-//! executable module expressions while handling variable resolution, function calls,
+//! executable model expressions while handling variable resolution, function calls,
 //! and literal values.
 //!
 //! # Overview
 //!
-//! The expression resolver transforms AST expressions into module expressions that can be
-//! evaluated within the Oneil module system. This includes:
+//! The expression resolver transforms AST expressions into model expressions that can be
+//! evaluated within the Oneil model system. This includes:
 //!
 //! - **Binary Operations**: Arithmetic, comparison, and logical operations
 //! - **Unary Operations**: Negation and logical NOT operations
@@ -37,12 +37,12 @@
 //! ## Variables
 //! Resolves variables through the variable resolution system:
 //! - **Local variables**: Test inputs, function parameters
-//! - **Parameters**: Module parameters
+//! - **Parameters**: Model parameters
 //! - **Submodel accessors**: `parameter.submodel` notation
 //!
 //! # Error Handling
 //!
-//! The module provides comprehensive error handling for various failure scenarios:
+//! The model provides comprehensive error handling for various failure scenarios:
 //! - Variable resolution errors (undefined variables, submodels with errors)
 //! - Expression evaluation errors
 //! - Function call errors
@@ -57,13 +57,13 @@ use oneil_ir::reference::Identifier;
 
 use crate::{
     error::{self, VariableResolutionError},
-    loader::resolver::{ModuleInfo, ParameterInfo, SubmodelInfo, variable::resolve_variable},
+    loader::resolver::{ModelInfo, ParameterInfo, SubmodelInfo, variable::resolve_variable},
 };
 
-/// Resolves an AST expression into a module expression.
+/// Resolves an AST expression into a model expression.
 ///
-/// This function transforms an abstract syntax tree expression into a module expression
-/// that can be evaluated within the Oneil module system. The resolution process handles
+/// This function transforms an abstract syntax tree expression into a model expression
+/// that can be evaluated within the Oneil model system. The resolution process handles
 /// variable lookup, function name resolution, and expression structure conversion.
 ///
 /// # Arguments
@@ -72,11 +72,11 @@ use crate::{
 /// * `local_variables` - Set of local variable identifiers available in the current scope
 /// * `defined_parameters_info` - Information about defined parameters and their status
 /// * `submodel_info` - Information about available submodels and their paths
-/// * `module_info` - Information about all available modules and their loading status
+/// * `model_info` - Information about all available models and their loading status
 ///
 /// # Returns
 ///
-/// * `Ok(oneil_ir::expr::Expr)` - The resolved module expression
+/// * `Ok(oneil_ir::expr::Expr)` - The resolved model expression
 /// * `Err(Vec<VariableResolutionError>)` - Any variable resolution errors that occurred
 ///
 
@@ -95,7 +95,7 @@ pub fn resolve_expr(
     local_variables: &HashSet<Identifier>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
-    module_info: &ModuleInfo,
+    model_info: &ModelInfo,
 ) -> Result<oneil_ir::expr::Expr, Vec<VariableResolutionError>> {
     match value {
         ast::Expr::BinaryOp { op, left, right } => {
@@ -104,14 +104,14 @@ pub fn resolve_expr(
                 local_variables,
                 defined_parameters_info,
                 submodel_info,
-                module_info,
+                model_info,
             );
             let right = resolve_expr(
                 right,
                 local_variables,
                 defined_parameters_info,
                 submodel_info,
-                module_info,
+                model_info,
             );
             let op = resolve_binary_op(op);
 
@@ -125,7 +125,7 @@ pub fn resolve_expr(
                 local_variables,
                 defined_parameters_info,
                 submodel_info,
-                module_info,
+                model_info,
             );
             let op = resolve_unary_op(op);
 
@@ -142,7 +142,7 @@ pub fn resolve_expr(
                     local_variables,
                     defined_parameters_info,
                     submodel_info,
-                    module_info,
+                    model_info,
                 )
             });
 
@@ -155,7 +155,7 @@ pub fn resolve_expr(
             local_variables,
             defined_parameters_info,
             submodel_info,
-            module_info,
+            model_info,
         )
         .map_err(|error| vec![error]),
         ast::Expr::Literal(literal) => {
@@ -165,10 +165,10 @@ pub fn resolve_expr(
     }
 }
 
-/// Converts an AST binary operation to a module binary operation.
+/// Converts an AST binary operation to a model binary operation.
 ///
-/// This function maps AST binary operations to their corresponding module binary operations.
-/// All AST binary operations have direct equivalents in the module system.
+/// This function maps AST binary operations to their corresponding model binary operations.
+/// All AST binary operations have direct equivalents in the model system.
 ///
 /// # Arguments
 ///
@@ -176,7 +176,7 @@ pub fn resolve_expr(
 ///
 /// # Returns
 ///
-/// The corresponding module binary operation
+/// The corresponding model binary operation
 fn resolve_binary_op(op: &ast::expression::BinaryOp) -> oneil_ir::expr::BinaryOp {
     match op {
         ast::expression::BinaryOp::Add => oneil_ir::expr::BinaryOp::Add,
@@ -199,9 +199,9 @@ fn resolve_binary_op(op: &ast::expression::BinaryOp) -> oneil_ir::expr::BinaryOp
     }
 }
 
-/// Converts an AST unary operation to a module unary operation.
+/// Converts an AST unary operation to a model unary operation.
 ///
-/// This function maps AST unary operations to their corresponding module unary operations.
+/// This function maps AST unary operations to their corresponding model unary operations.
 /// Currently supports negation and logical NOT operations.
 ///
 /// # Arguments
@@ -210,7 +210,7 @@ fn resolve_binary_op(op: &ast::expression::BinaryOp) -> oneil_ir::expr::BinaryOp
 ///
 /// # Returns
 ///
-/// The corresponding module unary operation
+/// The corresponding model unary operation
 fn resolve_unary_op(op: &ast::expression::UnaryOp) -> oneil_ir::expr::UnaryOp {
     match op {
         ast::expression::UnaryOp::Neg => oneil_ir::expr::UnaryOp::Neg,
@@ -218,7 +218,7 @@ fn resolve_unary_op(op: &ast::expression::UnaryOp) -> oneil_ir::expr::UnaryOp {
     }
 }
 
-/// Resolves a function name to a module function name.
+/// Resolves a function name to a model function name.
 ///
 /// This function determines whether a function name refers to a built-in function
 /// or an imported function. Built-in functions are mapped to their corresponding
@@ -230,7 +230,7 @@ fn resolve_unary_op(op: &ast::expression::UnaryOp) -> oneil_ir::expr::UnaryOp {
 ///
 /// # Returns
 ///
-/// A module function name representing either a built-in or imported function
+/// A model function name representing either a built-in or imported function
 ///
 /// # Built-in Functions
 ///
@@ -266,9 +266,9 @@ fn resolve_function_name(name: &str) -> oneil_ir::expr::FunctionName {
     }
 }
 
-/// Converts an AST literal to a module literal.
+/// Converts an AST literal to a model literal.
 ///
-/// This function maps AST literals to their corresponding module literals.
+/// This function maps AST literals to their corresponding model literals.
 /// Supports numbers, strings, and boolean values.
 ///
 /// # Arguments
@@ -277,16 +277,12 @@ fn resolve_function_name(name: &str) -> oneil_ir::expr::FunctionName {
 ///
 /// # Returns
 ///
-/// The corresponding module literal
+/// The corresponding model literal
 fn resolve_literal(literal: &ast::expression::Literal) -> oneil_ir::expr::Literal {
     match literal {
         ast::expression::Literal::Number(number) => oneil_ir::expr::Literal::number(*number),
-        ast::expression::Literal::String(string) => {
-            oneil_ir::expr::Literal::string(string.clone())
-        }
-        ast::expression::Literal::Boolean(boolean) => {
-            oneil_ir::expr::Literal::boolean(*boolean)
-        }
+        ast::expression::Literal::String(string) => oneil_ir::expr::Literal::string(string.clone()),
+        ast::expression::Literal::Boolean(boolean) => oneil_ir::expr::Literal::boolean(*boolean),
     }
 }
 
@@ -306,14 +302,14 @@ mod tests {
         HashSet<Identifier>,
         ParameterInfo<'static>,
         SubmodelInfo<'static>,
-        ModuleInfo<'static>,
+        ModelInfo<'static>,
     ) {
         let local_vars = HashSet::new();
         let param_info = ParameterInfo::new(HashMap::new(), HashSet::new());
         let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
-        let module_info = ModuleInfo::new(HashMap::new(), HashSet::new());
+        let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
 
-        (local_vars, param_info, submodel_info, module_info)
+        (local_vars, param_info, submodel_info, model_info)
     }
 
     #[test]
@@ -322,7 +318,7 @@ mod tests {
         let literal = ast::Expr::Literal(ast::expression::Literal::Number(42.0));
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
@@ -330,7 +326,7 @@ mod tests {
             &local_vars,
             &param_info,
             &submodel_info,
-            &module_info,
+            &model_info,
         );
 
         // check the result
@@ -348,7 +344,7 @@ mod tests {
         let literal = ast::Expr::Literal(ast::expression::Literal::String("hello".to_string()));
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
@@ -356,7 +352,7 @@ mod tests {
             &local_vars,
             &param_info,
             &submodel_info,
-            &module_info,
+            &model_info,
         );
 
         // check the result
@@ -374,7 +370,7 @@ mod tests {
         let literal = ast::Expr::Literal(ast::expression::Literal::Boolean(true));
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
@@ -382,7 +378,7 @@ mod tests {
             &local_vars,
             &param_info,
             &submodel_info,
-            &module_info,
+            &model_info,
         );
 
         // check the result
@@ -404,16 +400,10 @@ mod tests {
         };
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
@@ -445,16 +435,10 @@ mod tests {
         };
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
@@ -480,16 +464,10 @@ mod tests {
         };
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
@@ -516,16 +494,10 @@ mod tests {
         };
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
@@ -549,17 +521,11 @@ mod tests {
         let expr = ast::Expr::Variable(ast::expression::Variable::Identifier("x".to_string()));
 
         // create the context
-        let (_, param_info, submodel_info, module_info) = create_empty_context();
+        let (_, param_info, submodel_info, model_info) = create_empty_context();
         let local_vars = HashSet::from([Identifier::new("x")]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
@@ -591,22 +557,14 @@ mod tests {
         );
         param_map.insert(&param_id, &parameter);
         let param_info = ParameterInfo::new(param_map, HashSet::new());
-        let (local_vars, _, submodel_info, module_info) = create_empty_context();
+        let (local_vars, _, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(
-                ident,
-            ))) => {
+            Ok(oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident))) => {
                 assert_eq!(ident, Identifier::new("param"));
             }
             _ => panic!("Expected parameter variable, got {:?}", result),
@@ -621,16 +579,10 @@ mod tests {
         ));
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
@@ -668,16 +620,10 @@ mod tests {
         };
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {
@@ -756,12 +702,12 @@ mod tests {
             (ast::expression::BinaryOp::MinMax, BinaryOp::MinMax),
         ];
 
-        for (ast_op, expected_module_op) in operations {
+        for (ast_op, expected_ir_op) in operations {
             // resolve the binary operation
             let result = resolve_binary_op(&ast_op);
 
             // check the result
-            assert_eq!(result, expected_module_op);
+            assert_eq!(result, expected_ir_op);
         }
     }
 
@@ -773,12 +719,12 @@ mod tests {
             (ast::expression::UnaryOp::Not, UnaryOp::Not),
         ];
 
-        for (ast_op, expected_module_op) in operations {
+        for (ast_op, expected_ir_op) in operations {
             // resolve the unary operation
             let result = resolve_unary_op(&ast_op);
 
             // check the result
-            assert_eq!(result, expected_module_op);
+            assert_eq!(result, expected_ir_op);
         }
     }
 
@@ -849,18 +795,18 @@ mod tests {
     fn test_resolve_literal_all_types() {
         // Test number
         let ast_number = ast::expression::Literal::Number(42.5);
-        let module_number = resolve_literal(&ast_number);
-        assert_eq!(module_number, Literal::Number(42.5));
+        let ir_number = resolve_literal(&ast_number);
+        assert_eq!(ir_number, Literal::Number(42.5));
 
         // Test string
         let ast_string = ast::expression::Literal::String("test string".to_string());
-        let module_string = resolve_literal(&ast_string);
-        assert_eq!(module_string, Literal::String("test string".to_string()));
+        let ir_string = resolve_literal(&ast_string);
+        assert_eq!(ir_string, Literal::String("test string".to_string()));
 
         // Test boolean
         let ast_bool = ast::expression::Literal::Boolean(false);
-        let module_bool = resolve_literal(&ast_bool);
-        assert_eq!(module_bool, Literal::Boolean(false));
+        let ir_bool = resolve_literal(&ast_bool);
+        assert_eq!(ir_bool, Literal::Boolean(false));
     }
 
     #[test]
@@ -877,16 +823,10 @@ mod tests {
         };
 
         // create the context
-        let (local_vars, param_info, submodel_info, module_info) = create_empty_context();
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &local_vars,
-            &param_info,
-            &submodel_info,
-            &module_info,
-        );
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
 
         // check the result
         match result {

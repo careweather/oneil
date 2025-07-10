@@ -1,4 +1,4 @@
-# Separate AST and Module Data Structures
+# Separate AST and IR Data Structures
 
 ## Status
 
@@ -8,28 +8,28 @@ Accepted
 
 We have two distinct layers in the Oneil language implementation:
 1. **Parser/AST layer** (`oneil_parser`, `oneil_ast`) - responsible for parsing source code and creating abstract syntax trees
-2. **Module layer** (`oneil_module`) - responsible for representing loaded modules and their semantic information
+2. **IR layer** (`oneil_ir`) - responsible for representing loaded models and their semantic information
 
-The question arose whether to reuse AST data structures (like `Expr`, `Declaration`, etc.) in the module data structures, or to create separate, module-specific data structures.
+The question arose whether to reuse AST data structures (like `Expr`, `Declaration`, etc.) in the IR data structures, or to create separate, IR-specific data structures.
 
 ## Decision
 
-We will **not** reuse AST data structures in the module data structures. Instead, we will create separate, module-specific data structures that are independent of the AST representation.
+We will **not** reuse AST data structures in the IR data structures. Instead, we will create separate, IR-specific data structures that are independent of the AST representation.
 
 This means:
-- Module data structures will have their own `Expr`, `Parameter`, `Limit`, etc. types
-- These types will be defined in the `oneil_module` crate and its dependencies
-- The module layer will not depend on `oneil_ast` or `oneil_parser` crates
-- When converting from AST to module representation, we will transform the data structures
+- IR data structures will have their own `Expr`, `Parameter`, `Limit`, etc. types
+- These types will be defined in the `oneil_ir` crate and its dependencies
+- The IR layer will not depend on `oneil_ast` or `oneil_parser` crates
+- When converting from AST to IR representation, we will transform the data structures
 
 ## Consequences
 
 ### Positive Consequences
-- **Decoupling**: The module layer is completely independent of the parser/AST layer
-- **Flexibility**: Module data structures can evolve independently of AST structures
+- **Decoupling**: The IR layer is completely independent of the parser/AST layer
+- **Flexibility**: IR data structures can evolve independently of AST structures
 - **Clear separation of concerns**: Each layer has its own domain-specific data models
-- **Easier testing**: Module logic can be tested without AST dependencies
-- **Future-proofing**: Changes to AST structures won't affect module representation
+- **Easier testing**: IR logic can be tested without AST dependencies
+- **Future-proofing**: Changes to AST structures won't affect IR representation
 
 ### Negative Consequences
 - **Code duplication**: Similar data structures exist in multiple places

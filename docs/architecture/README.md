@@ -4,7 +4,7 @@ The Oneil programming language has many different parts of it, but the core of
 Oneil follows the following architecture for evaluation of a model.
 
 1. [Tokenization and Parsing](#tokenizerparser)
-2. Module Resolution
+2. Model Resolution
 3. Type and Unit Checking
 4. Evaluation
 

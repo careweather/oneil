@@ -1,7 +1,7 @@
-//! Error handling for the Oneil module loader.
+//! Error handling for the Oneil model loader.
 //!
 //! This module provides error types and utilities for handling various error conditions
-//! that can occur during module loading, including:
+//! that can occur during model loading, including:
 //!
 //! - Parse errors from AST parsing
 //! - Resolution errors for submodels, parameters, and tests
@@ -10,16 +10,16 @@
 //!
 //! # Error Types
 //!
-//! - `LoadError`: Represents errors that occur during module loading
+//! - `LoadError`: Represents errors that occur during model loading
 //! - `CircularDependencyError`: Represents circular dependency detection
 //! - Various resolution error types for different resolution phases
 //!
 //! # Error Collection
 //!
 //! The module provides utilities for collecting and managing errors across multiple
-//! modules and resolution phases, allowing for comprehensive error reporting.
+//! models and resolution phases, allowing for comprehensive error reporting.
 
-use oneil_ir::reference::ModulePath;
+use oneil_ir::reference::ModelPath;
 
 pub mod collection;
 pub mod resolution;
@@ -31,14 +31,14 @@ pub use resolution::{
 };
 pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_errors};
 
-/// Represents errors that can occur during module loading.
+/// Represents errors that can occur during model loading.
 ///
-/// This enum encapsulates all possible error types that can occur during the module
+/// This enum encapsulates all possible error types that can occur during the model
 /// loading process. It distinguishes between parse errors (which occur during AST
 /// parsing) and resolution errors (which occur during dependency resolution).
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoadError<Ps> {
-    /// Error that occurred during AST parsing of a module file.
+    /// Error that occurred during AST parsing of a model file.
     ParseError(Ps),
     /// Errors that occurred during dependency resolution.
     ResolutionErrors(resolution::ResolutionErrors),
@@ -72,27 +72,27 @@ impl<Ps> LoadError<Ps> {
     }
 }
 
-/// Represents a circular dependency detected during module loading.
+/// Represents a circular dependency detected during model loading.
 ///
-/// A circular dependency occurs when module A depends on module B, which depends on
-/// module C, which depends back on module A (or any other cycle). This error contains
-/// the complete cycle of module paths that form the circular dependency.
+/// A circular dependency occurs when model A depends on model B, which depends on
+/// model C, which depends back on model A (or any other cycle). This error contains
+/// the complete cycle of model paths that form the circular dependency.
 #[derive(Debug, Clone, PartialEq)]
-pub struct CircularDependencyError(Vec<ModulePath>);
+pub struct CircularDependencyError(Vec<ModelPath>);
 
 impl CircularDependencyError {
     /// Creates a new circular dependency error.
     ///
     /// # Arguments
     ///
-    /// * `circular_dependency` - A vector of module paths that form the circular dependency.
+    /// * `circular_dependency` - A vector of model paths that form the circular dependency.
     ///   The vector should contain the complete cycle, with the first and last elements
-    ///   being the same module if the cycle is complete.
+    ///   being the same model if the cycle is complete.
     ///
     /// # Returns
     ///
     /// A new `CircularDependencyError` containing the circular dependency path.
-    pub fn new(circular_dependency: Vec<ModulePath>) -> Self {
+    pub fn new(circular_dependency: Vec<ModelPath>) -> Self {
         Self(circular_dependency)
     }
 }

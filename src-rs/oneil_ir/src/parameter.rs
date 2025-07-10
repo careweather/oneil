@@ -1,4 +1,4 @@
-//! Parameter definitions and management for Oneil modules.
+//! Parameter definitions and management for Oneil model IR.
 //!
 //! This module provides the data structures for representing parameters in Oneil,
 //! including their values, dependencies, constraints, and metadata. Parameters
@@ -14,7 +14,7 @@ use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier, unit::Com
 /// A collection of parameters that can be managed together.
 ///
 /// `ParameterCollection` provides a container for multiple parameters,
-/// allowing easy lookup and iteration over all parameters in a module.
+/// allowing easy lookup and iteration over all parameters in a model.
 /// It implements `Deref` to provide direct access to the underlying
 /// parameter mapping.
 #[derive(Debug, Clone, PartialEq)]
@@ -63,7 +63,7 @@ impl Deref for ParameterCollection {
     }
 }
 
-/// Represents a single parameter in an Oneil module.
+/// Represents a single parameter in an Oneil model.
 ///
 /// Parameters are the primary mechanism for defining configurable values
 /// in Oneil models. Each parameter has:

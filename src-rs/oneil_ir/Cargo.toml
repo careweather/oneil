@@ -9,4 +9,3 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-oneil_ast = { path = "../oneil_ast" }

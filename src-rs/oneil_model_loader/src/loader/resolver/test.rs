@@ -1,12 +1,12 @@
-//! Model test resolution for the Oneil module loader
+//! Model test resolution for the Oneil model loader
 //!
 //! This module provides functionality for resolving model tests and submodel tests
-//! in Oneil modules. Test resolution involves processing test declarations and
+//! in Oneil models. Test resolution involves processing test declarations and
 //! submodel test inputs to create executable test structures.
 //!
 //! # Overview
 //!
-//! Tests in Oneil allow modules to define validation logic and test scenarios.
+//! Tests in Oneil allow models to define validation logic and test scenarios.
 //! This module handles two types of tests:
 //!
 //! ## Model Tests
@@ -33,7 +33,7 @@
 //!
 //! # Error Handling
 //!
-//! The module provides comprehensive error handling for various failure scenarios:
+//! The model provides comprehensive error handling for various failure scenarios:
 //! - **Variable Resolution Errors**: When test expressions reference undefined variables
 //! - **Parameter Resolution Errors**: When test inputs reference undefined parameters
 //! - **Submodel Resolution Errors**: When test expressions reference undefined submodels
@@ -52,7 +52,7 @@ use oneil_ir::{
 use crate::{
     error::{self, ModelTestResolutionError, SubmodelTestInputResolutionError},
     loader::resolver::{
-        ModuleInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
+        ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
         trace_level::resolve_trace_level,
     },
 };
@@ -66,9 +66,9 @@ use crate::{
 /// # Arguments
 ///
 /// * `tests` - A vector of AST test declarations to resolve
-/// * `defined_parameters_info` - Information about available parameters in the module
-/// * `submodel_info` - Information about available submodels in the module
-/// * `module_info` - Information about all available modules
+/// * `defined_parameters_info` - Information about available parameters in the model
+/// * `submodel_info` - Information about available submodels in the model
+/// * `model_info` - Information about all available models
 ///
 /// # Returns
 ///
@@ -84,7 +84,7 @@ pub fn resolve_model_tests(
     tests: Vec<ast::Test>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
-    module_info: &ModuleInfo,
+    model_info: &ModelInfo,
 ) -> (
     HashMap<TestIndex, ModelTest>,
     HashMap<TestIndex, Vec<ModelTestResolutionError>>,
@@ -108,7 +108,7 @@ pub fn resolve_model_tests(
             local_variables,
             defined_parameters_info,
             submodel_info,
-            module_info,
+            model_info,
         )
         .map_err(|errors| (test_index.clone(), error::convert_errors(errors)))?;
 
@@ -128,9 +128,9 @@ pub fn resolve_model_tests(
 ///
 /// * `submodel_tests` - A vector of submodel test inputs, each containing a submodel
 ///   identifier and a list of model input declarations
-/// * `defined_parameters_info` - Information about available parameters in the module
-/// * `submodel_info` - Information about available submodels in the module
-/// * `module_info` - Information about all available modules and their loading status
+/// * `defined_parameters_info` - Information about available parameters in the model
+/// * `submodel_info` - Information about available submodels in the model
+/// * `model_info` - Information about all available models and their loading status
 ///
 /// # Returns
 ///
@@ -146,7 +146,7 @@ pub fn resolve_submodel_tests(
     submodel_tests: Vec<(Identifier, Vec<ast::declaration::ModelInput>)>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
-    module_info: &ModuleInfo,
+    model_info: &ModelInfo,
 ) -> (
     Vec<SubmodelTest>,
     HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>,
@@ -162,7 +162,7 @@ pub fn resolve_submodel_tests(
                     &HashSet::new(),
                     defined_parameters_info,
                     submodel_info,
-                    module_info,
+                    model_info,
                 )?;
 
                 Ok((identifier, value))
@@ -191,7 +191,7 @@ mod tests {
         parameter::TraceLevel,
         test::Test,
     };
-    use oneil_ir::debug_info::TraceLevel as ModuleTraceLevel;
+    use oneil_ir::debug_info::TraceLevel as ModelTraceLevel;
     use std::collections::HashSet;
 
     /// Creates test parameter information for testing
@@ -204,9 +204,9 @@ mod tests {
         SubmodelInfo::new(HashMap::new(), HashSet::new())
     }
 
-    /// Creates test module information for testing
-    fn create_empty_module_info() -> ModuleInfo<'static> {
-        ModuleInfo::new(HashMap::new(), HashSet::new())
+    /// Creates test model information for testing
+    fn create_empty_model_info() -> ModelInfo<'static> {
+        ModelInfo::new(HashMap::new(), HashSet::new())
     }
 
     #[test]
@@ -219,7 +219,7 @@ mod tests {
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -270,7 +270,7 @@ mod tests {
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -280,17 +280,17 @@ mod tests {
         assert_eq!(resolved_tests.len(), 3);
 
         let test_0 = resolved_tests.get(&TestIndex::new(0)).unwrap();
-        assert_eq!(test_0.trace_level(), &ModuleTraceLevel::None);
+        assert_eq!(test_0.trace_level(), &ModelTraceLevel::None);
         assert_eq!(test_0.inputs().len(), 0);
 
         let test_1 = resolved_tests.get(&TestIndex::new(1)).unwrap();
-        assert_eq!(test_1.trace_level(), &ModuleTraceLevel::None);
+        assert_eq!(test_1.trace_level(), &ModelTraceLevel::None);
         assert_eq!(test_1.inputs().len(), 2);
         assert!(test_1.inputs().contains(&Identifier::new("x")));
         assert!(test_1.inputs().contains(&Identifier::new("y")));
 
         let test_2 = resolved_tests.get(&TestIndex::new(2)).unwrap();
-        assert_eq!(test_2.trace_level(), &ModuleTraceLevel::Trace);
+        assert_eq!(test_2.trace_level(), &ModelTraceLevel::Trace);
         assert_eq!(test_2.inputs().len(), 1);
         assert!(test_2.inputs().contains(&Identifier::new("param")));
     }
@@ -312,7 +312,7 @@ mod tests {
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -321,7 +321,7 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
-        assert_eq!(test.trace_level(), &ModuleTraceLevel::Debug);
+        assert_eq!(test.trace_level(), &ModelTraceLevel::Debug);
         assert_eq!(test.inputs().len(), 1);
         assert!(test.inputs().contains(&Identifier::new("x")));
     }
@@ -343,7 +343,7 @@ mod tests {
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -383,7 +383,7 @@ mod tests {
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -400,7 +400,7 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
-        assert_eq!(test.trace_level(), &ModuleTraceLevel::None);
+        assert_eq!(test.trace_level(), &ModelTraceLevel::None);
         assert_eq!(test.inputs().len(), 1);
         assert!(test.inputs().contains(&Identifier::new("x")));
     }
@@ -415,7 +415,7 @@ mod tests {
             submodel_tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -450,7 +450,7 @@ mod tests {
             submodel_tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -492,7 +492,7 @@ mod tests {
             submodel_tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -531,7 +531,7 @@ mod tests {
             submodel_tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -577,7 +577,7 @@ mod tests {
             submodel_tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -631,7 +631,7 @@ mod tests {
             submodel_tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors
@@ -681,7 +681,7 @@ mod tests {
             submodel_tests,
             &parameter_info,
             &create_empty_submodel_info(),
-            &create_empty_module_info(),
+            &create_empty_model_info(),
         );
 
         // check the errors

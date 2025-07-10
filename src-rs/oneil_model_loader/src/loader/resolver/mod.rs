@@ -1,12 +1,12 @@
-//! Resolution functionality for Oneil module dependencies.
+//! Resolution functionality for Oneil model dependencies.
 //!
 //! This module provides functionality for resolving various dependencies within Oneil
-//! modules, including submodels, parameters, and tests. It handles the complex task
-//! of connecting references to their actual definitions across multiple modules.
+//! models, including submodels, parameters, and tests. It handles the complex task
+//! of connecting references to their actual definitions across multiple models.
 //!
 //! # Resolution Types
 //!
-//! - **Submodel resolution**: Resolves `use model` declarations to their actual module paths
+//! - **Submodel resolution**: Resolves `use model` declarations to their actual model paths
 //! - **Parameter resolution**: Resolves parameter references to their actual parameter definitions
 //! - **Test resolution**: Resolves test references to their actual test definitions
 //!
@@ -15,7 +15,7 @@
 //! The resolution process involves several phases:
 //!
 //! 1. **Submodel resolution**: First, all `use model` declarations are resolved to their
-//!    corresponding module paths
+//!    corresponding model paths
 //! 2. **Parameter resolution**: Parameters are resolved using the resolved submodel information
 //! 3. **Test resolution**: Tests are resolved using both parameter and submodel information
 //!
@@ -27,15 +27,15 @@
 //!
 //! # Info Maps
 //!
-//! The module uses `InfoMap` types to pass information about available modules, submodels,
+//! The model uses `InfoMap` types to pass information about available models, submodels,
 //! and parameters to the resolution functions. These maps track both successful resolutions
 //! and items that have errors, allowing the resolution functions to make informed decisions
 //! about error handling.
 
 use oneil_ir::{
-    module::Module,
+    model::Model,
     parameter::Parameter,
-    reference::{Identifier, ModulePath},
+    reference::{Identifier, ModelPath},
 };
 
 use crate::util::info::InfoMap;
@@ -61,12 +61,12 @@ pub type ParameterInfo<'a> = InfoMap<&'a Identifier, &'a Parameter>;
 
 /// Type alias for submodel information maps used during resolution.
 ///
-/// This type represents a map from submodel identifiers to their resolved module paths,
+/// This type represents a map from submodel identifiers to their resolved model paths,
 /// along with information about which submodels have errors.
-pub type SubmodelInfo<'a> = InfoMap<&'a Identifier, &'a ModulePath>;
+pub type SubmodelInfo<'a> = InfoMap<&'a Identifier, &'a ModelPath>;
 
-/// Type alias for module information maps used during resolution.
+/// Type alias for model information maps used during resolution.
 ///
-/// This type represents a map from module paths to their loaded modules,
-/// along with information about which modules have errors.
-pub type ModuleInfo<'a> = InfoMap<&'a ModulePath, &'a Module>;
+/// This type represents a map from model paths to their loaded models,
+/// along with information about which models have errors.
+pub type ModelInfo<'a> = InfoMap<&'a ModelPath, &'a Model>;

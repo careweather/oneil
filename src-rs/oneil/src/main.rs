@@ -15,9 +15,9 @@ fn main() {
                 let ast = file_parser::FileLoader.parse_ast(file);
                 println!("{:#?}", ast);
             }
-            DevCommands::PrintModules { file } => {
-                let module = oneil_model_loader::load_module(file, &file_parser::FileLoader);
-                println!("{:#?}", module);
+            DevCommands::PrintIr { file } => {
+                let model = oneil_model_loader::load_model(file, &file_parser::FileLoader);
+                println!("{:#?}", model);
             }
         },
     }
