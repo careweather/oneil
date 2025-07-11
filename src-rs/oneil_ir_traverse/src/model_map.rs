@@ -1,3 +1,8 @@
+//! Model map module for storing processed model traversal results.
+//!
+//! This module defines the data structures used to store the results of traversing and processing
+//! models, including both successful results and errors, for all model components.
+
 use std::collections::HashMap;
 
 use oneil_ir::{
@@ -5,6 +10,11 @@ use oneil_ir::{
     test::TestIndex,
 };
 
+/// A collection of processed data for a single model.
+///
+/// This struct holds the results of processing all components within a model:
+/// python imports, submodels, parameters, model tests, and submodel tests.
+/// Each component type is stored in its own map for efficient lookup.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
     python_imports_map: HashMap<PythonPath, PyT>,
@@ -17,6 +27,15 @@ pub struct ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
 impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
     ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
 {
+    /// Creates a new `ModelMapEntry` with the provided component maps.
+    ///
+    /// # Arguments
+    ///
+    /// * `python_imports_map` - Map of python import paths to their processed data
+    /// * `submodels_map` - Map of submodel identifiers to their processed data
+    /// * `parameters_map` - Map of parameter identifiers to their processed data
+    /// * `model_tests_map` - Map of test indices to their processed data
+    /// * `submodel_tests_map` - Map of submodel test identifiers to their processed data
     pub fn new(
         python_imports_map: HashMap<PythonPath, PyT>,
         submodels_map: HashMap<Identifier, SubmodelT>,
@@ -34,6 +53,10 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
     }
 }
 
+/// A collection of processed data for multiple models.
+///
+/// This struct maps model paths to their corresponding `ModelMapEntry`,
+/// allowing efficient lookup of processed data for any model in the collection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
     map: HashMap<ModelPath, ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>>,
@@ -42,6 +65,11 @@ pub struct ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
 impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
     ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
 {
+    /// Creates a new `ModelMap` with the provided model entries.
+    ///
+    /// # Arguments
+    ///
+    /// * `map` - HashMap mapping model paths to their processed data entries
     pub fn new(
         map: HashMap<ModelPath, ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>>,
     ) -> Self {

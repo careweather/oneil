@@ -1,3 +1,15 @@
+//! # Oneil IR Traverse
+//!
+//! This crate provides functionality for traversing Oneil IR model collections and processing
+//! their components (python imports, submodels, parameters, model tests, and submodel tests)
+//! using customizable processors.
+//!
+//! The main entry point is the `traverse` function, which takes a model collection and
+//! processor implementations for each component type. It returns a `ModelMap` containing
+//! the processed data or errors for each component.
+
+#![warn(missing_docs)]
+
 use oneil_ir::model::ModelCollection;
 
 use crate::builder::ModelMapBuilder;
@@ -11,6 +23,35 @@ pub use traits::{
     ModelTestProcess, ParameterProcess, PythonImportProcess, SubmodelProcess, SubmodelTestProcess,
 };
 
+/// Traverses a model collection and processes its components using the provided processors.
+///
+/// This function iterates through all models in evaluation order and processes each in the following order:
+/// 1. Python imports
+/// 2. Submodels
+/// 3. Parameters
+/// 4. Model tests
+/// 5. Submodel tests
+///
+/// The processors are called in the order of the above list.
+///
+/// Parameters are processed in evaluation order. Other items do not have a
+/// defined order.
+///
+/// # Arguments
+///
+/// * `model_collection` - The collection of models to traverse
+/// * `python_import_process` - Processor for python imports
+/// * `submodel_process` - Processor for submodels
+/// * `parameter_process` - Processor for parameters
+/// * `model_test_process` - Processor for model tests
+/// * `submodel_test_process` - Processor for submodel tests
+///
+/// # Returns
+///
+/// Returns a `Result` containing either:
+/// * `Ok(ModelMap)` - All components processed successfully
+/// * `Err((ModelMap, ModelMap))` - Some components failed, with the first map containing
+///   successful results and the second containing errors
 pub fn traverse<PythonImportP, SubmodelP, ParameterP, ModelTestP, SubmodelTestP>(
     model_collection: &ModelCollection,
     python_import_process: PythonImportP,
