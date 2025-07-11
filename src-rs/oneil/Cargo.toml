@@ -12,4 +12,5 @@ repository.workspace = true
 oneil_ast = { path = "../oneil_ast" }
 oneil_model_loader = { path = "../oneil_model_loader" }
 oneil_parser = { path = "../oneil_parser" }
+oneil_unit_checker = { path = "../oneil_unit_checker" }
 clap = { version = "4.5.1", features = ["derive"] }

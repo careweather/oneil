@@ -33,4 +33,10 @@ pub enum DevCommands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
     },
+    /// Print the unit map of a file
+    PrintUnitMap {
+        /// Path to the Oneil source file
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+    },
 }
