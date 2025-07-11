@@ -8,7 +8,7 @@ use oneil_ir::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
     python_imports_map: HashMap<PythonPath, PyT>,
-    submodels_map: HashMap<ModelPath, SubmodelT>,
+    submodels_map: HashMap<Identifier, SubmodelT>,
     parameters_map: HashMap<Identifier, ParamT>,
     model_tests_map: HashMap<TestIndex, ModelTestT>,
     submodel_tests_map: HashMap<Identifier, SubmodelTestT>,
@@ -19,7 +19,7 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
 {
     pub fn new(
         python_imports_map: HashMap<PythonPath, PyT>,
-        submodels_map: HashMap<ModelPath, SubmodelT>,
+        submodels_map: HashMap<Identifier, SubmodelT>,
         parameters_map: HashMap<Identifier, ParamT>,
         model_tests_map: HashMap<TestIndex, ModelTestT>,
         submodel_tests_map: HashMap<Identifier, SubmodelTestT>,

@@ -10,7 +10,7 @@ use crate::model_map::{ModelMap, ModelMapEntry};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelMapEntryBuilder<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
     python_imports_map: HashMap<PythonPath, PyT>,
-    submodels_map: HashMap<ModelPath, SubmodelT>,
+    submodels_map: HashMap<Identifier, SubmodelT>,
     parameters_map: HashMap<Identifier, ParamT>,
     model_tests_map: HashMap<TestIndex, ModelTestT>,
     submodel_tests_map: HashMap<Identifier, SubmodelTestT>,
@@ -37,12 +37,12 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
         self.python_imports_map.insert(path, value);
     }
 
-    pub fn add_submodel_data(&mut self, path: ModelPath, value: SubmodelT) {
+    pub fn add_submodel_data(&mut self, id: Identifier, value: SubmodelT) {
         assert!(
-            !self.submodels_map.contains_key(&path),
+            !self.submodels_map.contains_key(&id),
             "submodel already exists"
         );
-        self.submodels_map.insert(path, value);
+        self.submodels_map.insert(id, value);
     }
 
     pub fn add_parameter_data(&mut self, id: Identifier, value: ParamT) {
@@ -150,18 +150,18 @@ impl<
             .add_python_import_data(path, error);
     }
 
-    pub fn add_submodel_data(&mut self, model_path: ModelPath, path: ModelPath, value: SubmodelT) {
+    pub fn add_submodel_data(&mut self, model_path: ModelPath, id: Identifier, value: SubmodelT) {
         self.map
             .entry(model_path)
             .or_insert_with(ModelMapEntryBuilder::new)
-            .add_submodel_data(path, value);
+            .add_submodel_data(id, value);
     }
 
-    pub fn add_submodel_error(&mut self, model_path: ModelPath, path: ModelPath, error: SubmodelE) {
+    pub fn add_submodel_error(&mut self, model_path: ModelPath, id: Identifier, error: SubmodelE) {
         self.error_map
             .entry(model_path)
             .or_insert_with(ModelMapEntryBuilder::new)
-            .add_submodel_data(path, error);
+            .add_submodel_data(id, error);
     }
 
     pub fn add_parameter_data(&mut self, model_path: ModelPath, id: Identifier, value: ParamT) {

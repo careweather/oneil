@@ -301,7 +301,7 @@ impl Model {
     /// assert_eq!(order[0], &Identifier::new("radius")); // dependency first
     /// assert_eq!(order[1], &Identifier::new("area")); // then dependent parameter
     /// ```
-    pub fn get_parameter_evaluation_order(&self) -> Vec<&Identifier> {
+    pub fn get_parameter_evaluation_order(&self) -> Vec<&Parameter> {
         let (evaluation_order, _) = self.parameters.iter().fold(
             (Vec::new(), HashSet::new()),
             |(evaluation_order, visited), (_, parameter)| {
@@ -315,9 +315,9 @@ impl Model {
     fn get_parameter_evaluation_order_recursive<'a>(
         &'a self,
         parameter: &'a Parameter,
-        evaluation_order: Vec<&'a Identifier>,
+        evaluation_order: Vec<&'a Parameter>,
         mut visited: HashSet<&'a Identifier>,
-    ) -> (Vec<&'a Identifier>, HashSet<&'a Identifier>) {
+    ) -> (Vec<&'a Parameter>, HashSet<&'a Identifier>) {
         if visited.contains(&parameter.identifier()) {
             return (evaluation_order, visited);
         }
@@ -336,7 +336,7 @@ impl Model {
             },
         );
 
-        evaluation_order.push(parameter.identifier());
+        evaluation_order.push(parameter);
 
         (evaluation_order, final_visited)
     }
@@ -803,7 +803,7 @@ mod tests {
         );
         let order = model_with_one_param.get_parameter_evaluation_order();
         assert_eq!(order.len(), 1);
-        assert_eq!(order[0], &Identifier::new("radius"));
+        assert_eq!(order[0].identifier(), &Identifier::new("radius"));
     }
 
     #[test]
@@ -842,8 +842,8 @@ mod tests {
         );
         let order = model_with_linear_chain.get_parameter_evaluation_order();
         assert_eq!(order.len(), 2);
-        assert_eq!(order[0], &Identifier::new("radius")); // dependency first
-        assert_eq!(order[1], &Identifier::new("area")); // then dependent parameter
+        assert_eq!(order[0].identifier(), &Identifier::new("radius")); // dependency first
+        assert_eq!(order[1].identifier(), &Identifier::new("area")); // then dependent parameter
     }
 
     #[test]
@@ -914,19 +914,19 @@ mod tests {
         // Check that dependencies come before dependents
         let base_idx = order
             .iter()
-            .position(|&id| id == &Identifier::new("base"))
+            .position(|&param| param.identifier() == &Identifier::new("base"))
             .unwrap();
         let height_idx = order
             .iter()
-            .position(|&id| id == &Identifier::new("height"))
+            .position(|&param| param.identifier() == &Identifier::new("height"))
             .unwrap();
         let area_idx = order
             .iter()
-            .position(|&id| id == &Identifier::new("area"))
+            .position(|&param| param.identifier() == &Identifier::new("area"))
             .unwrap();
         let volume_idx = order
             .iter()
-            .position(|&id| id == &Identifier::new("volume"))
+            .position(|&param| param.identifier() == &Identifier::new("volume"))
             .unwrap();
 
         assert!(base_idx < area_idx);

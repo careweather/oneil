@@ -154,14 +154,14 @@ impl ModelTest {
 /// `SubmodelTest` represents testing done for a single submodel within a
 /// model. It includes:
 ///
-/// - **Submodel Name**: The identifier of the submodel being tested
+/// - **Submodel Identifier**: The identifier of the submodel being tested (within the model)
 /// - **Inputs**: Mapping of test input identifiers to their values
 ///
 /// Submodel tests are used to ensure that individual submodels
 /// work correctly with specific input parameters.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubmodelTest {
-    submodel_name: Identifier,
+    submodel_identifier: Identifier,
     inputs: SubmodelTestInputs,
 }
 
@@ -170,7 +170,7 @@ impl SubmodelTest {
     ///
     /// # Arguments
     ///
-    /// * `submodel_name` - The identifier of the submodel to test
+    /// * `submodel_identifier` - The identifier of the submodel to test
     /// * `inputs` - The input values for the submodel test
     ///
     /// # Example
@@ -187,14 +187,14 @@ impl SubmodelTest {
     ///     SubmodelTestInputs::new(inputs)
     /// );
     /// ```
-    pub fn new(submodel_name: Identifier, inputs: SubmodelTestInputs) -> Self {
+    pub fn new(submodel_identifier: Identifier, inputs: SubmodelTestInputs) -> Self {
         Self {
-            submodel_name,
+            submodel_identifier,
             inputs,
         }
     }
 
-    /// Returns the name of the submodel being tested.
+    /// Returns the identifier of the submodel being tested.
     ///
     /// # Returns
     ///
@@ -211,10 +211,10 @@ impl SubmodelTest {
     ///     SubmodelTestInputs::new(HashMap::new())
     /// );
     ///
-    /// assert_eq!(test.submodel_name().value(), "my_submodel");
+    /// assert_eq!(test.submodel_identifier().value(), "my_submodel");
     /// ```
-    pub fn submodel_name(&self) -> &Identifier {
-        &self.submodel_name
+    pub fn submodel_identifier(&self) -> &Identifier {
+        &self.submodel_identifier
     }
 
     /// Returns the input values for this submodel test.

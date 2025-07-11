@@ -459,7 +459,7 @@ mod tests {
         // check the resolved tests
         assert!(resolved_tests.len() == 1);
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
+        assert_eq!(test.submodel_identifier(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 2);
         assert!(test.inputs().contains_key(&Identifier::new("location")));
         assert!(test.inputs().contains_key(&Identifier::new("height")));
@@ -502,12 +502,12 @@ mod tests {
         assert_eq!(resolved_tests.len(), 2);
 
         let test_0 = &resolved_tests[0];
-        assert_eq!(test_0.submodel_name(), &Identifier::new("sensor1"));
+        assert_eq!(test_0.submodel_identifier(), &Identifier::new("sensor1"));
         assert_eq!(test_0.inputs().len(), 1);
         assert!(test_0.inputs().contains_key(&Identifier::new("param1")));
 
         let test_1 = &resolved_tests[1];
-        assert_eq!(test_1.submodel_name(), &Identifier::new("sensor2"));
+        assert_eq!(test_1.submodel_identifier(), &Identifier::new("sensor2"));
         assert_eq!(test_1.inputs().len(), 1);
         assert!(test_1.inputs().contains_key(&Identifier::new("param2")));
     }
@@ -594,7 +594,7 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor1"));
+        assert_eq!(test.submodel_identifier(), &Identifier::new("sensor1"));
         assert_eq!(test.inputs().len(), 1);
         assert!(test.inputs().contains_key(&Identifier::new("param1")));
     }
@@ -641,7 +641,7 @@ mod tests {
         assert_eq!(resolved_tests.len(), 1);
 
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
+        assert_eq!(test.submodel_identifier(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 2);
         assert!(test.inputs().contains_key(&Identifier::new("calculation")));
         assert!(test.inputs().contains_key(&Identifier::new("is_valid")));
@@ -690,7 +690,7 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
+        assert_eq!(test.submodel_identifier(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 1);
         assert!(test.inputs().contains_key(&Identifier::new("param")));
     }
