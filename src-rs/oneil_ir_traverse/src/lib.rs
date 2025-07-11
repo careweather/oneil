@@ -1,17 +1,15 @@
 use oneil_ir::model::ModelCollection;
 
-use crate::{
-    builder::ModelMapBuilder,
-    model_map::ModelMap,
-    traits::{
-        ModelTestProcess, ParameterProcess, PythonImportProcess, SubmodelProcess,
-        SubmodelTestProcess,
-    },
-};
+use crate::builder::ModelMapBuilder;
 
 mod builder;
 mod model_map;
-mod traits;
+pub mod traits;
+
+pub use model_map::{ModelMap, ModelMapEntry};
+pub use traits::{
+    ModelTestProcess, ParameterProcess, PythonImportProcess, SubmodelProcess, SubmodelTestProcess,
+};
 
 pub fn traverse<PythonImportP, SubmodelP, ParameterP, ModelTestP, SubmodelTestP>(
     model_collection: &ModelCollection,
