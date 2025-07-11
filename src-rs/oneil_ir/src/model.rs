@@ -545,12 +545,12 @@ impl ModelCollection {
     /// ));
     ///
     /// let collection = ModelCollection::new(initial_models, models);
-    /// let order = collection.model_evaluation_order();
+    /// let order = collection.get_model_evaluation_order();
     /// assert_eq!(order.len(), 2);
     /// assert_eq!(order[0], &ModelPath::new("sub")); // dependency first
     /// assert_eq!(order[1], &ModelPath::new("main")); // then main model
     /// ```
-    pub fn model_evaluation_order(&self) -> Vec<&ModelPath> {
+    pub fn get_model_evaluation_order(&self) -> Vec<&ModelPath> {
         let (evaluation_order, _) = self.initial_models().iter().fold(
             (Vec::new(), HashSet::new()),
             |(evaluation_order, visited), model_path| {
@@ -1052,7 +1052,7 @@ mod tests {
     #[test]
     fn test_model_collection_model_evaluation_order_empty() {
         let collection = ModelCollection::new(HashSet::new(), HashMap::new());
-        let order = collection.model_evaluation_order();
+        let order = collection.get_model_evaluation_order();
         assert!(order.is_empty());
     }
 
@@ -1072,7 +1072,7 @@ mod tests {
             ),
         );
         let collection = ModelCollection::new(initial_models, models);
-        let order = collection.model_evaluation_order();
+        let order = collection.get_model_evaluation_order();
         assert_eq!(order.len(), 1);
         assert_eq!(order[0], &ModelPath::new("main"));
     }
@@ -1107,7 +1107,7 @@ mod tests {
             ),
         );
         let collection = ModelCollection::new(initial_models, models);
-        let order = collection.model_evaluation_order();
+        let order = collection.get_model_evaluation_order();
         assert_eq!(order.len(), 2);
         assert_eq!(order[0], &ModelPath::new("sub")); // dependency first
         assert_eq!(order[1], &ModelPath::new("main")); // then main model
@@ -1167,7 +1167,7 @@ mod tests {
             ),
         );
         let collection = ModelCollection::new(initial_models, models);
-        let order = collection.model_evaluation_order();
+        let order = collection.get_model_evaluation_order();
         assert_eq!(order.len(), 4);
 
         // Check that dependencies come before dependents
@@ -1213,7 +1213,7 @@ mod tests {
             ),
         );
         let collection = ModelCollection::new(initial_models, models);
-        let order = collection.model_evaluation_order();
+        let order = collection.get_model_evaluation_order();
         // Should still return the model, even with circular dependency
         assert_eq!(order.len(), 1);
         assert_eq!(order[0], &ModelPath::new("circular"));

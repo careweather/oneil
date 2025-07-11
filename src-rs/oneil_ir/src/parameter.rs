@@ -172,6 +172,156 @@ impl Parameter {
     pub fn dependencies(&self) -> &HashSet<Identifier> {
         &self.dependencies
     }
+
+    /// Returns a reference to the value of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the ParameterValue containing either a simple expression or piecewise function.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use std::collections::HashSet;
+    ///
+    /// let param = Parameter::new(
+    ///     HashSet::new(),
+    ///     Identifier::new("x"),
+    ///     ParameterValue::simple(Expr::literal(Literal::number(42.0)), None),
+    ///     Limits::default(),
+    ///     false,
+    ///     TraceLevel::None,
+    /// );
+    ///
+    /// match param.value() {
+    ///     ParameterValue::Simple(expr, _) => {
+    ///         assert_eq!(expr, &Expr::literal(Literal::number(42.0)));
+    ///     },
+    ///     _ => panic!("Expected simple value")
+    /// }
+    /// ```
+    pub fn value(&self) -> &ParameterValue {
+        &self.value
+    }
+
+    /// Returns a reference to the limits for this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the Limits struct containing min/max bounds.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use std::collections::HashSet;
+    ///
+    /// let limits = Limits::continuous(Expr::literal(Literal::number(0.0)), Expr::literal(Literal::number(100.0)));
+    /// let param = Parameter::new(
+    ///     HashSet::new(),
+    ///     Identifier::new("x"),
+    ///     ParameterValue::simple(Expr::literal(Literal::number(42.0)), None),
+    ///     limits.clone(),
+    ///     false,
+    ///     TraceLevel::None,
+    /// );
+    ///
+    /// assert_eq!(param.limits(), &limits);
+    /// ```
+    pub fn limits(&self) -> &Limits {
+        &self.limits
+    }
+
+    /// Returns whether this parameter is marked as a performance parameter.
+    ///
+    /// # Returns
+    ///
+    /// A boolean indicating if this is a performance parameter.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use std::collections::HashSet;
+    ///
+    /// let param = Parameter::new(
+    ///     HashSet::new(),
+    ///     Identifier::new("x"),
+    ///     ParameterValue::simple(Expr::literal(Literal::number(42.0)), None),
+    ///     Limits::default(),
+    ///     true,
+    ///     TraceLevel::None,
+    /// );
+    ///
+    /// assert!(param.is_performance());
+    /// ```
+    pub fn is_performance(&self) -> bool {
+        self.is_performance
+    }
+
+    /// Returns the trace level for this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the TraceLevel enum indicating debug trace settings.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use std::collections::HashSet;
+    ///
+    /// let param = Parameter::new(
+    ///     HashSet::new(),
+    ///     Identifier::new("x"),
+    ///     ParameterValue::simple(Expr::literal(Literal::number(42.0)), None),
+    ///     Limits::default(),
+    ///     false,
+    ///     TraceLevel::Debug,
+    /// );
+    ///
+    /// assert_eq!(param.trace_level(), &TraceLevel::Debug);
+    /// ```
+    pub fn trace_level(&self) -> &TraceLevel {
+        &self.trace_level
+    }
+
+    /// Returns a reference to the optional unit of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the optional CompositeUnit for this parameter.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel, unit::{CompositeUnit, Unit}};
+    /// use std::collections::HashSet;
+    ///
+    /// let units = vec![
+    ///     Unit::new("m".to_string(), 2.0),  // meters squared
+    ///     Unit::new("kg".to_string(), 1.0), // kilograms
+    ///     Unit::new("s".to_string(), -2.0), // per second squared
+    /// ];
+    /// let composite = CompositeUnit::new(units);
+    ///
+    /// let param = Parameter::new(
+    ///     HashSet::new(),
+    ///     Identifier::new("length"),
+    ///     ParameterValue::simple(Expr::literal(Literal::number(10.0)), Some(composite.clone())),
+    ///     Limits::default(),
+    ///     false,
+    ///     TraceLevel::None,
+    /// );
+    ///
+    /// assert_eq!(param.unit(), Some(&composite));
+    /// ```
+    pub fn unit(&self) -> Option<&CompositeUnit> {
+        match &self.value {
+            ParameterValue::Simple(_, unit) | ParameterValue::Piecewise(_, unit) => unit.as_ref(),
+        }
+    }
 }
 
 /// The value of a parameter, which can be either a simple expression or a piecewise function.
