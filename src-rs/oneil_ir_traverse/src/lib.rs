@@ -13,14 +13,13 @@ mod builder;
 mod model_map;
 mod traits;
 
-pub fn traverse<PythonImportP, SubmodelP, ParameterP, ModelTestP, SubmodelTestP, X>(
+pub fn traverse<PythonImportP, SubmodelP, ParameterP, ModelTestP, SubmodelTestP>(
     model_collection: &ModelCollection,
     python_import_process: PythonImportP,
     submodel_process: SubmodelP,
     parameter_process: ParameterP,
     model_test_process: ModelTestP,
     submodel_test_process: SubmodelTestP,
-    extra_context: &X,
 ) -> Result<
     ModelMap<
         PythonImportP::Output,
@@ -47,11 +46,11 @@ pub fn traverse<PythonImportP, SubmodelP, ParameterP, ModelTestP, SubmodelTestP,
     ),
 >
 where
-    PythonImportP: PythonImportProcess<X>,
-    SubmodelP: SubmodelProcess<X>,
-    ParameterP: ParameterProcess<X>,
-    ModelTestP: ModelTestProcess<X>,
-    SubmodelTestP: SubmodelTestProcess<X>,
+    PythonImportP: PythonImportProcess,
+    SubmodelP: SubmodelProcess,
+    ParameterP: ParameterProcess,
+    ModelTestP: ModelTestProcess,
+    SubmodelTestP: SubmodelTestProcess,
 {
     // create the model map builder
     let model_map_builder = ModelMapBuilder::new();
@@ -74,7 +73,7 @@ where
                     .iter()
                     .fold(builder, |mut builder, python_path| {
                         // process the python import
-                        let result = python_import_process.process(python_path, extra_context);
+                        let result = python_import_process.process(python_path);
 
                         // add the python import to the model map
                         match result {
@@ -97,8 +96,7 @@ where
                 builder,
                 |mut builder, (submodel_id, submodel_path)| {
                     // process the submodel
-                    let result =
-                        submodel_process.process(submodel_id, submodel_path, extra_context);
+                    let result = submodel_process.process(submodel_id, submodel_path);
 
                     // add the submodel to the model map
                     match result {
@@ -122,7 +120,7 @@ where
                 builder,
                 |mut builder, parameter| {
                     // process the parameter
-                    let result = parameter_process.process(parameter, extra_context);
+                    let result = parameter_process.process(parameter);
 
                     // add the parameter to the model map
                     match result {
@@ -146,7 +144,7 @@ where
                 builder,
                 |mut builder, (test_index, model_test)| {
                     // process the model test
-                    let result = model_test_process.process(test_index, model_test, extra_context);
+                    let result = model_test_process.process(test_index, model_test);
 
                     // add the model test to the model map
                     match result {
@@ -170,7 +168,7 @@ where
                 builder,
                 |mut builder, submodel_test| {
                     // process the submodel test
-                    let result = submodel_test_process.process(submodel_test, extra_context);
+                    let result = submodel_test_process.process(submodel_test);
 
                     // add the submodel test to the model map
                     match result {

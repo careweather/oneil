@@ -6,32 +6,24 @@ use oneil_ir::{
 
 // X is generic because we want to be able to use the () implementation with any
 // extra context
-pub trait PythonImportProcess<X> {
+pub trait PythonImportProcess {
     type Output;
     type Error;
 
-    fn process(
-        &self,
-        import_path: &PythonPath,
-        extra_context: &X,
-    ) -> Result<Self::Output, Self::Error>;
+    fn process(&self, import_path: &PythonPath) -> Result<Self::Output, Self::Error>;
 }
 
 /// A default implementation for when we don't care about python imports
-impl<X> PythonImportProcess<X> for () {
+impl PythonImportProcess for () {
     type Output = ();
     type Error = ();
 
-    fn process(
-        &self,
-        _import_path: &PythonPath,
-        _extra_context: &X,
-    ) -> Result<Self::Output, Self::Error> {
+    fn process(&self, _import_path: &PythonPath) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
 }
 
-pub trait SubmodelProcess<X> {
+pub trait SubmodelProcess {
     type Output;
     type Error;
 
@@ -39,12 +31,11 @@ pub trait SubmodelProcess<X> {
         &self,
         submodel_id: &Identifier,
         submodel_path: &ModelPath,
-        extra_context: &X,
     ) -> Result<Self::Output, Self::Error>;
 }
 
 /// A default implementation for when we don't care about submodels
-impl<X> SubmodelProcess<X> for () {
+impl SubmodelProcess for () {
     type Output = ();
     type Error = ();
 
@@ -52,38 +43,29 @@ impl<X> SubmodelProcess<X> for () {
         &self,
         _submodel_id: &Identifier,
         _submodel_path: &ModelPath,
-        _extra_context: &X,
     ) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
 }
 
-pub trait ParameterProcess<X> {
+pub trait ParameterProcess {
     type Output;
     type Error;
 
-    fn process(
-        &self,
-        parameter: &Parameter,
-        extra_context: &X,
-    ) -> Result<Self::Output, Self::Error>;
+    fn process(&self, parameter: &Parameter) -> Result<Self::Output, Self::Error>;
 }
 
 /// A default implementation for when we don't care about parameters
-impl<X> ParameterProcess<X> for () {
+impl ParameterProcess for () {
     type Output = ();
     type Error = ();
 
-    fn process(
-        &self,
-        _parameter: &Parameter,
-        _extra_context: &X,
-    ) -> Result<Self::Output, Self::Error> {
+    fn process(&self, _parameter: &Parameter) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
 }
 
-pub trait ModelTestProcess<X> {
+pub trait ModelTestProcess {
     type Output;
     type Error;
 
@@ -91,12 +73,11 @@ pub trait ModelTestProcess<X> {
         &self,
         test_index: &TestIndex,
         model_test: &ModelTest,
-        extra_context: &X,
     ) -> Result<Self::Output, Self::Error>;
 }
 
 /// A default implementation for when we don't care about model tests
-impl<X> ModelTestProcess<X> for () {
+impl ModelTestProcess for () {
     type Output = ();
     type Error = ();
 
@@ -104,30 +85,24 @@ impl<X> ModelTestProcess<X> for () {
         &self,
         _test_index: &TestIndex,
         _model_test: &ModelTest,
-        _extra_context: &X,
     ) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
 }
 
-pub trait SubmodelTestProcess<X> {
+pub trait SubmodelTestProcess {
     type Output;
     type Error;
 
-    fn process(&self, input: &SubmodelTest, extra_context: &X)
-    -> Result<Self::Output, Self::Error>;
+    fn process(&self, submodel_test: &SubmodelTest) -> Result<Self::Output, Self::Error>;
 }
 
 /// A default implementation for when we don't care about submodel tests
-impl<X> SubmodelTestProcess<X> for () {
+impl SubmodelTestProcess for () {
     type Output = ();
     type Error = ();
 
-    fn process(
-        &self,
-        _input: &SubmodelTest,
-        _extra_context: &X,
-    ) -> Result<Self::Output, Self::Error> {
+    fn process(&self, _submodel_test: &SubmodelTest) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
 }
