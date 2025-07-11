@@ -1,16 +1,16 @@
-//! Model test resolution for the Oneil model loader
+//! Test resolution for the Oneil model loader
 //!
-//! This module provides functionality for resolving model tests and submodel tests
-//! in Oneil models. Test resolution involves processing test declarations and
-//! submodel test inputs to create executable test structures.
+//! This module provides functionality for resolving tests in Oneil models.
+//! Test resolution involves processing test declarations and submodel test
+//! inputs to create executable test structures.
 //!
 //! # Overview
 //!
 //! Tests in Oneil allow models to define validation logic and test scenarios.
 //! This module handles two types of tests:
 //!
-//! ## Model Tests
-//! Model tests are defined using the `test` declaration syntax:
+//! ## Tests
+//! Tests are defined using the `test` declaration syntax:
 //! ```oneil
 //! test: x > 0
 //! test {x, y}: x + y == 10
@@ -46,21 +46,21 @@ use std::collections::{HashMap, HashSet};
 use oneil_ast as ast;
 use oneil_ir::{
     reference::Identifier,
-    test::{ModelTest, SubmodelTest, SubmodelTestInputs, TestIndex},
+    test::{SubmodelTest, SubmodelTestInputs, Test, TestIndex},
 };
 
 use crate::{
-    error::{self, ModelTestResolutionError, SubmodelTestInputResolutionError},
+    error::{self, SubmodelTestInputResolutionError, TestResolutionError},
     loader::resolver::{
         ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
         trace_level::resolve_trace_level,
     },
 };
 
-/// Resolves model tests from AST test declarations.
+/// Resolves tests from AST test declarations.
 ///
 /// This function processes a collection of `ast::Test` declarations and resolves
-/// them into executable `ModelTest` structures with proper variable scoping and
+/// them into executable `Test` structures with proper variable scoping and
 /// error handling.
 ///
 /// # Arguments
@@ -73,21 +73,21 @@ use crate::{
 /// # Returns
 ///
 /// A tuple containing:
-/// * `HashMap<TestIndex, ModelTest>` - Successfully resolved model tests mapped to their indices
-/// * `HashMap<TestIndex, Vec<ModelTestResolutionError>>` - Any resolution errors that occurred
+/// * `HashMap<TestIndex, Test>` - Successfully resolved tests mapped to their indices
+/// * `HashMap<TestIndex, Vec<TestResolutionError>>` - Any resolution errors that occurred
 ///
 /// # Error Handling
 ///
 /// All errors are collected and returned rather than causing the function to fail.
 /// Each test is processed independently, so errors in one test don't affect others.
-pub fn resolve_model_tests(
+pub fn resolve_tests(
     tests: Vec<ast::Test>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
 ) -> (
-    HashMap<TestIndex, ModelTest>,
-    HashMap<TestIndex, Vec<ModelTestResolutionError>>,
+    HashMap<TestIndex, Test>,
+    HashMap<TestIndex, Vec<TestResolutionError>>,
 ) {
     let tests = tests.into_iter().enumerate().map(|(test_index, test)| {
         let test_index = TestIndex::new(test_index);
@@ -112,7 +112,7 @@ pub fn resolve_model_tests(
         )
         .map_err(|errors| (test_index.clone(), error::convert_errors(errors)))?;
 
-        Ok((test_index, ModelTest::new(trace_level, inputs, test_expr)))
+        Ok((test_index, Test::new(trace_level, inputs, test_expr)))
     });
 
     error::split_ok_and_errors(tests)
@@ -210,12 +210,12 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_empty() {
-        // create the model tests
+    fn test_resolve_tests_empty() {
+        // create the tests
         let tests = vec![];
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
@@ -230,8 +230,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_basic() {
-        // create the model tests
+    fn test_resolve_tests_basic() {
+        // create the tests
         let tests = vec![
             // test: true
             Test {
@@ -265,8 +265,8 @@ mod tests {
             },
         ];
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
@@ -296,8 +296,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_with_debug_trace() {
-        // create the model tests
+    fn test_resolve_tests_with_debug_trace() {
+        // create the tests
         let tests = vec![
             // ** test {x}: true
             Test {
@@ -307,8 +307,8 @@ mod tests {
             },
         ];
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
@@ -327,8 +327,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_with_undefined_variable() {
-        // create the model tests
+    fn test_resolve_tests_with_undefined_variable() {
+        // create the tests
         let tests = vec![
             // test {x}: undefined_var
             Test {
@@ -338,8 +338,8 @@ mod tests {
             },
         ];
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
@@ -353,7 +353,7 @@ mod tests {
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
-            ModelTestResolutionError::new(VariableResolutionError::undefined_parameter(
+            TestResolutionError::new(VariableResolutionError::undefined_parameter(
                 Identifier::new("undefined_var"),
             )),
         );
@@ -363,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_mixed_success_and_error() {
+    fn test_resolve_tests_mixed_success_and_error() {
         let tests = vec![
             // test {x}: true
             Test {
@@ -379,7 +379,7 @@ mod tests {
             },
         ];
 
-        let (resolved_tests, errors) = resolve_model_tests(
+        let (resolved_tests, errors) = resolve_tests(
             tests,
             &create_empty_parameter_info(),
             &create_empty_submodel_info(),
@@ -392,7 +392,7 @@ mod tests {
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
-            ModelTestResolutionError::new(VariableResolutionError::undefined_parameter(
+            TestResolutionError::new(VariableResolutionError::undefined_parameter(
                 Identifier::new("undefined_var"),
             )),
         );

@@ -13,19 +13,19 @@ use oneil_ir::{
 /// A collection of processed data for a single model.
 ///
 /// This struct holds the results of processing all components within a model:
-/// python imports, submodels, parameters, model tests, and submodel tests.
+/// python imports, submodels, parameters, tests, and submodel tests.
 /// Each component type is stored in its own map for efficient lookup.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
+pub struct ModelMapEntry<PyT, SubmodelT, ParamT, TestT, SubmodelTestT> {
     python_imports_map: HashMap<PythonPath, PyT>,
     submodels_map: HashMap<Identifier, SubmodelT>,
     parameters_map: HashMap<Identifier, ParamT>,
-    model_tests_map: HashMap<TestIndex, ModelTestT>,
+    tests_map: HashMap<TestIndex, TestT>,
     submodel_tests_map: HashMap<Identifier, SubmodelTestT>,
 }
 
-impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
-    ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
+impl<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
+    ModelMapEntry<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
 {
     /// Creates a new `ModelMapEntry` with the provided component maps.
     ///
@@ -34,20 +34,20 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
     /// * `python_imports_map` - Map of python import paths to their processed data
     /// * `submodels_map` - Map of submodel identifiers to their processed data
     /// * `parameters_map` - Map of parameter identifiers to their processed data
-    /// * `model_tests_map` - Map of test indices to their processed data
+    /// * `tests_map` - Map of test indices to their processed data
     /// * `submodel_tests_map` - Map of submodel test identifiers to their processed data
     pub fn new(
         python_imports_map: HashMap<PythonPath, PyT>,
         submodels_map: HashMap<Identifier, SubmodelT>,
         parameters_map: HashMap<Identifier, ParamT>,
-        model_tests_map: HashMap<TestIndex, ModelTestT>,
+        tests_map: HashMap<TestIndex, TestT>,
         submodel_tests_map: HashMap<Identifier, SubmodelTestT>,
     ) -> Self {
         Self {
             python_imports_map,
             submodels_map,
             parameters_map,
-            model_tests_map,
+            tests_map,
             submodel_tests_map,
         }
     }
@@ -58,12 +58,12 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
 /// This struct maps model paths to their corresponding `ModelMapEntry`,
 /// allowing efficient lookup of processed data for any model in the collection.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
-    map: HashMap<ModelPath, ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>>,
+pub struct ModelMap<PyT, SubmodelT, ParamT, TestT, SubmodelTestT> {
+    map: HashMap<ModelPath, ModelMapEntry<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>>,
 }
 
-impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
-    ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
+impl<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
+    ModelMap<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
 {
     /// Creates a new `ModelMap` with the provided model entries.
     ///
@@ -71,7 +71,7 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
     ///
     /// * `map` - HashMap mapping model paths to their processed data entries
     pub fn new(
-        map: HashMap<ModelPath, ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>>,
+        map: HashMap<ModelPath, ModelMapEntry<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>>,
     ) -> Self {
         Self { map }
     }

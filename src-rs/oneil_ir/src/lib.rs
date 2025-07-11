@@ -72,7 +72,7 @@
 //!     HashSet::new(), // no Python imports
 //!     HashMap::new(),  // no submodels
 //!     ParameterCollection::new(params),
-//!     HashMap::new(),  // no model tests
+//!     HashMap::new(),  // no tests
 //!     Vec::new(),      // no submodel tests
 //! );
 //! ```

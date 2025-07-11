@@ -1,12 +1,12 @@
 //! Traits for processing model components during traversal.
 //!
 //! This module defines the traits that must be implemented to process each component
-//! (python imports, submodels, parameters, model tests, submodel tests) during model traversal.
+//! (python imports, submodels, parameters, tests, submodel tests) during model traversal.
 
 use oneil_ir::{
     parameter::Parameter,
     reference::{Identifier, ModelPath, PythonPath},
-    test::{ModelTest, SubmodelTest, TestIndex},
+    test::{SubmodelTest, Test, TestIndex},
 };
 
 /// Trait for processing python imports during model traversal.
@@ -117,44 +117,36 @@ impl ParameterProcess for () {
     }
 }
 
-/// Trait for processing model tests during model traversal.
+/// Trait for processing tests during model traversal.
 ///
-/// Implementations of this trait define how model tests should be processed
+/// Implementations of this trait define how tests should be processed
 /// when encountered during model traversal. The processor can return either
 /// successful output data or an error.
-pub trait ModelTestProcess {
+pub trait TestProcess {
     /// The type of output data produced by successful processing.
     type Output;
     /// The type of error that can occur during processing.
     type Error;
 
-    /// Processes a model test.
+    /// Processes a test.
     ///
     /// # Arguments
     ///
     /// * `test_index` - The index of the test
-    /// * `model_test` - The model test to process
+    /// * `test` - The test to process
     ///
     /// # Returns
     ///
     /// Returns `Ok(output)` if processing succeeds, or `Err(error)` if it fails.
-    fn process(
-        &self,
-        test_index: &TestIndex,
-        model_test: &ModelTest,
-    ) -> Result<Self::Output, Self::Error>;
+    fn process(&self, test_index: &TestIndex, test: &Test) -> Result<Self::Output, Self::Error>;
 }
 
-/// A default implementation for when we don't care about model tests
-impl ModelTestProcess for () {
+/// A default implementation for when we don't care about tests
+impl TestProcess for () {
     type Output = ();
     type Error = ();
 
-    fn process(
-        &self,
-        _test_index: &TestIndex,
-        _model_test: &ModelTest,
-    ) -> Result<Self::Output, Self::Error> {
+    fn process(&self, _test_index: &TestIndex, _test: &Test) -> Result<Self::Output, Self::Error> {
         Ok(())
     }
 }

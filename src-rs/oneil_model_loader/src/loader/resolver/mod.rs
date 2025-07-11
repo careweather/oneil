@@ -50,8 +50,8 @@ mod variable;
 
 pub use parameter::resolve_parameters;
 pub use submodel::resolve_submodels_and_tests;
-pub use test::resolve_model_tests;
 pub use test::resolve_submodel_tests;
+pub use test::resolve_tests;
 
 /// Type alias for parameter information maps used during resolution.
 ///

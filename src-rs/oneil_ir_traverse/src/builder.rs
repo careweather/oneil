@@ -15,19 +15,19 @@ use crate::model_map::{ModelMap, ModelMapEntry};
 /// Builder for constructing a `ModelMapEntry` incrementally.
 ///
 /// This struct provides methods to add processed data for different component types
-/// (python imports, submodels, parameters, model tests, submodel tests) to a single model.
+/// (python imports, submodels, parameters, tests, submodel tests) to a single model.
 /// It ensures that each component is only added once by using assertions.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelMapEntryBuilder<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
+pub struct ModelMapEntryBuilder<PyT, SubmodelT, ParamT, TestT, SubmodelTestT> {
     python_imports_map: HashMap<PythonPath, PyT>,
     submodels_map: HashMap<Identifier, SubmodelT>,
     parameters_map: HashMap<Identifier, ParamT>,
-    model_tests_map: HashMap<TestIndex, ModelTestT>,
+    tests_map: HashMap<TestIndex, TestT>,
     submodel_tests_map: HashMap<Identifier, SubmodelTestT>,
 }
 
-impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
-    ModelMapEntryBuilder<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
+impl<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
+    ModelMapEntryBuilder<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
 {
     /// Creates a new empty `ModelMapEntryBuilder`.
     pub fn new() -> Self {
@@ -35,7 +35,7 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
             python_imports_map: HashMap::new(),
             submodels_map: HashMap::new(),
             parameters_map: HashMap::new(),
-            model_tests_map: HashMap::new(),
+            tests_map: HashMap::new(),
             submodel_tests_map: HashMap::new(),
         }
     }
@@ -94,22 +94,19 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
         self.parameters_map.insert(id, value);
     }
 
-    /// Adds processed data for a model test.
+    /// Adds processed data for a test.
     ///
     /// # Arguments
     ///
     /// * `index` - The test index
-    /// * `value` - The processed data for this model test
+    /// * `value` - The processed data for this test
     ///
     /// # Panics
     ///
-    /// Panics if a model test with the same index has already been added.
-    pub fn add_model_test_data(&mut self, index: TestIndex, value: ModelTestT) {
-        assert!(
-            !self.model_tests_map.contains_key(&index),
-            "model test already exists"
-        );
-        self.model_tests_map.insert(index, value);
+    /// Panics if a test with the same index has already been added.
+    pub fn add_test_data(&mut self, index: TestIndex, value: TestT) {
+        assert!(!self.tests_map.contains_key(&index), "test already exists");
+        self.tests_map.insert(index, value);
     }
 
     /// Adds processed data for a submodel test.
@@ -131,16 +128,16 @@ impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
     }
 }
 
-impl<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
-    Into<ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>>
-    for ModelMapEntryBuilder<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>
+impl<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
+    Into<ModelMapEntry<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>>
+    for ModelMapEntryBuilder<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>
 {
-    fn into(self) -> ModelMapEntry<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT> {
+    fn into(self) -> ModelMapEntry<PyT, SubmodelT, ParamT, TestT, SubmodelTestT> {
         ModelMapEntry::new(
             self.python_imports_map,
             self.submodels_map,
             self.parameters_map,
-            self.model_tests_map,
+            self.tests_map,
             self.submodel_tests_map,
         )
     }
@@ -159,29 +156,17 @@ pub struct ModelMapBuilder<
     SubmodelE,
     ParamT,
     ParamE,
-    ModelTestT,
-    ModelTestE,
+    TestT,
+    TestE,
     SubmodelTestT,
     SubmodelTestE,
 > {
-    map:
-        HashMap<ModelPath, ModelMapEntryBuilder<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>>,
+    map: HashMap<ModelPath, ModelMapEntryBuilder<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>>,
     error_map:
-        HashMap<ModelPath, ModelMapEntryBuilder<PyE, SubmodelE, ParamE, ModelTestE, SubmodelTestE>>,
+        HashMap<ModelPath, ModelMapEntryBuilder<PyE, SubmodelE, ParamE, TestE, SubmodelTestE>>,
 }
 
-impl<
-    PyT,
-    PyE,
-    SubmodelT,
-    SubmodelE,
-    ParamT,
-    ParamE,
-    ModelTestT,
-    ModelTestE,
-    SubmodelTestT,
-    SubmodelTestE,
->
+impl<PyT, PyE, SubmodelT, SubmodelE, ParamT, ParamE, TestT, TestE, SubmodelTestT, SubmodelTestE>
     ModelMapBuilder<
         PyT,
         PyE,
@@ -189,8 +174,8 @@ impl<
         SubmodelE,
         ParamT,
         ParamE,
-        ModelTestT,
-        ModelTestE,
+        TestT,
+        TestE,
         SubmodelTestT,
         SubmodelTestE,
     >
@@ -287,42 +272,32 @@ impl<
             .add_parameter_data(id, error);
     }
 
-    /// Adds successful processed data for a model test.
+    /// Adds successful processed data for a test.
     ///
     /// # Arguments
     ///
     /// * `model_path` - The path of the model containing the test
     /// * `index` - The test index
-    /// * `value` - The processed data for this model test
-    pub fn add_model_test_data(
-        &mut self,
-        model_path: ModelPath,
-        index: TestIndex,
-        value: ModelTestT,
-    ) {
+    /// * `value` - The processed data for this test
+    pub fn add_test_data(&mut self, model_path: ModelPath, index: TestIndex, value: TestT) {
         self.map
             .entry(model_path)
             .or_insert_with(ModelMapEntryBuilder::new)
-            .add_model_test_data(index, value);
+            .add_test_data(index, value);
     }
 
-    /// Adds error data for a model test.
+    /// Adds error data for a test.
     ///
     /// # Arguments
     ///
     /// * `model_path` - The path of the model containing the test
     /// * `index` - The test index
     /// * `error` - The error that occurred during processing
-    pub fn add_model_test_error(
-        &mut self,
-        model_path: ModelPath,
-        index: TestIndex,
-        error: ModelTestE,
-    ) {
+    pub fn add_test_error(&mut self, model_path: ModelPath, index: TestIndex, error: TestE) {
         self.error_map
             .entry(model_path)
             .or_insert_with(ModelMapEntryBuilder::new)
-            .add_model_test_data(index, error);
+            .add_test_data(index, error);
     }
 
     /// Adds successful processed data for a submodel test.
@@ -364,18 +339,8 @@ impl<
     }
 }
 
-impl<
-    PyT,
-    PyE,
-    SubmodelT,
-    SubmodelE,
-    ParamT,
-    ParamE,
-    ModelTestT,
-    ModelTestE,
-    SubmodelTestT,
-    SubmodelTestE,
-> TryInto<ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>>
+impl<PyT, PyE, SubmodelT, SubmodelE, ParamT, ParamE, TestT, TestE, SubmodelTestT, SubmodelTestE>
+    TryInto<ModelMap<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>>
     for ModelMapBuilder<
         PyT,
         PyE,
@@ -383,20 +348,20 @@ impl<
         SubmodelE,
         ParamT,
         ParamE,
-        ModelTestT,
-        ModelTestE,
+        TestT,
+        TestE,
         SubmodelTestT,
         SubmodelTestE,
     >
 {
     type Error = (
-        ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>,
-        ModelMap<PyE, SubmodelE, ParamE, ModelTestE, SubmodelTestE>,
+        ModelMap<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>,
+        ModelMap<PyE, SubmodelE, ParamE, TestE, SubmodelTestE>,
     );
 
     fn try_into(
         self,
-    ) -> Result<ModelMap<PyT, SubmodelT, ParamT, ModelTestT, SubmodelTestT>, Self::Error> {
+    ) -> Result<ModelMap<PyT, SubmodelT, ParamT, TestT, SubmodelTestT>, Self::Error> {
         if self.error_map.is_empty() {
             let map: HashMap<_, _> = self.map.into_iter().map(|(k, v)| (k, v.into())).collect();
 

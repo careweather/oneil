@@ -227,7 +227,7 @@ mod tests {
             HashSet::new(),                                                // python_imports
             submodel_map,                                                  // submodels
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()), // parameters
-            HashMap::new(),                                                // model_tests
+            HashMap::new(),                                                // tests
             Vec::new(),                                                    // submodel_tests
         )
     }

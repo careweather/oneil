@@ -36,7 +36,7 @@ pub struct ResolutionErrors {
     import_errors: HashMap<PythonPath, ImportResolutionError>,
     submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
     parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
-    model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
+    test_resolution_errors: HashMap<TestIndex, Vec<TestResolutionError>>,
     submodel_test_resolution_errors: HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>,
 }
 
@@ -48,7 +48,7 @@ impl ResolutionErrors {
     /// * `import_errors` - Errors that occurred during Python import validation
     /// * `submodel_resolution_errors` - Errors that occurred during submodel resolution
     /// * `parameter_resolution_errors` - Errors that occurred during parameter resolution
-    /// * `model_test_resolution_errors` - Errors that occurred during model test resolution
+    /// * `test_resolution_errors` - Errors that occurred during test resolution
     /// * `submodel_test_resolution_errors` - Errors that occurred during submodel test resolution
     ///
     /// # Returns
@@ -58,14 +58,14 @@ impl ResolutionErrors {
         import_errors: HashMap<PythonPath, ImportResolutionError>,
         submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
         parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
-        model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
+        test_resolution_errors: HashMap<TestIndex, Vec<TestResolutionError>>,
         submodel_test_resolution_errors: HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>,
     ) -> Self {
         Self {
             import_errors,
             submodel_resolution_errors,
             parameter_resolution_errors,
-            model_test_resolution_errors,
+            test_resolution_errors,
             submodel_test_resolution_errors,
         }
     }
@@ -79,7 +79,7 @@ impl ResolutionErrors {
         self.import_errors.is_empty()
             && self.submodel_resolution_errors.is_empty()
             && self.parameter_resolution_errors.is_empty()
-            && self.model_test_resolution_errors.is_empty()
+            && self.test_resolution_errors.is_empty()
             && self.submodel_test_resolution_errors.is_empty()
     }
 }
@@ -194,15 +194,15 @@ impl From<VariableResolutionError> for ParameterResolutionError {
     }
 }
 
-/// Represents an error that occurred during model test resolution.
+/// Represents an error that occurred during test resolution.
 ///
-/// This error type is used when a model test cannot be resolved, typically due
+/// This error type is used when a test cannot be resolved, typically due
 /// to variable resolution errors within the test's expressions.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelTestResolutionError(VariableResolutionError);
+pub struct TestResolutionError(VariableResolutionError);
 
-impl ModelTestResolutionError {
-    /// Creates a new model test resolution error.
+impl TestResolutionError {
+    /// Creates a new test resolution error.
     ///
     /// # Arguments
     ///
@@ -210,13 +210,13 @@ impl ModelTestResolutionError {
     ///
     /// # Returns
     ///
-    /// A new `ModelTestResolutionError` instance.
+    /// A new `TestResolutionError` instance.
     pub fn new(error: VariableResolutionError) -> Self {
         Self(error)
     }
 }
 
-impl From<VariableResolutionError> for ModelTestResolutionError {
+impl From<VariableResolutionError> for TestResolutionError {
     fn from(error: VariableResolutionError) -> Self {
         Self::new(error)
     }

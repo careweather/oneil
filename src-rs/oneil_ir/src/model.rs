@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
-    test::{ModelTest, SubmodelTest, TestIndex},
+    test::{SubmodelTest, Test, TestIndex},
 };
 
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
@@ -29,7 +29,7 @@ pub struct Model {
     python_imports: HashSet<PythonPath>,
     submodels: HashMap<Identifier, ModelPath>,
     parameters: ParameterCollection,
-    model_tests: HashMap<TestIndex, ModelTest>,
+    tests: HashMap<TestIndex, Test>,
     submodel_tests: Vec<SubmodelTest>,
 }
 
@@ -41,7 +41,7 @@ impl Model {
     /// * `python_imports` - Set of Python modules to import
     /// * `submodels` - Mapping of submodel identifiers to their model paths
     /// * `parameters` - Collection of parameters defined in this model
-    /// * `model_tests` - Tests for the entire model
+    /// * `tests` - Tests for the entire model
     /// * `submodel_tests` - Tests for individual submodels
     ///
     /// # Example
@@ -54,7 +54,7 @@ impl Model {
     ///     HashSet::new(), // no Python imports
     ///     HashMap::new(),  // no submodels
     ///     ParameterCollection::new(HashMap::new()),
-    ///     HashMap::new(),  // no model tests
+    ///     HashMap::new(),  // no tests
     ///     Vec::new(),      // no submodel tests
     /// );
     /// ```
@@ -62,14 +62,14 @@ impl Model {
         python_imports: HashSet<PythonPath>,
         submodels: HashMap<Identifier, ModelPath>,
         parameters: ParameterCollection,
-        model_tests: HashMap<TestIndex, ModelTest>,
+        tests: HashMap<TestIndex, Test>,
         submodel_tests: Vec<SubmodelTest>,
     ) -> Self {
         Self {
             python_imports,
             submodels,
             parameters,
-            model_tests,
+            tests,
             submodel_tests,
         }
     }
@@ -159,12 +159,12 @@ impl Model {
         self.parameters.get(identifier)
     }
 
-    /// Returns a reference to all model tests in this model.
+    /// Returns a reference to all tests in this model.
     ///
-    /// Model tests validate the behavior of the entire model and are
+    /// Tests validate the behavior of the entire model and are
     /// indexed by test indices for easy lookup.
-    pub fn get_model_tests(&self) -> &HashMap<TestIndex, ModelTest> {
-        &self.model_tests
+    pub fn get_tests(&self) -> &HashMap<TestIndex, Test> {
+        &self.tests
     }
 
     /// Returns a reference to all submodel tests in this model.
@@ -178,7 +178,7 @@ impl Model {
     /// Checks if this model is empty (contains no components).
     ///
     /// A model is considered empty if it has no Python imports, submodels,
-    /// parameters, model tests, or submodel tests.
+    /// parameters, tests, or submodel tests.
     ///
     /// # Example
     ///
@@ -200,7 +200,7 @@ impl Model {
         self.python_imports.is_empty()
             && self.submodels.is_empty()
             && self.parameters.is_empty()
-            && self.model_tests.is_empty()
+            && self.tests.is_empty()
             && self.submodel_tests.is_empty()
     }
 
@@ -595,7 +595,7 @@ mod tests {
         expr::{Expr, Literal},
         parameter::{Limits, Parameter, ParameterCollection, ParameterValue},
         reference::{Identifier, ModelPath, PythonPath},
-        test::{ModelTest, SubmodelTest, SubmodelTestInputs, TestIndex},
+        test::{SubmodelTest, SubmodelTestInputs, Test, TestIndex},
     };
     use std::collections::{HashMap, HashSet};
     use std::path::PathBuf;
@@ -665,11 +665,11 @@ mod tests {
     }
 
     #[test]
-    fn test_model_is_not_empty_with_model_tests() {
-        let mut model_tests = HashMap::new();
-        model_tests.insert(
+    fn test_model_is_not_empty_with_tests() {
+        let mut tests = HashMap::new();
+        tests.insert(
             TestIndex::new(0),
-            ModelTest::new(
+            Test::new(
                 TraceLevel::None,
                 HashSet::new(),
                 Expr::literal(Literal::number(1.0)),
@@ -679,7 +679,7 @@ mod tests {
             HashSet::new(),
             HashMap::new(),
             ParameterCollection::new(HashMap::new()),
-            model_tests,
+            tests,
             Vec::new(),
         );
         assert!(!model_with_tests.is_empty());
