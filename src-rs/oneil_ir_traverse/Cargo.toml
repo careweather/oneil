@@ -1,7 +1,7 @@
 
 [package]
-name = "oneil_shared"
-description = "Shared tools for Oneil language libraries"
+name = "oneil_ir_traverse"
+description = "Tools for traversing the IR of the Oneil language"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

@@ -168,6 +168,13 @@ name = "oneil_ir"
 version = "0.15.0"
 
 [[package]]
+name = "oneil_ir_traverse"
+version = "0.15.0"
+dependencies = [
+ "oneil_ir",
+]
+
+[[package]]
 name = "oneil_model_loader"
 version = "0.15.0"
 dependencies = [
@@ -185,13 +192,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oneil_shared"
-version = "0.15.0"
-dependencies = [
- "oneil_ir",
-]
-
-[[package]]
 name = "oneil_unit"
 version = "0.15.0"
 
@@ -200,7 +200,7 @@ name = "oneil_unit_checker"
 version = "0.15.0"
 dependencies = [
  "oneil_ir",
- "oneil_shared",
+ "oneil_ir_traverse",
  "oneil_unit",
 ]
 
