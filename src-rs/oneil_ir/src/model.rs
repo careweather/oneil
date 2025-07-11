@@ -298,8 +298,8 @@ impl Model {
     ///
     /// let order = model.get_parameter_evaluation_order();
     /// assert_eq!(order.len(), 2);
-    /// assert_eq!(order[0], &Identifier::new("radius")); // dependency first
-    /// assert_eq!(order[1], &Identifier::new("area")); // then dependent parameter
+    /// assert_eq!(order[0].identifier(), &Identifier::new("radius")); // dependency first
+    /// assert_eq!(order[1].identifier(), &Identifier::new("area")); // then dependent parameter
     /// ```
     pub fn get_parameter_evaluation_order(&self) -> Vec<&Parameter> {
         let (evaluation_order, _) = self.parameters.iter().fold(
