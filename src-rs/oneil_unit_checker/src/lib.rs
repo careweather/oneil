@@ -1,32 +1,43 @@
-use std::ops::Deref;
-
 use oneil_ir::model::ModelCollection;
+use oneil_shared::ModelMap;
+use oneil_unit::Unit;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct UnitMap(oneil_shared::ModelMap<oneil_unit::Unit>);
+use crate::util::{UnitMap, UnitMapBuilder};
 
-impl Deref for UnitMap {
-    type Target = oneil_shared::ModelMap<oneil_unit::Unit>;
+mod convert;
+mod infer;
+mod util;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+pub fn check_units(model_collection: &ModelCollection) -> Result<UnitMap, (UnitMap, ModelMap<()>)> {
+    let unit_map_builder = UnitMapBuilder::new();
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct UnitMapBuilder(oneil_shared::ModelMapBuilder<oneil_unit::Unit>);
+    let unit_map_builder = model_collection.get_model_evaluation_order().iter().fold(
+        unit_map_builder,
+        |builder, model_path| {
+            let model = model_collection
+                .models()
+                .get(model_path)
+                .expect("model should exist");
 
-impl Deref for UnitMapBuilder {
-    type Target = oneil_shared::ModelMapBuilder<oneil_unit::Unit>;
+            model
+                .get_parameter_evaluation_order()
+                .iter()
+                .fold(builder, |builder, parameter_id| {
+                    let parameter = model
+                        .get_parameter(parameter_id)
+                        .expect("parameter should exist");
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-pub fn check_units(model_collection: &ModelCollection) -> Result<UnitMap, ()> {
-    for _model in model_collection.models() {
-        todo!()
-    }
+                    let parameter_unit = parameter.unit();
+                    let parameter_unit = parameter_unit
+                        .map(convert::convert_unit)
+                        .unwrap_or(Unit::empty());
 
-    todo!()
+                    let inferred_units = infer::infer_units(parameter_id, &builder);
+
+                    todo!()
+                })
+        },
+    );
+
+    unit_map_builder.try_into()
 }

@@ -26,19 +26,25 @@ impl<T> ModelMap<T> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelMapBuilder<T>(HashMap<ModelPath, HashMap<Identifier, T>>);
+pub struct ModelMapBuilder<T, E> {
+    map: HashMap<ModelPath, HashMap<Identifier, T>>,
+    errors: HashMap<ModelPath, HashMap<Identifier, E>>,
+}
 
-impl<T> ModelMapBuilder<T> {
+impl<T, E> ModelMapBuilder<T, E> {
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Self {
+            map: HashMap::new(),
+            errors: HashMap::new(),
+        }
     }
 
     pub fn add_model_data(&mut self, model_path: ModelPath, data: HashMap<Identifier, T>) {
         assert!(
-            !self.0.contains_key(&model_path),
+            !self.map.contains_key(&model_path),
             "Model path already exists"
         );
-        self.0.insert(model_path, data);
+        self.map.insert(model_path, data);
     }
 
     pub fn add_parameter_data(
@@ -47,13 +53,33 @@ impl<T> ModelMapBuilder<T> {
         parameter_name: Identifier,
         data: T,
     ) {
-        self.0
+        self.map
             .entry(model_path)
             .or_insert_with(HashMap::new)
             .insert(parameter_name, data);
     }
 
-    pub fn build(self) -> ModelMap<T> {
-        ModelMap(self.0)
+    pub fn add_parameter_error(
+        &mut self,
+        model_path: ModelPath,
+        parameter_name: Identifier,
+        error: E,
+    ) {
+        self.errors
+            .entry(model_path)
+            .or_insert_with(HashMap::new)
+            .insert(parameter_name, error);
+    }
+}
+
+impl<T, E> TryInto<ModelMap<T>> for ModelMapBuilder<T, E> {
+    type Error = (ModelMap<T>, ModelMap<E>);
+
+    fn try_into(self) -> Result<ModelMap<T>, Self::Error> {
+        if self.errors.is_empty() {
+            Ok(ModelMap(self.map))
+        } else {
+            Err((ModelMap(self.map), ModelMap(self.errors)))
+        }
     }
 }
