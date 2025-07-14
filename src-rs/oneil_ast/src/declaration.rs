@@ -39,7 +39,7 @@ impl Decl {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Import {
-    pub path: String,
+    path: String,
 }
 
 pub type ImportNode = Node<Import>;
@@ -48,14 +48,18 @@ impl Import {
     pub fn new(path: String) -> Self {
         Self { path }
     }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseModel {
-    pub model_name: IdentifierNode,
-    pub subcomponents: Vec<IdentifierNode>,
-    pub inputs: Option<Vec<ModelInputNode>>,
-    pub as_name: Option<IdentifierNode>,
+    model_name: IdentifierNode,
+    subcomponents: Vec<IdentifierNode>,
+    inputs: Option<Vec<ModelInputNode>>,
+    as_name: Option<IdentifierNode>,
 }
 
 pub type UseModelNode = Node<UseModel>;
@@ -74,12 +78,28 @@ impl UseModel {
             as_name,
         }
     }
+
+    pub fn model_name(&self) -> &IdentifierNode {
+        &self.model_name
+    }
+
+    pub fn subcomponents(&self) -> &[IdentifierNode] {
+        &self.subcomponents
+    }
+
+    pub fn inputs(&self) -> Option<&[ModelInputNode]> {
+        self.inputs.as_deref()
+    }
+
+    pub fn as_name(&self) -> Option<&IdentifierNode> {
+        self.as_name.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelInput {
-    pub name: IdentifierNode,
-    pub value: ExprNode,
+    name: IdentifierNode,
+    value: ExprNode,
 }
 
 pub type ModelInputNode = Node<ModelInput>;
@@ -87,5 +107,13 @@ pub type ModelInputNode = Node<ModelInput>;
 impl ModelInput {
     pub fn new(name: IdentifierNode, value: ExprNode) -> Self {
         Self { name, value }
+    }
+
+    pub fn name(&self) -> &IdentifierNode {
+        &self.name
+    }
+
+    pub fn value(&self) -> &ExprNode {
+        &self.value
     }
 }

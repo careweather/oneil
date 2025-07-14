@@ -2,9 +2,9 @@ use crate::{atom::IdentifierNode, debug_info::TraceLevelNode, expression::ExprNo
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
-    pub trace_level: TraceLevelNode,
-    pub inputs: Vec<IdentifierNode>,
-    pub expr: ExprNode,
+    trace_level: TraceLevelNode,
+    inputs: Vec<IdentifierNode>,
+    expr: ExprNode,
 }
 
 pub type TestNode = Node<Test>;
@@ -16,5 +16,17 @@ impl Test {
             inputs,
             expr,
         }
+    }
+
+    pub fn trace_level(&self) -> &TraceLevelNode {
+        &self.trace_level
+    }
+
+    pub fn inputs(&self) -> &[IdentifierNode] {
+        &self.inputs
+    }
+
+    pub fn expr(&self) -> &ExprNode {
+        &self.expr
     }
 }

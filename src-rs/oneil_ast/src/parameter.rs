@@ -12,13 +12,13 @@ use crate::{
 /// Parameters are used to define the values of variables in the model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    pub name: LabelNode,
-    pub ident: IdentifierNode,
-    pub value: ParameterValueNode,
-    pub limits: Option<LimitsNode>,
-    pub is_performance: Node<bool>,
-    pub trace_level: TraceLevelNode,
-    pub note: Option<NoteNode>,
+    name: LabelNode,
+    ident: IdentifierNode,
+    value: ParameterValueNode,
+    limits: Option<LimitsNode>,
+    is_performance: Node<bool>,
+    trace_level: TraceLevelNode,
+    note: Option<NoteNode>,
 }
 
 pub type ParameterNode = Node<Parameter>;
@@ -42,6 +42,34 @@ impl Parameter {
             trace_level,
             note,
         }
+    }
+
+    pub fn name(&self) -> &LabelNode {
+        &self.name
+    }
+
+    pub fn ident(&self) -> &IdentifierNode {
+        &self.ident
+    }
+
+    pub fn value(&self) -> &ParameterValueNode {
+        &self.value
+    }
+
+    pub fn limits(&self) -> Option<&LimitsNode> {
+        self.limits.as_ref()
+    }
+
+    pub fn is_performance(&self) -> &Node<bool> {
+        &self.is_performance
+    }
+
+    pub fn trace_level(&self) -> &TraceLevelNode {
+        &self.trace_level
+    }
+
+    pub fn note(&self) -> Option<&NoteNode> {
+        self.note.as_ref()
     }
 }
 
@@ -87,7 +115,7 @@ impl Limits {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewiseExpr {
-    pub parts: Vec<PiecewisePartNode>,
+    parts: Vec<PiecewisePartNode>,
 }
 
 pub type PiecewiseExprNode = Node<PiecewiseExpr>;
@@ -96,12 +124,16 @@ impl PiecewiseExpr {
     pub fn new(parts: Vec<PiecewisePartNode>) -> Self {
         Self { parts }
     }
+
+    pub fn parts(&self) -> &[PiecewisePartNode] {
+        &self.parts
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewisePart {
-    pub expr: ExprNode,
-    pub if_expr: ExprNode,
+    expr: ExprNode,
+    if_expr: ExprNode,
 }
 
 pub type PiecewisePartNode = Node<PiecewisePart>;
@@ -109,5 +141,13 @@ pub type PiecewisePartNode = Node<PiecewisePart>;
 impl PiecewisePart {
     pub fn new(expr: ExprNode, if_expr: ExprNode) -> Self {
         Self { expr, if_expr }
+    }
+
+    pub fn expr(&self) -> &ExprNode {
+        &self.expr
+    }
+
+    pub fn if_expr(&self) -> &ExprNode {
+        &self.if_expr
     }
 }
