@@ -14,7 +14,7 @@ use oneil_ir::{
 /// Implementations of this trait define how python imports should be processed
 /// when encountered during model traversal. The processor can return either
 /// successful output data or an error.
-pub trait PythonImportProcess {
+pub trait ProcessPythonImport {
     /// The type of output data produced by successful processing.
     type Output;
     /// The type of error that can occur during processing.
@@ -33,7 +33,7 @@ pub trait PythonImportProcess {
 }
 
 /// A default implementation for when we don't care about python imports
-impl PythonImportProcess for () {
+impl ProcessPythonImport for () {
     type Output = ();
     type Error = ();
 
@@ -47,7 +47,7 @@ impl PythonImportProcess for () {
 /// Implementations of this trait define how submodels should be processed
 /// when encountered during model traversal. The processor can return either
 /// successful output data or an error.
-pub trait SubmodelProcess {
+pub trait ProcessSubmodel {
     /// The type of output data produced by successful processing.
     type Output;
     /// The type of error that can occur during processing.
@@ -71,7 +71,7 @@ pub trait SubmodelProcess {
 }
 
 /// A default implementation for when we don't care about submodels
-impl SubmodelProcess for () {
+impl ProcessSubmodel for () {
     type Output = ();
     type Error = ();
 
@@ -89,7 +89,7 @@ impl SubmodelProcess for () {
 /// Implementations of this trait define how parameters should be processed
 /// when encountered during model traversal. The processor can return either
 /// successful output data or an error.
-pub trait ParameterProcess {
+pub trait ProcessParameter {
     /// The type of output data produced by successful processing.
     type Output;
     /// The type of error that can occur during processing.
@@ -108,7 +108,7 @@ pub trait ParameterProcess {
 }
 
 /// A default implementation for when we don't care about parameters
-impl ParameterProcess for () {
+impl ProcessParameter for () {
     type Output = ();
     type Error = ();
 
@@ -122,7 +122,7 @@ impl ParameterProcess for () {
 /// Implementations of this trait define how tests should be processed
 /// when encountered during model traversal. The processor can return either
 /// successful output data or an error.
-pub trait TestProcess {
+pub trait ProcessTest {
     /// The type of output data produced by successful processing.
     type Output;
     /// The type of error that can occur during processing.
@@ -142,7 +142,7 @@ pub trait TestProcess {
 }
 
 /// A default implementation for when we don't care about tests
-impl TestProcess for () {
+impl ProcessTest for () {
     type Output = ();
     type Error = ();
 
@@ -156,7 +156,7 @@ impl TestProcess for () {
 /// Implementations of this trait define how submodel tests should be processed
 /// when encountered during model traversal. The processor can return either
 /// successful output data or an error.
-pub trait SubmodelTestProcess {
+pub trait ProcessSubmodelTest {
     /// The type of output data produced by successful processing.
     type Output;
     /// The type of error that can occur during processing.
@@ -175,7 +175,7 @@ pub trait SubmodelTestProcess {
 }
 
 /// A default implementation for when we don't care about submodel tests
-impl SubmodelTestProcess for () {
+impl ProcessSubmodelTest for () {
     type Output = ();
     type Error = ();
 

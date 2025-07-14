@@ -20,7 +20,7 @@ pub mod traits;
 
 pub use model_map::{ModelMap, ModelMapEntry};
 pub use traits::{
-    ParameterProcess, PythonImportProcess, SubmodelProcess, SubmodelTestProcess, TestProcess,
+    ProcessParameter, ProcessPythonImport, ProcessSubmodel, ProcessSubmodelTest, ProcessTest,
 };
 
 /// Traverses a model collection and processes its components using the provided processors.
@@ -85,11 +85,11 @@ pub fn traverse<PythonImportP, SubmodelP, ParameterP, TestP, SubmodelTestP>(
     ),
 >
 where
-    PythonImportP: PythonImportProcess,
-    SubmodelP: SubmodelProcess,
-    ParameterP: ParameterProcess,
-    TestP: TestProcess,
-    SubmodelTestP: SubmodelTestProcess,
+    PythonImportP: ProcessPythonImport,
+    SubmodelP: ProcessSubmodel,
+    ParameterP: ProcessParameter,
+    TestP: ProcessTest,
+    SubmodelTestP: ProcessSubmodelTest,
 {
     // create the model map builder
     let model_map_builder = ModelMapBuilder::new();
