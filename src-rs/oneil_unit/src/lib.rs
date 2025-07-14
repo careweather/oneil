@@ -6,3 +6,9 @@ impl Unit {
         Self
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TestUnits;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubmodelTestUnits;

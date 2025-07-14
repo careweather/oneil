@@ -1,48 +1,40 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
-use oneil_shared::{ModelMap, ModelMapBuilder};
+use oneil_ir_traverse::ModelMap;
+use oneil_unit::{SubmodelTestUnits, TestUnits, Unit};
+
+use crate::error::UnitError;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UnitMap(ModelMap<oneil_unit::Unit>);
+pub struct UnitMap(ModelMap<(), (), Unit, TestUnits, SubmodelTestUnits>);
 
 impl Deref for UnitMap {
-    type Target = ModelMap<oneil_unit::Unit>;
+    type Target = ModelMap<(), (), Unit, TestUnits, SubmodelTestUnits>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl From<ModelMap<(), (), Unit, TestUnits, SubmodelTestUnits>> for UnitMap {
+    fn from(map: ModelMap<(), (), Unit, TestUnits, SubmodelTestUnits>) -> Self {
+        Self(map)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UnitMapBuilder(ModelMapBuilder<oneil_unit::Unit, ()>);
+pub struct UnitErrorMap(ModelMap<(), (), Vec<UnitError>, Vec<UnitError>, Vec<UnitError>>);
 
-impl UnitMapBuilder {
-    pub fn new() -> Self {
-        Self(ModelMapBuilder::new())
-    }
-}
-
-impl Deref for UnitMapBuilder {
-    type Target = oneil_shared::ModelMapBuilder<oneil_unit::Unit, ()>;
+impl Deref for UnitErrorMap {
+    type Target = ModelMap<(), (), Vec<UnitError>, Vec<UnitError>, Vec<UnitError>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for UnitMapBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl TryInto<UnitMap> for UnitMapBuilder {
-    type Error = (UnitMap, ModelMap<()>);
-
-    fn try_into(self) -> Result<UnitMap, Self::Error> {
-        self.0
-            .try_into()
-            .map(UnitMap)
-            .map_err(|(map, errors)| (UnitMap(map), errors))
+impl From<ModelMap<(), (), Vec<UnitError>, Vec<UnitError>, Vec<UnitError>>> for UnitErrorMap {
+    fn from(map: ModelMap<(), (), Vec<UnitError>, Vec<UnitError>, Vec<UnitError>>) -> Self {
+        Self(map)
     }
 }
