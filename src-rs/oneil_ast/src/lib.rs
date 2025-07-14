@@ -11,6 +11,7 @@ pub mod expression;
 pub mod model;
 pub mod note;
 pub mod parameter;
+pub mod span;
 pub mod test;
 pub mod unit;
 
@@ -19,5 +20,6 @@ pub use expression::Expr;
 pub use model::Model;
 pub use note::Note;
 pub use parameter::Parameter;
+pub use span::Span;
 pub use test::Test;
 pub use unit::UnitExpr;
