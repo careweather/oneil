@@ -154,6 +154,7 @@ version = "0.15.0"
 dependencies = [
  "clap",
  "oneil_ast",
+ "oneil_ir",
  "oneil_model_loader",
  "oneil_parser",
 ]

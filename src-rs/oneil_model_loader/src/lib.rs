@@ -55,10 +55,7 @@ use std::{collections::HashSet, path::Path};
 
 use oneil_ir::{model::ModelCollection, reference::ModelPath};
 
-use crate::{
-    error::collection::ModelErrorMap,
-    util::{Stack, builder::ModelCollectionBuilder},
-};
+use crate::util::{Stack, builder::ModelCollectionBuilder};
 
 mod error;
 mod loader;
@@ -67,6 +64,7 @@ mod util;
 #[cfg(test)]
 mod test;
 
+pub use crate::error::collection::ModelErrorMap;
 pub use crate::util::FileLoader;
 
 /// Loads a single model and all its dependencies.

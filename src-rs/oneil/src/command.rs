@@ -26,11 +26,19 @@ pub enum DevCommands {
         /// Path to the Oneil source file
         #[arg(value_name = "FILE")]
         file: PathBuf,
+
+        /// Display partial AST even if there are errors
+        #[arg(long)]
+        display_partial: bool,
     },
     /// Print the intermediate representation of a file
     PrintIr {
         /// Path to the Oneil source file
         #[arg(value_name = "FILE")]
         file: PathBuf,
+
+        /// Display partial AST even if there are errors
+        #[arg(long)]
+        display_partial: bool,
     },
 }
