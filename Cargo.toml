@@ -1,17 +1,14 @@
-[package]
-name = "oneil"
+[workspace]
+members = ["src-rs/*"]
+resolver = "3"
+
+[workspace.package]
 version = "0.15.0"
 edition = "2024"
+authors = ["Brendon Bown <brendon.bown@gmail.com>"]
+license = "MPL-2.0"
+readme = "README.md"
+repository = "https://github.com/careweather/oneil"
 
-[lib]
-name = "oneil"
-path = "src/rs/lib.rs"
-
-[[bin]]
-name = "oneil"
-path = "src/rs/main.rs"
-
-[dependencies]
-nom = "8.0.0"
-nom_locate = "5.0.0"
-clap = { version = "4.5.1", features = ["derive"] }
+[workspace.lints.rust]
+missing_docs = "warn"

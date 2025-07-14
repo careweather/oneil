@@ -153,8 +153,34 @@ name = "oneil"
 version = "0.15.0"
 dependencies = [
  "clap",
+ "oneil_ast",
+ "oneil_model_loader",
+ "oneil_parser",
+]
+
+[[package]]
+name = "oneil_ast"
+version = "0.15.0"
+
+[[package]]
+name = "oneil_ir"
+version = "0.15.0"
+
+[[package]]
+name = "oneil_model_loader"
+version = "0.15.0"
+dependencies = [
+ "oneil_ast",
+ "oneil_ir",
+]
+
+[[package]]
+name = "oneil_parser"
+version = "0.15.0"
+dependencies = [
  "nom",
  "nom_locate",
+ "oneil_ast",
 ]
 
 [[package]]

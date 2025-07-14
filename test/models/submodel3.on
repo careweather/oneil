@@ -1,0 +1,12 @@
+# Submodel 3: Specialized functions for My Section
+
+# Variables
+Price: price = 100
+Discount rate: discount_rate = 0.1
+
+Calculate discount: calculate_discount = price * (1 - discount_rate)
+
+# Formatting and conversion
+Value: value = 20
+To percentage: to_percentage = value * 100
+From percentage: from_percentage = to_percentage / 100

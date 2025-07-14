@@ -1,0 +1,15 @@
+use submodel1 as s1
+use submodel2 as s2
+
+X: x = 2 + 1
+
+Y: y = x + 2
+
+# A section
+section My Section
+
+import pyfile
+use submodel3 as s3
+
+Z: z = x - Y
+

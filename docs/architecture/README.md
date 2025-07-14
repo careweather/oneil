@@ -4,7 +4,7 @@ The Oneil programming language has many different parts of it, but the core of
 Oneil follows the following architecture for evaluation of a model.
 
 1. [Tokenization and Parsing](#tokenizerparser)
-2. Module Resolution
+2. Model Resolution
 3. Type and Unit Checking
 4. Evaluation
 
@@ -99,30 +99,31 @@ Code for tokenization is found in the `crate::parser::token` module.
 Note that all tokens take the form of
 
 ```rs
-use crate::parser::util::{Result, Span};
+use crate::parser::util::{Result, Span, Token};
 
-pub fn my_token(input: Span) -> Result<Span, TokenError> {
+pub fn my_token(input: Span) -> Result<Token, TokenError> {
     // ... parsing code ...
 }
 ```
 
 Notice that it:
 - takes a `Span` as input
-- returns a `Result`, with `Span` as the output and `TokenError` as the error kind
+- returns a `Result`, with `Token` as the output and `TokenError` as the error kind
 
 For most tokens, this is done using the `crate::parser::token::util::token`
 combinator. (The only place it is not used is in the note token parsers)
 
-The `token` combinator accepts any parser and returns the `Span` that it parses.
-In addition, the `token` combinator accepts a `TokenErrorKind` that it will
-attach as an error if it fails to parse the token. For example, a simple string
-token parser could look like the following:
+The `token` combinator accepts any parser and returns the `Token` that it
+parses. A `Token` stores data about the lexeme that it parsed and the whitespace
+that followed.  In addition, the `token` combinator accepts a `TokenErrorKind`
+that it will attach as an error if it fails to parse the token. For example, a
+simple string token parser could look like the following:
 
 ```rs
-use crate::parser::util::{Result, Span};
+use crate::parser::util::{Result, Span, Token};
 use crate::parser::token::util::token;
 
-pub fn my_token(input: Span) -> Result<Span, TokenError> {
+pub fn my_token(input: Span) -> Result<Token, TokenError> {
     token(
         |input| {
             let (rest, _) = tag("\"").parse(input)?;
@@ -182,6 +183,9 @@ used when the string should *only* contain that item.
 Note that because of the way that the `model` module attempts to recover when it
 hits an error and return a partial result alongside errors encountered, `model`
 only has a `parse_complete` version.
+
+Parsers should also avoid using combinators that recognize strings directly,
+such as `tag` or `char`. Instead, parsers should rely on `token` parsers.
 
 ### Error Handling
 

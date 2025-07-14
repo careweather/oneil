@@ -1,0 +1,28 @@
+# Submodel 1: Basic mathematical constants and operations
+
+# Mathematical constants
+PI: pi = 3.14159265359
+E: e = 2.71828182846
+
+# Variables
+X: x = 2
+Y: y = 3
+
+# Basic mathematical functions
+Square root: sqrt = sqrt(x)
+Square: square = x ^ 2
+Cube: cube = x ^ 3
+
+# Trigonometric functions (simplified)
+Sine: sin = x - (x ^ 3) / 6 + (x ^ 5) / 120
+Cosine: cos = 1 - (x ^ 2) / 2 + (x ^ 4) / 24
+
+# Utility functions
+Absolute value: abs = { x if x >= 0
+                      { -x if x < 0
+
+Maximum: max = { x if x > y
+               { y if x < y
+
+Minimum: min = { x if x < y
+               { y if x > y

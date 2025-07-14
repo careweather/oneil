@@ -1,0 +1,13 @@
+[package]
+name = "oneil_parser"
+description = "Parser for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+oneil_ast = { path = "../oneil_ast" }
+nom = "8.0.0"
+nom_locate = "5.0.0"
