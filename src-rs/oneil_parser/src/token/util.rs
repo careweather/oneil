@@ -1,4 +1,5 @@
-use nom::{Parser as _, character::complete::space0, combinator::recognize};
+use nom::{Parser as NomParser, character::complete::space0, combinator::recognize};
+use oneil_ast::span::SpanLike;
 
 use crate::token::{
     Parser, Result, Span,
@@ -50,6 +51,20 @@ impl<'a> Token<'a> {
         let start = self.whitespace.location_offset();
         let length = self.whitespace.fragment().len();
         start + length
+    }
+}
+
+impl<'a> SpanLike for Token<'a> {
+    fn get_start(&self) -> usize {
+        self.lexeme.location_offset()
+    }
+
+    fn get_end(&self) -> usize {
+        self.lexeme.location_offset() + self.lexeme.fragment().len()
+    }
+
+    fn get_whitespace_end(&self) -> usize {
+        self.whitespace.location_offset() + self.whitespace.fragment().len()
     }
 }
 
