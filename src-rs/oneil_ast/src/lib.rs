@@ -9,6 +9,7 @@
 pub mod declaration;
 pub mod expression;
 pub mod model;
+pub mod node;
 pub mod note;
 pub mod parameter;
 pub mod span;
