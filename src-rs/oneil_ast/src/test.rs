@@ -1,9 +1,8 @@
-use super::expression::Expr;
-use super::parameter::TraceLevel;
+use crate::{Expr, debug_info::TraceLevelNode};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
-    pub trace_level: TraceLevel,
+    pub trace_level: TraceLevelNode,
     pub inputs: Vec<String>,
     pub expr: Expr,
 }

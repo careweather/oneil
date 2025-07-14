@@ -1,3 +1,5 @@
+use crate::debug_info::TraceLevelNode;
+
 use super::expression::Expr;
 use super::note::Note;
 use super::unit::UnitExpr;
@@ -12,7 +14,7 @@ pub struct Parameter {
     pub value: ParameterValue,
     pub limits: Option<Limits>,
     pub is_performance: bool,
-    pub trace_level: TraceLevel,
+    pub trace_level: TraceLevelNode,
     pub note: Option<Note>,
 }
 
@@ -30,13 +32,6 @@ pub enum ParameterValue {
 pub enum Limits {
     Continuous { min: Expr, max: Expr },
     Discrete { values: Vec<Expr> },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TraceLevel {
-    None,
-    Trace,
-    Debug,
 }
 
 #[derive(Debug, Clone, PartialEq)]

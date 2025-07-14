@@ -7,6 +7,7 @@
 //! in memory after parsing.
 
 pub mod atom;
+pub mod debug_info;
 pub mod declaration;
 pub mod expression;
 pub mod model;
