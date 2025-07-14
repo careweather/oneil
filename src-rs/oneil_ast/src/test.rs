@@ -1,8 +1,20 @@
-use crate::{Expr, debug_info::TraceLevelNode};
+use crate::{atom::IdentifierNode, debug_info::TraceLevelNode, expression::ExprNode, node::Node};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
     pub trace_level: TraceLevelNode,
-    pub inputs: Vec<String>,
-    pub expr: Expr,
+    pub inputs: Vec<IdentifierNode>,
+    pub expr: ExprNode,
 }
+
+impl Test {
+    pub fn new(trace_level: TraceLevelNode, inputs: Vec<IdentifierNode>, expr: ExprNode) -> Self {
+        Self {
+            trace_level,
+            inputs,
+            expr,
+        }
+    }
+}
+
+pub type TestNode = Node<Test>;
