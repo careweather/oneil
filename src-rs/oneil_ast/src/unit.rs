@@ -17,6 +17,8 @@ pub enum UnitExpr {
     },
 }
 
+pub type UnitExprNode = Node<UnitExpr>;
+
 impl UnitExpr {
     pub fn binary_op(op: UnitOpNode, left: UnitExprNode, right: UnitExprNode) -> Self {
         let left = Box::new(left);
@@ -32,13 +34,13 @@ impl UnitExpr {
     }
 }
 
-pub type UnitExprNode = Node<UnitExpr>;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnitOp {
     Multiply,
     Divide,
 }
+
+pub type UnitOpNode = Node<UnitOp>;
 
 impl UnitOp {
     pub fn multiply() -> Self {
@@ -49,5 +51,3 @@ impl UnitOp {
         Self::Divide
     }
 }
-
-pub type UnitOpNode = Node<UnitOp>;

@@ -27,6 +27,8 @@ pub enum Expr {
     Literal(LiteralNode),
 }
 
+pub type ExprNode = Node<Expr>;
+
 impl Expr {
     pub fn binary_op(op: BinaryOpNode, left: ExprNode, right: ExprNode) -> Self {
         Self::BinaryOp {
@@ -56,8 +58,6 @@ impl Expr {
     }
 }
 
-pub type ExprNode = Node<Expr>;
-
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum BinaryOp {
     Add,
@@ -78,6 +78,8 @@ pub enum BinaryOp {
     Or,
     MinMax,
 }
+
+pub type BinaryOpNode = Node<BinaryOp>;
 
 impl BinaryOp {
     pub fn add() -> Self {
@@ -149,13 +151,13 @@ impl BinaryOp {
     }
 }
 
-pub type BinaryOpNode = Node<BinaryOp>;
-
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum UnaryOp {
     Neg,
     Not,
 }
+
+pub type UnaryOpNode = Node<UnaryOp>;
 
 impl UnaryOp {
     pub fn neg() -> Self {
@@ -167,8 +169,6 @@ impl UnaryOp {
     }
 }
 
-pub type UnaryOpNode = Node<UnaryOp>;
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Variable {
     Identifier(IdentifierNode),
@@ -177,6 +177,8 @@ pub enum Variable {
         component: Box<VariableNode>,
     },
 }
+
+pub type VariableNode = Node<Variable>;
 
 impl Variable {
     pub fn identifier(id: IdentifierNode) -> Self {
@@ -191,14 +193,14 @@ impl Variable {
     }
 }
 
-pub type VariableNode = Node<Variable>;
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Number(NumberNode),
     String(StrNode),
     Boolean(BooleanNode),
 }
+
+pub type LiteralNode = Node<Literal>;
 
 impl Literal {
     pub fn number(num: NumberNode) -> Self {
@@ -213,5 +215,3 @@ impl Literal {
         Self::Boolean(bool)
     }
 }
-
-pub type LiteralNode = Node<Literal>;

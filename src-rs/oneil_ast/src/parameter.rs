@@ -21,6 +21,8 @@ pub struct Parameter {
     pub note: Option<NoteNode>,
 }
 
+pub type ParameterNode = Node<Parameter>;
+
 impl Parameter {
     pub fn new(
         name: LabelNode,
@@ -43,8 +45,6 @@ impl Parameter {
     }
 }
 
-pub type ParameterNode = Node<Parameter>;
-
 /// A value assigned to a parameter.
 ///
 /// Parameter values can be either simple expressions or piecewise expressions
@@ -54,6 +54,8 @@ pub enum ParameterValue {
     Simple(ExprNode, Option<UnitExprNode>),
     Piecewise(PiecewiseExprNode, Option<UnitExprNode>),
 }
+
+pub type ParameterValueNode = Node<ParameterValue>;
 
 impl ParameterValue {
     pub fn simple(expr: ExprNode, unit: Option<UnitExprNode>) -> Self {
@@ -65,13 +67,13 @@ impl ParameterValue {
     }
 }
 
-pub type ParameterValueNode = Node<ParameterValue>;
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Limits {
     Continuous { min: ExprNode, max: ExprNode },
     Discrete { values: Vec<ExprNode> },
 }
+
+pub type LimitsNode = Node<Limits>;
 
 impl Limits {
     pub fn continuous(min: ExprNode, max: ExprNode) -> Self {
@@ -83,12 +85,12 @@ impl Limits {
     }
 }
 
-pub type LimitsNode = Node<Limits>;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewiseExpr {
     pub parts: Vec<PiecewisePartNode>,
 }
+
+pub type PiecewiseExprNode = Node<PiecewiseExpr>;
 
 impl PiecewiseExpr {
     pub fn new(parts: Vec<PiecewisePartNode>) -> Self {
@@ -96,18 +98,16 @@ impl PiecewiseExpr {
     }
 }
 
-pub type PiecewiseExprNode = Node<PiecewiseExpr>;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewisePart {
     pub expr: ExprNode,
     pub if_expr: ExprNode,
 }
 
+pub type PiecewisePartNode = Node<PiecewisePart>;
+
 impl PiecewisePart {
     pub fn new(expr: ExprNode, if_expr: ExprNode) -> Self {
         Self { expr, if_expr }
     }
 }
-
-pub type PiecewisePartNode = Node<PiecewisePart>;

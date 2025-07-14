@@ -7,6 +7,8 @@ pub enum TraceLevel {
     Debug,
 }
 
+pub type TraceLevelNode = Node<TraceLevel>;
+
 impl TraceLevel {
     pub fn none() -> Self {
         Self::None
@@ -20,5 +22,3 @@ impl TraceLevel {
         Self::Debug
     }
 }
-
-pub type TraceLevelNode = Node<TraceLevel>;

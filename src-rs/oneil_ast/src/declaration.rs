@@ -17,6 +17,8 @@ pub enum Decl {
     Test(TestNode),
 }
 
+pub type DeclNode = Node<Decl>;
+
 impl Decl {
     pub fn import(path: ImportNode) -> Self {
         Self::Import(path)
@@ -35,20 +37,18 @@ impl Decl {
     }
 }
 
-pub type DeclNode = Node<Decl>;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Import {
     pub path: String,
 }
+
+pub type ImportNode = Node<Import>;
 
 impl Import {
     pub fn new(path: String) -> Self {
         Self { path }
     }
 }
-
-pub type ImportNode = Node<Import>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseModel {
@@ -57,6 +57,8 @@ pub struct UseModel {
     pub inputs: Option<Vec<ModelInputNode>>,
     pub as_name: Option<IdentifierNode>,
 }
+
+pub type UseModelNode = Node<UseModel>;
 
 impl UseModel {
     pub fn new(
@@ -74,18 +76,16 @@ impl UseModel {
     }
 }
 
-pub type UseModelNode = Node<UseModel>;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelInput {
     pub name: IdentifierNode,
     pub value: ExprNode,
 }
 
+pub type ModelInputNode = Node<ModelInput>;
+
 impl ModelInput {
     pub fn new(name: IdentifierNode, value: ExprNode) -> Self {
         Self { name, value }
     }
 }
-
-pub type ModelInputNode = Node<ModelInput>;

@@ -8,6 +8,8 @@ use crate::node::Node;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Note(String);
 
+pub type NoteNode = Node<Note>;
+
 impl Note {
     pub fn new(value: String) -> Self {
         Self(value)
@@ -17,5 +19,3 @@ impl Note {
         &self.0
     }
 }
-
-pub type NoteNode = Node<Note>;

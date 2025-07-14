@@ -7,6 +7,8 @@ pub struct Test {
     pub expr: ExprNode,
 }
 
+pub type TestNode = Node<Test>;
+
 impl Test {
     pub fn new(trace_level: TraceLevelNode, inputs: Vec<IdentifierNode>, expr: ExprNode) -> Self {
         Self {
@@ -16,5 +18,3 @@ impl Test {
         }
     }
 }
-
-pub type TestNode = Node<Test>;
