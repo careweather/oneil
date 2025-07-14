@@ -1,6 +1,6 @@
 use std::{fmt::Debug, ops::Deref};
 
-use crate::Span;
+use crate::{Span, span::SpanLike};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<T>
@@ -21,6 +21,23 @@ where
 
     pub fn get_span(&self) -> &Span {
         &self.span
+    }
+}
+
+impl<T> SpanLike for Node<T>
+where
+    T: Debug + Clone + PartialEq,
+{
+    fn get_start(&self) -> usize {
+        self.span.start()
+    }
+
+    fn get_end(&self) -> usize {
+        self.span.end()
+    }
+
+    fn get_whitespace_end(&self) -> usize {
+        self.span.whitespace_end()
     }
 }
 

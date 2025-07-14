@@ -14,7 +14,19 @@ impl Span {
         }
     }
 
-    pub fn get_span<T, U>(start_span: &T, end_span: &U) -> Self
+    pub fn start(&self) -> usize {
+        self.start
+    }
+
+    pub fn end(&self) -> usize {
+        self.end
+    }
+
+    pub fn whitespace_end(&self) -> usize {
+        self.whitespace_end
+    }
+
+    pub fn calc_span<T, U>(start_span: &T, end_span: &U) -> Self
     where
         T: SpanLike,
         U: SpanLike,
@@ -53,7 +65,7 @@ where
     U: SpanLike,
 {
     fn from((start_span, end_span): (&T, &U)) -> Self {
-        Self::get_span(start_span, end_span)
+        Self::calc_span(start_span, end_span)
     }
 }
 
