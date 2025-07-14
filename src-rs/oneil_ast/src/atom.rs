@@ -29,3 +29,13 @@ impl Number {
 }
 
 pub type NumberNode = Node<Number>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Str(std::string::String);
+
+pub type StrNode = Node<Str>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Boolean(bool);
+
+pub type BooleanNode = Node<Boolean>;
