@@ -160,16 +160,37 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
             && self.import_errors.is_empty()
     }
 
+    /// Returns a set of Python paths that have import errors.
+    ///
+    /// This function is only available in test builds.
+    ///
+    /// # Returns
+    ///
+    /// A set of Python paths that failed to import.
     #[cfg(test)]
     pub fn get_imports_with_errors(&self) -> HashSet<&PythonPath> {
         self.import_errors.keys().collect()
     }
 
+    /// Returns a reference to the map of model errors.
+    ///
+    /// This function is only available in test builds.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing model paths and their associated load errors.
     #[cfg(test)]
     pub fn get_model_errors(&self) -> &HashMap<ModelPath, LoadError<Ps>> {
         &self.model_errors
     }
 
+    /// Returns a reference to the map of circular dependency errors.
+    ///
+    /// This function is only available in test builds.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing model paths and their associated circular dependency errors.
     #[cfg(test)]
     pub fn get_circular_dependency_errors(
         &self,
