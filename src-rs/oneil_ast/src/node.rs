@@ -15,12 +15,17 @@ impl<T> Node<T>
 where
     T: Debug + Clone + PartialEq,
 {
-    pub fn new(span: Span, value: T) -> Self {
+    pub fn new(spanlike: impl SpanLike, value: T) -> Self {
+        let span = Span::from(&spanlike);
         Self { span, value }
     }
 
-    pub fn get_span(&self) -> &Span {
+    pub fn node_span(&self) -> &Span {
         &self.span
+    }
+
+    pub fn node_value(&self) -> &T {
+        &self.value
     }
 }
 

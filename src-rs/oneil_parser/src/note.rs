@@ -4,28 +4,29 @@
 
 use nom::Parser;
 use nom::combinator::all_consuming;
+use oneil_ast::node::Node;
 
 use crate::error::{ErrorHandlingParser, ParserError};
 use crate::token::note::{NoteKind, note as note_token};
 use crate::util::{Result, Span};
-use oneil_ast::note::Note;
+use oneil_ast::note::{Note, NoteNode};
 
 /// Parse a note, which can be either a single-line note starting with `~`
 /// or a multi-line note delimited by `~~~`.
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span) -> Result<Note, ParserError> {
+pub fn parse(input: Span) -> Result<NoteNode, ParserError> {
     note(input)
 }
 
 /// Parse a note
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<Note, ParserError> {
+pub fn parse_complete(input: Span) -> Result<NoteNode, ParserError> {
     all_consuming(note).parse(input)
 }
 
-fn note(input: Span) -> Result<Note, ParserError> {
+fn note(input: Span) -> Result<NoteNode, ParserError> {
     let (rest, (token, kind)) = note_token
         .map_error(ParserError::expect_note)
         .parse(input)?;
@@ -33,11 +34,11 @@ fn note(input: Span) -> Result<Note, ParserError> {
     let note = match kind {
         NoteKind::SingleLine => {
             let content = token.lexeme().trim_start_matches('~').trim();
-            Note(content.to_string())
+            Node::new(token, Note::new(content.to_string()))
         }
         NoteKind::MultiLine => {
             let content = token.lexeme().trim_matches('~').trim();
-            Note(content.to_string())
+            Node::new(token, Note::new(content.to_string()))
         }
     };
 
@@ -48,12 +49,14 @@ fn note(input: Span) -> Result<Note, ParserError> {
 mod tests {
     use super::*;
     use crate::Config;
+    use oneil_ast::Span as AstSpan;
 
     #[test]
     fn test_single_line_note() {
         let input = Span::new_extra("~ This is a note\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse single line note");
-        assert_eq!(note, Note("This is a note".to_string()));
+        assert_eq!(note.node_span(), &AstSpan::new(0, 16, 17));
+        assert_eq!(note.node_value(), &Note::new("This is a note".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -61,7 +64,8 @@ mod tests {
     fn test_single_line_note_at_eof() {
         let input = Span::new_extra("~ note", Config::default());
         let (rest, note) = parse(input).expect("should parse single line note at EOF");
-        assert_eq!(note, Note("note".to_string()));
+        assert_eq!(note.node_span(), &AstSpan::new(0, 0, 5));
+        assert_eq!(note.node_value(), &Note::new("note".to_string()));
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -69,7 +73,8 @@ mod tests {
     fn test_multi_line_note() {
         let input = Span::new_extra("~~~\nLine 1\nLine 2\n~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse multi-line note");
-        assert_eq!(note, Note("Line 1\nLine 2".to_string()));
+        assert_eq!(note.node_span(), &AstSpan::new(0, 0, 16));
+        assert_eq!(note.node_value(), &Note::new("Line 1\nLine 2".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -77,7 +82,8 @@ mod tests {
     fn test_multi_line_note_extra_tildes() {
         let input = Span::new_extra("~~~~~\nfoo\nbar\n~~~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse multi-line note with extra tildes");
-        assert_eq!(note, Note("foo\nbar".to_string()));
+        assert_eq!(note.node_span(), &AstSpan::new(0, 0, 16));
+        assert_eq!(note.node_value(), &Note::new("foo\nbar".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -85,7 +91,8 @@ mod tests {
     fn test_multi_line_note_empty() {
         let input = Span::new_extra("~~~\n~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse empty multi-line note");
-        assert_eq!(note, Note("".to_string()));
+        assert_eq!(note.node_span(), &AstSpan::new(0, 0, 0));
+        assert_eq!(note.node_value(), &Note::new("".to_string()));
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -107,7 +114,8 @@ mod tests {
     fn test_parse_complete_single_line_success() {
         let input = Span::new_extra("~ This is a note\n", Config::default());
         let (rest, note) = parse_complete(input).unwrap();
-        assert_eq!(note, Note("This is a note".to_string()));
+        assert_eq!(note.node_span(), &AstSpan::new(0, 0, 16));
+        assert_eq!(note.node_value(), &Note::new("This is a note".to_string()));
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -115,7 +123,8 @@ mod tests {
     fn test_parse_complete_multi_line_success() {
         let input = Span::new_extra("~~~\nLine 1\nLine 2\n~~~\n", Config::default());
         let (rest, note) = parse_complete(input).unwrap();
-        assert_eq!(note, Note("Line 1\nLine 2".to_string()));
+        assert_eq!(note.node_span(), &AstSpan::new(0, 0, 16));
+        assert_eq!(note.node_value(), &Note::new("Line 1\nLine 2".to_string()));
         assert_eq!(rest.fragment(), &"");
     }
 
