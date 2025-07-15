@@ -37,6 +37,23 @@ impl Span {
             end_span.get_whitespace_end(),
         )
     }
+
+    pub fn calc_span_with_whitespace<T, U, V>(
+        start_span: &T,
+        end_span: &U,
+        whitespace_span: &V,
+    ) -> Self
+    where
+        T: SpanLike,
+        U: SpanLike,
+        V: SpanLike,
+    {
+        Self::new(
+            start_span.get_start(),
+            end_span.get_end(),
+            whitespace_span.get_whitespace_end(),
+        )
+    }
 }
 
 pub trait SpanLike {

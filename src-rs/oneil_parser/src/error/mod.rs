@@ -507,51 +507,49 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing colon in a test declaration
-    pub fn test_missing_colon(test_token: Token) -> impl Fn(TokenError) -> Self {
+    pub fn test_missing_colon(test_token: &Token) -> impl Fn(TokenError) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::MissingColon {
-                test_offset: test_token.lexeme_offset(),
-            })),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::missing_colon(
+                test_token,
+            ))),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a missing expression in a test declaration
-    pub fn test_missing_expr(test_token: Token) -> impl Fn(Self) -> Self {
+    pub fn test_missing_expr(test_token: &Token) -> impl Fn(Self) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::MissingExpr {
-                test_offset: test_token.lexeme_offset(),
-            })),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::missing_expr(
+                test_token,
+            ))),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a missing end of line in a test declaration
-    pub fn test_missing_end_of_line(test_token: Token) -> impl Fn(TokenError) -> Self {
-        move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::MissingEndOfLine {
-                test_offset: test_token.lexeme_offset(),
-            })),
+    pub fn test_missing_end_of_line(test_token: &Token) -> impl Fn(TokenError) -> Self {
+        |error| Self {
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::missing_end_of_line(
+                test_token,
+            ))),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for missing inputs in a test declaration
-    pub fn test_missing_inputs(brace_left_token: Token) -> impl Fn(TokenError) -> Self {
-        move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::MissingInputs {
-                brace_left_offset: brace_left_token.lexeme_offset(),
-            })),
+    pub fn test_missing_inputs(brace_left_token: &Token) -> impl Fn(TokenError) -> Self {
+        |error| Self {
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Test(TestKind::missing_inputs(
+                brace_left_token,
+            ))),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for an unclosed brace
-    pub fn unclosed_brace(brace_left_token: Token) -> impl Fn(TokenError) -> Self {
-        move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::UnclosedBrace {
-                brace_left_offset: brace_left_token.lexeme_offset(),
-            }),
+    pub fn unclosed_brace(brace_left_token: &Token) -> impl Fn(TokenError) -> Self {
+        |error| Self {
+            kind: ParserErrorKind::Incomplete(IncompleteKind::unclosed_brace(brace_left_token)),
             offset: error.offset,
         }
     }
@@ -665,8 +663,8 @@ pub enum IncompleteKind {
     },
     /// Found an unclosed brace
     UnclosedBrace {
-        /// The offset of the opening brace
-        brace_left_offset: usize,
+        /// The span of the opening brace
+        brace_left_span: AstSpan,
     },
     /// Found an invalid number with the given text
     InvalidNumber(AstSpan),
@@ -676,6 +674,12 @@ impl IncompleteKind {
     pub fn unclosed_paren(paren_left_token: &Token) -> Self {
         Self::UnclosedParen {
             paren_left_span: AstSpan::from(paren_left_token),
+        }
+    }
+
+    pub fn unclosed_brace(brace_left_token: &Token) -> Self {
+        Self::UnclosedBrace {
+            brace_left_span: AstSpan::from(brace_left_token),
         }
     }
 
@@ -888,24 +892,50 @@ pub enum ParameterKind {
 pub enum TestKind {
     /// Found a missing colon in a test declaration
     MissingColon {
-        /// The offset of the test keyword
-        test_offset: usize,
+        /// The span of the test keyword
+        test_span: AstSpan,
     },
     /// Found a missing expression in a test declaration
     MissingExpr {
-        /// The offset of the test keyword
-        test_offset: usize,
+        /// The span of the test keyword
+        test_span: AstSpan,
     },
     /// Found a missing end of line in a test declaration
     MissingEndOfLine {
-        /// The offset of the test keyword
-        test_offset: usize,
+        /// The span of the test keyword
+        test_span: AstSpan,
     },
     /// Found missing inputs in a test declaration
     MissingInputs {
-        /// The offset of the opening brace
-        brace_left_offset: usize,
+        /// The span of the opening brace
+        brace_left_span: AstSpan,
     },
+}
+
+impl TestKind {
+    pub fn missing_colon(test_token: &Token) -> Self {
+        Self::MissingColon {
+            test_span: AstSpan::from(test_token),
+        }
+    }
+
+    pub fn missing_expr(test_token: &Token) -> Self {
+        Self::MissingExpr {
+            test_span: AstSpan::from(test_token),
+        }
+    }
+
+    pub fn missing_end_of_line(test_token: &Token) -> Self {
+        Self::MissingEndOfLine {
+            test_span: AstSpan::from(test_token),
+        }
+    }
+
+    pub fn missing_inputs(brace_left_token: &Token) -> Self {
+        Self::MissingInputs {
+            brace_left_span: AstSpan::from(brace_left_token),
+        }
+    }
 }
 
 /// The different kind of incomplete unit errors
