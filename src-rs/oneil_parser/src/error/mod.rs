@@ -409,12 +409,10 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing unit in a parameter
-    pub fn parameter_missing_unit(colon_token: Token) -> impl Fn(Self) -> Self {
+    pub fn parameter_missing_unit(colon_token: &Token) -> impl Fn(Self) -> Self {
         move |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Parameter(
-                ParameterKind::MissingUnit {
-                    colon_offset: colon_token.lexeme_offset(),
-                },
+                ParameterKind::missing_unit(colon_token),
             )),
             offset: error.offset,
         }
@@ -461,46 +459,38 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an unclosed bracket
-    pub fn unclosed_bracket(bracket_left_token: Token) -> impl Fn(TokenError) -> Self {
+    pub fn unclosed_bracket(bracket_left_token: &Token) -> impl Fn(TokenError) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::UnclosedBracket {
-                bracket_left_offset: bracket_left_token.lexeme_offset(),
-            }),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::unclosed_bracket(bracket_left_token)),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a missing expression in piecewise
-    pub fn piecewise_missing_expr(brace_left_token: Token) -> impl Fn(Self) -> Self {
+    pub fn piecewise_missing_expr(brace_left_token: &Token) -> impl Fn(Self) -> Self {
         move |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Parameter(
-                ParameterKind::PiecewiseMissingExpr {
-                    brace_left_offset: brace_left_token.lexeme_offset(),
-                },
+                ParameterKind::piecewise_missing_expr(brace_left_token),
             )),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a missing if keyword in piecewise
-    pub fn piecewise_missing_if(brace_left_token: Token) -> impl Fn(TokenError) -> Self {
+    pub fn piecewise_missing_if(brace_left_token: &Token) -> impl Fn(TokenError) -> Self {
         move |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Parameter(
-                ParameterKind::PiecewiseMissingIf {
-                    brace_left_offset: brace_left_token.lexeme_offset(),
-                },
+                ParameterKind::piecewise_missing_if(brace_left_token),
             )),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a missing if expression in piecewise
-    pub fn piecewise_missing_if_expr(brace_left_token: Token) -> impl Fn(Self) -> Self {
+    pub fn piecewise_missing_if_expr(brace_left_token: &Token) -> impl Fn(Self) -> Self {
         move |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Parameter(
-                ParameterKind::PiecewiseMissingIfExpr {
-                    brace_left_offset: brace_left_token.lexeme_offset(),
-                },
+                ParameterKind::piecewise_missing_if_expr(brace_left_token),
             )),
             offset: error.offset,
         }
@@ -653,8 +643,8 @@ pub enum IncompleteKind {
     Unit(UnitKind),
     /// Found an unclosed bracket
     UnclosedBracket {
-        /// The offset of the opening bracket
-        bracket_left_offset: usize,
+        /// The span of the opening bracket
+        bracket_left_span: AstSpan,
     },
     /// Found an unclosed parenthesis
     UnclosedParen {
@@ -671,6 +661,12 @@ pub enum IncompleteKind {
 }
 
 impl IncompleteKind {
+    pub fn unclosed_bracket(bracket_left_token: &Token) -> Self {
+        Self::UnclosedBracket {
+            bracket_left_span: AstSpan::from(bracket_left_token),
+        }
+    }
+
     pub fn unclosed_paren(paren_left_token: &Token) -> Self {
         Self::UnclosedParen {
             paren_left_span: AstSpan::from(paren_left_token),
@@ -859,8 +855,8 @@ pub enum ParameterKind {
     },
     /// Found a missing unit
     MissingUnit {
-        /// The offset of the colon
-        colon_offset: usize,
+        /// The span of the colon
+        colon_span: AstSpan,
     },
     /// Found a missing minimum value in limits
     LimitMissingMin,
@@ -872,19 +868,45 @@ pub enum ParameterKind {
     LimitMissingValues,
     /// Found a missing expression in piecewise
     PiecewiseMissingExpr {
-        /// The offset of the opening brace
-        brace_left_offset: usize,
+        /// The span of the opening brace
+        brace_left_span: AstSpan,
     },
     /// Found a missing if keyword in piecewise
     PiecewiseMissingIf {
-        /// The offset of the opening brace
-        brace_left_offset: usize,
+        /// The span of the opening brace
+        brace_left_span: AstSpan,
     },
     /// Found a missing if expression in piecewise
     PiecewiseMissingIfExpr {
-        /// The offset of the opening brace
-        brace_left_offset: usize,
+        /// The span of the opening brace
+        brace_left_span: AstSpan,
     },
+}
+
+impl ParameterKind {
+    pub fn missing_unit(colon_token: &Token) -> Self {
+        Self::MissingUnit {
+            colon_span: AstSpan::from(colon_token),
+        }
+    }
+
+    pub fn piecewise_missing_expr(brace_left_token: &Token) -> Self {
+        Self::PiecewiseMissingExpr {
+            brace_left_span: AstSpan::from(brace_left_token),
+        }
+    }
+
+    pub fn piecewise_missing_if(brace_left_token: &Token) -> Self {
+        Self::PiecewiseMissingIf {
+            brace_left_span: AstSpan::from(brace_left_token),
+        }
+    }
+
+    pub fn piecewise_missing_if_expr(brace_left_token: &Token) -> Self {
+        Self::PiecewiseMissingIfExpr {
+            brace_left_span: AstSpan::from(brace_left_token),
+        }
+    }
 }
 
 /// The different kind of incomplete test errors

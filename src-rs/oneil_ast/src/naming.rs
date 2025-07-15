@@ -10,7 +10,7 @@ impl Identifier {
         Self(value)
     }
 
-    pub fn value(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         &self.0
     }
 }
@@ -25,7 +25,7 @@ impl Label {
         Self(value)
     }
 
-    pub fn value(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         &self.0
     }
 }

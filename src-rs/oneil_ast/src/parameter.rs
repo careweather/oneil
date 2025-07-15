@@ -12,12 +12,12 @@ use crate::{
 /// Parameters are used to define the values of variables in the model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    name: LabelNode,
+    label: LabelNode,
     ident: IdentifierNode,
     value: ParameterValueNode,
     limits: Option<LimitsNode>,
-    is_performance: Node<bool>,
-    trace_level: TraceLevelNode,
+    performance_marker: Option<PerformanceMarkerNode>,
+    trace_level: Option<TraceLevelNode>,
     note: Option<NoteNode>,
 }
 
@@ -25,27 +25,27 @@ pub type ParameterNode = Node<Parameter>;
 
 impl Parameter {
     pub fn new(
-        name: LabelNode,
+        label: LabelNode,
         ident: IdentifierNode,
         value: ParameterValueNode,
         limits: Option<LimitsNode>,
-        is_performance: Node<bool>,
-        trace_level: TraceLevelNode,
+        performance_marker: Option<PerformanceMarkerNode>,
+        trace_level: Option<TraceLevelNode>,
         note: Option<NoteNode>,
     ) -> Self {
         Self {
-            name,
+            label,
             ident,
             value,
             limits,
-            is_performance,
+            performance_marker,
             trace_level,
             note,
         }
     }
 
-    pub fn name(&self) -> &LabelNode {
-        &self.name
+    pub fn label(&self) -> &LabelNode {
+        &self.label
     }
 
     pub fn ident(&self) -> &IdentifierNode {
@@ -60,12 +60,12 @@ impl Parameter {
         self.limits.as_ref()
     }
 
-    pub fn is_performance(&self) -> &Node<bool> {
-        &self.is_performance
+    pub fn performance_marker(&self) -> Option<&PerformanceMarkerNode> {
+        self.performance_marker.as_ref()
     }
 
-    pub fn trace_level(&self) -> &TraceLevelNode {
-        &self.trace_level
+    pub fn trace_level(&self) -> Option<&TraceLevelNode> {
+        self.trace_level.as_ref()
     }
 
     pub fn note(&self) -> Option<&NoteNode> {
@@ -80,7 +80,7 @@ impl Parameter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     Simple(ExprNode, Option<UnitExprNode>),
-    Piecewise(PiecewiseExprNode, Option<UnitExprNode>),
+    Piecewise(Vec<PiecewisePartNode>, Option<UnitExprNode>),
 }
 
 pub type ParameterValueNode = Node<ParameterValue>;
@@ -90,8 +90,8 @@ impl ParameterValue {
         Self::Simple(expr, unit)
     }
 
-    pub fn piecewise(expr: PiecewiseExprNode, unit: Option<UnitExprNode>) -> Self {
-        Self::Piecewise(expr, unit)
+    pub fn piecewise(parts: Vec<PiecewisePartNode>, unit: Option<UnitExprNode>) -> Self {
+        Self::Piecewise(parts, unit)
     }
 }
 
@@ -114,19 +114,13 @@ impl Limits {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PiecewiseExpr {
-    parts: Vec<PiecewisePartNode>,
-}
+pub struct PerformanceMarker;
 
-pub type PiecewiseExprNode = Node<PiecewiseExpr>;
+pub type PerformanceMarkerNode = Node<PerformanceMarker>;
 
-impl PiecewiseExpr {
-    pub fn new(parts: Vec<PiecewisePartNode>) -> Self {
-        Self { parts }
-    }
-
-    pub fn parts(&self) -> &[PiecewisePartNode] {
-        &self.parts
+impl PerformanceMarker {
+    pub fn new() -> Self {
+        Self
     }
 }
 
