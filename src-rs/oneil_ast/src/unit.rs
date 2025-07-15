@@ -1,7 +1,4 @@
-use crate::{
-    atom::{IdentifierNode, NumberNode},
-    node::Node,
-};
+use crate::{atom::IdentifierNode, node::Node};
 
 /// Represents a unit expression
 #[derive(Debug, Clone, PartialEq)]
@@ -11,9 +8,12 @@ pub enum UnitExpr {
         left: Box<UnitExprNode>,
         right: Box<UnitExprNode>,
     },
+    Parenthesized {
+        expr: Box<UnitExprNode>,
+    },
     Unit {
         identifier: IdentifierNode,
-        exponent: Option<NumberNode>,
+        exponent: Option<UnitExponentNode>,
     },
 }
 
@@ -26,7 +26,13 @@ impl UnitExpr {
         Self::BinaryOp { op, left, right }
     }
 
-    pub fn unit(identifier: IdentifierNode, exponent: Option<NumberNode>) -> Self {
+    pub fn parenthesized(expr: UnitExprNode) -> Self {
+        Self::Parenthesized {
+            expr: Box::new(expr),
+        }
+    }
+
+    pub fn unit(identifier: IdentifierNode, exponent: Option<UnitExponentNode>) -> Self {
         Self::Unit {
             identifier,
             exponent,
@@ -49,5 +55,24 @@ impl UnitOp {
 
     pub fn divide() -> Self {
         Self::Divide
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Unit {
+    identifier: IdentifierNode,
+    exponent: Option<f64>,
+}
+
+pub type UnitNode = Node<Unit>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnitExponent(f64);
+
+pub type UnitExponentNode = Node<UnitExponent>;
+
+impl UnitExponent {
+    pub fn new(value: f64) -> Self {
+        Self(value)
     }
 }

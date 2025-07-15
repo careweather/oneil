@@ -46,6 +46,16 @@ where
     }
 }
 
+impl<T> From<T> for Node<T>
+where
+    T: Debug + Clone + PartialEq + SpanLike,
+{
+    fn from(value: T) -> Self {
+        let span = Span::from(&value);
+        Self::new(span, value)
+    }
+}
+
 // this allows us to treat node as the value it contains
 impl<T> Deref for Node<T>
 where

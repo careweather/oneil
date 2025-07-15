@@ -29,8 +29,12 @@ use crate::{
     },
 };
 
-use oneil_ast::expression::{BinaryOp, UnaryOp};
 use oneil_ast::unit::UnitOp;
+use oneil_ast::{
+    Span as AstSpan,
+    expression::{BinaryOp, UnaryOp},
+    unit::UnitOpNode,
+};
 
 mod parser_trait;
 pub use parser_trait::ErrorHandlingParser;
@@ -316,11 +320,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an invalid number
-    pub fn invalid_number(number_token: Token) -> impl Fn() -> Self {
+    pub fn invalid_number(number_token: &Token) -> impl Fn() -> Self {
         move || Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::InvalidNumber(
-                number_token.lexeme().to_string(),
-            )),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::invalid_number(number_token)),
             offset: number_token.lexeme_offset(),
         }
     }
@@ -336,11 +338,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an unclosed parenthesis
-    pub fn unclosed_paren(paren_left_token: Token) -> impl Fn(TokenError) -> Self {
+    pub fn unclosed_paren(paren_left_token: &Token) -> impl Fn(TokenError) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::UnclosedParen {
-                paren_left_offset: paren_left_token.lexeme_offset(),
-            }),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::unclosed_paren(paren_left_token)),
             offset: error.offset,
         }
     }
@@ -565,32 +565,31 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing second term in a unit expression
-    pub fn unit_missing_second_term(operator: UnitOp) -> impl Fn(Self) -> Self {
+    pub fn unit_missing_second_term(operator_node: &UnitOpNode) -> impl Fn(Self) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::MissingSecondTerm {
-                operator,
-                operator_offset: error.offset,
-            })),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::missing_second_term(
+                operator_node,
+            ))),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a missing exponent in a unit expression
-    pub fn unit_missing_exponent(caret_token: Token) -> impl Fn(TokenError) -> Self {
+    pub fn unit_missing_exponent(caret_token: &Token) -> impl Fn(TokenError) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::MissingExponent {
-                caret_offset: caret_token.lexeme_offset(),
-            })),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::missing_exponent(
+                caret_token,
+            ))),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a missing expression in parenthesized unit
-    pub fn unit_paren_missing_expr(paren_left_token: Token) -> impl Fn(Self) -> Self {
+    pub fn unit_paren_missing_expr(paren_left_token: &Token) -> impl Fn(Self) -> Self {
         move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::ParenMissingExpr {
-                paren_left_offset: paren_left_token.lexeme_offset(),
-            })),
+            kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::paren_missing_expr(
+                paren_left_token,
+            ))),
             offset: error.offset,
         }
     }
@@ -671,8 +670,8 @@ pub enum IncompleteKind {
     },
     /// Found an unclosed parenthesis
     UnclosedParen {
-        /// The offset of the opening parenthesis
-        paren_left_offset: usize,
+        /// The span of the opening parenthesis
+        paren_left_span: AstSpan,
     },
     /// Found an unclosed brace
     UnclosedBrace {
@@ -680,7 +679,19 @@ pub enum IncompleteKind {
         brace_left_offset: usize,
     },
     /// Found an invalid number with the given text
-    InvalidNumber(String),
+    InvalidNumber(AstSpan),
+}
+
+impl IncompleteKind {
+    pub fn unclosed_paren(paren_left_token: &Token) -> Self {
+        Self::UnclosedParen {
+            paren_left_span: AstSpan::from(paren_left_token),
+        }
+    }
+
+    pub fn invalid_number(number_token: &Token) -> Self {
+        Self::InvalidNumber(AstSpan::from(number_token))
+    }
 }
 
 /// The different kind of incomplete declaration errors
@@ -890,21 +901,42 @@ pub enum TestKind {
 pub enum UnitKind {
     /// Found a missing second term in a unit expression
     MissingSecondTerm {
-        /// The operator
+        /// The operator span
+        operator_span: AstSpan,
+        /// The operator value
         operator: UnitOp,
-        /// The offset of the operator
-        operator_offset: usize,
     },
     /// Found a missing exponent in a unit expression
     MissingExponent {
-        /// The offset of the caret
-        caret_offset: usize,
+        /// The span of the caret
+        caret_span: AstSpan,
     },
     /// Found a missing expression in parenthesized unit
     ParenMissingExpr {
-        /// The offset of the opening parenthesis
-        paren_left_offset: usize,
+        /// The span of the opening parenthesis
+        paren_left_span: AstSpan,
     },
+}
+
+impl UnitKind {
+    pub fn missing_second_term(operator_node: &UnitOpNode) -> Self {
+        Self::MissingSecondTerm {
+            operator_span: operator_node.node_span().clone(),
+            operator: operator_node.node_value().clone(),
+        }
+    }
+
+    pub fn missing_exponent(caret_token: &Token) -> Self {
+        Self::MissingExponent {
+            caret_span: AstSpan::from(caret_token),
+        }
+    }
+
+    pub fn paren_missing_expr(paren_left_token: &Token) -> Self {
+        Self::ParenMissingExpr {
+            paren_left_span: AstSpan::from(paren_left_token),
+        }
+    }
 }
 
 impl<'a> ParseError<Span<'a>> for ParserError {
@@ -926,12 +958,13 @@ impl<'a> ParseError<Span<'a>> for ParserError {
     }
 }
 
-impl<'a, F> FromExternalError<Span<'a>, F> for ParserError
-where
-    F: Fn() -> ParserError,
-{
-    fn from_external_error(_input: Span<'a>, _kind: nom::error::ErrorKind, f: F) -> Self {
-        f()
+impl<'a> FromExternalError<Span<'a>, ParserError> for ParserError {
+    fn from_external_error(
+        _input: Span<'a>,
+        _kind: nom::error::ErrorKind,
+        other: ParserError,
+    ) -> Self {
+        other
     }
 }
 
