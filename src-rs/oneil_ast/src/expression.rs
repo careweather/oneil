@@ -1,7 +1,4 @@
-use crate::{
-    atom::{BooleanNode, IdentifierNode, NumberNode, StrNode},
-    node::Node,
-};
+use crate::{naming::IdentifierNode, node::Node};
 
 /// An expression in the Oneil language
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +17,10 @@ pub enum Expr {
     FunctionCall {
         name: IdentifierNode,
         args: Vec<ExprNode>,
+    },
+
+    Parenthesized {
+        expr: Box<ExprNode>,
     },
 
     Variable(VariableNode),
@@ -47,6 +48,12 @@ impl Expr {
 
     pub fn function_call(name: IdentifierNode, args: Vec<ExprNode>) -> Self {
         Self::FunctionCall { name, args }
+    }
+
+    pub fn parenthesized(expr: ExprNode) -> Self {
+        Self::Parenthesized {
+            expr: Box::new(expr),
+        }
     }
 
     pub fn variable(var: VariableNode) -> Self {
@@ -195,23 +202,23 @@ impl Variable {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
-    Number(NumberNode),
-    String(StrNode),
-    Boolean(BooleanNode),
+    Number(f64),
+    String(String),
+    Boolean(bool),
 }
 
 pub type LiteralNode = Node<Literal>;
 
 impl Literal {
-    pub fn number(num: NumberNode) -> Self {
+    pub fn number(num: f64) -> Self {
         Self::Number(num)
     }
 
-    pub fn string(str: StrNode) -> Self {
+    pub fn string(str: String) -> Self {
         Self::String(str)
     }
 
-    pub fn boolean(bool: BooleanNode) -> Self {
+    pub fn boolean(bool: bool) -> Self {
         Self::Boolean(bool)
     }
 }

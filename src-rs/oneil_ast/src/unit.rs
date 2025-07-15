@@ -1,4 +1,4 @@
-use crate::{atom::IdentifierNode, node::Node};
+use crate::{naming::IdentifierNode, node::Node};
 
 /// Represents a unit expression
 #[derive(Debug, Clone, PartialEq)]

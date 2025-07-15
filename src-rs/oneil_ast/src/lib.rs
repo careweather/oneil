@@ -6,11 +6,11 @@
 //! This module contains the core data structures that represent Oneil programs
 //! in memory after parsing.
 
-pub mod atom;
 pub mod debug_info;
 pub mod declaration;
 pub mod expression;
 pub mod model;
+pub mod naming;
 pub mod node;
 pub mod note;
 pub mod parameter;

@@ -29,12 +29,12 @@ use crate::{
     },
 };
 
-use oneil_ast::unit::UnitOp;
 use oneil_ast::{
     Span as AstSpan,
-    expression::{BinaryOp, UnaryOp},
+    expression::{BinaryOp, UnaryOp, UnaryOpNode},
     unit::UnitOpNode,
 };
+use oneil_ast::{expression::BinaryOpNode, unit::UnitOp};
 
 mod parser_trait;
 pub use parser_trait::ErrorHandlingParser;
@@ -294,52 +294,44 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a binary operation missing its second operand
-    pub fn binary_op_missing_second_operand(operator: BinaryOp) -> impl Fn(Self) -> Self {
-        move |error| Self {
+    pub fn binary_op_missing_second_operand(operator: &BinaryOpNode) -> impl Fn(Self) -> Self {
+        |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Expr(
-                ExprKind::BinaryOpMissingSecondOperand {
-                    operator,
-                    operator_offset: error.offset,
-                },
+                ExprKind::binary_op_missing_second_operand(operator),
             )),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for a unary operation missing its operand
-    pub fn unary_op_missing_operand(operator: UnaryOp) -> impl Fn(Self) -> Self {
-        move |error| Self {
+    pub fn unary_op_missing_operand(operator: &UnaryOpNode) -> impl Fn(Self) -> Self {
+        |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Expr(
-                ExprKind::UnaryOpMissingOperand {
-                    operator,
-                    operator_offset: error.offset,
-                },
+                ExprKind::unary_op_missing_operand(operator),
             )),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for an invalid number
-    pub fn invalid_number(number_token: &Token) -> impl Fn() -> Self {
-        move || Self {
+    pub fn invalid_number(number_token: &Token) -> Self {
+        Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::invalid_number(number_token)),
             offset: number_token.lexeme_offset(),
         }
     }
 
     /// Creates a new ParserError for a parenthesis missing its expression
-    pub fn paren_missing_expression(paren_left_token: Token) -> impl Fn(Self) -> Self {
-        move |error| Self {
-            kind: ParserErrorKind::Incomplete(IncompleteKind::UnclosedParen {
-                paren_left_offset: paren_left_token.lexeme_offset(),
-            }),
+    pub fn paren_missing_expression(paren_left_token: &Token) -> impl Fn(Self) -> Self {
+        |error| Self {
+            kind: ParserErrorKind::Incomplete(IncompleteKind::unclosed_paren(paren_left_token)),
             offset: error.offset,
         }
     }
 
     /// Creates a new ParserError for an unclosed parenthesis
     pub fn unclosed_paren(paren_left_token: &Token) -> impl Fn(TokenError) -> Self {
-        move |error| Self {
+        |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::unclosed_paren(paren_left_token)),
             offset: error.offset,
         }
@@ -566,7 +558,7 @@ impl ParserError {
 
     /// Creates a new ParserError for a missing second term in a unit expression
     pub fn unit_missing_second_term(operator_node: &UnitOpNode) -> impl Fn(Self) -> Self {
-        move |error| Self {
+        |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::missing_second_term(
                 operator_node,
             ))),
@@ -576,7 +568,7 @@ impl ParserError {
 
     /// Creates a new ParserError for a missing exponent in a unit expression
     pub fn unit_missing_exponent(caret_token: &Token) -> impl Fn(TokenError) -> Self {
-        move |error| Self {
+        |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::missing_exponent(
                 caret_token,
             ))),
@@ -586,7 +578,7 @@ impl ParserError {
 
     /// Creates a new ParserError for a missing expression in parenthesized unit
     pub fn unit_paren_missing_expr(paren_left_token: &Token) -> impl Fn(Self) -> Self {
-        move |error| Self {
+        |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Unit(UnitKind::paren_missing_expr(
                 paren_left_token,
             ))),
@@ -595,12 +587,10 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing parent in a variable accessor
-    pub fn variable_missing_parent(dot_token: Token) -> impl Fn(TokenError) -> Self {
-        move |error| Self {
+    pub fn variable_missing_parent(dot_token: &Token) -> impl Fn(TokenError) -> Self {
+        |error| Self {
             kind: ParserErrorKind::Incomplete(IncompleteKind::Expr(
-                ExprKind::VariableMissingParent {
-                    dot_offset: dot_token.lexeme_offset(),
-                },
+                ExprKind::variable_missing_parent(dot_token),
             )),
             offset: error.offset,
         }
@@ -781,23 +771,45 @@ pub enum UseKind {
 pub enum ExprKind {
     /// Found a binary operation missing a second operand
     BinaryOpMissingSecondOperand {
-        /// The operator
+        /// The operator span
+        operator_span: AstSpan,
+        /// The operator value
         operator: BinaryOp,
-        /// The offset of the operator
-        operator_offset: usize,
     },
     /// Found a unary operation missing its operand
     UnaryOpMissingOperand {
-        /// The operator
+        /// The operator span
+        operator_span: AstSpan,
+        /// The operator value
         operator: UnaryOp,
-        /// The offset of the operator
-        operator_offset: usize,
     },
     /// Found a missing parent in a variable accessor
     VariableMissingParent {
-        /// The offset of the dot
-        dot_offset: usize,
+        /// The span of the dot
+        dot_span: AstSpan,
     },
+}
+
+impl ExprKind {
+    pub fn binary_op_missing_second_operand(operator: &BinaryOpNode) -> Self {
+        Self::BinaryOpMissingSecondOperand {
+            operator_span: operator.node_span().clone(),
+            operator: operator.node_value().clone(),
+        }
+    }
+
+    pub fn unary_op_missing_operand(operator: &UnaryOpNode) -> Self {
+        Self::UnaryOpMissingOperand {
+            operator_span: operator.node_span().clone(),
+            operator: operator.node_value().clone(),
+        }
+    }
+
+    pub fn variable_missing_parent(dot_token: &Token) -> Self {
+        Self::VariableMissingParent {
+            dot_span: AstSpan::from(dot_token),
+        }
+    }
 }
 
 /// The different kind of incomplete section errors

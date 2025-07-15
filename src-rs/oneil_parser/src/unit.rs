@@ -9,7 +9,7 @@ use nom::{
 
 use oneil_ast::{
     Span as AstSpan,
-    atom::Identifier,
+    naming::Identifier,
     node::Node,
     unit::{UnitExponent, UnitExpr, UnitExprNode, UnitOp},
 };

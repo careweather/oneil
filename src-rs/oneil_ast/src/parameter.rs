@@ -1,7 +1,7 @@
 use crate::{
-    atom::{IdentifierNode, LabelNode},
     debug_info::TraceLevelNode,
     expression::ExprNode,
+    naming::{IdentifierNode, LabelNode},
     node::Node,
     note::NoteNode,
     unit::UnitExprNode,

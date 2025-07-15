@@ -1,4 +1,4 @@
-use crate::{atom::LabelNode, declaration::DeclNode, node::Node, note::NoteNode};
+use crate::{declaration::DeclNode, naming::LabelNode, node::Node, note::NoteNode};
 
 /// A model definition in an Oneil program
 ///

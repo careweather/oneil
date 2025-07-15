@@ -1,4 +1,4 @@
-use crate::{atom::IdentifierNode, debug_info::TraceLevelNode, expression::ExprNode, node::Node};
+use crate::{debug_info::TraceLevelNode, expression::ExprNode, naming::IdentifierNode, node::Node};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {

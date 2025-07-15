@@ -1,5 +1,5 @@
 use crate::{
-    atom::IdentifierNode, expression::ExprNode, node::Node, parameter::ParameterNode,
+    expression::ExprNode, naming::IdentifierNode, node::Node, parameter::ParameterNode,
     test::TestNode,
 };
 
