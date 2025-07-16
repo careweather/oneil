@@ -10,6 +10,9 @@
 //! The error system is built on top of nom's error handling, extending it with
 //! Oneil-specific error types and location tracking.
 //!
+//! Note that all constructor methods in both `ParserError` and `ParserErrorReason`
+//! have been made `pub(crate)` to improve encapsulation.
+//!
 //! # Error Handling Strategy
 //!
 //! The parser uses a two-level error handling approach:
@@ -42,8 +45,6 @@ pub use parser_trait::ErrorHandlingParser;
 
 pub mod partial;
 pub use partial::ErrorsWithPartialResult;
-
-// TODO: make all constructors in this file `pub(crate)`
 
 /// An error that occurred during parsing.
 ///
@@ -78,7 +79,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an expected declaration
-    pub fn expect_decl(error: Self) -> Self {
+    pub(crate) fn expect_decl(error: Self) -> Self {
         Self {
             reason: ParserErrorReason::expect_decl(),
             error_offset: error.error_offset,
@@ -86,7 +87,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an expected expression
-    pub fn expect_expr(error: Self) -> Self {
+    pub(crate) fn expect_expr(error: Self) -> Self {
         Self {
             reason: ParserErrorReason::expect_expr(),
             error_offset: error.error_offset,
@@ -94,7 +95,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an expected note
-    pub fn expect_note(error: TokenError) -> Self {
+    pub(crate) fn expect_note(error: TokenError) -> Self {
         Self {
             reason: ParserErrorReason::expect_note(),
             error_offset: error.offset,
@@ -102,7 +103,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an expected parameter
-    pub fn expect_parameter(error: TokenError) -> Self {
+    pub(crate) fn expect_parameter(error: TokenError) -> Self {
         Self {
             reason: ParserErrorReason::expect_parameter(),
             error_offset: error.offset,
@@ -110,7 +111,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an expected test
-    pub fn expect_test(error: TokenError) -> Self {
+    pub(crate) fn expect_test(error: TokenError) -> Self {
         Self {
             reason: ParserErrorReason::expect_test(),
             error_offset: error.offset,
@@ -118,7 +119,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an expected unit
-    pub fn expect_unit(error: Self) -> Self {
+    pub(crate) fn expect_unit(error: Self) -> Self {
         Self {
             reason: ParserErrorReason::expect_unit(),
             error_offset: error.error_offset,
@@ -126,7 +127,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing path in an import declaration
-    pub fn import_missing_path(import_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn import_missing_path(import_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let import_span = AstSpan::from(import_span);
             Self {
@@ -137,7 +138,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing end of line in an import declaration
-    pub fn import_missing_end_of_line(
+    pub(crate) fn import_missing_end_of_line(
         import_path_span: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
@@ -150,7 +151,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing path in a from declaration
-    pub fn from_missing_path(from_span: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn from_missing_path(from_span: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let from_span = AstSpan::from(from_span);
             error.convert_reason(ParserErrorReason::from_missing_path(from_span))
@@ -158,7 +159,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing use keyword in a from declaration
-    pub fn from_missing_use(from_path: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn from_missing_use(from_path: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let from_path_span = AstSpan::from(from_path);
             Self {
@@ -169,7 +170,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing use model in a from declaration
-    pub fn from_missing_use_model(use_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn from_missing_use_model(use_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let use_span = AstSpan::from(use_token);
             Self {
@@ -180,7 +181,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing as keyword in a from declaration
-    pub fn from_missing_as(use_model_or_inputs: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn from_missing_as(
+        use_model_or_inputs: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let use_model_or_inputs_span = AstSpan::from(use_model_or_inputs);
             Self {
@@ -191,7 +194,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing alias in a from declaration
-    pub fn from_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn from_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let as_span = AstSpan::from(as_token);
             Self {
@@ -202,7 +205,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing end of line in a from declaration
-    pub fn from_missing_end_of_line(alias_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn from_missing_end_of_line(
+        alias_span: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let alias_span = AstSpan::from(alias_span);
             Self {
@@ -213,7 +218,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing path in a use declaration
-    pub fn use_missing_path(use_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn use_missing_path(use_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let use_span = AstSpan::from(use_token);
             Self {
@@ -224,7 +229,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing as keyword in a use declaration
-    pub fn use_missing_as(use_path_or_inputs: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn use_missing_as(
+        use_path_or_inputs: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let use_path_or_inputs_span = AstSpan::from(use_path_or_inputs);
             Self {
@@ -235,7 +242,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing alias in a use declaration
-    pub fn use_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn use_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let as_span = AstSpan::from(as_token);
             Self {
@@ -246,7 +253,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing end of line in a use declaration
-    pub fn use_missing_end_of_line(alias_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn use_missing_end_of_line(
+        alias_span: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let alias_span = AstSpan::from(alias_span);
             Self {
@@ -257,7 +266,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing value in a model input
-    pub fn model_input_missing_value(equals_span: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn model_input_missing_value(equals_span: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let equals_span = AstSpan::from(equals_span);
             Self {
@@ -268,7 +277,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing subcomponent in a model path
-    pub fn model_path_missing_subcomponent(
+    pub(crate) fn model_path_missing_subcomponent(
         dot_token: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
@@ -281,7 +290,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a binary operation missing its second operand
-    pub fn expr_binary_op_missing_second_operand(operator: &BinaryOpNode) -> impl Fn(Self) -> Self {
+    pub(crate) fn expr_binary_op_missing_second_operand(
+        operator: &BinaryOpNode,
+    ) -> impl Fn(Self) -> Self {
         move |error| {
             let operator_span = AstSpan::from(operator);
             let operator = operator.node_value().clone();
@@ -296,7 +307,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a unary operation missing its operand
-    pub fn unary_op_missing_operand(operator: &UnaryOpNode) -> impl Fn(Self) -> Self {
+    pub(crate) fn unary_op_missing_operand(operator: &UnaryOpNode) -> impl Fn(Self) -> Self {
         move |error| {
             let operator_span = AstSpan::from(operator);
             let operator = operator.node_value().clone();
@@ -308,7 +319,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a parenthesis missing its expression
-    pub fn expr_paren_missing_expression(
+    pub(crate) fn expr_paren_missing_expression(
         paren_left_token: &impl SpanLike,
     ) -> impl Fn(Self) -> Self {
         move |error| {
@@ -321,7 +332,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing parent in a variable accessor
-    pub fn expr_variable_missing_parent(dot_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn expr_variable_missing_parent(
+        dot_span: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let dot_span = AstSpan::from(dot_span);
             Self {
@@ -332,7 +345,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a section missing a label
-    pub fn section_missing_label(section_token: &Token) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn section_missing_label(section_token: &Token) -> impl Fn(TokenError) -> Self {
         move |error| {
             let section_span = AstSpan::from(section_token);
             Self {
@@ -343,7 +356,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a section missing an end of line
-    pub fn section_missing_end_of_line(
+    pub(crate) fn section_missing_end_of_line(
         section_label_span: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
@@ -356,7 +369,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing identifier in a parameter
-    pub fn parameter_missing_identifier(
+    pub(crate) fn parameter_missing_identifier(
         colon_token: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
@@ -369,7 +382,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing equals sign in a parameter
-    pub fn parameter_missing_equals_sign(
+    pub(crate) fn parameter_missing_equals_sign(
         ident_span: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
@@ -382,7 +395,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing value in a parameter
-    pub fn parameter_missing_value(equals_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn parameter_missing_value(equals_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let equals_span = AstSpan::from(equals_token);
             Self {
@@ -393,7 +406,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing end of line in a parameter
-    pub fn parameter_missing_end_of_line(
+    pub(crate) fn parameter_missing_end_of_line(
         value_span: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
@@ -406,7 +419,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing unit in a parameter
-    pub fn parameter_missing_unit(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn parameter_missing_unit(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let colon_span = AstSpan::from(colon_token);
             Self {
@@ -417,7 +430,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing minimum value in limits
-    pub fn limit_missing_min(paren_left_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn limit_missing_min(paren_left_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let left_paren_span = AstSpan::from(paren_left_token);
             Self {
@@ -428,7 +441,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing comma in limits
-    pub fn limit_missing_comma(min_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn limit_missing_comma(min_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let min_span = AstSpan::from(min_span);
             Self {
@@ -439,7 +452,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing maximum value in limits
-    pub fn limit_missing_max(comma_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn limit_missing_max(comma_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let comma_span = AstSpan::from(comma_token);
             Self {
@@ -450,7 +463,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for missing values in discrete limits
-    pub fn limit_missing_values(bracket_left_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn limit_missing_values(
+        bracket_left_token: &impl SpanLike,
+    ) -> impl Fn(Self) -> Self {
         move |error| {
             let bracket_left_span = AstSpan::from(bracket_left_token);
             Self {
@@ -461,7 +476,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing expression in piecewise
-    pub fn piecewise_missing_expr(brace_left_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn piecewise_missing_expr(
+        brace_left_token: &impl SpanLike,
+    ) -> impl Fn(Self) -> Self {
         // TODO: make sure that we use the convert function above rather than creating a new one
         move |error| {
             let brace_left_span = AstSpan::from(brace_left_token);
@@ -473,7 +490,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing if keyword in piecewise
-    pub fn piecewise_missing_if(expr_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn piecewise_missing_if(expr_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let expr_span = AstSpan::from(expr_span);
             Self {
@@ -484,7 +501,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing if expression in piecewise
-    pub fn piecewise_missing_if_expr(if_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn piecewise_missing_if_expr(if_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let if_span = AstSpan::from(if_token);
             Self {
@@ -495,7 +512,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing colon in a test declaration
-    pub fn test_missing_colon(
+    pub(crate) fn test_missing_colon(
         test_kw_or_inputs_span: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
@@ -508,7 +525,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing expression in a test declaration
-    pub fn test_missing_expr(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn test_missing_expr(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let colon_span = AstSpan::from(colon_token);
             Self {
@@ -519,7 +536,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing end of line in a test declaration
-    pub fn test_missing_end_of_line(expr_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn test_missing_end_of_line(
+        expr_span: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let expr_span = AstSpan::from(expr_span);
             Self {
@@ -530,7 +549,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for missing inputs in a test declaration
-    pub fn test_missing_inputs(brace_left_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn test_missing_inputs(
+        brace_left_token: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let brace_left_span = AstSpan::from(brace_left_token);
             Self {
@@ -541,7 +562,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing second term in a unit expression
-    pub fn unit_missing_second_term(operator_node: &UnitOpNode) -> impl Fn(Self) -> Self {
+    pub(crate) fn unit_missing_second_term(operator_node: &UnitOpNode) -> impl Fn(Self) -> Self {
         move |error| {
             let operator_span = AstSpan::from(operator_node);
             let operator = operator_node.node_value().clone();
@@ -553,7 +574,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing exponent in a unit expression
-    pub fn unit_missing_exponent(caret_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn unit_missing_exponent(
+        caret_token: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let caret_span = AstSpan::from(caret_token);
             Self {
@@ -564,9 +587,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing expression in parenthesized unit
-    pub fn unit_paren_missing_expr(paren_left_token: &Token) -> impl Fn(Self) -> Self {
-        todo!();
-        println!();
+    pub(crate) fn unit_paren_missing_expr(
+        paren_left_token: &impl SpanLike,
+    ) -> impl Fn(Self) -> Self {
         move |error| {
             let paren_left_span = AstSpan::from(paren_left_token);
             Self {
@@ -577,7 +600,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an unclosed brace
-    pub fn unclosed_brace(brace_left_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn unclosed_brace(brace_left_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let brace_left_span = AstSpan::from(brace_left_token);
             Self {
@@ -588,7 +611,9 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an unclosed bracket
-    pub fn unclosed_bracket(bracket_left_token: &Token) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn unclosed_bracket(
+        bracket_left_token: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let bracket_left_span = AstSpan::from(bracket_left_token);
             Self {
@@ -599,7 +624,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for an unclosed parenthesis
-    pub fn unclosed_paren(paren_left_token: &Token) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn unclosed_paren(paren_left_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let paren_left_span = AstSpan::from(paren_left_token);
             Self {
@@ -633,129 +658,129 @@ pub enum ParserErrorReason {
 }
 
 impl ParserErrorReason {
-    pub fn expect_decl() -> Self {
+    pub(crate) fn expect_decl() -> Self {
         Self::Expect(ExpectKind::Decl)
     }
 
-    pub fn expect_expr() -> Self {
+    pub(crate) fn expect_expr() -> Self {
         Self::Expect(ExpectKind::Expr)
     }
 
-    pub fn expect_note() -> Self {
+    pub(crate) fn expect_note() -> Self {
         Self::Expect(ExpectKind::Note)
     }
 
-    pub fn expect_parameter() -> Self {
+    pub(crate) fn expect_parameter() -> Self {
         Self::Expect(ExpectKind::Parameter)
     }
 
-    pub fn expect_test() -> Self {
+    pub(crate) fn expect_test() -> Self {
         Self::Expect(ExpectKind::Test)
     }
 
-    pub fn expect_unit() -> Self {
+    pub(crate) fn expect_unit() -> Self {
         Self::Expect(ExpectKind::Unit)
     }
 
-    pub fn import_missing_path(import_span: AstSpan) -> Self {
+    pub(crate) fn import_missing_path(import_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: import_span,
             kind: IncompleteKind::Decl(DeclKind::Import(ImportKind::MissingPath)),
         }
     }
 
-    pub fn import_missing_end_of_line(import_path_span: AstSpan) -> Self {
+    pub(crate) fn import_missing_end_of_line(import_path_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: import_path_span,
             kind: IncompleteKind::Decl(DeclKind::Import(ImportKind::MissingEndOfLine)),
         }
     }
 
-    pub fn from_missing_path(from_span: AstSpan) -> Self {
+    pub(crate) fn from_missing_path(from_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: from_span,
             kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingPath)),
         }
     }
 
-    pub fn from_missing_use(from_path_span: AstSpan) -> Self {
+    pub(crate) fn from_missing_use(from_path_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: from_path_span,
             kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingUse)),
         }
     }
 
-    pub fn from_missing_use_model(use_span: AstSpan) -> Self {
+    pub(crate) fn from_missing_use_model(use_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: use_span,
             kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingUseModel)),
         }
     }
 
-    pub fn from_missing_as(use_model_or_inputs_span: AstSpan) -> Self {
+    pub(crate) fn from_missing_as(use_model_or_inputs_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: use_model_or_inputs_span,
             kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAs)),
         }
     }
 
-    pub fn from_missing_alias(as_span: AstSpan) -> Self {
+    pub(crate) fn from_missing_alias(as_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: as_span,
             kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAlias)),
         }
     }
 
-    pub fn from_missing_end_of_line(alias_span: AstSpan) -> Self {
+    pub(crate) fn from_missing_end_of_line(alias_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: alias_span,
             kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingEndOfLine)),
         }
     }
 
-    pub fn use_missing_path(use_span: AstSpan) -> Self {
+    pub(crate) fn use_missing_path(use_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: use_span,
             kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingPath)),
         }
     }
 
-    pub fn use_missing_as(use_path_or_inputs_span: AstSpan) -> Self {
+    pub(crate) fn use_missing_as(use_path_or_inputs_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: use_path_or_inputs_span,
             kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAs)),
         }
     }
 
-    pub fn use_missing_alias(as_span: AstSpan) -> Self {
+    pub(crate) fn use_missing_alias(as_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: as_span,
             kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAlias)),
         }
     }
 
-    pub fn use_missing_end_of_line(alias_span: AstSpan) -> Self {
+    pub(crate) fn use_missing_end_of_line(alias_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: alias_span,
             kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingEndOfLine)),
         }
     }
 
-    pub fn model_input_missing_value(equals_span: AstSpan) -> Self {
+    pub(crate) fn model_input_missing_value(equals_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: equals_span,
             kind: IncompleteKind::Decl(DeclKind::ModelInputMissingValue),
         }
     }
 
-    pub fn model_path_missing_subcomponent(dot_span: AstSpan) -> Self {
+    pub(crate) fn model_path_missing_subcomponent(dot_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: dot_span,
             kind: IncompleteKind::Decl(DeclKind::ModelPathMissingSubcomponent),
         }
     }
 
-    pub fn expr_binary_op_missing_second_operand(
+    pub(crate) fn expr_binary_op_missing_second_operand(
         operator_span: AstSpan,
         operator: BinaryOp,
     ) -> Self {
@@ -765,204 +790,204 @@ impl ParserErrorReason {
         }
     }
 
-    pub fn expr_paren_missing_expr(paren_left_span: AstSpan) -> Self {
+    pub(crate) fn expr_paren_missing_expr(paren_left_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: paren_left_span,
             kind: IncompleteKind::Expr(ExprKind::ParenMissingExpr),
         }
     }
 
-    pub fn expr_unary_op_missing_operand(operator_span: AstSpan, operator: UnaryOp) -> Self {
+    pub(crate) fn expr_unary_op_missing_operand(operator_span: AstSpan, operator: UnaryOp) -> Self {
         Self::Incomplete {
             cause: operator_span,
             kind: IncompleteKind::Expr(ExprKind::UnaryOpMissingOperand { operator }),
         }
     }
 
-    pub fn expr_variable_missing_parent_model(dot_span: AstSpan) -> Self {
+    pub(crate) fn expr_variable_missing_parent_model(dot_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: dot_span,
             kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
         }
     }
 
-    pub fn section_missing_label(section_span: AstSpan) -> Self {
+    pub(crate) fn section_missing_label(section_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: section_span,
             kind: IncompleteKind::Section(SectionKind::MissingLabel),
         }
     }
 
-    pub fn section_missing_end_of_line(section_label_span: AstSpan) -> Self {
+    pub(crate) fn section_missing_end_of_line(section_label_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: section_label_span,
             kind: IncompleteKind::Section(SectionKind::MissingEndOfLine),
         }
     }
 
-    pub fn parameter_missing_identifier(colon_span: AstSpan) -> Self {
+    pub(crate) fn parameter_missing_identifier(colon_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: colon_span,
             kind: IncompleteKind::Parameter(ParameterKind::MissingIdentifier),
         }
     }
 
-    pub fn parameter_missing_equals_sign(ident_span: AstSpan) -> Self {
+    pub(crate) fn parameter_missing_equals_sign(ident_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: ident_span,
             kind: IncompleteKind::Parameter(ParameterKind::MissingEqualsSign),
         }
     }
 
-    pub fn parameter_missing_value(equals_span: AstSpan) -> Self {
+    pub(crate) fn parameter_missing_value(equals_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: equals_span,
             kind: IncompleteKind::Parameter(ParameterKind::MissingValue),
         }
     }
 
-    pub fn parameter_missing_end_of_line(value_span: AstSpan) -> Self {
+    pub(crate) fn parameter_missing_end_of_line(value_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: value_span,
             kind: IncompleteKind::Parameter(ParameterKind::MissingEndOfLine),
         }
     }
 
-    pub fn parameter_missing_unit(colon_span: AstSpan) -> Self {
+    pub(crate) fn parameter_missing_unit(colon_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: colon_span,
             kind: IncompleteKind::Parameter(ParameterKind::MissingUnit),
         }
     }
 
-    pub fn limit_missing_min(left_paren_span: AstSpan) -> Self {
+    pub(crate) fn limit_missing_min(left_paren_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: left_paren_span,
             kind: IncompleteKind::Parameter(ParameterKind::LimitMissingMin),
         }
     }
 
-    pub fn limit_missing_comma(min_span: AstSpan) -> Self {
+    pub(crate) fn limit_missing_comma(min_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: min_span,
             kind: IncompleteKind::Parameter(ParameterKind::LimitMissingComma),
         }
     }
 
-    pub fn limit_missing_max(comma_span: AstSpan) -> Self {
+    pub(crate) fn limit_missing_max(comma_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: comma_span,
             kind: IncompleteKind::Parameter(ParameterKind::LimitMissingMax),
         }
     }
 
-    pub fn limit_missing_values(left_bracket_span: AstSpan) -> Self {
+    pub(crate) fn limit_missing_values(left_bracket_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: left_bracket_span,
             kind: IncompleteKind::Parameter(ParameterKind::LimitMissingValues),
         }
     }
 
-    pub fn piecewise_missing_expr(brace_left_span: AstSpan) -> Self {
+    pub(crate) fn piecewise_missing_expr(brace_left_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: brace_left_span,
             kind: IncompleteKind::Parameter(ParameterKind::PiecewiseMissingExpr),
         }
     }
 
-    pub fn piecewise_missing_if(expr_span: AstSpan) -> Self {
+    pub(crate) fn piecewise_missing_if(expr_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: expr_span,
             kind: IncompleteKind::Parameter(ParameterKind::PiecewiseMissingIf),
         }
     }
 
-    pub fn piecewise_missing_if_expr(if_span: AstSpan) -> Self {
+    pub(crate) fn piecewise_missing_if_expr(if_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: if_span,
             kind: IncompleteKind::Parameter(ParameterKind::PiecewiseMissingIfExpr),
         }
     }
 
-    pub fn test_missing_colon(test_kw_or_inputs_span: AstSpan) -> Self {
+    pub(crate) fn test_missing_colon(test_kw_or_inputs_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: test_kw_or_inputs_span,
             kind: IncompleteKind::Test(TestKind::MissingColon),
         }
     }
 
-    pub fn test_missing_expr(colon_span: AstSpan) -> Self {
+    pub(crate) fn test_missing_expr(colon_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: colon_span,
             kind: IncompleteKind::Test(TestKind::MissingExpr),
         }
     }
 
-    pub fn test_missing_end_of_line(expr_span: AstSpan) -> Self {
+    pub(crate) fn test_missing_end_of_line(expr_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: expr_span,
             kind: IncompleteKind::Test(TestKind::MissingEndOfLine),
         }
     }
 
-    pub fn test_missing_inputs(brace_left_span: AstSpan) -> Self {
+    pub(crate) fn test_missing_inputs(brace_left_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: brace_left_span,
             kind: IncompleteKind::Test(TestKind::MissingInputs),
         }
     }
 
-    pub fn unit_missing_second_term(operator_span: AstSpan, operator: UnitOp) -> Self {
+    pub(crate) fn unit_missing_second_term(operator_span: AstSpan, operator: UnitOp) -> Self {
         Self::Incomplete {
             cause: operator_span,
             kind: IncompleteKind::Unit(UnitKind::MissingSecondTerm { operator }),
         }
     }
 
-    pub fn unit_missing_exponent(caret_span: AstSpan) -> Self {
+    pub(crate) fn unit_missing_exponent(caret_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: caret_span,
             kind: IncompleteKind::Unit(UnitKind::MissingExponent),
         }
     }
 
-    pub fn unit_paren_missing_expr(paren_left_span: AstSpan) -> Self {
+    pub(crate) fn unit_paren_missing_expr(paren_left_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: paren_left_span,
             kind: IncompleteKind::Unit(UnitKind::ParenMissingExpr),
         }
     }
 
-    pub fn unclosed_brace(brace_left_span: AstSpan) -> Self {
+    pub(crate) fn unclosed_brace(brace_left_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: brace_left_span,
             kind: IncompleteKind::UnclosedBrace,
         }
     }
 
-    pub fn unclosed_bracket(bracket_left_span: AstSpan) -> Self {
+    pub(crate) fn unclosed_bracket(bracket_left_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: bracket_left_span,
             kind: IncompleteKind::UnclosedBracket,
         }
     }
 
-    pub fn unclosed_paren(paren_left_span: AstSpan) -> Self {
+    pub(crate) fn unclosed_paren(paren_left_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: paren_left_span,
             kind: IncompleteKind::UnclosedParen,
         }
     }
 
-    pub fn unexpected_token() -> Self {
+    pub(crate) fn unexpected_token() -> Self {
         Self::UnexpectedToken
     }
 
-    pub fn token_error(kind: TokenErrorKind) -> Self {
+    pub(crate) fn token_error(kind: TokenErrorKind) -> Self {
         Self::TokenError(kind)
     }
 
-    pub fn nom_error(kind: nom::error::ErrorKind) -> Self {
+    pub(crate) fn nom_error(kind: nom::error::ErrorKind) -> Self {
         Self::NomError(kind)
     }
 }
