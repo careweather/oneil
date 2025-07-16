@@ -104,11 +104,7 @@ impl<T> CanBeEmpty for Option<T> {
 /// An empty model represents no successfully parsed model.
 impl CanBeEmpty for oneil_ast::model::Model {
     fn empty() -> Self {
-        oneil_ast::model::Model {
-            note: None,
-            decls: Vec::new(),
-            sections: Vec::new(),
-        }
+        oneil_ast::model::Model::new(None, vec![], vec![])
     }
 }
 

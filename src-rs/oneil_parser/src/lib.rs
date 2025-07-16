@@ -10,7 +10,10 @@
 //       also add tests later to ensure that the parser produces errors when
 //       parsing invalid input and that the errors are correct and clear.
 
-use oneil_ast as ast;
+use oneil_ast::{
+    Model, declaration::DeclNode, expression::ExprNode, model::ModelNode, note::NoteNode,
+    parameter::ParameterNode, test::TestNode, unit::UnitExprNode,
+};
 
 mod config;
 pub mod error;
@@ -32,43 +35,40 @@ pub use config::Config;
 pub fn parse_model(
     input: &str,
     config: Option<Config>,
-) -> Result<ast::Model, error::ErrorsWithPartialResult<ast::Model, error::ParserError>> {
+) -> Result<ModelNode, error::ErrorsWithPartialResult<Model, error::ParserError>> {
     parse(input, config, model::parse_complete)
 }
 
 pub fn parse_declaration(
     input: &str,
     config: Option<Config>,
-) -> Result<ast::Decl, error::ParserError> {
+) -> Result<DeclNode, error::ParserError> {
     parse(input, config, declaration::parse_complete)
 }
 
 pub fn parse_expression(
     input: &str,
     config: Option<Config>,
-) -> Result<ast::Expr, error::ParserError> {
+) -> Result<ExprNode, error::ParserError> {
     parse(input, config, expression::parse_complete)
 }
 
-pub fn parse_note(input: &str, config: Option<Config>) -> Result<ast::Note, error::ParserError> {
+pub fn parse_note(input: &str, config: Option<Config>) -> Result<NoteNode, error::ParserError> {
     parse(input, config, note::parse_complete)
 }
 
 pub fn parse_parameter(
     input: &str,
     config: Option<Config>,
-) -> Result<ast::Parameter, error::ParserError> {
+) -> Result<ParameterNode, error::ParserError> {
     parse(input, config, parameter::parse_complete)
 }
 
-pub fn parse_test(input: &str, config: Option<Config>) -> Result<ast::Test, error::ParserError> {
+pub fn parse_test(input: &str, config: Option<Config>) -> Result<TestNode, error::ParserError> {
     parse(input, config, test::parse_complete)
 }
 
-pub fn parse_unit(
-    input: &str,
-    config: Option<Config>,
-) -> Result<ast::UnitExpr, error::ParserError> {
+pub fn parse_unit(input: &str, config: Option<Config>) -> Result<UnitExprNode, error::ParserError> {
     parse(input, config, unit::parse_complete)
 }
 
