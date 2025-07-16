@@ -78,62 +78,51 @@ impl ParserError {
         Self { reason, ..self }
     }
 
+    /// Creates a new ParserError from a TokenError with a specific reason
+    ///
+    /// This is used to convert token-level errors to parser-level errors
+    fn new_from_token_error(error: TokenError, reason: ParserErrorReason) -> Self {
+        Self {
+            reason,
+            error_offset: error.offset,
+        }
+    }
+
     /// Creates a new ParserError for an expected declaration
     pub(crate) fn expect_decl(error: Self) -> Self {
-        Self {
-            reason: ParserErrorReason::expect_decl(),
-            error_offset: error.error_offset,
-        }
+        error.convert_reason(ParserErrorReason::expect_decl())
     }
 
     /// Creates a new ParserError for an expected expression
     pub(crate) fn expect_expr(error: Self) -> Self {
-        Self {
-            reason: ParserErrorReason::expect_expr(),
-            error_offset: error.error_offset,
-        }
+        error.convert_reason(ParserErrorReason::expect_expr())
     }
 
     /// Creates a new ParserError for an expected note
     pub(crate) fn expect_note(error: TokenError) -> Self {
-        Self {
-            reason: ParserErrorReason::expect_note(),
-            error_offset: error.offset,
-        }
+        Self::new_from_token_error(error, ParserErrorReason::expect_note())
     }
 
     /// Creates a new ParserError for an expected parameter
     pub(crate) fn expect_parameter(error: TokenError) -> Self {
-        Self {
-            reason: ParserErrorReason::expect_parameter(),
-            error_offset: error.offset,
-        }
+        Self::new_from_token_error(error, ParserErrorReason::expect_parameter())
     }
 
     /// Creates a new ParserError for an expected test
     pub(crate) fn expect_test(error: TokenError) -> Self {
-        Self {
-            reason: ParserErrorReason::expect_test(),
-            error_offset: error.offset,
-        }
+        Self::new_from_token_error(error, ParserErrorReason::expect_test())
     }
 
     /// Creates a new ParserError for an expected unit
     pub(crate) fn expect_unit(error: Self) -> Self {
-        Self {
-            reason: ParserErrorReason::expect_unit(),
-            error_offset: error.error_offset,
-        }
+        error.convert_reason(ParserErrorReason::expect_unit())
     }
 
     /// Creates a new ParserError for a missing path in an import declaration
     pub(crate) fn import_missing_path(import_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let import_span = AstSpan::from(import_span);
-            Self {
-                reason: ParserErrorReason::import_missing_path(import_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::import_missing_path(import_span))
         }
     }
 
@@ -143,10 +132,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let import_path_span = AstSpan::from(import_path_span);
-            Self {
-                reason: ParserErrorReason::import_missing_end_of_line(import_path_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::import_missing_end_of_line(import_path_span),
+            )
         }
     }
 
@@ -162,10 +151,7 @@ impl ParserError {
     pub(crate) fn from_missing_use(from_path: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let from_path_span = AstSpan::from(from_path);
-            Self {
-                reason: ParserErrorReason::from_missing_use(from_path_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::from_missing_use(from_path_span))
         }
     }
 
@@ -173,10 +159,7 @@ impl ParserError {
     pub(crate) fn from_missing_use_model(use_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let use_span = AstSpan::from(use_token);
-            Self {
-                reason: ParserErrorReason::from_missing_use_model(use_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::from_missing_use_model(use_span))
         }
     }
 
@@ -186,10 +169,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let use_model_or_inputs_span = AstSpan::from(use_model_or_inputs);
-            Self {
-                reason: ParserErrorReason::from_missing_as(use_model_or_inputs_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::from_missing_as(use_model_or_inputs_span),
+            )
         }
     }
 
@@ -197,10 +180,7 @@ impl ParserError {
     pub(crate) fn from_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let as_span = AstSpan::from(as_token);
-            Self {
-                reason: ParserErrorReason::from_missing_alias(as_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::from_missing_alias(as_span))
         }
     }
 
@@ -210,10 +190,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let alias_span = AstSpan::from(alias_span);
-            Self {
-                reason: ParserErrorReason::from_missing_end_of_line(alias_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::from_missing_end_of_line(alias_span),
+            )
         }
     }
 
@@ -221,10 +201,7 @@ impl ParserError {
     pub(crate) fn use_missing_path(use_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let use_span = AstSpan::from(use_token);
-            Self {
-                reason: ParserErrorReason::use_missing_path(use_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::use_missing_path(use_span))
         }
     }
 
@@ -234,10 +211,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let use_path_or_inputs_span = AstSpan::from(use_path_or_inputs);
-            Self {
-                reason: ParserErrorReason::use_missing_as(use_path_or_inputs_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::use_missing_as(use_path_or_inputs_span),
+            )
         }
     }
 
@@ -245,10 +222,7 @@ impl ParserError {
     pub(crate) fn use_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let as_span = AstSpan::from(as_token);
-            Self {
-                reason: ParserErrorReason::use_missing_alias(as_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::use_missing_alias(as_span))
         }
     }
 
@@ -258,10 +232,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let alias_span = AstSpan::from(alias_span);
-            Self {
-                reason: ParserErrorReason::use_missing_end_of_line(alias_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::use_missing_end_of_line(alias_span),
+            )
         }
     }
 
@@ -269,10 +243,7 @@ impl ParserError {
     pub(crate) fn model_input_missing_value(equals_span: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let equals_span = AstSpan::from(equals_span);
-            Self {
-                reason: ParserErrorReason::model_input_missing_value(equals_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::model_input_missing_value(equals_span))
         }
     }
 
@@ -282,10 +253,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let dot_span = AstSpan::from(dot_token);
-            Self {
-                reason: ParserErrorReason::model_path_missing_subcomponent(dot_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::model_path_missing_subcomponent(dot_span),
+            )
         }
     }
 
@@ -296,13 +267,10 @@ impl ParserError {
         move |error| {
             let operator_span = AstSpan::from(operator);
             let operator = operator.node_value().clone();
-            Self {
-                reason: ParserErrorReason::expr_binary_op_missing_second_operand(
-                    operator_span,
-                    operator,
-                ),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::expr_binary_op_missing_second_operand(
+                operator_span,
+                operator,
+            ))
         }
     }
 
@@ -311,10 +279,10 @@ impl ParserError {
         move |error| {
             let operator_span = AstSpan::from(operator);
             let operator = operator.node_value().clone();
-            Self {
-                reason: ParserErrorReason::expr_unary_op_missing_operand(operator_span, operator),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::expr_unary_op_missing_operand(
+                operator_span,
+                operator,
+            ))
         }
     }
 
@@ -324,10 +292,7 @@ impl ParserError {
     ) -> impl Fn(Self) -> Self {
         move |error| {
             let paren_left_span = AstSpan::from(paren_left_token);
-            Self {
-                reason: ParserErrorReason::expr_paren_missing_expr(paren_left_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::expr_paren_missing_expr(paren_left_span))
         }
     }
 
@@ -337,10 +302,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let dot_span = AstSpan::from(dot_span);
-            Self {
-                reason: ParserErrorReason::expr_variable_missing_parent_model(dot_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::expr_variable_missing_parent_model(dot_span),
+            )
         }
     }
 
@@ -348,10 +313,10 @@ impl ParserError {
     pub(crate) fn section_missing_label(section_token: &Token) -> impl Fn(TokenError) -> Self {
         move |error| {
             let section_span = AstSpan::from(section_token);
-            Self {
-                reason: ParserErrorReason::section_missing_label(section_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::section_missing_label(section_span),
+            )
         }
     }
 
@@ -361,10 +326,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let section_label_span = AstSpan::from(section_label_span);
-            Self {
-                reason: ParserErrorReason::section_missing_end_of_line(section_label_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::section_missing_end_of_line(section_label_span),
+            )
         }
     }
 
@@ -374,10 +339,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let colon_span = AstSpan::from(colon_token);
-            Self {
-                reason: ParserErrorReason::parameter_missing_identifier(colon_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::parameter_missing_identifier(colon_span),
+            )
         }
     }
 
@@ -387,10 +352,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let ident_span = AstSpan::from(ident_span);
-            Self {
-                reason: ParserErrorReason::parameter_missing_equals_sign(ident_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::parameter_missing_equals_sign(ident_span),
+            )
         }
     }
 
@@ -398,10 +363,7 @@ impl ParserError {
     pub(crate) fn parameter_missing_value(equals_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let equals_span = AstSpan::from(equals_token);
-            Self {
-                reason: ParserErrorReason::parameter_missing_value(equals_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::parameter_missing_value(equals_span))
         }
     }
 
@@ -411,10 +373,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let value_span = AstSpan::from(value_span);
-            Self {
-                reason: ParserErrorReason::parameter_missing_end_of_line(value_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::parameter_missing_end_of_line(value_span),
+            )
         }
     }
 
@@ -422,10 +384,7 @@ impl ParserError {
     pub(crate) fn parameter_missing_unit(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let colon_span = AstSpan::from(colon_token);
-            Self {
-                reason: ParserErrorReason::parameter_missing_unit(colon_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::parameter_missing_unit(colon_span))
         }
     }
 
@@ -433,10 +392,7 @@ impl ParserError {
     pub(crate) fn limit_missing_min(paren_left_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let left_paren_span = AstSpan::from(paren_left_token);
-            Self {
-                reason: ParserErrorReason::limit_missing_min(left_paren_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::limit_missing_min(left_paren_span))
         }
     }
 
@@ -444,10 +400,7 @@ impl ParserError {
     pub(crate) fn limit_missing_comma(min_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let min_span = AstSpan::from(min_span);
-            Self {
-                reason: ParserErrorReason::limit_missing_comma(min_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::limit_missing_comma(min_span))
         }
     }
 
@@ -455,10 +408,7 @@ impl ParserError {
     pub(crate) fn limit_missing_max(comma_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let comma_span = AstSpan::from(comma_token);
-            Self {
-                reason: ParserErrorReason::limit_missing_max(comma_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::limit_missing_max(comma_span))
         }
     }
 
@@ -468,10 +418,7 @@ impl ParserError {
     ) -> impl Fn(Self) -> Self {
         move |error| {
             let bracket_left_span = AstSpan::from(bracket_left_token);
-            Self {
-                reason: ParserErrorReason::limit_missing_values(bracket_left_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::limit_missing_values(bracket_left_span))
         }
     }
 
@@ -479,13 +426,9 @@ impl ParserError {
     pub(crate) fn piecewise_missing_expr(
         brace_left_token: &impl SpanLike,
     ) -> impl Fn(Self) -> Self {
-        // TODO: make sure that we use the convert function above rather than creating a new one
         move |error| {
             let brace_left_span = AstSpan::from(brace_left_token);
-            Self {
-                reason: ParserErrorReason::piecewise_missing_expr(brace_left_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::piecewise_missing_expr(brace_left_span))
         }
     }
 
@@ -493,10 +436,7 @@ impl ParserError {
     pub(crate) fn piecewise_missing_if(expr_span: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let expr_span = AstSpan::from(expr_span);
-            Self {
-                reason: ParserErrorReason::piecewise_missing_if(expr_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::piecewise_missing_if(expr_span))
         }
     }
 
@@ -504,10 +444,7 @@ impl ParserError {
     pub(crate) fn piecewise_missing_if_expr(if_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let if_span = AstSpan::from(if_token);
-            Self {
-                reason: ParserErrorReason::piecewise_missing_if_expr(if_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::piecewise_missing_if_expr(if_span))
         }
     }
 
@@ -517,10 +454,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let test_kw_or_inputs_span = AstSpan::from(test_kw_or_inputs_span);
-            Self {
-                reason: ParserErrorReason::test_missing_colon(test_kw_or_inputs_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::test_missing_colon(test_kw_or_inputs_span),
+            )
         }
     }
 
@@ -528,10 +465,7 @@ impl ParserError {
     pub(crate) fn test_missing_expr(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let colon_span = AstSpan::from(colon_token);
-            Self {
-                reason: ParserErrorReason::test_missing_expr(colon_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::test_missing_expr(colon_span))
         }
     }
 
@@ -541,10 +475,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let expr_span = AstSpan::from(expr_span);
-            Self {
-                reason: ParserErrorReason::test_missing_end_of_line(expr_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::test_missing_end_of_line(expr_span),
+            )
         }
     }
 
@@ -554,10 +488,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let brace_left_span = AstSpan::from(brace_left_token);
-            Self {
-                reason: ParserErrorReason::test_missing_inputs(brace_left_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::test_missing_inputs(brace_left_span),
+            )
         }
     }
 
@@ -566,10 +500,10 @@ impl ParserError {
         move |error| {
             let operator_span = AstSpan::from(operator_node);
             let operator = operator_node.node_value().clone();
-            Self {
-                reason: ParserErrorReason::unit_missing_second_term(operator_span, operator),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::unit_missing_second_term(
+                operator_span,
+                operator,
+            ))
         }
     }
 
@@ -579,10 +513,7 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let caret_span = AstSpan::from(caret_token);
-            Self {
-                reason: ParserErrorReason::unit_missing_exponent(caret_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::unit_missing_exponent(caret_span))
         }
     }
 
@@ -592,10 +523,7 @@ impl ParserError {
     ) -> impl Fn(Self) -> Self {
         move |error| {
             let paren_left_span = AstSpan::from(paren_left_token);
-            Self {
-                reason: ParserErrorReason::unit_paren_missing_expr(paren_left_span),
-                error_offset: error.error_offset,
-            }
+            error.convert_reason(ParserErrorReason::unit_paren_missing_expr(paren_left_span))
         }
     }
 
@@ -603,10 +531,7 @@ impl ParserError {
     pub(crate) fn unclosed_brace(brace_left_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let brace_left_span = AstSpan::from(brace_left_token);
-            Self {
-                reason: ParserErrorReason::unclosed_brace(brace_left_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::unclosed_brace(brace_left_span))
         }
     }
 
@@ -616,10 +541,10 @@ impl ParserError {
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let bracket_left_span = AstSpan::from(bracket_left_token);
-            Self {
-                reason: ParserErrorReason::unclosed_bracket(bracket_left_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::unclosed_bracket(bracket_left_span),
+            )
         }
     }
 
@@ -627,10 +552,7 @@ impl ParserError {
     pub(crate) fn unclosed_paren(paren_left_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let paren_left_span = AstSpan::from(paren_left_token);
-            Self {
-                reason: ParserErrorReason::unclosed_paren(paren_left_span),
-                error_offset: error.offset,
-            }
+            Self::new_from_token_error(error, ParserErrorReason::unclosed_paren(paren_left_span))
         }
     }
 }
