@@ -38,7 +38,7 @@ impl Model {
 /// A labeled section within a model
 #[derive(Debug, Clone, PartialEq)]
 pub struct Section {
-    label: LabelNode,
+    header: SectionHeaderNode,
     note: Option<NoteNode>,
     decls: Vec<DeclNode>,
 }
@@ -46,12 +46,16 @@ pub struct Section {
 pub type SectionNode = Node<Section>;
 
 impl Section {
-    pub fn new(label: LabelNode, note: Option<NoteNode>, decls: Vec<DeclNode>) -> Self {
-        Self { label, note, decls }
+    pub fn new(header: SectionHeaderNode, note: Option<NoteNode>, decls: Vec<DeclNode>) -> Self {
+        Self {
+            header,
+            note,
+            decls,
+        }
     }
 
-    pub fn label(&self) -> &LabelNode {
-        &self.label
+    pub fn header(&self) -> &SectionHeaderNode {
+        &self.header
     }
 
     pub fn note(&self) -> Option<&NoteNode> {
@@ -60,5 +64,22 @@ impl Section {
 
     pub fn decls(&self) -> &[DeclNode] {
         &self.decls
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SectionHeader {
+    label: LabelNode,
+}
+
+pub type SectionHeaderNode = Node<SectionHeader>;
+
+impl SectionHeader {
+    pub fn new(label: LabelNode) -> Self {
+        Self { label }
+    }
+
+    pub fn label(&self) -> &LabelNode {
+        &self.label
     }
 }

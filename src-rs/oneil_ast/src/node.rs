@@ -27,6 +27,10 @@ where
     pub fn node_value(&self) -> &T {
         &self.value
     }
+
+    pub fn take_value(self) -> T {
+        self.value
+    }
 }
 
 impl<T> SpanLike for Node<T>

@@ -1,14 +1,18 @@
 //! Parser for model definitions in an Oneil program.
 
+use std::result::Result as StdResult;
+
 use nom::{
     Parser as _,
     bytes::complete::take_while,
     combinator::{cut, eof, opt, value},
 };
-
 use oneil_ast::{
-    declaration::Decl,
-    model::{Model, Section},
+    Span as AstSpan,
+    declaration::DeclNode,
+    model::{Model, ModelNode, Section, SectionHeader, SectionHeaderNode, SectionNode},
+    naming::Label,
+    node::Node,
 };
 
 use crate::{
@@ -18,21 +22,23 @@ use crate::{
         partial::ErrorsWithPartialResult,
     },
     note::parse as parse_note,
-    token::{Token, keyword::section, naming::label, structure::end_of_line},
+    token::{keyword::section, naming::label, structure::end_of_line},
     util::{Result, Span},
 };
 
 /// Parses a model definition, consuming the complete input
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<Model, ErrorsWithPartialResult<Model, ParserError>> {
+pub fn parse_complete(
+    input: Span,
+) -> Result<ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
     let (rest, model) = model(input)?;
     let result = eof(rest);
 
     match result {
         Ok((rest, _)) => Ok((rest, model)),
         Err(nom::Err::Error(e)) => Err(nom::Err::Failure(ErrorsWithPartialResult::new(
-            model,
+            model.take_value(),
             vec![e],
         ))),
         _ => unreachable!(),
@@ -40,31 +46,27 @@ pub fn parse_complete(input: Span) -> Result<Model, ErrorsWithPartialResult<Mode
 }
 
 /// Parses a model definition
-fn model(input: Span) -> Result<Model, ErrorsWithPartialResult<Model, ParserError>> {
+fn model(input: Span) -> Result<ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
     let (rest, _) = opt(end_of_line).convert_errors().parse(input)?;
     let (rest, note) = opt(parse_note).convert_errors().parse(rest)?;
-    let (rest, decls, decl_errors) = parse_decls(rest);
-    let (rest, sections, section_errors) = parse_sections(rest);
+    let (rest, mut decls, decl_errors) = parse_decls(rest);
+    let (rest, sections, decls_without_section, section_errors) = parse_sections(rest);
+
+    // for any decls where the section header parsing failed, add them to the top-level decls
+    decls.extend(decls_without_section);
 
     let errors = [decl_errors, section_errors].concat();
 
     if errors.is_empty() {
-        Ok((
-            rest,
-            Model {
-                note,
-                decls,
-                sections,
-            },
-        ))
+        // assume that the model spans the entire file
+        let model_span = AstSpan::new(0, input.len(), input.len());
+        let model_node = Node::new(model_span, Model::new(note, decls, sections));
+
+        Ok((rest, model_node))
     } else {
+        let model = Model::new(note, decls, sections);
         Err(nom::Err::Failure(ErrorsWithPartialResult::new(
-            Model {
-                note,
-                decls,
-                sections,
-            },
-            errors,
+            model, errors,
         )))
     }
 }
@@ -77,13 +79,13 @@ fn model(input: Span) -> Result<Model, ErrorsWithPartialResult<Model, ParserErro
 /// In addition, because it returns partial results, the results may be used
 /// in order to determine other partial information, such as the associated
 /// units of the declarations that were successfully parsed.
-fn parse_decls(input: Span) -> (Span, Vec<Decl>, Vec<ParserError>) {
+fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
     fn parse_decls_recur<'a>(
         input: Span<'a>,
-        mut acc_decls: Vec<Decl>,
+        mut acc_decls: Vec<DeclNode>,
         mut acc_errors: Vec<ParserError>,
         last_was_error: bool,
-    ) -> (Span<'a>, Vec<Decl>, Vec<ParserError>) {
+    ) -> (Span<'a>, Vec<DeclNode>, Vec<ParserError>) {
         let result = parse_decl(input);
 
         match result {
@@ -129,25 +131,36 @@ fn parse_decls(input: Span) -> (Span, Vec<Decl>, Vec<ParserError>) {
 }
 
 /// Parses the sections of a model
-fn parse_sections(input: Span) -> (Span, Vec<Section>, Vec<ParserError>) {
+fn parse_sections(input: Span) -> (Span, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
     fn parse_sections_recur<'a>(
         input: Span<'a>,
-        mut acc_sections: Vec<Section>,
+        mut acc_sections: Vec<SectionNode>,
+        mut acc_decls: Vec<DeclNode>,
         mut acc_errors: Vec<ParserError>,
-    ) -> (Span<'a>, Vec<Section>, Vec<ParserError>) {
+    ) -> (Span<'a>, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
         let section_result = parse_section(input);
 
         match section_result {
-            Some((rest, section, errors)) => {
-                acc_sections.push(section);
+            Some((rest, section_result, errors)) => {
+                match section_result {
+                    Ok(section) => {
+                        // if the section was parsed successfully, add it to the accumulator
+                        acc_sections.push(section);
+                    }
+                    Err(decls) => {
+                        // if the section was not parsed successfully, add the decls to the top-level decls
+                        acc_decls.extend(decls);
+                    }
+                }
+
                 acc_errors.extend(errors);
-                parse_sections_recur(rest, acc_sections, acc_errors)
+                parse_sections_recur(rest, acc_sections, acc_decls, acc_errors)
             }
-            None => (input, acc_sections, acc_errors),
+            None => (input, acc_sections, acc_decls, acc_errors),
         }
     }
 
-    parse_sections_recur(input, vec![], vec![])
+    parse_sections_recur(input, vec![], vec![], vec![])
 }
 
 /// Parses a section within a model
@@ -157,11 +170,17 @@ fn parse_sections(input: Span) -> (Span, Vec<Section>, Vec<ParserError>) {
 ///
 /// Otherwise, this function returns a tuple containing the section and the
 /// errors that occurred while parsing the section, if any.
-fn parse_section(input: Span) -> Option<(Span, Section, Vec<ParserError>)> {
+fn parse_section(
+    input: Span,
+) -> Option<(
+    Span,
+    StdResult<SectionNode, Vec<DeclNode>>,
+    Vec<ParserError>,
+)> {
     let section_header_result = parse_section_header(input);
 
-    let (rest, label, mut errors) = match section_header_result {
-        Ok((rest, label)) => (rest, Some(label), vec![]),
+    let (rest, header, mut errors) = match section_header_result {
+        Ok((rest, header)) => (rest, Some(header), vec![]),
         Err(nom::Err::Error(_e)) => {
             // No section header was found, so we return None
             return None;
@@ -181,25 +200,44 @@ fn parse_section(input: Span) -> Option<(Span, Section, Vec<ParserError>)> {
     let (rest, decls, decl_errors) = parse_decls(rest);
     errors.extend(decl_errors);
 
-    let label = label.map_or("<FAILED TO PARSE SECTION LABEL>".to_string(), |label| {
-        label.lexeme().to_string()
-    });
+    match header {
+        Some(header) => {
+            let span_start = &header;
+            let span_end = match (&note, decls.last()) {
+                (_, Some(decl)) => AstSpan::from(decl),
+                (Some(note), _) => AstSpan::from(note),
+                (_, _) => AstSpan::from(&header),
+            };
 
-    Some((rest, Section { label, note, decls }, errors))
+            let span = AstSpan::calc_span(&span_start, &span_end);
+
+            let section_node = Node::new(span, Section::new(header, note, decls));
+
+            Some((rest, Ok(section_node), errors))
+        }
+        // if there was a problem with the section header, return the decls parsed so that
+        // they can be merged with the top-level decls
+        None => Some((rest, Err(decls), errors)),
+    }
 }
 
-fn parse_section_header(input: Span) -> Result<Token, ParserError> {
+fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
 
     let (rest, label) = cut(label)
         .map_failure(ParserError::section_missing_label(section_span))
         .parse(rest)?;
+    let label_value = Label::new(label.lexeme().to_string());
+    let label_node = Node::new(label, label_value);
 
-    let (rest, _) = cut(end_of_line)
+    let (rest, end_of_line_token) = cut(end_of_line)
         .map_failure(ParserError::section_missing_end_of_line(section_span))
         .parse(rest)?;
 
-    Ok((rest, label))
+    let span = AstSpan::calc_span_with_whitespace(&section_span, &label, &end_of_line_token);
+    let header_node = Node::new(span, SectionHeader::new(label_node));
+
+    Ok((rest, header_node))
 }
 
 /// Attempts to recover from a parsing error by skipping to the next line
@@ -219,15 +257,15 @@ fn skip_to_next_line(input: Span) -> Span {
 mod tests {
     use super::*;
     use crate::Config;
-    use oneil_ast::declaration::{Decl, Import};
+    use oneil_ast::declaration::Decl;
 
     #[test]
     fn test_empty_model() {
         let input = Span::new_extra("", Config::default());
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert!(model.decls.is_empty());
-        assert!(model.sections.is_empty());
+        assert!(model.note().is_none());
+        assert!(model.decls().is_empty());
+        assert!(model.sections().is_empty());
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -235,9 +273,9 @@ mod tests {
     fn test_model_with_note() {
         let input = Span::new_extra("~ This is a note\n", Config::default());
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_some());
-        assert!(model.decls.is_empty());
-        assert!(model.sections.is_empty());
+        assert!(model.note().is_some());
+        assert!(model.decls().is_empty());
+        assert!(model.sections().is_empty());
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -245,13 +283,13 @@ mod tests {
     fn test_model_with_import() {
         let input = Span::new_extra("import foo\n", Config::default());
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert_eq!(model.decls.len(), 1);
-        match &model.decls[0] {
-            Decl::Import(Import { path }) => assert_eq!(path, "foo"),
+        assert!(model.note().is_none());
+        assert_eq!(model.decls().len(), 1);
+        match &model.decls()[0].node_value() {
+            Decl::Import(import_node) => assert_eq!(import_node.path(), "foo"),
             _ => panic!("Expected import declaration"),
         }
-        assert!(model.sections.is_empty());
+        assert!(model.sections().is_empty());
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -259,14 +297,14 @@ mod tests {
     fn test_model_with_section() {
         let input = Span::new_extra("section foo\nimport bar\n", Config::default());
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert!(model.decls.is_empty());
-        assert_eq!(model.sections.len(), 1);
-        let section = &model.sections[0];
-        assert_eq!(section.label, "foo");
-        assert_eq!(section.decls.len(), 1);
-        match &section.decls[0] {
-            Decl::Import(Import { path }) => assert_eq!(path, "bar"),
+        assert!(model.note().is_none());
+        assert!(model.decls().is_empty());
+        assert_eq!(model.sections().len(), 1);
+        let section = &model.sections()[0];
+        assert_eq!(section.header().label().as_str(), "foo");
+        assert_eq!(section.decls().len(), 1);
+        match &section.decls()[0].node_value() {
+            Decl::Import(import_node) => assert_eq!(import_node.path(), "bar"),
             _ => panic!("Expected import declaration"),
         }
         assert_eq!(rest.fragment(), &"");
@@ -279,23 +317,23 @@ mod tests {
             Config::default(),
         );
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert!(model.decls.is_empty());
-        assert_eq!(model.sections.len(), 2);
+        assert!(model.note().is_none());
+        assert!(model.decls().is_empty());
+        assert_eq!(model.sections().len(), 2);
 
-        let section1 = &model.sections[0];
-        assert_eq!(section1.label, "foo");
-        assert_eq!(section1.decls.len(), 1);
-        match &section1.decls[0] {
-            Decl::Import(Import { path }) => assert_eq!(path, "bar"),
+        let section1 = &model.sections()[0];
+        assert_eq!(section1.header().label().as_str(), "foo");
+        assert_eq!(section1.decls().len(), 1);
+        match &section1.decls()[0].node_value() {
+            Decl::Import(import_node) => assert_eq!(import_node.path(), "bar"),
             _ => panic!("Expected import declaration"),
         }
 
-        let section2 = &model.sections[1];
-        assert_eq!(section2.label, "baz");
-        assert_eq!(section2.decls.len(), 1);
-        match &section2.decls[0] {
-            Decl::Import(Import { path }) => assert_eq!(path, "qux"),
+        let section2 = &model.sections()[1];
+        assert_eq!(section2.header().label().as_str(), "baz");
+        assert_eq!(section2.decls().len(), 1);
+        match &section2.decls()[0].node_value() {
+            Decl::Import(import_node) => assert_eq!(import_node.path(), "qux"),
             _ => panic!("Expected import declaration"),
         }
 
@@ -306,9 +344,9 @@ mod tests {
     fn test_parse_complete_empty_model_success() {
         let input = Span::new_extra("\n", Config::default());
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert!(model.decls.is_empty());
-        assert!(model.sections.is_empty());
+        assert!(model.note().is_none());
+        assert!(model.decls().is_empty());
+        assert!(model.sections().is_empty());
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -316,13 +354,13 @@ mod tests {
     fn test_parse_complete_with_declarations_success() {
         let input = Span::new_extra("import foo\nimport bar\n", Config::default());
         let (rest, model) = parse_complete(input).unwrap();
-        assert_eq!(model.decls.len(), 2);
-        match &model.decls[0] {
-            Decl::Import(Import { path }) => assert_eq!(path, "foo"),
+        assert_eq!(model.decls().len(), 2);
+        match &model.decls()[0].node_value() {
+            Decl::Import(import_node) => assert_eq!(import_node.path(), "foo"),
             _ => panic!("Expected import declaration"),
         }
-        match &model.decls[1] {
-            Decl::Import(Import { path }) => assert_eq!(path, "bar"),
+        match &model.decls()[1].node_value() {
+            Decl::Import(import_node) => assert_eq!(import_node.path(), "bar"),
             _ => panic!("Expected import declaration"),
         }
         assert_eq!(rest.fragment(), &"");
@@ -339,9 +377,9 @@ mod tests {
     fn test_parse_empty_model() {
         let input = Span::new_extra("", Config::default());
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert!(model.decls.is_empty());
-        assert!(model.sections.is_empty());
+        assert!(model.note().is_none());
+        assert!(model.decls().is_empty());
+        assert!(model.sections().is_empty());
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -352,8 +390,8 @@ mod tests {
             Config::default(),
         );
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert_eq!(model.decls.len(), 2);
+        assert!(model.note().is_none());
+        assert_eq!(model.decls().len(), 2);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -364,12 +402,12 @@ mod tests {
             Config::default(),
         );
         let (rest, model) = parse_complete(input).unwrap();
-        assert!(model.note.is_none());
-        assert_eq!(model.decls.len(), 1);
-        assert_eq!(model.sections.len(), 1);
-        let section = &model.sections[0];
-        assert_eq!(section.label, "My Section");
-        assert_eq!(section.decls.len(), 3);
+        assert!(model.note().is_none());
+        assert_eq!(model.decls().len(), 1);
+        assert_eq!(model.sections().len(), 1);
+        let section = &model.sections()[0];
+        assert_eq!(section.header().label().as_str(), "My Section");
+        assert_eq!(section.decls().len(), 3);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -402,10 +440,10 @@ mod tests {
                 let model = e.partial_result;
                 let errors = e.errors;
 
-                assert_eq!(model.decls.len(), 1);
-                assert_eq!(model.sections.len(), 1);
-                assert_eq!(model.sections[0].label, "My Section");
-                assert_eq!(model.sections[0].decls.len(), 1);
+                assert_eq!(model.decls().len(), 1);
+                assert_eq!(model.sections().len(), 1);
+                assert_eq!(model.sections()[0].header().label().as_str(), "My Section");
+                assert_eq!(model.sections()[0].decls().len(), 1);
 
                 assert_eq!(errors.len(), 4);
             }
