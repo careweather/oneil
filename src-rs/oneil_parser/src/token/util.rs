@@ -21,36 +21,9 @@ impl<'a> Token<'a> {
         self.lexeme.fragment()
     }
 
-    pub fn lexeme_offset(&self) -> usize {
-        self.lexeme.location_offset()
-    }
-
-    pub fn lexeme_line(&self) -> u32 {
-        self.lexeme.location_line()
-    }
-
-    pub fn lexeme_column(&self) -> usize {
-        self.lexeme.get_column()
-    }
-
-    pub fn get_lexeme_end_offset(&self) -> usize {
-        let start = self.lexeme.location_offset();
-        let length = self.lexeme.fragment().len();
-        start + length
-    }
-
+    #[cfg(test)]
     pub fn whitespace(&self) -> &str {
         self.whitespace.fragment()
-    }
-
-    pub fn whitespace_offset(&self) -> usize {
-        self.whitespace.location_offset()
-    }
-
-    pub fn get_whitespace_end_offset(&self) -> usize {
-        let start = self.whitespace.location_offset();
-        let length = self.whitespace.fragment().len();
-        start + length
     }
 }
 
