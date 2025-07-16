@@ -284,8 +284,8 @@ mod tests {
 
         match param.value().node_value() {
             ParameterValue::Simple(expr, unit) => {
-                let expected_value = Node::new(AstSpan::new(0, 0, 0), Literal::number(42.0));
-                let expected_expr = Node::new(AstSpan::new(0, 0, 0), Expr::literal(expected_value));
+                let expected_value = Node::new(AstSpan::new(7, 9, 9), Literal::number(42.0));
+                let expected_expr = Node::new(AstSpan::new(7, 9, 9), Expr::literal(expected_value));
 
                 assert_eq!(expr, &expected_expr);
                 assert!(unit.is_none());
@@ -308,12 +308,12 @@ mod tests {
 
         match param.limits().map(|limits| limits.node_value()) {
             Some(Limits::Continuous { min, max }) => {
-                let expected_min_literal = Node::new(AstSpan::new(0, 0, 0), Literal::number(0.0));
+                let expected_min_literal = Node::new(AstSpan::new(2, 3, 3), Literal::number(0.0));
                 let expected_min =
-                    Node::new(AstSpan::new(0, 0, 0), Expr::literal(expected_min_literal));
-                let expected_max_literal = Node::new(AstSpan::new(0, 0, 0), Literal::number(100.0));
+                    Node::new(AstSpan::new(2, 3, 3), Expr::literal(expected_min_literal));
+                let expected_max_literal = Node::new(AstSpan::new(5, 8, 8), Literal::number(100.0));
                 let expected_max =
-                    Node::new(AstSpan::new(0, 0, 0), Expr::literal(expected_max_literal));
+                    Node::new(AstSpan::new(5, 8, 8), Expr::literal(expected_max_literal));
 
                 assert_eq!(min, &expected_min);
                 assert_eq!(max, &expected_max);
@@ -330,9 +330,9 @@ mod tests {
         match param.limits().map(|limits| limits.node_value()) {
             Some(Limits::Discrete { values }) => {
                 let expected_literals = vec![
-                    Node::new(AstSpan::new(0, 0, 0), Literal::number(1.0)),
-                    Node::new(AstSpan::new(0, 0, 0), Literal::number(2.0)),
-                    Node::new(AstSpan::new(0, 0, 0), Literal::number(3.0)),
+                    Node::new(AstSpan::new(2, 3, 3), Literal::number(1.0)),
+                    Node::new(AstSpan::new(5, 6, 6), Literal::number(2.0)),
+                    Node::new(AstSpan::new(8, 9, 9), Literal::number(3.0)),
                 ];
 
                 let expected_exprs = expected_literals
@@ -392,15 +392,16 @@ mod tests {
         let (_, param) = parse(input).unwrap();
         match param.value().node_value() {
             ParameterValue::Simple(expr, unit) => {
-                let expected_value = Node::new(AstSpan::new(0, 0, 0), Literal::number(42.0));
-                let expected_expr = Node::new(AstSpan::new(0, 0, 0), Expr::literal(expected_value));
+                let expected_value = Node::new(AstSpan::new(7, 9, 10), Literal::number(42.0));
+                let expected_expr =
+                    Node::new(AstSpan::new(7, 9, 10), Expr::literal(expected_value));
 
                 assert_eq!(expr, &expected_expr);
 
                 let expected_unit_identifier =
-                    Node::new(AstSpan::new(0, 0, 0), Identifier::new("kg".to_string()));
+                    Node::new(AstSpan::new(12, 14, 14), Identifier::new("kg".to_string()));
                 let expected_unit = Node::new(
-                    AstSpan::new(0, 0, 0),
+                    AstSpan::new(12, 14, 14),
                     UnitExpr::unit(expected_unit_identifier, None),
                 );
 

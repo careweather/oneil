@@ -388,8 +388,8 @@ mod tests {
         let (_, expr) = parse(input).unwrap();
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 2, 3),
-            Expr::literal(Node::new(AstSpan::new(0, 0, 1), Literal::number(42.0))),
+            AstSpan::new(0, 2, 2),
+            Expr::literal(Node::new(AstSpan::new(0, 2, 2), Literal::number(42.0))),
         );
 
         assert_eq!(expr, expected_expr);
@@ -401,9 +401,9 @@ mod tests {
         let (_, expr) = parse(input).unwrap();
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 8, 9),
+            AstSpan::new(0, 7, 7),
             Expr::literal(Node::new(
-                AstSpan::new(0, 1, 7),
+                AstSpan::new(0, 7, 7),
                 Literal::string("hello".to_string()),
             )),
         );
@@ -417,8 +417,8 @@ mod tests {
         let (_, expr) = parse(input).unwrap();
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 5, 6),
-            Expr::literal(Node::new(AstSpan::new(0, 0, 1), Literal::boolean(true))),
+            AstSpan::new(0, 4, 4),
+            Expr::literal(Node::new(AstSpan::new(0, 4, 4), Literal::boolean(true))),
         );
 
         assert_eq!(expr, expected_expr);
@@ -430,8 +430,8 @@ mod tests {
         let (_, expr) = parse(input).unwrap();
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 6, 7),
-            Expr::literal(Node::new(AstSpan::new(0, 0, 1), Literal::boolean(false))),
+            AstSpan::new(0, 5, 5),
+            Expr::literal(Node::new(AstSpan::new(0, 5, 5), Literal::boolean(false))),
         );
 
         assert_eq!(expr, expected_expr);
@@ -442,12 +442,12 @@ mod tests {
         let input = Span::new_extra("foo", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_id = Node::new(AstSpan::new(0, 0, 1), Identifier::new("foo".to_string()));
+        let expected_id = Node::new(AstSpan::new(0, 3, 3), Identifier::new("foo".to_string()));
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 4, 5),
+            AstSpan::new(0, 3, 3),
             Expr::variable(Node::new(
-                AstSpan::new(0, 0, 1),
+                AstSpan::new(0, 3, 3),
                 Variable::identifier(expected_id),
             )),
         );
@@ -460,23 +460,21 @@ mod tests {
         let input = Span::new_extra("foo.bar.baz", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_id = Node::new(AstSpan::new(0, 0, 1), Identifier::new("foo".to_string()));
+        let expected_id = Node::new(AstSpan::new(0, 3, 3), Identifier::new("foo".to_string()));
+        let expected_id2 = Node::new(AstSpan::new(4, 7, 7), Identifier::new("bar".to_string()));
+        let expected_id3 = Node::new(AstSpan::new(8, 11, 11), Identifier::new("baz".to_string()));
 
-        let expected_id2 = Node::new(AstSpan::new(0, 0, 1), Identifier::new("bar".to_string()));
-
-        let expected_id3 = Node::new(AstSpan::new(0, 0, 1), Identifier::new("baz".to_string()));
-
-        let variable = Node::new(AstSpan::new(0, 0, 1), Variable::identifier(expected_id));
+        let variable = Node::new(AstSpan::new(0, 3, 3), Variable::identifier(expected_id));
         let variable = Node::new(
-            AstSpan::new(0, 0, 1),
+            AstSpan::new(0, 7, 7),
             Variable::accessor(expected_id2, variable),
         );
         let variable = Node::new(
-            AstSpan::new(0, 0, 1),
+            AstSpan::new(0, 11, 11),
             Variable::accessor(expected_id3, variable),
         );
 
-        let expected_expr = Node::new(AstSpan::new(0, 12, 13), Expr::variable(variable));
+        let expected_expr = Node::new(AstSpan::new(0, 11, 11), Expr::variable(variable));
         assert_eq!(expr, expected_expr);
     }
 
@@ -485,16 +483,16 @@ mod tests {
         let input = Span::new_extra("foo(1, 2)", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_foo = Node::new(AstSpan::new(0, 0, 1), Identifier::new("foo".to_string()));
+        let expected_foo = Node::new(AstSpan::new(0, 3, 3), Identifier::new("foo".to_string()));
 
-        let expected_1 = Node::new(AstSpan::new(0, 0, 1), Literal::number(1.0));
-        let expected_1 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_1));
+        let expected_1 = Node::new(AstSpan::new(4, 5, 5), Literal::number(1.0));
+        let expected_1 = Node::new(AstSpan::new(4, 5, 5), Expr::literal(expected_1));
 
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Literal::number(2.0));
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_2));
+        let expected_2 = Node::new(AstSpan::new(7, 8, 8), Literal::number(2.0));
+        let expected_2 = Node::new(AstSpan::new(7, 8, 8), Expr::literal(expected_2));
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 13, 14),
+            AstSpan::new(0, 9, 9),
             Expr::function_call(expected_foo, vec![expected_1, expected_2]),
         );
 
@@ -506,12 +504,12 @@ mod tests {
         let input = Span::new_extra("-42", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_42 = Node::new(AstSpan::new(0, 0, 1), Literal::number(42.0));
-        let expected_42 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_42));
+        let expected_42 = Node::new(AstSpan::new(1, 3, 3), Literal::number(42.0));
+        let expected_42 = Node::new(AstSpan::new(1, 3, 3), Expr::literal(expected_42));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), UnaryOp::Neg);
+        let op = Node::new(AstSpan::new(0, 1, 1), UnaryOp::Neg);
 
-        let expected_expr = Node::new(AstSpan::new(0, 3, 4), Expr::unary_op(op, expected_42));
+        let expected_expr = Node::new(AstSpan::new(0, 3, 3), Expr::unary_op(op, expected_42));
 
         assert_eq!(expr, expected_expr);
     }
@@ -521,16 +519,16 @@ mod tests {
         let input = Span::new_extra("2^3", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Literal::number(2.0));
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_2));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Literal::number(2.0));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Expr::literal(expected_2));
 
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Literal::number(3.0));
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_3));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Literal::number(3.0));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Expr::literal(expected_3));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), BinaryOp::Pow);
+        let op = Node::new(AstSpan::new(1, 2, 2), BinaryOp::Pow);
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 3, 4),
+            AstSpan::new(0, 3, 3),
             Expr::binary_op(op, expected_2, expected_3),
         );
 
@@ -542,16 +540,16 @@ mod tests {
         let input = Span::new_extra("2*3", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Literal::number(2.0));
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_2));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Literal::number(2.0));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Expr::literal(expected_2));
 
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Literal::number(3.0));
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_3));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Literal::number(3.0));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Expr::literal(expected_3));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), BinaryOp::Mul);
+        let op = Node::new(AstSpan::new(1, 2, 2), BinaryOp::Mul);
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 3, 4),
+            AstSpan::new(0, 3, 3),
             Expr::binary_op(op, expected_2, expected_3),
         );
 
@@ -563,16 +561,16 @@ mod tests {
         let input = Span::new_extra("2+3", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Literal::number(2.0));
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_2));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Literal::number(2.0));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Expr::literal(expected_2));
 
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Literal::number(3.0));
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_3));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Literal::number(3.0));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Expr::literal(expected_3));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), BinaryOp::Add);
+        let op = Node::new(AstSpan::new(1, 2, 2), BinaryOp::Add);
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 3, 4),
+            AstSpan::new(0, 3, 3),
             Expr::binary_op(op, expected_2, expected_3),
         );
 
@@ -585,23 +583,23 @@ mod tests {
         let (_, expr) = parse(input).unwrap();
 
         let expected_min = Node::new(
-            AstSpan::new(0, 0, 1),
+            AstSpan::new(0, 10, 11),
             Identifier::new("min_weight".to_string()),
         );
-        let expected_min = Node::new(AstSpan::new(0, 0, 1), Variable::identifier(expected_min));
-        let expected_min = Node::new(AstSpan::new(0, 0, 1), Expr::variable(expected_min));
+        let expected_min = Node::new(AstSpan::new(0, 10, 11), Variable::identifier(expected_min));
+        let expected_min = Node::new(AstSpan::new(0, 10, 11), Expr::variable(expected_min));
 
         let expected_max = Node::new(
-            AstSpan::new(0, 0, 1),
+            AstSpan::new(13, 23, 23),
             Identifier::new("max_weight".to_string()),
         );
-        let expected_max = Node::new(AstSpan::new(0, 0, 1), Variable::identifier(expected_max));
-        let expected_max = Node::new(AstSpan::new(0, 0, 1), Expr::variable(expected_max));
+        let expected_max = Node::new(AstSpan::new(13, 23, 23), Variable::identifier(expected_max));
+        let expected_max = Node::new(AstSpan::new(13, 23, 23), Expr::variable(expected_max));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), BinaryOp::MinMax);
+        let op = Node::new(AstSpan::new(11, 12, 13), BinaryOp::MinMax);
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 13, 14),
+            AstSpan::new(0, 23, 23),
             Expr::binary_op(op, expected_min, expected_max),
         );
 
@@ -613,16 +611,16 @@ mod tests {
         let input = Span::new_extra("2<3", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Literal::number(2.0));
-        let expected_2 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_2));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Literal::number(2.0));
+        let expected_2 = Node::new(AstSpan::new(0, 1, 1), Expr::literal(expected_2));
 
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Literal::number(3.0));
-        let expected_3 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_3));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Literal::number(3.0));
+        let expected_3 = Node::new(AstSpan::new(2, 3, 3), Expr::literal(expected_3));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), BinaryOp::LessThan);
+        let op = Node::new(AstSpan::new(1, 2, 2), BinaryOp::LessThan);
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 3, 4),
+            AstSpan::new(0, 3, 3),
             Expr::binary_op(op, expected_2, expected_3),
         );
 
@@ -634,12 +632,12 @@ mod tests {
         let input = Span::new_extra("not true", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_true = Node::new(AstSpan::new(0, 0, 1), Literal::boolean(true));
-        let expected_true = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_true));
+        let expected_true = Node::new(AstSpan::new(4, 8, 8), Literal::boolean(true));
+        let expected_true = Node::new(AstSpan::new(4, 8, 8), Expr::literal(expected_true));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), UnaryOp::Not);
+        let op = Node::new(AstSpan::new(0, 3, 4), UnaryOp::Not);
 
-        let expected_expr = Node::new(AstSpan::new(0, 5, 6), Expr::unary_op(op, expected_true));
+        let expected_expr = Node::new(AstSpan::new(0, 8, 8), Expr::unary_op(op, expected_true));
 
         assert_eq!(expr, expected_expr);
     }
@@ -649,16 +647,16 @@ mod tests {
         let input = Span::new_extra("true and false", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_true = Node::new(AstSpan::new(0, 0, 1), Literal::boolean(true));
-        let expected_true = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_true));
+        let expected_true = Node::new(AstSpan::new(0, 4, 5), Literal::boolean(true));
+        let expected_true = Node::new(AstSpan::new(0, 4, 5), Expr::literal(expected_true));
 
-        let expected_false = Node::new(AstSpan::new(0, 0, 1), Literal::boolean(false));
-        let expected_false = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_false));
+        let expected_false = Node::new(AstSpan::new(9, 14, 14), Literal::boolean(false));
+        let expected_false = Node::new(AstSpan::new(9, 14, 14), Expr::literal(expected_false));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), BinaryOp::And);
+        let op = Node::new(AstSpan::new(5, 8, 9), BinaryOp::And);
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 11, 12),
+            AstSpan::new(0, 14, 14),
             Expr::binary_op(op, expected_true, expected_false),
         );
 
@@ -670,16 +668,16 @@ mod tests {
         let input = Span::new_extra("true or false", Config::default());
         let (_, expr) = parse(input).unwrap();
 
-        let expected_true = Node::new(AstSpan::new(0, 0, 1), Literal::boolean(true));
-        let expected_true = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_true));
+        let expected_true = Node::new(AstSpan::new(0, 4, 5), Literal::boolean(true));
+        let expected_true = Node::new(AstSpan::new(0, 4, 5), Expr::literal(expected_true));
 
-        let expected_false = Node::new(AstSpan::new(0, 0, 1), Literal::boolean(false));
-        let expected_false = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_false));
+        let expected_false = Node::new(AstSpan::new(8, 13, 13), Literal::boolean(false));
+        let expected_false = Node::new(AstSpan::new(8, 13, 13), Expr::literal(expected_false));
 
-        let op = Node::new(AstSpan::new(0, 0, 1), BinaryOp::Or);
+        let op = Node::new(AstSpan::new(5, 7, 8), BinaryOp::Or);
 
         let expected_expr = Node::new(
-            AstSpan::new(0, 11, 12),
+            AstSpan::new(0, 13, 13),
             Expr::binary_op(op, expected_true, expected_false),
         );
 
@@ -699,8 +697,8 @@ mod tests {
         let input = Span::new_extra("42", Config::default());
         let (rest, expr) = parse_complete(input).unwrap();
 
-        let expected_42 = Node::new(AstSpan::new(0, 0, 1), Literal::number(42.0));
-        let expected_42 = Node::new(AstSpan::new(0, 0, 1), Expr::literal(expected_42));
+        let expected_42 = Node::new(AstSpan::new(0, 2, 2), Literal::number(42.0));
+        let expected_42 = Node::new(AstSpan::new(0, 2, 2), Expr::literal(expected_42));
 
         assert_eq!(expr, expected_42);
         assert_eq!(rest.fragment(), &"");

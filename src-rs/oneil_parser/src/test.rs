@@ -106,11 +106,11 @@ mod tests {
         let input = Span::new_extra("test: true\n", Config::default());
         let (rest, test) = parse(input).unwrap();
 
-        let expected_span = AstSpan::new(0, 0, 10);
+        let expected_span = AstSpan::new(0, 10, 11);
 
-        let expected_test_expr = Node::new(AstSpan::new(4, 8, 9), Literal::boolean(true));
+        let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
         let expected_test_expr =
-            Node::new(AstSpan::new(0, 0, 0), Expr::literal(expected_test_expr));
+            Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
 
         assert_eq!(test.node_span(), &expected_span);
         assert_eq!(test.trace_level(), None);
@@ -125,11 +125,11 @@ mod tests {
         let input = Span::new_extra("test: true", Config::default());
         let (rest, test) = parse(input).unwrap();
 
-        let expected_span = AstSpan::new(0, 0, 10);
+        let expected_span = AstSpan::new(0, 10, 10);
 
-        let expected_test_expr = Node::new(AstSpan::new(4, 8, 9), Literal::boolean(true));
+        let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
         let expected_test_expr =
-            Node::new(AstSpan::new(0, 0, 0), Expr::literal(expected_test_expr));
+            Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
 
         assert_eq!(test.node_span(), &expected_span);
         assert_eq!(test.trace_level(), None);
@@ -144,7 +144,7 @@ mod tests {
         let input = Span::new_extra("* test: true\n", Config::default());
         let (rest, test) = parse(input).unwrap();
 
-        let expected_span = AstSpan::new(0, 0, 10);
+        let expected_span = AstSpan::new(0, 12, 13);
 
         assert_eq!(test.node_span(), &expected_span);
         assert_eq!(
@@ -160,7 +160,7 @@ mod tests {
         let input = Span::new_extra("** test: true\n", Config::default());
         let (rest, test) = parse(input).unwrap();
 
-        let expected_span = AstSpan::new(0, 0, 10);
+        let expected_span = AstSpan::new(0, 13, 14);
 
         assert_eq!(test.node_span(), &expected_span);
         assert_eq!(
@@ -177,11 +177,11 @@ mod tests {
         let input = Span::new_extra("test {x, y}: x > y\n", Config::default());
         let (rest, test) = parse(input).unwrap();
 
-        let expected_span = AstSpan::new(0, 0, 10);
+        let expected_span = AstSpan::new(0, 18, 19);
 
         let expected_test_inputs = vec![
-            Node::new(AstSpan::new(4, 5, 6), Identifier::new("x".to_string())),
-            Node::new(AstSpan::new(7, 8, 9), Identifier::new("y".to_string())),
+            Node::new(AstSpan::new(6, 7, 7), Identifier::new("x".to_string())),
+            Node::new(AstSpan::new(9, 10, 10), Identifier::new("y".to_string())),
         ];
 
         assert_eq!(test.node_span(), &expected_span);
@@ -199,12 +199,12 @@ mod tests {
         let input = Span::new_extra("** test {x, y, z}: x > y and y > z\n", Config::default());
         let (rest, test) = parse(input).unwrap();
 
-        let expected_span = AstSpan::new(0, 0, 10);
+        let expected_span = AstSpan::new(0, 34, 35);
 
         let expected_test_inputs = vec![
-            Node::new(AstSpan::new(4, 5, 6), Identifier::new("x".to_string())),
-            Node::new(AstSpan::new(7, 8, 9), Identifier::new("y".to_string())),
-            Node::new(AstSpan::new(10, 11, 12), Identifier::new("z".to_string())),
+            Node::new(AstSpan::new(9, 10, 10), Identifier::new("x".to_string())),
+            Node::new(AstSpan::new(12, 13, 13), Identifier::new("y".to_string())),
+            Node::new(AstSpan::new(15, 16, 16), Identifier::new("z".to_string())),
         ];
 
         assert_eq!(test.node_span(), &expected_span);
@@ -225,11 +225,11 @@ mod tests {
         let input = Span::new_extra("test: true\n", Config::default());
         let (rest, test) = parse_complete(input).unwrap();
 
-        let expected_span = AstSpan::new(0, 0, 10);
+        let expected_span = AstSpan::new(0, 10, 11);
 
-        let expected_test_expr = Node::new(AstSpan::new(4, 8, 9), Literal::boolean(true));
+        let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
         let expected_test_expr =
-            Node::new(AstSpan::new(0, 0, 0), Expr::literal(expected_test_expr));
+            Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
 
         assert_eq!(test.node_span(), &expected_span);
         assert_eq!(test.trace_level(), None);
