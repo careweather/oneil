@@ -88,7 +88,10 @@ pub fn token<'a, O>(
     f: impl Parser<'a, O, TokenError>,
     convert_error: impl Fn(TokenError) -> TokenError,
 ) -> impl Parser<'a, Token<'a>, TokenError> {
-    (recognize(f).map_error(convert_error), inline_whitespace)
+    (
+        recognize(f).convert_error_to(convert_error),
+        inline_whitespace,
+    )
         .map(|(lexeme, whitespace)| Token::new(lexeme, whitespace))
 }
 

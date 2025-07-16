@@ -10,7 +10,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{all_consuming, cut, map, map_res, opt},
+    combinator::{all_consuming, map, map_res, opt},
     multi::{many0, separated_list0},
 };
 
@@ -44,8 +44,8 @@ fn left_associative_binary_op<'a>(
         let (rest, first_operand) = operand.parse(input)?;
         let (rest, rest_operands) = many0(|input| {
             let (rest, operator) = operator.parse(input)?;
-            let (rest, operand) = cut(operand)
-                .map_error(ParserError::binary_op_missing_second_operand(&operator))
+            let (rest, operand) = operand
+                .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
                 .parse(rest)?;
             Ok((rest, (operator, operand)))
         })
@@ -80,7 +80,9 @@ pub fn parse_complete(input: Span) -> Result<ExprNode, ParserError> {
 
 /// Parses an expression
 fn expr(input: Span) -> Result<ExprNode, ParserError> {
-    or_expr.map_error(ParserError::expect_expr).parse(input)
+    or_expr
+        .convert_error_to(ParserError::expect_expr)
+        .parse(input)
 }
 
 /// Parses an OR expression (lowest precedence)
@@ -108,8 +110,8 @@ fn not_expr(input: Span) -> Result<ExprNode, ParserError> {
                 .convert_errors()
                 .parse(input)?;
 
-            let (rest, expr) = cut(not_expr)
-                .map_error(ParserError::unary_op_missing_operand(&not_op))
+            let (rest, expr) = not_expr
+                .or_fail_with(ParserError::unary_op_missing_operand(&not_op))
                 .parse(rest)?;
 
             let span = AstSpan::calc_span(&not_op, &expr);
@@ -136,8 +138,8 @@ fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, first_operand) = minmax_expr.parse(input)?;
     let (rest, second_operand) = opt(|input| {
         let (rest, operator) = op.parse(input)?;
-        let (rest, operand) = cut(minmax_expr)
-            .map_error(ParserError::binary_op_missing_second_operand(&operator))
+        let (rest, operand) = minmax_expr
+            .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
             .parse(rest)?;
         Ok((rest, (operator, operand)))
     })
@@ -167,8 +169,8 @@ fn minmax_expr(input: Span) -> Result<ExprNode, ParserError> {
             .convert_errors()
             .parse(input)?;
 
-        let (rest, operand) = cut(additive_expr)
-            .map_error(ParserError::binary_op_missing_second_operand(&operator))
+        let (rest, operand) = additive_expr
+            .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
             .parse(rest)?;
 
         Ok((rest, (operator, operand)))
@@ -222,8 +224,8 @@ fn exponential_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, first_operand) = neg_expr.parse(input)?;
     let (rest, second_operand) = opt(|input| {
         let (rest, operator) = op.parse(input)?;
-        let (rest, operand) = cut(exponential_expr)
-            .map_error(ParserError::binary_op_missing_second_operand(&operator))
+        let (rest, operand) = exponential_expr
+            .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
             .parse(rest)?;
         Ok((rest, (operator, operand)))
     })
@@ -251,8 +253,8 @@ fn neg_expr(input: Span) -> Result<ExprNode, ParserError> {
                 .convert_errors()
                 .parse(input)?;
 
-            let (rest, expr) = cut(neg_expr)
-                .map_error(ParserError::unary_op_missing_operand(&minus_op))
+            let (rest, expr) = neg_expr
+                .or_fail_with(ParserError::unary_op_missing_operand(&minus_op))
                 .parse(rest)?;
 
             let span = AstSpan::calc_span(&minus_op, &expr);
@@ -310,8 +312,8 @@ fn function_call(input: Span) -> Result<ExprNode, ParserError> {
 
     let (rest, paren_left_span) = paren_left.convert_errors().parse(rest)?;
     let (rest, args) = separated_list0(comma.convert_errors(), expr).parse(rest)?;
-    let (rest, paren_right_span) = cut(paren_right)
-        .map_failure(ParserError::unclosed_paren(&paren_left_span))
+    let (rest, paren_right_span) = paren_right
+        .or_fail_with(ParserError::unclosed_paren(&paren_left_span))
         .parse(rest)?;
 
     let span = AstSpan::calc_span(&name, &paren_right_span);
@@ -330,9 +332,9 @@ fn variable(input: Span) -> Result<ExprNode, ParserError> {
 
     let (rest, rest_ids) = many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
-        let (rest, id) =
-            cut(identifier.map_error(ParserError::variable_missing_parent(&dot_token)))
-                .parse(rest)?;
+        let (rest, id) = identifier
+            .or_fail_with(ParserError::variable_missing_parent(&dot_token))
+            .parse(rest)?;
         let id_span = AstSpan::from(&id);
         let id = Node::new(id_span, Identifier::new(id.lexeme().to_string()));
 
@@ -360,12 +362,12 @@ fn variable(input: Span) -> Result<ExprNode, ParserError> {
 fn parenthesized_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
 
-    let (rest, expr) = cut(expr)
-        .map_failure(ParserError::paren_missing_expression(&paren_left_span))
+    let (rest, expr) = expr
+        .or_fail_with(ParserError::paren_missing_expression(&paren_left_span))
         .parse(rest)?;
 
-    let (rest, paren_right_span) = cut(paren_right)
-        .map_failure(ParserError::unclosed_paren(&paren_left_span))
+    let (rest, paren_right_span) = paren_right
+        .or_fail_with(ParserError::unclosed_paren(&paren_left_span))
         .parse(rest)?;
 
     // note: we need to wrap the expr in a parenthesized node in order to keep the spans accurate

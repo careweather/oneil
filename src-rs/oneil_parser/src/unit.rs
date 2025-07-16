@@ -3,7 +3,7 @@
 use nom::{
     Parser as NomParser,
     branch::alt,
-    combinator::{all_consuming, cut, map, opt},
+    combinator::{all_consuming, map, opt},
     multi::many0,
 };
 
@@ -40,7 +40,9 @@ pub fn parse_complete(input: Span) -> Result<UnitExprNode, ParserError> {
 
 /// Parses a unit expression
 fn unit_expr(input: Span) -> Result<UnitExprNode, ParserError> {
-    let (rest, first_term) = unit_term.map_error(ParserError::expect_unit).parse(input)?;
+    let (rest, first_term) = unit_term
+        .convert_error_to(ParserError::expect_unit)
+        .parse(input)?;
 
     let (rest, rest_terms) = many0(|input| {
         let op = alt((
@@ -49,8 +51,9 @@ fn unit_expr(input: Span) -> Result<UnitExprNode, ParserError> {
         ));
 
         let (rest, op) = op.convert_errors().parse(input)?;
-        let (rest, term) =
-            cut(unit_term.map_error(ParserError::unit_missing_second_term(&op))).parse(rest)?;
+        let (rest, term) = unit_term
+            .or_fail_with(ParserError::unit_missing_second_term(&op))
+            .parse(rest)?;
         Ok((rest, (op, term)))
     })
     .parse(rest)?;
@@ -75,9 +78,9 @@ fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
 
         let (rest, exp) = opt(|input| {
             let (rest, caret_token) = caret.convert_errors().parse(input)?;
-            let (rest, exp) =
-                cut(number.map_error(ParserError::unit_missing_exponent(&caret_token)))
-                    .parse(rest)?;
+            let (rest, exp) = number
+                .or_fail_with(ParserError::unit_missing_exponent(&caret_token))
+                .parse(rest)?;
             Ok((rest, exp))
         })
         .parse(rest)?;
@@ -108,13 +111,13 @@ fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
     let parse_parenthesized = |input| {
         let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
-        let (rest, expr) =
-            cut(unit_expr.map_error(ParserError::unit_paren_missing_expr(&paren_left_token)))
-                .parse(rest)?;
+        let (rest, expr) = unit_expr
+            .or_fail_with(ParserError::unit_paren_missing_expr(&paren_left_token))
+            .parse(rest)?;
 
-        let (rest, paren_right_token) =
-            cut(paren_right.map_error(ParserError::unclosed_paren(&paren_left_token)))
-                .parse(rest)?;
+        let (rest, paren_right_token) = paren_right
+            .or_fail_with(ParserError::unclosed_paren(&paren_left_token))
+            .parse(rest)?;
 
         let span = AstSpan::calc_span(&paren_left_token, &paren_right_token);
 

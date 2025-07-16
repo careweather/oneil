@@ -8,7 +8,7 @@
 use nom::Parser as _;
 use nom::bytes::complete::take_while;
 use nom::character::complete::{char, line_ending, not_line_ending};
-use nom::combinator::{consumed, cut, flat_map, recognize, verify};
+use nom::combinator::{consumed, flat_map, recognize, verify};
 use nom::multi::many0;
 
 use crate::token::{
@@ -75,20 +75,20 @@ fn multi_line_note(input: Span) -> Result<Token, TokenError> {
     flat_map(
         consumed(|input| {
             let (rest, delimiter_span) = multi_line_note_delimiter.parse(input)?;
-            let (rest, _) = cut(|input| -> Result<_, TokenError> {
+            let (rest, _) = (|input| -> Result<_, TokenError> {
                 let (rest, _) = line_ending.parse(input)?;
                 let (rest, _) = multi_line_note_content.parse(rest)?;
                 let (rest, _) = multi_line_note_delimiter.parse(rest)?;
                 Ok((rest, ()))
             })
-            .map_failure(TokenError::unclosed_note(delimiter_span))
+            .or_fail_with(TokenError::unclosed_note(delimiter_span))
             .parse(rest)?;
             Ok((rest, delimiter_span))
         }),
         |(content, delimiter_span)| {
             move |input| {
-                let (rest, whitespace) = cut(end_of_line_span)
-                    .map_failure(TokenError::unclosed_note(delimiter_span))
+                let (rest, whitespace) = end_of_line_span
+                    .or_fail_with(TokenError::unclosed_note(delimiter_span))
                     .parse(input)?;
 
                 Ok((rest, Token::new(content, whitespace)))
@@ -108,7 +108,7 @@ pub fn note(input: Span) -> Result<(Token, NoteKind), TokenError> {
     let single_line_note = single_line_note.map(|token| (token, NoteKind::SingleLine));
     let multi_line_note = multi_line_note.map(|token| (token, NoteKind::MultiLine));
     let note = single_line_note.or(multi_line_note);
-    note.map_error(TokenError::expected_note).parse(input)
+    note.or_fail_with(TokenError::expected_note).parse(input)
 }
 
 #[cfg(test)]

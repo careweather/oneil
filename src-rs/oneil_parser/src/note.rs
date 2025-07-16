@@ -28,7 +28,7 @@ pub fn parse_complete(input: Span) -> Result<NoteNode, ParserError> {
 
 fn note(input: Span) -> Result<NoteNode, ParserError> {
     let (rest, (token, kind)) = note_token
-        .map_error(ParserError::expect_note)
+        .convert_error_to(ParserError::expect_note)
         .parse(input)?;
 
     let note = match kind {

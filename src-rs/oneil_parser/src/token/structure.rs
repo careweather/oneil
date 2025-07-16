@@ -37,7 +37,7 @@ pub fn end_of_line(input: Span) -> Result<Token, TokenError> {
     let (rest, first_line_break) = linebreak
         .or(comment)
         .or(end_of_file)
-        .map_error(TokenError::expected_end_of_line)
+        .convert_error_to(TokenError::expected_end_of_line)
         .parse(input)?;
 
     let (rest, rest_whitespace) = recognize((

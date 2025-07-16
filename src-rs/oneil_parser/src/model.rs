@@ -5,7 +5,7 @@ use std::result::Result as StdResult;
 use nom::{
     Parser as _,
     bytes::complete::take_while,
-    combinator::{cut, eof, opt, value},
+    combinator::{eof, opt, value},
 };
 use oneil_ast::{
     Span as AstSpan,
@@ -224,14 +224,14 @@ fn parse_section(
 fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
 
-    let (rest, label) = cut(label)
-        .map_failure(ParserError::section_missing_label(section_span))
+    let (rest, label) = label
+        .or_fail_with(ParserError::section_missing_label(section_span))
         .parse(rest)?;
     let label_value = Label::new(label.lexeme().to_string());
     let label_node = Node::new(label, label_value);
 
-    let (rest, end_of_line_token) = cut(end_of_line)
-        .map_failure(ParserError::section_missing_end_of_line(section_span))
+    let (rest, end_of_line_token) = end_of_line
+        .or_fail_with(ParserError::section_missing_end_of_line(section_span))
         .parse(rest)?;
 
     let span = AstSpan::calc_span_with_whitespace(&section_span, &label, &end_of_line_token);

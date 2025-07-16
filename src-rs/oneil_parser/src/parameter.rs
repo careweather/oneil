@@ -2,7 +2,7 @@
 
 use nom::Parser;
 use nom::branch::alt;
-use nom::combinator::{all_consuming, cut, opt};
+use nom::combinator::{all_consuming, opt};
 use nom::multi::{many0, separated_list1};
 use oneil_ast::debug_info::{TraceLevel, TraceLevelNode};
 use oneil_ast::naming::{Identifier, Label};
@@ -53,28 +53,35 @@ fn parameter_decl(input: Span) -> Result<ParameterNode, ParserError> {
 
     let (rest, trace_level) = opt(trace_level).parse(rest)?;
 
-    let (rest, label) = label.map_error(ParserError::expect_parameter).parse(rest)?;
+    let (rest, label) = label
+        .convert_error_to(ParserError::expect_parameter)
+        .parse(rest)?;
     let label_span = AstSpan::from(&label);
     let label = Node::new(label_span, Label::new(label.lexeme().to_string()));
 
     let (rest, limits) = opt(limits).parse(rest)?;
 
-    let (rest, _) = colon.map_error(ParserError::expect_parameter).parse(rest)?;
+    let (rest, _) = colon
+        .or_fail_with(ParserError::expect_parameter)
+        .parse(rest)?;
 
-    let (rest, ident) =
-        cut(identifier.map_error(ParserError::parameter_missing_identifier)).parse(rest)?;
+    let (rest, ident) = identifier
+        .or_fail_with(ParserError::parameter_missing_identifier)
+        .parse(rest)?;
     let ident_span = AstSpan::from(&ident);
     let ident_node = Node::new(ident_span, Identifier::new(ident.lexeme().to_string()));
 
-    let (rest, _) =
-        cut(equals.map_error(ParserError::parameter_missing_equals_sign(ident))).parse(rest)?;
+    let (rest, _) = equals
+        .or_fail_with(ParserError::parameter_missing_equals_sign(ident))
+        .parse(rest)?;
 
-    let (rest, value) =
-        cut(parameter_value.map_error(ParserError::parameter_missing_value(ident))).parse(rest)?;
+    let (rest, value) = parameter_value
+        .or_fail_with(ParserError::parameter_missing_value(ident))
+        .parse(rest)?;
 
-    let (rest, linebreak_token) =
-        cut(end_of_line.map_error(ParserError::parameter_missing_end_of_line(ident)))
-            .parse(rest)?;
+    let (rest, linebreak_token) = end_of_line
+        .or_fail_with(ParserError::parameter_missing_end_of_line(ident))
+        .parse(rest)?;
 
     let (rest, note) = opt(parse_note).parse(rest)?;
 
@@ -135,17 +142,21 @@ fn limits(input: Span) -> Result<LimitsNode, ParserError> {
 fn continuous_limits(input: Span) -> Result<LimitsNode, ParserError> {
     let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
-    // TODO: in all parsers, change all `map_failure` to `map_error` and put
-    //       them inside the call to `cut` as shown here, so that other failures
-    //       don't get overwritten
-    let (rest, min) = cut(parse_expr.map_error(ParserError::limit_missing_min)).parse(rest)?;
+    let (rest, min) = parse_expr
+        .or_fail_with(ParserError::limit_missing_min)
+        .parse(rest)?;
 
-    let (rest, _) = cut(comma.map_error(ParserError::limit_missing_comma)).parse(rest)?;
+    let (rest, _) = comma
+        .or_fail_with(ParserError::limit_missing_comma)
+        .parse(rest)?;
 
-    let (rest, max) = cut(parse_expr.map_error(ParserError::limit_missing_max)).parse(rest)?;
+    let (rest, max) = parse_expr
+        .or_fail_with(ParserError::limit_missing_max)
+        .parse(rest)?;
 
-    let (rest, paren_right_token) =
-        cut(paren_right.map_error(ParserError::unclosed_paren(&paren_left_token))).parse(rest)?;
+    let (rest, paren_right_token) = paren_right
+        .or_fail_with(ParserError::unclosed_paren(&paren_left_token))
+        .parse(rest)?;
 
     let span = AstSpan::calc_span(&paren_left_token, &paren_right_token);
 
@@ -158,13 +169,13 @@ fn continuous_limits(input: Span) -> Result<LimitsNode, ParserError> {
 fn discrete_limits(input: Span) -> Result<LimitsNode, ParserError> {
     let (rest, bracket_left_token) = bracket_left.convert_errors().parse(input)?;
 
-    let (rest, values) = cut(separated_list1(comma.convert_errors(), parse_expr)
-        .map_error(ParserError::limit_missing_values))
-    .parse(rest)?;
+    let (rest, values) = separated_list1(comma.convert_errors(), parse_expr)
+        .or_fail_with(ParserError::limit_missing_values)
+        .parse(rest)?;
 
-    let (rest, bracket_right_token) =
-        cut(bracket_right.map_error(ParserError::unclosed_bracket(&bracket_left_token)))
-            .parse(rest)?;
+    let (rest, bracket_right_token) = bracket_right
+        .or_fail_with(ParserError::unclosed_bracket(&bracket_left_token))
+        .parse(rest)?;
 
     let span = AstSpan::calc_span(&bracket_left_token, &bracket_right_token);
 
@@ -185,9 +196,9 @@ fn simple_value(input: Span) -> Result<ParameterValueNode, ParserError> {
     let (rest, unit) = opt(|input| {
         let (rest, colon_token) = colon.convert_errors().parse(input)?;
 
-        let (rest, unit) =
-            cut(parse_unit.map_error(ParserError::parameter_missing_unit(&colon_token)))
-                .parse(rest)?;
+        let (rest, unit) = parse_unit
+            .or_fail_with(ParserError::parameter_missing_unit(&colon_token))
+            .parse(rest)?;
 
         Ok((rest, unit))
     })
@@ -210,9 +221,9 @@ fn piecewise_value(input: Span) -> Result<ParameterValueNode, ParserError> {
     let (rest, unit) = opt(|input| {
         let (rest, colon_token) = colon.convert_errors().parse(input)?;
 
-        let (rest, unit) =
-            cut(parse_unit.map_error(ParserError::parameter_missing_unit(&colon_token)))
-                .parse(rest)?;
+        let (rest, unit) = parse_unit
+            .or_fail_with(ParserError::parameter_missing_unit(&colon_token))
+            .parse(rest)?;
 
         Ok((rest, unit))
     })
@@ -244,16 +255,17 @@ fn piecewise_value(input: Span) -> Result<ParameterValueNode, ParserError> {
 fn piecewise_part(input: Span) -> Result<PiecewisePartNode, ParserError> {
     let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
 
-    let (rest, expr) =
-        cut(parse_expr.map_error(ParserError::piecewise_missing_expr(&brace_left_token)))
-            .parse(rest)?;
+    let (rest, expr) = parse_expr
+        .or_fail_with(ParserError::piecewise_missing_expr(&brace_left_token))
+        .parse(rest)?;
 
-    let (rest, _) =
-        cut(if_.map_error(ParserError::piecewise_missing_if(&brace_left_token))).parse(rest)?;
+    let (rest, _) = if_
+        .or_fail_with(ParserError::piecewise_missing_if(&brace_left_token))
+        .parse(rest)?;
 
-    let (rest, if_expr) =
-        cut(parse_expr.map_error(ParserError::piecewise_missing_if_expr(&brace_left_token)))
-            .parse(rest)?;
+    let (rest, if_expr) = parse_expr
+        .or_fail_with(ParserError::piecewise_missing_if_expr(&brace_left_token))
+        .parse(rest)?;
 
     let node = Node::new(
         AstSpan::calc_span(&brace_left_token, &if_expr),

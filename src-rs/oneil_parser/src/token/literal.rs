@@ -8,7 +8,7 @@ use nom::{
     Parser as _,
     bytes::complete::{tag, take_while},
     character::complete::{digit1, one_of},
-    combinator::{cut, opt},
+    combinator::opt,
 };
 
 use crate::token::{
@@ -25,8 +25,8 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
 
     let opt_decimal = opt(|input| -> Result<_, TokenError> {
         let (rest, decimal_point_span) = tag(".").parse(input)?;
-        let (rest, _) = cut(digit1)
-            .map_failure(TokenError::invalid_decimal_part(decimal_point_span))
+        let (rest, _) = digit1
+            .or_fail_with(TokenError::invalid_decimal_part(decimal_point_span))
             .parse(rest)?;
         Ok((rest, ()))
     });
@@ -34,8 +34,8 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
     let opt_exponent = opt(|input| {
         let (rest, e_span) = tag("e").or(tag("E")).parse(input)?;
         let (rest, _) = opt(one_of("+-")).parse(rest)?;
-        let (rest, _) = cut(digit1)
-            .map_failure(TokenError::invalid_exponent_part(e_span))
+        let (rest, _) = digit1
+            .or_fail_with(TokenError::invalid_exponent_part(e_span))
             .parse(rest)?;
         Ok((rest, ()))
     });
@@ -53,8 +53,8 @@ pub fn string(input: Span) -> Result<Token, TokenError> {
         |input| {
             let (rest, open_quote_span) = tag("\"").parse(input)?;
             let (rest, _) = take_while(|c: char| c != '"' && c != '\n').parse(rest)?;
-            let (rest, _) = cut(tag("\""))
-                .map_failure(TokenError::unclosed_string(open_quote_span))
+            let (rest, _) = tag("\"")
+                .or_fail_with(TokenError::unclosed_string(open_quote_span))
                 .parse(rest)?;
             Ok((rest, ()))
         },
