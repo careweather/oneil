@@ -18,7 +18,7 @@ use oneil_ast::{
 use crate::{
     declaration::parse as parse_decl,
     error::{
-        ErrorHandlingParser, ExpectKind, ParserError, ParserErrorKind,
+        ErrorHandlingParser, ExpectKind, ParserError, ParserErrorReason,
         partial::ErrorsWithPartialResult,
     },
     note::parse as parse_note,
@@ -110,7 +110,7 @@ fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
                 // if we were simply unable to find a declaration, rather than
                 // if we found a declaration, but it was invalid.
                 let is_possible_part_of_previous_decl =
-                    last_was_error && e.kind == ParserErrorKind::Expect(ExpectKind::Decl);
+                    last_was_error && e.reason == ParserErrorReason::Expect(ExpectKind::Decl);
 
                 if !is_possible_part_of_previous_decl {
                     acc_errors.push(e);
@@ -225,13 +225,13 @@ fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
 
     let (rest, label) = label
-        .or_fail_with(ParserError::section_missing_label(section_span))
+        .or_fail_with(ParserError::section_missing_label(&section_span))
         .parse(rest)?;
     let label_value = Label::new(label.lexeme().to_string());
     let label_node = Node::new(label, label_value);
 
     let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::section_missing_end_of_line(section_span))
+        .or_fail_with(ParserError::section_missing_end_of_line(&label))
         .parse(rest)?;
 
     let span = AstSpan::calc_span_with_whitespace(&section_span, &label, &end_of_line_token);

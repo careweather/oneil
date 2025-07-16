@@ -87,14 +87,13 @@ fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
 
         let exp = exp.map(|n| {
             let parse_result = n.lexeme().parse::<f64>();
-            (n, parse_result.map_err(|_| ()))
+            let parse_result = parse_result.expect("all valid numbers should parse correctly");
+
+            (n, parse_result)
         });
 
         let exp = match exp {
-            Some((n, Ok(exp))) => Some(Node::new(n, UnitExponent::new(exp))),
-            Some((n, Err(()))) => {
-                return Err(nom::Err::Failure(ParserError::invalid_number(&n)));
-            }
+            Some((n, exp)) => Some(Node::new(n, UnitExponent::new(exp))),
             None => None,
         };
 

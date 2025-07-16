@@ -10,7 +10,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{all_consuming, map, map_res, opt},
+    combinator::{all_consuming, map, opt},
     multi::{many0, separated_list0},
 };
 
@@ -45,7 +45,9 @@ fn left_associative_binary_op<'a>(
         let (rest, rest_operands) = many0(|input| {
             let (rest, operator) = operator.parse(input)?;
             let (rest, operand) = operand
-                .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
+                .or_fail_with(ParserError::expr_binary_op_missing_second_operand(
+                    &operator,
+                ))
                 .parse(rest)?;
             Ok((rest, (operator, operand)))
         })
@@ -139,7 +141,9 @@ fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, second_operand) = opt(|input| {
         let (rest, operator) = op.parse(input)?;
         let (rest, operand) = minmax_expr
-            .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
+            .or_fail_with(ParserError::expr_binary_op_missing_second_operand(
+                &operator,
+            ))
             .parse(rest)?;
         Ok((rest, (operator, operand)))
     })
@@ -170,7 +174,9 @@ fn minmax_expr(input: Span) -> Result<ExprNode, ParserError> {
             .parse(input)?;
 
         let (rest, operand) = additive_expr
-            .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
+            .or_fail_with(ParserError::expr_binary_op_missing_second_operand(
+                &operator,
+            ))
             .parse(rest)?;
 
         Ok((rest, (operator, operand)))
@@ -225,7 +231,9 @@ fn exponential_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, second_operand) = opt(|input| {
         let (rest, operator) = op.parse(input)?;
         let (rest, operand) = exponential_expr
-            .or_fail_with(ParserError::binary_op_missing_second_operand(&operator))
+            .or_fail_with(ParserError::expr_binary_op_missing_second_operand(
+                &operator,
+            ))
             .parse(rest)?;
         Ok((rest, (operator, operand)))
     })
@@ -269,16 +277,13 @@ fn neg_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// Parses a primary expression (literals, identifiers, function calls, parenthesized expressions)
 fn primary_expr(input: Span) -> Result<ExprNode, ParserError> {
     alt((
-        map_res(number.convert_errors(), |n| {
+        map(number.convert_errors(), |n| {
             let parse_result = n.lexeme().parse::<f64>();
-            match parse_result {
-                Ok(n_value) => {
-                    let node = Node::new(n, Literal::number(n_value));
-                    let node = Node::new(n, Expr::literal(node));
-                    Ok(node)
-                }
-                Err(_) => Err(ParserError::invalid_number(&n)),
-            }
+            let parse_result = parse_result.expect("all valid numbers should parse correctly");
+
+            let node = Node::new(n, Literal::number(parse_result));
+            let node = Node::new(n, Expr::literal(node));
+            node
         }),
         map(string.convert_errors(), |s| {
             // trim quotes from the string
@@ -333,7 +338,7 @@ fn variable(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, rest_ids) = many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
         let (rest, id) = identifier
-            .or_fail_with(ParserError::variable_missing_parent(&dot_token))
+            .or_fail_with(ParserError::expr_variable_missing_parent(&dot_token))
             .parse(rest)?;
         let id_span = AstSpan::from(&id);
         let id = Node::new(id_span, Identifier::new(id.lexeme().to_string()));
@@ -363,7 +368,7 @@ fn parenthesized_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
 
     let (rest, expr) = expr
-        .or_fail_with(ParserError::paren_missing_expression(&paren_left_span))
+        .or_fail_with(ParserError::expr_paren_missing_expression(&paren_left_span))
         .parse(rest)?;
 
     let (rest, paren_right_span) = paren_right

@@ -18,6 +18,16 @@ use crate::token::{
 };
 
 /// Parses a number literal, supporting optional sign, decimal, and exponent.
+///
+/// All valid numbers should be parsed correctly because they conform to the
+/// grammar noted here:
+/// https://doc.rust-lang.org/std/primitive.f64.html#impl-FromStr-for-f64
+///
+/// Therefore, when this parser is used, we can use the following pattern to convert it to an f64:
+/// ```ignore
+/// let parse_result = n.lexeme().parse::<f64>();
+/// let parse_result = parse_result.expect("all valid numbers should parse correctly");
+/// ```
 pub fn number(input: Span) -> Result<Token, TokenError> {
     let opt_sign = opt(one_of("+-"));
 

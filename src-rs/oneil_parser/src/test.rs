@@ -43,16 +43,22 @@ fn test_decl(input: Span) -> Result<TestNode, ParserError> {
 
     let (rest, inputs) = opt(test_inputs).parse(rest)?;
 
-    let (rest, _) = colon
-        .or_fail_with(ParserError::test_missing_colon(&test_keyword_token))
+    // for error reporting
+    let test_kw_or_inputs_span = inputs
+        .as_ref()
+        .map(AstSpan::from)
+        .unwrap_or(AstSpan::from(&test_keyword_token));
+
+    let (rest, colon_token) = colon
+        .or_fail_with(ParserError::test_missing_colon(&test_kw_or_inputs_span))
         .parse(rest)?;
 
     let (rest, expr) = parse_expr
-        .or_fail_with(ParserError::test_missing_expr(&test_keyword_token))
+        .or_fail_with(ParserError::test_missing_expr(&colon_token))
         .parse(rest)?;
 
     let (rest, linebreak_token) = end_of_line
-        .or_fail_with(ParserError::test_missing_end_of_line(&test_keyword_token))
+        .or_fail_with(ParserError::test_missing_end_of_line(&expr))
         .parse(rest)?;
 
     let span = match &trace_level {

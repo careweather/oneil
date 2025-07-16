@@ -55,17 +55,18 @@ fn decl(input: Span) -> Result<DeclNode, ParserError> {
 fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
-    let (rest, path) =
+    let (rest, import_path_token) =
         cut(identifier.or_fail_with(ParserError::import_missing_path(&import_token)))
             .parse(rest)?;
 
     let (rest, end_of_line_token) =
-        cut(end_of_line.or_fail_with(ParserError::import_missing_end_of_line(&import_token)))
+        cut(end_of_line.or_fail_with(ParserError::import_missing_end_of_line(&import_path_token)))
             .parse(rest)?;
 
-    let span = AstSpan::calc_span_with_whitespace(&import_token, &path, &end_of_line_token);
+    let span =
+        AstSpan::calc_span_with_whitespace(&import_token, &import_path_token, &end_of_line_token);
 
-    let import_node = Node::new(span, Import::new(path.lexeme().to_string()));
+    let import_node = Node::new(span, Import::new(import_path_token.lexeme().to_string()));
 
     let decl_node = Node::new(span, Decl::Import(import_node));
 
@@ -76,24 +77,30 @@ fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
 fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, from_token) = from.convert_errors().parse(input)?;
 
-    let (rest, (path, mut subcomponents)) = model_path
+    let (rest, (from_path, mut subcomponents)) = model_path
         .or_fail_with(ParserError::from_missing_path(&from_token))
         .parse(rest)?;
 
     let (rest, use_token) = use_
-        .or_fail_with(ParserError::from_missing_use(&from_token))
+        .or_fail_with(ParserError::from_missing_use(&from_path))
         .parse(rest)?;
 
     let (rest, use_model) = identifier
-        .or_fail_with(ParserError::from_missing_use_model(&from_token, &use_token))
+        .or_fail_with(ParserError::from_missing_use_model(&use_token))
         .parse(rest)?;
     let use_model = Node::new(use_model, Identifier::new(use_model.lexeme().to_string()));
+    let use_model_span = AstSpan::from(&use_model);
     subcomponents.push(use_model);
 
     let (rest, inputs) = opt(model_inputs).parse(rest)?;
 
+    // for error reporting
+    let use_model_or_inputs_span = inputs
+        .as_ref()
+        .map_or(use_model_span, |inputs| AstSpan::from(inputs));
+
     let (rest, as_token) = as_
-        .or_fail_with(ParserError::from_missing_as(&from_token))
+        .or_fail_with(ParserError::from_missing_as(&use_model_or_inputs_span))
         .parse(rest)?;
 
     let (rest, alias) = identifier
@@ -102,14 +109,14 @@ fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
     let alias = Node::new(alias, Identifier::new(alias.lexeme().to_string()));
 
     let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::from_missing_end_of_line(&from_token))
+        .or_fail_with(ParserError::from_missing_end_of_line(&alias))
         .parse(rest)?;
 
     let span = AstSpan::calc_span_with_whitespace(&from_token, &alias, &end_of_line_token);
 
     let use_model_node = Node::new(
         span,
-        UseModel::new(path, subcomponents, inputs, Some(alias)),
+        UseModel::new(from_path, subcomponents, inputs, Some(alias)),
     );
 
     let decl_node = Node::new(span, Decl::UseModel(use_model_node));
@@ -127,8 +134,15 @@ fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
 
     let (rest, inputs) = opt(model_inputs).parse(rest)?;
 
+    // for error reporting
+    let use_path_or_inputs_span = inputs
+        .as_ref()
+        .map(|inputs| AstSpan::from(inputs))
+        .or_else(|| subcomponents.last().map(AstSpan::from))
+        .unwrap_or(AstSpan::from(&path));
+
     let (rest, as_token) = as_
-        .or_fail_with(ParserError::use_missing_as(&use_token))
+        .or_fail_with(ParserError::use_missing_as(&use_path_or_inputs_span))
         .parse(rest)?;
 
     let (rest, alias) = identifier
@@ -137,7 +151,7 @@ fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
     let alias = Node::new(alias, Identifier::new(alias.lexeme().to_string()));
 
     let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::use_missing_end_of_line(&use_token))
+        .or_fail_with(ParserError::use_missing_end_of_line(&alias))
         .parse(rest)?;
 
     let span = AstSpan::calc_span_with_whitespace(&use_token, &alias, &end_of_line_token);
@@ -193,7 +207,7 @@ fn model_input(input: Span) -> Result<ModelInputNode, ParserError> {
 
     let (rest, equals_span) = equals.convert_errors().parse(rest)?;
     let (rest, value) = parse_expr
-        .or_fail_with(ParserError::model_input_missing_value(&ident, &equals_span))
+        .or_fail_with(ParserError::model_input_missing_value(&equals_span))
         .parse(rest)?;
 
     let span = AstSpan::calc_span(&ident, &value);

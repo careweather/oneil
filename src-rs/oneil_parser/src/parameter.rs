@@ -61,26 +61,26 @@ fn parameter_decl(input: Span) -> Result<ParameterNode, ParserError> {
 
     let (rest, limits) = opt(limits).parse(rest)?;
 
-    let (rest, _) = colon
+    let (rest, colon_token) = colon
         .or_fail_with(ParserError::expect_parameter)
         .parse(rest)?;
 
     let (rest, ident) = identifier
-        .or_fail_with(ParserError::parameter_missing_identifier)
+        .or_fail_with(ParserError::parameter_missing_identifier(&colon_token))
         .parse(rest)?;
     let ident_span = AstSpan::from(&ident);
     let ident_node = Node::new(ident_span, Identifier::new(ident.lexeme().to_string()));
 
-    let (rest, _) = equals
-        .or_fail_with(ParserError::parameter_missing_equals_sign(ident))
+    let (rest, equals_token) = equals
+        .or_fail_with(ParserError::parameter_missing_equals_sign(&ident_node))
         .parse(rest)?;
 
     let (rest, value) = parameter_value
-        .or_fail_with(ParserError::parameter_missing_value(ident))
+        .or_fail_with(ParserError::parameter_missing_value(&equals_token))
         .parse(rest)?;
 
     let (rest, linebreak_token) = end_of_line
-        .or_fail_with(ParserError::parameter_missing_end_of_line(ident))
+        .or_fail_with(ParserError::parameter_missing_end_of_line(&value))
         .parse(rest)?;
 
     let (rest, note) = opt(parse_note).parse(rest)?;
@@ -143,15 +143,15 @@ fn continuous_limits(input: Span) -> Result<LimitsNode, ParserError> {
     let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
     let (rest, min) = parse_expr
-        .or_fail_with(ParserError::limit_missing_min)
+        .or_fail_with(ParserError::limit_missing_min(&paren_left_token))
         .parse(rest)?;
 
-    let (rest, _) = comma
-        .or_fail_with(ParserError::limit_missing_comma)
+    let (rest, comma_token) = comma
+        .or_fail_with(ParserError::limit_missing_comma(&min))
         .parse(rest)?;
 
     let (rest, max) = parse_expr
-        .or_fail_with(ParserError::limit_missing_max)
+        .or_fail_with(ParserError::limit_missing_max(&comma_token))
         .parse(rest)?;
 
     let (rest, paren_right_token) = paren_right
@@ -170,7 +170,7 @@ fn discrete_limits(input: Span) -> Result<LimitsNode, ParserError> {
     let (rest, bracket_left_token) = bracket_left.convert_errors().parse(input)?;
 
     let (rest, values) = separated_list1(comma.convert_errors(), parse_expr)
-        .or_fail_with(ParserError::limit_missing_values)
+        .or_fail_with(ParserError::limit_missing_values(&bracket_left_token))
         .parse(rest)?;
 
     let (rest, bracket_right_token) = bracket_right
@@ -259,12 +259,12 @@ fn piecewise_part(input: Span) -> Result<PiecewisePartNode, ParserError> {
         .or_fail_with(ParserError::piecewise_missing_expr(&brace_left_token))
         .parse(rest)?;
 
-    let (rest, _) = if_
-        .or_fail_with(ParserError::piecewise_missing_if(&brace_left_token))
+    let (rest, if_token) = if_
+        .or_fail_with(ParserError::piecewise_missing_if(&expr))
         .parse(rest)?;
 
     let (rest, if_expr) = parse_expr
-        .or_fail_with(ParserError::piecewise_missing_if_expr(&brace_left_token))
+        .or_fail_with(ParserError::piecewise_missing_if_expr(&if_token))
         .parse(rest)?;
 
     let node = Node::new(
