@@ -1183,8 +1183,8 @@ impl<'a> ParseError<Span<'a>> for ParserError {
     fn from_error_kind(input: Span<'a>, reason: nom::error::ErrorKind) -> Self {
         let reason = match reason {
             // If `all_consuming` is used, we expect the parser to consume the entire input
-            nom::error::ErrorKind::Eof => ParserErrorReason::UnexpectedToken,
-            _ => ParserErrorReason::NomError(reason),
+            nom::error::ErrorKind::Eof => ParserErrorReason::unexpected_token(),
+            _ => ParserErrorReason::nom_error(reason),
         };
 
         Self {
@@ -1205,7 +1205,7 @@ impl<'a> ParseError<Span<'a>> for ParserError {
 impl From<TokenError> for ParserError {
     fn from(e: TokenError) -> Self {
         Self {
-            reason: ParserErrorReason::TokenError(e.kind),
+            reason: ParserErrorReason::token_error(e.kind),
             error_offset: e.offset,
         }
     }
