@@ -58,8 +58,8 @@ impl Import {
 pub struct UseModel {
     model_name: IdentifierNode,
     subcomponents: Vec<IdentifierNode>,
-    inputs: Option<Vec<ModelInputNode>>,
-    as_name: Option<IdentifierNode>,
+    inputs: Option<ModelInputListNode>,
+    alias: Option<IdentifierNode>,
 }
 
 pub type UseModelNode = Node<UseModel>;
@@ -68,14 +68,14 @@ impl UseModel {
     pub fn new(
         model_name: IdentifierNode,
         subcomponents: Vec<IdentifierNode>,
-        inputs: Option<Vec<ModelInputNode>>,
-        as_name: Option<IdentifierNode>,
+        inputs: Option<ModelInputListNode>,
+        alias: Option<IdentifierNode>,
     ) -> Self {
         Self {
             model_name,
             subcomponents,
             inputs,
-            as_name,
+            alias,
         }
     }
 
@@ -87,30 +87,41 @@ impl UseModel {
         &self.subcomponents
     }
 
-    pub fn inputs(&self) -> Option<&[ModelInputNode]> {
-        self.inputs.as_deref()
+    pub fn inputs(&self) -> Option<&ModelInputListNode> {
+        self.inputs.as_ref()
     }
 
-    pub fn as_name(&self) -> Option<&IdentifierNode> {
-        self.as_name.as_ref()
+    pub fn alias(&self) -> Option<&IdentifierNode> {
+        self.alias.as_ref()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModelInputList(Vec<ModelInputNode>);
+
+pub type ModelInputListNode = Node<ModelInputList>;
+
+impl ModelInputList {
+    pub fn new(inputs: Vec<ModelInputNode>) -> Self {
+        Self(inputs)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelInput {
-    name: IdentifierNode,
+    ident: IdentifierNode,
     value: ExprNode,
 }
 
 pub type ModelInputNode = Node<ModelInput>;
 
 impl ModelInput {
-    pub fn new(name: IdentifierNode, value: ExprNode) -> Self {
-        Self { name, value }
+    pub fn new(ident: IdentifierNode, value: ExprNode) -> Self {
+        Self { ident, value }
     }
 
-    pub fn name(&self) -> &IdentifierNode {
-        &self.name
+    pub fn ident(&self) -> &IdentifierNode {
+        &self.ident
     }
 
     pub fn value(&self) -> &ExprNode {

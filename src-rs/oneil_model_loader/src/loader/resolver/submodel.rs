@@ -107,7 +107,7 @@ pub fn resolve_submodels_and_tests(
             let use_model_path = ModelPath::new(use_model_path);
 
             // get the submodel name
-            let submodel_name = use_model.as_name.as_ref().unwrap_or(
+            let submodel_name = use_model.alias.as_ref().unwrap_or(
                 use_model
                     .subcomponents
                     .last()
