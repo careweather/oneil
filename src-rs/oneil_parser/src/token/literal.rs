@@ -28,11 +28,28 @@ use crate::token::{
 /// let parse_result = n.lexeme().parse::<f64>();
 /// let parse_result = parse_result.expect("all valid numbers should parse correctly");
 /// ```
+///
+/// The parser handles the following number formats:
+/// - Integers: `42`, `-17`, `+123`
+/// - Decimals: `3.1415`, `-2.5`, `+0.1`
+/// - Exponents: `2.5e10`, `-1.2E-3`, `1e+5`
+/// - Combined: `-1.23e-4`, `+5.67E+2`
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the parsed number literal.
 pub fn number(input: Span) -> Result<Token, TokenError> {
+    // Optional sign (+ or -) at the beginning
     let opt_sign = opt(one_of("+-"));
 
+    // Required sequence of digits
     let digit = digit1;
 
+    // Optional decimal part (e.g., ".1415")
     let opt_decimal = opt(|input| -> Result<_, TokenError> {
         let (rest, decimal_point_span) = tag(".").parse(input)?;
         let (rest, _) = digit1
@@ -41,6 +58,7 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
         Ok((rest, ()))
     });
 
+    // Optional exponent part (e.g., "e10", "E-3")
     let opt_exponent = opt(|input| {
         let (rest, e_span) = tag("e").or(tag("E")).parse(input)?;
         let (rest, _) = opt(one_of("+-")).parse(rest)?;
@@ -57,7 +75,28 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
     .parse(input)
 }
 
-/// Parses a string literal delimited by double quotes.
+/// Parses a string literal delimited by single quotes.
+///
+/// String literals in Oneil are delimited by single quotes (`'`) and can contain
+/// any characters except single quotes and newlines. The parser does not support
+/// escape sequences, so backslashes are treated as literal characters.
+///
+/// Examples of valid strings:
+/// - `'hello'`
+/// - `'foo bar'`
+/// - `'123'`
+///
+/// The parser will fail if:
+/// - The string is not properly closed with a single quote
+/// - The string contains a newline character
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the parsed string literal including the quotes.
 pub fn string(input: Span) -> Result<Token, TokenError> {
     token(
         |input| {

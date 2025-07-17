@@ -16,6 +16,23 @@ use crate::token::{
     util::{Token, token},
 };
 
+/// Creates a parser that succeeds when the next character is not the specified character.
+///
+/// This function is used to prevent partial matches of multi-character symbols.
+/// For example, when parsing `=`, we want to ensure the next character is not `=`
+/// to avoid matching `==` as two separate `=` tokens.
+///
+/// The parser succeeds if:
+/// - The next character is different from the specified character, OR
+/// - We've reached the end of the input
+///
+/// # Arguments
+///
+/// * `c` - The character that should NOT be the next character
+///
+/// # Returns
+///
+/// A parser that succeeds when the next character is not `c` or at end of input.
 fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError> {
     let next_char_is_not_c = peek(satisfy(move |next_char: char| next_char != c)).map(|_| ());
     let reached_end_of_file = eof.map(|_| ());

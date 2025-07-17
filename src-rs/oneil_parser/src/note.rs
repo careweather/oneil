@@ -19,13 +19,31 @@ pub fn parse(input: Span) -> Result<NoteNode, ParserError> {
     note(input)
 }
 
-/// Parse a note
+/// Parse a note, which can be either a single-line note starting with `~`
+/// or a multi-line note delimited by `~~~`.
 ///
 /// This function **fails if the complete input is not consumed**.
 pub fn parse_complete(input: Span) -> Result<NoteNode, ParserError> {
     all_consuming(note).parse(input)
 }
 
+/// Parses a note token and converts it to a note node.
+///
+/// This function parses either a single-line note (starting with `~`) or
+/// a multi-line note (delimited by `~~~`) and converts the token into
+/// a proper note node with the content extracted and trimmed.
+///
+/// For single-line notes, the leading `~` is removed and the content is trimmed.
+/// For multi-line notes, the leading and trailing `~~~` are removed and the
+/// content is trimmed.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a note node containing the parsed note with cleaned content.
 fn note(input: Span) -> Result<NoteNode, ParserError> {
     let (rest, (token, kind)) = note_token
         .convert_error_to(ParserError::expect_note)

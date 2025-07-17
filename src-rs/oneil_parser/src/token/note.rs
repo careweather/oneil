@@ -28,6 +28,19 @@ pub enum NoteKind {
     MultiLine,
 }
 
+/// Parses an end-of-line sequence and returns the span containing it.
+///
+/// This function is used internally to parse the end-of-line that follows
+/// single-line notes. It recognizes the end-of-line and returns the span
+/// for whitespace handling.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns the span containing the end-of-line sequence.
 fn end_of_line_span(input: Span) -> Result<Span, TokenError> {
     recognize(end_of_line).parse(input)
 }
@@ -36,6 +49,17 @@ fn end_of_line_span(input: Span) -> Result<Span, TokenError> {
 ///
 /// The note can contain any characters except for a newline, and it must be
 /// followed by a newline to be considered valid.
+///
+/// This function also checks that the note is not actually a multi-line note
+/// delimiter to avoid ambiguity.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the single-line note with its trailing whitespace.
 fn single_line_note(input: Span) -> Result<Token, TokenError> {
     let (rest, matched) = recognize((char('~'), not_line_ending)).parse(input)?;
     let (rest, whitespace) = end_of_line_span(rest)?;
@@ -48,6 +72,19 @@ fn single_line_note(input: Span) -> Result<Token, TokenError> {
     Ok((rest, Token::new(matched, whitespace)))
 }
 
+/// Parses a multi-line note delimiter (`~~~` with optional surrounding whitespace).
+///
+/// This function recognizes the delimiter that starts and ends multi-line notes.
+/// It requires at least 3 tilde characters (`~`) and allows optional whitespace
+/// before and after the tildes.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns the span containing the delimiter with its surrounding whitespace.
 fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
     recognize((
         inline_whitespace,
@@ -57,6 +94,19 @@ fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
     .parse(input)
 }
 
+/// Parses the content of a multi-line note.
+///
+/// This function parses all lines of content within a multi-line note,
+/// ensuring that no line contains the multi-line note delimiter `~~~`
+/// on its own line (which would end the note).
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns the span containing all the note content.
 fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
     recognize(many0(verify((not_line_ending, line_ending), |(s, _)| {
         multi_line_note_delimiter.parse(*s).is_err()
@@ -71,6 +121,17 @@ fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
 /// line, and the note must be closed with a matching `~~~` delimiter.
 ///
 /// If the multi-line note is not closed properly, this parser will fail.
+///
+/// This function uses a complex parsing strategy to handle the nested structure
+/// of multi-line notes with proper error handling for unclosed notes.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the multi-line note with its trailing whitespace.
 fn multi_line_note(input: Span) -> Result<Token, TokenError> {
     flat_map(
         consumed(|input| {
@@ -100,10 +161,39 @@ fn multi_line_note(input: Span) -> Result<Token, TokenError> {
 
 /// Parses a note, which can be either a single-line or multi-line note.
 ///
-/// If the note is not closed properly, this parser will fail.
+/// Single-line notes start with `~` and continue until the end of the line.
+/// Multi-line notes are delimited by `~~~` on their own lines and can contain
+/// multiple lines of content.
 ///
-/// In addition to the `Token`, this parser will also return the kind of note
-/// that was parsed.
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a tuple containing:
+/// - A `Token` with the complete note text including delimiters
+/// - A `NoteKind` indicating whether this is a single-line or multi-line note
+///
+/// # Errors
+///
+/// Returns a `TokenError` if:
+/// - The note is not properly closed (e.g. missing newline or closing delimiter)
+/// - The input does not start with a valid note delimiter
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_note;
+///
+/// // Single line note
+/// let input = "~ This is a note\n";
+/// let _ = parse_note(input, None).unwrap();
+///
+/// // Multi-line note
+/// let input = "~~~\nThis is a\nmulti-line note\n~~~\n";
+/// let _ = parse_note(input, None).unwrap();
+/// ```
 pub fn note(input: Span) -> Result<(Token, NoteKind), TokenError> {
     let single_line_note = single_line_note.map(|token| (token, NoteKind::SingleLine));
     let multi_line_note = multi_line_note.map(|token| (token, NoteKind::MultiLine));

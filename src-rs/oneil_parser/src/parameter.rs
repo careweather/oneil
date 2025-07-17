@@ -1,4 +1,26 @@
 //! Parser for parameter declarations in an Oneil program.
+//!
+//! This module provides parsing functionality for Oneil parameter declarations.
+//! A parameter declaration defines a named value with optional metadata such as
+//! limits, units, performance markers, and trace levels.
+//!
+//! # Parameter Declaration Syntax
+//!
+//! The general syntax for a parameter declaration is:
+//!
+//! ```text
+//! [performance] [trace_level] label [limits]: identifier = value [unit] \n [note]
+//! ```
+//!
+//! Where:
+//! - `performance` is optional and indicated by `$`
+//! - `trace_level` is optional and can be `*` (trace) or `**` (debug)
+//! - `label` is required and provides a human-readable name
+//! - `limits` is optional and can be continuous `(min, max)` or discrete `[val1, val2, ...]`
+//! - `identifier` is required and is the parameter name
+//! - `value` is required and can be simple or piecewise
+//! - `unit` is optional and follows the value with a colon
+//! - `note` is optional and provides additional documentation
 
 use nom::Parser;
 use nom::branch::alt;
@@ -48,6 +70,63 @@ pub fn parse_complete(input: Span) -> Result<ParameterNode, ParserError> {
 //       but only in design files. Maybe we can use a config flag to indicate
 //       whether we're parsing a design file or a model file and adjust from there.
 //       For now, we'll just require the preamble in all cases.
+/// Parses a complete parameter declaration with all optional components.
+///
+/// A parameter declaration has the following structure:
+/// `[performance] [trace_level] label [limits]: identifier = value [unit] [note]`
+///
+/// Where:
+/// - `performance` is optional and indicated by `$`
+/// - `trace_level` is optional and can be `*` (trace) or `**` (debug)
+/// - `label` is required and provides a human-readable name
+/// - `limits` is optional and can be continuous `(min, max)` or discrete `[val1, val2, ...]`
+/// - `identifier` is required and is the parameter name
+/// - `value` is required and can be simple or piecewise
+/// - `unit` is optional and follows the value with a colon
+/// - `note` is optional and provides additional documentation
+///
+/// The function handles all combinations of these components with proper
+/// error handling for missing required elements.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a parameter node containing all parsed components.
+///
+/// # Error Handling
+///
+/// The function provides detailed error messages for common parsing failures:
+/// - Missing label after performance/trace markers
+/// - Missing colon after label/limits
+/// - Missing identifier after colon
+/// - Missing equals sign after identifier
+/// - Missing value after equals sign
+/// - Missing end of line after value
+/// - Missing unit after colon in value
+/// - Missing expression in limits
+/// - Missing comma or closing delimiter in limits
+/// - Missing expression or condition in piecewise parts
+///
+/// # Examples
+///
+/// ```ignore
+/// use oneil_parser::parse_parameter;
+///
+/// // Basic parameter
+/// let param = parse_parameter("Radius: r = 5.0", None).unwrap();
+///
+/// // Parameter with all optional components
+/// let param = parse_parameter("$ ** Temperature(0, 100): temp = 25.0 :C", None).unwrap();
+///
+/// // Parameter with discrete limits
+/// let param = parse_parameter("Status[1, 2, 3]: state = 1", None).unwrap();
+///
+/// // Piecewise parameter
+/// let param = parse_parameter("Force: f = { 2*x if x > 0\n{ 0 if x <= 0\n", None).unwrap();
+/// ```
 fn parameter_decl(input: Span) -> Result<ParameterNode, ParserError> {
     let (rest, performance_marker) = opt(performance_marker).parse(input)?;
 
@@ -118,6 +197,25 @@ fn parameter_decl(input: Span) -> Result<ParameterNode, ParserError> {
 }
 
 /// Parse a performance indicator (`$`).
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a performance marker node if the `$` token is found, or an error
+/// if the token is malformed.
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_parameter;
+///
+/// // Parameter with performance marker
+/// let param = parse_parameter("$ Speed: v = 10.0 :m/s", None).unwrap();
+/// assert!(param.performance_marker().is_some());
+/// ```
 fn performance_marker(input: Span) -> Result<PerformanceMarkerNode, ParserError> {
     dollar
         .convert_errors()
@@ -126,6 +224,19 @@ fn performance_marker(input: Span) -> Result<PerformanceMarkerNode, ParserError>
 }
 
 /// Parse a trace level indicator (`*` or `**`).
+///
+/// Trace levels indicate the debugging/tracing level for a parameter:
+/// - `*` indicates trace level (basic debugging)
+/// - `**` indicates debug level (detailed debugging)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a trace level node if a valid trace indicator is found, or an error
+/// if the token is malformed.
 fn trace_level(input: Span) -> Result<TraceLevelNode, ParserError> {
     let single_star = star.map(|token| Node::new(token, TraceLevel::Trace));
     let double_star = star_star.map(|token| Node::new(token, TraceLevel::Debug));
@@ -134,11 +245,45 @@ fn trace_level(input: Span) -> Result<TraceLevelNode, ParserError> {
 }
 
 /// Parse parameter limits (either continuous or discrete).
+///
+/// Parameter limits define the valid range or set of values for a parameter:
+/// - Continuous limits: `(min, max)` - defines a range
+/// - Discrete limits: `[val1, val2, ...]` - defines a set of allowed values
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a limits node if valid limits are found, or an error if the
+/// limits are malformed.
 fn limits(input: Span) -> Result<LimitsNode, ParserError> {
     alt((continuous_limits, discrete_limits)).parse(input)
 }
 
 /// Parse continuous limits in parentheses, e.g. `(0, 100)`.
+///
+/// Continuous limits define a range of valid values for a parameter.
+/// The syntax requires two expressions separated by a comma, enclosed
+/// in parentheses.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a continuous limits node if valid limits are found, or an error
+/// if the limits are malformed.
+///
+/// # Error Conditions
+///
+/// - **Missing opening parenthesis**: When the input doesn't start with `(`
+/// - **Missing minimum value**: When no expression follows the opening parenthesis
+/// - **Missing comma**: When no comma separates the minimum and maximum values
+/// - **Missing maximum value**: When no expression follows the comma
+/// - **Missing closing parenthesis**: When the limits are not properly closed
 fn continuous_limits(input: Span) -> Result<LimitsNode, ParserError> {
     let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
@@ -166,6 +311,25 @@ fn continuous_limits(input: Span) -> Result<LimitsNode, ParserError> {
 }
 
 /// Parse discrete limits in square brackets, e.g. `[1, 2, 3]`.
+///
+/// Discrete limits define a set of allowed values for a parameter.
+/// The syntax requires one or more expressions separated by commas,
+/// enclosed in square brackets.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a discrete limits node if valid limits are found, or an error
+/// if the limits are malformed.
+///
+/// # Error Conditions
+///
+/// - **Missing opening bracket**: When the input doesn't start with `[`
+/// - **Missing values**: When no expressions are found after the opening bracket
+/// - **Missing closing bracket**: When the limits are not properly closed
 fn discrete_limits(input: Span) -> Result<LimitsNode, ParserError> {
     let (rest, bracket_left_token) = bracket_left.convert_errors().parse(input)?;
 
@@ -185,11 +349,69 @@ fn discrete_limits(input: Span) -> Result<LimitsNode, ParserError> {
 }
 
 /// Parse a parameter value (either simple or piecewise).
+///
+/// Parameter values can be either:
+/// - Simple: A single expression with optional unit
+/// - Piecewise: Multiple expressions with conditions, each on a separate line
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a parameter value node if a valid value is found, or an error
+/// if the value is malformed.
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_parameter;
+///
+/// // Simple value
+/// let param = parse_parameter("Radius: r = 5.0 :cm", None).unwrap();
+///
+/// // Piecewise value
+/// let param = parse_parameter("Force: f = { 2*x if x > 0\n{ 0 if x <= 0", None).unwrap();
+/// ```
 fn parameter_value(input: Span) -> Result<ParameterValueNode, ParserError> {
     simple_value.or(piecewise_value).parse(input)
 }
 
 /// Parse a simple parameter value (expression with optional unit).
+///
+/// A simple parameter value consists of an expression followed by an optional
+/// unit specification. The unit is introduced by a colon and can be any
+/// valid unit expression.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a simple parameter value node if a valid value is found, or an error
+/// if the value is malformed.
+///
+/// # Error Conditions
+///
+/// - **Missing expression**: When no expression follows the equals sign
+/// - **Missing unit**: When a colon is found but no valid unit follows
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_parameter;
+///
+/// // Simple value without unit
+/// let param = parse_parameter("Count: n = 42", None).unwrap();
+///
+/// // Simple value with unit
+/// let param = parse_parameter("Length: l = 10.0 :m", None).unwrap();
+///
+/// // Simple value with compound unit
+/// let param = parse_parameter("Speed: v = 5.0 :m/s", None).unwrap();
+/// ```
 fn simple_value(input: Span) -> Result<ParameterValueNode, ParserError> {
     let (rest, expr) = parse_expr.parse(input)?;
 
@@ -215,6 +437,41 @@ fn simple_value(input: Span) -> Result<ParameterValueNode, ParserError> {
 }
 
 /// Parse a piecewise parameter value.
+///
+/// A piecewise parameter value consists of multiple expressions with conditions,
+/// each on a separate line. The first piece is on the same line as the equals
+/// sign, and subsequent pieces are on new lines. Each piece has the format
+/// `{expression if condition}`.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a piecewise parameter value node if a valid value is found, or an error
+/// if the value is malformed.
+///
+/// # Error Conditions
+///
+/// - **Missing first piece**: When no piecewise part follows the equals sign
+/// - **Missing unit**: When a colon is found but no valid unit follows
+/// - **Missing subsequent pieces**: When a newline is found but no valid piece follows
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_parameter;
+///
+/// // Piecewise value without unit
+/// let param = parse_parameter("Force: f = { 2*x if x > 0\n{ 0 if x <= 0\n", None).unwrap();
+///
+/// // Piecewise value with unit
+/// let param = parse_parameter("Force: f = { 2*x if x > 0 :N\n{ 0 if x <= 0\n", None).unwrap();
+///
+/// // Multiple pieces
+/// let param = parse_parameter("Function: y = { x^2 if x > 0\n{ 0 if x == 0\n{ -x^2 if x < 0\n", None).unwrap();
+/// ```
 fn piecewise_value(input: Span) -> Result<ParameterValueNode, ParserError> {
     let (rest, first_part) = piecewise_part.parse(input)?;
 
@@ -252,6 +509,37 @@ fn piecewise_value(input: Span) -> Result<ParameterValueNode, ParserError> {
 }
 
 /// Parse a single piece of a piecewise expression, e.g. `{2*x if x > 0`.
+///
+/// A piecewise part consists of an expression followed by a condition,
+/// enclosed in braces. The condition is introduced by the `if` keyword.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a piecewise part node if a valid part is found, or an error
+/// if the part is malformed.
+///
+/// # Error Conditions
+///
+/// - **Missing opening brace**: When the input doesn't start with `{`
+/// - **Missing expression**: When no expression follows the opening brace
+/// - **Missing if keyword**: When no `if` keyword follows the expression
+/// - **Missing condition**: When no expression follows the `if` keyword
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_parameter;
+///
+/// // Simple piecewise part
+/// let param = parse_parameter("Value: v = { x if x > 0\n", None).unwrap();
+///
+/// // Complex piecewise part
+/// let param = parse_parameter("Result: r = { 2*x + 1 if x >= 0 and x < 10\n", None).unwrap();
+/// ```
 fn piecewise_part(input: Span) -> Result<PiecewisePartNode, ParserError> {
     let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
 

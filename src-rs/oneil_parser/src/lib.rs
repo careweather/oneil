@@ -77,6 +77,7 @@
 //! let ast: ModelNode = parse_model("Parameter radius: r = 5.0 :cm", None).unwrap();
 //! // Use the AST for further processing...
 //! ```
+#![warn(missing_docs)]
 
 // TODO: add tests for the errors that are produced by the parser. Right now, we
 //       only test whether the parser succeeds on parsing valid input. We should

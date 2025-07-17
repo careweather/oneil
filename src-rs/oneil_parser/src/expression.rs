@@ -36,6 +36,22 @@ use crate::{
     util::{Parser, Result, Span},
 };
 
+/// Creates a left-associative binary operator parser.
+///
+/// This function constructs a parser that handles left-associative binary operations
+/// like addition, multiplication, etc. It parses a sequence of operands separated
+/// by operators and builds the AST with proper left associativity.
+///
+/// For example, `a + b + c` is parsed as `(a + b) + c` rather than `a + (b + c)`.
+///
+/// # Arguments
+///
+/// * `operand` - Parser for the operands (e.g., expressions of higher precedence)
+/// * `operator` - Parser for the binary operators
+///
+/// # Returns
+///
+/// A parser that handles left-associative binary operations with proper error handling.
 fn left_associative_binary_op<'a>(
     mut operand: impl Parser<'a, ExprNode, ParserError> + Copy,
     mut operator: impl Parser<'a, BinaryOpNode, ParserError>,
@@ -80,7 +96,30 @@ pub fn parse_complete(input: Span) -> Result<ExprNode, ParserError> {
     all_consuming(expr).parse(input)
 }
 
-/// Parses an expression
+/// Parses an expression with proper operator precedence.
+///
+/// This function is the entry point for expression parsing and delegates
+/// to the highest precedence level (OR expressions). The precedence hierarchy
+/// from lowest to highest is:
+///
+/// 1. OR (`or`)
+/// 2. AND (`and`)
+/// 3. NOT (`not`)
+/// 4. Comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`)
+/// 5. Min/Max (`|`)
+/// 6. Addition/Subtraction (`+`, `-`, `--`)
+/// 7. Multiplication/Division (`*`, `/`, `//`, `%`)
+/// 8. Exponentiation (`^`)
+/// 9. Negation (`-`)
+/// 10. Primary expressions (literals, variables, function calls, parentheses)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node with proper operator precedence.
 fn expr(input: Span) -> Result<ExprNode, ParserError> {
     or_expr
         .convert_error_to(ParserError::expect_expr)
@@ -88,6 +127,25 @@ fn expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses an OR expression (lowest precedence)
+///
+/// OR expressions have the lowest precedence in the expression hierarchy.
+/// They are left-associative, meaning `a or b or c` is parsed as `(a or b) or c`.
+///
+/// Examples:
+/// - `true or false`
+/// - `x > 0 or y < 10`
+/// - `a or b or c or d`
+///
+/// The parser uses the `left_associative_binary_op` helper to ensure proper
+/// left associativity and error handling.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the OR expression with proper associativity.
 fn or_expr(input: Span) -> Result<ExprNode, ParserError> {
     let or = or
         .map(|token| Node::new(token, BinaryOp::Or))
@@ -96,6 +154,25 @@ fn or_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses an AND expression
+///
+/// AND expressions have higher precedence than OR expressions but lower than NOT expressions.
+/// They are left-associative, meaning `a and b and c` is parsed as `(a and b) and c`.
+///
+/// Examples:
+/// - `true and false`
+/// - `x > 0 and y < 10`
+/// - `a and b and c and d`
+///
+/// The parser uses the `left_associative_binary_op` helper to ensure proper
+/// left associativity and error handling.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the AND expression with proper associativity.
 fn and_expr(input: Span) -> Result<ExprNode, ParserError> {
     let and = and
         .map(|token| Node::new(token, BinaryOp::And))
@@ -104,6 +181,26 @@ fn and_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a NOT expression
+///
+/// NOT expressions have higher precedence than AND expressions but lower than comparison expressions.
+/// The NOT operator is a unary operator that negates its operand.
+///
+/// Examples:
+/// - `not true`
+/// - `not (x > 0)`
+/// - `not not false` (double negation)
+///
+/// The parser handles both:
+/// 1. NOT expressions: `not` followed by an expression
+/// 2. Comparison expressions: expressions without NOT
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing either a NOT expression or a comparison expression.
 fn not_expr(input: Span) -> Result<ExprNode, ParserError> {
     alt((
         |input| {
@@ -126,6 +223,36 @@ fn not_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a comparison expression
+///
+/// Comparison expressions have higher precedence than NOT expressions but lower than min/max expressions.
+/// They support the standard comparison operators: `==`, `!=`, `<`, `<=`, `>`, `>=`.
+///
+/// Examples:
+/// - `x == y`
+/// - `a < b`
+/// - `value >= 10`
+/// - `name != 'John'`
+/// - `42` (single operand, no comparison)
+///
+/// The parser handles both:
+/// 1. Binary comparisons: `operand operator operand`
+/// 2. Single operands: just an expression without comparison
+///
+/// Supported operators (in order of precedence):
+/// - `<=` (less than or equal)
+/// - `>=` (greater than or equal)
+/// - `<` (less than)
+/// - `>` (greater than)
+/// - `==` (equal)
+/// - `!=` (not equal)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing either a comparison expression or a single operand.
 fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
     let mut op = alt((
         less_than_equals.map(|token| Node::new(token, BinaryOp::LessThanEq)),
@@ -164,7 +291,27 @@ fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
 
 /// Parses a min/max expression
 ///
-/// Ex: `min_weight | max_weight`
+/// Min/max expressions have higher precedence than comparison expressions but lower than additive expressions.
+/// They use the `|` operator to represent min/max operations between two values.
+///
+/// Examples:
+/// - `min_weight | max_weight`
+/// - `x | y`
+///
+/// The parser handles both:
+/// 1. Binary min/max: `operand | operand`
+/// 2. Single operands: just an expression without min/max
+///
+/// The `|` operator is used to represent min/max operations, where the result
+/// depends on the context and the specific implementation of the min/max function.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing either a min/max expression or a single operand.
 fn minmax_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, first_operand) = additive_expr.parse(input)?;
     let (rest, second_operand) = opt(|input| {
@@ -197,6 +344,32 @@ fn minmax_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses an additive expression
+///
+/// Additive expressions have higher precedence than min/max expressions but lower than multiplicative expressions.
+/// They support addition (`+`), subtraction (`-`), and true subtraction (`--`).
+///
+/// Examples:
+/// - `a + b`
+/// - `x - y`
+/// - `a -- b` (true subtraction)
+/// - `1 + 2 + 3` (chained addition)
+/// - `10 - 5 - 2` (chained subtraction)
+///
+/// The parser uses the `left_associative_binary_op` helper to ensure proper
+/// left associativity and error handling.
+///
+/// Supported operators:
+/// - `+` (addition)
+/// - `-` (subtraction)
+/// - `--` (true subtraction, different from regular subtraction)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the additive expression with proper associativity.
 fn additive_expr(input: Span) -> Result<ExprNode, ParserError> {
     let op = alt((
         plus.map(|token| Node::new(token, BinaryOp::Add)),
@@ -209,6 +382,34 @@ fn additive_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a multiplicative expression
+///
+/// Multiplicative expressions have higher precedence than additive expressions but lower than exponential expressions.
+/// They support multiplication (`*`), division (`/`), true division (`//`), and modulo (`%`).
+///
+/// Examples:
+/// - `a * b`
+/// - `x / y`
+/// - `a // b` (true division)
+/// - `x % y` (modulo)
+/// - `2 * 3 * 4` (chained multiplication)
+/// - `10 / 2 / 5` (chained division)
+///
+/// The parser uses the `left_associative_binary_op` helper to ensure proper
+/// left associativity and error handling.
+///
+/// Supported operators:
+/// - `*` (multiplication)
+/// - `/` (division)
+/// - `//` (true division, different from regular division)
+/// - `%` (modulo/remainder)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the multiplicative expression with proper associativity.
 fn multiplicative_expr(input: Span) -> Result<ExprNode, ParserError> {
     let op = alt((
         star.map(|token| Node::new(token, BinaryOp::Mul)),
@@ -222,6 +423,30 @@ fn multiplicative_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses an exponential expression (right associative)
+///
+/// Exponential expressions have higher precedence than multiplicative expressions but lower than negation expressions.
+/// They use the `^` operator and are right-associative, meaning `a^b^c` is parsed as `a^(b^c)`.
+///
+/// Examples:
+/// - `a ^ b`
+/// - `2 ^ 3`
+/// - `x ^ y ^ z` (right associative: `x^(y^z)`)
+/// - `(a + b) ^ 2`
+///
+/// The parser handles both:
+/// 1. Binary exponentials: `operand ^ operand`
+/// 2. Single operands: just an expression without exponentiation
+///
+/// Right associativity means that `2^3^2` is evaluated as `2^(3^2) = 2^9 = 512`,
+/// not as `(2^3)^2 = 8^2 = 64`.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing either an exponential expression or a single operand.
 fn exponential_expr(input: Span) -> Result<ExprNode, ParserError> {
     let mut op = caret
         .map(|token| Node::new(token, BinaryOp::Pow))
@@ -253,6 +478,30 @@ fn exponential_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a negation expression
+///
+/// Negation expressions have higher precedence than exponential expressions but lower than primary expressions.
+/// The negation operator (`-`) is a unary operator that negates its operand.
+///
+/// Examples:
+/// - `-42`
+/// - `-x`
+/// - `-(a + b)`
+/// - `--5` (double negation)
+///
+/// The parser handles both:
+/// 1. Negation expressions: `-` followed by an expression
+/// 2. Primary expressions: expressions without negation
+///
+/// The negation operator can be applied to any expression, including
+/// literals, variables, function calls, and parenthesized expressions.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing either a negation expression or a primary expression.
 fn neg_expr(input: Span) -> Result<ExprNode, ParserError> {
     alt((
         |input| {
@@ -275,6 +524,34 @@ fn neg_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a primary expression (literals, identifiers, function calls, parenthesized expressions)
+///
+/// Primary expressions have the highest precedence in the expression hierarchy.
+/// They represent the basic building blocks of expressions.
+///
+/// Examples:
+/// - `42` (numeric literal)
+/// - `'hello'` (string literal)
+/// - `true`, `false` (boolean literals)
+/// - `foo` (variable/identifier)
+/// - `foo.bar.baz` (multi-word identifier)
+/// - `func(1, 2, 3)` (function call)
+/// - `(a + b)` (parenthesized expression)
+///
+/// The parser handles the following types of primary expressions:
+/// 1. Numeric literals (integers and floating-point numbers)
+/// 2. String literals (enclosed in single quotes)
+/// 3. Boolean literals (`true` and `false`)
+/// 4. Function calls (`name(arg1, arg2, ...)`)
+/// 5. Variables (simple identifiers or dot-separated paths)
+/// 6. Parenthesized expressions (`(expression)`)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the parsed primary expression.
 fn primary_expr(input: Span) -> Result<ExprNode, ParserError> {
     alt((
         map(number.convert_errors(), |n| {
@@ -310,6 +587,34 @@ fn primary_expr(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a function call
+///
+/// Function calls have the format `name(arg1, arg2, ...)` where `name` is an identifier
+/// and the arguments are comma-separated expressions.
+///
+/// Examples:
+/// - `foo()`
+/// - `bar(42)`
+/// - `func(x, y, z)`
+/// - `calculate(a + b, c * d)`
+/// - `nested(foo(1), bar(2))`
+///
+/// The parser requires:
+/// - A valid identifier as the function name
+/// - Opening parenthesis `(`
+/// - Zero or more comma-separated expressions as arguments
+/// - Closing parenthesis `)`
+///
+/// Function calls can be nested, and arguments can be any valid expression
+/// including literals, variables, other function calls, and complex expressions.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the function call, or an error if
+/// the function call is malformed (e.g., unclosed parentheses).
 fn function_call(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, name) = identifier.convert_errors().parse(input)?;
     let name_span = AstSpan::from(&name);
@@ -327,6 +632,33 @@ fn function_call(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a variable name
+///
+/// Variables can be simple identifiers or dot-separated paths representing
+/// nested object properties or module members.
+///
+/// Examples:
+/// - `foo` (simple variable)
+/// - `foo.bar` (nested property)
+/// - `foo.bar.baz` (deeply nested)
+/// - `module.function.parameter`
+/// - `config.database.host`
+///
+/// The parser handles:
+/// 1. Simple identifiers: single variable names
+/// 2. Dot-separated paths: multiple identifiers connected by dots
+///
+/// Each component in a dot-separated path must be a valid identifier.
+/// The parser builds a nested structure where each dot represents
+/// an accessor operation on the previous component.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the variable, which can be either
+/// a simple identifier or a nested accessor structure.
 fn variable(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, first_id) = identifier.convert_errors().parse(input)?;
     let first_id_span = AstSpan::from(&first_id);
@@ -364,6 +696,37 @@ fn variable(input: Span) -> Result<ExprNode, ParserError> {
 }
 
 /// Parses a parenthesized expression
+///
+/// Parenthesized expressions allow grouping of expressions to control precedence
+/// and associativity. They have the format `(expression)`.
+///
+/// Examples:
+/// - `(42)`
+/// - `(a + b)`
+/// - `(x * y + z)`
+/// - `((a + b) * c)`
+/// - `(func(1, 2))`
+///
+/// The parser requires:
+/// - Opening parenthesis `(`
+/// - A valid expression (any expression type)
+/// - Closing parenthesis `)`
+///
+/// Parenthesized expressions are wrapped in a special node type to preserve
+/// the span information that includes the parentheses. This is important for
+/// accurate error reporting and source location tracking.
+///
+/// Note: The parser ensures that parentheses are properly matched and will
+/// fail with an error if the closing parenthesis is missing.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an expression node representing the parenthesized expression, or an error if
+/// the parentheses are malformed (e.g., unclosed parentheses or missing expression).
 fn parenthesized_expr(input: Span) -> Result<ExprNode, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
 

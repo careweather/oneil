@@ -22,6 +22,24 @@ pub const KEYWORDS: &[&str] = &[
     "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
 ];
 
+/// Creates a keyword parser for the specified keyword string.
+///
+/// This function constructs a parser that matches the exact keyword string
+/// and ensures it's not followed by an alphanumeric character or underscore.
+/// This prevents partial matches (e.g., "and" vs "android").
+///
+/// The parser succeeds if:
+/// - The input starts with the exact keyword string
+/// - The keyword is followed by a non-alphanumeric character (or end of input)
+///
+/// # Arguments
+///
+/// * `kw_str` - The keyword string to match
+/// * `error_kind` - The error kind to use if the keyword is not found
+///
+/// # Returns
+///
+/// A parser that matches the specified keyword with proper boundary checking.
 fn keyword(
     kw_str: &str,
     error_kind: error::ExpectKeyword,

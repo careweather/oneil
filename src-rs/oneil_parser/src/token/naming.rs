@@ -20,17 +20,45 @@ use crate::token::{
 };
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
+///
+/// Identifiers in Oneil follow standard programming language rules:
+/// - Must start with an alphabetic character or underscore
+/// - Can be followed by any number of alphanumeric characters or underscores
+/// - Cannot be a reserved keyword
+///
+/// Examples of valid identifiers:
+/// - `foo`, `bar`, `baz`
+/// - `_private`, `public_var`
+/// - `user123`, `test_case`
+/// - `camelCase`, `snake_case`
+///
+/// Examples of invalid identifiers:
+/// - `123abc` (starts with digit)
+/// - `my-var` (contains dash)
+/// - `if` (reserved keyword)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the parsed identifier, or an error if the input
+/// is not a valid identifier or is a reserved keyword.
 pub fn identifier(input: Span) -> Result<Token, TokenError> {
     verify(
         token(
             |input| {
+                // First character must be alphabetic or underscore
                 let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_').parse(input)?;
+                // Remaining characters can be alphanumeric or underscore
                 let (rest, _) =
                     take_while(|c: char| c.is_alphanumeric() || c == '_').parse(rest)?;
                 Ok((rest, ()))
             },
             TokenError::expected_identifier,
         ),
+        // Ensure the identifier is not a reserved keyword
         |identifier| !keyword::KEYWORDS.contains(&identifier.lexeme()),
     )
     .parse(input)
@@ -38,16 +66,50 @@ pub fn identifier(input: Span) -> Result<Token, TokenError> {
 
 /// Parses a label (like an identifier but can contain spaces, tabs, and dashes).
 ///
+/// Labels in Oneil are more permissive than identifiers to allow for descriptive names.
+/// They are commonly used for section names, test names, and other human-readable labels.
+///
+/// Label syntax:
+/// - Must start with an alphanumeric character or underscore
+/// - Can contain alphanumeric characters, underscores, dashes, and apostrophes
+/// - Can contain spaces and tabs between word parts
+/// - Cannot be a reserved keyword
+///
+/// Examples of valid labels:
+/// - `foo-bar`, `my-section`
+/// - `foo bar`, `test case`
+/// - `foo\tbar` (with tab)
+/// - `user's data`, `test-123`
+/// - `foo bar baz`, `section-name with spaces`
+///
+/// Examples of invalid labels:
+/// - `-foo` (starts with dash)
+/// - `if` (reserved keyword)
+/// - `123test` (starts with digit)
+///
 /// Note that labels are often followed by a colon as a delimiter, but other
-/// tokens (such as a linebreak) can also be used.
+/// tokens (such as a linebreak) can also be used depending on the context.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the parsed label, or an error if the input
+/// is not a valid label or is a reserved keyword.
 pub fn label(input: Span) -> Result<Token, TokenError> {
     verify(
         token(
             |input| {
+                // First character must be alphanumeric or underscore
                 let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
 
+                // Parse zero or more word parts separated by whitespace
                 let (rest, _) = many0(|input| {
+                    // Consume optional whitespace (spaces and tabs)
                     let (rest, _) = take_while(|c: char| c == ' ' || c == '\t').parse(input)?;
+                    // Consume at least one word character (alphanumeric, underscore, dash, or apostrophe)
                     let (rest, _) = take_while1(|c: char| {
                         c.is_alphanumeric() || c == '_' || c == '-' || c == '\''
                     })
@@ -60,6 +122,7 @@ pub fn label(input: Span) -> Result<Token, TokenError> {
             },
             TokenError::expected_label,
         ),
+        // Ensure the label is not a reserved keyword
         |label| !keyword::KEYWORDS.contains(&label.lexeme()),
     )
     .parse(input)

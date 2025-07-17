@@ -1,3 +1,17 @@
+//! Detailed error reasons and categories for parser errors.
+//!
+//! This module contains the `ParserErrorReason` enum and related types that
+//! provide detailed categorization of parsing errors. It includes specific
+//! error types for different language constructs like declarations, expressions,
+//! parameters, and units.
+//!
+//! # Error Categories
+//!
+//! - **Expect**: Expected a specific language construct but found something else
+//! - **Incomplete**: Found an incomplete input with specific details about what's missing
+//! - **UnexpectedToken**: Found a token that wasn't expected in the current context
+//! - **TokenError**: Low-level tokenization errors
+//! - **NomError**: Internal nom parsing library errors
 use oneil_ast::{
     Span as AstSpan,
     expression::{BinaryOp, UnaryOp},
@@ -17,7 +31,9 @@ pub enum ParserErrorReason {
     Expect(ExpectKind),
     /// Found an incomplete input
     Incomplete {
+        /// The span in the source code that indicated that the input was incomplete
         cause: AstSpan,
+        /// The specific type of incomplete input that was found
         kind: IncompleteKind,
     },
     /// Found an unexpected token

@@ -45,6 +45,25 @@ pub fn parse_complete(input: Span) -> Result<DeclNode, ParserError> {
     all_consuming(decl).parse(input)
 }
 
+/// Parses any type of declaration by trying each declaration parser in sequence.
+///
+/// This function attempts to parse the input as each type of declaration:
+/// 1. Import declaration (`import path`)
+/// 2. From declaration (`from path use model as alias`)
+/// 3. Use declaration (`use path as alias`)
+/// 4. Parameter declaration (parameter definitions)
+/// 5. Test declaration (`test: condition`)
+///
+/// The first parser that succeeds determines the declaration type.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a declaration node of the appropriate type, or an error if no
+/// declaration type matches.
 fn decl(input: Span) -> Result<DeclNode, ParserError> {
     alt((import_decl, from_decl, use_decl, parameter_decl, test_decl))
         .convert_error_to(ParserError::expect_decl)
@@ -52,6 +71,28 @@ fn decl(input: Span) -> Result<DeclNode, ParserError> {
 }
 
 /// Parses an import declaration
+///
+/// An import declaration has the format: `import path` followed by a newline.
+/// The path is a simple identifier that represents the module or file to import.
+///
+/// Examples:
+/// - `import foo`
+/// - `import my_module`
+/// - `import utils`
+///
+/// The parser requires:
+/// - The `import` keyword
+/// - A valid identifier as the import path
+/// - A newline to terminate the declaration
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a declaration node containing the parsed import, or an error if
+/// the import declaration is malformed.
 fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
@@ -74,6 +115,33 @@ fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
 }
 
 /// Parses a from declaration
+///
+/// A from declaration has the format: `from path use model [inputs] as alias` followed by a newline.
+/// This declaration imports a specific model from a module and gives it a local alias.
+///
+/// Examples:
+/// - `from foo.bar use model as baz`
+/// - `from utils.math use model(x=1, y=2) as calculator`
+/// - `from my_module.submodule use model as local_name`
+///
+/// The parser requires:
+/// - The `from` keyword
+/// - A model path (e.g., "foo.bar")
+/// - The `use` keyword
+/// - The `model` keyword
+/// - Optional model inputs in parentheses
+/// - The `as` keyword
+/// - A valid identifier as the alias
+/// - A newline to terminate the declaration
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a declaration node containing the parsed from declaration, or an error if
+/// the declaration is malformed.
 fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, from_token) = from.convert_errors().parse(input)?;
 
@@ -125,6 +193,31 @@ fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
 }
 
 /// Parses a use declaration
+///
+/// A use declaration has the format: `use path [inputs] as alias` followed by a newline.
+/// This declaration imports a module or model and gives it a local alias.
+///
+/// Examples:
+/// - `use foo.bar as baz`
+/// - `use utils.math(x=1, y=2) as calculator`
+/// - `use my_module as local_name`
+///
+/// The parser requires:
+/// - The `use` keyword
+/// - A model path (e.g., "foo.bar")
+/// - Optional model inputs in parentheses
+/// - The `as` keyword
+/// - A valid identifier as the alias
+/// - A newline to terminate the declaration
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a declaration node containing the parsed use declaration, or an error if
+/// the declaration is malformed.
 fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, use_token) = use_.convert_errors().parse(input)?;
 
@@ -167,6 +260,29 @@ fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
 }
 
 /// Parses a model path (e.g., "foo.bar.baz")
+///
+/// A model path consists of a sequence of identifiers separated by dots.
+/// The first identifier is the main module name, and subsequent identifiers
+/// are subcomponents or nested modules.
+///
+/// Examples:
+/// - `foo` (single component)
+/// - `foo.bar` (two components)
+/// - `foo.bar.baz` (three components)
+/// - `utils.math.functions` (multiple components)
+///
+/// The parser returns:
+/// - The first identifier as the main path
+/// - A vector of subsequent identifiers as subcomponents
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a tuple containing the main path identifier and a vector of
+/// subcomponent identifiers, or an error if the path is malformed.
 fn model_path(input: Span) -> Result<(IdentifierNode, Vec<IdentifierNode>), ParserError> {
     let (rest, path) = identifier.convert_errors().parse(input)?;
     let path = Node::new(path, Identifier::new(path.lexeme().to_string()));
@@ -188,6 +304,30 @@ fn model_path(input: Span) -> Result<(IdentifierNode, Vec<IdentifierNode>), Pars
 }
 
 /// Parses model inputs (e.g., "(x=1, y=2)")
+///
+/// Model inputs are optional parameters passed to a model when importing it.
+/// They are enclosed in parentheses and consist of a comma-separated list
+/// of name-value pairs.
+///
+/// Examples:
+/// - `(x=1)` (single input)
+/// - `(x=1, y=2)` (two inputs)
+/// - `(width=10, height=20, color='red')` (multiple inputs)
+/// - `()` (empty inputs)
+///
+/// The parser requires:
+/// - Opening parenthesis `(`
+/// - Zero or more comma-separated model inputs
+/// - Closing parenthesis `)`
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a model input list node containing the parsed inputs, or an error if
+/// the input list is malformed (e.g., unclosed parentheses).
 fn model_inputs(input: Span) -> Result<ModelInputListNode, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
     let (rest, inputs) = separated_list0(comma.convert_errors(), model_input).parse(rest)?;
@@ -201,6 +341,30 @@ fn model_inputs(input: Span) -> Result<ModelInputListNode, ParserError> {
 }
 
 /// Parses a single model input (e.g., "x=1")
+///
+/// A model input consists of an identifier followed by an equals sign and an expression.
+/// The identifier is the parameter name, and the expression is the value to assign to it.
+///
+/// Examples:
+/// - `x=1` (simple numeric value)
+/// - `name='John'` (string value)
+/// - `enabled=true` (boolean value)
+/// - `size=width * height` (expression value)
+/// - `config={x: 1, y: 2}` (complex expression)
+///
+/// The parser requires:
+/// - A valid identifier as the parameter name
+/// - An equals sign `=`
+/// - A valid expression as the parameter value
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a model input node containing the parsed name-value pair, or an error if
+/// the input is malformed (e.g., missing equals sign or invalid expression).
 fn model_input(input: Span) -> Result<ModelInputNode, ParserError> {
     let (rest, ident) = identifier.convert_errors().parse(input)?;
     let ident_node = Node::new(ident, Identifier::new(ident.lexeme().to_string()));
@@ -215,6 +379,19 @@ fn model_input(input: Span) -> Result<ModelInputNode, ParserError> {
     Ok((rest, Node::new(span, ModelInput::new(ident_node, value))))
 }
 
+/// Parses a parameter declaration by delegating to the parameter parser.
+///
+/// This function wraps the parameter parser to create a declaration node.
+/// It handles the conversion from a parameter node to a declaration node
+/// with proper span calculation.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a declaration node containing the parsed parameter.
 fn parameter_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, parameter) = parse_parameter.parse(input)?;
 
@@ -224,6 +401,19 @@ fn parameter_decl(input: Span) -> Result<DeclNode, ParserError> {
     Ok((rest, decl_node))
 }
 
+/// Parses a test declaration by delegating to the test parser.
+///
+/// This function wraps the test parser to create a declaration node.
+/// It handles the conversion from a test node to a declaration node
+/// with proper span calculation.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a declaration node containing the parsed test.
 fn test_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, test) = parse_test.parse(input)?;
 

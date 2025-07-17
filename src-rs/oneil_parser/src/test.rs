@@ -1,4 +1,41 @@
 //! Parser for test declarations in an Oneil program.
+//!
+//! This module provides parsing functionality for Oneil test declarations.
+//! A test declaration defines a validation condition that can be used to
+//! verify the correctness of a model or its components.
+//!
+//! # Test Declaration Syntax
+//!
+//! The general syntax for a test declaration is:
+//!
+//! ```text
+//! [trace_level] test [inputs]: expression
+//! ```
+//!
+//! Where:
+//! - `trace_level` is optional and can be `*` (trace) or `**` (debug)
+//! - `test` is the required keyword
+//! - `inputs` is optional and has the form `{x, y, z}` - defines variables to test
+//! - `:` is the required separator
+//! - `expression` is the test condition that should evaluate to true
+//!
+//! # Examples
+//!
+//! ```rust
+//! use oneil_parser::parse_test;
+//!
+//! // Simple test
+//! let test = parse_test("test: x > 0", None).unwrap();
+//!
+//! // Test with inputs
+//! let test = parse_test("test {x, y}: x > y", None).unwrap();
+//!
+//! // Test with trace level
+//! let test = parse_test("* test: temperature > 0", None).unwrap();
+//!
+//! // Complex test with all components
+//! let test = parse_test("** test {a, b, c}: a > b and b > c", None).unwrap();
+//! ```
 
 use nom::Parser;
 use nom::combinator::{all_consuming, opt};
@@ -34,6 +71,56 @@ pub fn parse_complete(input: Span) -> Result<TestNode, ParserError> {
     all_consuming(test_decl).parse(input)
 }
 
+/// Parses a test declaration with optional trace level and inputs.
+///
+/// A test declaration has the following structure:
+/// `[trace_level] test [inputs]: expression`
+///
+/// Where:
+/// - `trace_level` is optional and can be `*` (trace) or `**` (debug)
+/// - `test` is the required keyword
+/// - `inputs` is optional and has the form `{x, y, z}`
+/// - `:` is the required separator
+/// - `expression` is the test condition
+///
+/// The function handles all combinations of these components with proper
+/// error handling for missing required elements.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a test node containing the parsed test declaration.
+///
+/// # Error Handling
+///
+/// The function provides detailed error messages for common parsing failures:
+/// - Missing `test` keyword
+/// - Missing colon after test keyword or inputs
+/// - Missing expression after colon
+/// - Missing end of line after expression
+/// - Missing inputs after opening brace
+/// - Missing closing brace for inputs
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_test;
+///
+/// // Basic test
+/// let test = parse_test("test: x > 0", None).unwrap();
+///
+/// // Test with trace level
+/// let test = parse_test("* test: temperature > 0", None).unwrap();
+///
+/// // Test with inputs
+/// let test = parse_test("test {x, y}: x > y", None).unwrap();
+///
+/// // Test with all components
+/// let test = parse_test("** test {a, b, c}: a > b and b > c", None).unwrap();
+/// ```
 fn test_decl(input: Span) -> Result<TestNode, ParserError> {
     let (rest, trace_level) = opt(trace_level).parse(input)?;
 
@@ -74,6 +161,33 @@ fn test_decl(input: Span) -> Result<TestNode, ParserError> {
 }
 
 /// Parse a trace level indicator (`*` or `**`).
+///
+/// Trace levels indicate the debugging/tracing level for a test:
+/// - `*` indicates trace level (basic debugging)
+/// - `**` indicates debug level (detailed debugging)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a trace level node if a valid trace indicator is found, or an error
+/// if one isn't found.
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_test;
+///
+/// // Test with trace level
+/// let test = parse_test("* test: x > 0", None).unwrap();
+/// assert!(test.trace_level().is_some());
+///
+/// // Test with debug level
+/// let test = parse_test("** test: x > 0", None).unwrap();
+/// assert!(test.trace_level().is_some());
+/// ```
 fn trace_level(input: Span) -> Result<TraceLevelNode, ParserError> {
     let single_star = star.map(|token| Node::new(token, TraceLevel::Trace));
     let double_star = star_star.map(|token| Node::new(token, TraceLevel::Debug));
@@ -82,6 +196,43 @@ fn trace_level(input: Span) -> Result<TraceLevelNode, ParserError> {
 }
 
 /// Parse test inputs in curly braces, e.g. `{x, y, z}`.
+///
+/// Test inputs define the variables that should be tested in the test condition.
+/// The syntax requires one or more identifiers separated by commas, enclosed
+/// in curly braces.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a test inputs node if valid inputs are found, or an error
+/// if the inputs are malformed.
+///
+/// # Error Conditions
+///
+/// - **Missing opening brace**: When the input doesn't start with `{`
+/// - **Missing inputs**: When no identifiers are found after the opening brace
+/// - **Missing closing brace**: When the inputs are not properly closed
+///
+/// # Examples
+///
+/// ```rust
+/// use oneil_parser::parse_test;
+///
+/// // Single input
+/// let test = parse_test("test {x}: x > 0", None).unwrap();
+/// assert!(test.inputs().is_some());
+///
+/// // Multiple inputs
+/// let test = parse_test("test {x, y, z}: x > y and y > z", None).unwrap();
+/// assert!(test.inputs().is_some());
+///
+/// // No inputs (valid)
+/// let test = parse_test("test: true", None).unwrap();
+/// assert!(test.inputs().is_none());
+/// ```
 fn test_inputs(input: Span) -> Result<TestInputsNode, ParserError> {
     let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
 

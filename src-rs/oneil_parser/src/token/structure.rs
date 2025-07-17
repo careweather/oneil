@@ -19,20 +19,74 @@ use crate::token::{
     util::{Token, inline_whitespace},
 };
 
+/// Parses a line break character or sequence.
+///
+/// This function recognizes various line ending sequences including `\n`, `\r\n`,
+/// and `\r`. It's used internally by the `end_of_line` parser.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns the span containing the line break sequence.
 fn linebreak(input: Span) -> Result<Span, TokenError> {
     line_ending.parse(input)
 }
 
+/// Parses the end of the input file.
+///
+/// This function succeeds only when there is no more input to parse.
+/// It's used internally by the `end_of_line` parser to handle files
+/// that end without a final newline.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an empty span when at end of file.
 fn end_of_file(input: Span) -> Result<Span, TokenError> {
     eof.parse(input)
 }
 
+/// Parses a comment line starting with `#`.
+///
+/// This function recognizes comments that start with `#` and continue
+/// until the end of the line or end of file. Comments are treated
+/// as structural elements and can be part of end-of-line sequences.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns the span containing the comment including the `#` and newline.
 fn comment(input: Span) -> Result<Span, TokenError> {
     recognize((char('#'), not_line_ending, line_ending.or(eof))).parse(input)
 }
 
-/// Parses one or more linebreaks, comments, or end-of-file markers, including
-/// trailing whitespace
+/// Parses one or more linebreaks, comments, or end-of-file markers, including trailing whitespace.
+///
+/// This function recognizes any combination of:
+/// - Line breaks (`\n`, `\r\n`, `\r`)
+/// - Comments (starting with `#` and continuing to end of line)
+/// - End-of-file markers
+///
+/// It also captures any whitespace that follows these elements. This is used to properly
+/// handle line endings and comments in the Oneil language syntax.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the first line break/comment/EOF marker and any trailing
+/// whitespace including subsequent line breaks or comments.
 pub fn end_of_line(input: Span) -> Result<Token, TokenError> {
     let (rest, first_line_break) = linebreak
         .or(comment)

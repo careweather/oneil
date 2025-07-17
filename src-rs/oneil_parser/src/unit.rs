@@ -38,7 +38,24 @@ pub fn parse_complete(input: Span) -> Result<UnitExprNode, ParserError> {
     all_consuming(unit_expr).parse(input)
 }
 
-/// Parses a unit expression
+/// Parses a unit expression with left-associative multiplication and division.
+///
+/// This function parses unit expressions with left-associative multiplication and division.
+/// It handles sequences of unit terms separated by `*` (multiplication) or `/` (division)
+/// operators, building the AST with proper associativity.
+///
+/// Examples:
+/// - `kg*m` → `(kg * m)`
+/// - `m/s^2` → `(m / s^2)`
+/// - `kg*m/s^2` → `((kg * m) / s^2)`
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a unit expression node with proper operator precedence and associativity.
 fn unit_expr(input: Span) -> Result<UnitExprNode, ParserError> {
     let (rest, first_term) = unit_term
         .convert_error_to(ParserError::expect_unit)
@@ -69,7 +86,23 @@ fn unit_expr(input: Span) -> Result<UnitExprNode, ParserError> {
     Ok((rest, expr))
 }
 
-/// Parses a unit term
+/// Parses a unit term, which can be either a simple unit or a parenthesized expression.
+///
+/// A unit term is the basic building block of unit expressions. It can be:
+/// - A simple unit identifier (e.g., `kg`, `m`, `s`)
+/// - A unit with an exponent (e.g., `m^2`, `s^-1`)
+/// - A parenthesized unit expression (e.g., `(kg * m)`)
+///
+/// The function handles both simple units and parenthesized expressions,
+/// with proper error handling for missing exponents and unclosed parentheses.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a unit expression node representing the parsed term.
 fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
     let parse_unit = |input| {
         let (rest, id_token) = identifier.convert_errors().parse(input)?;
