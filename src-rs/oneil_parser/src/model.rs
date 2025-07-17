@@ -18,8 +18,9 @@ use oneil_ast::{
 use crate::{
     declaration::parse as parse_decl,
     error::{
-        ErrorHandlingParser, ExpectKind, ParserError, ParserErrorReason,
+        ErrorHandlingParser, ParserError,
         partial::ErrorsWithPartialResult,
+        reason::{ExpectKind, ParserErrorReason},
     },
     note::parse as parse_note,
     token::{keyword::section, naming::label, structure::end_of_line},
