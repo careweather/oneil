@@ -90,7 +90,8 @@ UnitTerm = Identifier, [ "^", Number ] | "(" UnitExpr, ")" ;
 (* Basic Elements *)
 Identifier = Letter, { Letter | Digit | "_" } ;
 (* note: labels are context sensitive since they can contain spaces and tabs *)
-Label = ( Letter | Digit | "_" ) { Letter | Digit | "_" | "-" | "'" | " " | "\t" } ;
+Label = ( Letter | Digit | "_" ) { { " " | "\t" } LabelLetter { LabelLetter } } ;
+LabelLetter = Letter | Digit | "_" | "-" | "'" ;
 NumberLiteral = [ Sign ], ( Integer | Float | Scientific ) ;
 Integer = Digit, { Digit } ;
 Float = Integer , ".", Digit, { Digit } ;

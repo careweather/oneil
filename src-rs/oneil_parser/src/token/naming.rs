@@ -5,7 +5,11 @@
 //! language rules, while labels are more permissive to allow for descriptive names.
 
 use nom::{
-    Parser as _, bytes::complete::take_while, character::complete::satisfy, combinator::verify,
+    Parser as _,
+    bytes::complete::{take_while, take_while1},
+    character::complete::satisfy,
+    combinator::verify,
+    multi::many0,
 };
 
 use crate::token::{
@@ -42,13 +46,13 @@ pub fn label(input: Span) -> Result<Token, TokenError> {
             |input| {
                 let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
 
-                let (rest, _) = take_while(|c: char| {
-                    c.is_alphanumeric()
-                        || c == '_'
-                        || c == '-'
-                        || c == '\''
-                        || c == ' '
-                        || c == '\t'
+                let (rest, _) = many0(|input| {
+                    let (rest, _) = take_while(|c: char| c == ' ' || c == '\t').parse(input)?;
+                    let (rest, _) = take_while1(|c: char| {
+                        c.is_alphanumeric() || c == '_' || c == '-' || c == '\''
+                    })
+                    .parse(rest)?;
+                    Ok((rest, ()))
                 })
                 .parse(rest)?;
 
@@ -141,7 +145,17 @@ mod tests {
     fn test_label_with_trailing_whitespace() {
         let input = Span::new_extra("foo : rest", Config::default());
         let (rest, matched) = label(input).expect("should parse label with trailing whitespace");
-        assert_eq!(matched.lexeme(), "foo ");
+        assert_eq!(matched.lexeme(), "foo");
+        assert_eq!(matched.whitespace(), " ");
+        assert_eq!(rest.fragment(), &": rest");
+    }
+
+    #[test]
+    fn test_label_with_multiple_spaces() {
+        let input = Span::new_extra("foo bar : rest", Config::default());
+        let (rest, matched) = label(input).expect("should parse label with multiple spaces");
+        assert_eq!(matched.lexeme(), "foo bar");
+        assert_eq!(matched.whitespace(), " ");
         assert_eq!(rest.fragment(), &": rest");
     }
 
