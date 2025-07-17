@@ -65,14 +65,18 @@ impl ParserError {
     ///
     /// This is used to convert a wrapped token error to a parser error
     fn convert_reason(self, reason: ParserErrorReason) -> Self {
-        let is_token_error = matches!(
+        let is_token_expect_error = matches!(
             self.reason,
             ParserErrorReason::TokenError(TokenErrorKind::Expect(_))
         );
+
+        let is_parser_expect_error = matches!(self.reason, ParserErrorReason::Expect(_));
+
         assert!(
-            is_token_error,
-            "Cannot convert a non-token error to a parser error (attempted to convert {:?})",
-            self.reason
+            is_token_expect_error || is_parser_expect_error,
+            "Cannot convert a non-expect error to a parser error (attempted to convert {:?} to {:?})",
+            self.reason,
+            reason,
         );
 
         Self { reason, ..self }
@@ -383,6 +387,7 @@ impl ParserError {
     /// Creates a new ParserError for a missing unit in a parameter
     pub(crate) fn parameter_missing_unit(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
+            eprintln!("error: {:?}", error);
             let colon_span = AstSpan::from(colon_token);
             error.convert_reason(ParserErrorReason::parameter_missing_unit(colon_span))
         }
