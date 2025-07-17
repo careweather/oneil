@@ -37,19 +37,26 @@ pub fn identifier(input: Span) -> Result<Token, TokenError> {
 /// Note that labels are often followed by a colon as a delimiter, but other
 /// tokens (such as a linebreak) can also be used.
 pub fn label(input: Span) -> Result<Token, TokenError> {
-    // TODO: verify that the label is not a keyword
-    token(
-        |input| {
-            let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
+    verify(
+        token(
+            |input| {
+                let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
 
-            let (rest, _) = take_while(|c: char| {
-                c.is_alphanumeric() || c == '_' || c == '-' || c == '\'' || c == ' ' || c == '\t'
-            })
-            .parse(rest)?;
+                let (rest, _) = take_while(|c: char| {
+                    c.is_alphanumeric()
+                        || c == '_'
+                        || c == '-'
+                        || c == '\''
+                        || c == ' '
+                        || c == '\t'
+                })
+                .parse(rest)?;
 
-            Ok((rest, ()))
-        },
-        TokenError::expected_label,
+                Ok((rest, ()))
+            },
+            TokenError::expected_label,
+        ),
+        |label| !keyword::KEYWORDS.contains(&label.lexeme()),
     )
     .parse(input)
 }
@@ -136,5 +143,29 @@ mod tests {
         let (rest, matched) = label(input).expect("should parse label with trailing whitespace");
         assert_eq!(matched.lexeme(), "foo ");
         assert_eq!(rest.fragment(), &": rest");
+    }
+
+    #[test]
+    fn test_identifier_keyword_fails() {
+        for keyword in keyword::KEYWORDS {
+            let input = Span::new_extra(keyword, Config::default());
+            let res = identifier(input);
+            assert!(
+                res.is_err(),
+                "should not parse keyword '{keyword}' as identifier"
+            );
+        }
+    }
+
+    #[test]
+    fn test_label_keyword_fails() {
+        for keyword in keyword::KEYWORDS {
+            let input = Span::new_extra(keyword, Config::default());
+            let res = label(input);
+            assert!(
+                res.is_err(),
+                "should not parse keyword '{keyword}' as label"
+            );
+        }
     }
 }
