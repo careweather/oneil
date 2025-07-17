@@ -3,7 +3,7 @@
 use nom::{
     Parser as _,
     branch::alt,
-    combinator::{all_consuming, cut, opt},
+    combinator::{all_consuming, opt},
     multi::{many0, separated_list0},
 };
 
@@ -47,7 +47,7 @@ pub fn parse_complete(input: Span) -> Result<DeclNode, ParserError> {
 
 fn decl(input: Span) -> Result<DeclNode, ParserError> {
     alt((import_decl, from_decl, use_decl, parameter_decl, test_decl))
-        .or_fail_with(ParserError::expect_decl)
+        .convert_error_to(ParserError::expect_decl)
         .parse(input)
 }
 
@@ -55,13 +55,13 @@ fn decl(input: Span) -> Result<DeclNode, ParserError> {
 fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
-    let (rest, import_path_token) =
-        cut(identifier.or_fail_with(ParserError::import_missing_path(&import_token)))
-            .parse(rest)?;
+    let (rest, import_path_token) = identifier
+        .or_fail_with(ParserError::import_missing_path(&import_token))
+        .parse(rest)?;
 
-    let (rest, end_of_line_token) =
-        cut(end_of_line.or_fail_with(ParserError::import_missing_end_of_line(&import_path_token)))
-            .parse(rest)?;
+    let (rest, end_of_line_token) = end_of_line
+        .or_fail_with(ParserError::import_missing_end_of_line(&import_path_token))
+        .parse(rest)?;
 
     let span =
         AstSpan::calc_span_with_whitespace(&import_token, &import_path_token, &end_of_line_token);
@@ -173,9 +173,9 @@ fn model_path(input: Span) -> Result<(IdentifierNode, Vec<IdentifierNode>), Pars
 
     let (rest, subcomponents) = many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
-        let (rest, subcomponent) =
-            cut(identifier.or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token)))
-                .parse(rest)?;
+        let (rest, subcomponent) = identifier
+            .or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token))
+            .parse(rest)?;
         let subcomponent_node = Node::new(
             subcomponent,
             Identifier::new(subcomponent.lexeme().to_string()),
