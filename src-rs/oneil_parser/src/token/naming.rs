@@ -38,13 +38,12 @@ pub fn identifier(input: Span) -> Result<Token, TokenError> {
 /// tokens (such as a linebreak) can also be used.
 pub fn label(input: Span) -> Result<Token, TokenError> {
     // TODO: verify that the label is not a keyword
-    // TODO: labels also accept apostrophes
     token(
         |input| {
             let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
 
             let (rest, _) = take_while(|c: char| {
-                c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' || c == '\t'
+                c.is_alphanumeric() || c == '_' || c == '-' || c == '\'' || c == ' ' || c == '\t'
             })
             .parse(rest)?;
 
