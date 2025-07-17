@@ -108,7 +108,8 @@ pub fn note(input: Span) -> Result<(Token, NoteKind), TokenError> {
     let single_line_note = single_line_note.map(|token| (token, NoteKind::SingleLine));
     let multi_line_note = multi_line_note.map(|token| (token, NoteKind::MultiLine));
     let note = single_line_note.or(multi_line_note);
-    note.or_fail_with(TokenError::expected_note).parse(input)
+    note.convert_error_to(TokenError::expected_note)
+        .parse(input)
 }
 
 #[cfg(test)]

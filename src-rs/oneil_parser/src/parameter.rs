@@ -62,7 +62,7 @@ fn parameter_decl(input: Span) -> Result<ParameterNode, ParserError> {
     let (rest, limits) = opt(limits).parse(rest)?;
 
     let (rest, colon_token) = colon
-        .or_fail_with(ParserError::expect_parameter)
+        .convert_error_to(ParserError::expect_parameter)
         .parse(rest)?;
 
     let (rest, ident) = identifier
