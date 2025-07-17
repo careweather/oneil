@@ -101,7 +101,7 @@ where
     {
         move |input| {
             self.parse(input).map_err(|e| match e {
-                nom::Err::Error(e) => nom::Err::Failure(e.into()),
+                nom::Err::Error(e) => nom::Err::Error(e.into()),
                 nom::Err::Failure(e) => nom::Err::Failure(e.into()),
                 nom::Err::Incomplete(e) => nom::Err::Incomplete(e),
             })
