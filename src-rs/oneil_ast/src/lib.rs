@@ -1,10 +1,9 @@
-#![allow(missing_docs)]
-// AST nodes should be self-documenting
-
 //! Abstract Syntax Tree (AST) definitions for the Oneil language.
 //!
 //! This module contains the core data structures that represent Oneil programs
 //! in memory after parsing.
+
+#![warn(missing_docs)]
 
 pub mod debug_info;
 pub mod declaration;
