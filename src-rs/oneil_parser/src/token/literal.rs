@@ -61,9 +61,9 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
 pub fn string(input: Span) -> Result<Token, TokenError> {
     token(
         |input| {
-            let (rest, open_quote_span) = tag("\"").parse(input)?;
-            let (rest, _) = take_while(|c: char| c != '"' && c != '\n').parse(rest)?;
-            let (rest, _) = tag("\"")
+            let (rest, open_quote_span) = tag("\'").parse(input)?;
+            let (rest, _) = take_while(|c: char| c != '\'' && c != '\n').parse(rest)?;
+            let (rest, _) = tag("'")
                 .or_fail_with(TokenError::unclosed_string(open_quote_span))
                 .parse(rest)?;
             Ok((rest, ()))
@@ -127,32 +127,32 @@ mod tests {
 
     #[test]
     fn test_string_simple() {
-        let input = Span::new_extra("\"hello\" rest", Config::default());
+        let input = Span::new_extra("'hello' rest", Config::default());
         let (rest, matched) = string(input).expect("should parse string");
-        assert_eq!(matched.lexeme(), "\"hello\"");
+        assert_eq!(matched.lexeme(), "'hello'");
         assert_eq!(rest.fragment(), &"rest");
     }
 
     #[test]
     fn test_string_with_spaces() {
-        let input = Span::new_extra("\"foo bar\" baz", Config::default());
+        let input = Span::new_extra("'foo bar' baz", Config::default());
         let (rest, matched) = string(input).expect("should parse string with spaces");
-        assert_eq!(matched.lexeme(), "\"foo bar\"");
+        assert_eq!(matched.lexeme(), "'foo bar'");
         assert_eq!(rest.fragment(), &"baz");
     }
 
     #[test]
     fn test_string_escape_sequences_not_supported() {
-        let input = Span::new_extra("\"foo \\\" bar", Config::default());
+        let input = Span::new_extra("'foo \\' bar", Config::default());
         let (rest, matched) =
             string(input).expect("should parse string (escape sequences not supported)");
-        assert_eq!(matched.lexeme(), "\"foo \\\"");
+        assert_eq!(matched.lexeme(), "'foo \\'");
         assert_eq!(rest.fragment(), &"bar");
     }
 
     #[test]
     fn test_string_unterminated() {
-        let input = Span::new_extra("\"unterminated", Config::default());
+        let input = Span::new_extra("'unterminated", Config::default());
         let res = string(input);
         assert!(res.is_err(), "should not parse unterminated string");
     }

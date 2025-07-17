@@ -98,5 +98,5 @@ Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
 Sign = "+" | "-" ;
 Letter = "A" | ... | "Z" | "a" | ... | "z" ;
 Digit = "0" | "1" | ... | "9" ;
-StringLiteral = "\"", { Any character except LineBreak or "\" }, "\"", ;
+StringLiteral = "'", { Any character except LineBreak or "'" }, "'", ;
 BooleanLiteral = "true" | "false" ;

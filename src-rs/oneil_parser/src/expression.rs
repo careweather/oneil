@@ -404,7 +404,7 @@ mod tests {
 
     #[test]
     fn test_primary_expr_string() {
-        let input = Span::new_extra("\"hello\"", Config::default());
+        let input = Span::new_extra("'hello'", Config::default());
         let (_, expr) = parse(input).unwrap();
 
         let expected_expr = Node::new(
