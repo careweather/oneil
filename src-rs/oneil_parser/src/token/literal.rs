@@ -115,84 +115,639 @@ pub fn string(input: Span) -> Result<Token, TokenError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Config, Span};
+    use crate::{
+        Config, Span,
+        token::error::{ExpectKind, IncompleteKind, TokenErrorKind},
+    };
 
-    #[test]
-    fn test_number_integer() {
-        let input = Span::new_extra("42 rest", Config::default());
-        let (rest, matched) = number(input).expect("should parse integer");
-        assert_eq!(matched.lexeme(), "42");
-        assert_eq!(rest.fragment(), &"rest");
+    mod number_tests {
+
+        use super::*;
+
+        // Success cases
+        #[test]
+        fn test_integer() {
+            let input = Span::new_extra("42 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse integer");
+            assert_eq!(matched.lexeme(), "42");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_negative_integer() {
+            let input = Span::new_extra("-17 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse negative integer");
+            assert_eq!(matched.lexeme(), "-17");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_decimal() {
+            let input = Span::new_extra("3.1415 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse decimal");
+            assert_eq!(matched.lexeme(), "3.1415");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_exponent() {
+            let input = Span::new_extra("2.5e10 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse exponent");
+            assert_eq!(matched.lexeme(), "2.5e10");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_negative_exponent() {
+            let input = Span::new_extra("-1.2E-3 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse negative exponent");
+            assert_eq!(matched.lexeme(), "-1.2E-3");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_multiple_decimal_points() {
+            let input = Span::new_extra("123.456.789", Config::default());
+            let (rest, matched) = number(input).expect("should parse first decimal part");
+            assert_eq!(matched.lexeme(), "123.456");
+            assert_eq!(rest.fragment(), &".789");
+        }
+
+        #[test]
+        fn test_multiple_exponents() {
+            let input = Span::new_extra("123e10e5", Config::default());
+            let (rest, matched) = number(input).expect("should parse first exponent part");
+            assert_eq!(matched.lexeme(), "123e10");
+            assert_eq!(rest.fragment(), &"e5");
+        }
+
+        #[test]
+        fn test_exponent_before_decimal() {
+            let input = Span::new_extra("123e5.456", Config::default());
+            let (rest, matched) = number(input).expect("should parse exponent part");
+            assert_eq!(matched.lexeme(), "123e5");
+            assert_eq!(rest.fragment(), &".456");
+        }
+
+        #[test]
+        fn test_invalid_exponent_letter() {
+            let input = Span::new_extra("123f5", Config::default());
+            let (rest, matched) = number(input).expect("should parse digits only");
+            assert_eq!(matched.lexeme(), "123");
+            assert_eq!(rest.fragment(), &"f5");
+        }
+
+        #[test]
+        fn test_invalid_exponent_letter_uppercase() {
+            let input = Span::new_extra("123F5", Config::default());
+            let (rest, matched) = number(input).expect("should parse digits only");
+            assert_eq!(matched.lexeme(), "123");
+            assert_eq!(rest.fragment(), &"F5");
+        }
+
+        #[test]
+        fn test_with_letters_mixed() {
+            let input = Span::new_extra("123abc", Config::default());
+            let (rest, matched) = number(input).expect("should parse digits only");
+            assert_eq!(matched.lexeme(), "123");
+            assert_eq!(rest.fragment(), &"abc");
+        }
+
+        #[test]
+        fn test_with_symbols_mixed() {
+            let input = Span::new_extra("123+456", Config::default());
+            let (rest, matched) = number(input).expect("should parse digits only");
+            assert_eq!(matched.lexeme(), "123");
+            assert_eq!(rest.fragment(), &"+456");
+        }
+
+        #[test]
+        fn test_leading_zeros() {
+            let input = Span::new_extra("00123 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse leading zeros");
+            assert_eq!(matched.lexeme(), "00123");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_negative_zero() {
+            let input = Span::new_extra("-0 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse negative zero");
+            assert_eq!(matched.lexeme(), "-0");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_positive_zero() {
+            let input = Span::new_extra("+0 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse positive zero");
+            assert_eq!(matched.lexeme(), "+0");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_zero_decimal() {
+            let input = Span::new_extra("0.123 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse zero decimal");
+            assert_eq!(matched.lexeme(), "0.123");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_zero_exponent() {
+            let input = Span::new_extra("123e0 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse zero exponent");
+            assert_eq!(matched.lexeme(), "123e0");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_max_precision() {
+            let input = Span::new_extra("3.141592653589793 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse high precision");
+            assert_eq!(matched.lexeme(), "3.141592653589793");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_large_exponent() {
+            let input = Span::new_extra("1e308 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse large exponent");
+            assert_eq!(matched.lexeme(), "1e308");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_small_exponent() {
+            let input = Span::new_extra("1e-308 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse small exponent");
+            assert_eq!(matched.lexeme(), "1e-308");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        // Error cases
+        #[test]
+        fn test_empty_input() {
+            let input = Span::new_extra("", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_whitespace_only() {
+            let input = Span::new_extra("   ", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_letters_only() {
+            let input = Span::new_extra("abc", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_symbols_only() {
+            let input = Span::new_extra("+-", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_decimal_point_only() {
+            let input = Span::new_extra(".", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_decimal_without_digits() {
+            let input = Span::new_extra(".123", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_exponent_only() {
+            let input = Span::new_extra("e", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_exponent_without_digits() {
+            let input = Span::new_extra("123e", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Failure(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Incomplete(IncompleteKind::InvalidExponentPart { .. })
+                )),
+                _ => panic!(
+                    "expected TokenError::Incomplete(InvalidExponentPart), got {:?}",
+                    res
+                ),
+            }
+        }
+
+        #[test]
+        fn test_exponent_with_sign_only() {
+            let input = Span::new_extra("123e+", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Failure(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Incomplete(IncompleteKind::InvalidExponentPart { .. })
+                )),
+                _ => panic!(
+                    "expected TokenError::Incomplete(InvalidExponentPart), got {:?}",
+                    res
+                ),
+            }
+        }
+
+        #[test]
+        fn test_exponent_with_sign_only_negative() {
+            let input = Span::new_extra("123e-", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Failure(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Incomplete(IncompleteKind::InvalidExponentPart { .. })
+                )),
+                _ => panic!(
+                    "expected TokenError::Incomplete(InvalidExponentPart), got {:?}",
+                    res
+                ),
+            }
+        }
+
+        #[test]
+        fn test_error_messages_are_specific() {
+            let input = Span::new_extra("abc", Config::default());
+            let res = number(input);
+            assert!(res.is_err(), "should fail with specific error");
+
+            if let Err(nom::Err::Error(token_error)) = res {
+                assert!(
+                    matches!(token_error.kind, TokenErrorKind::Expect(ExpectKind::Number)),
+                    "error should be for Number"
+                );
+            } else {
+                panic!(
+                    "expected TokenError but got different error type: {:?}",
+                    res
+                );
+            }
+        }
+
+        #[test]
+        fn test_invalid_decimal_part_error() {
+            let input = Span::new_extra("123.", Config::default());
+            let res = number(input);
+            assert!(res.is_err(), "should fail on invalid decimal part");
+
+            if let Err(nom::Err::Failure(token_error)) = res {
+                assert!(
+                    matches!(
+                        token_error.kind,
+                        TokenErrorKind::Incomplete(IncompleteKind::InvalidDecimalPart { .. })
+                    ),
+                    "error should be for InvalidDecimalPart"
+                );
+            } else {
+                panic!(
+                    "expected TokenError Failure but got different error type: {:?}",
+                    res
+                );
+            }
+        }
+
+        #[test]
+        fn test_invalid_exponent_part_error() {
+            let input = Span::new_extra("123e", Config::default());
+            let res = number(input);
+            assert!(res.is_err(), "should fail on invalid exponent part");
+
+            if let Err(nom::Err::Failure(token_error)) = res {
+                assert!(
+                    matches!(
+                        token_error.kind,
+                        TokenErrorKind::Incomplete(IncompleteKind::InvalidExponentPart { .. })
+                    ),
+                    "error should be for InvalidExponentPart"
+                );
+            } else {
+                panic!(
+                    "expected TokenError Failure but got different error type: {:?}",
+                    res
+                );
+            }
+        }
     }
 
-    #[test]
-    fn test_number_negative_integer() {
-        let input = Span::new_extra("-17 rest", Config::default());
-        let (rest, matched) = number(input).expect("should parse negative integer");
-        assert_eq!(matched.lexeme(), "-17");
-        assert_eq!(rest.fragment(), &"rest");
-    }
+    mod string_tests {
+        use super::*;
 
-    #[test]
-    fn test_number_decimal() {
-        let input = Span::new_extra("3.1415 rest", Config::default());
-        let (rest, matched) = number(input).expect("should parse decimal");
-        assert_eq!(matched.lexeme(), "3.1415");
-        assert_eq!(rest.fragment(), &"rest");
-    }
+        // Success cases
+        #[test]
+        fn test_simple() {
+            let input = Span::new_extra("'hello' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse string");
+            assert_eq!(matched.lexeme(), "'hello'");
+            assert_eq!(rest.fragment(), &"rest");
+        }
 
-    #[test]
-    fn test_number_exponent() {
-        let input = Span::new_extra("2.5e10 rest", Config::default());
-        let (rest, matched) = number(input).expect("should parse exponent");
-        assert_eq!(matched.lexeme(), "2.5e10");
-        assert_eq!(rest.fragment(), &"rest");
-    }
+        #[test]
+        fn test_with_spaces() {
+            let input = Span::new_extra("'foo bar' baz", Config::default());
+            let (rest, matched) = string(input).expect("should parse string with spaces");
+            assert_eq!(matched.lexeme(), "'foo bar'");
+            assert_eq!(rest.fragment(), &"baz");
+        }
 
-    #[test]
-    fn test_number_negative_exponent() {
-        let input = Span::new_extra("-1.2E-3 rest", Config::default());
-        let (rest, matched) = number(input).expect("should parse negative exponent");
-        assert_eq!(matched.lexeme(), "-1.2E-3");
-        assert_eq!(rest.fragment(), &"rest");
-    }
+        #[test]
+        fn test_escape_sequences_not_supported() {
+            let input = Span::new_extra("'foo \\' bar", Config::default());
+            let (rest, matched) =
+                string(input).expect("should parse string (escape sequences not supported)");
+            assert_eq!(matched.lexeme(), "'foo \\'");
+            assert_eq!(rest.fragment(), &"bar");
+        }
 
-    #[test]
-    fn test_number_invalid() {
-        let input = Span::new_extra("foo", Config::default());
-        let res = number(input);
-        assert!(res.is_err());
-    }
+        #[test]
+        fn test_empty_string() {
+            let input = Span::new_extra("'' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse empty string");
+            assert_eq!(matched.lexeme(), "''");
+            assert_eq!(rest.fragment(), &"rest");
+        }
 
-    #[test]
-    fn test_string_simple() {
-        let input = Span::new_extra("'hello' rest", Config::default());
-        let (rest, matched) = string(input).expect("should parse string");
-        assert_eq!(matched.lexeme(), "'hello'");
-        assert_eq!(rest.fragment(), &"rest");
-    }
+        #[test]
+        fn test_with_carriage_return() {
+            let input = Span::new_extra("'hello\rworld' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse string with carriage return");
+            assert_eq!(matched.lexeme(), "'hello\rworld'");
+            assert_eq!(rest.fragment(), &"rest");
+        }
 
-    #[test]
-    fn test_string_with_spaces() {
-        let input = Span::new_extra("'foo bar' baz", Config::default());
-        let (rest, matched) = string(input).expect("should parse string with spaces");
-        assert_eq!(matched.lexeme(), "'foo bar'");
-        assert_eq!(rest.fragment(), &"baz");
-    }
+        #[test]
+        fn test_with_tab() {
+            let input = Span::new_extra("'hello\tworld' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse string with tab");
+            assert_eq!(matched.lexeme(), "'hello\tworld'");
+            assert_eq!(rest.fragment(), &"rest");
+        }
 
-    #[test]
-    fn test_string_escape_sequences_not_supported() {
-        let input = Span::new_extra("'foo \\' bar", Config::default());
-        let (rest, matched) =
-            string(input).expect("should parse string (escape sequences not supported)");
-        assert_eq!(matched.lexeme(), "'foo \\'");
-        assert_eq!(rest.fragment(), &"bar");
-    }
+        #[test]
+        fn test_with_numbers() {
+            let input = Span::new_extra("'123 456' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse string with numbers");
+            assert_eq!(matched.lexeme(), "'123 456'");
+            assert_eq!(rest.fragment(), &"rest");
+        }
 
-    #[test]
-    fn test_string_unterminated() {
-        let input = Span::new_extra("'unterminated", Config::default());
-        let res = string(input);
-        assert!(res.is_err(), "should not parse unterminated string");
+        #[test]
+        fn test_with_double_quotes() {
+            let input = Span::new_extra("'hello \"world\"' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse string with double quotes");
+            assert_eq!(matched.lexeme(), "'hello \"world\"'");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_with_backslashes() {
+            let input = Span::new_extra("'hello\\world' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse string with backslashes");
+            assert_eq!(matched.lexeme(), "'hello\\world'");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_with_whitespace_only() {
+            let input = Span::new_extra("'   ' rest", Config::default());
+            let (rest, matched) = string(input).expect("should parse string with whitespace only");
+            assert_eq!(matched.lexeme(), "'   '");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_very_long() {
+            let long_content = "a".repeat(1000);
+            let input_str = format!("'{}' rest", long_content);
+            let input = Span::new_extra(&input_str, Config::default());
+            let (rest, matched) = string(input).expect("should parse very long string");
+            let expected_lexeme = format!("'{}'", long_content);
+            assert_eq!(matched.lexeme(), expected_lexeme);
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_with_nested_single_quotes() {
+            let input = Span::new_extra("'hello'world' rest", Config::default());
+            let (rest, matched) =
+                string(input).expect("should parse string ending at first closing quote");
+            assert_eq!(matched.lexeme(), "'hello'");
+            assert_eq!(rest.fragment(), &"world' rest");
+        }
+
+        #[test]
+        fn test_at_end_of_file() {
+            let input = Span::new_extra("'hello'", Config::default());
+            let (rest, matched) = string(input).expect("should parse string at end of file");
+            assert_eq!(matched.lexeme(), "'hello'");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        // Error cases
+        #[test]
+        fn test_empty_input() {
+            let input = Span::new_extra("", Config::default());
+            let res = string(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::String)
+                )),
+                _ => panic!("expected TokenError::Expect(String), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_no_opening_quote() {
+            let input = Span::new_extra("hello'", Config::default());
+            let res = string(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::String)
+                )),
+                _ => panic!("expected TokenError::Expect(String), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_no_closing_quote() {
+            let input = Span::new_extra("'hello", Config::default());
+            let res = string(input);
+            match res {
+                Err(nom::Err::Failure(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
+                )),
+                _ => panic!(
+                    "expected TokenError::Incomplete(UnclosedString), got {:?}",
+                    res
+                ),
+            }
+        }
+
+        #[test]
+        fn test_with_newline() {
+            let input = Span::new_extra("'hello\nworld'", Config::default());
+            let res = string(input);
+            match res {
+                Err(nom::Err::Failure(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
+                )),
+                _ => panic!(
+                    "expected TokenError::Incomplete(UnclosedString), got {:?}",
+                    res
+                ),
+            }
+        }
+
+        #[test]
+        fn test_with_mixed_whitespace() {
+            let input = Span::new_extra("' \t\n\r ' rest", Config::default());
+            let res = string(input);
+            assert!(
+                res.is_err(),
+                "should fail on string with mixed whitespace including newlines"
+            );
+        }
+
+        #[test]
+        fn test_unterminated_at_end_of_file() {
+            let input = Span::new_extra("'hello", Config::default());
+            let res = string(input);
+            match res {
+                Err(nom::Err::Failure(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
+                )),
+                _ => panic!(
+                    "expected TokenError::Incomplete(UnclosedString), got {:?}",
+                    res
+                ),
+            }
+        }
+
+        #[test]
+        fn test_error_messages_are_specific() {
+            let input = Span::new_extra("abc", Config::default());
+            let res = string(input);
+            assert!(res.is_err(), "should fail with specific error");
+
+            if let Err(nom::Err::Error(token_error)) = res {
+                assert!(
+                    matches!(token_error.kind, TokenErrorKind::Expect(ExpectKind::String)),
+                    "error should be for String"
+                );
+            } else {
+                panic!(
+                    "expected TokenError but got different error type: {:?}",
+                    res
+                );
+            }
+        }
+
+        #[test]
+        fn test_unclosed_string_error() {
+            let input = Span::new_extra("'hello", Config::default());
+            let res = string(input);
+            assert!(res.is_err(), "should fail on unclosed string");
+
+            if let Err(nom::Err::Failure(token_error)) = res {
+                assert!(
+                    matches!(
+                        token_error.kind,
+                        TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
+                    ),
+                    "error should be for UnclosedString"
+                );
+            } else {
+                panic!(
+                    "expected TokenError Failure but got different error type: {:?}",
+                    res
+                );
+            }
+        }
+
+        #[test]
+        fn test_unclosed_string_with_newline_error() {
+            let input = Span::new_extra("'hello\n", Config::default());
+            let res = string(input);
+            assert!(res.is_err(), "should fail on unclosed string with newline");
+
+            if let Err(nom::Err::Failure(token_error)) = res {
+                assert!(
+                    matches!(
+                        token_error.kind,
+                        TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
+                    ),
+                    "error should be for UnclosedString"
+                );
+            } else {
+                panic!(
+                    "expected TokenError Failure but got different error type: {:?}",
+                    res
+                );
+            }
+        }
     }
 }
