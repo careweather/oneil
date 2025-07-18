@@ -1080,4 +1080,632 @@ mod tests {
         let result = parse_complete(input);
         assert!(result.is_err());
     }
+
+    mod error_tests {
+        use super::*;
+        use crate::error::reason::{ExpectKind, ExprKind, IncompleteKind, ParserErrorReason};
+
+        mod general_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_empty_input() {
+                let input = Span::new_extra("", Config::default());
+                let result = parse(input);
+                match result {
+                    Err(nom::Err::Error(error)) => {
+                        assert_eq!(error.error_offset, 0);
+                        assert!(matches!(
+                            error.reason,
+                            ParserErrorReason::Expect(ExpectKind::Expr)
+                        ));
+                    }
+                    _ => panic!("Expected error for empty input"),
+                }
+            }
+
+            #[test]
+            fn test_whitespace_only() {
+                let input = Span::new_extra("   ", Config::default());
+                let result = parse(input);
+                match result {
+                    Err(nom::Err::Error(error)) => {
+                        assert_eq!(error.error_offset, 0);
+                        assert!(matches!(
+                            error.reason,
+                            ParserErrorReason::Expect(ExpectKind::Expr)
+                        ));
+                    }
+                    _ => panic!("Expected error for whitespace only"),
+                }
+            }
+
+            #[test]
+            fn test_symbols_only() {
+                let input = Span::new_extra("+++", Config::default());
+                let result = parse(input);
+                match result {
+                    Err(nom::Err::Error(error)) => {
+                        assert_eq!(error.error_offset, 0);
+                        assert!(matches!(
+                            error.reason,
+                            ParserErrorReason::Expect(ExpectKind::Expr)
+                        ));
+                    }
+                    _ => panic!("Expected error for symbols only"),
+                }
+            }
+
+            #[test]
+            fn test_parse_complete_with_remaining_input() {
+                let input = Span::new_extra("42 + 1 rest", Config::default());
+                let result = parse_complete(input);
+                match result {
+                    Err(nom::Err::Error(error)) => {
+                        assert_eq!(error.error_offset, 7);
+                        assert_eq!(error.reason, ParserErrorReason::UnexpectedToken);
+                    }
+                    _ => panic!("Expected error for remaining input"),
+                }
+            }
+        }
+
+        mod unary_op_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_negation_missing_operand() {
+                let input = Span::new_extra("-", Config::default());
+                let result = parse(input);
+                let expected_minus_span = AstSpan::new(0, 1, 1);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 1);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::UnaryOpMissingOperand { operator }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, UnaryOp::Neg);
+                                assert_eq!(cause, expected_minus_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_not_missing_operand() {
+                let input = Span::new_extra("not", Config::default());
+                let result = parse(input);
+                let expected_not_span = AstSpan::new(0, 3, 3);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 3);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::UnaryOpMissingOperand { operator }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, UnaryOp::Not);
+                                assert_eq!(cause, expected_not_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+        }
+
+        mod binary_op_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_addition_missing_second_operand() {
+                let input = Span::new_extra("1 +", Config::default());
+                let result = parse(input);
+                let expected_plus_span = AstSpan::new(2, 3, 3);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 3);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::Add);
+                                assert_eq!(cause, expected_plus_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_multiplication_missing_second_operand() {
+                let input = Span::new_extra("2 *", Config::default());
+                let result = parse(input);
+                let expected_star_span = AstSpan::new(2, 3, 3);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 3);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::Mul);
+                                assert_eq!(cause, expected_star_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_exponentiation_missing_second_operand() {
+                let input = Span::new_extra("2 ^", Config::default());
+                let result = parse(input);
+                let expected_caret_span = AstSpan::new(2, 3, 3);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 3);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::Pow);
+                                assert_eq!(cause, expected_caret_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_comparison_missing_second_operand() {
+                let input = Span::new_extra("x <", Config::default());
+                let result = parse(input);
+                let expected_less_span = AstSpan::new(2, 3, 3);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 3);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::LessThan);
+                                assert_eq!(cause, expected_less_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_logical_and_missing_second_operand() {
+                let input = Span::new_extra("true and", Config::default());
+                let result = parse(input);
+                let expected_and_span = AstSpan::new(5, 8, 8);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 8);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::And);
+                                assert_eq!(cause, expected_and_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_logical_or_missing_second_operand() {
+                let input = Span::new_extra("false or", Config::default());
+                let result = parse(input);
+                let expected_or_span = AstSpan::new(6, 8, 8);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 8);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::Or);
+                                assert_eq!(cause, expected_or_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_minmax_missing_second_operand() {
+                let input = Span::new_extra("min_weight |", Config::default());
+                let result = parse(input);
+                let expected_bar_span = AstSpan::new(11, 12, 12);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 12);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::MinMax);
+                                assert_eq!(cause, expected_bar_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+        }
+
+        mod parenthesized_expr_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_missing_expression_in_parentheses() {
+                let input = Span::new_extra("()", Config::default());
+                let result = parse(input);
+                let expected_paren_left_span = AstSpan::new(0, 1, 1);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 1);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::Expr(ExprKind::ParenMissingExpr),
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_paren_left_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_unclosed_parentheses() {
+                let input = Span::new_extra("(1 + 2", Config::default());
+                let result = parse(input);
+                let expected_paren_left_span = AstSpan::new(0, 1, 1);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 6);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::UnclosedParen,
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_paren_left_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_nested_unclosed_parentheses() {
+                let input = Span::new_extra("((1 + 2)", Config::default());
+                let result = parse(input);
+                let expected_paren_left_span = AstSpan::new(0, 1, 1);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 8);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::UnclosedParen,
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_paren_left_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+        }
+
+        mod function_call_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_missing_opening_paren() {
+                let input = Span::new_extra("foo", Config::default());
+                let result = parse(input);
+                // This should succeed as it's a valid variable
+                assert!(result.is_ok());
+            }
+
+            #[test]
+            fn test_missing_closing_paren() {
+                let input = Span::new_extra("foo(1, 2", Config::default());
+                let result = parse(input);
+                let expected_paren_left_span = AstSpan::new(3, 4, 4);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 8);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::UnclosedParen,
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_paren_left_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_empty_function_call() {
+                let input = Span::new_extra("foo()", Config::default());
+                let result = parse(input);
+                // This should succeed as it's a valid function call with no arguments
+                assert!(result.is_ok());
+            }
+
+            #[test]
+            fn test_missing_argument_after_comma() {
+                let input = Span::new_extra("foo(1,)", Config::default());
+                let result = parse(input);
+                let expected_paren_left_span = AstSpan::new(3, 4, 4);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 5);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::UnclosedParen,
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_paren_left_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+        }
+
+        mod variable_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_missing_identifier_after_dot() {
+                let input = Span::new_extra("foo.", Config::default());
+                let result = parse(input);
+                let expected_dot_span = AstSpan::new(3, 4, 4);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 4);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_dot_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_consecutive_dots() {
+                let input = Span::new_extra("foo..bar", Config::default());
+                let result = parse(input);
+                let expected_dot_span = AstSpan::new(3, 4, 4);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 4);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_dot_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_dot_at_end() {
+                let input = Span::new_extra("foo.bar.", Config::default());
+                let result = parse(input);
+                let expected_dot_span = AstSpan::new(7, 8, 8);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 8);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
+                                cause,
+                            } => {
+                                assert_eq!(cause, expected_dot_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+        }
+
+        mod literal_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_unterminated_string() {
+                let input = Span::new_extra("'hello", Config::default());
+                let result = parse(input);
+                // This should be a token error for unterminated string
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 6);
+                        assert!(matches!(error.reason, ParserErrorReason::TokenError(_)));
+                    }
+                    _ => panic!(
+                        "Expected token error for unterminated string, got {:?}",
+                        result
+                    ),
+                }
+            }
+
+            #[test]
+            fn test_invalid_number() {
+                let input = Span::new_extra("@", Config::default());
+                let result = parse(input);
+                // This should be an Expect(Expr) error since @ is not a valid expression start
+                match result {
+                    Err(nom::Err::Error(error)) => {
+                        assert_eq!(error.error_offset, 0);
+                        assert!(matches!(
+                            error.reason,
+                            ParserErrorReason::Expect(ExpectKind::Expr)
+                        ));
+                    }
+                    _ => panic!(
+                        "Expected Expect(Expr) error for invalid expression start, got {:?}",
+                        result
+                    ),
+                }
+            }
+        }
+
+        mod precedence_error_tests {
+            use super::*;
+
+            #[test]
+            fn test_chained_binary_ops_missing_operand() {
+                let input = Span::new_extra("1 + 2 *", Config::default());
+                let result = parse(input);
+                let expected_star_span = AstSpan::new(6, 7, 7);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 7);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::Mul);
+                                assert_eq!(cause, expected_star_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+
+            #[test]
+            fn test_complex_expression_missing_operand() {
+                let input = Span::new_extra("(1 + 2) * 3 +", Config::default());
+                let result = parse(input);
+                let expected_plus_span = AstSpan::new(12, 13, 13);
+
+                match result {
+                    Err(nom::Err::Failure(error)) => {
+                        assert_eq!(error.error_offset, 13);
+                        match error.reason {
+                            ParserErrorReason::Incomplete {
+                                kind:
+                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                        operator,
+                                    }),
+                                cause,
+                            } => {
+                                assert_eq!(operator, BinaryOp::Add);
+                                assert_eq!(cause, expected_plus_span);
+                            }
+                            _ => panic!("Unexpected reason {:?}", error.reason),
+                        }
+                    }
+                    _ => panic!("Unexpected result {:?}", result),
+                }
+            }
+        }
+    }
 }
