@@ -244,6 +244,19 @@ impl ParserError {
         }
     }
 
+    /// Creates a new ParserError for a missing equals sign in a model input
+    pub(crate) fn model_input_missing_equals(
+        ident_span: &impl SpanLike,
+    ) -> impl Fn(TokenError) -> Self {
+        move |error| {
+            let ident_span = AstSpan::from(ident_span);
+            Self::new_from_token_error(
+                error,
+                ParserErrorReason::model_input_missing_equals(ident_span),
+            )
+        }
+    }
+
     /// Creates a new ParserError for a missing value in a model input
     pub(crate) fn model_input_missing_value(equals_span: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {

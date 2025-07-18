@@ -153,6 +153,13 @@ impl ParserErrorReason {
         }
     }
 
+    pub(crate) fn model_input_missing_equals(ident_span: AstSpan) -> Self {
+        Self::Incomplete {
+            cause: ident_span,
+            kind: IncompleteKind::Decl(DeclKind::ModelInputMissingEquals),
+        }
+    }
+
     pub(crate) fn model_input_missing_value(equals_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: equals_span,
@@ -437,6 +444,8 @@ pub enum DeclKind {
         /// The kind of use error
         UseKind,
     ),
+    /// Model input is missing an equals sign
+    ModelInputMissingEquals,
     /// Model input is missing a value
     ModelInputMissingValue,
     /// Found an incomplete model path

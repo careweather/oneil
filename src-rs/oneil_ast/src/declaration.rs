@@ -133,6 +133,11 @@ impl ModelInputList {
     pub fn new(inputs: Vec<ModelInputNode>) -> Self {
         Self(inputs)
     }
+
+    /// Returns a slice of the model inputs
+    pub fn inputs(&self) -> &[ModelInputNode] {
+        &self.0
+    }
 }
 
 /// A single model input with an identifier and value

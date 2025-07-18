@@ -125,7 +125,7 @@ fn test_decl(input: Span) -> Result<TestNode, ParserError> {
     let (rest, trace_level) = opt(trace_level).parse(input)?;
 
     let (rest, test_keyword_token) = test_keyword
-        .or_fail_with(ParserError::expect_test)
+        .convert_error_to(ParserError::expect_test)
         .parse(rest)?;
 
     let (rest, inputs) = opt(test_inputs).parse(rest)?;
