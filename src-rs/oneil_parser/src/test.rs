@@ -257,151 +257,485 @@ fn test_inputs(input: Span) -> Result<TestInputsNode, ParserError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Config;
+    use crate::{
+        Config,
+        error::reason::{ExpectKind, IncompleteKind, ParserErrorReason, TestKind},
+    };
     use oneil_ast::expression::{Expr, Literal};
 
-    #[test]
-    fn test_decl_basic() {
-        let input = Span::new_extra("test: true\n", Config::default());
-        let (rest, test) = parse(input).unwrap();
+    mod success_tests {
+        use super::*;
 
-        let expected_span = AstSpan::new(0, 10, 11);
+        #[test]
+        fn test_decl_basic() {
+            let input = Span::new_extra("test: true\n", Config::default());
+            let (rest, test) = parse(input).unwrap();
 
-        let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
-        let expected_test_expr =
-            Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
+            let expected_span = AstSpan::new(0, 10, 11);
 
-        assert_eq!(test.node_span(), &expected_span);
-        assert_eq!(test.trace_level(), None);
-        assert_eq!(test.inputs(), None);
-        assert_eq!(test.expr(), &expected_test_expr);
+            let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
+            let expected_test_expr =
+                Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
 
-        assert_eq!(rest.fragment(), &"");
+            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.trace_level(), None);
+            assert_eq!(test.inputs(), None);
+            assert_eq!(test.expr(), &expected_test_expr);
+
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_decl_at_eof() {
+            let input = Span::new_extra("test: true", Config::default());
+            let (rest, test) = parse(input).unwrap();
+
+            let expected_span = AstSpan::new(0, 10, 10);
+
+            let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
+            let expected_test_expr =
+                Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
+
+            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.trace_level(), None);
+            assert_eq!(test.inputs(), None);
+            assert_eq!(test.expr(), &expected_test_expr);
+
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_decl_with_trace() {
+            let input = Span::new_extra("* test: true\n", Config::default());
+            let (rest, test) = parse(input).unwrap();
+
+            let expected_span = AstSpan::new(0, 12, 13);
+
+            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(
+                test.trace_level().map(|t| t.node_value()),
+                Some(&TraceLevel::Trace)
+            );
+
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_decl_with_debug() {
+            let input = Span::new_extra("** test: true\n", Config::default());
+            let (rest, test) = parse(input).unwrap();
+
+            let expected_span = AstSpan::new(0, 13, 14);
+
+            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(
+                test.trace_level().map(|t| t.node_value()),
+                Some(&TraceLevel::Debug)
+            );
+            assert_eq!(test.inputs(), None);
+
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_decl_with_inputs() {
+            let input = Span::new_extra("test {x, y}: x > y\n", Config::default());
+            let (rest, test) = parse(input).unwrap();
+
+            let expected_span = AstSpan::new(0, 18, 19);
+
+            let expected_test_inputs = vec![
+                Node::new(AstSpan::new(6, 7, 7), Identifier::new("x".to_string())),
+                Node::new(AstSpan::new(9, 10, 10), Identifier::new("y".to_string())),
+            ];
+
+            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.trace_level(), None);
+            assert_eq!(
+                test.inputs().map(|i| i.node_value()),
+                Some(&TestInputs::new(expected_test_inputs))
+            );
+
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_decl_full() {
+            let input = Span::new_extra("** test {x, y}: x > y\n", Config::default());
+            let (rest, test) = parse(input).unwrap();
+
+            let expected_span = AstSpan::new(0, 21, 22);
+
+            let expected_test_inputs = vec![
+                Node::new(AstSpan::new(9, 10, 10), Identifier::new("x".to_string())),
+                Node::new(AstSpan::new(12, 13, 13), Identifier::new("y".to_string())),
+            ];
+
+            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(
+                test.trace_level().map(|t| t.node_value()),
+                Some(&TraceLevel::Debug)
+            );
+            assert_eq!(
+                test.inputs().map(|i| i.node_value()),
+                Some(&TestInputs::new(expected_test_inputs))
+            );
+
+            assert_eq!(rest.fragment(), &"");
+        }
     }
 
-    #[test]
-    fn test_decl_at_eof() {
-        let input = Span::new_extra("test: true", Config::default());
-        let (rest, test) = parse(input).unwrap();
+    mod parse_complete_tests {
+        use super::*;
 
-        let expected_span = AstSpan::new(0, 10, 10);
+        #[test]
+        fn test_parse_complete_success() {
+            let input = Span::new_extra("test: true\n", Config::default());
+            let (rest, test) = parse_complete(input).unwrap();
 
-        let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
-        let expected_test_expr =
-            Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
+            let expected_span = AstSpan::new(0, 10, 11);
 
-        assert_eq!(test.node_span(), &expected_span);
-        assert_eq!(test.trace_level(), None);
-        assert_eq!(test.inputs(), None);
-        assert_eq!(test.expr(), &expected_test_expr);
+            let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
+            let expected_test_expr =
+                Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
 
-        assert_eq!(rest.fragment(), &"");
+            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.trace_level(), None);
+            assert_eq!(test.inputs(), None);
+            assert_eq!(test.expr(), &expected_test_expr);
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_parse_complete_with_remaining_input() {
+            let input = Span::new_extra("test: true\n extra", Config::default());
+            let result = parse_complete(input);
+            assert!(result.is_err());
+        }
     }
 
-    #[test]
-    fn test_decl_with_trace() {
-        let input = Span::new_extra("* test: true\n", Config::default());
-        let (rest, test) = parse(input).unwrap();
+    mod error_tests {
+        use super::*;
 
-        let expected_span = AstSpan::new(0, 12, 13);
+        #[test]
+        fn test_error_missing_test_keyword() {
+            let input = Span::new_extra(": true\n", Config::default());
+            let result = parse(input);
 
-        assert_eq!(test.node_span(), &expected_span);
-        assert_eq!(
-            test.trace_level().map(|t| t.node_value()),
-            Some(&TraceLevel::Trace)
-        );
+            match result {
+                Err(nom::Err::Error(error)) => {
+                    assert_eq!(error.error_offset, 0);
+                    assert!(matches!(
+                        error.reason,
+                        ParserErrorReason::Expect(ExpectKind::Test)
+                    ));
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        assert_eq!(rest.fragment(), &"");
-    }
+        #[test]
+        fn test_error_missing_colon_after_test() {
+            let input = Span::new_extra("test true\n", Config::default());
+            let result = parse(input);
+            let expected_test_span = AstSpan::new(0, 4, 5);
 
-    #[test]
-    fn test_decl_with_debug() {
-        let input = Span::new_extra("** test: true\n", Config::default());
-        let (rest, test) = parse(input).unwrap();
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 5); // After "test"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::Test(TestKind::MissingColon),
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_test_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        let expected_span = AstSpan::new(0, 13, 14);
+        #[test]
+        fn test_error_missing_colon_after_inputs() {
+            let input = Span::new_extra("test {x, y} true\n", Config::default());
+            let result = parse(input);
+            let expected_inputs_span = AstSpan::new(5, 11, 12);
 
-        assert_eq!(test.node_span(), &expected_span);
-        assert_eq!(
-            test.trace_level().map(|t| t.node_value()),
-            Some(&TraceLevel::Debug)
-        );
-        assert_eq!(test.inputs(), None);
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 12); // After "test {x, y}"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::Test(TestKind::MissingColon),
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_inputs_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        assert_eq!(rest.fragment(), &"");
-    }
+        #[test]
+        fn test_error_missing_expression() {
+            let input = Span::new_extra("test:\n", Config::default());
+            let result = parse(input);
+            let expected_colon_span = AstSpan::new(4, 5, 5);
 
-    #[test]
-    fn test_decl_with_inputs() {
-        let input = Span::new_extra("test {x, y}: x > y\n", Config::default());
-        let (rest, test) = parse(input).unwrap();
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 5); // After ":"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::Test(TestKind::MissingExpr),
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_colon_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        let expected_span = AstSpan::new(0, 18, 19);
+        #[test]
+        fn test_error_missing_inputs_after_brace() {
+            let input = Span::new_extra("test {}: true\n", Config::default());
+            let result = parse(input);
+            let expected_brace_span = AstSpan::new(5, 6, 6);
 
-        let expected_test_inputs = vec![
-            Node::new(AstSpan::new(6, 7, 7), Identifier::new("x".to_string())),
-            Node::new(AstSpan::new(9, 10, 10), Identifier::new("y".to_string())),
-        ];
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 6); // After "{"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::Test(TestKind::MissingInputs),
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_brace_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        assert_eq!(test.node_span(), &expected_span);
-        assert_eq!(test.trace_level(), None);
-        assert_eq!(
-            test.inputs().map(|i| i.node_value()),
-            Some(&TestInputs::new(expected_test_inputs))
-        );
+        #[test]
+        fn test_error_unclosed_brace() {
+            let input = Span::new_extra("test {x, y: true\n", Config::default());
+            let result = parse(input);
+            let expected_brace_span = AstSpan::new(5, 6, 6);
 
-        assert_eq!(rest.fragment(), &"");
-    }
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 10); // After "y"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::UnclosedBrace,
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_brace_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-    #[test]
-    fn test_decl_full() {
-        let input = Span::new_extra("** test {x, y, z}: x > y and y > z\n", Config::default());
-        let (rest, test) = parse(input).unwrap();
+        #[test]
+        fn test_error_missing_inputs_with_trace() {
+            let input = Span::new_extra("* test {}: true\n", Config::default());
+            let result = parse(input);
+            let expected_brace_span = AstSpan::new(7, 8, 8);
 
-        let expected_span = AstSpan::new(0, 34, 35);
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 8); // After "{"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::Test(TestKind::MissingInputs),
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_brace_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        let expected_test_inputs = vec![
-            Node::new(AstSpan::new(9, 10, 10), Identifier::new("x".to_string())),
-            Node::new(AstSpan::new(12, 13, 13), Identifier::new("y".to_string())),
-            Node::new(AstSpan::new(15, 16, 16), Identifier::new("z".to_string())),
-        ];
+        #[test]
+        fn test_error_missing_colon_with_debug() {
+            let input = Span::new_extra("** test {x, y} true\n", Config::default());
+            let result = parse(input);
+            let expected_inputs_span = AstSpan::new(8, 14, 15);
 
-        assert_eq!(test.node_span(), &expected_span);
-        assert_eq!(
-            test.trace_level().map(|t| t.node_value()),
-            Some(&TraceLevel::Debug)
-        );
-        assert_eq!(
-            test.inputs().map(|i| i.node_value()),
-            Some(&TestInputs::new(expected_test_inputs))
-        );
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 15); // After "test {x, y}"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::Test(TestKind::MissingColon),
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_inputs_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        assert_eq!(rest.fragment(), &"");
-    }
+        #[test]
+        fn test_error_missing_expression_with_trace() {
+            let input = Span::new_extra("* test:\n", Config::default());
+            let result = parse(input);
+            let expected_colon_span = AstSpan::new(6, 7, 7);
 
-    #[test]
-    fn test_parse_complete_success() {
-        let input = Span::new_extra("test: true\n", Config::default());
-        let (rest, test) = parse_complete(input).unwrap();
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 7); // After ":"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::Test(TestKind::MissingExpr),
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_colon_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        let expected_span = AstSpan::new(0, 10, 11);
+        #[test]
+        fn test_error_invalid_trace_level() {
+            let input = Span::new_extra("*** test: true\n", Config::default());
+            let result = parse(input);
 
-        let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
-        let expected_test_expr =
-            Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
+            match result {
+                Err(nom::Err::Error(error)) => {
+                    assert_eq!(error.error_offset, 2);
+                    assert!(matches!(
+                        error.reason,
+                        ParserErrorReason::Expect(ExpectKind::Test)
+                    ));
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-        assert_eq!(test.node_span(), &expected_span);
-        assert_eq!(test.trace_level(), None);
-        assert_eq!(test.inputs(), None);
-        assert_eq!(test.expr(), &expected_test_expr);
+        #[test]
+        fn test_error_empty_input() {
+            let input = Span::new_extra("", Config::default());
+            let result = parse(input);
 
-        assert_eq!(rest.fragment(), &"");
-    }
+            match result {
+                Err(nom::Err::Error(error)) => {
+                    assert_eq!(error.error_offset, 0);
+                    assert!(matches!(
+                        error.reason,
+                        ParserErrorReason::Expect(ExpectKind::Test)
+                    ));
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
 
-    #[test]
-    fn test_parse_complete_with_remaining_input() {
-        let input = Span::new_extra("test: true\nrest", Config::default());
-        let result = parse_complete(input);
-        assert!(result.is_err());
+        #[test]
+        fn test_error_whitespace_only() {
+            let input = Span::new_extra("   \n", Config::default());
+            let result = parse(input);
+
+            match result {
+                Err(nom::Err::Error(error)) => {
+                    assert_eq!(error.error_offset, 0); // After whitespace
+                    assert!(matches!(
+                        error.reason,
+                        ParserErrorReason::Expect(ExpectKind::Test)
+                    ));
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
+
+        #[test]
+        fn test_error_missing_comma_between_inputs() {
+            let input = Span::new_extra("test {x y}: true\n", Config::default());
+            let result = parse(input);
+            let expected_brace_span = AstSpan::new(5, 6, 6);
+
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 8); // After "x"
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::UnclosedBrace,
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_brace_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
+
+        #[test]
+        fn test_error_trailing_comma_in_inputs() {
+            let input = Span::new_extra("test {x,}: true\n", Config::default());
+            let result = parse(input);
+            let expected_brace_span = AstSpan::new(5, 6, 6);
+
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 7); // After ","
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::UnclosedBrace,
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_brace_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
+
+        #[test]
+        fn test_error_invalid_identifier_in_inputs() {
+            let input = Span::new_extra("test {x, 123}: true\n", Config::default());
+            let result = parse(input);
+            let expected_brace_span = AstSpan::new(5, 6, 6);
+
+            match result {
+                Err(nom::Err::Failure(error)) => {
+                    assert_eq!(error.error_offset, 7); // After "x, "
+                    match error.reason {
+                        ParserErrorReason::Incomplete {
+                            kind: IncompleteKind::UnclosedBrace,
+                            cause,
+                        } => {
+                            assert_eq!(cause, expected_brace_span);
+                        }
+                        error => panic!("Unexpected error {:?}", error),
+                    }
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
     }
 }
