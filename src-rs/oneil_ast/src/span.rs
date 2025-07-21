@@ -3,6 +3,9 @@
 //! This module provides the `Span` struct and related functionality for
 //! tracking source code locations in the AST.
 
+// TODO: in order to reduce opportunity for bugs, use `span_length` and
+//       `whitespace_length` instead of `start` and `end`
+
 /// Represents a span of source code with start, end, and whitespace end positions
 ///
 /// Spans are used throughout the AST to provide precise location information

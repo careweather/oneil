@@ -95,7 +95,7 @@ where
     builder.mark_model_as_visited(&model_path);
 
     // parse model ast
-    let model_ast = file_loader.parse_ast(model_path.clone());
+    let model_ast = file_loader.parse_ast(&model_path);
 
     // TODO: this might be able to recover and produce a partial model?
     let model_ast = match model_ast {
@@ -107,7 +107,7 @@ where
     };
 
     // split model ast into imports, use models, parameters, and tests
-    let (imports, use_models, parameters, tests) = split_model_ast(model_ast);
+    let (imports, use_models, parameters, tests) = split_model_ast(&model_ast);
 
     // validate imports
     let (python_imports, import_resolution_errors, builder) =
@@ -203,20 +203,20 @@ where
 /// - `Vec<ast::Parameter>` - All parameter declarations
 /// - `Vec<ast::Test>` - All test declarations
 fn split_model_ast(
-    model_ast: ast::Model,
+    model_ast: &ast::model::ModelNode,
 ) -> (
-    Vec<ast::declaration::Import>,
-    Vec<ast::declaration::UseModel>,
-    Vec<ast::Parameter>,
-    Vec<ast::Test>,
+    Vec<&ast::declaration::ImportNode>,
+    Vec<&ast::declaration::UseModelNode>,
+    Vec<&ast::parameter::ParameterNode>,
+    Vec<&ast::test::TestNode>,
 ) {
     let mut imports = vec![];
     let mut use_models = vec![];
     let mut parameters = vec![];
     let mut tests = vec![];
 
-    for decl in model_ast.decls {
-        match decl {
+    for decl in model_ast.decls() {
+        match decl.node_value() {
             ast::declaration::Decl::Import(import) => imports.push(import),
             ast::declaration::Decl::UseModel(use_model) => use_models.push(use_model),
             ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter),
@@ -224,9 +224,9 @@ fn split_model_ast(
         }
     }
 
-    for section in model_ast.sections {
-        for decl in section.decls {
-            match decl {
+    for section in model_ast.sections() {
+        for decl in section.decls() {
+            match decl.node_value() {
                 ast::declaration::Decl::Import(import) => imports.push(import),
                 ast::declaration::Decl::UseModel(use_model) => use_models.push(use_model),
                 ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter),
@@ -270,7 +270,7 @@ fn load_use_models<F>(
     model_path: ModelPath,
     load_stack: &mut Stack<ModelPath>,
     file_loader: &F,
-    use_models: &Vec<ast::declaration::UseModel>,
+    use_models: &[&ast::declaration::UseModelNode],
     builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
 ) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
 where
@@ -281,7 +281,7 @@ where
     // TODO: check for duplicate use models
     let builder = use_models.into_iter().fold(builder, |builder, use_model| {
         // get the use model path
-        let use_model_path = model_path.get_sibling_path(&use_model.model_name);
+        let use_model_path = model_path.get_sibling_path(use_model.model_name().as_str());
         let use_model_path = ModelPath::new(use_model_path);
 
         // load the use model (and its submodels)
@@ -300,48 +300,60 @@ mod tests {
         error::{CircularDependencyError, SubmodelResolutionError},
         test::TestFileParser,
     };
-    use oneil_ast::{
-        Model,
-        declaration::{Decl, UseModel},
-        model::Section,
-    };
     use std::collections::{HashMap, HashSet};
     use std::path::PathBuf;
 
+    // re-export ast types for testing convenience
+    mod ast {
+        pub use oneil_ast::{
+            Span,
+            declaration::{Decl, UseModel},
+            model::{Model, ModelNode, Section, SectionHeader},
+            naming::{Identifier, Label},
+            node::Node,
+        };
+    }
+
+    fn unimportant_span() -> ast::Span {
+        ast::Span::new(0, 0, 0)
+    }
+
+    fn span_from_str(s: &str) -> ast::Span {
+        ast::Span::new(0, s.len(), s.len())
+    }
+
     /// Creates an empty test model
-    fn create_empty_model() -> Model {
-        Model {
-            note: None,
-            decls: vec![],
-            sections: vec![],
-        }
+    fn create_empty_model_node() -> ast::ModelNode {
+        let span = unimportant_span();
+
+        let model = ast::Model::new(None, vec![], vec![]);
+
+        ast::Node::new(span, model)
     }
 
     /// Creates a simple test model that uses multiple submodels
-    fn create_test_model(submodel_names: &[&str]) -> Model {
+    fn create_test_model(submodel_names: &[&str]) -> ast::ModelNode {
         let decls = submodel_names
             .iter()
             .map(|name| {
-                Decl::UseModel(UseModel {
-                    model_name: name.to_string(),
-                    subcomponents: vec![],
-                    inputs: None,
-                    as_name: None,
-                })
+                let use_model_name = ast::Identifier::new(name.to_string());
+                let use_model_name_node = ast::Node::new(span_from_str(name), use_model_name);
+                let use_model = ast::UseModel::new(use_model_name_node, vec![], None, None);
+                let use_model_node = ast::Node::new(unimportant_span(), use_model);
+                let use_model_decl =
+                    ast::Node::new(unimportant_span(), ast::Decl::use_model(use_model_node));
+                use_model_decl
             })
             .collect();
 
-        Model {
-            note: None,
-            decls,
-            sections: vec![],
-        }
+        let model = ast::Model::new(None, decls, vec![]);
+        ast::Node::new(unimportant_span(), model)
     }
 
     #[test]
     fn test_split_model_ast_empty() {
-        let model = create_empty_model();
-        let (imports, use_models, parameters, tests) = split_model_ast(model);
+        let model = create_empty_model_node();
+        let (imports, use_models, parameters, tests) = split_model_ast(&model);
 
         assert!(imports.is_empty());
         assert!(use_models.is_empty());
@@ -352,12 +364,12 @@ mod tests {
     #[test]
     fn test_split_model_ast_with_all_declarations() {
         let model = create_test_model(&["submodel"]);
-        let (imports, use_models, parameters, tests) = split_model_ast(model);
+        let (imports, use_models, parameters, tests) = split_model_ast(&model);
 
         assert_eq!(imports.len(), 0);
         assert_eq!(use_models.len(), 1);
-        assert_eq!(use_models[0].model_name, "submodel");
-        assert!(use_models[0].subcomponents.is_empty());
+        assert_eq!(use_models[0].model_name().as_str(), "submodel");
+        assert!(use_models[0].subcomponents().is_empty());
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
     }
@@ -365,12 +377,12 @@ mod tests {
     #[test]
     fn test_split_model_ast_use_model_only() {
         let model = create_test_model(&["submodel1", "submodel2"]);
-        let (imports, use_models, parameters, tests) = split_model_ast(model);
+        let (imports, use_models, parameters, tests) = split_model_ast(&model);
 
         assert!(imports.is_empty());
         assert_eq!(use_models.len(), 2);
-        assert_eq!(use_models[0].model_name, "submodel1");
-        assert_eq!(use_models[1].model_name, "submodel2");
+        assert_eq!(use_models[0].model_name().as_str(), "submodel1");
+        assert_eq!(use_models[1].model_name().as_str(), "submodel2");
 
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
@@ -513,7 +525,7 @@ mod tests {
 
         // load the model
         let file_loader =
-            TestFileParser::new(vec![(PathBuf::from("test.on"), create_empty_model())]);
+            TestFileParser::new(vec![(PathBuf::from("test.on"), create_empty_model_node())]);
 
         let result = load_model(model_path, builder, &mut load_stack, &file_loader);
 
@@ -559,24 +571,24 @@ mod tests {
         let model_path = ModelPath::new("parent");
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::new(vec![
-            (PathBuf::from("child1.on"), create_empty_model()),
-            (PathBuf::from("child2.on"), create_empty_model()),
+            (PathBuf::from("child1.on"), create_empty_model_node()),
+            (PathBuf::from("child2.on"), create_empty_model_node()),
         ]);
 
+        let child1_identifier = ast::Identifier::new("child1".to_string());
+        let child1_identifier_node = ast::Node::new(span_from_str("child1"), child1_identifier);
+        let child2_identifier = ast::Identifier::new("child2".to_string());
+        let child2_identifier_node = ast::Node::new(span_from_str("child2"), child2_identifier);
+
         let use_models = vec![
-            UseModel {
-                model_name: "child1".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: None,
-            },
-            UseModel {
-                model_name: "child2".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: None,
-            },
+            ast::UseModel::new(child1_identifier_node, vec![], None, None),
+            ast::UseModel::new(child2_identifier_node, vec![], None, None),
         ];
+        let use_models = use_models
+            .into_iter()
+            .map(|use_model| ast::Node::new(unimportant_span(), use_model))
+            .collect::<Vec<_>>();
+        let use_models_ref = use_models.iter().collect::<Vec<_>>();
 
         let builder = ModelCollectionBuilder::new(HashSet::new());
 
@@ -585,7 +597,7 @@ mod tests {
             model_path,
             &mut load_stack,
             &file_loader,
-            &use_models,
+            &use_models_ref,
             builder,
         );
 
@@ -607,12 +619,15 @@ mod tests {
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::empty(); // No models available
 
-        let use_models = vec![UseModel {
-            model_name: "nonexistent".to_string(),
-            subcomponents: vec![],
-            inputs: None,
-            as_name: None,
-        }];
+        let use_model_name = ast::Identifier::new("nonexistent".to_string());
+        let use_model_name_node = ast::Node::new(span_from_str("nonexistent"), use_model_name);
+
+        let use_models = vec![ast::UseModel::new(use_model_name_node, vec![], None, None)];
+        let use_models = use_models
+            .into_iter()
+            .map(|use_model| ast::Node::new(unimportant_span(), use_model))
+            .collect::<Vec<_>>();
+        let use_models_ref = use_models.iter().collect::<Vec<_>>();
 
         let builder = ModelCollectionBuilder::new(HashSet::new());
 
@@ -621,7 +636,7 @@ mod tests {
             model_path,
             &mut load_stack,
             &file_loader,
-            &use_models,
+            &use_models_ref,
             builder,
         );
 
@@ -648,7 +663,7 @@ mod tests {
         // create a dependency chain: root.on -> level1.on -> level2.on
         let root_model = create_test_model(&["level1"]);
         let level1_model = create_test_model(&["level2"]);
-        let level2_model = create_empty_model();
+        let level2_model = create_empty_model_node();
 
         let file_loader = TestFileParser::new(vec![
             (PathBuf::from("root.on"), root_model),
@@ -680,26 +695,33 @@ mod tests {
         let mut load_stack = Stack::new();
 
         // create a model with sections
-        let submodel = create_empty_model();
+        let submodel_node = create_empty_model_node();
 
-        let model = Model {
-            note: None,
-            decls: vec![],
-            sections: vec![Section {
-                label: "section1".to_string(),
-                decls: vec![Decl::UseModel(UseModel {
-                    model_name: "submodel".to_string(),
-                    subcomponents: vec![],
-                    inputs: None,
-                    as_name: None,
-                })],
-                note: None,
-            }],
-        };
+        // Create a section header
+        let section_label = ast::Label::new("section1".to_string());
+        let section_label_node = ast::Node::new(span_from_str("section1"), section_label);
+        let section_header = ast::SectionHeader::new(section_label_node);
+        let section_header_node = ast::Node::new(unimportant_span(), section_header);
+
+        // Create a use model declaration
+        let use_model_name = ast::Identifier::new("submodel".to_string());
+        let use_model_name_node = ast::Node::new(span_from_str("submodel"), use_model_name);
+        let use_model = ast::UseModel::new(use_model_name_node, vec![], None, None);
+        let use_model_node = ast::Node::new(unimportant_span(), use_model);
+        let use_model_decl =
+            ast::Node::new(unimportant_span(), ast::Decl::use_model(use_model_node));
+
+        // Create a section
+        let section = ast::Section::new(section_header_node, None, vec![use_model_decl]);
+        let section_node = ast::Node::new(unimportant_span(), section);
+
+        // Create the model
+        let model = ast::Model::new(None, vec![], vec![section_node]);
+        let model_node = ast::Node::new(unimportant_span(), model);
 
         let file_loader = TestFileParser::new(vec![
-            (PathBuf::from("test.on"), model),
-            (PathBuf::from("submodel.on"), submodel),
+            (PathBuf::from("test.on"), model_node),
+            (PathBuf::from("submodel.on"), submodel_node),
         ]);
 
         // load the model

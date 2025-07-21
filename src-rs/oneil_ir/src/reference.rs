@@ -145,7 +145,7 @@ impl ModelPath {
     /// let sibling2 = current.get_sibling_path("shapes/triangle");
     /// assert_eq!(sibling2.to_string_lossy(), "models/geometry/shapes/triangle");
     /// ```
-    pub fn get_sibling_path(&self, sibling_name: impl AsRef<Path>) -> PathBuf {
+    pub fn get_sibling_path(&self, sibling_name: impl AsRef<str>) -> PathBuf {
         let parent = self.0.parent();
         let sibling_name = sibling_name.as_ref();
 

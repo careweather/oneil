@@ -57,7 +57,7 @@ pub trait FileLoader {
     /// # Returns
     ///
     /// Returns `Ok(Model)` if parsing succeeds, or `Err(Self::ParseError)` if parsing fails.
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError>;
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::model::ModelNode, Self::ParseError>;
 
     /// Validates a Python import.
     ///
