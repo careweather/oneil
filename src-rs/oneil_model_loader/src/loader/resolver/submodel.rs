@@ -90,34 +90,35 @@ use crate::{error::SubmodelResolutionError, loader::resolver::ModelInfo, util::i
 /// - **Invalid paths**: If the model path cannot be resolved
 ///
 /// All errors are collected and returned rather than causing the function to fail.
-pub fn resolve_submodels_and_tests(
-    use_models: Vec<ast::declaration::UseModel>,
+pub fn resolve_submodels_and_tests<'a>(
+    use_models: Vec<&'a ast::declaration::UseModelNode>,
     model_path: &ModelPath,
     model_info: &ModelInfo,
 ) -> (
     HashMap<Identifier, ModelPath>,
-    Vec<(Identifier, Vec<ast::declaration::ModelInput>)>,
+    Vec<(Identifier, Option<&'a ast::declaration::ModelInputListNode>)>,
     HashMap<Identifier, SubmodelResolutionError>,
 ) {
     use_models.into_iter().fold(
         (HashMap::new(), Vec::new(), HashMap::new()),
         |(mut submodels, mut submodel_tests, mut resolution_errors), use_model| {
             // get the use model path
-            let use_model_path = model_path.get_sibling_path(&use_model.model_name);
+            let use_model_path = model_path.get_sibling_path(&use_model.model_name().as_str());
             let use_model_path = ModelPath::new(use_model_path);
 
             // get the submodel name
-            let submodel_name = use_model.alias.as_ref().unwrap_or(
-                use_model
-                    .subcomponents
-                    .last()
-                    .unwrap_or(&use_model.model_name),
-            );
-            let submodel_name = Identifier::new(submodel_name);
+            let submodel_name = use_model
+                .alias()
+                .or(use_model.subcomponents().last())
+                .unwrap_or(use_model.model_name());
+            let submodel_name = Identifier::new(submodel_name.as_str());
 
             // resolve the use model path
-            let resolved_use_model_path =
-                resolve_model_path(use_model_path.clone(), &use_model.subcomponents, model_info);
+            let resolved_use_model_path = resolve_model_path(
+                use_model_path.clone(),
+                use_model.subcomponents(),
+                model_info,
+            );
 
             // insert the use model path into the submodels map if it was resolved successfully
             // otherwise, add the error to the builder
@@ -128,7 +129,7 @@ pub fn resolve_submodels_and_tests(
                     // store the inputs for the submodel tests
                     // (the inputs are stored in their AST form for now and converted to
                     // the model input type once all the submodels have been resolved)
-                    let inputs = use_model.inputs.unwrap_or_default();
+                    let inputs = use_model.inputs();
                     submodel_tests.push((submodel_name, inputs));
                 }
                 Err(error) => {
@@ -180,7 +181,7 @@ pub fn resolve_submodels_and_tests(
 /// will panic, indicating a bug in the model loading process.
 fn resolve_model_path(
     model_path: ModelPath,
-    subcomponents: &[String],
+    subcomponents: &[ast::naming::IdentifierNode],
     model_info: &ModelInfo,
 ) -> Result<ModelPath, SubmodelResolutionError> {
     // if the model that we are trying to resolve has had an error, this
@@ -196,7 +197,7 @@ fn resolve_model_path(
         return Ok(model_path);
     }
 
-    let submodel_name = Identifier::new(subcomponents[0].clone());
+    let submodel_name = Identifier::new(subcomponents[0].as_str());
     let submodel_path = model
         .get_submodel(&submodel_name)
         .ok_or(SubmodelResolutionError::undefined_submodel_in_submodel(
