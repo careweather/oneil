@@ -69,13 +69,13 @@ impl<'a> SpanLike for Token<'a> {
     }
 
     /// Returns the ending offset of the token's lexeme.
-    fn get_end(&self) -> usize {
-        self.lexeme.location_offset() + self.lexeme.fragment().len()
+    fn get_length(&self) -> usize {
+        self.lexeme.fragment().len()
     }
 
     /// Returns the ending offset including trailing whitespace.
-    fn get_whitespace_end(&self) -> usize {
-        self.whitespace.location_offset() + self.whitespace.fragment().len()
+    fn get_whitespace_length(&self) -> usize {
+        self.whitespace.fragment().len()
     }
 }
 

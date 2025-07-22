@@ -590,9 +590,9 @@ mod tests {
 
             match param.value().node_value() {
                 ParameterValue::Simple(expr, unit) => {
-                    let expected_value = Node::new(AstSpan::new(7, 9, 9), Literal::number(42.0));
+                    let expected_value = Node::new(AstSpan::new(7, 2, 0), Literal::number(42.0));
                     let expected_expr =
-                        Node::new(AstSpan::new(7, 9, 9), Expr::literal(expected_value));
+                        Node::new(AstSpan::new(7, 2, 0), Expr::literal(expected_value));
 
                     assert_eq!(expr, &expected_expr);
                     assert!(unit.is_none());
@@ -616,13 +616,13 @@ mod tests {
             match param.limits().map(|limits| limits.node_value()) {
                 Some(Limits::Continuous { min, max }) => {
                     let expected_min_literal =
-                        Node::new(AstSpan::new(2, 3, 3), Literal::number(0.0));
+                        Node::new(AstSpan::new(2, 1, 0), Literal::number(0.0));
                     let expected_min =
-                        Node::new(AstSpan::new(2, 3, 3), Expr::literal(expected_min_literal));
+                        Node::new(AstSpan::new(2, 1, 0), Expr::literal(expected_min_literal));
                     let expected_max_literal =
-                        Node::new(AstSpan::new(5, 8, 8), Literal::number(100.0));
+                        Node::new(AstSpan::new(5, 3, 0), Literal::number(100.0));
                     let expected_max =
-                        Node::new(AstSpan::new(5, 8, 8), Expr::literal(expected_max_literal));
+                        Node::new(AstSpan::new(5, 3, 0), Expr::literal(expected_max_literal));
 
                     assert_eq!(min, &expected_min);
                     assert_eq!(max, &expected_max);
@@ -639,9 +639,9 @@ mod tests {
             match param.limits().map(|limits| limits.node_value()) {
                 Some(Limits::Discrete { values }) => {
                     let expected_literals = vec![
-                        Node::new(AstSpan::new(2, 3, 3), Literal::number(1.0)),
-                        Node::new(AstSpan::new(5, 6, 6), Literal::number(2.0)),
-                        Node::new(AstSpan::new(8, 9, 9), Literal::number(3.0)),
+                        Node::new(AstSpan::new(2, 1, 0), Literal::number(1.0)),
+                        Node::new(AstSpan::new(5, 1, 0), Literal::number(2.0)),
+                        Node::new(AstSpan::new(8, 1, 0), Literal::number(3.0)),
                     ];
 
                     let expected_exprs = expected_literals
@@ -701,16 +701,16 @@ mod tests {
             let (_, param) = parse(input).unwrap();
             match param.value().node_value() {
                 ParameterValue::Simple(expr, unit) => {
-                    let expected_value = Node::new(AstSpan::new(7, 9, 10), Literal::number(42.0));
+                    let expected_value = Node::new(AstSpan::new(7, 2, 1), Literal::number(42.0));
                     let expected_expr =
-                        Node::new(AstSpan::new(7, 9, 10), Expr::literal(expected_value));
+                        Node::new(AstSpan::new(7, 2, 1), Expr::literal(expected_value));
 
                     assert_eq!(expr, &expected_expr);
 
                     let expected_unit_identifier =
-                        Node::new(AstSpan::new(12, 14, 14), Identifier::new("kg".to_string()));
+                        Node::new(AstSpan::new(12, 2, 0), Identifier::new("kg".to_string()));
                     let expected_unit = Node::new(
-                        AstSpan::new(12, 14, 14),
+                        AstSpan::new(12, 2, 0),
                         UnitExpr::unit(expected_unit_identifier, None),
                     );
 
@@ -903,7 +903,7 @@ mod tests {
         fn test_error_missing_identifier() {
             let input = Span::new_extra("x: = 42\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(1, 2, 3);
+            let expected_colon_span = AstSpan::new(1, 1, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -926,7 +926,7 @@ mod tests {
         fn test_error_missing_equals_sign() {
             let input = Span::new_extra("x: y 42\n", Config::default());
             let result = parse(input);
-            let expected_ident_span = AstSpan::new(3, 4, 5);
+            let expected_ident_span = AstSpan::new(3, 1, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -949,7 +949,7 @@ mod tests {
         fn test_error_missing_value() {
             let input = Span::new_extra("x: y =\n", Config::default());
             let result = parse(input);
-            let expected_equals_span = AstSpan::new(5, 6, 6);
+            let expected_equals_span = AstSpan::new(5, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -972,7 +972,7 @@ mod tests {
         fn test_error_missing_unit_after_colon() {
             let input = Span::new_extra("x: y = 42 :\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(10, 11, 11);
+            let expected_colon_span = AstSpan::new(10, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -995,7 +995,7 @@ mod tests {
         fn test_error_continuous_limits_missing_min() {
             let input = Span::new_extra("x(, 100): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 2, 2);
+            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1018,7 +1018,7 @@ mod tests {
         fn test_error_continuous_limits_missing_comma() {
             let input = Span::new_extra("x(0 100): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_min_span = AstSpan::new(2, 3, 4);
+            let expected_min_span = AstSpan::new(2, 1, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1041,7 +1041,7 @@ mod tests {
         fn test_error_continuous_limits_missing_max() {
             let input = Span::new_extra("x(0,): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_comma_span = AstSpan::new(3, 4, 4);
+            let expected_comma_span = AstSpan::new(3, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1064,7 +1064,7 @@ mod tests {
         fn test_error_continuous_limits_unclosed_paren() {
             let input = Span::new_extra("x(0, 100: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 2, 2);
+            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1087,7 +1087,7 @@ mod tests {
         fn test_error_discrete_limits_missing_values() {
             let input = Span::new_extra("x[]: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_bracket_span = AstSpan::new(1, 2, 2);
+            let expected_bracket_span = AstSpan::new(1, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1110,7 +1110,7 @@ mod tests {
         fn test_error_discrete_limits_unclosed_bracket() {
             let input = Span::new_extra("x[1, 2, 3: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_bracket_span = AstSpan::new(1, 2, 2);
+            let expected_bracket_span = AstSpan::new(1, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1133,7 +1133,7 @@ mod tests {
         fn test_error_piecewise_missing_expr() {
             let input = Span::new_extra("x: y = { if z > 0\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(7, 8, 9);
+            let expected_brace_span = AstSpan::new(7, 1, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1156,7 +1156,7 @@ mod tests {
         fn test_error_piecewise_missing_if() {
             let input = Span::new_extra("x: y = {2*z z > 0\n", Config::default());
             let result = parse(input);
-            let expected_expr_span = AstSpan::new(8, 11, 12);
+            let expected_expr_span = AstSpan::new(8, 3, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1179,7 +1179,7 @@ mod tests {
         fn test_error_piecewise_missing_if_expr() {
             let input = Span::new_extra("x: y = {2*z if\n", Config::default());
             let result = parse(input);
-            let expected_if_span = AstSpan::new(12, 14, 14);
+            let expected_if_span = AstSpan::new(12, 2, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1202,7 +1202,7 @@ mod tests {
         fn test_error_piecewise_missing_unit_after_colon() {
             let input = Span::new_extra("x: y = {2*z if z > 0 :\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(21, 22, 22);
+            let expected_colon_span = AstSpan::new(21, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1225,7 +1225,7 @@ mod tests {
         fn test_error_invalid_expression() {
             let input = Span::new_extra("x: y = @invalid\n", Config::default());
             let result = parse(input);
-            let expected_equals_span = AstSpan::new(5, 6, 7);
+            let expected_equals_span = AstSpan::new(5, 1, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1248,7 +1248,7 @@ mod tests {
         fn test_error_invalid_unit() {
             let input = Span::new_extra("x: y = 42 : @invalid\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(10, 11, 12);
+            let expected_colon_span = AstSpan::new(10, 1, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1390,7 +1390,7 @@ mod tests {
         fn test_error_mixed_limits_syntax() {
             let input = Span::new_extra("x(0, 100][1, 2]: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 2, 2);
+            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1413,7 +1413,7 @@ mod tests {
         fn test_error_piecewise_missing_newline_between_parts() {
             let input = Span::new_extra("x: y = {2*z if z > 0 {0 if z <= 0\n", Config::default());
             let result = parse(input);
-            let expected_first_part_span = AstSpan::new(7, 20, 21);
+            let expected_first_part_span = AstSpan::new(7, 13, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1436,7 +1436,7 @@ mod tests {
         fn test_error_continuous_limits_with_extra_comma() {
             let input = Span::new_extra("x(0, 100,): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 2, 2);
+            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1459,7 +1459,7 @@ mod tests {
         fn test_error_discrete_limits_with_trailing_comma() {
             let input = Span::new_extra("x[1, 2, 3,]: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_bracket_span = AstSpan::new(1, 2, 2);
+            let expected_bracket_span = AstSpan::new(1, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -1485,7 +1485,7 @@ mod tests {
                 Config::default(),
             );
             let result = parse(input);
-            let expected_second_part_span = AstSpan::new(7, 33, 34);
+            let expected_second_part_span = AstSpan::new(7, 26, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {

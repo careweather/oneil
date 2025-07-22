@@ -271,11 +271,11 @@ mod tests {
             let input = Span::new_extra("test: true\n", Config::default());
             let (rest, test) = parse(input).unwrap();
 
-            let expected_span = AstSpan::new(0, 10, 11);
+            let expected_span = AstSpan::new(0, 10, 1);
 
-            let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
+            let expected_test_expr = Node::new(AstSpan::new(6, 4, 0), Literal::boolean(true));
             let expected_test_expr =
-                Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
+                Node::new(AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
 
             assert_eq!(test.node_span(), &expected_span);
             assert_eq!(test.trace_level(), None);
@@ -290,11 +290,11 @@ mod tests {
             let input = Span::new_extra("test: true", Config::default());
             let (rest, test) = parse(input).unwrap();
 
-            let expected_span = AstSpan::new(0, 10, 10);
+            let expected_span = AstSpan::new(0, 10, 0);
 
-            let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
+            let expected_test_expr = Node::new(AstSpan::new(6, 4, 0), Literal::boolean(true));
             let expected_test_expr =
-                Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
+                Node::new(AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
 
             assert_eq!(test.node_span(), &expected_span);
             assert_eq!(test.trace_level(), None);
@@ -309,7 +309,7 @@ mod tests {
             let input = Span::new_extra("* test: true\n", Config::default());
             let (rest, test) = parse(input).unwrap();
 
-            let expected_span = AstSpan::new(0, 12, 13);
+            let expected_span = AstSpan::new(0, 12, 1);
 
             assert_eq!(test.node_span(), &expected_span);
             assert_eq!(
@@ -325,7 +325,7 @@ mod tests {
             let input = Span::new_extra("** test: true\n", Config::default());
             let (rest, test) = parse(input).unwrap();
 
-            let expected_span = AstSpan::new(0, 13, 14);
+            let expected_span = AstSpan::new(0, 13, 1);
 
             assert_eq!(test.node_span(), &expected_span);
             assert_eq!(
@@ -342,11 +342,11 @@ mod tests {
             let input = Span::new_extra("test {x, y}: x > y\n", Config::default());
             let (rest, test) = parse(input).unwrap();
 
-            let expected_span = AstSpan::new(0, 18, 19);
+            let expected_span = AstSpan::new(0, 18, 1);
 
             let expected_test_inputs = vec![
-                Node::new(AstSpan::new(6, 7, 7), Identifier::new("x".to_string())),
-                Node::new(AstSpan::new(9, 10, 10), Identifier::new("y".to_string())),
+                Node::new(AstSpan::new(6, 1, 0), Identifier::new("x".to_string())),
+                Node::new(AstSpan::new(9, 1, 0), Identifier::new("y".to_string())),
             ];
 
             assert_eq!(test.node_span(), &expected_span);
@@ -364,11 +364,11 @@ mod tests {
             let input = Span::new_extra("** test {x, y}: x > y\n", Config::default());
             let (rest, test) = parse(input).unwrap();
 
-            let expected_span = AstSpan::new(0, 21, 22);
+            let expected_span = AstSpan::new(0, 21, 1);
 
             let expected_test_inputs = vec![
-                Node::new(AstSpan::new(9, 10, 10), Identifier::new("x".to_string())),
-                Node::new(AstSpan::new(12, 13, 13), Identifier::new("y".to_string())),
+                Node::new(AstSpan::new(9, 1, 0), Identifier::new("x".to_string())),
+                Node::new(AstSpan::new(12, 1, 0), Identifier::new("y".to_string())),
             ];
 
             assert_eq!(test.node_span(), &expected_span);
@@ -393,11 +393,11 @@ mod tests {
             let input = Span::new_extra("test: true\n", Config::default());
             let (rest, test) = parse_complete(input).unwrap();
 
-            let expected_span = AstSpan::new(0, 10, 11);
+            let expected_span = AstSpan::new(0, 10, 1);
 
-            let expected_test_expr = Node::new(AstSpan::new(6, 10, 10), Literal::boolean(true));
+            let expected_test_expr = Node::new(AstSpan::new(6, 4, 0), Literal::boolean(true));
             let expected_test_expr =
-                Node::new(AstSpan::new(6, 10, 10), Expr::literal(expected_test_expr));
+                Node::new(AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
 
             assert_eq!(test.node_span(), &expected_span);
             assert_eq!(test.trace_level(), None);
@@ -438,7 +438,7 @@ mod tests {
         fn test_error_missing_colon_after_test() {
             let input = Span::new_extra("test true\n", Config::default());
             let result = parse(input);
-            let expected_test_span = AstSpan::new(0, 4, 5);
+            let expected_test_span = AstSpan::new(0, 4, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -461,7 +461,7 @@ mod tests {
         fn test_error_missing_colon_after_inputs() {
             let input = Span::new_extra("test {x, y} true\n", Config::default());
             let result = parse(input);
-            let expected_inputs_span = AstSpan::new(5, 11, 12);
+            let expected_inputs_span = AstSpan::new(5, 6, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -484,7 +484,7 @@ mod tests {
         fn test_error_missing_expression() {
             let input = Span::new_extra("test:\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(4, 5, 5);
+            let expected_colon_span = AstSpan::new(4, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -507,7 +507,7 @@ mod tests {
         fn test_error_missing_inputs_after_brace() {
             let input = Span::new_extra("test {}: true\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(5, 6, 6);
+            let expected_brace_span = AstSpan::new(5, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -530,7 +530,7 @@ mod tests {
         fn test_error_unclosed_brace() {
             let input = Span::new_extra("test {x, y: true\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(5, 6, 6);
+            let expected_brace_span = AstSpan::new(5, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -553,7 +553,7 @@ mod tests {
         fn test_error_missing_inputs_with_trace() {
             let input = Span::new_extra("* test {}: true\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(7, 8, 8);
+            let expected_brace_span = AstSpan::new(7, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -576,7 +576,7 @@ mod tests {
         fn test_error_missing_colon_with_debug() {
             let input = Span::new_extra("** test {x, y} true\n", Config::default());
             let result = parse(input);
-            let expected_inputs_span = AstSpan::new(8, 14, 15);
+            let expected_inputs_span = AstSpan::new(8, 6, 1);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -599,7 +599,7 @@ mod tests {
         fn test_error_missing_expression_with_trace() {
             let input = Span::new_extra("* test:\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(6, 7, 7);
+            let expected_colon_span = AstSpan::new(6, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -673,7 +673,7 @@ mod tests {
         fn test_error_missing_comma_between_inputs() {
             let input = Span::new_extra("test {x y}: true\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(5, 6, 6);
+            let expected_brace_span = AstSpan::new(5, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -696,7 +696,7 @@ mod tests {
         fn test_error_trailing_comma_in_inputs() {
             let input = Span::new_extra("test {x,}: true\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(5, 6, 6);
+            let expected_brace_span = AstSpan::new(5, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -719,7 +719,7 @@ mod tests {
         fn test_error_invalid_identifier_in_inputs() {
             let input = Span::new_extra("test {x, 123}: true\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(5, 6, 6);
+            let expected_brace_span = AstSpan::new(5, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {

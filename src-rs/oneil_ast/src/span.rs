@@ -13,17 +13,17 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Span {
     start: usize,
-    end: usize,
-    whitespace_end: usize,
+    length: usize,
+    whitespace_length: usize,
 }
 
 impl Span {
     /// Creates a new span with the given positions
-    pub fn new(start: usize, end: usize, whitespace_end: usize) -> Self {
+    pub fn new(start: usize, length: usize, whitespace_length: usize) -> Self {
         Self {
             start,
-            end,
-            whitespace_end,
+            length,
+            whitespace_length,
         }
     }
 
@@ -32,14 +32,24 @@ impl Span {
         self.start
     }
 
+    /// Returns the length of the span
+    pub fn length(&self) -> usize {
+        self.length
+    }
+
+    /// Returns the length of the whitespace after the span
+    pub fn whitespace_length(&self) -> usize {
+        self.whitespace_length
+    }
+
     /// Returns the end position of the span
     pub fn end(&self) -> usize {
-        self.end
+        self.start + self.length
     }
 
     /// Returns the position where whitespace ends after the span
     pub fn whitespace_end(&self) -> usize {
-        self.whitespace_end
+        self.start + self.length + self.whitespace_length
     }
 
     /// Calculates a span from two span-like objects
@@ -53,8 +63,8 @@ impl Span {
     {
         Self::new(
             start_span.get_start(),
-            end_span.get_end(),
-            end_span.get_whitespace_end(),
+            end_span.get_end() - start_span.get_start(),
+            end_span.get_whitespace_length(),
         )
     }
 
@@ -74,8 +84,8 @@ impl Span {
     {
         Self::new(
             start_span.get_start(),
-            end_span.get_end(),
-            whitespace_span.get_whitespace_end(),
+            end_span.get_end() - start_span.get_start(),
+            whitespace_span.get_length() + whitespace_span.get_whitespace_length(),
         )
     }
 }
@@ -87,10 +97,20 @@ impl Span {
 pub trait SpanLike {
     /// Returns the start position
     fn get_start(&self) -> usize;
-    /// Returns the end position
-    fn get_end(&self) -> usize;
-    /// Returns the position where whitespace ends
-    fn get_whitespace_end(&self) -> usize;
+    /// Returns the length of the span
+    fn get_length(&self) -> usize;
+    /// Returns the length of the whitespace after the span
+    fn get_whitespace_length(&self) -> usize;
+
+    /// Returns the end position of the span
+    fn get_end(&self) -> usize {
+        self.get_start() + self.get_length()
+    }
+
+    /// Returns the position where whitespace ends after the span
+    fn get_whitespace_end(&self) -> usize {
+        self.get_end() + self.get_whitespace_length()
+    }
 }
 
 impl SpanLike for Span {
@@ -98,22 +118,12 @@ impl SpanLike for Span {
         self.start
     }
 
-    fn get_end(&self) -> usize {
-        self.end
+    fn get_length(&self) -> usize {
+        self.length
     }
 
-    fn get_whitespace_end(&self) -> usize {
-        self.whitespace_end
-    }
-}
-
-impl<T, U> From<(&T, &U)> for Span
-where
-    T: SpanLike,
-    U: SpanLike,
-{
-    fn from((start_span, end_span): (&T, &U)) -> Self {
-        Self::calc_span(start_span, end_span)
+    fn get_whitespace_length(&self) -> usize {
+        self.whitespace_length
     }
 }
 
@@ -122,6 +132,10 @@ where
     T: SpanLike,
 {
     fn from(span: &T) -> Self {
-        Self::new(span.get_start(), span.get_end(), span.get_whitespace_end())
+        Self::new(
+            span.get_start(),
+            span.get_length(),
+            span.get_whitespace_length(),
+        )
     }
 }

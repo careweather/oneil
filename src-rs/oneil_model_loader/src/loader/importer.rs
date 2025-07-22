@@ -90,7 +90,7 @@ mod tests {
 
     fn build_import(path: &str) -> ImportNode {
         // for simplicity's sake, we'll use a span that's the length of the path
-        let span = Span::new(0, path.len(), path.len());
+        let span = Span::new(0, path.len(), 0);
         let import = Import::new(path.to_string());
         ImportNode::new(span, import)
     }

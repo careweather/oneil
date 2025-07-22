@@ -621,7 +621,7 @@ mod tests {
             fn test_missing_path() {
                 let input = Span::new_extra("import\n", Config::default());
                 let result = parse(input);
-                let expected_import_span = AstSpan::new(0, 6, 6);
+                let expected_import_span = AstSpan::new(0, 6, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -645,7 +645,7 @@ mod tests {
             fn test_invalid_path_identifier() {
                 let input = Span::new_extra("import 123\n", Config::default());
                 let result = parse(input);
-                let expected_import_span = AstSpan::new(0, 6, 7);
+                let expected_import_span = AstSpan::new(0, 6, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -669,7 +669,7 @@ mod tests {
             fn test_path_with_missing_end_of_line() {
                 let input = Span::new_extra("import foo@bar\n", Config::default());
                 let result = parse(input);
-                let expected_foo_span = AstSpan::new(7, 10, 10);
+                let expected_foo_span = AstSpan::new(7, 3, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -749,7 +749,7 @@ mod tests {
             fn test_missing_as_keyword() {
                 let input = Span::new_extra("use foo.bar baz\n", Config::default());
                 let result = parse(input);
-                let expected_foo_bar_span = AstSpan::new(4, 11, 12);
+                let expected_foo_bar_span = AstSpan::new(4, 7, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -773,7 +773,7 @@ mod tests {
             fn test_missing_alias() {
                 let input = Span::new_extra("use foo.bar as\n", Config::default());
                 let result = parse(input);
-                let expected_as_span = AstSpan::new(12, 14, 14);
+                let expected_as_span = AstSpan::new(12, 2, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -798,7 +798,7 @@ mod tests {
                 // TODO: Could we have a better error message here? "Invalid path identifier"
                 let input = Span::new_extra("use 123.bar as baz\n", Config::default());
                 let result = parse(input);
-                let expected_use_span = AstSpan::new(0, 3, 4);
+                let expected_use_span = AstSpan::new(0, 3, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -823,7 +823,7 @@ mod tests {
                 // TODO: Could we have a better error message here? "Invalid alias identifier"
                 let input = Span::new_extra("use foo.bar as 123\n", Config::default());
                 let result = parse(input);
-                let expected_as_span = AstSpan::new(12, 14, 15);
+                let expected_as_span = AstSpan::new(12, 2, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -847,7 +847,7 @@ mod tests {
             fn test_unclosed_parentheses() {
                 let input = Span::new_extra("use foo.bar(x = 1 as baz\n", Config::default());
                 let result = parse(input);
-                let expected_paren_span = AstSpan::new(11, 12, 12);
+                let expected_paren_span = AstSpan::new(11, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -871,7 +871,7 @@ mod tests {
             fn test_missing_equals_in_input() {
                 let input = Span::new_extra("use foo.bar(x 1) as baz\n", Config::default());
                 let result = parse(input);
-                let expected_x_span = AstSpan::new(12, 13, 14);
+                let expected_x_span = AstSpan::new(12, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -895,7 +895,7 @@ mod tests {
             fn test_invalid_model_input() {
                 let input = Span::new_extra("use foo.bar(x = ) as baz\n", Config::default());
                 let result = parse(input);
-                let expected_equals_span = AstSpan::new(14, 15, 16);
+                let expected_equals_span = AstSpan::new(14, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -920,7 +920,7 @@ mod tests {
                 // TODO: Could we have a better error message here?
                 let input = Span::new_extra("use foo.bar(x=1 y=2) as baz\n", Config::default());
                 let result = parse(input);
-                let expected_paren_span = AstSpan::new(11, 12, 12);
+                let expected_paren_span = AstSpan::new(11, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -968,7 +968,7 @@ mod tests {
             fn test_missing_use_keyword() {
                 let input = Span::new_extra("from foo.bar model as baz\n", Config::default());
                 let result = parse(input);
-                let expected_foo_bar_span = AstSpan::new(5, 12, 13);
+                let expected_foo_bar_span = AstSpan::new(5, 7, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -991,7 +991,7 @@ mod tests {
             fn test_missing_model_keyword() {
                 let input = Span::new_extra("from foo.bar use as baz\n", Config::default());
                 let result = parse(input);
-                let expected_use_span = AstSpan::new(13, 16, 17);
+                let expected_use_span = AstSpan::new(13, 3, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1015,7 +1015,7 @@ mod tests {
             fn test_missing_as_keyword() {
                 let input = Span::new_extra("from foo.bar use model baz\n", Config::default());
                 let result = parse(input);
-                let expected_model_span = AstSpan::new(17, 22, 23);
+                let expected_model_span = AstSpan::new(17, 5, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1038,7 +1038,7 @@ mod tests {
             fn test_missing_alias() {
                 let input = Span::new_extra("from foo.bar use model as\n", Config::default());
                 let result = parse(input);
-                let expected_as_span = AstSpan::new(23, 25, 25);
+                let expected_as_span = AstSpan::new(23, 2, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1061,7 +1061,7 @@ mod tests {
             fn test_invalid_path_identifier() {
                 let input = Span::new_extra("from 123.bar use model as baz\n", Config::default());
                 let result = parse(input);
-                let expected_from_span = AstSpan::new(0, 4, 5);
+                let expected_from_span = AstSpan::new(0, 4, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1084,7 +1084,7 @@ mod tests {
             fn test_invalid_model_identifier() {
                 let input = Span::new_extra("from foo.bar use 123 as baz\n", Config::default());
                 let result = parse(input);
-                let expected_use_span = AstSpan::new(13, 16, 17);
+                let expected_use_span = AstSpan::new(13, 3, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1108,7 +1108,7 @@ mod tests {
             fn test_invalid_alias_identifier() {
                 let input = Span::new_extra("from foo.bar use model as 123\n", Config::default());
                 let result = parse(input);
-                let expected_as_span = AstSpan::new(23, 25, 26);
+                let expected_as_span = AstSpan::new(23, 2, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1132,7 +1132,7 @@ mod tests {
                 let input =
                     Span::new_extra("from foo.bar use model(x = 1 as baz\n", Config::default());
                 let result = parse(input);
-                let expected_paren_span = AstSpan::new(22, 23, 23);
+                let expected_paren_span = AstSpan::new(22, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1156,7 +1156,7 @@ mod tests {
                 let input =
                     Span::new_extra("from foo.bar use model(x = ) as baz\n", Config::default());
                 let result = parse(input);
-                let expected_equals_span = AstSpan::new(25, 26, 27);
+                let expected_equals_span = AstSpan::new(25, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1180,7 +1180,7 @@ mod tests {
                 let input =
                     Span::new_extra("from foo.bar use model(x 1) as baz\n", Config::default());
                 let result = parse(input);
-                let expected_x_span = AstSpan::new(23, 24, 25);
+                let expected_x_span = AstSpan::new(23, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1206,7 +1206,7 @@ mod tests {
                     Config::default(),
                 );
                 let result = parse(input);
-                let expected_paren_span = AstSpan::new(22, 23, 23);
+                let expected_paren_span = AstSpan::new(22, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1272,7 +1272,7 @@ mod tests {
             fn test_missing_subcomponent_after_dot() {
                 let input = Span::new_extra("foo.", Config::default());
                 let result = model_path(input);
-                let expected_dot_span = AstSpan::new(3, 4, 4);
+                let expected_dot_span = AstSpan::new(3, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1295,7 +1295,7 @@ mod tests {
             fn test_invalid_subcomponent_after_dot() {
                 let input = Span::new_extra("foo.123", Config::default());
                 let result = model_path(input);
-                let expected_dot_span = AstSpan::new(3, 4, 4);
+                let expected_dot_span = AstSpan::new(3, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1318,7 +1318,7 @@ mod tests {
             fn test_consecutive_dots() {
                 let input = Span::new_extra("foo..bar", Config::default());
                 let result = model_path(input);
-                let expected_dot_span = AstSpan::new(3, 4, 4);
+                let expected_dot_span = AstSpan::new(3, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1341,7 +1341,7 @@ mod tests {
             fn test_dot_at_end() {
                 let input = Span::new_extra("foo.bar.", Config::default());
                 let result = model_path(input);
-                let expected_dot_span = AstSpan::new(7, 8, 8);
+                let expected_dot_span = AstSpan::new(7, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1389,7 +1389,7 @@ mod tests {
             fn test_missing_closing_paren() {
                 let input = Span::new_extra("(x = 1", Config::default());
                 let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 1);
+                let expected_paren_span = AstSpan::new(0, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1420,7 +1420,7 @@ mod tests {
             fn test_missing_equals_in_input() {
                 let input = Span::new_extra("(x 1)", Config::default());
                 let result = model_inputs(input);
-                let expected_x_span = AstSpan::new(1, 2, 3);
+                let expected_x_span = AstSpan::new(1, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1443,7 +1443,7 @@ mod tests {
             fn test_missing_value_in_input() {
                 let input = Span::new_extra("(x = )", Config::default());
                 let result = model_inputs(input);
-                let expected_equals_span = AstSpan::new(3, 4, 5);
+                let expected_equals_span = AstSpan::new(3, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1466,7 +1466,7 @@ mod tests {
             fn test_missing_comma_between_inputs() {
                 let input = Span::new_extra("(x = 1 y = 2)", Config::default());
                 let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 1);
+                let expected_paren_span = AstSpan::new(0, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1490,7 +1490,7 @@ mod tests {
                 // TODO: Improve this error: "missing test input"
                 let input = Span::new_extra("(x = 1,)", Config::default());
                 let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 1);
+                let expected_paren_span = AstSpan::new(0, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1514,7 +1514,7 @@ mod tests {
                 // TODO: Improve this error: "invalid identifier"
                 let input = Span::new_extra("(123 = 1)", Config::default());
                 let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 1);
+                let expected_paren_span = AstSpan::new(0, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1581,7 +1581,7 @@ mod tests {
             fn test_missing_equals() {
                 let input = Span::new_extra("x 1", Config::default());
                 let result = model_input(input);
-                let expected_x_span = AstSpan::new(0, 1, 2);
+                let expected_x_span = AstSpan::new(0, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1604,7 +1604,7 @@ mod tests {
             fn test_missing_value() {
                 let input = Span::new_extra("x =", Config::default());
                 let result = model_input(input);
-                let expected_equals_span = AstSpan::new(2, 3, 3);
+                let expected_equals_span = AstSpan::new(2, 1, 0);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {
@@ -1647,7 +1647,7 @@ mod tests {
                 // TODO: Improve this error: "invalid value expression"
                 let input = Span::new_extra("x = @", Config::default());
                 let result = model_input(input);
-                let expected_equals_span = AstSpan::new(2, 3, 4);
+                let expected_equals_span = AstSpan::new(2, 1, 1);
 
                 match result {
                     Err(nom::Err::Failure(error)) => {

@@ -215,7 +215,7 @@ mod tests {
 
     /// Helper function to create a test span
     fn test_span(start: usize, end: usize) -> ast::Span {
-        ast::Span::new(start, end, end)
+        ast::Span::new(start, end - start, 0)
     }
 
     /// Helper function to create an identifier node

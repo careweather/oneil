@@ -319,7 +319,7 @@ mod tests {
     }
 
     fn span_from_str(s: &str) -> ast::Span {
-        ast::Span::new(0, s.len(), s.len())
+        ast::Span::new(0, s.len(), 0)
     }
 
     /// Creates an empty test model

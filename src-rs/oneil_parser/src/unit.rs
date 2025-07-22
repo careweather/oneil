@@ -180,8 +180,8 @@ mod tests {
             let input = Span::new_extra("kg", Config::default());
             let (_, unit) = parse(input).unwrap();
 
-            let expected_id = Node::new(AstSpan::new(0, 2, 2), Identifier::new("kg".to_string()));
-            let expected_unit = Node::new(AstSpan::new(0, 2, 2), UnitExpr::unit(expected_id, None));
+            let expected_id = Node::new(AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
+            let expected_unit = Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_id, None));
 
             assert_eq!(unit, expected_unit);
         }
@@ -191,10 +191,10 @@ mod tests {
             let input = Span::new_extra("m^2", Config::default());
             let (_, unit) = parse(input).unwrap();
 
-            let expected_id = Node::new(AstSpan::new(0, 1, 1), Identifier::new("m".to_string()));
-            let expected_exp = Node::new(AstSpan::new(2, 3, 3), UnitExponent::new(2.0));
+            let expected_id = Node::new(AstSpan::new(0, 1, 0), Identifier::new("m".to_string()));
+            let expected_exp = Node::new(AstSpan::new(2, 1, 0), UnitExponent::new(2.0));
             let expected_unit = Node::new(
-                AstSpan::new(0, 3, 3),
+                AstSpan::new(0, 3, 0),
                 UnitExpr::unit(expected_id, Some(expected_exp)),
             );
 
@@ -207,18 +207,18 @@ mod tests {
             let (_, unit) = parse(input).unwrap();
 
             let expected_kg_id =
-                Node::new(AstSpan::new(0, 2, 2), Identifier::new("kg".to_string()));
+                Node::new(AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
             let expected_left =
-                Node::new(AstSpan::new(0, 2, 2), UnitExpr::unit(expected_kg_id, None));
+                Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_kg_id, None));
 
-            let expected_m_id = Node::new(AstSpan::new(3, 4, 4), Identifier::new("m".to_string()));
+            let expected_m_id = Node::new(AstSpan::new(3, 1, 0), Identifier::new("m".to_string()));
             let expected_right =
-                Node::new(AstSpan::new(3, 4, 4), UnitExpr::unit(expected_m_id, None));
+                Node::new(AstSpan::new(3, 1, 0), UnitExpr::unit(expected_m_id, None));
 
-            let expected_op = Node::new(AstSpan::new(2, 3, 3), UnitOp::Multiply);
+            let expected_op = Node::new(AstSpan::new(2, 1, 0), UnitOp::Multiply);
 
             let expected_unit = Node::new(
-                AstSpan::new(0, 4, 4),
+                AstSpan::new(0, 4, 0),
                 UnitExpr::binary_op(expected_op, expected_left, expected_right),
             );
 
@@ -230,18 +230,18 @@ mod tests {
             let input = Span::new_extra("m/s", Config::default());
             let (_, unit) = parse(input).unwrap();
 
-            let expected_m_id = Node::new(AstSpan::new(0, 1, 1), Identifier::new("m".to_string()));
+            let expected_m_id = Node::new(AstSpan::new(0, 1, 0), Identifier::new("m".to_string()));
             let expected_left =
-                Node::new(AstSpan::new(0, 1, 1), UnitExpr::unit(expected_m_id, None));
+                Node::new(AstSpan::new(0, 1, 0), UnitExpr::unit(expected_m_id, None));
 
-            let expected_s_id = Node::new(AstSpan::new(2, 3, 3), Identifier::new("s".to_string()));
+            let expected_s_id = Node::new(AstSpan::new(2, 1, 0), Identifier::new("s".to_string()));
             let expected_right =
-                Node::new(AstSpan::new(2, 3, 3), UnitExpr::unit(expected_s_id, None));
+                Node::new(AstSpan::new(2, 1, 0), UnitExpr::unit(expected_s_id, None));
 
-            let expected_op = Node::new(AstSpan::new(1, 2, 2), UnitOp::Divide);
+            let expected_op = Node::new(AstSpan::new(1, 1, 0), UnitOp::Divide);
 
             let expected_unit = Node::new(
-                AstSpan::new(0, 3, 3),
+                AstSpan::new(0, 3, 0),
                 UnitExpr::binary_op(expected_op, expected_left, expected_right),
             );
 
@@ -254,40 +254,40 @@ mod tests {
             let (_, unit) = parse(input).unwrap();
 
             // m^2
-            let expected_m_id = Node::new(AstSpan::new(0, 1, 1), Identifier::new("m".to_string()));
-            let expected_m_exp = Node::new(AstSpan::new(2, 3, 3), UnitExponent::new(2.0));
+            let expected_m_id = Node::new(AstSpan::new(0, 1, 0), Identifier::new("m".to_string()));
+            let expected_m_exp = Node::new(AstSpan::new(2, 1, 0), UnitExponent::new(2.0));
             let expected_m = Node::new(
-                AstSpan::new(0, 3, 3),
+                AstSpan::new(0, 3, 0),
                 UnitExpr::unit(expected_m_id, Some(expected_m_exp)),
             );
 
             // kg
             let expected_kg_id =
-                Node::new(AstSpan::new(4, 6, 6), Identifier::new("kg".to_string()));
+                Node::new(AstSpan::new(4, 2, 0), Identifier::new("kg".to_string()));
             let expected_kg =
-                Node::new(AstSpan::new(4, 6, 6), UnitExpr::unit(expected_kg_id, None));
+                Node::new(AstSpan::new(4, 2, 0), UnitExpr::unit(expected_kg_id, None));
 
             // m^2 * kg
-            let expected_mult = Node::new(AstSpan::new(3, 4, 4), UnitOp::Multiply);
+            let expected_mult = Node::new(AstSpan::new(3, 1, 0), UnitOp::Multiply);
             let expected_left = Node::new(
-                AstSpan::new(0, 6, 6),
+                AstSpan::new(0, 6, 0),
                 UnitExpr::binary_op(expected_mult, expected_m, expected_kg),
             );
 
             // s
-            let expected_s_id = Node::new(AstSpan::new(7, 8, 8), Identifier::new("s".to_string()));
-            let expected_s_exp = Node::new(AstSpan::new(9, 10, 10), UnitExponent::new(2.0));
+            let expected_s_id = Node::new(AstSpan::new(7, 1, 0), Identifier::new("s".to_string()));
+            let expected_s_exp = Node::new(AstSpan::new(9, 1, 0), UnitExponent::new(2.0));
             let expected_s = Node::new(
-                AstSpan::new(7, 10, 10),
+                AstSpan::new(7, 3, 0),
                 UnitExpr::unit(expected_s_id, Some(expected_s_exp)),
             );
 
             // /
-            let expected_div = Node::new(AstSpan::new(6, 7, 7), UnitOp::Divide);
+            let expected_div = Node::new(AstSpan::new(6, 1, 0), UnitOp::Divide);
 
             // (m^2*kg)/s^2
             let expected_unit = Node::new(
-                AstSpan::new(0, 10, 10),
+                AstSpan::new(0, 10, 0),
                 UnitExpr::binary_op(expected_div, expected_left, expected_s),
             );
 
@@ -301,43 +301,43 @@ mod tests {
 
             // kg
             let expected_kg_id =
-                Node::new(AstSpan::new(1, 3, 3), Identifier::new("kg".to_string()));
+                Node::new(AstSpan::new(1, 2, 0), Identifier::new("kg".to_string()));
             let expected_kg =
-                Node::new(AstSpan::new(1, 3, 3), UnitExpr::unit(expected_kg_id, None));
+                Node::new(AstSpan::new(1, 2, 0), UnitExpr::unit(expected_kg_id, None));
 
             // m
-            let expected_m_id = Node::new(AstSpan::new(4, 5, 5), Identifier::new("m".to_string()));
-            let expected_m = Node::new(AstSpan::new(4, 5, 5), UnitExpr::unit(expected_m_id, None));
+            let expected_m_id = Node::new(AstSpan::new(4, 1, 0), Identifier::new("m".to_string()));
+            let expected_m = Node::new(AstSpan::new(4, 1, 0), UnitExpr::unit(expected_m_id, None));
 
             // *
-            let expected_mult = Node::new(AstSpan::new(3, 4, 4), UnitOp::Multiply);
+            let expected_mult = Node::new(AstSpan::new(3, 1, 0), UnitOp::Multiply);
 
             // kg*m
             let expected_inner = Node::new(
-                AstSpan::new(1, 5, 5),
+                AstSpan::new(1, 4, 0),
                 UnitExpr::binary_op(expected_mult, expected_kg, expected_m),
             );
 
             // (kg*m)
             let expected_paren = Node::new(
-                AstSpan::new(0, 6, 6),
+                AstSpan::new(0, 6, 0),
                 UnitExpr::parenthesized(expected_inner),
             );
 
             // s
-            let expected_s_id = Node::new(AstSpan::new(7, 8, 8), Identifier::new("s".to_string()));
-            let expected_s_exp = Node::new(AstSpan::new(9, 10, 10), UnitExponent::new(2.0));
+            let expected_s_id = Node::new(AstSpan::new(7, 1, 0), Identifier::new("s".to_string()));
+            let expected_s_exp = Node::new(AstSpan::new(9, 1, 0), UnitExponent::new(2.0));
             let expected_s = Node::new(
-                AstSpan::new(7, 10, 10),
+                AstSpan::new(7, 3, 0),
                 UnitExpr::unit(expected_s_id, Some(expected_s_exp)),
             );
 
             // /
-            let expected_div = Node::new(AstSpan::new(6, 7, 7), UnitOp::Divide);
+            let expected_div = Node::new(AstSpan::new(6, 1, 0), UnitOp::Divide);
 
             // (kg*m)/s^2
             let expected_unit = Node::new(
-                AstSpan::new(0, 10, 10),
+                AstSpan::new(0, 10, 0),
                 UnitExpr::binary_op(expected_div, expected_paren, expected_s),
             );
 
@@ -349,8 +349,8 @@ mod tests {
             let input = Span::new_extra("kg", Config::default());
             let (rest, unit) = parse_complete(input).unwrap();
 
-            let expected_id = Node::new(AstSpan::new(0, 2, 2), Identifier::new("kg".to_string()));
-            let expected_unit = Node::new(AstSpan::new(0, 2, 2), UnitExpr::unit(expected_id, None));
+            let expected_id = Node::new(AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
+            let expected_unit = Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_id, None));
 
             assert_eq!(unit, expected_unit);
             assert_eq!(rest.fragment(), &"");
@@ -365,8 +365,8 @@ mod tests {
             let input = Span::new_extra("kg", Config::default());
             let (rest, unit) = parse_complete(input).unwrap();
 
-            let expected_id = Node::new(AstSpan::new(0, 2, 2), Identifier::new("kg".to_string()));
-            let expected_unit = Node::new(AstSpan::new(0, 2, 2), UnitExpr::unit(expected_id, None));
+            let expected_id = Node::new(AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
+            let expected_unit = Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_id, None));
 
             assert_eq!(unit, expected_unit);
             assert_eq!(rest.fragment(), &"");
@@ -421,7 +421,7 @@ mod tests {
         fn test_error_missing_second_term_after_multiply() {
             let input = Span::new_extra("kg*", Config::default());
             let result = parse(input);
-            let expected_op_span = AstSpan::new(2, 3, 3);
+            let expected_op_span = AstSpan::new(2, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -445,7 +445,7 @@ mod tests {
         fn test_error_missing_second_term_after_divide() {
             let input = Span::new_extra("kg/", Config::default());
             let result = parse(input);
-            let expected_op_span = AstSpan::new(2, 3, 3);
+            let expected_op_span = AstSpan::new(2, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -469,7 +469,7 @@ mod tests {
         fn test_error_missing_exponent() {
             let input = Span::new_extra("kg^", Config::default());
             let result = parse(input);
-            let expected_caret_span = AstSpan::new(2, 3, 3);
+            let expected_caret_span = AstSpan::new(2, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -492,7 +492,7 @@ mod tests {
         fn test_error_parenthesized_missing_expr() {
             let input = Span::new_extra("()", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(0, 1, 1);
+            let expected_paren_span = AstSpan::new(0, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -515,7 +515,7 @@ mod tests {
         fn test_error_unclosed_paren() {
             let input = Span::new_extra("(kg*m", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(0, 1, 1);
+            let expected_paren_span = AstSpan::new(0, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -555,7 +555,7 @@ mod tests {
         fn test_error_invalid_exponent() {
             let input = Span::new_extra("kg^@invalid", Config::default());
             let result = parse(input);
-            let expected_caret_span = AstSpan::new(2, 3, 3);
+            let expected_caret_span = AstSpan::new(2, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -578,7 +578,7 @@ mod tests {
         fn test_error_missing_second_term_in_complex_expression() {
             let input = Span::new_extra("kg*m/", Config::default());
             let result = parse(input);
-            let expected_op_span = AstSpan::new(4, 5, 5);
+            let expected_op_span = AstSpan::new(4, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {
@@ -602,7 +602,7 @@ mod tests {
         fn test_error_nested_unclosed_paren() {
             let input = Span::new_extra("((kg*m)", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(0, 1, 1);
+            let expected_paren_span = AstSpan::new(0, 1, 0);
 
             match result {
                 Err(nom::Err::Failure(error)) => {

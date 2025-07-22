@@ -103,7 +103,7 @@ fn model(input: Span) -> Result<ModelNode, ErrorsWithPartialResult<Model, Parser
 
     if errors.is_empty() {
         // assume that the model spans the entire file
-        let model_span = AstSpan::new(0, input.len(), input.len());
+        let model_span = AstSpan::new(0, input.len(), 0);
         let model_node = Node::new(model_span, Model::new(note, decls, sections));
 
         Ok((rest, model_node))
@@ -635,7 +635,7 @@ mod tests {
                                 kind: IncompleteKind::Section(SectionKind::MissingLabel),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(0, 7, 7));
+                                assert_eq!(cause, AstSpan::new(0, 7, 0));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -661,7 +661,7 @@ mod tests {
                                 kind: IncompleteKind::Section(SectionKind::MissingEndOfLine),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(8, 11, 12));
+                                assert_eq!(cause, AstSpan::new(8, 3, 1));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -688,7 +688,7 @@ mod tests {
                                 kind: IncompleteKind::Decl(_),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(12, 18, 18));
+                                assert_eq!(cause, AstSpan::new(12, 6, 0));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -718,7 +718,7 @@ mod tests {
                                 kind: IncompleteKind::Decl(_),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(0, 6, 6));
+                                assert_eq!(cause, AstSpan::new(0, 6, 0));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -744,7 +744,7 @@ mod tests {
                                 kind: IncompleteKind::Decl(_),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(4, 7, 7));
+                                assert_eq!(cause, AstSpan::new(4, 3, 0));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -770,7 +770,7 @@ mod tests {
                                 kind: IncompleteKind::Decl(_),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(5, 8, 8));
+                                assert_eq!(cause, AstSpan::new(5, 3, 0));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -796,7 +796,7 @@ mod tests {
                                 kind: IncompleteKind::Parameter(_),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(3, 4, 4));
+                                assert_eq!(cause, AstSpan::new(3, 1, 0));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -822,7 +822,7 @@ mod tests {
                                 kind: IncompleteKind::Parameter(_),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(5, 6, 6));
+                                assert_eq!(cause, AstSpan::new(5, 1, 0));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
@@ -848,7 +848,7 @@ mod tests {
                                 kind: IncompleteKind::Test(_),
                                 cause,
                             } => {
-                                assert_eq!(cause, AstSpan::new(0, 4, 5));
+                                assert_eq!(cause, AstSpan::new(0, 4, 1));
                             }
                             _ => panic!("Unexpected reason {:?}", errors[0].reason),
                         }
