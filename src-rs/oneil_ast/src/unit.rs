@@ -107,4 +107,9 @@ impl UnitExponent {
     pub fn new(value: f64) -> Self {
         Self(value)
     }
+
+    /// Returns the value of the unit exponent
+    pub fn value(&self) -> f64 {
+        self.0
+    }
 }

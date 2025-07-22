@@ -3,6 +3,8 @@
 //! This module contains structures for representing test declarations
 //! in Oneil programs.
 
+use std::ops::Deref;
+
 use crate::{debug_info::TraceLevelNode, expression::ExprNode, naming::IdentifierNode, node::Node};
 
 /// A test declaration in an Oneil program
@@ -65,5 +67,13 @@ impl TestInputs {
     /// Creates a new test inputs collection
     pub fn new(inputs: Vec<IdentifierNode>) -> Self {
         Self { inputs }
+    }
+}
+
+impl Deref for TestInputs {
+    type Target = Vec<IdentifierNode>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inputs
     }
 }

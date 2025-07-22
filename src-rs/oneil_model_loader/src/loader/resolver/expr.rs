@@ -91,13 +91,13 @@ use crate::{
 /// All errors are collected and returned rather than causing the function to fail
 /// immediately.
 pub fn resolve_expr(
-    value: &ast::Expr,
+    value: &ast::expression::ExprNode,
     local_variables: &HashSet<Identifier>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
 ) -> Result<oneil_ir::expr::Expr, Vec<VariableResolutionError>> {
-    match value {
+    match value.node_value() {
         ast::Expr::BinaryOp { op, left, right } => {
             let left = resolve_expr(
                 left,
@@ -135,7 +135,7 @@ pub fn resolve_expr(
             }
         }
         ast::Expr::FunctionCall { name, args } => {
-            let name = resolve_function_name(name);
+            let name = resolve_function_name(name.as_str());
             let args = args.iter().map(|arg| {
                 resolve_expr(
                     arg,
@@ -162,6 +162,13 @@ pub fn resolve_expr(
             let literal = resolve_literal(literal);
             Ok(oneil_ir::expr::Expr::literal(literal))
         }
+        ast::Expr::Parenthesized { expr } => resolve_expr(
+            expr,
+            local_variables,
+            defined_parameters_info,
+            submodel_info,
+            model_info,
+        ),
     }
 }
 
@@ -298,6 +305,100 @@ mod tests {
 
     /// Helper function to create basic test data structures for tests that
     /// don't rely on any context.
+    /// Helper function to create a test span
+    fn test_span(start: usize, end: usize) -> ast::Span {
+        ast::Span::new(start, end, end)
+    }
+
+    /// Helper function to create a literal expression node
+    fn create_literal_expr_node(
+        literal: ast::expression::Literal,
+        start: usize,
+        end: usize,
+    ) -> ast::expression::ExprNode {
+        let literal_node = ast::node::Node::new(test_span(start, end), literal);
+        let expr = ast::expression::Expr::Literal(literal_node);
+        ast::node::Node::new(test_span(start, end), expr)
+    }
+
+    /// Helper function to create a variable expression node
+    fn create_variable_expr_node(
+        variable: ast::expression::VariableNode,
+        start: usize,
+        end: usize,
+    ) -> ast::expression::ExprNode {
+        let expr = ast::expression::Expr::Variable(variable);
+        ast::node::Node::new(test_span(start, end), expr)
+    }
+
+    /// Helper function to create a binary operation expression node
+    fn create_binary_op_expr_node(
+        left: ast::expression::ExprNode,
+        op: ast::expression::BinaryOp,
+        right: ast::expression::ExprNode,
+        start: usize,
+        end: usize,
+    ) -> ast::expression::ExprNode {
+        let op_node = ast::node::Node::new(test_span(start, end), op);
+        let expr = ast::expression::Expr::BinaryOp {
+            left: Box::new(left),
+            op: op_node,
+            right: Box::new(right),
+        };
+        ast::node::Node::new(test_span(start, end), expr)
+    }
+
+    /// Helper function to create a unary operation expression node
+    fn create_unary_op_expr_node(
+        op: ast::expression::UnaryOp,
+        expr: ast::expression::ExprNode,
+        start: usize,
+        end: usize,
+    ) -> ast::expression::ExprNode {
+        let op_node = ast::node::Node::new(test_span(start, end), op);
+        let expr_node = ast::expression::Expr::UnaryOp {
+            op: op_node,
+            expr: Box::new(expr),
+        };
+        ast::node::Node::new(test_span(start, end), expr_node)
+    }
+
+    /// Helper function to create a function call expression node
+    fn create_function_call_expr_node(
+        name: &str,
+        args: Vec<ast::expression::ExprNode>,
+        start: usize,
+        end: usize,
+    ) -> ast::expression::ExprNode {
+        let identifier = ast::naming::Identifier::new(name.to_string());
+        let name_node = ast::node::Node::new(test_span(start, start + name.len()), identifier);
+        let expr = ast::expression::Expr::FunctionCall {
+            name: name_node,
+            args,
+        };
+        ast::node::Node::new(test_span(start, end), expr)
+    }
+
+    /// Helper function to create a simple identifier variable
+    fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
+        let identifier = ast::naming::Identifier::new(name.to_string());
+        let identifier_node = ast::node::Node::new(test_span(0, name.len()), identifier);
+        let variable = ast::expression::Variable::Identifier(identifier_node);
+        ast::node::Node::new(test_span(0, name.len()), variable)
+    }
+
+    /// Helper function to create a parenthesized expression node
+    fn create_parenthesized_expr_node(
+        expr: ast::expression::ExprNode,
+        start: usize,
+        end: usize,
+    ) -> ast::expression::ExprNode {
+        let parenthesized_expr = ast::expression::Expr::Parenthesized {
+            expr: Box::new(expr),
+        };
+        ast::node::Node::new(test_span(start, end), parenthesized_expr)
+    }
+
     fn create_empty_context() -> (
         HashSet<Identifier>,
         ParameterInfo<'static>,
@@ -315,7 +416,7 @@ mod tests {
     #[test]
     fn test_resolve_literal_number() {
         // create the expression
-        let literal = ast::Expr::Literal(ast::expression::Literal::Number(42.0));
+        let literal = create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -341,7 +442,8 @@ mod tests {
     #[test]
     fn test_resolve_literal_string() {
         // create the expression
-        let literal = ast::Expr::Literal(ast::expression::Literal::String("hello".to_string()));
+        let literal =
+            create_literal_expr_node(ast::expression::Literal::String("hello".to_string()), 0, 5);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -367,7 +469,7 @@ mod tests {
     #[test]
     fn test_resolve_literal_boolean() {
         // create the expression
-        let literal = ast::Expr::Literal(ast::expression::Literal::Boolean(true));
+        let literal = create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -393,11 +495,9 @@ mod tests {
     #[test]
     fn test_resolve_binary_op() {
         // create the expression
-        let expr = ast::Expr::BinaryOp {
-            op: ast::expression::BinaryOp::Add,
-            left: Box::new(ast::Expr::Literal(ast::expression::Literal::Number(1.0))),
-            right: Box::new(ast::Expr::Literal(ast::expression::Literal::Number(2.0))),
-        };
+        let left = create_literal_expr_node(ast::expression::Literal::Number(1.0), 0, 1);
+        let right = create_literal_expr_node(ast::expression::Literal::Number(2.0), 4, 5);
+        let expr = create_binary_op_expr_node(left, ast::expression::BinaryOp::Add, right, 0, 5);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -429,10 +529,8 @@ mod tests {
     #[test]
     fn test_resolve_unary_op() {
         // create the expression
-        let expr = ast::Expr::UnaryOp {
-            op: ast::expression::UnaryOp::Neg,
-            expr: Box::new(ast::Expr::Literal(ast::expression::Literal::Number(5.0))),
-        };
+        let inner_expr = create_literal_expr_node(ast::expression::Literal::Number(5.0), 1, 4);
+        let expr = create_unary_op_expr_node(ast::expression::UnaryOp::Neg, inner_expr, 0, 4);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -458,10 +556,8 @@ mod tests {
     #[test]
     fn test_resolve_function_call_builtin() {
         // create the expression
-        let expr = ast::Expr::FunctionCall {
-            name: "sin".to_string(),
-            args: vec![ast::Expr::Literal(ast::expression::Literal::Number(3.14))],
-        };
+        let arg = create_literal_expr_node(ast::expression::Literal::Number(3.14), 4, 8);
+        let expr = create_function_call_expr_node("sin", vec![arg], 0, 8);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -488,10 +584,8 @@ mod tests {
     #[test]
     fn test_resolve_function_call_imported() {
         // create the expression
-        let expr = ast::Expr::FunctionCall {
-            name: "custom_function".to_string(),
-            args: vec![ast::Expr::Literal(ast::expression::Literal::Number(42.0))],
-        };
+        let arg = create_literal_expr_node(ast::expression::Literal::Number(42.0), 16, 19);
+        let expr = create_function_call_expr_node("custom_function", vec![arg], 0, 19);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -518,7 +612,8 @@ mod tests {
     #[test]
     fn test_resolve_variable_local() {
         // create the expression
-        let expr = ast::Expr::Variable(ast::expression::Variable::Identifier("x".to_string()));
+        let variable = create_identifier_variable("x");
+        let expr = create_variable_expr_node(variable, 0, 1);
 
         // create the context
         let (_, param_info, submodel_info, model_info) = create_empty_context();
@@ -539,7 +634,8 @@ mod tests {
     #[test]
     fn test_resolve_variable_parameter() {
         // create the expression
-        let expr = ast::Expr::Variable(ast::expression::Variable::Identifier("param".to_string()));
+        let variable = create_identifier_variable("param");
+        let expr = create_variable_expr_node(variable, 0, 5);
 
         // create the context
         let mut param_map = HashMap::new();
@@ -574,9 +670,8 @@ mod tests {
     #[test]
     fn test_resolve_variable_undefined() {
         // create the expression
-        let expr = ast::Expr::Variable(ast::expression::Variable::Identifier(
-            "undefined".to_string(),
-        ));
+        let variable = create_identifier_variable("undefined");
+        let expr = create_variable_expr_node(variable, 0, 9);
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -602,22 +697,21 @@ mod tests {
     #[test]
     fn test_resolve_complex_expression() {
         // create the expression: (1 + 2) * sin(3.14)
-        let inner_binary = ast::Expr::BinaryOp {
-            op: ast::expression::BinaryOp::Add,
-            left: Box::new(ast::Expr::Literal(ast::expression::Literal::Number(1.0))),
-            right: Box::new(ast::Expr::Literal(ast::expression::Literal::Number(2.0))),
-        };
+        let left_1 = create_literal_expr_node(ast::expression::Literal::Number(1.0), 1, 2);
+        let right_1 = create_literal_expr_node(ast::expression::Literal::Number(2.0), 5, 6);
+        let inner_binary =
+            create_binary_op_expr_node(left_1, ast::expression::BinaryOp::Add, right_1, 0, 7);
 
-        let func_call = ast::Expr::FunctionCall {
-            name: "sin".to_string(),
-            args: vec![ast::Expr::Literal(ast::expression::Literal::Number(3.14))],
-        };
+        let func_arg = create_literal_expr_node(ast::expression::Literal::Number(3.14), 12, 16);
+        let func_call = create_function_call_expr_node("sin", vec![func_arg], 8, 17);
 
-        let expr = ast::Expr::BinaryOp {
-            op: ast::expression::BinaryOp::Mul,
-            left: Box::new(inner_binary),
-            right: Box::new(func_call),
-        };
+        let expr = create_binary_op_expr_node(
+            inner_binary,
+            ast::expression::BinaryOp::Mul,
+            func_call,
+            0,
+            17,
+        );
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -812,15 +906,17 @@ mod tests {
     #[test]
     fn test_resolve_expression_with_errors() {
         // create the expression
-        let expr = ast::Expr::BinaryOp {
-            op: ast::expression::BinaryOp::Add,
-            left: Box::new(ast::Expr::Variable(ast::expression::Variable::Identifier(
-                "undefined1".to_string(),
-            ))),
-            right: Box::new(ast::Expr::Variable(ast::expression::Variable::Identifier(
-                "undefined2".to_string(),
-            ))),
-        };
+        let left_var = create_identifier_variable("undefined1");
+        let left_expr = create_variable_expr_node(left_var, 0, 11);
+        let right_var = create_identifier_variable("undefined2");
+        let right_expr = create_variable_expr_node(right_var, 15, 26);
+        let expr = create_binary_op_expr_node(
+            left_expr,
+            ast::expression::BinaryOp::Add,
+            right_expr,
+            0,
+            26,
+        );
 
         // create the context
         let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
@@ -848,6 +944,213 @@ mod tests {
                 assert!(error_identifiers.contains(&Identifier::new("undefined2")));
             }
             _ => panic!("Expected error, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_parenthesized_expression() {
+        // Test a simple parenthesized expression: (1 + 2)
+        let left = create_literal_expr_node(ast::expression::Literal::Number(1.0), 1, 2);
+        let right = create_literal_expr_node(ast::expression::Literal::Number(2.0), 5, 6);
+        let inner_expr =
+            create_binary_op_expr_node(left, ast::expression::BinaryOp::Add, right, 0, 7);
+        let expr = create_parenthesized_expr_node(inner_expr, 0, 8);
+
+        // create the context
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
+
+        // resolve the expression
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
+
+        // check the result
+        match result {
+            Ok(oneil_ir::expr::Expr::BinaryOp { op, left, right }) => {
+                assert_eq!(op, BinaryOp::Add);
+                assert_eq!(
+                    *left,
+                    oneil_ir::expr::Expr::Literal {
+                        value: Literal::Number(1.0)
+                    }
+                );
+                assert_eq!(
+                    *right,
+                    oneil_ir::expr::Expr::Literal {
+                        value: Literal::Number(2.0)
+                    }
+                );
+            }
+            _ => panic!("Expected binary operation, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_nested_parenthesized_expression() {
+        // Test nested parentheses: ((1 + 2) * 3)
+        let inner_left = create_literal_expr_node(ast::expression::Literal::Number(1.0), 2, 3);
+        let inner_right = create_literal_expr_node(ast::expression::Literal::Number(2.0), 6, 7);
+        let inner_binary = create_binary_op_expr_node(
+            inner_left,
+            ast::expression::BinaryOp::Add,
+            inner_right,
+            1,
+            8,
+        );
+        let inner_parenthesized = create_parenthesized_expr_node(inner_binary, 1, 9);
+        let outer_right = create_literal_expr_node(ast::expression::Literal::Number(3.0), 12, 13);
+        let expr = create_binary_op_expr_node(
+            inner_parenthesized,
+            ast::expression::BinaryOp::Mul,
+            outer_right,
+            0,
+            13,
+        );
+
+        // create the context
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
+
+        // resolve the expression
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
+
+        // check the result
+        match result {
+            Ok(oneil_ir::expr::Expr::BinaryOp { op, left, right }) => {
+                assert_eq!(op, BinaryOp::Mul);
+
+                // check left side ((1 + 2))
+                match *left {
+                    oneil_ir::expr::Expr::BinaryOp {
+                        op: left_op,
+                        left: left_left,
+                        right: left_right,
+                    } => {
+                        assert_eq!(left_op, BinaryOp::Add);
+                        assert_eq!(
+                            *left_left,
+                            oneil_ir::expr::Expr::Literal {
+                                value: Literal::Number(1.0)
+                            }
+                        );
+                        assert_eq!(
+                            *left_right,
+                            oneil_ir::expr::Expr::Literal {
+                                value: Literal::Number(2.0)
+                            }
+                        );
+                    }
+                    _ => panic!("Expected binary operation on left, got {:?}", left),
+                }
+
+                // check right side (3)
+                assert_eq!(
+                    *right,
+                    oneil_ir::expr::Expr::Literal {
+                        value: Literal::Number(3.0)
+                    }
+                );
+            }
+            _ => panic!("Expected binary operation, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_single_literal_multiple_parentheses() {
+        // Test a single literal wrapped in multiple parentheses: ((42))
+        let inner_literal = create_literal_expr_node(ast::expression::Literal::Number(42.0), 2, 4);
+        let first_parentheses = create_parenthesized_expr_node(inner_literal, 1, 5);
+        let expr = create_parenthesized_expr_node(first_parentheses, 0, 6);
+
+        // create the context
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
+
+        // resolve the expression
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
+
+        // check the result
+        match result {
+            Ok(oneil_ir::expr::Expr::Literal { value }) => {
+                assert_eq!(value, Literal::Number(42.0));
+            }
+            _ => panic!("Expected literal expression, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_single_literal_deep_nested_parentheses() {
+        // Test a single literal with deeply nested parentheses: (((3.14)))
+        let inner_literal = create_literal_expr_node(ast::expression::Literal::Number(3.14), 3, 7);
+        let third_level = create_parenthesized_expr_node(inner_literal, 2, 8);
+        let second_level = create_parenthesized_expr_node(third_level, 1, 9);
+        let expr = create_parenthesized_expr_node(second_level, 0, 10);
+
+        // create the context
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
+
+        // resolve the expression
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
+
+        // check the result
+        match result {
+            Ok(oneil_ir::expr::Expr::Literal { value }) => {
+                assert_eq!(value, Literal::Number(3.14));
+            }
+            _ => panic!("Expected literal expression, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_parenthesized_function_call() {
+        // Test a parenthesized function call: (sin(3.14))
+        let func_arg = create_literal_expr_node(ast::expression::Literal::Number(3.14), 5, 9);
+        let func_call = create_function_call_expr_node("sin", vec![func_arg], 1, 10);
+        let expr = create_parenthesized_expr_node(func_call, 0, 11);
+
+        // create the context
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
+
+        // resolve the expression
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
+
+        // check the result
+        match result {
+            Ok(oneil_ir::expr::Expr::FunctionCall { name, args }) => {
+                assert_eq!(name, FunctionName::sin());
+                assert_eq!(args.len(), 1);
+                assert_eq!(
+                    args[0],
+                    oneil_ir::expr::Expr::Literal {
+                        value: Literal::Number(3.14)
+                    }
+                );
+            }
+            _ => panic!("Expected function call, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_parenthesized_unary_operation() {
+        // Test a parenthesized unary operation: (-5)
+        let inner_expr = create_literal_expr_node(ast::expression::Literal::Number(5.0), 1, 2);
+        let unary_expr = create_unary_op_expr_node(ast::expression::UnaryOp::Neg, inner_expr, 0, 3);
+        let expr = create_parenthesized_expr_node(unary_expr, 0, 4);
+
+        // create the context
+        let (local_vars, param_info, submodel_info, model_info) = create_empty_context();
+
+        // resolve the expression
+        let result = resolve_expr(&expr, &local_vars, &param_info, &submodel_info, &model_info);
+
+        // check the result
+        match result {
+            Ok(oneil_ir::expr::Expr::UnaryOp { op, expr }) => {
+                assert_eq!(op, UnaryOp::Neg);
+                assert_eq!(
+                    *expr,
+                    oneil_ir::expr::Expr::Literal {
+                        value: Literal::Number(5.0)
+                    }
+                );
+            }
+            _ => panic!("Expected unary operation, got {:?}", result),
         }
     }
 }

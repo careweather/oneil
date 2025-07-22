@@ -87,15 +87,15 @@ use crate::{
 ///    - Recursively resolve the component within that submodel
 ///    - Handle nested accessors through recursive calls
 pub fn resolve_variable(
-    variable: &ast::expression::Variable,
+    variable: &ast::expression::VariableNode,
     local_variables: &HashSet<Identifier>,
     defined_parameters: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     modelinfo: &ModelInfo,
 ) -> Result<oneil_ir::expr::Expr, VariableResolutionError> {
-    match variable {
+    match variable.node_value() {
         ast::expression::Variable::Identifier(identifier) => {
-            let identifier = Identifier::new(identifier);
+            let identifier = Identifier::new(identifier.as_str());
             if local_variables.contains(&identifier) {
                 Ok(oneil_ir::expr::Expr::local_variable(identifier))
             } else {
@@ -113,7 +113,7 @@ pub fn resolve_variable(
             }
         }
         ast::expression::Variable::Accessor { parent, component } => {
-            let parent_identifier = Identifier::new(parent);
+            let parent_identifier = Identifier::new(parent.as_str());
             let submodel_path = match submodel_info.get(&parent_identifier) {
                 InfoResult::Found(submodel_path) => submodel_path,
                 InfoResult::HasError => {
@@ -170,7 +170,7 @@ fn resolve_variable_recursive(
     match variable {
         // if the variable is an identifier, this means that the variable refers to a parameter
         ast::expression::Variable::Identifier(identifier) => {
-            let identifier = Identifier::new(identifier);
+            let identifier = Identifier::new(identifier.as_str());
             if model.get_parameter(&identifier).is_some() {
                 Ok(oneil_ir::expr::Expr::parameter_variable(identifier))
             } else {
@@ -183,7 +183,7 @@ fn resolve_variable_recursive(
 
         // if the variable is an accessor, this means that the variable refers to a submodel
         ast::expression::Variable::Accessor { parent, component } => {
-            let parent_identifier = Identifier::new(parent);
+            let parent_identifier = Identifier::new(parent.as_str());
             let submodel_path = match model.get_submodel(&parent_identifier) {
                 Some(submodel_path) => submodel_path,
                 None => {
@@ -216,6 +216,47 @@ mod tests {
         reference::{Identifier, ModelPath},
     };
     use std::collections::{HashMap, HashSet};
+
+    /// Helper function to create a test span
+    fn test_span(start: usize, end: usize) -> ast::Span {
+        ast::Span::new(start, end, end)
+    }
+
+    /// Helper function to create an identifier node
+    fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
+        let identifier = ast::naming::Identifier::new(name.to_string());
+        ast::node::Node::new(test_span(start, start + name.len()), identifier)
+    }
+
+    /// Helper function to create a variable node
+    fn create_variable_node(
+        variable: ast::expression::Variable,
+        start: usize,
+        end: usize,
+    ) -> ast::expression::VariableNode {
+        ast::node::Node::new(test_span(start, end), variable)
+    }
+
+    /// Helper function to create a simple identifier variable
+    fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
+        let identifier_node = create_identifier_node(name, 0);
+        let variable = ast::expression::Variable::Identifier(identifier_node);
+        create_variable_node(variable, 0, name.len())
+    }
+
+    /// Helper function to create an accessor variable
+    fn create_accessor_variable(
+        parent: &str,
+        component: ast::expression::VariableNode,
+    ) -> ast::expression::VariableNode {
+        let parent_node = create_identifier_node(parent, 0);
+        let component_end = component.node_span().end();
+        let variable = ast::expression::Variable::Accessor {
+            parent: parent_node,
+            component: Box::new(component),
+        };
+        create_variable_node(variable, 0, parent.len() + 1 + component_end)
+    }
 
     /// Helper function to create a basic model info for testing
     fn create_test_modelinfo() -> ModelInfo<'static> {
@@ -274,7 +315,7 @@ mod tests {
 
     #[test]
     fn test_resolve_local_variable() {
-        let variable = ast::expression::Variable::Identifier("local_var".to_string());
+        let variable = create_identifier_variable("local_var");
         let mut local_vars = HashSet::new();
         local_vars.insert(Identifier::new("local_var"));
 
@@ -297,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_resolve_parameter_variable() {
-        let variable = ast::expression::Variable::Identifier("temperature".to_string());
+        let variable = create_identifier_variable("temperature");
         let local_vars = HashSet::new();
 
         let mut param_map = HashMap::new();
@@ -335,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_parameter() {
-        let variable = ast::expression::Variable::Identifier("undefined_param".to_string());
+        let variable = create_identifier_variable("undefined_param");
         let local_vars = HashSet::new();
 
         let result = resolve_variable(
@@ -357,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_resolve_parameter_with_error() {
-        let variable = ast::expression::Variable::Identifier("error_param".to_string());
+        let variable = create_identifier_variable("error_param");
         let local_vars = HashSet::new();
 
         let mut param_with_errors = HashSet::new();
@@ -384,11 +425,8 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_submodel() {
-        let inner_var = ast::expression::Variable::Identifier("parameter".to_string());
-        let variable = ast::expression::Variable::Accessor {
-            parent: "undefined_submodel".to_string(),
-            component: Box::new(inner_var),
-        };
+        let inner_var = create_identifier_variable("parameter");
+        let variable = create_accessor_variable("undefined_submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -412,11 +450,8 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_with_error() {
-        let inner_var = ast::expression::Variable::Identifier("parameter".to_string());
-        let variable = ast::expression::Variable::Accessor {
-            parent: "error_submodel".to_string(),
-            component: Box::new(inner_var),
-        };
+        let inner_var = create_identifier_variable("parameter");
+        let variable = create_accessor_variable("error_submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -445,11 +480,8 @@ mod tests {
     #[test]
     fn test_resolve_nested_accessor() {
         // Create a nested variable: submodel.parameter
-        let inner_var = ast::expression::Variable::Identifier("parameter".to_string());
-        let variable = ast::expression::Variable::Accessor {
-            parent: "submodel".to_string(),
-            component: Box::new(inner_var),
-        };
+        let inner_var = create_identifier_variable("parameter");
+        let variable = create_accessor_variable("submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -486,15 +518,9 @@ mod tests {
     #[test]
     fn test_resolve_deeply_nested_accessor() {
         // Create a deeply nested variable: parameter.submodel2.submodel1
-        let parameter_var = ast::expression::Variable::Identifier("parameter".to_string());
-        let submodel2_var = ast::expression::Variable::Accessor {
-            parent: "submodel2".to_string(),
-            component: Box::new(parameter_var),
-        };
-        let variable = ast::expression::Variable::Accessor {
-            parent: "submodel1".to_string(),
-            component: Box::new(submodel2_var),
-        };
+        let parameter_var = create_identifier_variable("parameter");
+        let submodel2_var = create_accessor_variable("submodel2", parameter_var);
+        let variable = create_accessor_variable("submodel1", submodel2_var);
 
         let local_vars = HashSet::new();
 
@@ -533,11 +559,8 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_parameter_in_submodel() {
-        let inner_var = ast::expression::Variable::Identifier("undefined_param".to_string());
-        let variable = ast::expression::Variable::Accessor {
-            parent: "submodel".to_string(),
-            component: Box::new(inner_var),
-        };
+        let inner_var = create_identifier_variable("undefined_param");
+        let variable = create_accessor_variable("submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -583,15 +606,9 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_submodel_in_submodel() {
-        let inner_var = ast::expression::Variable::Identifier("parameter".to_string());
-        let variable = ast::expression::Variable::Accessor {
-            parent: "undefined_submodel".to_string(),
-            component: Box::new(inner_var),
-        };
-        let variable = ast::expression::Variable::Accessor {
-            parent: "submodel".to_string(),
-            component: Box::new(variable),
-        };
+        let inner_var = create_identifier_variable("parameter");
+        let variable = create_accessor_variable("undefined_submodel", inner_var);
+        let variable = create_accessor_variable("submodel", variable);
 
         let local_vars = HashSet::new();
 
@@ -637,11 +654,8 @@ mod tests {
 
     #[test]
     fn test_resolve_modelwith_error() {
-        let inner_var = ast::expression::Variable::Identifier("parameter".to_string());
-        let variable = ast::expression::Variable::Accessor {
-            parent: "submodel".to_string(),
-            component: Box::new(inner_var),
-        };
+        let inner_var = create_identifier_variable("parameter");
+        let variable = create_accessor_variable("submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -676,7 +690,7 @@ mod tests {
 
     #[test]
     fn test_local_variable_takes_precedence_over_parameter() {
-        let variable = ast::expression::Variable::Identifier("conflict".to_string());
+        let variable = create_identifier_variable("conflict");
         let mut local_vars = HashSet::new();
         local_vars.insert(Identifier::new("conflict"));
 
@@ -718,7 +732,7 @@ mod tests {
 
     #[test]
     fn test_empty_local_variables() {
-        let variable = ast::expression::Variable::Identifier("parameter".to_string());
+        let variable = create_identifier_variable("parameter");
         let local_vars = HashSet::new();
 
         let mut param_map = HashMap::new();
