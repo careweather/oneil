@@ -23,6 +23,7 @@ use std::collections::HashMap;
 
 use oneil_ir::{
     reference::{Identifier, ModelPath, PythonPath},
+    span::WithSpan,
     test::TestIndex,
 };
 
@@ -33,7 +34,7 @@ use oneil_ir::{
 /// for checking if any errors occurred and accessing the different error categories.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolutionErrors {
-    import_errors: HashMap<PythonPath, ImportResolutionError>,
+    import_errors: HashMap<WithSpan<PythonPath>, ImportResolutionError>,
     submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
     parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
     model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
@@ -55,7 +56,7 @@ impl ResolutionErrors {
     ///
     /// A new `ResolutionErrors` instance containing all the specified errors.
     pub fn new(
-        import_errors: HashMap<PythonPath, ImportResolutionError>,
+        import_errors: HashMap<WithSpan<PythonPath>, ImportResolutionError>,
         submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
         parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
         model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,

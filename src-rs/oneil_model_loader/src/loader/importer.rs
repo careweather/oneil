@@ -1,9 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
-use oneil_ir::reference::{ModelPath, PythonPath};
+use oneil_ir::{
+    reference::{ModelPath, PythonPath},
+    span::WithSpan,
+};
 
 use crate::{
-    FileLoader, error::resolution::ImportResolutionError, util::builder::ModelCollectionBuilder,
+    FileLoader,
+    error::resolution::ImportResolutionError,
+    util::{builder::ModelCollectionBuilder, get_span_from_ast_span},
 };
 
 /// Validates a list of Python import declarations for a given model.
@@ -22,7 +27,7 @@ use crate::{
 /// # Returns
 ///
 /// A tuple containing:
-/// * `HashSet<PythonPath>` - Successfully validated Python import paths
+/// * `HashSet<WithSpan<PythonPath>>` - Successfully validated Python import paths
 /// * `HashMap<PythonPath, ImportResolutionError>` - Failed imports with their errors
 /// * `ModelCollectionBuilder<F::ParseError, F::PythonError>` - Updated builder
 ///
@@ -37,8 +42,8 @@ pub fn validate_imports<F>(
     imports: Vec<&oneil_ast::declaration::ImportNode>,
     file_loader: &F,
 ) -> (
-    HashSet<PythonPath>,
-    HashMap<PythonPath, ImportResolutionError>,
+    HashSet<WithSpan<PythonPath>>,
+    HashMap<WithSpan<PythonPath>, ImportResolutionError>,
     ModelCollectionBuilder<F::ParseError, F::PythonError>,
 )
 where
@@ -50,17 +55,20 @@ where
         |(mut python_imports, mut import_resolution_errors, mut builder), import| {
             let python_path = model_path.get_sibling_path(&import.path());
             let python_path = PythonPath::new(python_path);
+            let span = get_span_from_ast_span(import.node_span());
+            let python_path_with_span = WithSpan::new(python_path.clone(), span);
 
             let result = file_loader.validate_python_import(&python_path);
             eprintln!("{:?}: {:?}", python_path, result);
             match result {
                 Ok(()) => {
-                    python_imports.insert(python_path);
+                    python_imports.insert(python_path_with_span);
                     (python_imports, import_resolution_errors, builder)
                 }
                 Err(error) => {
                     builder.add_import_error(python_path.clone(), error);
-                    import_resolution_errors.insert(python_path, ImportResolutionError::new());
+                    import_resolution_errors
+                        .insert(python_path_with_span, ImportResolutionError::new());
                     (python_imports, import_resolution_errors, builder)
                 }
             }
@@ -121,7 +129,10 @@ mod tests {
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python"))));
+        assert!(valid_imports.contains(&WithSpan::new(
+            PythonPath::new(PathBuf::from("my_python")),
+            get_span_from_ast_span(&imports[0].node_span())
+        )));
         assert!(errors.is_empty());
     }
 
@@ -155,7 +166,10 @@ mod tests {
         eprintln!("valid_imports: {:?}", valid_imports);
         eprintln!("errors: {:?}", errors);
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python"))));
+        assert!(valid_imports.contains(&WithSpan::new(
+            PythonPath::new(PathBuf::from("my_python")),
+            oneil_ir::span::Span::new(0, 10)
+        )));
         assert_eq!(errors.len(), 1);
         assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent"))));
     }
@@ -176,9 +190,18 @@ mod tests {
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
         assert_eq!(valid_imports.len(), 3);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python1"))));
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python2"))));
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("my_python3"))));
+        assert!(valid_imports.contains(&WithSpan::new(
+            PythonPath::new(PathBuf::from("my_python1")),
+            get_span_from_ast_span(&imports[0].node_span())
+        )));
+        assert!(valid_imports.contains(&WithSpan::new(
+            PythonPath::new(PathBuf::from("my_python2")),
+            get_span_from_ast_span(&imports[1].node_span())
+        )));
+        assert!(valid_imports.contains(&WithSpan::new(
+            PythonPath::new(PathBuf::from("my_python3")),
+            get_span_from_ast_span(&imports[2].node_span())
+        )));
         assert!(errors.is_empty());
     }
 
@@ -230,6 +253,9 @@ mod tests {
 
         // The import should be converted to a Python path relative to the model
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&PythonPath::new(PathBuf::from("subdir/my_python"))));
+        assert!(valid_imports.contains(&WithSpan::new(
+            PythonPath::new(PathBuf::from("subdir/my_python")),
+            get_span_from_ast_span(&imports[0].node_span())
+        )));
     }
 }

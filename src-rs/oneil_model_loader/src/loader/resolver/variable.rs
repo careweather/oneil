@@ -36,12 +36,16 @@
 use std::collections::HashSet;
 
 use oneil_ast as ast;
-use oneil_ir::reference::{Identifier, ModelPath};
+use oneil_ir::{
+    expr::{Expr, ExprWithSpan},
+    reference::{Identifier, ModelPath},
+    span::WithSpan,
+};
 
 use crate::{
     error::VariableResolutionError,
     loader::resolver::{ModelInfo, ParameterInfo, SubmodelInfo},
-    util::info::InfoResult,
+    util::{get_span_from_ast_span, info::InfoResult},
 };
 
 /// Resolves a variable expression to its corresponding model expression.
@@ -91,17 +95,21 @@ pub fn resolve_variable(
     local_variables: &HashSet<Identifier>,
     defined_parameters: &ParameterInfo,
     submodel_info: &SubmodelInfo,
-    modelinfo: &ModelInfo,
-) -> Result<oneil_ir::expr::Expr, VariableResolutionError> {
+    model_info: &ModelInfo,
+) -> Result<ExprWithSpan, VariableResolutionError> {
     match variable.node_value() {
         ast::expression::Variable::Identifier(identifier) => {
             let identifier = Identifier::new(identifier.as_str());
             if local_variables.contains(&identifier) {
-                Ok(oneil_ir::expr::Expr::local_variable(identifier))
+                let span = get_span_from_ast_span(variable.node_span());
+                let expr = Expr::local_variable(identifier, span);
+                Ok(WithSpan::new(expr, span))
             } else {
                 match defined_parameters.get(&identifier) {
                     InfoResult::Found(_parameter) => {
-                        Ok(oneil_ir::expr::Expr::parameter_variable(identifier))
+                        let span = get_span_from_ast_span(variable.node_span());
+                        let expr = Expr::parameter_variable(identifier, span);
+                        Ok(WithSpan::new(expr, span))
                     }
                     InfoResult::HasError => {
                         return Err(VariableResolutionError::parameter_has_error(identifier));
@@ -128,13 +136,17 @@ pub fn resolve_variable(
                 }
             };
 
-            resolve_variable_recursive(
+            let (model_path, ident) = resolve_variable_recursive(
                 submodel_path,
                 component,
                 defined_parameters,
                 submodel_info,
-                modelinfo,
-            )
+                model_info,
+            )?;
+
+            let span = get_span_from_ast_span(variable.node_span());
+            let expr = Expr::external_variable(model_path, ident, span);
+            Ok(WithSpan::new(expr, span))
         }
     }
 }
@@ -155,9 +167,9 @@ fn resolve_variable_recursive(
     variable: &ast::expression::Variable,
     defined_parameters: &ParameterInfo,
     submodel_info: &SubmodelInfo,
-    modelinfo: &ModelInfo,
-) -> Result<oneil_ir::expr::Expr, VariableResolutionError> {
-    let model = match modelinfo.get(submodel_path) {
+    model_info: &ModelInfo,
+) -> Result<(ModelPath, Identifier), VariableResolutionError> {
+    let model = match model_info.get(submodel_path) {
         InfoResult::Found(model) => model,
         InfoResult::HasError => {
             return Err(VariableResolutionError::model_has_error(
@@ -172,7 +184,7 @@ fn resolve_variable_recursive(
         ast::expression::Variable::Identifier(identifier) => {
             let identifier = Identifier::new(identifier.as_str());
             if model.get_parameter(&identifier).is_some() {
-                Ok(oneil_ir::expr::Expr::parameter_variable(identifier))
+                Ok((submodel_path.clone(), identifier))
             } else {
                 return Err(VariableResolutionError::undefined_parameter_in_submodel(
                     submodel_path.clone(),
@@ -200,7 +212,7 @@ fn resolve_variable_recursive(
                 component,
                 defined_parameters,
                 submodel_info,
-                modelinfo,
+                model_info,
             )
         }
     }
@@ -280,7 +292,7 @@ mod tests {
             HashSet::new(),
             Identifier::new(param_name),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -329,7 +341,7 @@ mod tests {
 
         assert!(result.is_ok());
         match result.unwrap() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Local(ident)) => {
+            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Local(ident)) => {
                 assert_eq!(ident, Identifier::new("local_var"));
             }
             error => panic!("Expected local variable expression, got {:?}", error),
@@ -346,7 +358,7 @@ mod tests {
             HashSet::new(),
             Identifier::new("temperature"),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -367,7 +379,7 @@ mod tests {
 
         assert!(result.is_ok());
         match result.unwrap() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
                 assert_eq!(ident, Identifier::new("temperature"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),
@@ -508,7 +520,7 @@ mod tests {
 
         assert!(result.is_ok());
         match result.unwrap() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
                 assert_eq!(ident, Identifier::new("parameter"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),
@@ -550,7 +562,7 @@ mod tests {
 
         assert!(result.is_ok());
         match result.unwrap() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
                 assert_eq!(ident, Identifier::new("parameter"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),
@@ -699,7 +711,7 @@ mod tests {
             HashSet::new(),
             Identifier::new("conflict"),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -720,7 +732,7 @@ mod tests {
 
         assert!(result.is_ok());
         match result.unwrap() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Local(ident)) => {
+            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Local(ident)) => {
                 assert_eq!(ident, Identifier::new("conflict"));
             }
             error => panic!(
@@ -740,7 +752,7 @@ mod tests {
             HashSet::new(),
             Identifier::new("parameter"),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -761,7 +773,7 @@ mod tests {
 
         assert!(result.is_ok());
         match result.unwrap() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
                 assert_eq!(ident, Identifier::new("parameter"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),

@@ -53,11 +53,12 @@
 use std::collections::HashSet;
 
 use oneil_ast as ast;
-use oneil_ir::reference::Identifier;
+use oneil_ir::{expr::Expr, reference::Identifier, span::WithSpan};
 
 use crate::{
     error::{self, VariableResolutionError},
     loader::resolver::{ModelInfo, ParameterInfo, SubmodelInfo, variable::resolve_variable},
+    util::get_span_from_ast_span,
 };
 
 /// Resolves an AST expression into a model expression.
@@ -96,7 +97,8 @@ pub fn resolve_expr(
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
-) -> Result<oneil_ir::expr::Expr, Vec<VariableResolutionError>> {
+) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+    let value_span = get_span_from_ast_span(value.node_span());
     match value.node_value() {
         ast::Expr::BinaryOp { op, left, right } => {
             let left = resolve_expr(
@@ -113,11 +115,12 @@ pub fn resolve_expr(
                 submodel_info,
                 model_info,
             );
-            let op = resolve_binary_op(op);
+            let op_with_span = resolve_binary_op(op);
 
             let (left, right) = error::combine_errors(left, right)?;
 
-            Ok(oneil_ir::expr::Expr::binary_op(op, left, right))
+            let expr = Expr::binary_op(op_with_span, left, right);
+            Ok(WithSpan::new(expr, value_span))
         }
         ast::Expr::UnaryOp { op, expr } => {
             let expr = resolve_expr(
@@ -127,15 +130,18 @@ pub fn resolve_expr(
                 submodel_info,
                 model_info,
             );
-            let op = resolve_unary_op(op);
+            let op_with_span = resolve_unary_op(op);
 
             match expr {
-                Ok(expr) => Ok(oneil_ir::expr::Expr::unary_op(op, expr)),
+                Ok(expr) => Ok(WithSpan::new(
+                    Expr::unary_op(op_with_span, expr),
+                    value_span,
+                )),
                 Err(errors) => Err(errors),
             }
         }
         ast::Expr::FunctionCall { name, args } => {
-            let name = resolve_function_name(name.as_str());
+            let name_with_span = resolve_function_name(name);
             let args = args.iter().map(|arg| {
                 resolve_expr(
                     arg,
@@ -148,7 +154,8 @@ pub fn resolve_expr(
 
             let args = error::combine_error_list(args)?;
 
-            Ok(oneil_ir::expr::Expr::function_call(name, args))
+            let expr = Expr::function_call(name_with_span, args);
+            Ok(WithSpan::new(expr, value_span))
         }
         ast::Expr::Variable(variable) => resolve_variable(
             variable,
@@ -160,7 +167,8 @@ pub fn resolve_expr(
         .map_err(|error| vec![error]),
         ast::Expr::Literal(literal) => {
             let literal = resolve_literal(literal);
-            Ok(oneil_ir::expr::Expr::literal(literal))
+            let expr = Expr::literal(literal);
+            Ok(WithSpan::new(expr, value_span))
         }
         ast::Expr::Parenthesized { expr } => resolve_expr(
             expr,
@@ -184,8 +192,8 @@ pub fn resolve_expr(
 /// # Returns
 ///
 /// The corresponding model binary operation
-fn resolve_binary_op(op: &ast::expression::BinaryOp) -> oneil_ir::expr::BinaryOp {
-    match op {
+fn resolve_binary_op(op: &ast::expression::BinaryOpNode) -> WithSpan<oneil_ir::expr::BinaryOp> {
+    let op_value = match op.node_value() {
         ast::expression::BinaryOp::Add => oneil_ir::expr::BinaryOp::Add,
         ast::expression::BinaryOp::Sub => oneil_ir::expr::BinaryOp::Sub,
         ast::expression::BinaryOp::TrueSub => oneil_ir::expr::BinaryOp::TrueSub,
@@ -203,7 +211,9 @@ fn resolve_binary_op(op: &ast::expression::BinaryOp) -> oneil_ir::expr::BinaryOp
         ast::expression::BinaryOp::And => oneil_ir::expr::BinaryOp::And,
         ast::expression::BinaryOp::Or => oneil_ir::expr::BinaryOp::Or,
         ast::expression::BinaryOp::MinMax => oneil_ir::expr::BinaryOp::MinMax,
-    }
+    };
+    let op_span = get_span_from_ast_span(op.node_span());
+    WithSpan::new(op_value, op_span)
 }
 
 /// Converts an AST unary operation to a model unary operation.
@@ -218,11 +228,13 @@ fn resolve_binary_op(op: &ast::expression::BinaryOp) -> oneil_ir::expr::BinaryOp
 /// # Returns
 ///
 /// The corresponding model unary operation
-fn resolve_unary_op(op: &ast::expression::UnaryOp) -> oneil_ir::expr::UnaryOp {
-    match op {
+fn resolve_unary_op(op: &ast::expression::UnaryOpNode) -> WithSpan<oneil_ir::expr::UnaryOp> {
+    let op_value = match op.node_value() {
         ast::expression::UnaryOp::Neg => oneil_ir::expr::UnaryOp::Neg,
         ast::expression::UnaryOp::Not => oneil_ir::expr::UnaryOp::Not,
-    }
+    };
+    let op_span = get_span_from_ast_span(op.node_span());
+    WithSpan::new(op_value, op_span)
 }
 
 /// Resolves a function name to a model function name.
@@ -246,8 +258,11 @@ fn resolve_unary_op(op: &ast::expression::UnaryOp) -> oneil_ir::expr::UnaryOp {
 /// - **Logarithmic**: `sqrt`, `ln`, `log`, `log10`
 /// - **Rounding**: `floor`, `ceiling`
 /// - **Utility**: `extent`, `range`, `abs`, `sign`, `mid`, `strip`, `mnmx`
-fn resolve_function_name(name: &str) -> oneil_ir::expr::FunctionName {
-    match name {
+fn resolve_function_name(
+    name: &ast::naming::IdentifierNode,
+) -> WithSpan<oneil_ir::expr::FunctionName> {
+    let span = get_span_from_ast_span(name.node_span());
+    let name = match name.as_str() {
         "min" => oneil_ir::expr::FunctionName::min(),
         "max" => oneil_ir::expr::FunctionName::max(),
         "sin" => oneil_ir::expr::FunctionName::sin(),
@@ -269,8 +284,9 @@ fn resolve_function_name(name: &str) -> oneil_ir::expr::FunctionName {
         "mid" => oneil_ir::expr::FunctionName::mid(),
         "strip" => oneil_ir::expr::FunctionName::strip(),
         "mnmx" => oneil_ir::expr::FunctionName::minmax(),
-        _ => oneil_ir::expr::FunctionName::imported(name.to_string()),
-    }
+        name => oneil_ir::expr::FunctionName::imported(name.to_string()),
+    };
+    WithSpan::new(name, span)
 }
 
 /// Converts an AST literal to a model literal.
@@ -285,12 +301,14 @@ fn resolve_function_name(name: &str) -> oneil_ir::expr::FunctionName {
 /// # Returns
 ///
 /// The corresponding model literal
-fn resolve_literal(literal: &ast::expression::Literal) -> oneil_ir::expr::Literal {
-    match literal {
+fn resolve_literal(literal: &ast::expression::LiteralNode) -> WithSpan<oneil_ir::expr::Literal> {
+    let span = get_span_from_ast_span(literal.node_span());
+    let literal = match literal.node_value() {
         ast::expression::Literal::Number(number) => oneil_ir::expr::Literal::number(*number),
         ast::expression::Literal::String(string) => oneil_ir::expr::Literal::string(string.clone()),
         ast::expression::Literal::Boolean(boolean) => oneil_ir::expr::Literal::boolean(*boolean),
-    }
+    };
+    WithSpan::new(literal, span)
 }
 
 #[cfg(test)]
@@ -432,7 +450,7 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Literal { value }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::Literal { value }) => {
                 assert!(matches!(value, Literal::Number(42.0)));
             }
             _ => panic!("Expected literal expression, got {:?}", result),
@@ -459,7 +477,7 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Literal { value }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::Literal { value }) => {
                 assert_eq!(value, Literal::String("hello".to_string()));
             }
             _ => panic!("Expected literal expression, got {:?}", result),
@@ -485,7 +503,7 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Literal { value }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::Literal { value }) => {
                 assert_eq!(value, Literal::Boolean(true));
             }
             _ => panic!("Expected literal expression, got {:?}", result),
@@ -507,17 +525,17 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::BinaryOp { op, left, right }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::BinaryOp { op, left, right }) => {
                 assert_eq!(op, BinaryOp::Add);
                 assert_eq!(
                     *left,
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(1.0)
                     }
                 );
                 assert_eq!(
                     *right,
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(2.0)
                     }
                 );
@@ -540,11 +558,11 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::UnaryOp { op, expr }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::UnaryOp { op, expr }) => {
                 assert_eq!(op, UnaryOp::Neg);
                 assert_eq!(
                     *expr,
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(5.0),
                     }
                 );
@@ -567,12 +585,12 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::FunctionCall { name, args }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::FunctionCall { name, args }) => {
                 assert_eq!(name, FunctionName::sin());
                 assert_eq!(args.len(), 1);
                 assert_eq!(
                     args[0],
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(3.14),
                     }
                 );
@@ -595,12 +613,12 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::FunctionCall { name, args }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::FunctionCall { name, args }) => {
                 assert_eq!(name, FunctionName::imported("custom_function".to_string()));
                 assert_eq!(args.len(), 1);
                 assert_eq!(
                     args[0],
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(42.0),
                     }
                 );
@@ -624,7 +642,7 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Local(ident))) => {
+            Ok(oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Local(ident))) => {
                 assert_eq!(ident, Identifier::new("x"));
             }
             _ => panic!("Expected local variable, got {:?}", result),
@@ -644,7 +662,7 @@ mod tests {
             HashSet::new(),
             param_id.clone(),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -660,7 +678,9 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident))) => {
+            Ok(oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(
+                ident,
+            ))) => {
                 assert_eq!(ident, Identifier::new("param"));
             }
             _ => panic!("Expected parameter variable, got {:?}", result),
@@ -721,12 +741,12 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::BinaryOp { op, left, right }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::BinaryOp { op, left, right }) => {
                 assert_eq!(op, BinaryOp::Mul);
 
                 // check left side (1 + 2)
                 match *left {
-                    oneil_ir::expr::Expr::BinaryOp {
+                    oneil_ir::expr::ExprWithSpan::BinaryOp {
                         op: left_op,
                         left: left_left,
                         right: left_right,
@@ -734,13 +754,13 @@ mod tests {
                         assert_eq!(left_op, BinaryOp::Add);
                         assert_eq!(
                             *left_left,
-                            oneil_ir::expr::Expr::Literal {
+                            oneil_ir::expr::ExprWithSpan::Literal {
                                 value: Literal::Number(1.0)
                             }
                         );
                         assert_eq!(
                             *left_right,
-                            oneil_ir::expr::Expr::Literal {
+                            oneil_ir::expr::ExprWithSpan::Literal {
                                 value: Literal::Number(2.0)
                             }
                         );
@@ -750,12 +770,12 @@ mod tests {
 
                 // check right side (sin(3.14))
                 match *right {
-                    oneil_ir::expr::Expr::FunctionCall { name, args } => {
+                    oneil_ir::expr::ExprWithSpan::FunctionCall { name, args } => {
                         assert_eq!(name, FunctionName::sin());
                         assert_eq!(args.len(), 1);
                         assert_eq!(
                             args[0],
-                            oneil_ir::expr::Expr::Literal {
+                            oneil_ir::expr::ExprWithSpan::Literal {
                                 value: Literal::Number(3.14)
                             }
                         );
@@ -964,17 +984,17 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::BinaryOp { op, left, right }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::BinaryOp { op, left, right }) => {
                 assert_eq!(op, BinaryOp::Add);
                 assert_eq!(
                     *left,
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(1.0)
                     }
                 );
                 assert_eq!(
                     *right,
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(2.0)
                     }
                 );
@@ -1013,12 +1033,12 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::BinaryOp { op, left, right }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::BinaryOp { op, left, right }) => {
                 assert_eq!(op, BinaryOp::Mul);
 
                 // check left side ((1 + 2))
                 match *left {
-                    oneil_ir::expr::Expr::BinaryOp {
+                    oneil_ir::expr::ExprWithSpan::BinaryOp {
                         op: left_op,
                         left: left_left,
                         right: left_right,
@@ -1026,13 +1046,13 @@ mod tests {
                         assert_eq!(left_op, BinaryOp::Add);
                         assert_eq!(
                             *left_left,
-                            oneil_ir::expr::Expr::Literal {
+                            oneil_ir::expr::ExprWithSpan::Literal {
                                 value: Literal::Number(1.0)
                             }
                         );
                         assert_eq!(
                             *left_right,
-                            oneil_ir::expr::Expr::Literal {
+                            oneil_ir::expr::ExprWithSpan::Literal {
                                 value: Literal::Number(2.0)
                             }
                         );
@@ -1043,7 +1063,7 @@ mod tests {
                 // check right side (3)
                 assert_eq!(
                     *right,
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(3.0)
                     }
                 );
@@ -1067,7 +1087,7 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Literal { value }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::Literal { value }) => {
                 assert_eq!(value, Literal::Number(42.0));
             }
             _ => panic!("Expected literal expression, got {:?}", result),
@@ -1090,7 +1110,7 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::Literal { value }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::Literal { value }) => {
                 assert_eq!(value, Literal::Number(3.14));
             }
             _ => panic!("Expected literal expression, got {:?}", result),
@@ -1112,12 +1132,12 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::FunctionCall { name, args }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::FunctionCall { name, args }) => {
                 assert_eq!(name, FunctionName::sin());
                 assert_eq!(args.len(), 1);
                 assert_eq!(
                     args[0],
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(3.14)
                     }
                 );
@@ -1141,11 +1161,11 @@ mod tests {
 
         // check the result
         match result {
-            Ok(oneil_ir::expr::Expr::UnaryOp { op, expr }) => {
+            Ok(oneil_ir::expr::ExprWithSpan::UnaryOp { op, expr }) => {
                 assert_eq!(op, UnaryOp::Neg);
                 assert_eq!(
                     *expr,
-                    oneil_ir::expr::Expr::Literal {
+                    oneil_ir::expr::ExprWithSpan::Literal {
                         value: Literal::Number(5.0)
                     }
                 );

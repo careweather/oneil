@@ -46,6 +46,7 @@ use std::collections::{HashMap, HashSet};
 use oneil_ast as ast;
 use oneil_ir::{
     reference::Identifier,
+    span::{Span, WithSpan},
     test::{ModelTest, SubmodelTest, SubmodelTestInputs, TestIndex},
 };
 
@@ -55,6 +56,7 @@ use crate::{
         ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
         trace_level::resolve_trace_level,
     },
+    util::get_span_from_ast_span,
 };
 
 /// Resolves model tests from AST test declarations.
@@ -95,21 +97,24 @@ pub fn resolve_model_tests(
         let trace_level = resolve_trace_level(test.trace_level());
 
         // TODO: verify that there are no duplicate inputs
-        let inputs = test
+        let inputs: HashSet<WithSpan<Identifier>> = test
             .inputs()
             .map(|inputs| {
                 inputs
                     .iter()
-                    .map(|input| Identifier::new(input.as_str()))
+                    .map(|input| {
+                        let span = get_span_from_ast_span(input.node_span());
+                        WithSpan::new(Identifier::new(input.as_str()), span)
+                    })
                     .collect()
             })
             .unwrap_or_default();
 
-        let local_variables = &inputs;
+        let local_variables: HashSet<_> = inputs.iter().map(|id| id.value().clone()).collect();
 
         let test_expr = resolve_expr(
             &test.expr(),
-            local_variables,
+            &local_variables,
             defined_parameters_info,
             submodel_info,
             model_info,
@@ -147,44 +152,55 @@ pub fn resolve_model_tests(
 /// All errors are collected and returned rather than causing the function to fail.
 /// Each submodel test is processed independently, so errors in one test don't affect others.
 pub fn resolve_submodel_tests(
-    submodel_tests: Vec<(Identifier, Option<&ast::declaration::ModelInputListNode>)>,
+    submodel_tests: Vec<(
+        Identifier,
+        Span,
+        Option<&ast::declaration::ModelInputListNode>,
+    )>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
 ) -> (
-    Vec<SubmodelTest>,
+    Vec<WithSpan<SubmodelTest>>,
     HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>,
 ) {
-    let submodel_tests = submodel_tests.into_iter().map(|(submodel_name, inputs)| {
-        // TODO: verify that there are no duplicate inputs
-        let inputs: Vec<_> = inputs
-            .map(|inputs| {
-                inputs
-                    .inputs()
-                    .iter()
-                    .map(|input| {
-                        let identifier = Identifier::new(input.ident().as_str());
-                        let value = resolve_expr(
-                            &input.value(),
-                            &HashSet::new(),
-                            defined_parameters_info,
-                            submodel_info,
-                            model_info,
-                        )?;
+    let submodel_tests =
+        submodel_tests
+            .into_iter()
+            .map(|(submodel_name, use_model_span, inputs)| {
+                // TODO: verify that there are no duplicate inputs
+                let inputs: Vec<_> = inputs
+                    .map(|inputs| {
+                        inputs
+                            .inputs()
+                            .iter()
+                            .map(|input| {
+                                let identifier = Identifier::new(input.ident().as_str());
+                                let span = get_span_from_ast_span(input.ident().node_span());
+                                let identifier_with_span = WithSpan::new(identifier, span);
+                                let value = resolve_expr(
+                                    &input.value(),
+                                    &HashSet::new(),
+                                    defined_parameters_info,
+                                    submodel_info,
+                                    model_info,
+                                )?;
 
-                        Ok((identifier, value))
+                                Ok((identifier_with_span, value))
+                            })
+                            .collect()
                     })
-                    .collect()
-            })
-            .unwrap_or_default();
+                    .unwrap_or_default();
 
-        let inputs = error::combine_error_list(inputs)
-            .map_err(|errors| (submodel_name.clone(), error::convert_errors(errors)))?;
-        let inputs = HashMap::from_iter(inputs);
-        let inputs = SubmodelTestInputs::new(inputs);
+                let inputs = error::combine_error_list(inputs)
+                    .map_err(|errors| (submodel_name.clone(), error::convert_errors(errors)))?;
+                let inputs = HashMap::from_iter(inputs);
+                let inputs = SubmodelTestInputs::new(inputs);
 
-        Ok(SubmodelTest::new(submodel_name, inputs))
-    });
+                let submodel_test = SubmodelTest::new(submodel_name, inputs);
+
+                Ok(WithSpan::new(submodel_test, use_model_span))
+            });
 
     error::split_ok_and_errors(submodel_tests)
 }
@@ -845,7 +861,7 @@ mod tests {
             HashSet::new(),
             test_param_id.clone(),
             oneil_ir::parameter::ParameterValue::Simple(
-                oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(10.0)),
+                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(10.0)),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),

@@ -34,7 +34,7 @@ use crate::{
         ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
         trace_level::resolve_trace_level, unit::resolve_unit,
     },
-    util::{Stack, builder::ParameterCollectionBuilder, info::InfoMap},
+    util::{Stack, builder::ParameterCollectionBuilder, get_span_from_ast_span, info::InfoMap},
 };
 
 /// Resolves a collection of AST parameters into resolved model parameters.
@@ -372,9 +372,11 @@ fn resolve_parameter(
 
     let resolved_parameters = match error::combine_errors(value, limits) {
         Ok((value, limits)) => {
+            let ident_span = get_span_from_ast_span(parameter.ident().node_span());
+            let ident_with_span = oneil_ir::span::WithSpan::new(ident, ident_span);
             let parameter = Parameter::new(
                 parameter_dependencies.clone(),
-                ident,
+                ident_with_span,
                 value,
                 limits,
                 is_performance,

@@ -60,9 +60,16 @@
 use std::collections::HashMap;
 
 use oneil_ast as ast;
-use oneil_ir::reference::{Identifier, ModelPath};
+use oneil_ir::{
+    reference::{Identifier, ModelPath},
+    span::{Span, WithSpan},
+};
 
-use crate::{error::SubmodelResolutionError, loader::resolver::ModelInfo, util::info::InfoResult};
+use crate::{
+    error::SubmodelResolutionError,
+    loader::resolver::ModelInfo,
+    util::{get_span_from_ast_span, info::InfoResult},
+};
 
 /// Resolves submodels and their associated tests from use model declarations.
 ///
@@ -95,8 +102,12 @@ pub fn resolve_submodels_and_tests<'a>(
     model_path: &ModelPath,
     model_info: &ModelInfo,
 ) -> (
-    HashMap<Identifier, ModelPath>,
-    Vec<(Identifier, Option<&'a ast::declaration::ModelInputListNode>)>,
+    HashMap<Identifier, WithSpan<ModelPath>>,
+    Vec<(
+        Identifier,
+        Span,
+        Option<&'a ast::declaration::ModelInputListNode>,
+    )>,
     HashMap<Identifier, SubmodelResolutionError>,
 ) {
     use_models.into_iter().fold(
@@ -124,13 +135,16 @@ pub fn resolve_submodels_and_tests<'a>(
             // otherwise, add the error to the builder
             match resolved_use_model_path {
                 Ok(resolved_use_model_path) => {
-                    submodels.insert(submodel_name.clone(), resolved_use_model_path.clone());
+                    // create a span for the submodel
+                    let span = get_span_from_ast_span(use_model.node_span());
+                    let model_path_with_span = WithSpan::new(resolved_use_model_path.clone(), span);
+                    submodels.insert(submodel_name.clone(), model_path_with_span);
 
                     // store the inputs for the submodel tests
                     // (the inputs are stored in their AST form for now and converted to
                     // the model input type once all the submodels have been resolved)
                     let inputs = use_model.inputs();
-                    submodel_tests.push((submodel_name, inputs));
+                    submodel_tests.push((submodel_name, span, inputs));
                 }
                 Err(error) => {
                     resolution_errors.insert(submodel_name, error);
@@ -204,7 +218,8 @@ fn resolve_model_path(
             model_path.clone(),
             submodel_name,
         ))?
-        .clone();
+        .clone()
+        .take_value();
 
     resolve_model_path(submodel_path, &subcomponents[1..], model_info)
 }

@@ -18,6 +18,7 @@ use oneil_ir::{
     model::Model,
     parameter::Parameter,
     reference::{Identifier, ModelPath},
+    span::WithSpan,
 };
 
 use crate::{
@@ -133,7 +134,7 @@ where
 
     let submodels_with_errors: HashSet<&Identifier> = submodel_resolution_errors.keys().collect();
 
-    let submodel_info: InfoMap<&Identifier, &ModelPath> =
+    let submodel_info: InfoMap<&Identifier, &WithSpan<ModelPath>> =
         InfoMap::new(submodels.iter().collect(), submodels_with_errors);
 
     // resolve parameters
