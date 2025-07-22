@@ -5,7 +5,10 @@
 //! system is designed to be extensible and type-safe, supporting both built-in
 //! functions and imported Python functions.
 
-use crate::reference::{Identifier, ModelPath};
+use crate::{
+    reference::{Identifier, ModelPath},
+    span::{Span, WithSpan},
+};
 
 /// Abstract syntax tree for mathematical and logical expressions.
 ///
@@ -39,11 +42,11 @@ pub enum Expr {
     /// ```
     BinaryOp {
         /// The binary operator to apply.
-        op: BinaryOp,
+        op: WithSpan<BinaryOp>,
         /// The left-hand operand.
-        left: Box<Expr>,
+        left: Box<ExprWithSpan>,
         /// The right-hand operand.
-        right: Box<Expr>,
+        right: Box<ExprWithSpan>,
     },
     /// Unary operation applied to a single expression.
     ///
@@ -62,9 +65,9 @@ pub enum Expr {
     /// ```
     UnaryOp {
         /// The unary operator to apply.
-        op: UnaryOp,
+        op: WithSpan<UnaryOp>,
         /// The operand expression.
-        expr: Box<Expr>,
+        expr: Box<ExprWithSpan>,
     },
     /// Function call with a name and argument list.
     ///
@@ -83,18 +86,20 @@ pub enum Expr {
     /// ```
     FunctionCall {
         /// The name of the function to call.
-        name: FunctionName,
+        name: WithSpan<FunctionName>,
         /// The arguments to pass to the function.
-        args: Vec<Expr>,
+        args: Vec<ExprWithSpan>,
     },
     /// Variable reference (local, parameter, or external).
-    Variable(Variable),
+    Variable(WithSpan<Variable>),
     /// Constant literal value.
     Literal {
         /// The literal value.
-        value: Literal,
+        value: WithSpan<Literal>,
     },
 }
+
+pub type ExprWithSpan = WithSpan<Expr>;
 
 impl Expr {
     /// Creates a binary operation expression.
@@ -114,7 +119,7 @@ impl Expr {
     /// let right = Expr::literal(Literal::number(3.0));
     /// let expr = Expr::binary_op(BinaryOp::Add, left, right);
     /// ```
-    pub fn binary_op(op: BinaryOp, left: Expr, right: Expr) -> Self {
+    pub fn binary_op(op: WithSpan<BinaryOp>, left: ExprWithSpan, right: ExprWithSpan) -> Self {
         Self::BinaryOp {
             op,
             left: Box::new(left),
@@ -137,7 +142,7 @@ impl Expr {
     /// let operand = Expr::literal(Literal::number(5.0));
     /// let expr = Expr::unary_op(UnaryOp::Neg, operand);
     /// ```
-    pub fn unary_op(op: UnaryOp, expr: Expr) -> Self {
+    pub fn unary_op(op: WithSpan<UnaryOp>, expr: ExprWithSpan) -> Self {
         Self::UnaryOp {
             op,
             expr: Box::new(expr),
@@ -159,7 +164,7 @@ impl Expr {
     /// let args = vec![Expr::literal(Literal::number(3.14))];
     /// let expr = Expr::function_call(FunctionName::sin(), args);
     /// ```
-    pub fn function_call(name: FunctionName, args: Vec<Expr>) -> Self {
+    pub fn function_call(name: WithSpan<FunctionName>, args: Vec<ExprWithSpan>) -> Self {
         Self::FunctionCall { name, args }
     }
 
@@ -176,8 +181,8 @@ impl Expr {
     ///
     /// let expr = Expr::local_variable(Identifier::new("x"));
     /// ```
-    pub fn local_variable(ident: Identifier) -> Self {
-        Self::Variable(Variable::Local(ident))
+    pub fn local_variable(ident: Identifier, variable_span: Span) -> Self {
+        Self::Variable(WithSpan::new(Variable::Local(ident), variable_span))
     }
 
     /// Creates a parameter variable reference.
@@ -193,8 +198,8 @@ impl Expr {
     ///
     /// let expr = Expr::parameter_variable(Identifier::new("radius"));
     /// ```
-    pub fn parameter_variable(ident: Identifier) -> Self {
-        Self::Variable(Variable::Parameter(ident))
+    pub fn parameter_variable(ident: Identifier, variable_span: Span) -> Self {
+        Self::Variable(WithSpan::new(Variable::Parameter(ident), variable_span))
     }
 
     /// Creates an external variable reference.
@@ -214,8 +219,11 @@ impl Expr {
     ///     Identifier::new("pi")
     /// );
     /// ```
-    pub fn external_variable(model: ModelPath, ident: Identifier) -> Self {
-        Self::Variable(Variable::External { model, ident })
+    pub fn external_variable(model: ModelPath, ident: Identifier, variable_span: Span) -> Self {
+        Self::Variable(WithSpan::new(
+            Variable::External { model, ident },
+            variable_span,
+        ))
     }
 
     /// Creates a literal expression.
@@ -231,7 +239,7 @@ impl Expr {
     ///
     /// let expr = Expr::literal(Literal::number(42.0));
     /// ```
-    pub fn literal(value: Literal) -> Self {
+    pub fn literal(value: WithSpan<Literal>) -> Self {
         Self::Literal { value }
     }
 }
@@ -495,6 +503,20 @@ pub enum Variable {
         /// The identifier of the parameter in that model.
         ident: Identifier,
     },
+}
+
+impl Variable {
+    pub fn local(ident: Identifier) -> Self {
+        Self::Local(ident)
+    }
+
+    pub fn parameter(ident: Identifier) -> Self {
+        Self::Parameter(ident)
+    }
+
+    pub fn external(model: ModelPath, ident: Identifier) -> Self {
+        Self::External { model, ident }
+    }
 }
 
 /// Literal values that can appear in expressions.

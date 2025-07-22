@@ -10,6 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
+    span::WithSpan,
     test::{ModelTest, SubmodelTest, TestIndex},
 };
 
@@ -26,11 +27,11 @@ use crate::{
 /// Models are immutable by design, following functional programming principles.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
-    python_imports: HashSet<PythonPath>,
-    submodels: HashMap<Identifier, ModelPath>,
+    python_imports: HashSet<WithSpan<PythonPath>>,
+    submodels: HashMap<Identifier, WithSpan<ModelPath>>,
     parameters: ParameterCollection,
     model_tests: HashMap<TestIndex, ModelTest>,
-    submodel_tests: Vec<SubmodelTest>,
+    submodel_tests: Vec<WithSpan<SubmodelTest>>,
 }
 
 impl Model {
@@ -47,7 +48,7 @@ impl Model {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{model::Model, parameter::ParameterCollection};
+    /// use oneil_ir::{model::Model, parameter::ParameterCollection, span::WithSpan, reference::{Identifier, ModelPath, PythonPath}};
     /// use std::collections::{HashMap, HashSet};
     ///
     /// let model = Model::new(
@@ -59,11 +60,11 @@ impl Model {
     /// );
     /// ```
     pub fn new(
-        python_imports: HashSet<PythonPath>,
-        submodels: HashMap<Identifier, ModelPath>,
+        python_imports: HashSet<WithSpan<PythonPath>>,
+        submodels: HashMap<Identifier, WithSpan<ModelPath>>,
         parameters: ParameterCollection,
         model_tests: HashMap<TestIndex, ModelTest>,
-        submodel_tests: Vec<SubmodelTest>,
+        submodel_tests: Vec<WithSpan<SubmodelTest>>,
     ) -> Self {
         Self {
             python_imports,
@@ -78,7 +79,7 @@ impl Model {
     ///
     /// Python imports allow models to use external Python functionality
     /// for complex calculations or data processing.
-    pub fn get_python_imports(&self) -> &HashSet<PythonPath> {
+    pub fn get_python_imports(&self) -> &HashSet<WithSpan<PythonPath>> {
         &self.python_imports
     }
 
@@ -93,11 +94,11 @@ impl Model {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{model::Model, reference::{Identifier, ModelPath}, parameter::ParameterCollection};
+    /// use oneil_ir::{model::Model, parameter::ParameterCollection, span::WithSpan, reference::{Identifier, ModelPath, PythonPath}};
     /// use std::collections::{HashMap, HashSet};
     ///
     /// let mut submodels = HashMap::new();
-    /// submodels.insert(Identifier::new("sub"), ModelPath::new("submodel"));
+    /// submodels.insert(Identifier::new("sub"), WithSpan::new(ModelPath::new("submodel"), oneil_ir::span::Span::new(0, 0)));
     ///
     /// let model = Model::new(
     ///     HashSet::new(),
@@ -110,7 +111,7 @@ impl Model {
     /// assert!(model.get_submodel(&Identifier::new("sub")).is_some());
     /// assert!(model.get_submodel(&Identifier::new("nonexistent")).is_none());
     /// ```
-    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&ModelPath> {
+    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&WithSpan<ModelPath>> {
         self.submodels.get(identifier)
     }
 
@@ -137,7 +138,7 @@ impl Model {
     ///
     /// Submodel tests validate the behavior of individual submodels
     /// and are stored in a vector since they don't need indexed access.
-    pub fn get_submodel_tests(&self) -> &Vec<SubmodelTest> {
+    pub fn get_submodel_tests(&self) -> &[WithSpan<SubmodelTest>] {
         &self.submodel_tests
     }
 
@@ -218,7 +219,7 @@ impl ModelCollection {
         }
     }
 
-    /// Returns all Python imports from all modelss in the collection.
+    /// Returns all Python imports from all models in the collection.
     ///
     /// This method aggregates Python imports from all models, which is useful
     /// for dependency analysis and ensuring all required Python modules are available.
@@ -230,7 +231,7 @@ impl ModelCollection {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{model::{ModelCollection, Model}, reference::{ModelPath, PythonPath}, parameter::ParameterCollection};
+    /// use oneil_ir::{model::{ModelCollection, Model}, reference::{ModelPath, PythonPath}, parameter::ParameterCollection, span::WithSpan};
     /// use std::collections::{HashMap, HashSet};
     /// use std::path::PathBuf;
     ///
@@ -238,7 +239,7 @@ impl ModelCollection {
     /// initial_models.insert(ModelPath::new("main"));
     ///
     /// let mut python_imports = HashSet::new();
-    /// python_imports.insert(PythonPath::new(PathBuf::from("math")));
+    /// python_imports.insert(WithSpan::new(PythonPath::new(PathBuf::from("math")), oneil_ir::span::Span::new(0, 0)));
     ///
     /// let mut models = HashMap::new();
     /// models.insert(ModelPath::new("main"), Model::new(
@@ -256,7 +257,7 @@ impl ModelCollection {
     pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
         self.models
             .values()
-            .flat_map(|model| model.python_imports.iter())
+            .flat_map(|model| model.python_imports.iter().map(|ws| &**ws))
             .collect()
     }
 }

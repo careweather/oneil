@@ -8,7 +8,11 @@ use std::{
     ops::Deref,
 };
 
-use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier};
+use crate::{
+    debug_info::TraceLevel,
+    expr::ExprWithSpan,
+    reference::{Identifier, IdentifierWithSpan},
+};
 
 /// An index for identifying model tests.
 ///
@@ -50,8 +54,8 @@ impl TestIndex {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelTest {
     trace_level: TraceLevel,
-    inputs: HashSet<Identifier>,
-    test_expr: Expr,
+    inputs: HashSet<IdentifierWithSpan>,
+    test_expr: ExprWithSpan,
 }
 
 impl ModelTest {
@@ -75,7 +79,11 @@ impl ModelTest {
     /// let test_expr = Expr::literal(Literal::number(78.54)); // Expected area for radius = 5
     /// let test = ModelTest::new(TraceLevel::None, inputs, test_expr);
     /// ```
-    pub fn new(trace_level: TraceLevel, inputs: HashSet<Identifier>, test_expr: Expr) -> Self {
+    pub fn new(
+        trace_level: TraceLevel,
+        inputs: HashSet<IdentifierWithSpan>,
+        test_expr: ExprWithSpan,
+    ) -> Self {
         Self {
             trace_level,
             inputs,
@@ -119,7 +127,7 @@ impl ModelTest {
     /// assert!(test.inputs().contains(&Identifier::new("radius")));
     /// assert!(test.inputs().contains(&Identifier::new("height")));
     /// ```
-    pub fn inputs(&self) -> &HashSet<Identifier> {
+    pub fn inputs(&self) -> &HashSet<IdentifierWithSpan> {
         &self.inputs
     }
 
@@ -144,7 +152,7 @@ impl ModelTest {
     ///
     /// assert_eq!(test.test_expr(), &expected_area);
     /// ```
-    pub fn test_expr(&self) -> &Expr {
+    pub fn test_expr(&self) -> &ExprWithSpan {
         &self.test_expr
     }
 }
@@ -256,7 +264,7 @@ impl SubmodelTest {
 /// to their test values. It implements `Deref` to provide direct
 /// access to the underlying mapping.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SubmodelTestInputs(HashMap<Identifier, Expr>);
+pub struct SubmodelTestInputs(HashMap<IdentifierWithSpan, ExprWithSpan>);
 
 impl SubmodelTestInputs {
     /// Creates new submodel test inputs from a mapping of identifiers to expressions.
@@ -277,13 +285,13 @@ impl SubmodelTestInputs {
     ///
     /// let test_inputs = SubmodelTestInputs::new(inputs);
     /// ```
-    pub fn new(inputs: HashMap<Identifier, Expr>) -> Self {
+    pub fn new(inputs: HashMap<IdentifierWithSpan, ExprWithSpan>) -> Self {
         Self(inputs)
     }
 }
 
 impl Deref for SubmodelTestInputs {
-    type Target = HashMap<Identifier, Expr>;
+    type Target = HashMap<IdentifierWithSpan, ExprWithSpan>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

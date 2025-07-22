@@ -6,6 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::span::WithSpan;
+
 /// An identifier for a variable, parameter, or other named entity in Oneil.
 ///
 /// `Identifier` represents a string-based name that uniquely identifies
@@ -56,6 +58,8 @@ impl Identifier {
         &self.0
     }
 }
+
+pub type IdentifierWithSpan = WithSpan<Identifier>;
 
 /// A path to an Oneil model file.
 ///

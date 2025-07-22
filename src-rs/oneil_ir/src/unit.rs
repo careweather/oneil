@@ -7,6 +7,8 @@
 //! The unit system supports both simple units and composite units that
 //! combine multiple base units with exponents.
 
+use crate::span::Span;
+
 /// A composite unit composed of multiple base units.
 ///
 /// `CompositeUnit` represents a complex unit that is built from multiple
@@ -89,7 +91,9 @@ impl CompositeUnit {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unit {
     name: String,
+    name_span: Span,
     exponent: f64,
+    exponent_span: Span,
 }
 
 impl Unit {
@@ -110,8 +114,13 @@ impl Unit {
     /// let per_second = Unit::new("s".to_string(), -1.0);
     /// let sqrt_meter = Unit::new("m".to_string(), 0.5);
     /// ```
-    pub fn new(name: String, exponent: f64) -> Self {
-        Self { name, exponent }
+    pub fn new(name: String, name_span: Span, exponent: f64, exponent_span: Span) -> Self {
+        Self {
+            name,
+            name_span,
+            exponent,
+            exponent_span,
+        }
     }
 
     /// Returns the name of this unit.
@@ -133,6 +142,10 @@ impl Unit {
     /// ```
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn name_span(&self) -> &Span {
+        &self.name_span
     }
 
     /// Returns the exponent of this unit.
@@ -163,5 +176,9 @@ impl Unit {
     /// ```
     pub fn exponent(&self) -> f64 {
         self.exponent
+    }
+
+    pub fn exponent_span(&self) -> &Span {
+        &self.exponent_span
     }
 }

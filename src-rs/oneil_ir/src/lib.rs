@@ -95,5 +95,6 @@ pub mod expr;
 pub mod model;
 pub mod parameter;
 pub mod reference;
+pub mod span;
 pub mod test;
 pub mod unit;

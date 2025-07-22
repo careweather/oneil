@@ -9,7 +9,12 @@ use std::{
     ops::Deref,
 };
 
-use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier, unit::CompositeUnit};
+use crate::{
+    debug_info::TraceLevel,
+    expr::ExprWithSpan,
+    reference::{Identifier, IdentifierWithSpan},
+    unit::CompositeUnit,
+};
 
 /// A collection of parameters that can be managed together.
 ///
@@ -77,7 +82,7 @@ impl Deref for ParameterCollection {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     dependencies: HashSet<Identifier>,
-    ident: Identifier,
+    ident: IdentifierWithSpan,
     value: ParameterValue,
     limits: Limits,
     is_performance: bool,
@@ -113,7 +118,7 @@ impl Parameter {
     /// ```
     pub fn new(
         dependencies: HashSet<Identifier>,
-        ident: Identifier,
+        ident: IdentifierWithSpan,
         value: ParameterValue,
         limits: Limits,
         is_performance: bool,
@@ -171,7 +176,7 @@ impl Parameter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     /// A simple expression with an optional unit.
-    Simple(Expr, Option<CompositeUnit>),
+    Simple(ExprWithSpan, Option<CompositeUnit>),
     /// A piecewise function with multiple expressions and conditions.
     Piecewise(Vec<PiecewiseExpr>, Option<CompositeUnit>),
 }
@@ -192,7 +197,7 @@ impl ParameterValue {
     /// let expr = Expr::literal(Literal::number(3.14159));
     /// let value = ParameterValue::simple(expr, None);
     /// ```
-    pub fn simple(expr: Expr, unit: Option<CompositeUnit>) -> Self {
+    pub fn simple(expr: ExprWithSpan, unit: Option<CompositeUnit>) -> Self {
         Self::Simple(expr, unit)
     }
 
@@ -229,8 +234,8 @@ impl ParameterValue {
 /// value should be used. The condition is evaluated as a boolean expression.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewiseExpr {
-    expr: Expr,
-    if_expr: Expr,
+    expr: ExprWithSpan,
+    if_expr: ExprWithSpan,
 }
 
 impl PiecewiseExpr {
@@ -255,7 +260,7 @@ impl PiecewiseExpr {
     ///
     /// let piecewise = PiecewiseExpr::new(value, condition);
     /// ```
-    pub fn new(expr: Expr, if_expr: Expr) -> Self {
+    pub fn new(expr: ExprWithSpan, if_expr: ExprWithSpan) -> Self {
         Self { expr, if_expr }
     }
 }
@@ -271,14 +276,14 @@ pub enum Limits {
     /// Continuous range with minimum and maximum values.
     Continuous {
         /// The minimum allowed value expression.
-        min: Expr,
+        min: ExprWithSpan,
         /// The maximum allowed value expression.
-        max: Expr,
+        max: ExprWithSpan,
     },
     /// Discrete set of allowed values.
     Discrete {
         /// Vector of expressions representing allowed values.
-        values: Vec<Expr>,
+        values: Vec<ExprWithSpan>,
     },
 }
 
@@ -312,7 +317,7 @@ impl Limits {
     /// let max = Expr::literal(Literal::number(100.0));
     /// let limits = Limits::continuous(min, max);
     /// ```
-    pub fn continuous(min: Expr, max: Expr) -> Self {
+    pub fn continuous(min: ExprWithSpan, max: ExprWithSpan) -> Self {
         Self::Continuous { min, max }
     }
 
@@ -334,7 +339,7 @@ impl Limits {
     /// ];
     /// let limits = Limits::discrete(values);
     /// ```
-    pub fn discrete(values: Vec<Expr>) -> Self {
+    pub fn discrete(values: Vec<ExprWithSpan>) -> Self {
         Self::Discrete { values }
     }
 }
