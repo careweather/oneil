@@ -555,10 +555,11 @@ mod tests {
         assert!(result.is_ok());
         let result = result.expect("result should be ok");
         match result.value() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::External { model, ident }) => {
+                assert_eq!(model, &ModelPath::new("test_submodel"));
                 assert_eq!(ident, &Identifier::new("parameter"));
             }
-            error => panic!("Expected parameter variable expression, got {:?}", error),
+            error => panic!("Expected external variable expression, got {:?}", error),
         }
     }
 
@@ -603,10 +604,11 @@ mod tests {
         assert!(result.is_ok());
         let result = result.expect("result should be ok");
         match result.value() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::External { model, ident }) => {
+                assert_eq!(model, &ModelPath::new("test_submodel2"));
                 assert_eq!(ident, &Identifier::new("parameter"));
             }
-            error => panic!("Expected parameter variable expression, got {:?}", error),
+            error => panic!("Expected external variable expression, got {:?}", error),
         }
     }
 
