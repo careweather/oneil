@@ -35,7 +35,7 @@ impl<'a> oneil_model_loader::FileLoader for FileLoader {
     type ParseError = LoadingError;
     type PythonError = DoesNotExistError;
 
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError> {
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::model::ModelNode, Self::ParseError> {
         let file_content = std::fs::read_to_string(path)?;
         let ast = parser::parse_model(&file_content, None)?;
         Ok(ast)
