@@ -21,14 +21,14 @@ fn main() {
             } => {
                 let ast = file_parser::FileLoader.parse_ast(&file);
                 match ast {
-                    Ok(ast) => printer::ast::print(&ast),
+                    Ok(ast) => printer::ast::print(&ast, false),
                     Err(LoadingError::InvalidFile(error)) => {
                         printer::error::file::print(&file, &error)
                     }
                     Err(LoadingError::Parser(error_with_partial)) => {
                         printer::error::parser::print(&file, error_with_partial.errors);
                         if display_partial {
-                            printer::ast::print(&error_with_partial.partial_result);
+                            printer::ast::print(&error_with_partial.partial_result, false);
                         }
                     }
                 }
