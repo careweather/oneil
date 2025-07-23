@@ -547,136 +547,144 @@ mod tests {
         reference::Identifier,
     };
 
-    // Helper function to create a test span
-    fn test_span(start: usize, end: usize) -> ast::Span {
-        ast::Span::new(start, end - start, 0)
-    }
+    mod helper {
+        use super::*;
 
-    // Helper function to create a literal expression node
-    fn create_literal_expr_node(
-        literal: ast::expression::Literal,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::ExprNode {
-        let literal_node = ast::node::Node::new(test_span(start, end), literal);
-        let expr = ast::expression::Expr::Literal(literal_node);
-        ast::node::Node::new(test_span(start, end), expr)
-    }
+        // Helper function to create a test span
+        pub fn test_span(start: usize, end: usize) -> ast::Span {
+            ast::Span::new(start, end - start, 0)
+        }
 
-    // Helper function to create a variable expression node
-    fn create_variable_expr_node(
-        variable: ast::expression::VariableNode,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::ExprNode {
-        let expr = ast::expression::Expr::Variable(variable);
-        ast::node::Node::new(test_span(start, end), expr)
-    }
+        // Helper function to create a literal expression node
+        pub fn create_literal_expr_node(
+            literal: ast::expression::Literal,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ExprNode {
+            let literal_node = ast::node::Node::new(test_span(start, end), literal);
+            let expr = ast::expression::Expr::Literal(literal_node);
+            ast::node::Node::new(test_span(start, end), expr)
+        }
 
-    // Helper function to create a binary operation expression node
-    fn create_binary_op_expr_node(
-        left: ast::expression::ExprNode,
-        op: ast::expression::BinaryOp,
-        right: ast::expression::ExprNode,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::ExprNode {
-        let op_node = ast::node::Node::new(test_span(start, end), op);
-        let expr = ast::expression::Expr::BinaryOp {
-            left: Box::new(left),
-            op: op_node,
-            right: Box::new(right),
-        };
-        ast::node::Node::new(test_span(start, end), expr)
-    }
+        // Helper function to create a variable expression node
+        pub fn create_variable_expr_node(
+            variable: ast::expression::VariableNode,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ExprNode {
+            let expr = ast::expression::Expr::Variable(variable);
+            ast::node::Node::new(test_span(start, end), expr)
+        }
 
-    // Helper function to create a function call expression node
-    fn create_function_call_expr_node(
-        name: &str,
-        args: Vec<ast::expression::ExprNode>,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::ExprNode {
-        let identifier = ast::naming::Identifier::new(name.to_string());
-        let name_node = ast::node::Node::new(test_span(start, start + name.len()), identifier);
-        let expr = ast::expression::Expr::FunctionCall {
-            name: name_node,
-            args,
-        };
-        ast::node::Node::new(test_span(start, end), expr)
-    }
+        // Helper function to create a binary operation expression node
+        pub fn create_binary_op_expr_node(
+            left: ast::expression::ExprNode,
+            op: ast::expression::BinaryOp,
+            right: ast::expression::ExprNode,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ExprNode {
+            let op_node = ast::node::Node::new(test_span(start, end), op);
+            let expr = ast::expression::Expr::BinaryOp {
+                left: Box::new(left),
+                op: op_node,
+                right: Box::new(right),
+            };
+            ast::node::Node::new(test_span(start, end), expr)
+        }
 
-    // Helper function to create a simple identifier variable
-    fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
-        let identifier = ast::naming::Identifier::new(name.to_string());
-        let identifier_node = ast::node::Node::new(test_span(0, name.len()), identifier);
-        let variable = ast::expression::Variable::Identifier(identifier_node);
-        ast::node::Node::new(test_span(0, name.len()), variable)
-    }
+        // Helper function to create a function call expression node
+        pub fn create_function_call_expr_node(
+            name: &str,
+            args: Vec<ast::expression::ExprNode>,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ExprNode {
+            let identifier = ast::naming::Identifier::new(name.to_string());
+            let name_node = ast::node::Node::new(test_span(start, start + name.len()), identifier);
+            let expr = ast::expression::Expr::FunctionCall {
+                name: name_node,
+                args,
+            };
+            ast::node::Node::new(test_span(start, end), expr)
+        }
 
-    // Helper function to create a simple parameter
-    fn create_simple_parameter(ident: &str, value: f64) -> ast::parameter::ParameterNode {
-        let label = ast::naming::Label::new(format!("Parameter {}", ident));
-        let label_node = ast::node::Node::new(test_span(0, 0), label);
-        let identifier = ast::naming::Identifier::new(ident.to_string());
-        let ident_node = ast::node::Node::new(test_span(0, ident.len()), identifier);
+        // Helper function to create a simple identifier variable
+        pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
+            let identifier = ast::naming::Identifier::new(name.to_string());
+            let identifier_node = ast::node::Node::new(test_span(0, name.len()), identifier);
+            let variable = ast::expression::Variable::Identifier(identifier_node);
+            ast::node::Node::new(test_span(0, name.len()), variable)
+        }
 
-        let literal = ast::expression::Literal::Number(value);
-        let literal_node = ast::node::Node::new(test_span(0, 1), literal);
-        let expr = ast::expression::Expr::Literal(literal_node);
-        let expr_node = ast::node::Node::new(test_span(0, 1), expr);
-        let value_node = ast::node::Node::new(
-            test_span(0, 1),
-            ast::parameter::ParameterValue::Simple(expr_node, None),
-        );
+        // Helper function to create a simple parameter
+        pub fn create_simple_parameter(ident: &str, value: f64) -> ast::parameter::ParameterNode {
+            let label = ast::naming::Label::new(format!("Parameter {}", ident));
+            let label_node = ast::node::Node::new(test_span(0, 0), label);
+            let identifier = ast::naming::Identifier::new(ident.to_string());
+            let ident_node = ast::node::Node::new(test_span(0, ident.len()), identifier);
 
-        let parameter =
-            ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
-        ast::node::Node::new(test_span(0, ident.len()), parameter)
-    }
+            let literal = ast::expression::Literal::Number(value);
+            let literal_node = ast::node::Node::new(test_span(0, 1), literal);
+            let expr = ast::expression::Expr::Literal(literal_node);
+            let expr_node = ast::node::Node::new(test_span(0, 1), expr);
+            let value_node = ast::node::Node::new(
+                test_span(0, 1),
+                ast::parameter::ParameterValue::Simple(expr_node, None),
+            );
 
-    // Helper function to create a dependent parameter
-    fn create_dependent_parameter(ident: &str, dependency: &str) -> ast::parameter::ParameterNode {
-        let label = ast::naming::Label::new(format!("Parameter {}", ident));
-        let label_node = ast::node::Node::new(test_span(0, 0), label);
-        let identifier = ast::naming::Identifier::new(ident.to_string());
-        let ident_node = ast::node::Node::new(test_span(0, ident.len()), identifier);
+            let parameter =
+                ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
+            ast::node::Node::new(test_span(0, ident.len()), parameter)
+        }
 
-        let dep_identifier = ast::naming::Identifier::new(dependency.to_string());
-        let dep_ident_node = ast::node::Node::new(test_span(0, dependency.len()), dep_identifier);
-        let dep_variable = ast::expression::Variable::Identifier(dep_ident_node);
-        let dep_var_node = ast::node::Node::new(test_span(0, dependency.len()), dep_variable);
-        let dep_expr = ast::expression::Expr::Variable(dep_var_node);
-        let dep_expr_node = ast::node::Node::new(test_span(0, dependency.len()), dep_expr);
+        // Helper function to create a dependent parameter
+        pub fn create_dependent_parameter(
+            ident: &str,
+            dependency: &str,
+        ) -> ast::parameter::ParameterNode {
+            let label = ast::naming::Label::new(format!("Parameter {}", ident));
+            let label_node = ast::node::Node::new(test_span(0, 0), label);
+            let identifier = ast::naming::Identifier::new(ident.to_string());
+            let ident_node = ast::node::Node::new(test_span(0, ident.len()), identifier);
 
-        let literal = ast::expression::Literal::Number(1.0);
-        let literal_node = ast::node::Node::new(test_span(0, 1), literal);
-        let literal_expr = ast::expression::Expr::Literal(literal_node);
-        let literal_expr_node = ast::node::Node::new(test_span(0, 1), literal_expr);
+            let dep_identifier = ast::naming::Identifier::new(dependency.to_string());
+            let dep_ident_node =
+                ast::node::Node::new(test_span(0, dependency.len()), dep_identifier);
+            let dep_variable = ast::expression::Variable::Identifier(dep_ident_node);
+            let dep_var_node = ast::node::Node::new(test_span(0, dependency.len()), dep_variable);
+            let dep_expr = ast::expression::Expr::Variable(dep_var_node);
+            let dep_expr_node = ast::node::Node::new(test_span(0, dependency.len()), dep_expr);
 
-        let op = ast::expression::BinaryOp::Add;
-        let op_node = ast::node::Node::new(test_span(0, 1), op);
-        let binary_expr = ast::expression::Expr::BinaryOp {
-            left: Box::new(dep_expr_node),
-            op: op_node,
-            right: Box::new(literal_expr_node),
-        };
-        let binary_expr_node = ast::node::Node::new(test_span(0, 3), binary_expr);
-        let value_node = ast::node::Node::new(
-            test_span(0, 3),
-            ast::parameter::ParameterValue::Simple(binary_expr_node, None),
-        );
+            let literal = ast::expression::Literal::Number(1.0);
+            let literal_node = ast::node::Node::new(test_span(0, 1), literal);
+            let literal_expr = ast::expression::Expr::Literal(literal_node);
+            let literal_expr_node = ast::node::Node::new(test_span(0, 1), literal_expr);
 
-        let parameter =
-            ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
-        ast::node::Node::new(test_span(0, ident.len()), parameter)
-    }
+            let op = ast::expression::BinaryOp::Add;
+            let op_node = ast::node::Node::new(test_span(0, 1), op);
+            let binary_expr = ast::expression::Expr::BinaryOp {
+                left: Box::new(dep_expr_node),
+                op: op_node,
+                right: Box::new(literal_expr_node),
+            };
+            let binary_expr_node = ast::node::Node::new(test_span(0, 3), binary_expr);
+            let value_node = ast::node::Node::new(
+                test_span(0, 3),
+                ast::parameter::ParameterValue::Simple(binary_expr_node, None),
+            );
 
-    // Helper function to create mock model and submodel info
-    fn create_mock_info<'a>() -> (SubmodelInfo<'a>, ModelInfo<'a>) {
-        let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
-        let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
-        (submodel_info, model_info)
+            let parameter =
+                ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
+            ast::node::Node::new(test_span(0, ident.len()), parameter)
+        }
+
+        // Helper function to create mock model and submodel info
+        pub fn create_mock_info<'a>() -> (SubmodelInfo<'a>, ModelInfo<'a>) {
+            let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
+            let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
+            (submodel_info, model_info)
+        }
     }
 
     #[test]
@@ -685,7 +693,7 @@ mod tests {
         let parameters = vec![];
 
         // create the submodel and model info
-        let (submodel_info, model_info) = create_mock_info();
+        let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
@@ -700,12 +708,12 @@ mod tests {
     #[test]
     fn test_resolve_parameters_simple() {
         // create the parameters
-        let param_a = create_simple_parameter("a", 10.0);
-        let param_b = create_simple_parameter("b", 20.0);
+        let param_a = helper::create_simple_parameter("a", 10.0);
+        let param_b = helper::create_simple_parameter("b", 20.0);
         let parameters = vec![&param_a, &param_b];
 
         // create the submodel and model info
-        let (submodel_info, model_info) = create_mock_info();
+        let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
@@ -726,12 +734,12 @@ mod tests {
     #[test]
     fn test_resolve_parameters_with_dependencies() {
         // create the parameters
-        let param_a = create_simple_parameter("a", 10.0);
-        let param_b = create_dependent_parameter("b", "a");
+        let param_a = helper::create_simple_parameter("a", 10.0);
+        let param_b = helper::create_dependent_parameter("b", "a");
         let parameters = vec![&param_a, &param_b];
 
         // create the submodel and model info
-        let (submodel_info, model_info) = create_mock_info();
+        let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
@@ -752,12 +760,12 @@ mod tests {
     #[test]
     fn test_resolve_parameters_circular_dependency() {
         // create the parameters
-        let param_a = create_dependent_parameter("a", "b");
-        let param_b = create_dependent_parameter("b", "a");
+        let param_a = helper::create_dependent_parameter("a", "b");
+        let param_b = helper::create_dependent_parameter("b", "a");
         let parameters = vec![&param_a, &param_b];
 
         // create the submodel and model info
-        let (submodel_info, model_info) = create_mock_info();
+        let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
@@ -807,7 +815,7 @@ mod tests {
 
     #[test]
     fn test_get_parameter_internal_dependencies_simple() {
-        let parameter = create_simple_parameter("a", 10.0);
+        let parameter = helper::create_simple_parameter("a", 10.0);
         let dependencies = get_parameter_internal_dependencies(&parameter);
 
         assert!(dependencies.is_empty());
@@ -815,7 +823,7 @@ mod tests {
 
     #[test]
     fn test_get_parameter_internal_dependencies_with_variable() {
-        let parameter = create_dependent_parameter("a", "b");
+        let parameter = helper::create_dependent_parameter("a", "b");
         let dependencies = get_parameter_internal_dependencies(&parameter);
 
         assert_eq!(dependencies.len(), 1);
@@ -826,27 +834,28 @@ mod tests {
     fn test_get_parameter_internal_dependencies_with_limits() {
         // Create a parameter with limits that reference other parameters
         let label = ast::naming::Label::new("Test Parameter".to_string());
-        let label_node = ast::node::Node::new(test_span(0, 0), label);
+        let label_node = ast::node::Node::new(helper::test_span(0, 0), label);
         let identifier = ast::naming::Identifier::new("test".to_string());
-        let ident_node = ast::node::Node::new(test_span(0, 4), identifier);
+        let ident_node = ast::node::Node::new(helper::test_span(0, 4), identifier);
 
         // Create the value expression
-        let value_expr = create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1);
+        let value_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1);
         let value_node = ast::node::Node::new(
-            test_span(0, 1),
+            helper::test_span(0, 1),
             ast::parameter::ParameterValue::Simple(value_expr, None),
         );
 
         // Create the limits with variable references
-        let min_var = create_identifier_variable("min_val");
-        let min_expr = create_variable_expr_node(min_var, 0, 7);
-        let max_var = create_identifier_variable("max_val");
-        let max_expr = create_variable_expr_node(max_var, 0, 7);
+        let min_var = helper::create_identifier_variable("min_val");
+        let min_expr = helper::create_variable_expr_node(min_var, 0, 7);
+        let max_var = helper::create_identifier_variable("max_val");
+        let max_expr = helper::create_variable_expr_node(max_var, 0, 7);
         let limits = ast::parameter::Limits::Continuous {
             min: min_expr,
             max: max_expr,
         };
-        let limits_node = ast::node::Node::new(test_span(0, 7), limits);
+        let limits_node = ast::node::Node::new(helper::test_span(0, 7), limits);
 
         let parameter = ast::Parameter::new(
             label_node,
@@ -867,7 +876,7 @@ mod tests {
 
     #[test]
     fn test_get_expr_internal_dependencies_literal() {
-        let expr = create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
+        let expr = helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
 
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
@@ -876,8 +885,8 @@ mod tests {
 
     #[test]
     fn test_get_expr_internal_dependencies_variable() {
-        let variable = create_identifier_variable("test_var");
-        let expr = create_variable_expr_node(variable, 0, 8);
+        let variable = helper::create_identifier_variable("test_var");
+        let expr = helper::create_variable_expr_node(variable, 0, 8);
 
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
@@ -887,12 +896,17 @@ mod tests {
 
     #[test]
     fn test_get_expr_internal_dependencies_binary_op() {
-        let left_var = create_identifier_variable("a");
-        let left_expr = create_variable_expr_node(left_var, 0, 1);
-        let right_var = create_identifier_variable("b");
-        let right_expr = create_variable_expr_node(right_var, 4, 5);
-        let expr =
-            create_binary_op_expr_node(left_expr, ast::expression::BinaryOp::Add, right_expr, 0, 5);
+        let left_var = helper::create_identifier_variable("a");
+        let left_expr = helper::create_variable_expr_node(left_var, 0, 1);
+        let right_var = helper::create_identifier_variable("b");
+        let right_expr = helper::create_variable_expr_node(right_var, 4, 5);
+        let expr = helper::create_binary_op_expr_node(
+            left_expr,
+            ast::expression::BinaryOp::Add,
+            right_expr,
+            0,
+            5,
+        );
 
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
@@ -903,11 +917,12 @@ mod tests {
 
     #[test]
     fn test_get_expr_internal_dependencies_function_call() {
-        let arg1_var = create_identifier_variable("arg1");
-        let arg1_expr = create_variable_expr_node(arg1_var, 9, 13);
-        let arg2_var = create_identifier_variable("arg2");
-        let arg2_expr = create_variable_expr_node(arg2_var, 15, 19);
-        let expr = create_function_call_expr_node("test_func", vec![arg1_expr, arg2_expr], 0, 19);
+        let arg1_var = helper::create_identifier_variable("arg1");
+        let arg1_expr = helper::create_variable_expr_node(arg1_var, 9, 13);
+        let arg2_var = helper::create_identifier_variable("arg2");
+        let arg2_expr = helper::create_variable_expr_node(arg2_var, 15, 19);
+        let expr =
+            helper::create_function_call_expr_node("test_func", vec![arg1_expr, arg2_expr], 0, 19);
 
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
@@ -920,17 +935,17 @@ mod tests {
     fn test_get_expr_internal_dependencies_accessor() {
         // Create an accessor variable
         let parent_identifier = ast::naming::Identifier::new("parent".to_string());
-        let parent_node = ast::node::Node::new(test_span(0, 6), parent_identifier);
+        let parent_node = ast::node::Node::new(helper::test_span(0, 6), parent_identifier);
         let component_identifier = ast::naming::Identifier::new("component".to_string());
-        let component_node = ast::node::Node::new(test_span(0, 9), component_identifier);
+        let component_node = ast::node::Node::new(helper::test_span(0, 9), component_identifier);
         let component_variable = ast::expression::Variable::Identifier(component_node);
-        let component_var_node = ast::node::Node::new(test_span(0, 9), component_variable);
+        let component_var_node = ast::node::Node::new(helper::test_span(0, 9), component_variable);
         let accessor_variable = ast::expression::Variable::Accessor {
             parent: parent_node,
             component: Box::new(component_var_node),
         };
-        let accessor_var_node = ast::node::Node::new(test_span(0, 9), accessor_variable);
-        let expr = create_variable_expr_node(accessor_var_node, 0, 9);
+        let accessor_var_node = ast::node::Node::new(helper::test_span(0, 9), accessor_variable);
+        let expr = helper::create_variable_expr_node(accessor_var_node, 0, 9);
 
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
@@ -940,10 +955,10 @@ mod tests {
 
     #[test]
     fn test_resolve_parameter_value_simple() {
-        let expr = create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
+        let expr = helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
         let value = ast::parameter::ParameterValue::Simple(expr, None);
-        let value_node = ast::node::Node::new(test_span(0, 4), value);
-        let (submodel_info, model_info) = create_mock_info();
+        let value_node = ast::node::Node::new(helper::test_span(0, 4), value);
+        let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
         let result = resolve_parameter_value(
@@ -960,7 +975,7 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_none() {
-        let (submodel_info, model_info) = create_mock_info();
+        let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
         let result = resolve_limits(None, &defined_parameters_info, &submodel_info, &model_info);
@@ -972,14 +987,16 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_continuous() {
-        let min_expr = create_literal_expr_node(ast::expression::Literal::Number(0.0), 0, 1);
-        let max_expr = create_literal_expr_node(ast::expression::Literal::Number(100.0), 0, 3);
+        let min_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(0.0), 0, 1);
+        let max_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(100.0), 0, 3);
         let limits = ast::parameter::Limits::Continuous {
             min: min_expr,
             max: max_expr,
         };
-        let limits_node = ast::node::Node::new(test_span(0, 3), limits);
-        let (submodel_info, model_info) = create_mock_info();
+        let limits_node = ast::node::Node::new(helper::test_span(0, 3), limits);
+        let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
         let result = resolve_limits(
@@ -996,14 +1013,14 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_discrete() {
-        let value1 = create_literal_expr_node(ast::expression::Literal::Number(1.0), 0, 1);
-        let value2 = create_literal_expr_node(ast::expression::Literal::Number(2.0), 0, 1);
-        let value3 = create_literal_expr_node(ast::expression::Literal::Number(3.0), 0, 1);
+        let value1 = helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 0, 1);
+        let value2 = helper::create_literal_expr_node(ast::expression::Literal::Number(2.0), 0, 1);
+        let value3 = helper::create_literal_expr_node(ast::expression::Literal::Number(3.0), 0, 1);
         let limits = ast::parameter::Limits::Discrete {
             values: vec![value1, value2, value3],
         };
-        let limits_node = ast::node::Node::new(test_span(0, 3), limits);
-        let (submodel_info, model_info) = create_mock_info();
+        let limits_node = ast::node::Node::new(helper::test_span(0, 3), limits);
+        let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
         let result = resolve_limits(

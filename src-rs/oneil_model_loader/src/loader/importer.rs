@@ -80,35 +80,38 @@ where
 mod tests {
     use std::path::PathBuf;
 
-    use oneil_ast::{
-        Span,
-        declaration::{Import, ImportNode},
-    };
+    use oneil_ast::declaration::ImportNode;
 
     use super::*;
     use crate::test::TestPythonValidator;
 
-    fn get_model_path() -> ModelPath {
-        ModelPath::new(PathBuf::from("test_model"))
-    }
+    mod helper {
+        use oneil_ast::{Span, declaration::Import};
 
-    fn get_empty_builder() -> ModelCollectionBuilder<(), ()> {
-        ModelCollectionBuilder::new(HashSet::new())
-    }
+        use super::*;
 
-    fn build_import(path: &str) -> ImportNode {
-        // for simplicity's sake, we'll use a span that's the length of the path
-        let span = Span::new(0, path.len(), 0);
-        let import = Import::new(path.to_string());
-        ImportNode::new(span, import)
+        pub(crate) fn get_model_path() -> ModelPath {
+            ModelPath::new(PathBuf::from("test_model"))
+        }
+
+        pub(crate) fn get_empty_builder() -> ModelCollectionBuilder<(), ()> {
+            ModelCollectionBuilder::new(HashSet::new())
+        }
+
+        pub(crate) fn build_import(path: &str) -> ImportNode {
+            // for simplicity's sake, we'll use a span that's the length of the path
+            let span = Span::new(0, path.len(), 0);
+            let import = Import::new(path.to_string());
+            ImportNode::new(span, import)
+        }
     }
 
     #[test]
     fn test_validate_imports_empty_list() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = get_model_path();
-        let builder = get_empty_builder();
+        let model_path = helper::get_model_path();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
         let imports = vec![];
@@ -128,11 +131,11 @@ mod tests {
     fn test_validate_imports_single_valid_import() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = get_model_path();
-        let builder = get_empty_builder();
+        let model_path = helper::get_model_path();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![build_import("my_python")];
+        let imports = vec![helper::build_import("my_python")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -156,11 +159,11 @@ mod tests {
     fn test_validate_imports_single_invalid_import() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
-        let model_path = get_model_path();
-        let builder = get_empty_builder();
+        let model_path = helper::get_model_path();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![build_import("nonexistent")];
+        let imports = vec![helper::build_import("nonexistent")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -184,11 +187,14 @@ mod tests {
     fn test_validate_imports_mixed_valid_and_invalid() {
         // set up the context
         let file_loader = TestPythonValidator::validate_some(vec!["my_python.py".into()]);
-        let model_path = get_model_path();
-        let builder = get_empty_builder();
+        let model_path = helper::get_model_path();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![build_import("my_python"), build_import("nonexistent")];
+        let imports = vec![
+            helper::build_import("my_python"),
+            helper::build_import("nonexistent"),
+        ];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -218,14 +224,14 @@ mod tests {
     fn test_validate_imports_multiple_valid_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = get_model_path();
-        let builder = get_empty_builder();
+        let model_path = helper::get_model_path();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
         let imports = vec![
-            build_import("my_python1"),
-            build_import("my_python2"),
-            build_import("my_python3"),
+            helper::build_import("my_python1"),
+            helper::build_import("my_python2"),
+            helper::build_import("my_python3"),
         ];
         let import_refs = imports.iter().collect();
 
@@ -261,11 +267,14 @@ mod tests {
     fn test_validate_imports_all_invalid() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
-        let model_path = get_model_path();
-        let builder = get_empty_builder();
+        let model_path = helper::get_model_path();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![build_import("nonexistent1"), build_import("nonexistent2")];
+        let imports = vec![
+            helper::build_import("nonexistent1"),
+            helper::build_import("nonexistent2"),
+        ];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -295,11 +304,11 @@ mod tests {
     fn test_validate_imports_builder_error_tracking() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
-        let model_path = get_model_path();
-        let builder = get_empty_builder();
+        let model_path = helper::get_model_path();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![build_import("nonexistent")];
+        let imports = vec![helper::build_import("nonexistent")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -319,10 +328,10 @@ mod tests {
         // set up the context
         let file_loader = TestPythonValidator::validate_some(vec!["subdir/my_python.py".into()]);
         let model_path = ModelPath::new(PathBuf::from("subdir/test_model"));
-        let builder = get_empty_builder();
+        let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![build_import("my_python")];
+        let imports = vec![helper::build_import("my_python")];
         let import_refs = imports.iter().collect();
 
         // validate the imports

@@ -229,114 +229,118 @@ mod tests {
     };
     use std::collections::{HashMap, HashSet};
 
-    /// Helper function to create a test span
-    fn test_span(start: usize, end: usize) -> ast::Span {
-        ast::Span::new(start, end - start, 0)
-    }
+    mod helper {
+        use super::*;
 
-    /// Helper function to create an identifier node
-    fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
-        let identifier = ast::naming::Identifier::new(name.to_string());
-        ast::node::Node::new(test_span(start, start + name.len()), identifier)
-    }
+        /// Helper function to create a test span
+        pub fn test_span(start: usize, end: usize) -> ast::Span {
+            ast::Span::new(start, end - start, 0)
+        }
 
-    /// Helper function to create a variable node
-    fn create_variable_node(
-        variable: ast::expression::Variable,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::VariableNode {
-        ast::node::Node::new(test_span(start, end), variable)
-    }
+        /// Helper function to create an identifier node
+        pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
+            let identifier = ast::naming::Identifier::new(name.to_string());
+            ast::node::Node::new(test_span(start, start + name.len()), identifier)
+        }
 
-    /// Helper function to create a simple identifier variable
-    fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
-        let identifier_node = create_identifier_node(name, 0);
-        let variable = ast::expression::Variable::Identifier(identifier_node);
-        create_variable_node(variable, 0, name.len())
-    }
+        /// Helper function to create a variable node
+        pub fn create_variable_node(
+            variable: ast::expression::Variable,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::VariableNode {
+            ast::node::Node::new(test_span(start, end), variable)
+        }
 
-    /// Helper function to create an accessor variable
-    fn create_accessor_variable(
-        parent: &str,
-        component: ast::expression::VariableNode,
-    ) -> ast::expression::VariableNode {
-        let parent_node = create_identifier_node(parent, 0);
-        let component_end = component.node_span().end();
-        let variable = ast::expression::Variable::Accessor {
-            parent: parent_node,
-            component: Box::new(component),
-        };
-        create_variable_node(variable, 0, parent.len() + 1 + component_end)
-    }
+        /// Helper function to create a simple identifier variable
+        pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
+            let identifier_node = create_identifier_node(name, 0);
+            let variable = ast::expression::Variable::Identifier(identifier_node);
+            create_variable_node(variable, 0, name.len())
+        }
 
-    /// Helper function to create a basic model info for testing
-    fn create_test_modelinfo() -> ModelInfo<'static> {
-        ModelInfo::new(HashMap::new(), HashSet::new())
-    }
+        /// Helper function to create an accessor variable
+        pub fn create_accessor_variable(
+            parent: &str,
+            component: ast::expression::VariableNode,
+        ) -> ast::expression::VariableNode {
+            let parent_node = create_identifier_node(parent, 0);
+            let component_end = component.node_span().end();
+            let variable = ast::expression::Variable::Accessor {
+                parent: parent_node,
+                component: Box::new(component),
+            };
+            create_variable_node(variable, 0, parent.len() + 1 + component_end)
+        }
 
-    /// Helper function to create a basic parameter info for testing
-    fn create_test_parameter_info() -> ParameterInfo<'static> {
-        ParameterInfo::new(HashMap::new(), HashSet::new())
-    }
+        /// Helper function to create a basic model info for testing
+        pub fn create_test_modelinfo() -> ModelInfo<'static> {
+            ModelInfo::new(HashMap::new(), HashSet::new())
+        }
 
-    /// Helper function to create a basic submodel info for testing
-    fn create_test_submodel_info() -> SubmodelInfo<'static> {
-        SubmodelInfo::new(HashMap::new(), HashSet::new())
-    }
+        /// Helper function to create a basic parameter info for testing
+        pub fn create_test_parameter_info() -> ParameterInfo<'static> {
+            ParameterInfo::new(HashMap::new(), HashSet::new())
+        }
 
-    /// Helper function to create a model with a parameter
-    fn create_modelwith_parameter(param_name: &str) -> Model {
-        let mut param_map = HashMap::new();
-        let param = Parameter::new(
-            HashSet::new(),
-            Identifier::new(param_name),
-            oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
-                None,
-            ),
-            oneil_ir::parameter::Limits::default(),
-            false,
-            oneil_ir::debug_info::TraceLevel::None,
-        );
-        param_map.insert(Identifier::new(param_name), param);
-        let param_collection = oneil_ir::parameter::ParameterCollection::new(param_map);
+        /// Helper function to create a basic submodel info for testing
+        pub fn create_test_submodel_info() -> SubmodelInfo<'static> {
+            SubmodelInfo::new(HashMap::new(), HashSet::new())
+        }
 
-        Model::new(
-            HashSet::new(),
-            HashMap::new(),
-            param_collection,
-            HashMap::new(),
-            Vec::new(),
-        )
-    }
+        /// Helper function to create a model with a parameter
+        pub fn create_modelwith_parameter(param_name: &str) -> Model {
+            let mut param_map = HashMap::new();
+            let param = Parameter::new(
+                HashSet::new(),
+                Identifier::new(param_name),
+                oneil_ir::parameter::ParameterValue::simple(
+                    oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
+                    None,
+                ),
+                oneil_ir::parameter::Limits::default(),
+                false,
+                oneil_ir::debug_info::TraceLevel::None,
+            );
+            param_map.insert(Identifier::new(param_name), param);
+            let param_collection = oneil_ir::parameter::ParameterCollection::new(param_map);
 
-    /// Helper function to create a model with a submodel
-    fn create_modelwith_submodel(submodel_name: &str, submodel_path: ModelPath) -> Model {
-        let mut submodel_map = HashMap::new();
-        submodel_map.insert(Identifier::new(submodel_name), submodel_path);
+            Model::new(
+                HashSet::new(),
+                HashMap::new(),
+                param_collection,
+                HashMap::new(),
+                Vec::new(),
+            )
+        }
 
-        Model::new(
-            HashSet::new(),
-            submodel_map,
-            oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
-            HashMap::new(),
-            Vec::new(),
-        )
+        /// Helper function to create a model with a submodel
+        pub fn create_modelwith_submodel(submodel_name: &str, submodel_path: ModelPath) -> Model {
+            let mut submodel_map = HashMap::new();
+            submodel_map.insert(Identifier::new(submodel_name), submodel_path);
+
+            Model::new(
+                HashSet::new(),
+                submodel_map,
+                oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
+                HashMap::new(),
+                Vec::new(),
+            )
+        }
     }
 
     #[test]
     fn test_resolve_local_variable() {
-        let variable = create_identifier_variable("local_var");
+        let variable = helper::create_identifier_variable("local_var");
         let mut local_vars = HashSet::new();
         local_vars.insert(Identifier::new("local_var"));
 
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
-            &create_test_submodel_info(),
-            &create_test_modelinfo(),
+            &helper::create_test_parameter_info(),
+            &helper::create_test_submodel_info(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_ok());
@@ -350,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_resolve_parameter_variable() {
-        let variable = create_identifier_variable("temperature");
+        let variable = helper::create_identifier_variable("temperature");
         let local_vars = HashSet::new();
 
         let mut param_map = HashMap::new();
@@ -373,8 +377,8 @@ mod tests {
             &variable,
             &local_vars,
             &param_info,
-            &create_test_submodel_info(),
-            &create_test_modelinfo(),
+            &helper::create_test_submodel_info(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_ok());
@@ -388,15 +392,15 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_parameter() {
-        let variable = create_identifier_variable("undefined_param");
+        let variable = helper::create_identifier_variable("undefined_param");
         let local_vars = HashSet::new();
 
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
-            &create_test_submodel_info(),
-            &create_test_modelinfo(),
+            &helper::create_test_parameter_info(),
+            &helper::create_test_submodel_info(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_err());
@@ -410,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_resolve_parameter_with_error() {
-        let variable = create_identifier_variable("error_param");
+        let variable = helper::create_identifier_variable("error_param");
         let local_vars = HashSet::new();
 
         let mut param_with_errors = HashSet::new();
@@ -422,8 +426,8 @@ mod tests {
             &variable,
             &local_vars,
             &param_info,
-            &create_test_submodel_info(),
-            &create_test_modelinfo(),
+            &helper::create_test_submodel_info(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_err());
@@ -437,17 +441,17 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_submodel() {
-        let inner_var = create_identifier_variable("parameter");
-        let variable = create_accessor_variable("undefined_submodel", inner_var);
+        let inner_var = helper::create_identifier_variable("parameter");
+        let variable = helper::create_accessor_variable("undefined_submodel", inner_var);
 
         let local_vars = HashSet::new();
 
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
-            &create_test_submodel_info(),
-            &create_test_modelinfo(),
+            &helper::create_test_parameter_info(),
+            &helper::create_test_submodel_info(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_err());
@@ -462,8 +466,8 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_with_error() {
-        let inner_var = create_identifier_variable("parameter");
-        let variable = create_accessor_variable("error_submodel", inner_var);
+        let inner_var = helper::create_identifier_variable("parameter");
+        let variable = helper::create_accessor_variable("error_submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -475,9 +479,9 @@ mod tests {
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
+            &helper::create_test_parameter_info(),
             &submodel_info,
-            &create_test_modelinfo(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_err());
@@ -492,8 +496,8 @@ mod tests {
     #[test]
     fn test_resolve_nested_accessor() {
         // Create a nested variable: submodel.parameter
-        let inner_var = create_identifier_variable("parameter");
-        let variable = create_accessor_variable("submodel", inner_var);
+        let inner_var = helper::create_identifier_variable("parameter");
+        let variable = helper::create_accessor_variable("submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -506,14 +510,14 @@ mod tests {
 
         // Create model info with the submodel model
         let mut modelmap = HashMap::new();
-        let submodel_model = create_modelwith_parameter("parameter");
+        let submodel_model = helper::create_modelwith_parameter("parameter");
         modelmap.insert(&submodel_path, &submodel_model);
         let modelinfo = ModelInfo::new(modelmap, HashSet::new());
 
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
+            &helper::create_test_parameter_info(),
             &submodel_info,
             &modelinfo,
         );
@@ -530,9 +534,9 @@ mod tests {
     #[test]
     fn test_resolve_deeply_nested_accessor() {
         // Create a deeply nested variable: parameter.submodel2.submodel1
-        let parameter_var = create_identifier_variable("parameter");
-        let submodel2_var = create_accessor_variable("submodel2", parameter_var);
-        let variable = create_accessor_variable("submodel1", submodel2_var);
+        let parameter_var = helper::create_identifier_variable("parameter");
+        let submodel2_var = helper::create_accessor_variable("submodel2", parameter_var);
+        let variable = helper::create_accessor_variable("submodel1", submodel2_var);
 
         let local_vars = HashSet::new();
 
@@ -546,8 +550,9 @@ mod tests {
         // Create model info with nested models
         let mut modelmap = HashMap::new();
         let submodel2_path = ModelPath::new("test_submodel2");
-        let submodel2_model = create_modelwith_parameter("parameter");
-        let submodel1_model = create_modelwith_submodel("submodel2", submodel2_path.clone());
+        let submodel2_model = helper::create_modelwith_parameter("parameter");
+        let submodel1_model =
+            helper::create_modelwith_submodel("submodel2", submodel2_path.clone());
         modelmap.insert(&submodel1_path, &submodel1_model);
         modelmap.insert(&submodel2_path, &submodel2_model);
         let modelinfo = ModelInfo::new(modelmap, HashSet::new());
@@ -555,7 +560,7 @@ mod tests {
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
+            &helper::create_test_parameter_info(),
             &submodel_info,
             &modelinfo,
         );
@@ -571,8 +576,8 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_parameter_in_submodel() {
-        let inner_var = create_identifier_variable("undefined_param");
-        let variable = create_accessor_variable("submodel", inner_var);
+        let inner_var = helper::create_identifier_variable("undefined_param");
+        let variable = helper::create_accessor_variable("submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -598,7 +603,7 @@ mod tests {
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
+            &helper::create_test_parameter_info(),
             &submodel_info,
             &modelinfo,
         );
@@ -618,9 +623,9 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_submodel_in_submodel() {
-        let inner_var = create_identifier_variable("parameter");
-        let variable = create_accessor_variable("undefined_submodel", inner_var);
-        let variable = create_accessor_variable("submodel", variable);
+        let inner_var = helper::create_identifier_variable("parameter");
+        let variable = helper::create_accessor_variable("undefined_submodel", inner_var);
+        let variable = helper::create_accessor_variable("submodel", variable);
 
         let local_vars = HashSet::new();
 
@@ -646,7 +651,7 @@ mod tests {
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
+            &helper::create_test_parameter_info(),
             &submodel_info,
             &modelinfo,
         );
@@ -666,8 +671,8 @@ mod tests {
 
     #[test]
     fn test_resolve_modelwith_error() {
-        let inner_var = create_identifier_variable("parameter");
-        let variable = create_accessor_variable("submodel", inner_var);
+        let inner_var = helper::create_identifier_variable("parameter");
+        let variable = helper::create_accessor_variable("submodel", inner_var);
 
         let local_vars = HashSet::new();
 
@@ -686,7 +691,7 @@ mod tests {
         let result = resolve_variable(
             &variable,
             &local_vars,
-            &create_test_parameter_info(),
+            &helper::create_test_parameter_info(),
             &submodel_info,
             &modelinfo,
         );
@@ -702,7 +707,7 @@ mod tests {
 
     #[test]
     fn test_local_variable_takes_precedence_over_parameter() {
-        let variable = create_identifier_variable("conflict");
+        let variable = helper::create_identifier_variable("conflict");
         let mut local_vars = HashSet::new();
         local_vars.insert(Identifier::new("conflict"));
 
@@ -726,8 +731,8 @@ mod tests {
             &variable,
             &local_vars,
             &param_info,
-            &create_test_submodel_info(),
-            &create_test_modelinfo(),
+            &helper::create_test_submodel_info(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_ok());
@@ -744,7 +749,7 @@ mod tests {
 
     #[test]
     fn test_empty_local_variables() {
-        let variable = create_identifier_variable("parameter");
+        let variable = helper::create_identifier_variable("parameter");
         let local_vars = HashSet::new();
 
         let mut param_map = HashMap::new();
@@ -767,8 +772,8 @@ mod tests {
             &variable,
             &local_vars,
             &param_info,
-            &create_test_submodel_info(),
-            &create_test_modelinfo(),
+            &helper::create_test_submodel_info(),
+            &helper::create_test_modelinfo(),
         );
 
         assert!(result.is_ok());

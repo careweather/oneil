@@ -214,129 +214,134 @@ mod tests {
     use oneil_ir::debug_info::TraceLevel as ModelTraceLevel;
     use std::collections::HashSet;
 
-    /// Creates test parameter information for testing
-    fn create_empty_parameter_info() -> ParameterInfo<'static> {
-        ParameterInfo::new(HashMap::new(), HashSet::new())
-    }
+    mod helper {
+        use super::*;
 
-    /// Creates test submodel information for testing
-    fn create_empty_submodel_info() -> SubmodelInfo<'static> {
-        SubmodelInfo::new(HashMap::new(), HashSet::new())
-    }
+        /// Creates test parameter information for testing
+        pub fn create_empty_parameter_info() -> ParameterInfo<'static> {
+            ParameterInfo::new(HashMap::new(), HashSet::new())
+        }
 
-    /// Creates test model information for testing
-    fn create_empty_model_info() -> ModelInfo<'static> {
-        ModelInfo::new(HashMap::new(), HashSet::new())
-    }
+        /// Creates test submodel information for testing
+        pub fn create_empty_submodel_info() -> SubmodelInfo<'static> {
+            SubmodelInfo::new(HashMap::new(), HashSet::new())
+        }
 
-    /// Helper function to create a test span
-    fn test_span(start: usize, end: usize) -> ast::Span {
-        ast::Span::new(start, end - start, 0)
-    }
+        /// Creates test model information for testing
+        pub fn create_empty_model_info() -> ModelInfo<'static> {
+            ModelInfo::new(HashMap::new(), HashSet::new())
+        }
 
-    /// Helper function to create an identifier node
-    fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
-        let identifier = ast::naming::Identifier::new(name.to_string());
-        ast::node::Node::new(test_span(start, start + name.len()), identifier)
-    }
+        /// Helper function to create a test span
+        pub fn test_span(start: usize, end: usize) -> ast::Span {
+            ast::Span::new(start, end - start, 0)
+        }
 
-    /// Helper function to create a literal expression node
-    fn create_literal_expr_node(
-        literal: ast::expression::Literal,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::ExprNode {
-        let literal_node = ast::node::Node::new(test_span(start, end), literal);
-        let expr = ast::expression::Expr::Literal(literal_node);
-        ast::node::Node::new(test_span(start, end), expr)
-    }
+        /// Helper function to create an identifier node
+        pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
+            let identifier = ast::naming::Identifier::new(name.to_string());
+            ast::node::Node::new(test_span(start, start + name.len()), identifier)
+        }
 
-    /// Helper function to create a simple identifier variable
-    fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
-        let identifier_node = create_identifier_node(name, 0);
-        let variable = ast::expression::Variable::Identifier(identifier_node);
-        ast::node::Node::new(test_span(0, name.len()), variable)
-    }
+        /// Helper function to create a literal expression node
+        pub fn create_literal_expr_node(
+            literal: ast::expression::Literal,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ExprNode {
+            let literal_node = ast::node::Node::new(test_span(start, end), literal);
+            let expr = ast::expression::Expr::Literal(literal_node);
+            ast::node::Node::new(test_span(start, end), expr)
+        }
 
-    /// Helper function to create a variable expression node
-    fn create_variable_expr_node(
-        variable: ast::expression::VariableNode,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::ExprNode {
-        let expr = ast::expression::Expr::Variable(variable);
-        ast::node::Node::new(test_span(start, end), expr)
-    }
+        /// Helper function to create a simple identifier variable
+        pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
+            let identifier_node = create_identifier_node(name, 0);
+            let variable = ast::expression::Variable::Identifier(identifier_node);
+            ast::node::Node::new(test_span(0, name.len()), variable)
+        }
 
-    /// Helper function to create a binary operation expression node
-    fn create_binary_op_expr_node(
-        left: ast::expression::ExprNode,
-        op: ast::expression::BinaryOp,
-        right: ast::expression::ExprNode,
-        start: usize,
-        end: usize,
-    ) -> ast::expression::ExprNode {
-        let op_node = ast::node::Node::new(test_span(start, end), op);
-        let expr = ast::expression::Expr::BinaryOp {
-            left: Box::new(left),
-            op: op_node,
-            right: Box::new(right),
-        };
-        ast::node::Node::new(test_span(start, end), expr)
-    }
+        /// Helper function to create a variable expression node
+        pub fn create_variable_expr_node(
+            variable: ast::expression::VariableNode,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ExprNode {
+            let expr = ast::expression::Expr::Variable(variable);
+            ast::node::Node::new(test_span(start, end), expr)
+        }
 
-    /// Helper function to create a test inputs node
-    fn create_test_inputs_node(
-        inputs: Vec<&str>,
-        start: usize,
-        end: usize,
-    ) -> ast::test::TestInputsNode {
-        let input_nodes = inputs
-            .iter()
-            .enumerate()
-            .map(|(i, name)| create_identifier_node(name, start + i * (name.len() + 2)))
-            .collect();
-        let test_inputs = ast::test::TestInputs::new(input_nodes);
-        ast::node::Node::new(test_span(start, end), test_inputs)
-    }
+        /// Helper function to create a binary operation expression node
+        pub fn create_binary_op_expr_node(
+            left: ast::expression::ExprNode,
+            op: ast::expression::BinaryOp,
+            right: ast::expression::ExprNode,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ExprNode {
+            let op_node = ast::node::Node::new(test_span(start, end), op);
+            let expr = ast::expression::Expr::BinaryOp {
+                left: Box::new(left),
+                op: op_node,
+                right: Box::new(right),
+            };
+            ast::node::Node::new(test_span(start, end), expr)
+        }
 
-    /// Helper function to create a test node
-    fn create_test_node(
-        trace_level: Option<ast::debug_info::TraceLevel>,
-        inputs: Option<Vec<&str>>,
-        expr: ast::expression::ExprNode,
-        start: usize,
-        end: usize,
-    ) -> ast::test::TestNode {
-        let trace_level_node =
-            trace_level.map(|tl| ast::node::Node::new(test_span(start, start + 1), tl));
+        /// Helper function to create a test inputs node
+        pub fn create_test_inputs_node(
+            inputs: Vec<&str>,
+            start: usize,
+            end: usize,
+        ) -> ast::test::TestInputsNode {
+            let input_nodes = inputs
+                .iter()
+                .enumerate()
+                .map(|(i, name)| create_identifier_node(name, start + i * (name.len() + 2)))
+                .collect();
+            let test_inputs = ast::test::TestInputs::new(input_nodes);
+            ast::node::Node::new(test_span(start, end), test_inputs)
+        }
 
-        let inputs_node = inputs.map(|input_list| create_test_inputs_node(input_list, start, end));
+        /// Helper function to create a test node
+        pub fn create_test_node(
+            trace_level: Option<ast::debug_info::TraceLevel>,
+            inputs: Option<Vec<&str>>,
+            expr: ast::expression::ExprNode,
+            start: usize,
+            end: usize,
+        ) -> ast::test::TestNode {
+            let trace_level_node =
+                trace_level.map(|tl| ast::node::Node::new(test_span(start, start + 1), tl));
 
-        let test = ast::test::Test::new(trace_level_node, inputs_node, expr);
-        ast::node::Node::new(test_span(start, end), test)
-    }
+            let inputs_node =
+                inputs.map(|input_list| create_test_inputs_node(input_list, start, end));
 
-    /// Helper function to create a model input node
-    fn create_model_input_node(
-        ident: &str,
-        value: ast::expression::ExprNode,
-        start: usize,
-        end: usize,
-    ) -> ast::declaration::ModelInputNode {
-        let ident_node = create_identifier_node(ident, start);
-        let model_input = ast::declaration::ModelInput::new(ident_node, value);
-        ast::node::Node::new(test_span(start, end), model_input)
-    }
+            let test = ast::test::Test::new(trace_level_node, inputs_node, expr);
+            ast::node::Node::new(test_span(start, end), test)
+        }
 
-    /// Helper function to create a model input list node
-    fn create_model_input_list_node(
-        inputs: Vec<ast::declaration::ModelInputNode>,
-        start: usize,
-        end: usize,
-    ) -> ast::declaration::ModelInputListNode {
-        let input_list = ast::declaration::ModelInputList::new(inputs);
-        ast::node::Node::new(test_span(start, end), input_list)
+        /// Helper function to create a model input node
+        pub fn create_model_input_node(
+            ident: &str,
+            value: ast::expression::ExprNode,
+            start: usize,
+            end: usize,
+        ) -> ast::declaration::ModelInputNode {
+            let ident_node = create_identifier_node(ident, start);
+            let model_input = ast::declaration::ModelInput::new(ident_node, value);
+            ast::node::Node::new(test_span(start, end), model_input)
+        }
+
+        /// Helper function to create a model input list node
+        pub fn create_model_input_list_node(
+            inputs: Vec<ast::declaration::ModelInputNode>,
+            start: usize,
+            end: usize,
+        ) -> ast::declaration::ModelInputListNode {
+            let input_list = ast::declaration::ModelInputList::new(inputs);
+            ast::node::Node::new(test_span(start, end), input_list)
+        }
     }
 
     #[test]
@@ -348,9 +353,9 @@ mod tests {
         // resolve the model tests
         let (resolved_tests, errors) = resolve_model_tests(
             tests_refs,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -365,21 +370,25 @@ mod tests {
         // create the model tests
         let tests = vec![
             // test: true
-            create_test_node(
+            helper::create_test_node(
                 None,
                 None,
-                create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
+                helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
                 0,
                 4,
             ),
             // test {x, y}: x > 0
-            create_test_node(
+            helper::create_test_node(
                 None,
                 Some(vec!["x", "y"]),
-                create_binary_op_expr_node(
-                    create_variable_expr_node(create_identifier_variable("x"), 0, 1),
+                helper::create_binary_op_expr_node(
+                    helper::create_variable_expr_node(
+                        helper::create_identifier_variable("x"),
+                        0,
+                        1,
+                    ),
                     ast::expression::BinaryOp::GreaterThan,
-                    create_literal_expr_node(ast::expression::Literal::Number(0.0), 4, 5),
+                    helper::create_literal_expr_node(ast::expression::Literal::Number(0.0), 4, 5),
                     0,
                     5,
                 ),
@@ -387,13 +396,17 @@ mod tests {
                 5,
             ),
             // * test {param}: param == 42
-            create_test_node(
+            helper::create_test_node(
                 Some(ast::debug_info::TraceLevel::Trace),
                 Some(vec!["param"]),
-                create_binary_op_expr_node(
-                    create_variable_expr_node(create_identifier_variable("param"), 0, 5),
+                helper::create_binary_op_expr_node(
+                    helper::create_variable_expr_node(
+                        helper::create_identifier_variable("param"),
+                        0,
+                        5,
+                    ),
                     ast::expression::BinaryOp::Eq,
-                    create_literal_expr_node(ast::expression::Literal::Number(42.0), 9, 11),
+                    helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 9, 11),
                     0,
                     11,
                 ),
@@ -406,9 +419,9 @@ mod tests {
         // resolve the model tests
         let (resolved_tests, errors) = resolve_model_tests(
             tests_refs,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -438,10 +451,10 @@ mod tests {
         // create the model tests
         let tests = vec![
             // ** test {x}: true
-            create_test_node(
+            helper::create_test_node(
                 Some(ast::debug_info::TraceLevel::Debug),
                 Some(vec!["x"]),
-                create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
+                helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
                 0,
                 4,
             ),
@@ -451,9 +464,9 @@ mod tests {
         // resolve the model tests
         let (resolved_tests, errors) = resolve_model_tests(
             tests_refs,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -472,10 +485,14 @@ mod tests {
         // create the model tests
         let tests = vec![
             // test {x}: undefined_var
-            create_test_node(
+            helper::create_test_node(
                 None,
                 Some(vec!["x"]),
-                create_variable_expr_node(create_identifier_variable("undefined_var"), 0, 13),
+                helper::create_variable_expr_node(
+                    helper::create_identifier_variable("undefined_var"),
+                    0,
+                    13,
+                ),
                 0,
                 13,
             ),
@@ -485,9 +502,9 @@ mod tests {
         // resolve the model tests
         let (resolved_tests, errors) = resolve_model_tests(
             tests_refs,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -510,18 +527,22 @@ mod tests {
     fn test_resolve_model_tests_mixed_success_and_error() {
         let tests = vec![
             // test {x}: true
-            create_test_node(
+            helper::create_test_node(
                 None,
                 Some(vec!["x"]),
-                create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
+                helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
                 0,
                 4,
             ),
             // test {y}: undefined_var
-            create_test_node(
+            helper::create_test_node(
                 Some(ast::debug_info::TraceLevel::Trace),
                 Some(vec!["y"]),
-                create_variable_expr_node(create_identifier_variable("undefined_var"), 0, 13),
+                helper::create_variable_expr_node(
+                    helper::create_identifier_variable("undefined_var"),
+                    0,
+                    13,
+                ),
                 0,
                 13,
             ),
@@ -530,9 +551,9 @@ mod tests {
 
         let (resolved_tests, errors) = resolve_model_tests(
             tests_refs,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -562,9 +583,9 @@ mod tests {
         // resolve the submodel tests
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -577,11 +598,11 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_basic() {
         // create the submodel tests
-        let input_list = create_model_input_list_node(
+        let input_list = helper::create_model_input_list_node(
             vec![
-                create_model_input_node(
+                helper::create_model_input_node(
                     "location",
-                    create_literal_expr_node(
+                    helper::create_literal_expr_node(
                         ast::expression::Literal::String("north".to_string()),
                         0,
                         7,
@@ -589,9 +610,9 @@ mod tests {
                     0,
                     7,
                 ),
-                create_model_input_node(
+                helper::create_model_input_node(
                     "height",
-                    create_literal_expr_node(ast::expression::Literal::Number(100.0), 0, 6),
+                    helper::create_literal_expr_node(ast::expression::Literal::Number(100.0), 0, 6),
                     0,
                     6,
                 ),
@@ -607,9 +628,9 @@ mod tests {
         // resolve the submodel tests
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -627,20 +648,20 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_multiple() {
         // create the submodel tests
-        let input_list1 = create_model_input_list_node(
-            vec![create_model_input_node(
+        let input_list1 = helper::create_model_input_list_node(
+            vec![helper::create_model_input_node(
                 "param1",
-                create_literal_expr_node(ast::expression::Literal::Number(10.0), 0, 4),
+                helper::create_literal_expr_node(ast::expression::Literal::Number(10.0), 0, 4),
                 0,
                 4,
             )],
             0,
             10,
         );
-        let input_list2 = create_model_input_list_node(
-            vec![create_model_input_node(
+        let input_list2 = helper::create_model_input_list_node(
+            vec![helper::create_model_input_node(
                 "param2",
-                create_literal_expr_node(
+                helper::create_literal_expr_node(
                     ast::expression::Literal::String("value".to_string()),
                     0,
                     7,
@@ -661,9 +682,9 @@ mod tests {
         // resolve the submodel tests
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -686,10 +707,14 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_with_undefined_variable() {
         // create the submodel tests
-        let input_list = create_model_input_list_node(
-            vec![create_model_input_node(
+        let input_list = helper::create_model_input_list_node(
+            vec![helper::create_model_input_node(
                 "param",
-                create_variable_expr_node(create_identifier_variable("undefined_var"), 0, 13),
+                helper::create_variable_expr_node(
+                    helper::create_identifier_variable("undefined_var"),
+                    0,
+                    13,
+                ),
                 0,
                 13,
             )],
@@ -704,9 +729,9 @@ mod tests {
         // resolve the submodel tests
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -728,20 +753,24 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_mixed_success_and_error() {
         // create the submodel tests
-        let input_list1 = create_model_input_list_node(
-            vec![create_model_input_node(
+        let input_list1 = helper::create_model_input_list_node(
+            vec![helper::create_model_input_node(
                 "param1",
-                create_literal_expr_node(ast::expression::Literal::Number(10.0), 0, 4),
+                helper::create_literal_expr_node(ast::expression::Literal::Number(10.0), 0, 4),
                 0,
                 4,
             )],
             0,
             10,
         );
-        let input_list2 = create_model_input_list_node(
-            vec![create_model_input_node(
+        let input_list2 = helper::create_model_input_list_node(
+            vec![helper::create_model_input_node(
                 "param2",
-                create_variable_expr_node(create_identifier_variable("undefined_var"), 0, 13),
+                helper::create_variable_expr_node(
+                    helper::create_identifier_variable("undefined_var"),
+                    0,
+                    13,
+                ),
                 0,
                 13,
             )],
@@ -758,9 +787,9 @@ mod tests {
         // resolve the submodel tests
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -785,26 +814,42 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_with_complex_expressions() {
         // create the submodel tests
-        let input_list = create_model_input_list_node(
+        let input_list = helper::create_model_input_list_node(
             vec![
-                create_model_input_node(
+                helper::create_model_input_node(
                     "calculation",
-                    create_binary_op_expr_node(
-                        create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1),
+                    helper::create_binary_op_expr_node(
+                        helper::create_literal_expr_node(
+                            ast::expression::Literal::Number(5.0),
+                            0,
+                            1,
+                        ),
                         ast::expression::BinaryOp::Add,
-                        create_literal_expr_node(ast::expression::Literal::Number(3.0), 4, 5),
+                        helper::create_literal_expr_node(
+                            ast::expression::Literal::Number(3.0),
+                            4,
+                            5,
+                        ),
                         0,
                         5,
                     ),
                     0,
                     5,
                 ),
-                create_model_input_node(
+                helper::create_model_input_node(
                     "is_valid",
-                    create_binary_op_expr_node(
-                        create_literal_expr_node(ast::expression::Literal::Number(10.0), 0, 2),
+                    helper::create_binary_op_expr_node(
+                        helper::create_literal_expr_node(
+                            ast::expression::Literal::Number(10.0),
+                            0,
+                            2,
+                        ),
                         ast::expression::BinaryOp::GreaterThan,
-                        create_literal_expr_node(ast::expression::Literal::Number(5.0), 6, 7),
+                        helper::create_literal_expr_node(
+                            ast::expression::Literal::Number(5.0),
+                            6,
+                            7,
+                        ),
                         0,
                         7,
                     ),
@@ -822,9 +867,9 @@ mod tests {
 
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
-            &create_empty_parameter_info(),
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_parameter_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
@@ -843,10 +888,14 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_with_parameter_reference() {
         // create the submodel tests
-        let input_list = create_model_input_list_node(
-            vec![create_model_input_node(
+        let input_list = helper::create_model_input_list_node(
+            vec![helper::create_model_input_node(
                 "param",
-                create_variable_expr_node(create_identifier_variable("test_param"), 0, 9),
+                helper::create_variable_expr_node(
+                    helper::create_identifier_variable("test_param"),
+                    0,
+                    9,
+                ),
                 0,
                 9,
             )],
@@ -877,8 +926,8 @@ mod tests {
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
             &parameter_info,
-            &create_empty_submodel_info(),
-            &create_empty_model_info(),
+            &helper::create_empty_submodel_info(),
+            &helper::create_empty_model_info(),
         );
 
         // check the errors
