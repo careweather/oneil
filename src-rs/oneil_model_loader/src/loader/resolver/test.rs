@@ -214,6 +214,9 @@ mod tests {
     use oneil_ir::debug_info::TraceLevel as ModelTraceLevel;
     use std::collections::HashSet;
 
+    // TODO: write tests that test the span of the test inputs
+    // TODO: these are brittle, low-quality tests
+
     mod helper {
         use super::*;
 
@@ -233,14 +236,19 @@ mod tests {
         }
 
         /// Helper function to create a test span
-        pub fn test_span(start: usize, end: usize) -> ast::Span {
+        pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
             ast::Span::new(start, end - start, 0)
+        }
+
+        /// Helper function to create a test IR span
+        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::Span {
+            oneil_ir::span::Span::new(start, end - start)
         }
 
         /// Helper function to create an identifier node
         pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            ast::node::Node::new(test_span(start, start + name.len()), identifier)
+            ast::node::Node::new(test_ast_span(start, start + name.len()), identifier)
         }
 
         /// Helper function to create a literal expression node
@@ -249,16 +257,16 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ExprNode {
-            let literal_node = ast::node::Node::new(test_span(start, end), literal);
+            let literal_node = ast::node::Node::new(test_ast_span(start, end), literal);
             let expr = ast::expression::Expr::Literal(literal_node);
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(test_ast_span(start, end), expr)
         }
 
         /// Helper function to create a simple identifier variable
         pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
             let identifier_node = create_identifier_node(name, 0);
             let variable = ast::expression::Variable::Identifier(identifier_node);
-            ast::node::Node::new(test_span(0, name.len()), variable)
+            ast::node::Node::new(test_ast_span(0, name.len()), variable)
         }
 
         /// Helper function to create a variable expression node
@@ -268,7 +276,7 @@ mod tests {
             end: usize,
         ) -> ast::expression::ExprNode {
             let expr = ast::expression::Expr::Variable(variable);
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(test_ast_span(start, end), expr)
         }
 
         /// Helper function to create a binary operation expression node
@@ -279,13 +287,13 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ExprNode {
-            let op_node = ast::node::Node::new(test_span(start, end), op);
+            let op_node = ast::node::Node::new(test_ast_span(start, end), op);
             let expr = ast::expression::Expr::BinaryOp {
                 left: Box::new(left),
                 op: op_node,
                 right: Box::new(right),
             };
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(test_ast_span(start, end), expr)
         }
 
         /// Helper function to create a test inputs node
@@ -300,7 +308,7 @@ mod tests {
                 .map(|(i, name)| create_identifier_node(name, start + i * (name.len() + 2)))
                 .collect();
             let test_inputs = ast::test::TestInputs::new(input_nodes);
-            ast::node::Node::new(test_span(start, end), test_inputs)
+            ast::node::Node::new(test_ast_span(start, end), test_inputs)
         }
 
         /// Helper function to create a test node
@@ -312,13 +320,13 @@ mod tests {
             end: usize,
         ) -> ast::test::TestNode {
             let trace_level_node =
-                trace_level.map(|tl| ast::node::Node::new(test_span(start, start + 1), tl));
+                trace_level.map(|tl| ast::node::Node::new(test_ast_span(start, start + 1), tl));
 
             let inputs_node =
                 inputs.map(|input_list| create_test_inputs_node(input_list, start, end));
 
             let test = ast::test::Test::new(trace_level_node, inputs_node, expr);
-            ast::node::Node::new(test_span(start, end), test)
+            ast::node::Node::new(test_ast_span(start, end), test)
         }
 
         /// Helper function to create a model input node
@@ -330,7 +338,7 @@ mod tests {
         ) -> ast::declaration::ModelInputNode {
             let ident_node = create_identifier_node(ident, start);
             let model_input = ast::declaration::ModelInput::new(ident_node, value);
-            ast::node::Node::new(test_span(start, end), model_input)
+            ast::node::Node::new(test_ast_span(start, end), model_input)
         }
 
         /// Helper function to create a model input list node
@@ -340,7 +348,7 @@ mod tests {
             end: usize,
         ) -> ast::declaration::ModelInputListNode {
             let input_list = ast::declaration::ModelInputList::new(inputs);
-            ast::node::Node::new(test_span(start, end), input_list)
+            ast::node::Node::new(test_ast_span(start, end), input_list)
         }
     }
 
@@ -437,13 +445,22 @@ mod tests {
         let test_1 = resolved_tests.get(&TestIndex::new(1)).unwrap();
         assert_eq!(test_1.trace_level(), &ModelTraceLevel::None);
         assert_eq!(test_1.inputs().len(), 2);
-        assert!(test_1.inputs().contains(&Identifier::new("x")));
-        assert!(test_1.inputs().contains(&Identifier::new("y")));
+        assert!(test_1.inputs().contains(&WithSpan::new(
+            Identifier::new("x"),
+            helper::test_ir_span(0, 1)
+        )));
+        assert!(test_1.inputs().contains(&WithSpan::new(
+            Identifier::new("y"),
+            helper::test_ir_span(4, 5)
+        )));
 
         let test_2 = resolved_tests.get(&TestIndex::new(2)).unwrap();
         assert_eq!(test_2.trace_level(), &ModelTraceLevel::Trace);
         assert_eq!(test_2.inputs().len(), 1);
-        assert!(test_2.inputs().contains(&Identifier::new("param")));
+        assert!(test_2.inputs().contains(&WithSpan::new(
+            Identifier::new("param"),
+            helper::test_ir_span(0, 5)
+        )));
     }
 
     #[test]
@@ -477,7 +494,10 @@ mod tests {
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
         assert_eq!(test.trace_level(), &ModelTraceLevel::Debug);
         assert_eq!(test.inputs().len(), 1);
-        assert!(test.inputs().contains(&Identifier::new("x")));
+        assert!(test.inputs().contains(&WithSpan::new(
+            Identifier::new("x"),
+            helper::test_ir_span(0, 1)
+        )));
     }
 
     #[test]
@@ -572,7 +592,10 @@ mod tests {
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
         assert_eq!(test.trace_level(), &ModelTraceLevel::None);
         assert_eq!(test.inputs().len(), 1);
-        assert!(test.inputs().contains(&Identifier::new("x")));
+        assert!(test.inputs().contains(&WithSpan::new(
+            Identifier::new("x"),
+            helper::test_ir_span(0, 1)
+        )));
     }
 
     #[test]
@@ -622,7 +645,11 @@ mod tests {
         );
         let submodel_tests = vec![
             // use my_sensor(location = "north", height = 100) as sensor
-            (Identifier::new("sensor"), Some(&input_list)),
+            (
+                Identifier::new("sensor"),
+                helper::test_ir_span(0, 7),
+                Some(&input_list),
+            ),
         ];
 
         // resolve the submodel tests
@@ -641,8 +668,14 @@ mod tests {
         let test = &resolved_tests[0];
         assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 2);
-        assert!(test.inputs().contains_key(&Identifier::new("location")));
-        assert!(test.inputs().contains_key(&Identifier::new("height")));
+        assert!(test.inputs().contains_key(&WithSpan::new(
+            Identifier::new("location"),
+            helper::test_ir_span(0, 7)
+        )));
+        assert!(test.inputs().contains_key(&WithSpan::new(
+            Identifier::new("height"),
+            helper::test_ir_span(0, 6)
+        )));
     }
 
     #[test]
@@ -674,9 +707,17 @@ mod tests {
         );
         let submodel_tests = vec![
             // use my_sensor1(param1 = 10) as sensor1
-            (Identifier::new("sensor1"), Some(&input_list1)),
+            (
+                Identifier::new("sensor1"),
+                helper::test_ir_span(0, 7),
+                Some(&input_list1),
+            ),
             // use my_sensor2(param2 = "value") as sensor2
-            (Identifier::new("sensor2"), Some(&input_list2)),
+            (
+                Identifier::new("sensor2"),
+                helper::test_ir_span(0, 7),
+                Some(&input_list2),
+            ),
         ];
 
         // resolve the submodel tests
@@ -696,12 +737,18 @@ mod tests {
         let test_0 = &resolved_tests[0];
         assert_eq!(test_0.submodel_name(), &Identifier::new("sensor1"));
         assert_eq!(test_0.inputs().len(), 1);
-        assert!(test_0.inputs().contains_key(&Identifier::new("param1")));
+        assert!(test_0.inputs().contains_key(&WithSpan::new(
+            Identifier::new("param1"),
+            helper::test_ir_span(0, 7)
+        )));
 
         let test_1 = &resolved_tests[1];
         assert_eq!(test_1.submodel_name(), &Identifier::new("sensor2"));
         assert_eq!(test_1.inputs().len(), 1);
-        assert!(test_1.inputs().contains_key(&Identifier::new("param2")));
+        assert!(test_1.inputs().contains_key(&WithSpan::new(
+            Identifier::new("param2"),
+            helper::test_ir_span(0, 7)
+        )));
     }
 
     #[test]
@@ -723,7 +770,11 @@ mod tests {
         );
         let submodel_tests = vec![
             // use my_sensor(param = undefined_var) as sensor
-            (Identifier::new("sensor"), Some(&input_list)),
+            (
+                Identifier::new("sensor"),
+                helper::test_ir_span(0, 7),
+                Some(&input_list),
+            ),
         ];
 
         // resolve the submodel tests
@@ -779,9 +830,17 @@ mod tests {
         );
         let submodel_tests = vec![
             // use my_sensor1(param1 = 10) as sensor1
-            (Identifier::new("sensor1"), Some(&input_list1)),
+            (
+                Identifier::new("sensor1"),
+                helper::test_ir_span(0, 7),
+                Some(&input_list1),
+            ),
             // use my_sensor2(param2 = undefined_var) as sensor2
-            (Identifier::new("sensor2"), Some(&input_list2)),
+            (
+                Identifier::new("sensor2"),
+                helper::test_ir_span(0, 7),
+                Some(&input_list2),
+            ),
         ];
 
         // resolve the submodel tests
@@ -808,7 +867,10 @@ mod tests {
         let test = &resolved_tests[0];
         assert_eq!(test.submodel_name(), &Identifier::new("sensor1"));
         assert_eq!(test.inputs().len(), 1);
-        assert!(test.inputs().contains_key(&Identifier::new("param1")));
+        assert!(test.inputs().contains_key(&WithSpan::new(
+            Identifier::new("param1"),
+            helper::test_ir_span(0, 7)
+        )));
     }
 
     #[test]
@@ -862,7 +924,11 @@ mod tests {
         );
         let submodel_tests = vec![
             // use my_sensor(calculation = 5 + 3, is_valid = 10 > 5) as sensor
-            (Identifier::new("sensor"), Some(&input_list)),
+            (
+                Identifier::new("sensor"),
+                helper::test_ir_span(0, 7),
+                Some(&input_list),
+            ),
         ];
 
         let (resolved_tests, errors) = resolve_submodel_tests(
@@ -881,8 +947,14 @@ mod tests {
         let test = &resolved_tests[0];
         assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 2);
-        assert!(test.inputs().contains_key(&Identifier::new("calculation")));
-        assert!(test.inputs().contains_key(&Identifier::new("is_valid")));
+        assert!(test.inputs().contains_key(&WithSpan::new(
+            Identifier::new("calculation"),
+            helper::test_ir_span(0, 7)
+        )));
+        assert!(test.inputs().contains_key(&WithSpan::new(
+            Identifier::new("is_valid"),
+            helper::test_ir_span(0, 7)
+        )));
     }
 
     #[test]
@@ -902,17 +974,23 @@ mod tests {
             0,
             15,
         );
-        let submodel_tests = vec![(Identifier::new("sensor"), Some(&input_list))];
+        let submodel_tests = vec![(
+            Identifier::new("sensor"),
+            helper::test_ir_span(0, 7),
+            Some(&input_list),
+        )];
 
         // create the parameter info
         let test_param_id = Identifier::new("test_param");
+        let test_param_id_with_span =
+            WithSpan::new(test_param_id.clone(), helper::test_ir_span(0, 9));
+        let test_param_value = oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(10.0));
+        let test_param_value_with_span =
+            WithSpan::new(test_param_value, helper::test_ir_span(0, 15));
         let test_param = oneil_ir::parameter::Parameter::new(
             HashSet::new(),
-            test_param_id.clone(),
-            oneil_ir::parameter::ParameterValue::Simple(
-                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(10.0)),
-                None,
-            ),
+            test_param_id_with_span,
+            oneil_ir::parameter::ParameterValue::Simple(test_param_value_with_span, None),
             oneil_ir::parameter::Limits::default(),
             false,
             oneil_ir::debug_info::TraceLevel::None,
@@ -938,6 +1016,9 @@ mod tests {
         let test = &resolved_tests[0];
         assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 1);
-        assert!(test.inputs().contains_key(&Identifier::new("param")));
+        assert!(test.inputs().contains_key(&WithSpan::new(
+            Identifier::new("param"),
+            helper::test_ir_span(0, 9)
+        )));
     }
 }
