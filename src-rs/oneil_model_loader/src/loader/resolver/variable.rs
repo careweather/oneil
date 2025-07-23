@@ -102,13 +102,13 @@ pub fn resolve_variable(
             let identifier = Identifier::new(identifier.as_str());
             if local_variables.contains(&identifier) {
                 let span = get_span_from_ast_span(variable.node_span());
-                let expr = Expr::local_variable(identifier, span);
+                let expr = Expr::local_variable(identifier);
                 Ok(WithSpan::new(expr, span))
             } else {
                 match defined_parameters.get(&identifier) {
                     InfoResult::Found(_parameter) => {
                         let span = get_span_from_ast_span(variable.node_span());
-                        let expr = Expr::parameter_variable(identifier, span);
+                        let expr = Expr::parameter_variable(identifier);
                         Ok(WithSpan::new(expr, span))
                     }
                     InfoResult::HasError => {
@@ -145,7 +145,7 @@ pub fn resolve_variable(
             )?;
 
             let span = get_span_from_ast_span(variable.node_span());
-            let expr = Expr::external_variable(model_path, ident, span);
+            let expr = Expr::external_variable(model_path, ident);
             Ok(WithSpan::new(expr, span))
         }
     }
@@ -229,27 +229,35 @@ mod tests {
     };
     use std::collections::{HashMap, HashSet};
 
+    // TODO: write tests that test the span of the test inputs
+    // TODO: these are brittle, low-quality tests
+
     mod helper {
         use super::*;
 
         /// Helper function to create a test span
-        pub fn test_span(start: usize, end: usize) -> ast::Span {
+        pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
             ast::Span::new(start, end - start, 0)
+        }
+
+        /// Helper function to create a test IR span
+        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::Span {
+            oneil_ir::span::Span::new(start, end - start)
         }
 
         /// Helper function to create an identifier node
         pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            ast::node::Node::new(test_span(start, start + name.len()), identifier)
+            ast::node::Node::new(test_ast_span(start, start + name.len()), identifier)
         }
 
         /// Helper function to create a variable node
-        pub fn create_variable_node(
+        fn create_variable_node(
             variable: ast::expression::Variable,
             start: usize,
             end: usize,
         ) -> ast::expression::VariableNode {
-            ast::node::Node::new(test_span(start, end), variable)
+            ast::node::Node::new(test_ast_span(start, end), variable)
         }
 
         /// Helper function to create a simple identifier variable
@@ -274,35 +282,43 @@ mod tests {
         }
 
         /// Helper function to create a basic model info for testing
-        pub fn create_test_modelinfo() -> ModelInfo<'static> {
+        pub fn create_test_model_info<'a>() -> ModelInfo<'a> {
             ModelInfo::new(HashMap::new(), HashSet::new())
         }
 
         /// Helper function to create a basic parameter info for testing
-        pub fn create_test_parameter_info() -> ParameterInfo<'static> {
+        pub fn create_test_parameter_info<'a>() -> ParameterInfo<'a> {
             ParameterInfo::new(HashMap::new(), HashSet::new())
         }
 
         /// Helper function to create a basic submodel info for testing
-        pub fn create_test_submodel_info() -> SubmodelInfo<'static> {
+        pub fn create_test_submodel_info<'a>() -> SubmodelInfo<'a> {
             SubmodelInfo::new(HashMap::new(), HashSet::new())
         }
 
         /// Helper function to create a model with a parameter
-        pub fn create_modelwith_parameter(param_name: &str) -> Model {
+        pub fn create_model_with_parameter(param_name: &str) -> Model {
             let mut param_map = HashMap::new();
+            let param_name = WithSpan::new(
+                Identifier::new(param_name),
+                test_ir_span(0, param_name.len()),
+            );
+
             let param = Parameter::new(
                 HashSet::new(),
-                Identifier::new(param_name),
+                param_name.clone(),
                 oneil_ir::parameter::ParameterValue::simple(
-                    oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
+                    WithSpan::new(
+                        oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                        test_ir_span(0, 1),
+                    ),
                     None,
                 ),
                 oneil_ir::parameter::Limits::default(),
                 false,
                 oneil_ir::debug_info::TraceLevel::None,
             );
-            param_map.insert(Identifier::new(param_name), param);
+            param_map.insert(param_name.value().clone(), param);
             let param_collection = oneil_ir::parameter::ParameterCollection::new(param_map);
 
             Model::new(
@@ -315,9 +331,12 @@ mod tests {
         }
 
         /// Helper function to create a model with a submodel
-        pub fn create_modelwith_submodel(submodel_name: &str, submodel_path: ModelPath) -> Model {
+        pub fn create_modelwith_submodel(
+            submodel_name: &str,
+            submodel_path: WithSpan<ModelPath>,
+        ) -> Model {
             let mut submodel_map = HashMap::new();
-            submodel_map.insert(Identifier::new(submodel_name), submodel_path);
+            submodel_map.insert(Identifier::new(submodel_name), submodel_path.clone());
 
             Model::new(
                 HashSet::new(),
@@ -340,13 +359,16 @@ mod tests {
             &local_vars,
             &helper::create_test_parameter_info(),
             &helper::create_test_submodel_info(),
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_ok());
-        match result.unwrap() {
-            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Local(ident)) => {
-                assert_eq!(ident, Identifier::new("local_var"));
+        let result = result.expect("result should be ok");
+
+        assert_eq!(result.span(), &get_span_from_ast_span(variable.node_span()));
+        match result.value() {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Local(ident)) => {
+                assert_eq!(ident, &Identifier::new("local_var"));
             }
             error => panic!("Expected local variable expression, got {:?}", error),
         }
@@ -360,9 +382,12 @@ mod tests {
         let mut param_map = HashMap::new();
         let temp_param = Parameter::new(
             HashSet::new(),
-            Identifier::new("temperature"),
+            WithSpan::new(Identifier::new("temperature"), helper::test_ir_span(0, 10)),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
+                WithSpan::new(
+                    oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                    helper::test_ir_span(0, 1),
+                ),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -378,13 +403,16 @@ mod tests {
             &local_vars,
             &param_info,
             &helper::create_test_submodel_info(),
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_ok());
-        match result.unwrap() {
-            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
-                assert_eq!(ident, Identifier::new("temperature"));
+        let result = result.expect("result should be ok");
+
+        assert_eq!(result.span(), &get_span_from_ast_span(variable.node_span()));
+        match result.value() {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+                assert_eq!(ident, &Identifier::new("temperature"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),
         }
@@ -400,7 +428,7 @@ mod tests {
             &local_vars,
             &helper::create_test_parameter_info(),
             &helper::create_test_submodel_info(),
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_err());
@@ -427,7 +455,7 @@ mod tests {
             &local_vars,
             &param_info,
             &helper::create_test_submodel_info(),
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_err());
@@ -451,7 +479,7 @@ mod tests {
             &local_vars,
             &helper::create_test_parameter_info(),
             &helper::create_test_submodel_info(),
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_err());
@@ -481,7 +509,7 @@ mod tests {
             &local_vars,
             &helper::create_test_parameter_info(),
             &submodel_info,
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_err());
@@ -505,14 +533,16 @@ mod tests {
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path);
+        let submodel_path_with_span =
+            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
+        submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
         // Create model info with the submodel model
-        let mut modelmap = HashMap::new();
-        let submodel_model = helper::create_modelwith_parameter("parameter");
-        modelmap.insert(&submodel_path, &submodel_model);
-        let modelinfo = ModelInfo::new(modelmap, HashSet::new());
+        let mut model_map = HashMap::new();
+        let submodel_model = helper::create_model_with_parameter("parameter");
+        model_map.insert(&submodel_path, &submodel_model);
+        let modelinfo = ModelInfo::new(model_map, HashSet::new());
 
         let result = resolve_variable(
             &variable,
@@ -523,9 +553,10 @@ mod tests {
         );
 
         assert!(result.is_ok());
-        match result.unwrap() {
-            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
-                assert_eq!(ident, Identifier::new("parameter"));
+        let result = result.expect("result should be ok");
+        match result.value() {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+                assert_eq!(ident, &Identifier::new("parameter"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),
         }
@@ -543,19 +574,23 @@ mod tests {
         // Create submodel info
         let mut submodel_map = HashMap::new();
         let submodel1_path = ModelPath::new("test_submodel1");
+        let submodel1_path_with_span =
+            WithSpan::new(submodel1_path.clone(), helper::test_ir_span(0, 10));
         let submodel1_id = Identifier::new("submodel1");
-        submodel_map.insert(&submodel1_id, &submodel1_path);
+        submodel_map.insert(&submodel1_id, &submodel1_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
         // Create model info with nested models
-        let mut modelmap = HashMap::new();
+        let mut model_map = HashMap::new();
         let submodel2_path = ModelPath::new("test_submodel2");
-        let submodel2_model = helper::create_modelwith_parameter("parameter");
+        let submodel2_path_with_span =
+            WithSpan::new(submodel2_path.clone(), helper::test_ir_span(0, 10));
+        let submodel2_model = helper::create_model_with_parameter("parameter");
         let submodel1_model =
-            helper::create_modelwith_submodel("submodel2", submodel2_path.clone());
-        modelmap.insert(&submodel1_path, &submodel1_model);
-        modelmap.insert(&submodel2_path, &submodel2_model);
-        let modelinfo = ModelInfo::new(modelmap, HashSet::new());
+            helper::create_modelwith_submodel("submodel2", submodel2_path_with_span.clone());
+        model_map.insert(&submodel1_path, &submodel1_model);
+        model_map.insert(&submodel2_path_with_span, &submodel2_model);
+        let modelinfo = ModelInfo::new(model_map, HashSet::new());
 
         let result = resolve_variable(
             &variable,
@@ -566,9 +601,10 @@ mod tests {
         );
 
         assert!(result.is_ok());
-        match result.unwrap() {
-            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
-                assert_eq!(ident, Identifier::new("parameter"));
+        let result = result.expect("result should be ok");
+        match result.value() {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+                assert_eq!(ident, &Identifier::new("parameter"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),
         }
@@ -584,8 +620,10 @@ mod tests {
         // Create submodel info
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
+        let submodel_path_with_span =
+            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path);
+        submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
         // Create model info with empty submodel model
@@ -632,12 +670,14 @@ mod tests {
         // Create submodel info
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
+        let submodel_path_with_span =
+            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path);
+        submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
         // Create model info with empty submodel model
-        let mut modelmap = HashMap::new();
+        let mut model_map = HashMap::new();
         let submodel_model = Model::new(
             HashSet::new(),
             HashMap::new(),
@@ -645,8 +685,8 @@ mod tests {
             HashMap::new(),
             Vec::new(),
         );
-        modelmap.insert(&submodel_path, &submodel_model);
-        let modelinfo = ModelInfo::new(modelmap, HashSet::new());
+        model_map.insert(&submodel_path, &submodel_model);
+        let modelinfo = ModelInfo::new(model_map, HashSet::new());
 
         let result = resolve_variable(
             &variable,
@@ -679,8 +719,10 @@ mod tests {
         // Create submodel info
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
+        let submodel_path_with_span =
+            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path);
+        submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
         // Create model info with error
@@ -714,9 +756,12 @@ mod tests {
         let mut param_map = HashMap::new();
         let param = Parameter::new(
             HashSet::new(),
-            Identifier::new("conflict"),
+            WithSpan::new(Identifier::new("conflict"), helper::test_ir_span(0, 10)),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
+                WithSpan::new(
+                    oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                    helper::test_ir_span(0, 1),
+                ),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -732,13 +777,14 @@ mod tests {
             &local_vars,
             &param_info,
             &helper::create_test_submodel_info(),
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_ok());
-        match result.unwrap() {
-            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Local(ident)) => {
-                assert_eq!(ident, Identifier::new("conflict"));
+        let result = result.expect("result should be ok");
+        match result.value() {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Local(ident)) => {
+                assert_eq!(ident, &Identifier::new("conflict"));
             }
             error => panic!(
                 "Expected local variable expression (should take precedence), got {:?}",
@@ -755,9 +801,12 @@ mod tests {
         let mut param_map = HashMap::new();
         let param = Parameter::new(
             HashSet::new(),
-            Identifier::new("parameter"),
+            WithSpan::new(Identifier::new("parameter"), helper::test_ir_span(0, 10)),
             oneil_ir::parameter::ParameterValue::simple(
-                oneil_ir::expr::ExprWithSpan::literal(oneil_ir::expr::Literal::number(42.0)),
+                WithSpan::new(
+                    oneil_ir::expr::Expr::literal(oneil_ir::expr::Literal::number(42.0)),
+                    helper::test_ir_span(0, 1),
+                ),
                 None,
             ),
             oneil_ir::parameter::Limits::default(),
@@ -773,13 +822,14 @@ mod tests {
             &local_vars,
             &param_info,
             &helper::create_test_submodel_info(),
-            &helper::create_test_modelinfo(),
+            &helper::create_test_model_info(),
         );
 
         assert!(result.is_ok());
-        match result.unwrap() {
-            oneil_ir::expr::ExprWithSpan::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
-                assert_eq!(ident, Identifier::new("parameter"));
+        let result = result.expect("result should be ok");
+        match result.value() {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+                assert_eq!(ident, &Identifier::new("parameter"));
             }
             error => panic!("Expected parameter variable expression, got {:?}", error),
         }
