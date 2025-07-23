@@ -144,6 +144,26 @@ impl Unit {
         &self.name
     }
 
+    /// Returns the source location span for the unit name.
+    ///
+    /// This method provides access to the source location information
+    /// for the unit name, which is useful for error reporting and
+    /// debugging.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `Span` indicating where the unit name appears in the source.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{unit::Unit, span::Span};
+    ///
+    /// let name_span = Span::new(10, 2);
+    /// let unit = Unit::new("kg".to_string(), name_span, 1.0, Span::new(0, 1));
+    /// assert_eq!(unit.name_span().start(), 10);
+    /// assert_eq!(unit.name_span().length(), 2);
+    /// ```
     pub fn name_span(&self) -> &Span {
         &self.name_span
     }
@@ -178,6 +198,26 @@ impl Unit {
         self.exponent
     }
 
+    /// Returns the source location span for the unit exponent.
+    ///
+    /// This method provides access to the source location information
+    /// for the unit exponent, which is useful for error reporting and
+    /// debugging.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `Span` indicating where the unit exponent appears in the source.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{unit::Unit, span::Span};
+    ///
+    /// let exponent_span = Span::new(15, 3);
+    /// let unit = Unit::new("m".to_string(), Span::new(0, 1), 2.0, exponent_span);
+    /// assert_eq!(unit.exponent_span().start(), 15);
+    /// assert_eq!(unit.exponent_span().length(), 3);
+    /// ```
     pub fn exponent_span(&self) -> &Span {
         &self.exponent_span
     }

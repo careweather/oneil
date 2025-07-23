@@ -59,6 +59,10 @@ impl Identifier {
     }
 }
 
+/// An identifier with associated source location information.
+///
+/// This type alias provides a convenient way to work with identifiers
+/// that include source location spans for error reporting and debugging.
 pub type IdentifierWithSpan = WithSpan<Identifier>;
 
 /// A path to an Oneil model file.

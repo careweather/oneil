@@ -102,6 +102,10 @@ pub enum Expr {
     },
 }
 
+/// An expression with associated source location information.
+///
+/// This type alias provides a convenient way to work with expressions
+/// that include source location spans for error reporting and debugging.
 pub type ExprWithSpan = WithSpan<Expr>;
 
 impl Expr {
@@ -509,14 +513,54 @@ pub enum Variable {
 }
 
 impl Variable {
+    /// Creates a local variable reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `ident` - The identifier of the local variable
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::Variable, reference::Identifier};
+    ///
+    /// let var = Variable::local(Identifier::new("x"));
+    /// ```
     pub fn local(ident: Identifier) -> Self {
         Self::Local(ident)
     }
 
+    /// Creates a parameter variable reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `ident` - The identifier of the parameter
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::Variable, reference::Identifier};
+    ///
+    /// let var = Variable::parameter(Identifier::new("radius"));
+    /// ```
     pub fn parameter(ident: Identifier) -> Self {
         Self::Parameter(ident)
     }
 
+    /// Creates an external variable reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The model path where the variable is defined
+    /// * `ident` - The identifier of the variable in that model
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::Variable, reference::{Identifier, ModelPath}};
+    ///
+    /// let var = Variable::external(ModelPath::new("submodel"), Identifier::new("area"));
+    /// ```
     pub fn external(model: ModelPath, ident: Identifier) -> Self {
         Self::External { model, ident }
     }
