@@ -105,80 +105,123 @@ mod tests {
 
     #[test]
     fn test_validate_imports_empty_list() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = get_model_path();
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![];
 
+        // validate the imports
         let (valid_imports, errors, _builder) =
             validate_imports(&model_path, builder, imports, &file_loader);
 
+        // check the imports
         assert!(valid_imports.is_empty());
+
+        // check the errors
         assert!(errors.is_empty());
     }
 
     #[test]
     fn test_validate_imports_single_valid_import() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = get_model_path();
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![build_import("my_python")];
         let import_refs = imports.iter().collect();
 
+        // validate the imports
         let (valid_imports, errors, _builder) =
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
+        // check the imports
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&WithSpan::new(
+
+        let valid_path = WithSpan::new(
             PythonPath::new(PathBuf::from("my_python")),
-            get_span_from_ast_span(&imports[0].node_span())
-        )));
+            get_span_from_ast_span(&imports[0].node_span()),
+        );
+        assert!(valid_imports.contains(&valid_path));
+
+        // check the errors
         assert!(errors.is_empty());
     }
 
     #[test]
     fn test_validate_imports_single_invalid_import() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_none();
         let model_path = get_model_path();
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![build_import("nonexistent")];
         let import_refs = imports.iter().collect();
 
+        // validate the imports
         let (valid_imports, errors, _builder) =
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
+        // check the imports
         assert!(valid_imports.is_empty());
+
+        // check the errors
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent"))));
+
+        let error_path = WithSpan::new(
+            PythonPath::new(PathBuf::from("nonexistent")),
+            get_span_from_ast_span(&imports[0].node_span()),
+        );
+        assert!(errors.contains_key(&error_path));
     }
 
     #[test]
     fn test_validate_imports_mixed_valid_and_invalid() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_some(vec!["my_python.py".into()]);
         let model_path = get_model_path();
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![build_import("my_python"), build_import("nonexistent")];
         let import_refs = imports.iter().collect();
 
+        // validate the imports
         let (valid_imports, errors, _builder) =
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
-        eprintln!("valid_imports: {:?}", valid_imports);
-        eprintln!("errors: {:?}", errors);
+        // check the imports
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&WithSpan::new(
+
+        let valid_path = WithSpan::new(
             PythonPath::new(PathBuf::from("my_python")),
-            oneil_ir::span::Span::new(0, 10)
-        )));
+            get_span_from_ast_span(&imports[0].node_span()),
+        );
+        assert!(valid_imports.contains(&valid_path));
+
+        // check the errors
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent"))));
+
+        let error_path = WithSpan::new(
+            PythonPath::new(PathBuf::from("nonexistent")),
+            get_span_from_ast_span(&imports[1].node_span()),
+        );
+        assert!(errors.contains_key(&error_path));
     }
 
     #[test]
     fn test_validate_imports_multiple_valid_imports() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = get_model_path();
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![
             build_import("my_python1"),
             build_import("my_python2"),
@@ -186,53 +229,84 @@ mod tests {
         ];
         let import_refs = imports.iter().collect();
 
+        // validate the imports
         let (valid_imports, errors, _builder) =
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
+        // check the imports
         assert_eq!(valid_imports.len(), 3);
-        assert!(valid_imports.contains(&WithSpan::new(
+        let valid_path1 = WithSpan::new(
             PythonPath::new(PathBuf::from("my_python1")),
-            get_span_from_ast_span(&imports[0].node_span())
-        )));
-        assert!(valid_imports.contains(&WithSpan::new(
+            get_span_from_ast_span(&imports[0].node_span()),
+        );
+        assert!(valid_imports.contains(&valid_path1));
+
+        let valid_path2 = WithSpan::new(
             PythonPath::new(PathBuf::from("my_python2")),
-            get_span_from_ast_span(&imports[1].node_span())
-        )));
-        assert!(valid_imports.contains(&WithSpan::new(
+            get_span_from_ast_span(&imports[1].node_span()),
+        );
+        assert!(valid_imports.contains(&valid_path2));
+
+        let valid_path3 = WithSpan::new(
             PythonPath::new(PathBuf::from("my_python3")),
-            get_span_from_ast_span(&imports[2].node_span())
-        )));
+            get_span_from_ast_span(&imports[2].node_span()),
+        );
+        assert!(valid_imports.contains(&valid_path3));
+
+        // check the errors
         assert!(errors.is_empty());
     }
 
     #[test]
     fn test_validate_imports_all_invalid() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_none();
         let model_path = get_model_path();
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![build_import("nonexistent1"), build_import("nonexistent2")];
         let import_refs = imports.iter().collect();
 
+        // validate the imports
         let (valid_imports, errors, _builder) =
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
+        // check the imports
         assert!(valid_imports.is_empty());
+
+        // check the errors
         assert_eq!(errors.len(), 2);
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent1"))));
-        assert!(errors.contains_key(&PythonPath::new(PathBuf::from("nonexistent2"))));
+
+        let error_path1 = WithSpan::new(
+            PythonPath::new(PathBuf::from("nonexistent1")),
+            get_span_from_ast_span(&imports[0].node_span()),
+        );
+        assert!(errors.contains_key(&error_path1));
+
+        let error_path2 = WithSpan::new(
+            PythonPath::new(PathBuf::from("nonexistent2")),
+            get_span_from_ast_span(&imports[1].node_span()),
+        );
+        assert!(errors.contains_key(&error_path2));
     }
 
     #[test]
     fn test_validate_imports_builder_error_tracking() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_none();
         let model_path = get_model_path();
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![build_import("nonexistent")];
         let import_refs = imports.iter().collect();
 
+        // validate the imports
         let (_valid_imports, _errors, builder) =
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
+        // check the builder
         assert!(
             builder
                 .get_imports_with_errors()
@@ -242,20 +316,29 @@ mod tests {
 
     #[test]
     fn test_validate_imports_path_conversion() {
+        // set up the context
         let file_loader = TestPythonValidator::validate_some(vec!["subdir/my_python.py".into()]);
         let model_path = ModelPath::new(PathBuf::from("subdir/test_model"));
         let builder = get_empty_builder();
+
+        // set up the imports
         let imports = vec![build_import("my_python")];
         let import_refs = imports.iter().collect();
 
-        let (valid_imports, _errors, _builder) =
+        // validate the imports
+        let (valid_imports, errors, _builder) =
             validate_imports(&model_path, builder, import_refs, &file_loader);
 
-        // The import should be converted to a Python path relative to the model
+        // check the imports
         assert_eq!(valid_imports.len(), 1);
-        assert!(valid_imports.contains(&WithSpan::new(
+
+        let valid_path = WithSpan::new(
             PythonPath::new(PathBuf::from("subdir/my_python")),
-            get_span_from_ast_span(&imports[0].node_span())
-        )));
+            get_span_from_ast_span(&imports[0].node_span()),
+        );
+        assert!(valid_imports.contains(&valid_path));
+
+        // check the errors
+        assert!(errors.is_empty());
     }
 }
