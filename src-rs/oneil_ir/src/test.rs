@@ -70,13 +70,13 @@ impl ModelTest {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::ModelTest, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier};
+    /// use oneil_ir::{test::ModelTest, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier, span::WithSpan};
     /// use std::collections::HashSet;
     ///
     /// let mut inputs = HashSet::new();
-    /// inputs.insert(Identifier::new("radius"));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("radius")));
     ///
-    /// let test_expr = Expr::literal(Literal::number(78.54)); // Expected area for radius = 5
+    /// let test_expr = WithSpan::test_new(Expr::literal(Literal::number(78.54))); // Expected area for radius = 5
     /// let test = ModelTest::new(TraceLevel::None, inputs, test_expr);
     /// ```
     pub fn new(
@@ -115,17 +115,17 @@ impl ModelTest {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::ModelTest, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier};
+    /// use oneil_ir::{test::ModelTest, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier, span::WithSpan};
     /// use std::collections::HashSet;
     ///
     /// let mut inputs = HashSet::new();
-    /// inputs.insert(Identifier::new("radius"));
-    /// inputs.insert(Identifier::new("height"));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("radius")));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("height")));
     ///
-    /// let test = ModelTest::new(TraceLevel::None, inputs, Expr::literal(Literal::number(0.0)));
+    /// let test = ModelTest::new(TraceLevel::None, inputs, WithSpan::test_new(Expr::literal(Literal::number(0.0))));
     ///
-    /// assert!(test.inputs().contains(&Identifier::new("radius")));
-    /// assert!(test.inputs().contains(&Identifier::new("height")));
+    /// assert!(test.inputs().contains(&WithSpan::test_new(Identifier::new("radius"))));
+    /// assert!(test.inputs().contains(&WithSpan::test_new(Identifier::new("height"))));
     /// ```
     pub fn inputs(&self) -> &HashSet<IdentifierWithSpan> {
         &self.inputs
@@ -144,10 +144,10 @@ impl ModelTest {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::ModelTest, expr::{Expr, Literal}, debug_info::TraceLevel};
+    /// use oneil_ir::{test::ModelTest, expr::{Expr, Literal}, debug_info::TraceLevel, span::WithSpan};
     /// use std::collections::HashSet;
     ///
-    /// let expected_area = Expr::literal(Literal::number(78.54));
+    /// let expected_area = WithSpan::test_new(Expr::literal(Literal::number(78.54)));
     /// let test = ModelTest::new(TraceLevel::None, HashSet::new(), expected_area.clone());
     ///
     /// assert_eq!(test.test_expr(), &expected_area);
@@ -184,11 +184,11 @@ impl SubmodelTest {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::{SubmodelTest, SubmodelTestInputs}, expr::{Expr, Literal}, reference::Identifier};
+    /// use oneil_ir::{test::{SubmodelTest, SubmodelTestInputs}, expr::{Expr, Literal}, reference::Identifier, span::WithSpan};
     /// use std::collections::HashMap;
     ///
     /// let mut inputs = HashMap::new();
-    /// inputs.insert(Identifier::new("radius"), Expr::literal(Literal::number(5.0)));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("radius")), WithSpan::test_new(Expr::literal(Literal::number(5.0))));
     ///
     /// let test = SubmodelTest::new(
     ///     Identifier::new("circle_area"),
@@ -237,12 +237,12 @@ impl SubmodelTest {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::{SubmodelTest, SubmodelTestInputs}, expr::{Expr, Literal}, reference::Identifier};
+    /// use oneil_ir::{test::{SubmodelTest, SubmodelTestInputs}, expr::{Expr, Literal}, reference::Identifier, span::WithSpan};
     /// use std::collections::HashMap;
     ///
     /// let mut inputs = HashMap::new();
-    /// inputs.insert(Identifier::new("x"), Expr::literal(Literal::number(10.0)));
-    /// inputs.insert(Identifier::new("y"), Expr::literal(Literal::number(20.0)));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("x")), WithSpan::test_new(Expr::literal(Literal::number(10.0))));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("y")), WithSpan::test_new(Expr::literal(Literal::number(20.0))));
     ///
     /// let test = SubmodelTest::new(
     ///     Identifier::new("calculator"),
@@ -251,7 +251,7 @@ impl SubmodelTest {
     ///
     /// let test_inputs = test.inputs();
     /// assert_eq!(test_inputs.len(), 2);
-    /// assert!(test_inputs.contains_key(&Identifier::new("x")));
+    /// assert!(test_inputs.contains_key(&WithSpan::test_new(Identifier::new("x"))));
     /// ```
     pub fn inputs(&self) -> &SubmodelTestInputs {
         &self.inputs
@@ -276,12 +276,12 @@ impl SubmodelTestInputs {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::SubmodelTestInputs, expr::{Expr, Literal}, reference::Identifier};
+    /// use oneil_ir::{test::SubmodelTestInputs, expr::{Expr, Literal}, reference::Identifier, span::WithSpan};
     /// use std::collections::HashMap;
     ///
     /// let mut inputs = HashMap::new();
-    /// inputs.insert(Identifier::new("width"), Expr::literal(Literal::number(10.0)));
-    /// inputs.insert(Identifier::new("height"), Expr::literal(Literal::number(5.0)));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("width")), WithSpan::test_new(Expr::literal(Literal::number(10.0))));
+    /// inputs.insert(WithSpan::test_new(Identifier::new("height")), WithSpan::test_new(Expr::literal(Literal::number(5.0))));
     ///
     /// let test_inputs = SubmodelTestInputs::new(inputs);
     /// ```

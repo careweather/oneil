@@ -41,10 +41,11 @@ impl ParameterCollection {
     /// use std::collections::HashMap;
     ///
     /// let mut params = HashMap::new();
+    /// use oneil_ir::span::WithSpan;
     /// let param = Parameter::new(
     ///     std::collections::HashSet::new(),
-    ///     Identifier::new("radius"),
-    ///     ParameterValue::simple(Expr::literal(Literal::number(5.0)), None),
+    ///     WithSpan::test_new(Identifier::new("radius")),
+    ///     ParameterValue::simple(WithSpan::test_new(Expr::literal(Literal::number(5.0))), None),
     ///     Limits::default(),
     ///     false,
     ///     TraceLevel::None,
@@ -104,13 +105,13 @@ impl Parameter {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel, span::WithSpan};
     /// use std::collections::HashSet;
     ///
     /// let param = Parameter::new(
     ///     HashSet::new(),
-    ///     Identifier::new("area"),
-    ///     ParameterValue::simple(Expr::literal(Literal::number(25.0)), None),
+    ///     WithSpan::test_new(Identifier::new("area")),
+    ///     ParameterValue::simple(WithSpan::test_new(Expr::literal(Literal::number(25.0))), None),
     ///     Limits::default(),
     ///     false,
     ///     TraceLevel::None,
@@ -147,7 +148,7 @@ impl Parameter {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel, span::WithSpan};
     /// use std::collections::HashSet;
     ///
     /// let mut deps = HashSet::new();
@@ -155,8 +156,8 @@ impl Parameter {
     ///
     /// let param = Parameter::new(
     ///     deps,
-    ///     Identifier::new("area"),
-    ///     ParameterValue::simple(Expr::literal(Literal::number(25.0)), None),
+    ///     WithSpan::test_new(Identifier::new("area")),
+    ///     ParameterValue::simple(WithSpan::test_new(Expr::literal(Literal::number(25.0))), None),
     ///     Limits::default(),
     ///     false,
     ///     TraceLevel::None,
@@ -192,9 +193,9 @@ impl ParameterValue {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::ParameterValue, expr::{Expr, Literal}, unit::CompositeUnit};
+    /// use oneil_ir::{parameter::ParameterValue, expr::{Expr, Literal}, unit::CompositeUnit, span::WithSpan};
     ///
-    /// let expr = Expr::literal(Literal::number(3.14159));
+    /// let expr = WithSpan::test_new(Expr::literal(Literal::number(3.14159)));
     /// let value = ParameterValue::simple(expr, None);
     /// ```
     pub fn simple(expr: ExprWithSpan, unit: Option<CompositeUnit>) -> Self {
@@ -211,14 +212,14 @@ impl ParameterValue {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::{ParameterValue, PiecewiseExpr}, expr::{Expr, Literal, BinaryOp}, reference::Identifier};
+    /// use oneil_ir::{parameter::{ParameterValue, PiecewiseExpr}, expr::{Expr, Literal, BinaryOp}, reference::Identifier, span::WithSpan};
     ///
-    /// let condition = Expr::binary_op(
-    ///     BinaryOp::LessThan,
-    ///     Expr::parameter_variable(Identifier::new("x")),
-    ///     Expr::literal(Literal::number(0.0))
-    /// );
-    /// let expr = Expr::literal(Literal::number(-1.0));
+    /// let condition = WithSpan::test_new(Expr::binary_op(
+    ///     WithSpan::test_new(BinaryOp::LessThan),
+    ///     WithSpan::test_new(Expr::parameter_variable(Identifier::new("x"))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0)))
+    /// ));
+    /// let expr = WithSpan::test_new(Expr::literal(Literal::number(-1.0)));
     /// let piecewise = PiecewiseExpr::new(expr, condition);
     ///
     /// let value = ParameterValue::piecewise(vec![piecewise], None);
@@ -249,14 +250,14 @@ impl PiecewiseExpr {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::PiecewiseExpr, expr::{Expr, Literal, BinaryOp}, reference::Identifier};
+    /// use oneil_ir::{parameter::PiecewiseExpr, expr::{Expr, Literal, BinaryOp}, reference::Identifier, span::WithSpan};
     ///
-    /// let value = Expr::literal(Literal::number(1.0));
-    /// let condition = Expr::binary_op(
-    ///     BinaryOp::GreaterThan,
-    ///     Expr::parameter_variable(Identifier::new("x")),
-    ///     Expr::literal(Literal::number(0.0))
-    /// );
+    /// let value = WithSpan::test_new(Expr::literal(Literal::number(1.0)));
+    /// let condition = WithSpan::test_new(Expr::binary_op(
+    ///     WithSpan::test_new(BinaryOp::GreaterThan),
+    ///     WithSpan::test_new(Expr::parameter_variable(Identifier::new("x"))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0)))
+    /// ));
     ///
     /// let piecewise = PiecewiseExpr::new(value, condition);
     /// ```
@@ -311,10 +312,10 @@ impl Limits {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}};
+    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}, span::WithSpan};
     ///
-    /// let min = Expr::literal(Literal::number(0.0));
-    /// let max = Expr::literal(Literal::number(100.0));
+    /// let min = WithSpan::test_new(Expr::literal(Literal::number(0.0)));
+    /// let max = WithSpan::test_new(Expr::literal(Literal::number(100.0)));
     /// let limits = Limits::continuous(min, max);
     /// ```
     pub fn continuous(min: ExprWithSpan, max: ExprWithSpan) -> Self {
@@ -330,12 +331,12 @@ impl Limits {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}};
+    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}, span::WithSpan};
     ///
     /// let values = vec![
-    ///     Expr::literal(Literal::number(1.0)),
-    ///     Expr::literal(Literal::number(2.0)),
-    ///     Expr::literal(Literal::number(3.0)),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(1.0))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(2.0))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(3.0))),
     /// ];
     /// let limits = Limits::discrete(values);
     /// ```

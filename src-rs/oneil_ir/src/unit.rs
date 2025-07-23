@@ -31,12 +31,12 @@ impl CompositeUnit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::{CompositeUnit, Unit};
+    /// use oneil_ir::{unit::{CompositeUnit, Unit}, span::Span};
     ///
     /// let units = vec![
-    ///     Unit::new("m".to_string(), 2.0),  // meters squared
-    ///     Unit::new("kg".to_string(), 1.0), // kilograms
-    ///     Unit::new("s".to_string(), -2.0), // per second squared
+    ///     Unit::new("m".to_string(), Span::new(0, 1), 2.0, Span::new(0, 1)),  // meters squared
+    ///     Unit::new("kg".to_string(), Span::new(0, 2), 1.0, Span::new(0, 1)), // kilograms
+    ///     Unit::new("s".to_string(), Span::new(0, 1), -2.0, Span::new(0, 1)), // per second squared
     /// ];
     ///
     /// let composite = CompositeUnit::new(units);
@@ -58,11 +58,11 @@ impl CompositeUnit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::{CompositeUnit, Unit};
+    /// use oneil_ir::{unit::{CompositeUnit, Unit}, span::Span};
     ///
     /// let units = vec![
-    ///     Unit::new("m".to_string(), 1.0),
-    ///     Unit::new("s".to_string(), -1.0),
+    ///     Unit::new("m".to_string(), Span::new(0, 1), 1.0, Span::new(0, 1)),
+    ///     Unit::new("s".to_string(), Span::new(0, 1), -1.0, Span::new(0, 1)),
     /// ];
     ///
     /// let composite = CompositeUnit::new(units);
@@ -107,12 +107,12 @@ impl Unit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::Unit;
+    /// use oneil_ir::{unit::Unit, span::Span};
     ///
-    /// let meter = Unit::new("m".to_string(), 1.0);
-    /// let square_meter = Unit::new("m".to_string(), 2.0);
-    /// let per_second = Unit::new("s".to_string(), -1.0);
-    /// let sqrt_meter = Unit::new("m".to_string(), 0.5);
+    /// let meter = Unit::new("m".to_string(), Span::new(0, 1), 1.0, Span::new(0, 1));
+    /// let square_meter = Unit::new("m".to_string(), Span::new(0, 1), 2.0, Span::new(0, 1));
+    /// let per_second = Unit::new("s".to_string(), Span::new(0, 1), -1.0, Span::new(0, 1));
+    /// let sqrt_meter = Unit::new("m".to_string(), Span::new(0, 1), 0.5, Span::new(0, 1));
     /// ```
     pub fn new(name: String, name_span: Span, exponent: f64, exponent_span: Span) -> Self {
         Self {
@@ -135,9 +135,9 @@ impl Unit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::Unit;
+    /// use oneil_ir::{unit::Unit, span::Span};
     ///
-    /// let unit = Unit::new("kg".to_string(), 1.0);
+    /// let unit = Unit::new("kg".to_string(), Span::new(0, 2), 1.0, Span::new(0, 1));
     /// assert_eq!(unit.name(), "kg");
     /// ```
     pub fn name(&self) -> &str {
@@ -164,11 +164,11 @@ impl Unit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::Unit;
+    /// use oneil_ir::{unit::Unit, span::Span};
     ///
-    /// let linear = Unit::new("m".to_string(), 1.0);
-    /// let squared = Unit::new("m".to_string(), 2.0);
-    /// let inverse = Unit::new("s".to_string(), -1.0);
+    /// let linear = Unit::new("m".to_string(), Span::new(0, 1), 1.0, Span::new(0, 1));
+    /// let squared = Unit::new("m".to_string(), Span::new(0, 1), 2.0, Span::new(0, 1));
+    /// let inverse = Unit::new("s".to_string(), Span::new(0, 1), -1.0, Span::new(0, 1));
     ///
     /// assert_eq!(linear.exponent(), 1.0);
     /// assert_eq!(squared.exponent(), 2.0);

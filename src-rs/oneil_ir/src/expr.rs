@@ -7,7 +7,7 @@
 
 use crate::{
     reference::{Identifier, ModelPath},
-    span::{Span, WithSpan},
+    span::WithSpan,
 };
 
 /// Abstract syntax tree for mathematical and logical expressions.
@@ -35,10 +35,11 @@ pub enum Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, BinaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let left = Expr::literal(Literal::number(5.0));
-    /// let right = Expr::literal(Literal::number(3.0));
-    /// let expr = Expr::binary_op(BinaryOp::Add, left, right);
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::binary_op(WithSpan::test_new(BinaryOp::Add), left, right);
     /// ```
     BinaryOp {
         /// The binary operator to apply.
@@ -59,9 +60,10 @@ pub enum Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, UnaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let operand = Expr::literal(Literal::number(5.0));
-    /// let expr = Expr::unary_op(UnaryOp::Neg, operand);
+    /// let operand = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let expr = Expr::unary_op(WithSpan::test_new(UnaryOp::Neg), operand);
     /// ```
     UnaryOp {
         /// The unary operator to apply.
@@ -80,9 +82,10 @@ pub enum Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, FunctionName, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let args = vec![Expr::literal(Literal::number(3.14))];
-    /// let expr = Expr::function_call(FunctionName::sin(), args);
+    /// let args = vec![WithSpan::test_new(Expr::literal(Literal::number(3.14)))];
+    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::sin()), args);
     /// ```
     FunctionCall {
         /// The name of the function to call.
@@ -114,10 +117,11 @@ impl Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, BinaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let left = Expr::literal(Literal::number(5.0));
-    /// let right = Expr::literal(Literal::number(3.0));
-    /// let expr = Expr::binary_op(BinaryOp::Add, left, right);
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::binary_op(WithSpan::test_new(BinaryOp::Add), left, right);
     /// ```
     pub fn binary_op(op: WithSpan<BinaryOp>, left: ExprWithSpan, right: ExprWithSpan) -> Self {
         Self::BinaryOp {
@@ -138,9 +142,10 @@ impl Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, UnaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let operand = Expr::literal(Literal::number(5.0));
-    /// let expr = Expr::unary_op(UnaryOp::Neg, operand);
+    /// let operand = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let expr = Expr::unary_op(WithSpan::test_new(UnaryOp::Neg), operand);
     /// ```
     pub fn unary_op(op: WithSpan<UnaryOp>, expr: ExprWithSpan) -> Self {
         Self::UnaryOp {
@@ -160,9 +165,10 @@ impl Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, FunctionName, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let args = vec![Expr::literal(Literal::number(3.14))];
-    /// let expr = Expr::function_call(FunctionName::sin(), args);
+    /// let args = vec![WithSpan::test_new(Expr::literal(Literal::number(3.14)))];
+    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::sin()), args);
     /// ```
     pub fn function_call(name: WithSpan<FunctionName>, args: Vec<ExprWithSpan>) -> Self {
         Self::FunctionCall { name, args }

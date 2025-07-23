@@ -39,6 +39,14 @@ impl<T> WithSpan<T> {
         Self { value, span }
     }
 
+    /// Creates a new `WithSpan<T>` with a dummy span for testing purposes.
+    ///
+    /// This is useful for creating test data where the exact span doesn't matter.
+    /// In production code, you should use `new()` with proper spans.
+    pub fn test_new(value: T) -> Self {
+        Self::new(value, Span::new(0, 0))
+    }
+
     pub fn value(&self) -> &T {
         &self.value
     }

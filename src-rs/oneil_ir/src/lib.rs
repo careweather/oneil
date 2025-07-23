@@ -54,11 +54,12 @@
 //! use std::collections::{HashMap, HashSet};
 //!
 //! // Create a simple parameter
-//! let param_expr = Expr::literal(Literal::number(42.0));
+//! use oneil_ir::span::WithSpan;
+//! let param_expr = WithSpan::test_new(Expr::literal(Literal::number(42.0)));
 //! let param_value = ParameterValue::simple(param_expr, None);
 //! let param = Parameter::new(
 //!     HashSet::new(),
-//!     Identifier::new("my_param"),
+//!     WithSpan::test_new(Identifier::new("my_param")),
 //!     param_value,
 //!     Limits::default(),
 //!     false,
