@@ -30,6 +30,10 @@ pub enum DevCommands {
         /// Display partial AST even if there are errors
         #[arg(long)]
         display_partial: bool,
+
+        /// Print the output in debug format
+        #[arg(long)]
+        print_debug: bool,
     },
     /// Print the intermediate representation of a file
     PrintIr {
@@ -40,5 +44,9 @@ pub enum DevCommands {
         /// Display partial AST even if there are errors
         #[arg(long)]
         display_partial: bool,
+
+        /// Print the output in debug format
+        #[arg(long)]
+        print_debug: bool,
     },
 }

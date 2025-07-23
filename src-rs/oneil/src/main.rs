@@ -18,17 +18,18 @@ fn main() {
             DevCommands::PrintAst {
                 file,
                 display_partial,
+                print_debug,
             } => {
                 let ast = file_parser::FileLoader.parse_ast(&file);
                 match ast {
-                    Ok(ast) => printer::ast::print(&ast, false),
+                    Ok(ast) => printer::ast::print(&ast, print_debug),
                     Err(LoadingError::InvalidFile(error)) => {
                         printer::error::file::print(&file, &error)
                     }
                     Err(LoadingError::Parser(error_with_partial)) => {
                         printer::error::parser::print(&file, error_with_partial.errors);
                         if display_partial {
-                            printer::ast::print(&error_with_partial.partial_result, false);
+                            printer::ast::print(&error_with_partial.partial_result, print_debug);
                         }
                     }
                 }
@@ -36,14 +37,15 @@ fn main() {
             DevCommands::PrintIr {
                 file,
                 display_partial,
+                print_debug,
             } => {
                 let model = oneil_model_loader::load_model(file, &file_parser::FileLoader);
                 match model {
-                    Ok(model) => printer::ir::print(&model),
+                    Ok(model) => printer::ir::print(&model, print_debug),
                     Err((model, error_map)) => {
                         printer::error::loader::print(error_map);
                         if display_partial {
-                            printer::ir::print(&model);
+                            printer::ir::print(&model, print_debug);
                         }
                     }
                 }
