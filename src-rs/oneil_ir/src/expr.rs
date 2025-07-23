@@ -91,7 +91,7 @@ pub enum Expr {
         args: Vec<ExprWithSpan>,
     },
     /// Variable reference (local, parameter, or external).
-    Variable(WithSpan<Variable>),
+    Variable(Variable),
     /// Constant literal value.
     Literal {
         /// The literal value.
@@ -181,8 +181,8 @@ impl Expr {
     ///
     /// let expr = Expr::local_variable(Identifier::new("x"));
     /// ```
-    pub fn local_variable(ident: Identifier, variable_span: Span) -> Self {
-        Self::Variable(WithSpan::new(Variable::Local(ident), variable_span))
+    pub fn local_variable(ident: Identifier) -> Self {
+        Self::Variable(Variable::Local(ident))
     }
 
     /// Creates a parameter variable reference.
@@ -198,8 +198,8 @@ impl Expr {
     ///
     /// let expr = Expr::parameter_variable(Identifier::new("radius"));
     /// ```
-    pub fn parameter_variable(ident: Identifier, variable_span: Span) -> Self {
-        Self::Variable(WithSpan::new(Variable::Parameter(ident), variable_span))
+    pub fn parameter_variable(ident: Identifier) -> Self {
+        Self::Variable(Variable::Parameter(ident))
     }
 
     /// Creates an external variable reference.
@@ -219,11 +219,8 @@ impl Expr {
     ///     Identifier::new("pi")
     /// );
     /// ```
-    pub fn external_variable(model: ModelPath, ident: Identifier, variable_span: Span) -> Self {
-        Self::Variable(WithSpan::new(
-            Variable::External { model, ident },
-            variable_span,
-        ))
+    pub fn external_variable(model: ModelPath, ident: Identifier) -> Self {
+        Self::Variable(Variable::External { model, ident })
     }
 
     /// Creates a literal expression.

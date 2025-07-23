@@ -798,14 +798,7 @@ mod tests {
 
                 match result.value() {
                     ir::expr::Expr::Variable(variable) => {
-                        let expected_var_span = get_span_from_ast_span(ast_variable.node_span());
-                        assert_eq!(variable.span(), &expected_var_span);
-                        match variable.value() {
-                            ir::expr::Variable::Local(ident) => {
-                                assert_eq!(ident, &Identifier::new("x"));
-                            }
-                            _ => panic!("Expected local variable, got {:?}", variable.value()),
-                        }
+                        assert_eq!(variable, &ir::expr::Variable::Local(Identifier::new("x")));
                     }
                     _ => panic!("Expected variable expression, got {:?}", result),
                 }
@@ -847,15 +840,10 @@ mod tests {
 
                 match result.value() {
                     ir::expr::Expr::Variable(variable) => {
-                        let expected_var_span = get_span_from_ast_span(ast_variable.node_span());
-                        assert_eq!(variable.span(), &expected_var_span);
-
-                        match variable.value() {
-                            ir::expr::Variable::Parameter(ident) => {
-                                assert_eq!(ident, &Identifier::new("param"));
-                            }
-                            _ => panic!("Expected parameter variable, got {:?}", variable.value()),
-                        }
+                        assert_eq!(
+                            variable,
+                            &ir::expr::Variable::Parameter(Identifier::new("param"))
+                        );
                     }
                     _ => panic!("Expected variable expression, got {:?}", result),
                 }
