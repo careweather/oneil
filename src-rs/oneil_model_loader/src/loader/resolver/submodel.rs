@@ -230,11 +230,18 @@ mod tests {
     use oneil_ir::model::Model;
     use std::collections::HashSet;
 
+    // TODO: write tests that test the span of the submodel path
+
     mod helper {
         use super::*;
-        // Helper function to create a test span
-        pub fn test_span(start: usize, end: usize) -> ast::Span {
+        // Helper function to create a test AST span
+        pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
             ast::Span::new(start, end - start, 0)
+        }
+
+        // Helper function to create a test IR span
+        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::Span {
+            oneil_ir::span::Span::new(start, end - start)
         }
 
         // Helper function to create a literal expression node
@@ -243,9 +250,9 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ExprNode {
-            let literal_node = ast::node::Node::new(test_span(start, end), literal);
+            let literal_node = ast::node::Node::new(test_ast_span(start, end), literal);
             let expr = ast::expression::Expr::Literal(literal_node);
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(test_ast_span(start, end), expr)
         }
 
         // Helper function to create a model input node
@@ -256,9 +263,10 @@ mod tests {
             end: usize,
         ) -> ast::declaration::ModelInputNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            let name_node = ast::node::Node::new(test_span(start, start + name.len()), identifier);
+            let name_node =
+                ast::node::Node::new(test_ast_span(start, start + name.len()), identifier);
             let model_input = ast::declaration::ModelInput::new(name_node, value);
-            ast::node::Node::new(test_span(start, end), model_input)
+            ast::node::Node::new(test_ast_span(start, end), model_input)
         }
 
         // Helper function to create a model input list node
@@ -268,7 +276,7 @@ mod tests {
             end: usize,
         ) -> ast::declaration::ModelInputListNode {
             let model_input_list = ast::declaration::ModelInputList::new(inputs);
-            ast::node::Node::new(test_span(start, end), model_input_list)
+            ast::node::Node::new(test_ast_span(start, end), model_input_list)
         }
 
         // Helper function to create a use model node
@@ -282,23 +290,24 @@ mod tests {
         ) -> ast::declaration::UseModelNode {
             let identifier = ast::naming::Identifier::new(model_name.to_string());
             let model_name_node =
-                ast::node::Node::new(test_span(start, start + model_name.len()), identifier);
+                ast::node::Node::new(test_ast_span(start, start + model_name.len()), identifier);
 
             let alias_node = alias.map(|name| {
                 let identifier = ast::naming::Identifier::new(name.to_string());
-                ast::node::Node::new(test_span(end - name.len(), end), identifier)
+                ast::node::Node::new(test_ast_span(end - name.len(), end), identifier)
             });
 
             let use_model =
                 ast::declaration::UseModel::new(model_name_node, subcomponents, inputs, alias_node);
-            ast::node::Node::new(test_span(start, end), use_model)
+            ast::node::Node::new(test_ast_span(start, end), use_model)
         }
 
         /// Creates a test model with specified submodels
-        pub fn create_test_model(submodels: Vec<(&str, ModelPath)>) -> Model {
+        pub fn create_test_model(submodels: Vec<(&str, WithSpan<ModelPath>)>) -> Model {
             let mut submodel_map = HashMap::new();
             for (name, path) in submodels {
-                submodel_map.insert(Identifier::new(name), path);
+                let identifier = Identifier::new(name);
+                submodel_map.insert(identifier, path);
             }
 
             Model::new(
@@ -339,10 +348,11 @@ mod tests {
         assert_eq!(submodels.len(), 1);
 
         let submodel_path = submodels.get(&temperature_id);
-        assert_eq!(submodel_path, Some(&temperature_path));
+        let submodel_path = submodel_path.expect("submodel path should be present");
+        assert_eq!(submodel_path.value(), &temperature_path);
 
         // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
+        let (test_id, _test_span, test_inputs) = &tests[0];
         assert_eq!(test_id, &temperature_id);
         assert!(test_inputs.is_none()); // no inputs
     }
@@ -388,10 +398,11 @@ mod tests {
         // submodel tests
         assert_eq!(submodels.len(), 1);
         let submodel_path = submodels.get(&sensor_id);
-        assert_eq!(submodel_path, Some(&sensor_path));
+        let submodel_path = submodel_path.expect("submodel path should be present");
+        assert_eq!(submodel_path.value(), &sensor_path);
 
         // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
+        let (test_id, _test_span, test_inputs) = &tests[0];
         assert_eq!(test_id, &sensor_id);
 
         let inputs = test_inputs.expect("test inputs should be present");
@@ -426,10 +437,11 @@ mod tests {
     fn test_resolve_nested_submodel() {
         // use weather.atmosphere.temperature as temp
         let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node = ast::node::Node::new(helper::test_span(0, 10), atmosphere_identifier);
+        let atmosphere_node =
+            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
         let temperature_identifier = ast::naming::Identifier::new("temperature".to_string());
         let temperature_node =
-            ast::node::Node::new(helper::test_span(0, 11), temperature_identifier);
+            ast::node::Node::new(helper::test_ast_span(0, 11), temperature_identifier);
         let subcomponents = vec![atmosphere_node, temperature_node];
 
         let use_model =
@@ -444,11 +456,15 @@ mod tests {
         let temperature_path = ModelPath::new("/temperature");
         let temperature_submodel = helper::create_test_model(vec![]);
         let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model =
-            helper::create_test_model(vec![("temperature", ModelPath::new("/temperature"))]);
+        let atmosphere_model = helper::create_test_model(vec![(
+            "temperature",
+            WithSpan::new(ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
+        )]);
         let weather_path = ModelPath::new("/weather");
-        let weather_model =
-            helper::create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let weather_model = helper::create_test_model(vec![(
+            "atmosphere",
+            WithSpan::new(ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+        )]);
         let model_map = HashMap::from([
             (&weather_path, &weather_model),
             (&atmosphere_path, &atmosphere_model),
@@ -467,10 +483,11 @@ mod tests {
         assert_eq!(submodels.len(), 1);
 
         let submodel_path = submodels.get(&temperature_id);
-        assert_eq!(submodel_path, Some(&temperature_path));
+        let submodel_path = submodel_path.expect("submodel path should be present");
+        assert_eq!(submodel_path.value(), &temperature_path);
 
         // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
+        let (test_id, _test_span, test_inputs) = &tests[0];
         assert_eq!(test_id, &temperature_id);
         assert!(test_inputs.is_none()); // no inputs
     }
@@ -503,10 +520,11 @@ mod tests {
         assert_eq!(submodels.len(), 1);
 
         let submodel_path = submodels.get(&temperature_id);
-        assert_eq!(submodel_path, Some(&temperature_path));
+        let submodel_path = submodel_path.expect("submodel path should be present");
+        assert_eq!(submodel_path.value(), &temperature_path);
 
         // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
+        let (test_id, _test_span, test_inputs) = &tests[0];
         assert_eq!(test_id, &temperature_id);
         assert!(test_inputs.is_none()); // no inputs
     }
@@ -516,7 +534,8 @@ mod tests {
         // build the use model list
         // use weather.atmosphere
         let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node = ast::node::Node::new(helper::test_span(0, 10), atmosphere_identifier);
+        let atmosphere_node =
+            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
         let subcomponents = vec![atmosphere_node];
 
         let use_model = helper::create_use_model_node("weather", subcomponents, None, None, 0, 20);
@@ -530,8 +549,10 @@ mod tests {
         let atmosphere_path = ModelPath::new("/atmosphere");
         let atmosphere_submodel = helper::create_test_model(vec![]);
         let weather_path = ModelPath::new("/weather");
-        let weather_submodel =
-            helper::create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let weather_submodel = helper::create_test_model(vec![(
+            "atmosphere",
+            WithSpan::new(ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+        )]);
 
         // create the model map
         let model_map = HashMap::from([
@@ -551,10 +572,11 @@ mod tests {
         assert_eq!(submodels.len(), 1);
 
         let submodel_path = submodels.get(&atmosphere_id);
-        assert_eq!(submodel_path, Some(&atmosphere_path));
+        let submodel_path = submodel_path.expect("submodel path should be present");
+        assert_eq!(submodel_path.value(), &atmosphere_path);
 
         // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
+        let (test_id, _test_span, test_inputs) = &tests[0];
         assert_eq!(test_id, &atmosphere_id);
         assert!(test_inputs.is_none()); // no inputs
     }
@@ -603,7 +625,8 @@ mod tests {
     fn test_resolve_undefined_submodel() {
         // build the use model list
         let undefined_identifier = ast::naming::Identifier::new("undefined_submodel".to_string());
-        let undefined_node = ast::node::Node::new(helper::test_span(0, 16), undefined_identifier);
+        let undefined_node =
+            ast::node::Node::new(helper::test_ast_span(0, 16), undefined_identifier);
         let subcomponents = vec![undefined_node];
 
         let use_model =
@@ -648,9 +671,11 @@ mod tests {
         // build the use model list
         // use weather.atmosphere.undefined as undefined
         let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node = ast::node::Node::new(helper::test_span(0, 10), atmosphere_identifier);
+        let atmosphere_node =
+            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
         let undefined_identifier = ast::naming::Identifier::new("undefined".to_string());
-        let undefined_node = ast::node::Node::new(helper::test_span(0, 9), undefined_identifier);
+        let undefined_node =
+            ast::node::Node::new(helper::test_ast_span(0, 9), undefined_identifier);
         let subcomponents = vec![atmosphere_node, undefined_node];
 
         let use_model =
@@ -665,8 +690,10 @@ mod tests {
         let atmosphere_path = ModelPath::new("/atmosphere");
         let atmosphere_model = helper::create_test_model(vec![]); // No submodels
         let weather_path = ModelPath::new("/weather");
-        let weather_model =
-            helper::create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let weather_model = helper::create_test_model(vec![(
+            "atmosphere",
+            WithSpan::new(ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+        )]);
         let model_map = HashMap::from([
             (&weather_path, &weather_model),
             (&atmosphere_path, &atmosphere_model),
@@ -746,21 +773,23 @@ mod tests {
         assert_eq!(submodels.len(), 2);
 
         let temp_submodel_path = submodels.get(&temperature_id);
-        assert_eq!(temp_submodel_path, Some(&temperature_path));
+        let temp_submodel_path = temp_submodel_path.expect("submodel path should be present");
+        assert_eq!(temp_submodel_path.value(), &temperature_path);
 
         let press_submodel_path = submodels.get(&pressure_id);
-        assert_eq!(press_submodel_path, Some(&pressure_path));
+        let press_submodel_path = press_submodel_path.expect("submodel path should be present");
+        assert_eq!(press_submodel_path.value(), &pressure_path);
 
         // test inputs tests
         assert_eq!(tests.len(), 2);
 
         // Check temperature test (no inputs)
-        let (test_id, test_inputs) = &tests[0];
+        let (test_id, _test_span, test_inputs) = &tests[0];
         assert_eq!(test_id, &temperature_id);
         assert!(test_inputs.is_none());
 
         // Check pressure test (with altitude input)
-        let (test_id, test_inputs) = &tests[1];
+        let (test_id, _test_span, test_inputs) = &tests[1];
         assert_eq!(test_id, &pressure_id);
 
         let inputs = test_inputs.expect("test inputs should be present");
@@ -831,13 +860,14 @@ mod tests {
         assert_eq!(submodels.len(), 1);
 
         let temp_submodel_path = submodels.get(&temperature_id);
-        assert_eq!(temp_submodel_path, Some(&temperature_path));
+        let temp_submodel_path = temp_submodel_path.expect("submodel path should be present");
+        assert_eq!(temp_submodel_path.value(), &temperature_path);
 
         // test inputs tests
         assert_eq!(tests.len(), 1);
 
         // check temperature test (no inputs)
-        let (test_id, test_inputs) = &tests[0];
+        let (test_id, _test_span, test_inputs) = &tests[0];
         assert_eq!(test_id, &temperature_id);
         assert!(test_inputs.is_none());
     }
