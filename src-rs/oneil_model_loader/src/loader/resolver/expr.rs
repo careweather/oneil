@@ -301,14 +301,12 @@ fn resolve_function_name(
 /// # Returns
 ///
 /// The corresponding model literal
-fn resolve_literal(literal: &ast::expression::LiteralNode) -> WithSpan<oneil_ir::expr::Literal> {
-    let span = get_span_from_ast_span(literal.node_span());
-    let literal = match literal.node_value() {
+fn resolve_literal(literal: &ast::expression::LiteralNode) -> oneil_ir::expr::Literal {
+    match literal.node_value() {
         ast::expression::Literal::Number(number) => oneil_ir::expr::Literal::number(*number),
         ast::expression::Literal::String(string) => oneil_ir::expr::Literal::string(string.clone()),
         ast::expression::Literal::Boolean(boolean) => oneil_ir::expr::Literal::boolean(*boolean),
-    };
-    WithSpan::new(literal, span)
+    }
 }
 
 #[cfg(test)]
@@ -473,13 +471,10 @@ mod tests {
             literal: f64,
             start: usize,
             end: usize,
-        ) -> WithSpan<ir::expr::Expr> {
+        ) -> ir::expr::ExprWithSpan {
             let literal = ir::expr::Literal::number(literal);
-            let literal_with_span = WithSpan::new(literal, Span::new(start, end));
             WithSpan::new(
-                ir::expr::Expr::Literal {
-                    value: literal_with_span,
-                },
+                ir::expr::Expr::Literal { value: literal },
                 Span::new(start, end),
             )
         }
@@ -519,8 +514,7 @@ mod tests {
                 assert_eq!(result.span(), &expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
-                        assert_eq!(value.span(), &expected_span);
-                        assert_eq!(value.value(), &Literal::Number(42.0));
+                        assert_eq!(value, &Literal::Number(42.0));
                     }
                     _ => panic!("Expected literal expression, got {:?}", result),
                 }
@@ -557,8 +551,7 @@ mod tests {
                 assert_eq!(result.span(), &expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
-                        assert_eq!(value.span(), &expected_span);
-                        assert_eq!(value.value(), &Literal::String("hello".to_string()));
+                        assert_eq!(value, &Literal::String("hello".to_string()));
                     }
                     _ => panic!("Expected literal expression, got {:?}", result),
                 }
@@ -592,8 +585,7 @@ mod tests {
                 assert_eq!(result.span(), &expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
-                        assert_eq!(value.span(), &expected_span);
-                        assert_eq!(value.value(), &Literal::Boolean(true));
+                        assert_eq!(value, &Literal::Boolean(true));
                     }
                     _ => panic!("Expected literal expression, got {:?}", result),
                 }
@@ -637,20 +629,14 @@ mod tests {
 
                         match left.value() {
                             ir::expr::Expr::Literal { value } => {
-                                let expected_left_span =
-                                    get_span_from_ast_span(ast_left.node_span());
-                                assert_eq!(value.span(), &expected_left_span);
-                                assert_eq!(value.value(), &Literal::Number(1.0));
+                                assert_eq!(value, &Literal::Number(1.0));
                             }
                             _ => panic!("Expected literal expression on left, got {:?}", left),
                         }
 
                         match right.value() {
                             ir::expr::Expr::Literal { value } => {
-                                let expected_right_span =
-                                    get_span_from_ast_span(ast_right.node_span());
-                                assert_eq!(value.span(), &expected_right_span);
-                                assert_eq!(value.value(), &Literal::Number(2.0));
+                                assert_eq!(value, &Literal::Number(2.0));
                             }
                             _ => panic!("Expected literal expression on right, got {:?}", right),
                         }
@@ -690,10 +676,7 @@ mod tests {
 
                         match expr.value() {
                             ir::expr::Expr::Literal { value } => {
-                                let expected_inner_span =
-                                    get_span_from_ast_span(ast_inner_expr.node_span());
-                                assert_eq!(value.span(), &expected_inner_span);
-                                assert_eq!(value.value(), &Literal::Number(5.0));
+                                assert_eq!(value, &Literal::Number(5.0));
                             }
                             _ => panic!("Expected literal expression, got {:?}", expr),
                         }
@@ -736,9 +719,7 @@ mod tests {
 
                         match &args[0].value() {
                             ir::expr::Expr::Literal { value } => {
-                                let expected_arg_span = get_span_from_ast_span(ast_arg.node_span());
-                                assert_eq!(value.span(), &expected_arg_span);
-                                assert_eq!(value.value(), &Literal::Number(3.14));
+                                assert_eq!(value, &Literal::Number(3.14));
                             }
                             _ => panic!("Expected literal argument, got {:?}", args[0]),
                         }
@@ -784,9 +765,7 @@ mod tests {
 
                         match &args[0].value() {
                             ir::expr::Expr::Literal { value } => {
-                                let expected_arg_span = get_span_from_ast_span(ast_arg.node_span());
-                                assert_eq!(value.span(), &expected_arg_span);
-                                assert_eq!(value.value(), &Literal::Number(42.0));
+                                assert_eq!(value, &Literal::Number(42.0));
                             }
                             _ => panic!("Expected literal argument, got {:?}", args[0]),
                         }
@@ -984,7 +963,7 @@ mod tests {
                                 assert_eq!(left_left.span(), &expected_left_span);
                                 match left_left.value() {
                                     ir::expr::Expr::Literal { value } => {
-                                        assert_eq!(value.value(), &Literal::Number(1.0));
+                                        assert_eq!(value, &Literal::Number(1.0));
                                     }
                                     _ => panic!(
                                         "Expected literal on left side, got {:?}",
@@ -997,7 +976,7 @@ mod tests {
                                 assert_eq!(left_right.span(), &expected_right_span);
                                 match left_right.value() {
                                     ir::expr::Expr::Literal { value } => {
-                                        assert_eq!(value.value(), &Literal::Number(2.0));
+                                        assert_eq!(value, &Literal::Number(2.0));
                                     }
                                     _ => panic!(
                                         "Expected literal on right side, got {:?}",
@@ -1025,7 +1004,7 @@ mod tests {
                                 assert_eq!(args[0].span(), &expected_arg_span);
                                 match args[0].value() {
                                     ir::expr::Expr::Literal { value } => {
-                                        assert_eq!(value.value(), &Literal::Number(3.14));
+                                        assert_eq!(value, &Literal::Number(3.14));
                                     }
                                     _ => panic!(
                                         "Expected literal argument, got {:?}",
@@ -1191,9 +1170,7 @@ mod tests {
         // Test number
         let ast_number = helper::create_literal_node(ast::expression::Literal::Number(42.5), 0, 4);
         let ir_number = resolve_literal(&ast_number);
-        let expected_span = get_span_from_ast_span(ast_number.node_span());
-        assert_eq!(ir_number.span(), &expected_span);
-        assert_eq!(ir_number.value(), &Literal::Number(42.5));
+        assert_eq!(ir_number, Literal::Number(42.5));
 
         // Test string
         let ast_string = helper::create_literal_node(
@@ -1202,19 +1179,12 @@ mod tests {
             11,
         );
         let ir_string = resolve_literal(&ast_string);
-        let expected_span = get_span_from_ast_span(ast_string.node_span());
-        assert_eq!(ir_string.span(), &expected_span);
-        assert_eq!(
-            ir_string.value(),
-            &Literal::String("test string".to_string())
-        );
+        assert_eq!(ir_string, Literal::String("test string".to_string()));
 
         // Test boolean
         let ast_bool = helper::create_literal_node(ast::expression::Literal::Boolean(false), 0, 5);
         let ir_bool = resolve_literal(&ast_bool);
-        let expected_span = get_span_from_ast_span(ast_bool.node_span());
-        assert_eq!(ir_bool.span(), &expected_span);
-        assert_eq!(ir_bool.value(), &Literal::Boolean(false));
+        assert_eq!(ir_bool, Literal::Boolean(false));
     }
 
     #[test]
@@ -1300,7 +1270,7 @@ mod tests {
                         assert_eq!(left.span(), &expected_left_span);
                         match left.value() {
                             ir::expr::Expr::Literal { value } => {
-                                assert_eq!(value.value(), &Literal::Number(1.0));
+                                assert_eq!(value, &Literal::Number(1.0));
                             }
                             _ => panic!("Expected literal on left side, got {:?}", left.value()),
                         }
@@ -1309,7 +1279,7 @@ mod tests {
                         assert_eq!(right.span(), &expected_right_span);
                         match right.value() {
                             ir::expr::Expr::Literal { value } => {
-                                assert_eq!(value.value(), &Literal::Number(2.0));
+                                assert_eq!(value, &Literal::Number(2.0));
                             }
                             _ => panic!("Expected literal on right side, got {:?}", right.value()),
                         }
@@ -1385,7 +1355,7 @@ mod tests {
                                 assert_eq!(left_left.span(), &expected_left_left_span);
                                 match left_left.value() {
                                     ir::expr::Expr::Literal { value } => {
-                                        assert_eq!(value.value(), &Literal::Number(1.0));
+                                        assert_eq!(value, &Literal::Number(1.0));
                                     }
                                     _ => panic!(
                                         "Expected literal on left side, got {:?}",
@@ -1398,7 +1368,7 @@ mod tests {
                                 assert_eq!(left_right.span(), &expected_left_right_span);
                                 match left_right.value() {
                                     ir::expr::Expr::Literal { value } => {
-                                        assert_eq!(value.value(), &Literal::Number(2.0));
+                                        assert_eq!(value, &Literal::Number(2.0));
                                     }
                                     _ => panic!(
                                         "Expected literal on right side, got {:?}",
@@ -1418,7 +1388,7 @@ mod tests {
                         assert_eq!(right.span(), &expected_right_span);
                         match right.value() {
                             ir::expr::Expr::Literal { value } => {
-                                assert_eq!(value.value(), &Literal::Number(3.0));
+                                assert_eq!(value, &Literal::Number(3.0));
                             }
                             _ => panic!("Expected literal on right side, got {:?}", right.value()),
                         }
@@ -1452,8 +1422,7 @@ mod tests {
                 assert_eq!(result.span(), &expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
-                        assert_eq!(value.span(), &expected_span);
-                        assert_eq!(value.value(), &Literal::Number(42.0));
+                        assert_eq!(value, &Literal::Number(42.0));
                     }
                     _ => panic!("Expected literal expression, got {:?}", result.value()),
                 }
@@ -1484,8 +1453,7 @@ mod tests {
                 assert_eq!(result.span(), &expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
-                        assert_eq!(value.span(), &expected_span);
-                        assert_eq!(value.value(), &Literal::Number(3.14));
+                        assert_eq!(value, &Literal::Number(3.14));
                     }
                     _ => panic!("Expected literal expression, got {:?}", result.value()),
                 }
@@ -1530,7 +1498,7 @@ mod tests {
                         assert_eq!(args[0].span(), &expected_arg_span);
                         match args[0].value() {
                             ir::expr::Expr::Literal { value } => {
-                                assert_eq!(value.value(), &Literal::Number(3.14));
+                                assert_eq!(value, &Literal::Number(3.14));
                             }
                             _ => panic!("Expected literal argument, got {:?}", args[0].value()),
                         }
@@ -1573,7 +1541,7 @@ mod tests {
                         assert_eq!(expr.span(), &expected_expr_span);
                         match expr.value() {
                             ir::expr::Expr::Literal { value } => {
-                                assert_eq!(value.value(), &Literal::Number(5.0));
+                                assert_eq!(value, &Literal::Number(5.0));
                             }
                             _ => panic!("Expected literal expression, got {:?}", expr.value()),
                         }

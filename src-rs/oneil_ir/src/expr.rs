@@ -95,7 +95,7 @@ pub enum Expr {
     /// Constant literal value.
     Literal {
         /// The literal value.
-        value: WithSpan<Literal>,
+        value: Literal,
     },
 }
 
@@ -239,7 +239,7 @@ impl Expr {
     ///
     /// let expr = Expr::literal(Literal::number(42.0));
     /// ```
-    pub fn literal(value: WithSpan<Literal>) -> Self {
+    pub fn literal(value: Literal) -> Self {
         Self::Literal { value }
     }
 }
