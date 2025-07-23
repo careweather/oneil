@@ -190,31 +190,43 @@ mod tests {
 
     #[test]
     fn test_simple_unit() {
+        // create a simple unit expression
         let unit_expr = helper::create_unit_node("m", Some(1.0), 0, 1);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 1.0)]);
     }
 
     #[test]
     fn test_unit_with_default_exponent() {
+        // create a unit expression without explicit exponent
         let unit_expr = helper::create_unit_node("kg", None, 0, 2);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("kg", 1.0)]);
     }
 
     #[test]
     fn test_unit_with_custom_exponent() {
+        // create a unit expression with custom exponent
         let unit_expr = helper::create_unit_node("m", Some(2.0), 0, 1);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 2.0)]);
     }
 
     #[test]
     fn test_multiplication() {
-        // m * kg
+        // create a multiplication expression: m * kg
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Multiply,
             helper::create_unit_node("m", Some(1.0), 0, 1),
@@ -222,14 +234,17 @@ mod tests {
             0,
             6,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 1.0), ("kg", 1.0)]);
     }
 
     #[test]
     fn test_division() {
-        // m / s
+        // create a division expression: m / s
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Divide,
             helper::create_unit_node("m", Some(1.0), 0, 1),
@@ -237,14 +252,17 @@ mod tests {
             0,
             5,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 1.0), ("s", -1.0)]);
     }
 
     #[test]
     fn test_complex_expression() {
-        // (m * kg) / (s * K)
+        // create a complex expression: (m * kg) / (s * K)
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Divide,
             helper::create_binary_op_node(
@@ -264,8 +282,11 @@ mod tests {
             0,
             16,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(
             composite.units(),
             &[("m", 1.0), ("kg", 1.0), ("s", -1.0), ("K", -1.0)],
@@ -274,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_nested_division() {
-        // m / (s / kg)
+        // create a nested division expression: m / (s / kg)
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Divide,
             helper::create_unit_node("m", Some(1.0), 0, 1),
@@ -288,14 +309,17 @@ mod tests {
             0,
             11,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 1.0), ("s", -1.0), ("kg", 1.0)]);
     }
 
     #[test]
     fn test_units_with_exponents() {
-        // m^2 * kg^3 / s^-1
+        // create an expression with exponents: m^2 * kg^3 / s^-1
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Multiply,
             helper::create_binary_op_node(
@@ -315,8 +339,11 @@ mod tests {
             0,
             17,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(
             composite.units(),
             &[("m", 2.0), ("kg", 3.0), ("s", -1.0), ("K", -1.0)],
@@ -325,7 +352,7 @@ mod tests {
 
     #[test]
     fn test_negative_exponents_in_division() {
-        // m^-2 / s^-3
+        // create an expression with negative exponents: m^-2 / s^-3
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Divide,
             helper::create_unit_node("m", Some(-2.0), 0, 1),
@@ -333,14 +360,17 @@ mod tests {
             0,
             6,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", -2.0), ("s", 3.0)]);
     }
 
     #[test]
     fn test_deeply_nested_expression() {
-        // ((m * kg) / s) * (N / m^2)
+        // create a deeply nested expression: ((m * kg) / s) * (N / m^2)
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Multiply,
             helper::create_binary_op_node(
@@ -366,8 +396,11 @@ mod tests {
             0,
             23,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(
             composite.units(),
             &[
@@ -382,32 +415,43 @@ mod tests {
 
     #[test]
     fn test_empty_unit_identifier() {
+        // create a unit expression with empty identifier
         let unit_expr = helper::create_unit_node("", Some(1.0), 0, 0);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("", 1.0)]);
     }
 
     #[test]
     fn test_zero_exponent() {
+        // create a unit expression with zero exponent
         let unit_expr = helper::create_unit_node("m", Some(0.0), 0, 1);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 0.0)]);
     }
 
     #[test]
     fn test_fractional_exponents() {
+        // create a unit expression with fractional exponent
         let unit_expr = helper::create_unit_node("m", Some(0.5), 0, 1);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 0.5)]);
     }
 
     #[test]
     fn test_order_insensitive_assertions() {
-        // This test demonstrates that our assertions are order-insensitive
-        // by testing a complex expression where the order of units might vary
+        // create a complex expression to test order-insensitive assertions
         // (m * kg * s) / (N * K)
         let unit_expr = helper::create_binary_op_node(
             UnitOp::Divide,
@@ -434,10 +478,11 @@ mod tests {
             0,
             21,
         );
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
-        // The expected units are: m^1, kg^1, s^1, N^-1, K^-1
-        // The order doesn't matter, we just check that all expected units exist
+        // check the result with one order
         helper::assert_units_match(
             composite.units(),
             &[
@@ -449,7 +494,7 @@ mod tests {
             ],
         );
 
-        // We can also test the same assertion with a different order - it should still pass
+        // check the result with a different order - it should still pass
         helper::assert_units_match(
             composite.units(),
             &[
@@ -464,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_parenthesized_expression() {
-        // Test a simple parenthesized expression: (m * kg)
+        // create a simple parenthesized expression: (m * kg)
         let inner_expr = helper::create_binary_op_node(
             UnitOp::Multiply,
             helper::create_unit_node("m", Some(1.0), 1, 2),
@@ -473,14 +518,17 @@ mod tests {
             7,
         );
         let unit_expr = helper::create_parenthesized_node(inner_expr, 0, 8);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 1.0), ("kg", 1.0)]);
     }
 
     #[test]
     fn test_nested_parenthesized_expression() {
-        // Test nested parentheses: ((m * kg) / s)
+        // create nested parentheses: ((m * kg) / s)
         let inner_mult = helper::create_binary_op_node(
             UnitOp::Multiply,
             helper::create_unit_node("m", Some(1.0), 2, 3),
@@ -497,45 +545,54 @@ mod tests {
             13,
         );
         let unit_expr = helper::create_parenthesized_node(division_expr, 0, 14);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
+        // check the result
         helper::assert_units_match(composite.units(), &[("m", 1.0), ("kg", 1.0), ("s", -1.0)]);
     }
 
     #[test]
     fn test_single_unit_multiple_parentheses() {
-        // Test a single unit wrapped in multiple parentheses: ((m))
+        // create a single unit wrapped in multiple parentheses: ((m))
         let inner_unit = helper::create_unit_node("m", Some(1.0), 2, 3);
         let first_parentheses = helper::create_parenthesized_node(inner_unit, 1, 4);
         let unit_expr = helper::create_parenthesized_node(first_parentheses, 0, 5);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
-        // The unit should be resolved correctly regardless of the number of parentheses
+        // check the result - the unit should be resolved correctly regardless of parentheses
         helper::assert_units_match(composite.units(), &[("m", 1.0)]);
     }
 
     #[test]
     fn test_single_unit_deep_nested_parentheses() {
-        // Test a single unit with deeply nested parentheses: (((kg)))
+        // create a single unit with deeply nested parentheses: (((kg)))
         let inner_unit = helper::create_unit_node("kg", Some(1.0), 3, 5);
         let third_level = helper::create_parenthesized_node(inner_unit, 2, 6);
         let second_level = helper::create_parenthesized_node(third_level, 1, 7);
         let unit_expr = helper::create_parenthesized_node(second_level, 0, 8);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
-        // The unit should be resolved correctly even with deeply nested parentheses
+        // check the result - the unit should be resolved correctly even with deeply nested parentheses
         helper::assert_units_match(composite.units(), &[("kg", 1.0)]);
     }
 
     #[test]
     fn test_single_unit_with_exponent_multiple_parentheses() {
-        // Test a single unit with exponent wrapped in multiple parentheses: ((m^2))
+        // create a single unit with exponent wrapped in multiple parentheses: ((m^2))
         let inner_unit = helper::create_unit_node("m", Some(2.0), 2, 3);
         let first_parentheses = helper::create_parenthesized_node(inner_unit, 1, 4);
         let unit_expr = helper::create_parenthesized_node(first_parentheses, 0, 5);
+
+        // resolve the unit
         let composite = resolve_unit(&unit_expr);
 
-        // The unit with exponent should be resolved correctly regardless of parentheses
+        // check the result - the unit with exponent should be resolved correctly regardless of parentheses
         helper::assert_units_match(composite.units(), &[("m", 2.0)]);
     }
 }

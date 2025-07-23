@@ -54,6 +54,8 @@ pub use submodel::resolve_submodels_and_tests;
 pub use test::resolve_model_tests;
 pub use test::resolve_submodel_tests;
 
+// TODO: in all resolver tests, seperate out tests that test spans and tests that test values
+
 /// Type alias for parameter information maps used during resolution.
 ///
 /// This type represents a map from parameter identifiers to their resolved parameter

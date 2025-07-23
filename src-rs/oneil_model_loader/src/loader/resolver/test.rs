@@ -220,17 +220,17 @@ mod tests {
     mod helper {
         use super::*;
 
-        /// Creates test parameter information for testing
+        /// Helper function to create test parameter information for testing
         pub fn create_empty_parameter_info() -> ParameterInfo<'static> {
             ParameterInfo::new(HashMap::new(), HashSet::new())
         }
 
-        /// Creates test submodel information for testing
+        /// Helper function to create test submodel information for testing
         pub fn create_empty_submodel_info() -> SubmodelInfo<'static> {
             SubmodelInfo::new(HashMap::new(), HashSet::new())
         }
 
-        /// Creates test model information for testing
+        /// Helper function to create test model information for testing
         pub fn create_empty_model_info() -> ModelInfo<'static> {
             ModelInfo::new(HashMap::new(), HashSet::new())
         }
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_resolve_model_tests_basic() {
-        // create the model tests
+        // create the model tests with various configurations
         let tests = vec![
             // test: true
             helper::create_test_node(
@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_resolve_model_tests_with_debug_trace() {
-        // create the model tests
+        // create the model tests with debug trace level
         let tests = vec![
             // ** test {x}: true
             helper::create_test_node(
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_resolve_model_tests_with_undefined_variable() {
-        // create the model tests
+        // create the model tests with undefined variable
         let tests = vec![
             // test {x}: undefined_var
             helper::create_test_node(
@@ -566,6 +566,7 @@ mod tests {
 
     #[test]
     fn test_resolve_model_tests_mixed_success_and_error() {
+        // create the model tests with mixed success and error cases
         let tests = vec![
             // test {x}: true
             helper::create_test_node(
@@ -590,6 +591,7 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
+        // resolve the model tests
         let (resolved_tests, errors) = resolve_model_tests(
             tests_refs,
             &helper::create_empty_parameter_info(),
@@ -641,7 +643,7 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_tests_basic() {
-        // create the submodel tests
+        // create the submodel tests with basic inputs
         let input_list = helper::create_model_input_list_node(
             vec![
                 helper::create_model_input_node(
@@ -701,7 +703,7 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_tests_multiple() {
-        // create the submodel tests
+        // create the submodel tests with multiple inputs
         let input_list1 = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param1",
@@ -774,7 +776,7 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_tests_with_undefined_variable() {
-        // create the submodel tests
+        // create the submodel tests with undefined variable
         let input_list = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param",
@@ -824,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_tests_mixed_success_and_error() {
-        // create the submodel tests
+        // create the submodel tests with mixed success and error cases
         let input_list1 = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param1",
@@ -896,7 +898,7 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_tests_with_complex_expressions() {
-        // create the submodel tests
+        // create the submodel tests with complex expressions
         let input_list = helper::create_model_input_list_node(
             vec![
                 helper::create_model_input_node(
@@ -952,6 +954,7 @@ mod tests {
             ),
         ];
 
+        // resolve the submodel tests
         let (resolved_tests, errors) = resolve_submodel_tests(
             submodel_tests,
             &helper::create_empty_parameter_info(),
@@ -980,7 +983,7 @@ mod tests {
 
     #[test]
     fn test_resolve_submodel_tests_with_parameter_reference() {
-        // create the submodel tests
+        // create the submodel tests with parameter reference
         let input_list = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param",
@@ -1001,7 +1004,7 @@ mod tests {
             Some(&input_list),
         )];
 
-        // create the parameter info
+        // create the parameter info with test parameter
         let test_param_id = Identifier::new("test_param");
         let test_param_id_with_span =
             WithSpan::new(test_param_id.clone(), helper::test_ir_span(0, 9));

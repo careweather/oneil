@@ -550,12 +550,12 @@ mod tests {
     mod helper {
         use super::*;
 
-        // Helper function to create a test span
+        /// Helper function to create a test span
         pub fn test_span(start: usize, end: usize) -> ast::Span {
             ast::Span::new(start, end - start, 0)
         }
 
-        // Helper function to create a literal expression node
+        /// Helper function to create a literal expression node
         pub fn create_literal_expr_node(
             literal: ast::expression::Literal,
             start: usize,
@@ -566,7 +566,7 @@ mod tests {
             ast::node::Node::new(test_span(start, end), expr)
         }
 
-        // Helper function to create a variable expression node
+        /// Helper function to create a variable expression node
         pub fn create_variable_expr_node(
             variable: ast::expression::VariableNode,
             start: usize,
@@ -576,7 +576,7 @@ mod tests {
             ast::node::Node::new(test_span(start, end), expr)
         }
 
-        // Helper function to create a binary operation expression node
+        /// Helper function to create a binary operation expression node
         pub fn create_binary_op_expr_node(
             left: ast::expression::ExprNode,
             op: ast::expression::BinaryOp,
@@ -593,7 +593,7 @@ mod tests {
             ast::node::Node::new(test_span(start, end), expr)
         }
 
-        // Helper function to create a function call expression node
+        /// Helper function to create a function call expression node
         pub fn create_function_call_expr_node(
             name: &str,
             args: Vec<ast::expression::ExprNode>,
@@ -609,7 +609,7 @@ mod tests {
             ast::node::Node::new(test_span(start, end), expr)
         }
 
-        // Helper function to create a simple identifier variable
+        /// Helper function to create a simple identifier variable
         pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
             let identifier_node = ast::node::Node::new(test_span(0, name.len()), identifier);
@@ -617,7 +617,7 @@ mod tests {
             ast::node::Node::new(test_span(0, name.len()), variable)
         }
 
-        // Helper function to create a simple parameter
+        /// Helper function to create a simple parameter with a literal value
         pub fn create_simple_parameter(ident: &str, value: f64) -> ast::parameter::ParameterNode {
             let label = ast::naming::Label::new(format!("Parameter {}", ident));
             let label_node = ast::node::Node::new(test_span(0, 0), label);
@@ -638,7 +638,7 @@ mod tests {
             ast::node::Node::new(test_span(0, ident.len()), parameter)
         }
 
-        // Helper function to create a dependent parameter
+        /// Helper function to create a dependent parameter that references another parameter
         pub fn create_dependent_parameter(
             ident: &str,
             dependency: &str,
@@ -679,7 +679,7 @@ mod tests {
             ast::node::Node::new(test_span(0, ident.len()), parameter)
         }
 
-        // Helper function to create mock model and submodel info
+        /// Helper function to create mock model and submodel info for testing
         pub fn create_mock_info<'a>() -> (SubmodelInfo<'a>, ModelInfo<'a>) {
             let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
             let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
@@ -698,10 +698,10 @@ mod tests {
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
-        // test the errors
+        // check the errors
         assert!(errors.is_empty());
 
-        // test the resolved parameters
+        // check the resolved parameters
         assert!(resolved_params.is_empty());
     }
 
@@ -718,10 +718,10 @@ mod tests {
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
-        // test the errors
+        // check the errors
         assert!(errors.is_empty());
 
-        // test the resolved parameters
+        // check the resolved parameters
         assert_eq!(resolved_params.len(), 2);
 
         let param_a = resolved_params.get(&Identifier::new("a")).unwrap();
@@ -744,10 +744,10 @@ mod tests {
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
-        // test the errors
+        // check the errors
         assert!(errors.is_empty());
 
-        // test the resolved parameters
+        // check the resolved parameters
         assert_eq!(resolved_params.len(), 2);
 
         let param_a = resolved_params.get(&Identifier::new("a")).unwrap();
@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_resolve_parameters_circular_dependency() {
-        // create the parameters
+        // create the parameters with circular dependency
         let param_a = helper::create_dependent_parameter("a", "b");
         let param_b = helper::create_dependent_parameter("b", "a");
         let parameters = vec![&param_a, &param_b];
@@ -770,7 +770,7 @@ mod tests {
         // resolve the parameters
         let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
 
-        // test the errors
+        // check the errors
         assert!(!errors.is_empty());
 
         assert!(errors.contains_key(&Identifier::new("a")));
@@ -779,7 +779,7 @@ mod tests {
         let a_errors = errors.get(&Identifier::new("a")).unwrap();
         let b_errors = errors.get(&Identifier::new("b")).unwrap();
 
-        // test that both parameters have errors, one is a circular dependency
+        // check that both parameters have errors, one is a circular dependency
         // error and both have a "parameter had error" error
         assert_eq!(a_errors.len() + b_errors.len(), 3);
 
@@ -809,36 +809,44 @@ mod tests {
             if ident == &Identifier::new("a")
         )));
 
-        // test the resolved parameters
+        // check the resolved parameters
         assert!(resolved_params.is_empty());
     }
 
     #[test]
     fn test_get_parameter_internal_dependencies_simple() {
+        // create a simple parameter
         let parameter = helper::create_simple_parameter("a", 10.0);
+
+        // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
 
+        // check the dependencies
         assert!(dependencies.is_empty());
     }
 
     #[test]
     fn test_get_parameter_internal_dependencies_with_variable() {
+        // create a dependent parameter
         let parameter = helper::create_dependent_parameter("a", "b");
+
+        // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
 
+        // check the dependencies
         assert_eq!(dependencies.len(), 1);
         assert!(dependencies.contains(&Identifier::new("b")));
     }
 
     #[test]
     fn test_get_parameter_internal_dependencies_with_limits() {
-        // Create a parameter with limits that reference other parameters
+        // create a parameter with limits that reference other parameters
         let label = ast::naming::Label::new("Test Parameter".to_string());
         let label_node = ast::node::Node::new(helper::test_span(0, 0), label);
         let identifier = ast::naming::Identifier::new("test".to_string());
         let ident_node = ast::node::Node::new(helper::test_span(0, 4), identifier);
 
-        // Create the value expression
+        // create the value expression
         let value_expr =
             helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1);
         let value_node = ast::node::Node::new(
@@ -846,7 +854,7 @@ mod tests {
             ast::parameter::ParameterValue::Simple(value_expr, None),
         );
 
-        // Create the limits with variable references
+        // create the limits with variable references
         let min_var = helper::create_identifier_variable("min_val");
         let min_expr = helper::create_variable_expr_node(min_var, 0, 7);
         let max_var = helper::create_identifier_variable("max_val");
@@ -867,8 +875,10 @@ mod tests {
             None,
         );
 
+        // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
 
+        // check the dependencies
         assert_eq!(dependencies.len(), 2);
         assert!(dependencies.contains(&Identifier::new("min_val")));
         assert!(dependencies.contains(&Identifier::new("max_val")));
@@ -876,26 +886,33 @@ mod tests {
 
     #[test]
     fn test_get_expr_internal_dependencies_literal() {
+        // create a literal expression
         let expr = helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
 
+        // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
+        // check the dependencies
         assert!(result.is_empty());
     }
 
     #[test]
     fn test_get_expr_internal_dependencies_variable() {
+        // create a variable expression
         let variable = helper::create_identifier_variable("test_var");
         let expr = helper::create_variable_expr_node(variable, 0, 8);
 
+        // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
+        // check the dependencies
         assert_eq!(result.len(), 1);
         assert!(result.contains(&Identifier::new("test_var")));
     }
 
     #[test]
     fn test_get_expr_internal_dependencies_binary_op() {
+        // create a binary operation with variables
         let left_var = helper::create_identifier_variable("a");
         let left_expr = helper::create_variable_expr_node(left_var, 0, 1);
         let right_var = helper::create_identifier_variable("b");
@@ -908,8 +925,10 @@ mod tests {
             5,
         );
 
+        // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
+        // check the dependencies
         assert_eq!(result.len(), 2);
         assert!(result.contains(&Identifier::new("a")));
         assert!(result.contains(&Identifier::new("b")));
@@ -917,6 +936,7 @@ mod tests {
 
     #[test]
     fn test_get_expr_internal_dependencies_function_call() {
+        // create a function call with variable arguments
         let arg1_var = helper::create_identifier_variable("arg1");
         let arg1_expr = helper::create_variable_expr_node(arg1_var, 9, 13);
         let arg2_var = helper::create_identifier_variable("arg2");
@@ -924,8 +944,10 @@ mod tests {
         let expr =
             helper::create_function_call_expr_node("test_func", vec![arg1_expr, arg2_expr], 0, 19);
 
+        // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
+        // check the dependencies
         assert_eq!(result.len(), 2);
         assert!(result.contains(&Identifier::new("arg1")));
         assert!(result.contains(&Identifier::new("arg2")));
@@ -933,7 +955,7 @@ mod tests {
 
     #[test]
     fn test_get_expr_internal_dependencies_accessor() {
-        // Create an accessor variable
+        // create an accessor variable
         let parent_identifier = ast::naming::Identifier::new("parent".to_string());
         let parent_node = ast::node::Node::new(helper::test_span(0, 6), parent_identifier);
         let component_identifier = ast::naming::Identifier::new("component".to_string());
@@ -947,20 +969,23 @@ mod tests {
         let accessor_var_node = ast::node::Node::new(helper::test_span(0, 9), accessor_variable);
         let expr = helper::create_variable_expr_node(accessor_var_node, 0, 9);
 
+        // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
 
-        // Accessors don't count as internal dependencies
+        // check the dependencies - accessors don't count as internal dependencies
         assert!(result.is_empty());
     }
 
     #[test]
     fn test_resolve_parameter_value_simple() {
+        // create a simple parameter value
         let expr = helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
         let value = ast::parameter::ParameterValue::Simple(expr, None);
         let value_node = ast::node::Node::new(helper::test_span(0, 4), value);
         let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
+        // resolve the parameter value
         let result = resolve_parameter_value(
             &value_node,
             &defined_parameters_info,
@@ -968,6 +993,7 @@ mod tests {
             &model_info,
         );
 
+        // check the result
         assert!(result.is_ok());
         let resolved_value = result.unwrap();
         assert!(matches!(resolved_value, ParameterValue::Simple(_, None)));
@@ -975,11 +1001,14 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_none() {
+        // create the context
         let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
+        // resolve the limits
         let result = resolve_limits(None, &defined_parameters_info, &submodel_info, &model_info);
 
+        // check the result
         assert!(result.is_ok());
         let limits = result.unwrap();
         assert!(matches!(limits, Limits::Default));
@@ -987,6 +1016,7 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_continuous() {
+        // create continuous limits with literal values
         let min_expr =
             helper::create_literal_expr_node(ast::expression::Literal::Number(0.0), 0, 1);
         let max_expr =
@@ -999,6 +1029,7 @@ mod tests {
         let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
+        // resolve the limits
         let result = resolve_limits(
             Some(&limits_node),
             &defined_parameters_info,
@@ -1006,6 +1037,7 @@ mod tests {
             &model_info,
         );
 
+        // check the result
         assert!(result.is_ok());
         let resolved_limits = result.unwrap();
         assert!(matches!(resolved_limits, Limits::Continuous { .. }));
@@ -1013,6 +1045,7 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_discrete() {
+        // create discrete limits with literal values
         let value1 = helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 0, 1);
         let value2 = helper::create_literal_expr_node(ast::expression::Literal::Number(2.0), 0, 1);
         let value3 = helper::create_literal_expr_node(ast::expression::Literal::Number(3.0), 0, 1);
@@ -1023,6 +1056,7 @@ mod tests {
         let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
+        // resolve the limits
         let result = resolve_limits(
             Some(&limits_node),
             &defined_parameters_info,
@@ -1030,6 +1064,7 @@ mod tests {
             &model_info,
         );
 
+        // check the result
         assert!(result.is_ok());
         let resolved_limits = result.unwrap();
         assert!(matches!(resolved_limits, Limits::Discrete { .. }));
