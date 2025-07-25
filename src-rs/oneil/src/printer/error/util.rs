@@ -112,13 +112,11 @@ impl<'a> Error<'a> {
 
                 let pointer = color_choice.bold_red("^");
 
-                let start_blank_line = format!("{} {} ", margin, bar);
+                let blank_line = format!("{} {} ", margin, bar);
                 let source_line = format!("{} {} {}", line_label, bar, line_source);
                 let pointer_line = format!("{} {} {}{}", margin, bar, pointer_indent, pointer);
-                let end_blank_line = start_blank_line.clone();
 
-                let source_lines =
-                    vec![start_blank_line, source_line, pointer_line, end_blank_line];
+                let source_lines = vec![blank_line, source_line, pointer_line];
                 let source_lines = source_lines.join("\n");
 
                 Some(source_lines)
