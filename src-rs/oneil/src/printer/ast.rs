@@ -4,16 +4,16 @@ use oneil_ast::{
     expression::{ExprNode, Literal, LiteralNode, Variable, VariableNode},
     model::SectionNode,
 };
-use std::io::Write;
+use std::io::{self, Write};
 
 /// Prints the AST in a hierarchical tree format for debugging
-pub fn print(ast: &Model, writer: &mut impl Write) {
-    print_model(ast, writer, 0);
+pub fn print(ast: &Model, writer: &mut impl Write) -> io::Result<()> {
+    print_model(ast, writer, 0)
 }
 
 /// Prints a model node with its declarations and sections
-fn print_model(model: &Model, writer: &mut impl Write, indent: usize) {
-    writeln!(writer, "{}Model", "  ".repeat(indent)).unwrap();
+fn print_model(model: &Model, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+    writeln!(writer, "{}Model", "  ".repeat(indent))?;
 
     // Print note if present
     if let Some(note) = model.note() {
@@ -44,6 +44,8 @@ fn print_model(model: &Model, writer: &mut impl Write, indent: usize) {
             print_section(section, writer, indent, prefix);
         }
     }
+
+    Ok(())
 }
 
 /// Prints a declaration node

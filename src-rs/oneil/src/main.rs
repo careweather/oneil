@@ -1,3 +1,5 @@
+use std::io;
+
 use clap::Parser;
 use oneil_model_loader::FileLoader;
 
@@ -10,7 +12,7 @@ mod command;
 mod file_parser;
 mod printer;
 
-fn main() {
+fn main() -> io::Result<()> {
     let cli = CliCommand::parse();
 
     match cli.command {
@@ -28,17 +30,19 @@ fn main() {
 
                 let ast = file_parser::FileLoader.parse_ast(&file);
                 match ast {
-                    Ok(ast) => printer.print_ast(&ast),
+                    Ok(ast) => printer.print_ast(&ast)?,
                     Err(LoadingError::InvalidFile(error)) => {
-                        printer.print_file_error(&file, &error)
+                        printer.print_file_error(&file, &error)?;
                     }
                     Err(LoadingError::Parser(error_with_partial)) => {
-                        printer.print_parser_error(&file, &error_with_partial.errors);
+                        printer.print_parser_errors(&file, &error_with_partial.errors)?;
                         if display_partial {
-                            printer.print_ast(&error_with_partial.partial_result);
+                            printer.print_ast(&error_with_partial.partial_result)?;
                         }
                     }
                 }
+
+                Ok(())
             }
             DevCommands::PrintIr {
                 file,
@@ -54,14 +58,16 @@ fn main() {
                 let model_collection =
                     oneil_model_loader::load_model(file, &file_parser::FileLoader);
                 match model_collection {
-                    Ok(model_collection) => printer.print_ir(&model_collection),
+                    Ok(model_collection) => printer.print_ir(&model_collection)?,
                     Err((model_collection, error_map)) => {
-                        printer.print_loader_error(&error_map);
+                        printer.print_loader_error(&error_map)?;
                         if display_partial {
-                            printer.print_ir(&model_collection);
+                            printer.print_ir(&model_collection)?;
                         }
                     }
                 }
+
+                Ok(())
             }
         },
     }

@@ -4,7 +4,7 @@ mod ir;
 mod util;
 
 use std::{
-    io::{Error as IoError, Write},
+    io::{self, Error as IoError, Write},
     path::Path,
 };
 
@@ -44,46 +44,56 @@ where
         }
     }
 
-    pub fn print_ast(&mut self, ast: &AstModel) {
+    pub fn print_ast(&mut self, ast: &AstModel) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "AST: {:?}", ast);
+            writeln!(self.writer, "AST: {:?}", ast)?;
         } else {
-            ast::print(ast, self.writer);
+            ast::print(ast, self.writer)?;
         }
+
+        Ok(())
     }
 
-    pub fn print_ir(&mut self, ir: &IrModelCollection) {
+    pub fn print_ir(&mut self, ir: &IrModelCollection) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "IR: {:?}", ir);
+            writeln!(self.writer, "IR: {:?}", ir)?;
         } else {
-            ir::print(ir, self.writer);
+            ir::print(ir, self.writer)?;
         }
+
+        Ok(())
     }
 
-    pub fn print_file_error(&mut self, path: &Path, error: &IoError) {
+    pub fn print_file_error(&mut self, path: &Path, error: &IoError) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "File error: {:?}", error);
+            writeln!(self.writer, "File error: {:?}", error)?;
         } else {
-            error::file::print(path, error, &self.color_choice, self.writer);
+            error::file::print(path, error, &self.color_choice, self.writer)?;
         }
+
+        Ok(())
     }
 
-    pub fn print_parser_error(&mut self, path: &Path, errors: &[ParserError]) {
+    pub fn print_parser_errors(&mut self, path: &Path, errors: &[ParserError]) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "Parser error: {:?}", errors);
+            writeln!(self.writer, "Parser error: {:?}", errors)?;
         } else {
-            error::parser::print_all(path, errors, &self.color_choice, self.writer);
+            error::parser::print_all(path, errors, &self.color_choice, self.writer)?;
         }
+
+        Ok(())
     }
 
     pub fn print_loader_error(
         &mut self,
         error_map: &ModelErrorMap<LoadingError, DoesNotExistError>,
-    ) {
+    ) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "Loader error: {:?}", error_map);
+            writeln!(self.writer, "Loader error: {:?}", error_map)?;
         } else {
-            error::loader::print(error_map, self.writer);
+            error::loader::print(error_map, self.writer)?;
         }
+
+        Ok(())
     }
 }
