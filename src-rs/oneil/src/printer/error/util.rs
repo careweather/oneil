@@ -174,10 +174,7 @@ impl<'a> ErrorLocation<'a> {
     }
 
     pub fn line_source(&self) -> &str {
-        let line_start = self.source[..self.offset].rfind('\n').unwrap_or(0);
-        let line_end = self.source[self.offset..]
-            .find('\n')
-            .unwrap_or(self.source.len());
-        &self.source[line_start..line_end]
+        // The line is 1-indexed, so we need to subtract 1 to get the correct line
+        self.source.lines().nth(self.line - 1).unwrap()
     }
 }
