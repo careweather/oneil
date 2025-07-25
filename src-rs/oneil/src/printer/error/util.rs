@@ -14,22 +14,22 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-
     pub fn builder() -> ErrorBuilder {
         ErrorBuilder::new()
     }
 
-    pub fn to_string(&self, color_choice: ColorChoice) -> String {
-        format!("error: {}", self.message)
+    pub fn to_string(&self, color_choice: &ColorChoice) -> String {
+        let error = color_choice.red("error");
+        let message = &self.message;
+        let message_line = format!("{}: {}", error, message);
+        let message_line = color_choice.bold(&message_line);
+        message_line
     }
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string(ColorChoice::DisableColors))
+        write!(f, "{}", self.to_string(&ColorChoice::DisableColors))
     }
 }
 

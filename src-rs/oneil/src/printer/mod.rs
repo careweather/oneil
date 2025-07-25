@@ -49,7 +49,7 @@ impl Printer {
         if self.print_debug {
             println!("File error: {:?}", error);
         } else {
-            error::file::print(path, error);
+            error::file::print(path, error, &self.color_choice);
         }
     }
 
