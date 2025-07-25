@@ -22,6 +22,11 @@
 //! 2. Parser-level errors (`ParserError`): For higher-level issues like
 //!    invalid syntax or unexpected tokens
 
+use std::{
+    error::Error,
+    fmt::{self, Display},
+};
+
 use nom::error::ParseError;
 use oneil_ast::{
     Span as AstSpan,
@@ -37,6 +42,8 @@ use crate::{
         error::{TokenError, TokenErrorKind},
     },
 };
+
+mod display;
 
 pub mod reason;
 use reason::ParserErrorReason;
@@ -574,6 +581,11 @@ impl ParserError {
             Self::new_from_token_error(error, ParserErrorReason::unclosed_paren(paren_left_span))
         }
     }
+
+    /// Converts the error to a string (only describing the error, not the location)
+    pub fn to_string(&self) -> String {
+        display::reason_to_string(&self.reason)
+    }
 }
 
 impl<'a> ParseError<Span<'a>> for ParserError {
@@ -607,3 +619,11 @@ impl From<TokenError> for ParserError {
         }
     }
 }
+
+impl Display for ParserError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl Error for ParserError {}

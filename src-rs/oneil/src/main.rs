@@ -22,7 +22,9 @@ fn main() {
                 no_colors,
             } => {
                 let use_colors = !no_colors;
-                let printer = printer::Printer::new(use_colors, print_debug);
+                // TODO: have a separate out/err writer
+                let mut writer = std::io::stdout();
+                let mut printer = printer::Printer::new(use_colors, print_debug, &mut writer);
 
                 let ast = file_parser::FileLoader.parse_ast(&file);
                 match ast {
@@ -45,7 +47,9 @@ fn main() {
                 no_colors,
             } => {
                 let use_colors = !no_colors;
-                let printer = printer::Printer::new(use_colors, print_debug);
+                // TODO: have a separate out/err writer
+                let mut writer = std::io::stdout();
+                let mut printer = printer::Printer::new(use_colors, print_debug, &mut writer);
 
                 let model_collection =
                     oneil_model_loader::load_model(file, &file_parser::FileLoader);

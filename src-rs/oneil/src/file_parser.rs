@@ -41,6 +41,7 @@ impl<'a> oneil_model_loader::FileLoader for FileLoader {
         Ok(ast)
     }
 
+    // TODO: check if the file can be read
     fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError> {
         let path = path.as_ref();
 

@@ -1,55 +1,10 @@
-use std::{io::Write, path::Path};
-
-use oneil_parser::error::{
-    ParserError,
-    reason::{
-        DeclKind, ExpectKind, ExprKind, FromKind, ImportKind, IncompleteKind, ParameterKind,
-        ParserErrorReason, SectionKind, TestKind, UnitKind, UseKind,
-    },
+use crate::error::reason::{
+    DeclKind, ExpectKind, ExprKind, FromKind, ImportKind, IncompleteKind, ParameterKind,
+    ParserErrorReason, SectionKind, TestKind, UnitKind, UseKind,
 };
 
-use crate::printer::{
-    ColorChoice,
-    error::{file::print as print_file_error, util::Error},
-};
-
-pub fn print_all(
-    path: &Path,
-    errors: &[ParserError],
-    color_choice: &ColorChoice,
-    writer: &mut impl Write,
-) {
-    for error in errors {
-        print(path, error, color_choice, writer);
-        writeln!(writer);
-    }
-}
-
-pub fn print(
-    path: &Path,
-    error: &ParserError,
-    color_choice: &ColorChoice,
-    writer: &mut impl Write,
-) {
-    let file_contents = std::fs::read_to_string(path);
-
-    let file_contents = match file_contents {
-        Ok(file_contents) => Some(file_contents),
-        Err(e) => {
-            print_file_error(path, &e, color_choice, writer);
-            None
-        }
-    };
-
-    let message = error.to_string();
-
-    let error = Error::builder().with_message(message).build();
-    let error = error.to_string(color_choice);
-    writeln!(writer, "{}", error);
-}
-
-fn error_to_string(error: &ParserError) -> String {
-    match &error.reason {
+pub fn reason_to_string(reason: &ParserErrorReason) -> String {
+    match &reason {
         ParserErrorReason::Expect(expect_kind) => match expect_kind {
             ExpectKind::Decl => "expected declaration".to_string(),
             ExpectKind::Expr => "expected expression".to_string(),
