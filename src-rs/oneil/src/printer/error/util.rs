@@ -147,8 +147,13 @@ impl<'a> ErrorLocation<'a> {
         // Find the offset of the first newline before the given offset.
         // The beginning of the file (offset 0) is assumed if there is no
         // newline before the offset.
-        let prev_newline = source[..offset].rfind('\n').unwrap_or(0);
-        let column = offset - prev_newline - 1;
+        let line_start = source[..offset]
+            .rfind('\n')
+            .map_or(0, |newline_idx| newline_idx + 1);
+
+        // The column is the offset of the error from the beginning of the line
+        // (+ 1 because the column is 1-indexed)
+        let column = offset - line_start + 1;
 
         let line = source[..offset].lines().count();
 
