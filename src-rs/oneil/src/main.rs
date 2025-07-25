@@ -19,17 +19,21 @@ fn main() {
                 file,
                 display_partial,
                 print_debug,
+                no_colors,
             } => {
+                let use_colors = !no_colors;
+                let printer = printer::Printer::new(use_colors, print_debug);
+
                 let ast = file_parser::FileLoader.parse_ast(&file);
                 match ast {
-                    Ok(ast) => printer::ast::print(&ast, print_debug),
+                    Ok(ast) => printer.print_ast(&ast),
                     Err(LoadingError::InvalidFile(error)) => {
-                        printer::error::file::print(&file, &error)
+                        printer.print_file_error(&file, &error)
                     }
                     Err(LoadingError::Parser(error_with_partial)) => {
-                        printer::error::parser::print(&file, error_with_partial.errors);
+                        printer.print_parser_error(&file, &error_with_partial.errors);
                         if display_partial {
-                            printer::ast::print(&error_with_partial.partial_result, print_debug);
+                            printer.print_ast(&error_with_partial.partial_result);
                         }
                     }
                 }
@@ -38,14 +42,19 @@ fn main() {
                 file,
                 display_partial,
                 print_debug,
+                no_colors,
             } => {
-                let model = oneil_model_loader::load_model(file, &file_parser::FileLoader);
-                match model {
-                    Ok(model) => printer::ir::print(&model, print_debug),
-                    Err((model, error_map)) => {
-                        printer::error::loader::print(error_map);
+                let use_colors = !no_colors;
+                let printer = printer::Printer::new(use_colors, print_debug);
+
+                let model_collection =
+                    oneil_model_loader::load_model(file, &file_parser::FileLoader);
+                match model_collection {
+                    Ok(model_collection) => printer.print_ir(&model_collection),
+                    Err((model_collection, error_map)) => {
+                        printer.print_loader_error(&error_map);
                         if display_partial {
-                            printer::ir::print(&model, print_debug);
+                            printer.print_ir(&model_collection);
                         }
                     }
                 }

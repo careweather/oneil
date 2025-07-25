@@ -4,7 +4,7 @@ use std::path::PathBuf;
 /// Oneil language CLI
 #[derive(Parser)]
 #[command(name = "oneil")]
-#[command(about = "Oneil language tooling", long_about = None)]
+#[command(version, about = "Oneil language tooling", long_about = None)]
 pub struct CliCommand {
     #[command(subcommand)]
     pub command: Commands,
@@ -34,6 +34,10 @@ pub enum DevCommands {
         /// Print the output in debug format
         #[arg(long)]
         print_debug: bool,
+
+        /// Disable colors in the output
+        #[arg(long)]
+        no_colors: bool,
     },
     /// Print the intermediate representation of a file
     PrintIr {
@@ -48,5 +52,9 @@ pub enum DevCommands {
         /// Print the output in debug format
         #[arg(long)]
         print_debug: bool,
+
+        /// Disable colors in the output
+        #[arg(long)]
+        no_colors: bool,
     },
 }

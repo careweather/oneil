@@ -7,12 +7,7 @@ use oneil_ast::{
 use std::fmt::Write;
 
 /// Prints the AST in a hierarchical tree format for debugging
-pub fn print(ast: &Model, print_debug: bool) {
-    if print_debug {
-        println!("AST: {:?}", ast);
-        return;
-    }
-
+pub fn print(ast: &Model) {
     let mut output = String::new();
     print_model(ast, &mut output, 0);
     println!("{}", output);
