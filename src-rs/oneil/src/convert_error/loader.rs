@@ -30,7 +30,15 @@ pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -
     }
 
     for (path, model_error) in error_map.get_model_errors() {
-        let model_errors = convert_model_errors(path, model_error);
+        let mut model_errors = convert_model_errors(path, model_error);
+
+        // sort the errors by offset so that the errors are in order of
+        // appearance within the file
+        model_errors.sort_by_key(|error| {
+            let location = error.location();
+            location.map(|location| location.offset())
+        });
+
         errors.extend(model_errors);
     }
 

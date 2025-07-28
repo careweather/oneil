@@ -117,6 +117,10 @@ impl ErrorLocation {
         }
     }
 
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
     pub fn line(&self) -> usize {
         self.line
     }
