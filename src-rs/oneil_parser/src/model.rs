@@ -187,7 +187,7 @@ fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
                 // All declarations must be terminated by an end of line, so we
                 // assume that the declaration parsing error is for a declaration
                 // that ends at the end of the line
-                let next_line = skip_to_next_line(input);
+                let next_line = skip_to_next_line_with_content(input);
 
                 parse_decls_recur(next_line, acc_decls, acc_errors, true)
             }
@@ -290,7 +290,7 @@ fn parse_section(
         }
         Err(nom::Err::Failure(e)) => {
             // There was a problem with the section header, so we keep the error and skip to the next line
-            let rest = skip_to_next_line(input);
+            let rest = skip_to_next_line_with_content(input);
             (rest, None, vec![e])
         }
         Err(nom::Err::Incomplete(_needed)) => (input, None, vec![]),
@@ -376,7 +376,7 @@ fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
 /// # Returns
 ///
 /// Returns the remaining input after skipping to the next line.
-fn skip_to_next_line(input: Span) -> Span {
+fn skip_to_next_line_with_content(input: Span) -> Span {
     let (rest, _) = take_while::<_, _, nom::error::Error<_>>(|c| c != '\n')
         .parse(input)
         .expect("should never fail");

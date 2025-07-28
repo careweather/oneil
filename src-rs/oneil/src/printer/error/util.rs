@@ -153,7 +153,9 @@ impl<'a> ErrorLocation<'a> {
         // (+ 1 because the column is 1-indexed)
         let column = offset - line_start + 1;
 
-        let line = source[..offset].lines().count();
+        // Count the number of newlines before the offset to get the line number
+        // (+ 1 because the line is 1-indexed)
+        let line = source[..offset].chars().filter(|c| *c == '\n').count() + 1;
 
         Self {
             source,
