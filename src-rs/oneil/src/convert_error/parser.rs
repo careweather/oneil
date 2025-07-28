@@ -29,11 +29,7 @@ pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<Error> {
 
 pub fn convert(path: &Path, file_contents: Option<&str>, error: &ParserError) -> Error {
     let message = error.to_string();
+    let location = file_contents.map(|contents| (contents, error.error_offset));
 
-    match file_contents {
-        Some(contents) => {
-            Error::new_with_contents(path.to_path_buf(), message, contents, error.error_offset)
-        }
-        None => Error::new(path.to_path_buf(), message),
-    }
+    Error::new_from_offset(path.to_path_buf(), message, location)
 }

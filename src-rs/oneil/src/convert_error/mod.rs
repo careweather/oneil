@@ -22,17 +22,32 @@ impl Error {
         }
     }
 
-    pub fn new_with_contents(
+    pub fn new_from_offset(
         path: PathBuf,
         message: String,
-        contents: &str,
-        offset: usize,
+        location: Option<(&str, usize)>,
     ) -> Self {
-        let location = ErrorLocation::from_source_and_offset(contents, offset);
+        let location = location
+            .map(|(contents, offset)| ErrorLocation::from_source_and_offset(contents, offset));
         Self {
             path,
             message,
-            location: Some(location),
+            location,
+        }
+    }
+
+    pub fn new_from_span(
+        path: PathBuf,
+        message: String,
+        location: Option<(&str, usize, usize)>,
+    ) -> Self {
+        let location = location.map(|(contents, offset, length)| {
+            ErrorLocation::from_source_and_span(contents, offset, length)
+        });
+        Self {
+            path,
+            message,
+            location,
         }
     }
 
@@ -55,11 +70,26 @@ pub struct ErrorLocation {
     offset: usize,
     line: usize,
     column: usize,
+    length: usize,
     line_source: String,
 }
 
 impl ErrorLocation {
     pub fn from_source_and_offset(source: &str, offset: usize) -> Self {
+        Self::from_source_and_span(source, offset, 1)
+    }
+
+    pub fn from_source_and_span(source: &str, offset: usize, length: usize) -> Self {
+        assert!(length > 0, "length must be greater than 0");
+        assert!(
+            offset < source.len(),
+            "offset must be less than the length of the source"
+        );
+        assert!(
+            offset + length <= source.len(),
+            "offset + length must be less than or equal to the length of the source"
+        );
+
         // Find the offset of the first newline before the given offset.
         // The beginning of the file (offset 0) is assumed if there is no
         // newline before the offset.
@@ -82,6 +112,7 @@ impl ErrorLocation {
             offset,
             line,
             column,
+            length,
             line_source,
         }
     }
@@ -92,6 +123,10 @@ impl ErrorLocation {
 
     pub fn column(&self) -> usize {
         self.column
+    }
+
+    pub fn length(&self) -> usize {
+        self.length
     }
 
     pub fn line_source(&self) -> &str {

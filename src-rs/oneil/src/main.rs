@@ -39,10 +39,7 @@ fn main() -> io::Result<()> {
                     Err(LoadingError::Parser(error_with_partial)) => {
                         let errors =
                             convert_error::parser::convert_all(&file, &error_with_partial.errors);
-
-                        for error in errors {
-                            printer.print_error(&error)?;
-                        }
+                        printer.print_errors(&errors)?;
 
                         if display_partial {
                             printer.print_ast(&error_with_partial.partial_result)?;
@@ -68,11 +65,8 @@ fn main() -> io::Result<()> {
                 match model_collection {
                     Ok(model_collection) => printer.print_ir(&model_collection)?,
                     Err((model_collection, error_map)) => {
-                        let errors = convert_error::loader::convert_all(&error_map);
-
-                        for error in errors {
-                            printer.print_error(&error)?;
-                        }
+                        let errors = convert_error::loader::convert_map(&error_map);
+                        printer.print_errors(&errors)?;
 
                         if display_partial {
                             printer.print_ir(&model_collection)?;

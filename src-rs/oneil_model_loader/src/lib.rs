@@ -57,7 +57,7 @@ use oneil_ir::{model::ModelCollection, reference::ModelPath};
 
 use crate::util::{Stack, builder::ModelCollectionBuilder};
 
-mod error;
+pub mod error;
 mod loader;
 mod util;
 

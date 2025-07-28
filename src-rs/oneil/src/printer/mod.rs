@@ -68,4 +68,13 @@ where
 
         Ok(())
     }
+
+    pub fn print_errors(&mut self, errors: &[Error]) -> io::Result<()> {
+        for error in errors {
+            self.print_error(error)?;
+            writeln!(self.writer)?;
+        }
+
+        Ok(())
+    }
 }

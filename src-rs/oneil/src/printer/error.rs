@@ -63,6 +63,7 @@ fn get_source_lines(error: &Error, color_choice: &ColorChoice) -> Option<String>
         Some(location) => {
             let line = location.line();
             let column = location.column();
+            let length = location.length();
             let line_source = location.line_source();
 
             // The width of the left margin is based on the number of digits
@@ -80,10 +81,14 @@ fn get_source_lines(error: &Error, color_choice: &ColorChoice) -> Option<String>
             let pointer_indent = " ".repeat(pointer_indent_width);
 
             let pointer = color_choice.bold_red("^");
+            let pointer_rest = color_choice.bold_red(&"-".repeat(length - 1));
 
             let blank_line = format!("{} {} ", margin, bar);
             let source_line = format!("{} {} {}", line_label, bar, line_source);
-            let pointer_line = format!("{} {} {}{}", margin, bar, pointer_indent, pointer);
+            let pointer_line = format!(
+                "{} {} {}{}{}",
+                margin, bar, pointer_indent, pointer, pointer_rest
+            );
 
             let source_lines = vec![blank_line, source_line, pointer_line];
             let source_lines = source_lines.join("\n");

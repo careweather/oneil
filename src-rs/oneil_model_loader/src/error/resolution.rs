@@ -19,13 +19,18 @@
 //! can contain lower-level errors (like variable resolution). This allows for detailed
 //! error reporting while maintaining a clean error structure.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
 
 use oneil_ir::{
     reference::{Identifier, ModelPath, PythonPath},
     span::WithSpan,
     test::TestIndex,
 };
+
+use crate::error::display;
 
 /// A collection of all resolution errors that occurred during model loading.
 ///
@@ -83,6 +88,81 @@ impl ResolutionErrors {
             && self.model_test_resolution_errors.is_empty()
             && self.submodel_test_resolution_errors.is_empty()
     }
+
+    /// Returns a reference to the map of import resolution errors.
+    ///
+    /// This method provides access to any errors that occurred during Python import validation.
+    /// The errors are mapped from the Python path (with source span information) to the
+    /// corresponding `ImportResolutionError`.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing Python paths and their associated import resolution errors.
+    pub fn get_import_errors(&self) -> &HashMap<WithSpan<PythonPath>, ImportResolutionError> {
+        &self.import_errors
+    }
+
+    /// Returns a reference to the map of submodel resolution errors.
+    ///
+    /// This method provides access to any errors that occurred during submodel resolution.
+    /// The errors are mapped from the submodel identifier to the corresponding `SubmodelResolutionError`.
+    /// These errors occur when a `use model` declaration cannot be resolved, either because the referenced
+    /// model has errors or the submodel identifier is not defined.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing submodel identifiers and their associated resolution errors.
+    pub fn get_submodel_resolution_errors(&self) -> &HashMap<Identifier, SubmodelResolutionError> {
+        &self.submodel_resolution_errors
+    }
+
+    /// Returns a reference to the map of parameter resolution errors.
+    ///
+    /// This method provides access to any errors that occurred during parameter resolution.
+    /// The errors are mapped from the parameter identifier to a vector of `ParameterResolutionError`s.
+    /// Multiple errors can occur for a single parameter, for example when a parameter references
+    /// multiple undefined variables or has circular dependencies.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing parameter identifiers and their associated resolution errors.
+    pub fn get_parameter_resolution_errors(
+        &self,
+    ) -> &HashMap<Identifier, Vec<ParameterResolutionError>> {
+        &self.parameter_resolution_errors
+    }
+
+    /// Returns a reference to the map of model test resolution errors.
+    ///
+    /// This method provides access to any errors that occurred during model test resolution.
+    /// The errors are mapped from the test index to a vector of `ModelTestResolutionError`s.
+    /// Multiple errors can occur for a single test, for example when a test references
+    /// undefined variables or has invalid assertions.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing test indices and their associated resolution errors.
+    pub fn get_model_test_resolution_errors(
+        &self,
+    ) -> &HashMap<TestIndex, Vec<ModelTestResolutionError>> {
+        &self.model_test_resolution_errors
+    }
+
+    /// Returns a reference to the map of submodel test resolution errors.
+    ///
+    /// This method provides access to any errors that occurred during submodel test input resolution.
+    /// The errors are mapped from the submodel identifier to a vector of `SubmodelTestInputResolutionError`s.
+    /// These errors occur when test inputs for a submodel cannot be resolved, for example when the input
+    /// references undefined variables or has invalid values.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing submodel identifiers and their associated test input resolution errors.
+    pub fn get_submodel_test_input_resolution_errors(
+        &self,
+    ) -> &HashMap<Identifier, Vec<SubmodelTestInputResolutionError>> {
+        &self.submodel_test_resolution_errors
+    }
 }
 
 /// Represents an error that occurred during Python import validation.
@@ -100,6 +180,16 @@ impl ImportResolutionError {
     /// A new `ImportResolutionError` instance.
     pub fn new() -> Self {
         Self
+    }
+
+    pub fn to_string(&self) -> String {
+        display::import_resolution_error_to_string(self)
+    }
+}
+
+impl Display for ImportResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }
 
@@ -146,6 +236,16 @@ impl SubmodelResolutionError {
     ) -> Self {
         Self::UndefinedSubmodel(Some(parent_model_path), identifier)
     }
+
+    pub fn to_string(&self) -> String {
+        display::submodel_resolution_error_to_string(self)
+    }
+}
+
+impl Display for SubmodelResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
 }
 
 /// Represents an error that occurred during parameter resolution.
@@ -187,6 +287,16 @@ impl ParameterResolutionError {
     pub fn variable_resolution(error: VariableResolutionError) -> Self {
         Self::VariableResolution(error)
     }
+
+    pub fn to_string(&self) -> String {
+        display::parameter_resolution_error_to_string(self)
+    }
+}
+
+impl Display for ParameterResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
 }
 
 impl From<VariableResolutionError> for ParameterResolutionError {
@@ -214,6 +324,20 @@ impl ModelTestResolutionError {
     /// A new `ModelTestResolutionError` instance.
     pub fn new(error: VariableResolutionError) -> Self {
         Self(error)
+    }
+
+    pub fn to_string(&self) -> String {
+        display::model_test_resolution_error_to_string(self)
+    }
+
+    pub fn get_error(&self) -> &VariableResolutionError {
+        &self.0
+    }
+}
+
+impl Display for ModelTestResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }
 
@@ -245,6 +369,16 @@ impl SubmodelTestInputResolutionError {
     /// A new `SubmodelTestInputResolutionError::VariableResolution` variant.
     pub fn variable_resolution(error: VariableResolutionError) -> Self {
         Self::VariableResolution(error)
+    }
+
+    pub fn to_string(&self) -> String {
+        display::submodel_test_resolution_error_to_string(self)
+    }
+}
+
+impl Display for SubmodelTestInputResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }
 
@@ -372,5 +506,15 @@ impl VariableResolutionError {
         identifier: Identifier,
     ) -> Self {
         Self::UndefinedSubmodel(Some(parent_model_path), identifier)
+    }
+
+    pub fn to_string(&self) -> String {
+        display::variable_resolution_error_to_string(self)
+    }
+}
+
+impl Display for VariableResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }

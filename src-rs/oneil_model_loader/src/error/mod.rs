@@ -22,12 +22,13 @@
 use oneil_ir::reference::ModelPath;
 
 pub mod collection;
+pub mod display;
 pub mod resolution;
 pub mod util;
 
 pub use resolution::{
-    ModelTestResolutionError, ParameterResolutionError, ResolutionErrors, SubmodelResolutionError,
-    SubmodelTestInputResolutionError, VariableResolutionError,
+    ImportResolutionError, ModelTestResolutionError, ParameterResolutionError, ResolutionErrors,
+    SubmodelResolutionError, SubmodelTestInputResolutionError, VariableResolutionError,
 };
 pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_errors};
 
@@ -94,5 +95,14 @@ impl CircularDependencyError {
     /// A new `CircularDependencyError` containing the circular dependency path.
     pub fn new(circular_dependency: Vec<ModelPath>) -> Self {
         Self(circular_dependency)
+    }
+
+    /// Returns the circular dependency path.
+    ///
+    /// # Returns
+    ///
+    /// A vector of model paths that form the circular dependency.
+    pub fn circular_dependency(&self) -> &[ModelPath] {
+        &self.0
     }
 }

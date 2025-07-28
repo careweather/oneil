@@ -28,6 +28,12 @@ impl From<OneilParserError> for LoadingError {
 #[derive(Debug)]
 pub struct DoesNotExistError(PathBuf);
 
+impl DoesNotExistError {
+    pub fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
 #[derive(Debug)]
 pub struct FileLoader;
 
