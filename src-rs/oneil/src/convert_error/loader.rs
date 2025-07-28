@@ -3,7 +3,7 @@ use std::fs;
 use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
-    error::{CircularDependencyError, LoadError, ResolutionErrors},
+    error::{CircularDependencyError, ImportResolutionError, LoadError, ResolutionErrors},
 };
 
 use crate::{
@@ -106,11 +106,9 @@ fn convert_resolution_errors(
     };
 
     for (python_path, import_error) in resolution_errors.get_import_errors() {
-        let message = import_error.to_string();
-        let (start, length): (usize, usize) = todo!();
-        let location = source.as_ref().map(|source| (source, start, length));
-        let error = Error::new_from_span(path.to_path_buf(), message, location);
-        errors.push(error);
+        // These are intentionally ignored because they indicate that a python
+        // file failed to resolve correctly. These errors should be indicated
+        // by corresponding import errors in `convert_import_error`.
     }
 
     for (identifier, submodel_resolution_error) in
