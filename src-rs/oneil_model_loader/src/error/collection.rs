@@ -51,6 +51,35 @@ pub struct ModelErrorMap<Ps, Py> {
 }
 
 impl<Ps, Py> ModelErrorMap<Ps, Py> {
+    /// Returns a reference to the map of model errors.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing model paths and their associated load errors.
+    pub fn get_model_errors(&self) -> &HashMap<ModelPath, LoadError<Ps>> {
+        &self.model_errors
+    }
+
+    /// Returns a reference to the map of circular dependency errors.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing model paths and their associated circular dependency errors.
+    pub fn get_circular_dependency_errors(
+        &self,
+    ) -> &HashMap<ModelPath, Vec<CircularDependencyError>> {
+        &self.circular_dependency_errors
+    }
+
+    /// Returns a reference to the map of import errors.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap containing Python paths and their associated import errors.
+    pub fn get_import_errors(&self) -> &HashMap<PythonPath, Py> {
+        &self.import_errors
+    }
+
     /// Creates a new empty error map.
     ///
     /// # Returns
@@ -75,7 +104,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     ///
     /// Panics if a model error already exists for the given model path.
     /// This ensures that each model can only have one error recorded.
-    pub fn add_model_error(&mut self, model_path: ModelPath, error: LoadError<Ps>) {
+    pub(crate) fn add_model_error(&mut self, model_path: ModelPath, error: LoadError<Ps>) {
         assert!(!self.model_errors.contains_key(&model_path));
         self.model_errors.insert(model_path, error);
     }
@@ -89,7 +118,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     ///
     /// Multiple circular dependency errors can be added for the same model,
     /// as a model might be involved in multiple circular dependency cycles.
-    pub fn add_circular_dependency_error(
+    pub(crate) fn add_circular_dependency_error(
         &mut self,
         model_path: ModelPath,
         circular_dependency: CircularDependencyError,
@@ -98,22 +127,6 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
             .entry(model_path)
             .or_insert(vec![])
             .push(circular_dependency);
-    }
-
-    /// Adds a parse error for the specified model.
-    ///
-    /// This is a convenience method that wraps the parse error in a `LoadError::ParseError`.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model that has a parse error
-    /// * `error` - The parse error that occurred
-    ///
-    /// # Panics
-    ///
-    /// Panics if a model error already exists for the given model path.
-    pub fn add_parse_error(&mut self, model_path: ModelPath, error: Ps) {
-        self.add_model_error(model_path, LoadError::ParseError(error));
     }
 
     /// Adds a Python import error for the specified import.
@@ -126,7 +139,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     /// # Panics
     ///
     /// Panics if an import error already exists for the given Python path.
-    pub fn add_import_error(&mut self, python_path: PythonPath, error: Py) {
+    pub(crate) fn add_import_error(&mut self, python_path: PythonPath, error: Py) {
         assert!(!self.import_errors.contains_key(&python_path));
         self.import_errors.insert(python_path, error);
     }
@@ -139,7 +152,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     /// # Returns
     ///
     /// A set of model paths that have any type of error.
-    pub fn get_models_with_errors(&self) -> HashSet<&ModelPath> {
+    pub(crate) fn get_models_with_errors(&self) -> HashSet<&ModelPath> {
         self.model_errors
             .keys()
             .chain(self.circular_dependency_errors.keys())
@@ -170,32 +183,6 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     #[cfg(test)]
     pub fn get_imports_with_errors(&self) -> HashSet<&PythonPath> {
         self.import_errors.keys().collect()
-    }
-
-    /// Returns a reference to the map of model errors.
-    ///
-    /// This function is only available in test builds.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap containing model paths and their associated load errors.
-    #[cfg(test)]
-    pub fn get_model_errors(&self) -> &HashMap<ModelPath, LoadError<Ps>> {
-        &self.model_errors
-    }
-
-    /// Returns a reference to the map of circular dependency errors.
-    ///
-    /// This function is only available in test builds.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap containing model paths and their associated circular dependency errors.
-    #[cfg(test)]
-    pub fn get_circular_dependency_errors(
-        &self,
-    ) -> &HashMap<ModelPath, Vec<CircularDependencyError>> {
-        &self.circular_dependency_errors
     }
 }
 
