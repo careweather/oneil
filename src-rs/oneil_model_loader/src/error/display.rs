@@ -71,7 +71,10 @@ pub fn parameter_resolution_error_to_string(error: &ParameterResolutionError) ->
                 .map(|id| format!("{:?}", id))
                 .collect::<Vec<_>>()
                 .join(" -> ");
-            format!("circular dependency detected: {}", dependency_chain)
+            format!(
+                "circular dependency detected in parameters: {}",
+                dependency_chain
+            )
         }
         ParameterResolutionError::VariableResolution(variable_error) => {
             variable_resolution_error_to_string(variable_error)

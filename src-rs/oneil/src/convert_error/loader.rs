@@ -1,11 +1,11 @@
-use std::fs;
+use std::{fs, path::Path};
 
-use oneil_ir::reference::{ModelPath, PythonPath};
+use oneil_ir::reference::{Identifier, ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, ImportResolutionError, LoadError, ResolutionErrors,
-        SubmodelResolutionError,
+        CircularDependencyError, ImportResolutionError, LoadError, ParameterResolutionError,
+        ResolutionErrors, SubmodelResolutionError, VariableResolutionError,
     },
 };
 
@@ -116,6 +116,7 @@ fn convert_resolution_errors(
         }
     };
 
+    // convert import errors
     for (python_path, import_error) in resolution_errors.get_import_errors() {
         // These are intentionally ignored because they indicate that a python
         // file failed to resolve correctly. These errors should be indicated
@@ -123,6 +124,7 @@ fn convert_resolution_errors(
         ignore_error();
     }
 
+    // convert submodel resolution errors
     for (identifier, submodel_resolution_error) in
         resolution_errors.get_submodel_resolution_errors()
     {
@@ -130,6 +132,7 @@ fn convert_resolution_errors(
             SubmodelResolutionError::ModelHasError(model_path) => {
                 ignore_error();
             }
+
             SubmodelResolutionError::UndefinedSubmodel(model_path, identifier) => {
                 let message = submodel_resolution_error.to_string();
                 let start = identifier.span().start();
@@ -141,29 +144,46 @@ fn convert_resolution_errors(
         }
     }
 
+    // convert parameter resolution errors
     for (identifier, parameter_resolution_errors) in
         resolution_errors.get_parameter_resolution_errors()
     {
         for parameter_resolution_error in parameter_resolution_errors {
-            let message = parameter_resolution_error.to_string();
-            let (start, length): (usize, usize) = todo!();
-            let location = source.as_ref().map(|source| (source, start, length));
-            let error = Error::new_from_span(path.to_path_buf(), message, location);
-            errors.push(error);
+            match parameter_resolution_error {
+                ParameterResolutionError::CircularDependency(identifiers) => {
+                    // because this is a circular dependency, we don't have a specific
+                    // location to report within the model
+                    let message = parameter_resolution_error.to_string();
+                    let error = Error::new(path.to_path_buf(), message);
+                    errors.push(error);
+                }
+
+                ParameterResolutionError::VariableResolution(variable_resolution_error) => {
+                    let error = convert_variable_resolution_error(
+                        path,
+                        identifier,
+                        variable_resolution_error,
+                    );
+                    errors.push(error);
+                }
+            }
         }
     }
 
+    // convert model test resolution errors
     for (test_index, test_resolution_errors) in resolution_errors.get_model_test_resolution_errors()
     {
         for test_resolution_error in test_resolution_errors {
-            let message = test_resolution_error.to_string();
-            let (start, length): (usize, usize) = todo!();
-            let location = source.as_ref().map(|source| (source, start, length));
-            let error = Error::new_from_span(path.to_path_buf(), message, location);
+            let error = convert_variable_resolution_error(
+                path,
+                test_index,
+                test_resolution_error.get_error(),
+            );
             errors.push(error);
         }
     }
 
+    // convert submodel test input resolution errors
     for (submodel_identifier, submodel_test_input_resolution_errors) in
         resolution_errors.get_submodel_test_input_resolution_errors()
     {
@@ -177,6 +197,14 @@ fn convert_resolution_errors(
     }
 
     errors
+}
+
+fn convert_variable_resolution_error(
+    path: &Path,
+    identifier: &Identifier,
+    variable_resolution_error: &VariableResolutionError,
+) -> Error {
+    todo!()
 }
 
 // This function is used to ignore errors that are not relevant to the user.
