@@ -3,19 +3,14 @@ mod error;
 mod ir;
 mod util;
 
-use std::{
-    io::{self, Error as IoError, Write},
-    path::Path,
-};
+pub use util::ColorChoice;
+
+use std::io::{self, Write};
 
 use oneil_ast::Model as AstModel;
 use oneil_ir::model::ModelCollection as IrModelCollection;
-use oneil_model_loader::ModelErrorMap;
-use oneil_parser::error::ParserError;
 
-pub use util::ColorChoice;
-
-use crate::file_parser::{DoesNotExistError, LoadingError};
+use crate::convert_error::Error;
 
 pub struct Printer<'a, W>
 where
@@ -64,34 +59,11 @@ where
         Ok(())
     }
 
-    pub fn print_file_error(&mut self, path: &Path, error: &IoError) -> io::Result<()> {
+    pub fn print_error(&mut self, error: &Error) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "File error: {:?}", error)?;
+            writeln!(self.writer, "Error: {:?}", error)?;
         } else {
-            error::file::print(path, error, &self.color_choice, self.writer)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn print_parser_errors(&mut self, path: &Path, errors: &[ParserError]) -> io::Result<()> {
-        if self.print_debug {
-            writeln!(self.writer, "Parser error: {:?}", errors)?;
-        } else {
-            error::parser::print_all(path, errors, &self.color_choice, self.writer)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn print_loader_error(
-        &mut self,
-        error_map: &ModelErrorMap<LoadingError, DoesNotExistError>,
-    ) -> io::Result<()> {
-        if self.print_debug {
-            writeln!(self.writer, "Loader error: {:?}", error_map)?;
-        } else {
-            error::loader::print(error_map, self.writer)?;
+            error::print(error, &self.color_choice, self.writer)?;
         }
 
         Ok(())

@@ -9,6 +9,7 @@ use crate::{
 };
 
 mod command;
+mod convert_error;
 mod file_parser;
 mod printer;
 
@@ -32,10 +33,17 @@ fn main() -> io::Result<()> {
                 match ast {
                     Ok(ast) => printer.print_ast(&ast)?,
                     Err(LoadingError::InvalidFile(error)) => {
-                        printer.print_file_error(&file, &error)?;
+                        let error = convert_error::file::convert(&file, &error);
+                        printer.print_error(&error)?;
                     }
                     Err(LoadingError::Parser(error_with_partial)) => {
-                        printer.print_parser_errors(&file, &error_with_partial.errors)?;
+                        let errors =
+                            convert_error::parser::convert_all(&file, &error_with_partial.errors);
+
+                        for error in errors {
+                            printer.print_error(&error)?;
+                        }
+
                         if display_partial {
                             printer.print_ast(&error_with_partial.partial_result)?;
                         }
@@ -60,7 +68,12 @@ fn main() -> io::Result<()> {
                 match model_collection {
                     Ok(model_collection) => printer.print_ir(&model_collection)?,
                     Err((model_collection, error_map)) => {
-                        printer.print_loader_error(&error_map)?;
+                        let errors = convert_error::loader::convert_all(&error_map);
+
+                        for error in errors {
+                            printer.print_error(&error)?;
+                        }
+
                         if display_partial {
                             printer.print_ir(&model_collection)?;
                         }

@@ -1,0 +1,9 @@
+use foo as
+
+use foo as bar
+
+foo
+
+section
+
+another error
