@@ -6,7 +6,9 @@ use crate::error::reason::{
 pub fn reason_to_string(reason: &ParserErrorReason) -> String {
     match &reason {
         ParserErrorReason::Expect(expect_kind) => match expect_kind {
-            ExpectKind::Decl => "expected declaration".to_string(),
+            // simplified from "expected declaration" in order to make the error
+            // message more understandable for the average user
+            ExpectKind::Decl => "expected parameter or test".to_string(),
             ExpectKind::Expr => "expected expression".to_string(),
             ExpectKind::Note => "expected note".to_string(),
             ExpectKind::Parameter => "expected parameter".to_string(),
@@ -16,40 +18,32 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
         ParserErrorReason::Incomplete { cause: _, kind } => match kind {
             IncompleteKind::Decl(decl_kind) => match decl_kind {
                 DeclKind::Import(import_kind) => match import_kind {
-                    ImportKind::MissingPath => "import declaration missing path".to_string(),
+                    ImportKind::MissingPath => "expected path after `import`".to_string(),
                     ImportKind::MissingEndOfLine => {
                         "import declaration must be followed by a new line".to_string()
                     }
                 },
                 DeclKind::From(from_kind) => match from_kind {
-                    FromKind::MissingPath => "from declaration missing path".to_string(),
-                    FromKind::MissingUse => "from declaration missing `use`".to_string(),
-                    FromKind::MissingUseModel => {
-                        "from declaration missing model after `use`".to_string()
-                    }
-                    FromKind::MissingAs => "from declaration missing `as`".to_string(),
-                    FromKind::MissingAlias => {
-                        "from declaration missing model alias after `as`".to_string()
-                    }
+                    FromKind::MissingPath => "expected path after `from`".to_string(),
+                    FromKind::MissingUse => "expected `use` after path".to_string(),
+                    FromKind::MissingUseModel => "expected model after `use`".to_string(),
+                    FromKind::MissingAs => "expected `as` after model".to_string(),
+                    FromKind::MissingAlias => "expected model alias after `as`".to_string(),
                     FromKind::MissingEndOfLine => {
                         "from declaration must be followed by a new line".to_string()
                     }
                 },
                 DeclKind::Use(use_kind) => match use_kind {
-                    UseKind::MissingPath => "use declaration missing path".to_string(),
-                    UseKind::MissingAs => "use declaration missing `as`".to_string(),
-                    UseKind::MissingAlias => {
-                        "use declaration missing model alias after `as`".to_string()
-                    }
+                    UseKind::MissingPath => "expected path after `use`".to_string(),
+                    UseKind::MissingAs => "expected `as` after path".to_string(),
+                    UseKind::MissingAlias => "expected model alias after `as`".to_string(),
                     UseKind::MissingEndOfLine => {
                         "use declaration must be followed by a new line".to_string()
                     }
                 },
-                DeclKind::ModelInputMissingEquals => "model input missing `=`".to_string(),
-                DeclKind::ModelInputMissingValue => "model input missing value".to_string(),
-                DeclKind::ModelPathMissingSubcomponent => {
-                    "model path missing model after `.`".to_string()
-                }
+                DeclKind::ModelInputMissingEquals => "expected `=`".to_string(),
+                DeclKind::ModelInputMissingValue => "expected value after `=`".to_string(),
+                DeclKind::ModelPathMissingSubcomponent => "expected model after `.`".to_string(),
             },
             IncompleteKind::Expr(expr_kind) => match expr_kind {
                 ExprKind::BinaryOpMissingSecondOperand { operator } => {
@@ -72,51 +66,49 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                         oneil_ast::expression::BinaryOp::Or => "||".to_string(),
                         oneil_ast::expression::BinaryOp::MinMax => "|".to_string(),
                     };
-                    format!("operator `{}` missing second operand", operator_str)
+                    format!("expected second operand after `{}`", operator_str)
                 }
-                ExprKind::ParenMissingExpr => {
-                    "parenthesized expression missing expression".to_string()
-                }
+                ExprKind::ParenMissingExpr => "expected expression inside parentheses".to_string(),
                 ExprKind::UnaryOpMissingOperand { operator } => {
                     let operator_str = match operator {
                         oneil_ast::expression::UnaryOp::Neg => "-".to_string(),
                         oneil_ast::expression::UnaryOp::Not => "!".to_string(),
                     };
-                    format!("operator `{}` missing operand", operator_str)
+                    format!("expected operand after `{}`", operator_str)
                 }
                 ExprKind::VariableMissingParentModel => {
-                    "variable missing parent model after `.`".to_string()
+                    "expected parent model after `.`".to_string()
                 }
             },
             IncompleteKind::Section(section_kind) => match section_kind {
-                SectionKind::MissingLabel => "section missing label".to_string(),
+                SectionKind::MissingLabel => "expected label after `section`".to_string(),
                 SectionKind::MissingEndOfLine => {
                     "section must be followed by a new line".to_string()
                 }
             },
             IncompleteKind::Parameter(parameter_kind) => match parameter_kind {
-                ParameterKind::MissingIdentifier => "parameter missing identifier".to_string(),
-                ParameterKind::MissingEqualsSign => "parameter missing `=`".to_string(),
-                ParameterKind::MissingValue => "parameter missing value".to_string(),
+                ParameterKind::MissingIdentifier => "expected identifier".to_string(),
+                ParameterKind::MissingEqualsSign => "expected `=`".to_string(),
+                ParameterKind::MissingValue => "expected value after `=`".to_string(),
                 ParameterKind::MissingEndOfLine => {
                     "parameter must be followed by a new line".to_string()
                 }
-                ParameterKind::MissingUnit => "parameter missing unit after `:`".to_string(),
-                ParameterKind::LimitMissingMin => "limit missing minimum value".to_string(),
-                ParameterKind::LimitMissingComma => "limit missing `,`".to_string(),
-                ParameterKind::LimitMissingMax => "limit missing maximum value".to_string(),
-                ParameterKind::LimitMissingValues => "limit missing values".to_string(),
-                ParameterKind::PiecewiseMissingExpr => "piecewise missing expression".to_string(),
-                ParameterKind::PiecewiseMissingIf => "piecewise missing `if`".to_string(),
+                ParameterKind::MissingUnit => "expected unit after `:`".to_string(),
+                ParameterKind::LimitMissingMin => "expected minimum value".to_string(),
+                ParameterKind::LimitMissingComma => "expected `,`".to_string(),
+                ParameterKind::LimitMissingMax => "expected maximum value".to_string(),
+                ParameterKind::LimitMissingValues => "expected values".to_string(),
+                ParameterKind::PiecewiseMissingExpr => "expected expression".to_string(),
+                ParameterKind::PiecewiseMissingIf => "expected `if`".to_string(),
                 ParameterKind::PiecewiseMissingIfExpr => {
                     "piecewise missing conditional expression after `if`".to_string()
                 }
             },
             IncompleteKind::Test(test_kind) => match test_kind {
-                TestKind::MissingColon => "test missing `:`".to_string(),
-                TestKind::MissingExpr => "test missing expression".to_string(),
+                TestKind::MissingColon => "expected `:`".to_string(),
+                TestKind::MissingExpr => "expected test expression".to_string(),
                 TestKind::MissingEndOfLine => "test must be followed by a new line".to_string(),
-                TestKind::MissingInputs => "test missing inputs".to_string(),
+                TestKind::MissingInputs => "expected inputs in `{}`".to_string(),
             },
             IncompleteKind::Unit(unit_kind) => match unit_kind {
                 UnitKind::MissingSecondTerm { operator } => {
@@ -124,10 +116,10 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                         oneil_ast::unit::UnitOp::Multiply => "*".to_string(),
                         oneil_ast::unit::UnitOp::Divide => "/".to_string(),
                     };
-                    format!("operator `{}` missing second operand", operator_str)
+                    format!("expected second operand after `{}`", operator_str)
                 }
-                UnitKind::MissingExponent => "unit missing exponent".to_string(),
-                UnitKind::ParenMissingExpr => "parenthesized unit missing expression".to_string(),
+                UnitKind::MissingExponent => "expected exponent".to_string(),
+                UnitKind::ParenMissingExpr => "expected expression inside parentheses".to_string(),
             },
             IncompleteKind::UnclosedBrace => "unclosed `{`".to_string(),
             IncompleteKind::UnclosedBracket => "unclosed `[`".to_string(),
