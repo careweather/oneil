@@ -203,7 +203,7 @@ pub enum SubmodelResolutionError {
     /// The referenced model has errors, preventing submodel resolution.
     ModelHasError(ModelPath),
     /// The submodel identifier is not defined in the referenced model.
-    UndefinedSubmodel(Option<ModelPath>, Identifier),
+    UndefinedSubmodel(Option<ModelPath>, WithSpan<Identifier>),
 }
 
 impl SubmodelResolutionError {
@@ -232,7 +232,7 @@ impl SubmodelResolutionError {
     /// A new `SubmodelResolutionError::UndefinedSubmodel` variant.
     pub fn undefined_submodel_in_submodel(
         parent_model_path: ModelPath,
-        identifier: Identifier,
+        identifier: WithSpan<Identifier>,
     ) -> Self {
         Self::UndefinedSubmodel(Some(parent_model_path), identifier)
     }

@@ -3,7 +3,10 @@ use std::fs;
 use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
-    error::{CircularDependencyError, ImportResolutionError, LoadError, ResolutionErrors},
+    error::{
+        CircularDependencyError, ImportResolutionError, LoadError, ResolutionErrors,
+        SubmodelResolutionError,
+    },
 };
 
 use crate::{
@@ -96,8 +99,8 @@ fn convert_resolution_errors(
     let path = model_path.as_ref();
 
     let source = fs::read_to_string(path);
-    let source = match source.as_ref() {
-        Ok(source) => Some(source),
+    let source = match source {
+        Ok(source) => Some(source.as_str()),
         Err(error) => {
             let file_error = file::convert(path, &error);
             errors.push(file_error);
@@ -109,16 +112,25 @@ fn convert_resolution_errors(
         // These are intentionally ignored because they indicate that a python
         // file failed to resolve correctly. These errors should be indicated
         // by corresponding import errors in `convert_import_error`.
+        ignore_error();
     }
 
     for (identifier, submodel_resolution_error) in
         resolution_errors.get_submodel_resolution_errors()
     {
-        let message = submodel_resolution_error.to_string();
-        let (start, length): (usize, usize) = todo!();
-        let location = source.as_ref().map(|source| (source, start, length));
-        let error = Error::new_from_span(path.to_path_buf(), message, location);
-        errors.push(error);
+        match submodel_resolution_error {
+            SubmodelResolutionError::ModelHasError(model_path) => {
+                ignore_error();
+            }
+            SubmodelResolutionError::UndefinedSubmodel(model_path, identifier) => {
+                let message = submodel_resolution_error.to_string();
+                let start = identifier.span().start();
+                let length = identifier.span().length();
+                let location = source.map(|source| (source, start, length));
+                let error = Error::new_from_span(path.to_path_buf(), message, location);
+                errors.push(error);
+            }
+        }
     }
 
     for (identifier, parameter_resolution_errors) in
@@ -158,3 +170,9 @@ fn convert_resolution_errors(
 
     errors
 }
+
+// This function is used to ignore errors that are not relevant to the user.
+//
+// Usually, this is because the error is a propagated error from another error,
+// such as `ImportResolutionError` or `SubmodelResolutionError::ModelHasError`.
+pub fn ignore_error() {}

@@ -44,10 +44,11 @@ pub fn submodel_resolution_error_to_string(error: &SubmodelResolutionError) -> S
                     let path = path.as_ref().display();
                     format!(
                         "submodel `{}` is not defined in model `{}`",
-                        identifier, path
+                        identifier.value(),
+                        path
                     )
                 }
-                None => format!("submodel `{}` is not defined", identifier),
+                None => format!("submodel `{}` is not defined", identifier.value()),
             }
         }
     }

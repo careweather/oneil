@@ -212,11 +212,12 @@ fn resolve_model_path(
     }
 
     let submodel_name = Identifier::new(subcomponents[0].as_str());
+    let submodel_name_span = get_span_from_ast_span(subcomponents[0].node_span());
     let submodel_path = model
         .get_submodel(&submodel_name)
         .ok_or(SubmodelResolutionError::undefined_submodel_in_submodel(
             model_path.clone(),
-            submodel_name,
+            WithSpan::new(submodel_name, submodel_name_span),
         ))?
         .clone()
         .take_value();
@@ -627,8 +628,9 @@ mod tests {
     fn test_resolve_undefined_submodel() {
         // create the use model list with undefined submodel
         let undefined_identifier = ast::naming::Identifier::new("undefined_submodel".to_string());
+        let undefined_identifier_span = helper::test_ast_span(0, 16);
         let undefined_node =
-            ast::node::Node::new(helper::test_ast_span(0, 16), undefined_identifier);
+            ast::node::Node::new(undefined_identifier_span.clone(), undefined_identifier);
         let subcomponents = vec![undefined_node];
 
         let use_model =
@@ -656,7 +658,14 @@ mod tests {
         match error {
             SubmodelResolutionError::UndefinedSubmodel(parent_path, submodel_name) => {
                 assert_eq!(parent_path, &Some(weather_path));
-                assert_eq!(submodel_name, &Identifier::new("undefined_submodel"));
+                assert_eq!(
+                    submodel_name.span(),
+                    &get_span_from_ast_span(&undefined_identifier_span)
+                );
+                assert_eq!(
+                    submodel_name.value(),
+                    &Identifier::new("undefined_submodel")
+                );
             }
             _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
         }
@@ -676,8 +685,9 @@ mod tests {
         let atmosphere_node =
             ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
         let undefined_identifier = ast::naming::Identifier::new("undefined".to_string());
+        let undefined_identifier_span = helper::test_ast_span(0, 9);
         let undefined_node =
-            ast::node::Node::new(helper::test_ast_span(0, 9), undefined_identifier);
+            ast::node::Node::new(undefined_identifier_span.clone(), undefined_identifier);
         let subcomponents = vec![atmosphere_node, undefined_node];
 
         let use_model =
@@ -713,7 +723,11 @@ mod tests {
         match error {
             SubmodelResolutionError::UndefinedSubmodel(parent_path, submodel_name) => {
                 assert_eq!(parent_path, &Some(atmosphere_path));
-                assert_eq!(submodel_name, &Identifier::new("undefined"));
+                assert_eq!(
+                    submodel_name.span(),
+                    &get_span_from_ast_span(&undefined_identifier_span)
+                );
+                assert_eq!(submodel_name.value(), &Identifier::new("undefined"));
             }
             _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
         }
