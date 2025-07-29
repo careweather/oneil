@@ -44,11 +44,11 @@ pub fn submodel_resolution_error_to_string(error: &SubmodelResolutionError) -> S
                     let path = path.as_ref().display();
                     format!(
                         "submodel `{}` is not defined in model `{}`",
-                        identifier.value(),
+                        identifier.as_str(),
                         path
                     )
                 }
-                None => format!("submodel `{}` is not defined", identifier.value()),
+                None => format!("submodel `{}` is not defined", identifier.as_str()),
             }
         }
     }
@@ -68,11 +68,11 @@ pub fn parameter_resolution_error_to_string(error: &ParameterResolutionError) ->
         ParameterResolutionError::CircularDependency(circular_dependency) => {
             let dependency_chain = circular_dependency
                 .iter()
-                .map(|id| format!("{:?}", id))
+                .map(|id| format!("{}", id.as_str()))
                 .collect::<Vec<_>>()
                 .join(" -> ");
             format!(
-                "circular dependency detected in parameters: {}",
+                "circular dependency detected in parameters - {}",
                 dependency_chain
             )
         }
@@ -124,30 +124,46 @@ pub fn submodel_test_resolution_error_to_string(
 ///
 /// A string containing a user-friendly error message for the variable resolution error.
 pub fn variable_resolution_error_to_string(error: &VariableResolutionError) -> String {
-    todo!("improve error messages");
     match error {
         VariableResolutionError::ModelHasError(model_path) => {
-            format!("model `{:?}` has errors", model_path)
+            let path = model_path.as_ref().display();
+            format!("model `{}` has errors", path)
         }
         VariableResolutionError::ParameterHasError(identifier) => {
-            format!("parameter `{:?}` has errors", identifier)
+            let identifier = identifier.as_str();
+            format!("parameter `{}` has errors", identifier)
         }
         VariableResolutionError::SubmodelResolutionFailed(identifier) => {
-            format!("submodel `{:?}` resolution failed", identifier)
+            let identifier = identifier.as_str();
+            format!("submodel `{}` resolution failed", identifier)
         }
-        VariableResolutionError::UndefinedParameter(model_path, identifier) => match model_path {
-            Some(path) => format!(
-                "parameter `{:?}` is not defined in model `{:?}`",
-                identifier, path
-            ),
-            None => format!("parameter `{:?}` is not defined", identifier),
-        },
-        VariableResolutionError::UndefinedSubmodel(model_path, identifier) => match model_path {
-            Some(path) => format!(
-                "submodel `{:?}` is not defined in model `{:?}`",
-                identifier, path
-            ),
-            None => format!("submodel `{:?}` is not defined", identifier),
-        },
+        VariableResolutionError::UndefinedParameter(model_path, identifier) => {
+            let identifier_str = identifier.value().as_str();
+            match model_path {
+                Some(path) => format!(
+                    "parameter `{}` is not defined in model `{}`",
+                    identifier_str,
+                    path.as_ref().display()
+                ),
+                None => format!(
+                    "parameter `{}` is not defined in the current model",
+                    identifier_str
+                ),
+            }
+        }
+        VariableResolutionError::UndefinedSubmodel(model_path, identifier) => {
+            let identifier_str = identifier.value().as_str();
+            match model_path {
+                Some(path) => format!(
+                    "submodel `{}` is not defined in model `{}`",
+                    identifier_str,
+                    path.as_ref().display()
+                ),
+                None => format!(
+                    "submodel `{}` is not defined in the current model",
+                    identifier_str
+                ),
+            }
+        }
     }
 }

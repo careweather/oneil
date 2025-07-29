@@ -52,9 +52,9 @@ impl Identifier {
     /// use oneil_ir::reference::Identifier;
     ///
     /// let id = Identifier::new("my_parameter");
-    /// assert_eq!(id.value(), "my_parameter");
+    /// assert_eq!(id.as_str(), "my_parameter");
     /// ```
-    pub fn value(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         &self.0
     }
 }
