@@ -1,7 +1,20 @@
+//! Intermediate Representation (IR) printing functionality for the Oneil CLI
+//!
+//! This module provides functionality for printing Oneil IR structures in a
+//! hierarchical tree format suitable for debugging and development. It handles
+//! all IR node types including model collections, models, parameters, expressions,
+//! and tests.
+//!
+//! The printing format uses a tree-like structure with indentation and special
+//! characters to show the hierarchical relationship between IR nodes:
+//! - `├──` for non-final children
+//! - `└──` for final children
+//! - Indentation to show nesting levels
+
 use std::io::{self, Write};
 
 use oneil_ir::{
-    expr::{BinaryOp, Expr, Literal, UnaryOp},
+    expr::{Expr, Literal},
     model::ModelCollection,
     parameter::{Limits, Parameter, ParameterValue},
     reference::Identifier,
@@ -263,7 +276,7 @@ fn print_parameter_value(
             }
             if let Some(unit) = unit {
                 writeln!(writer, "{}    └── Unit:", "  ".repeat(indent))?;
-                print_unit(unit, writer, indent + 2)?;
+                print_unit(unit, writer, indent + 4)?;
             }
         }
     }

@@ -1,3 +1,10 @@
+//! Abstract Syntax Tree (AST) printing functionality for the Oneil CLI
+//!
+//! This module provides functionality for printing Oneil AST structures in a
+//! hierarchical tree format suitable for debugging and development. It handles
+//! all AST node types including models, declarations, expressions, parameters,
+//! and units.
+
 use oneil_ast::{
     Decl, Expr, Model,
     declaration::DeclNode,
@@ -224,6 +231,7 @@ fn print_section(
             print_decl(decl, writer, indent + 2, sub_prefix)?;
         }
     }
+
     Ok(())
 }
 

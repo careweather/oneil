@@ -1,3 +1,15 @@
+//! Output formatting and printing functionality for the Oneil CLI
+//!
+//! This module provides the core printing capabilities for displaying AST, IR, and error
+//! information in a user-friendly format. It supports both colored and plain text output,
+//! debug mode for detailed internal representations, and hierarchical tree formatting.
+//!
+//! The module is organized into submodules:
+//! - `ast`: AST-specific printing functionality
+//! - `ir`: IR-specific printing functionality  
+//! - `error`: Error message formatting and display
+//! - `util`: Utility functions for color handling and formatting
+
 mod ast;
 mod error;
 mod ir;
@@ -12,12 +24,31 @@ use oneil_ir::model::ModelCollection as IrModelCollection;
 
 use crate::convert_error::Error;
 
+/// Main printer for formatting and displaying Oneil CLI output
+///
+/// The `Printer` struct provides a unified interface for printing various types of
+/// Oneil data structures (AST, IR, errors) with configurable formatting options.
+/// It supports colored output, debug mode, and writes to any type implementing `Write`.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::io::stdout;
+/// use oneil::printer::Printer;
+///
+/// let mut writer = stdout();
+/// let mut printer = Printer::new(true, false, &mut writer);
+/// // Use printer to output formatted data
+/// ```
 pub struct Printer<'a, W>
 where
     W: Write,
 {
+    /// Color choice configuration for output formatting
     color_choice: ColorChoice,
+    /// Whether to print in debug format (raw representation)
     print_debug: bool,
+    /// The writer to output formatted data to
     writer: &'a mut W,
 }
 
@@ -25,6 +56,19 @@ impl<'a, W> Printer<'a, W>
 where
     W: Write,
 {
+    /// Creates a new printer with the specified configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `use_colors` - Whether to enable colored output. When `true`, uses ANSI color codes
+    ///                  for enhanced readability. When `false`, outputs plain text.
+    /// * `print_debug` - Whether to print in debug format. When `true`, displays raw
+    ///                   debug representations. When `false`, uses formatted tree structures.
+    /// * `writer` - The writer to output formatted data to. Must implement `Write`.
+    ///
+    /// # Returns
+    ///
+    /// A new `Printer` instance configured with the specified options.
     pub fn new(use_colors: bool, print_debug: bool, writer: &'a mut W) -> Self {
         let color_choice = if use_colors {
             ColorChoice::EnableColors
@@ -39,6 +83,22 @@ where
         }
     }
 
+    /// Prints an Abstract Syntax Tree (AST) in the configured format
+    ///
+    /// Displays the AST either as a formatted hierarchical tree structure or as a
+    /// raw debug representation, depending on the `print_debug` configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `ast` - The AST model to print
+    ///
+    /// # Returns
+    ///
+    /// Returns `io::Result<()>` indicating success or failure of the write operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the underlying writer fails.
     pub fn print_ast(&mut self, ast: &AstModel) -> io::Result<()> {
         if self.print_debug {
             writeln!(self.writer, "AST: {:?}", ast)?;
@@ -49,6 +109,22 @@ where
         Ok(())
     }
 
+    /// Prints an Intermediate Representation (IR) in the configured format
+    ///
+    /// Displays the IR either as a formatted hierarchical tree structure or as a
+    /// raw debug representation, depending on the `print_debug` configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `ir` - The IR model collection to print
+    ///
+    /// # Returns
+    ///
+    /// Returns `io::Result<()>` indicating success or failure of the write operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the underlying writer fails.
     pub fn print_ir(&mut self, ir: &IrModelCollection) -> io::Result<()> {
         if self.print_debug {
             writeln!(self.writer, "IR: {:?}", ir)?;
@@ -59,6 +135,22 @@ where
         Ok(())
     }
 
+    /// Prints a single error with the configured formatting
+    ///
+    /// Displays an error message with source location information and optional
+    /// color highlighting, depending on the color configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `error` - The error to print
+    ///
+    /// # Returns
+    ///
+    /// Returns `io::Result<()>` indicating success or failure of the write operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the underlying writer fails.
     pub fn print_error(&mut self, error: &Error) -> io::Result<()> {
         if self.print_debug {
             writeln!(self.writer, "Error: {:?}", error)?;
@@ -69,6 +161,23 @@ where
         Ok(())
     }
 
+    /// Prints multiple errors with the configured formatting
+    ///
+    /// Displays a sequence of error messages, each with source location information
+    /// and optional color highlighting. Errors are separated by blank lines for
+    /// better readability.
+    ///
+    /// # Arguments
+    ///
+    /// * `errors` - A slice of errors to print
+    ///
+    /// # Returns
+    ///
+    /// Returns `io::Result<()>` indicating success or failure of the write operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the underlying writer fails.
     pub fn print_errors(&mut self, errors: &[Error]) -> io::Result<()> {
         for error in errors {
             self.print_error(error)?;

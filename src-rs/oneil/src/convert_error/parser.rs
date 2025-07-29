@@ -1,9 +1,38 @@
+//! Parser error conversion for the Oneil CLI
+//!
+//! This module provides functionality for converting parser errors from the Oneil
+//! parser library into the unified error format used by the Oneil CLI. It handles
+//! syntax errors, parsing failures, and other language-related errors that occur
+//! during the parsing of Oneil source files.
+
 use std::path::Path;
 
 use oneil_parser::error::ParserError;
 
 use crate::convert_error::{Error, convert_file_error};
 
+/// Converts all parser errors for a file into unified CLI errors
+///
+/// Takes a file path and a collection of parser errors, then converts each one
+/// into a unified error format. If the file cannot be read, it first adds a
+/// file reading error, then processes the parser errors without source location
+/// information.
+///
+/// # Arguments
+///
+/// * `path` - The path to the file that contains the parser errors
+/// * `parser_errors` - A slice of parser errors to convert
+///
+/// # Returns
+///
+/// Returns a vector of `Error` instances, one for each parser error, plus
+/// potentially a file reading error if the source file cannot be accessed.
+///
+/// # Note
+///
+/// This function attempts to read the source file to provide source location
+/// information for the errors. If the file cannot be read, it still processes
+/// the parser errors but without location information.
 pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<Error> {
     let mut errors = Vec::new();
 
@@ -27,6 +56,26 @@ pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<Error> {
     errors
 }
 
+/// Converts a single parser error into a unified CLI error format
+///
+/// Takes a file path, optional file contents, and a parser error, then creates
+/// a user-friendly error message with source location information if available.
+///
+/// # Arguments
+///
+/// * `path` - The path to the file that contains the parser error
+/// * `file_contents` - Optional file contents for source location calculation
+/// * `error` - The parser error to convert
+///
+/// # Returns
+///
+/// Returns a new `Error` instance with the parser error message and optional
+/// source location information if file contents are available.
+///
+/// # Note
+///
+/// If `file_contents` is `None`, the error will be created without source
+/// location information, but the error message will still be included.
 pub fn convert(path: &Path, file_contents: Option<&str>, error: &ParserError) -> Error {
     let message = error.to_string();
     let location = file_contents.map(|contents| (contents, error.error_offset));
