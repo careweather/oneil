@@ -1,0 +1,22 @@
+# Success Model 1: Basic mathematical operations
+
+# Mathematical constants
+PI: pi = 3.14159
+E: e = 2.71828
+
+# Basic arithmetic
+Addition: add = 5 + 3
+Subtraction: sub = 10 - 4
+Multiplication: mult = 6 * 7
+Division: div = 20 / 4
+
+# Exponentiation
+Power: power = 2 ^ 8
+
+# Variables and expressions
+X: x = 15
+Y: y = 3
+Complex expression: complex = (x + y) * 2 - 5
+
+# Final result
+Result: result = complex + power

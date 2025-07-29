@@ -1,0 +1,27 @@
+# Success Model 3: Sections and complex expressions
+
+# Basic setup
+Base value: base = 100
+Multiplier: mult = 1.5
+
+# First section
+section Calculations
+
+# Complex mathematical expressions
+Square root approximation: sqrt_approx = base ^ 0.5
+Cube root: cube_root = base ^ (1/3)
+Logarithm approximation: log_approx = base - 1
+
+# Trigonometric approximations
+Sine approximation: sin_approx = base - (base ^ 3) / 6
+Cosine approximation: cos_approx = 1 - (base ^ 2) / 2
+
+# Second section
+section Results
+
+# Combined calculations
+Combined result: combined = sqrt_approx + cube_root + log_approx
+Trig result: trig_result = sin_approx + cos_approx
+
+# Final result
+Result: result = combined * mult + trig_result

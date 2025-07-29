@@ -1,0 +1,27 @@
+# Success Model 2: Conditional expressions and piecewise functions
+
+# Input variables
+Input A: a = 10
+Input B: b = 5
+
+# Conditional expressions
+Absolute value: abs = { a if a >= 0
+                      { -a if a < 0
+
+Maximum: max = { a if a > b
+               { b if a <= b
+
+Minimum: min = { a if a < b
+               { b if a >= b
+
+# Boolean operations
+Is positive: is_positive = a > 0
+Is negative: is_negative = a < 0
+Is zero: is_zero = a == 0
+
+# Logical operations
+And test: and_test = is_positive and not is_zero
+Or test: or_test = is_positive or is_negative
+
+# Final result
+Result: result = max + min
