@@ -408,7 +408,6 @@ impl ParserError {
     /// Creates a new ParserError for a missing unit in a parameter
     pub(crate) fn parameter_missing_unit(colon_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
-            eprintln!("error: {:?}", error);
             let colon_span = AstSpan::from(colon_token);
             error.convert_reason(ParserErrorReason::parameter_missing_unit(colon_span))
         }

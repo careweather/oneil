@@ -730,7 +730,6 @@ mod tests {
 
         // check the errors
         let errors = result.get_model_errors();
-        eprintln!("{:?}", errors);
         assert!(errors.is_empty());
 
         // check the models

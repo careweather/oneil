@@ -59,7 +59,6 @@ where
             let python_path_with_span = WithSpan::new(python_path.clone(), span);
 
             let result = file_loader.validate_python_import(&python_path);
-            eprintln!("{:?}: {:?}", python_path, result);
             match result {
                 Ok(()) => {
                     python_imports.insert(python_path_with_span);
