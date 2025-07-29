@@ -99,29 +99,34 @@ pub fn resolve_variable(
 ) -> Result<ExprWithSpan, VariableResolutionError> {
     match variable.node_value() {
         ast::expression::Variable::Identifier(identifier) => {
-            let identifier = Identifier::new(identifier.as_str());
-            if local_variables.contains(&identifier) {
-                let span = get_span_from_ast_span(variable.node_span());
-                let expr = Expr::local_variable(identifier);
+            let span = get_span_from_ast_span(variable.node_span());
+            let var_identifier = Identifier::new(identifier.as_str());
+            let var_identifier_span = get_span_from_ast_span(identifier.node_span());
+            if local_variables.contains(&var_identifier) {
+                let expr = Expr::local_variable(var_identifier);
                 Ok(WithSpan::new(expr, span))
             } else {
-                match defined_parameters.get(&identifier) {
+                match defined_parameters.get(&var_identifier) {
                     InfoResult::Found(_parameter) => {
                         let span = get_span_from_ast_span(variable.node_span());
-                        let expr = Expr::parameter_variable(identifier);
+                        let expr = Expr::parameter_variable(var_identifier);
                         Ok(WithSpan::new(expr, span))
                     }
                     InfoResult::HasError => {
-                        return Err(VariableResolutionError::parameter_has_error(identifier));
+                        return Err(VariableResolutionError::parameter_has_error(var_identifier));
                     }
                     InfoResult::NotFound => {
-                        return Err(VariableResolutionError::undefined_parameter(identifier));
+                        return Err(VariableResolutionError::undefined_parameter(WithSpan::new(
+                            var_identifier,
+                            var_identifier_span,
+                        )));
                     }
                 }
             }
         }
         ast::expression::Variable::Accessor { parent, component } => {
             let parent_identifier = Identifier::new(parent.as_str());
+            let parent_identifier_span = get_span_from_ast_span(parent.node_span());
             let submodel_path = match submodel_info.get(&parent_identifier) {
                 InfoResult::Found(submodel_path) => submodel_path,
                 InfoResult::HasError => {
@@ -130,9 +135,10 @@ pub fn resolve_variable(
                     ));
                 }
                 InfoResult::NotFound => {
-                    return Err(VariableResolutionError::undefined_submodel(
+                    return Err(VariableResolutionError::undefined_submodel(WithSpan::new(
                         parent_identifier,
-                    ));
+                        parent_identifier_span,
+                    )));
                 }
             };
 
@@ -182,13 +188,14 @@ fn resolve_variable_recursive(
     match variable {
         // if the variable is an identifier, this means that the variable refers to a parameter
         ast::expression::Variable::Identifier(identifier) => {
-            let identifier = Identifier::new(identifier.as_str());
-            if model.get_parameter(&identifier).is_some() {
-                Ok((submodel_path.clone(), identifier))
+            let var_identifier = Identifier::new(identifier.as_str());
+            let var_identifier_span = get_span_from_ast_span(identifier.node_span());
+            if model.get_parameter(&var_identifier).is_some() {
+                Ok((submodel_path.clone(), var_identifier))
             } else {
                 return Err(VariableResolutionError::undefined_parameter_in_submodel(
                     submodel_path.clone(),
-                    identifier,
+                    WithSpan::new(var_identifier, var_identifier_span),
                 ));
             }
         }
@@ -196,12 +203,13 @@ fn resolve_variable_recursive(
         // if the variable is an accessor, this means that the variable refers to a submodel
         ast::expression::Variable::Accessor { parent, component } => {
             let parent_identifier = Identifier::new(parent.as_str());
+            let parent_identifier_span = get_span_from_ast_span(parent.node_span());
             let submodel_path = match model.get_submodel(&parent_identifier) {
                 Some(submodel_path) => submodel_path,
                 None => {
                     let source = VariableResolutionError::undefined_submodel_in_submodel(
                         submodel_path.clone(),
-                        parent_identifier,
+                        WithSpan::new(parent_identifier, parent_identifier_span),
                     );
                     return Err(source);
                 }
@@ -346,6 +354,17 @@ mod tests {
                 Vec::new(),
             )
         }
+
+        /// Helper function for getting the span of an accessor parent identifier
+        pub fn get_accessor_parent_identifier_span(
+            accessor: &ast::expression::VariableNode,
+        ) -> oneil_ir::span::Span {
+            let parent_span = match accessor.node_value() {
+                ast::expression::Variable::Accessor { parent, .. } => parent.node_span(),
+                _ => panic!("accessor should be an accessor variable"),
+            };
+            get_span_from_ast_span(parent_span)
+        }
     }
 
     #[test]
@@ -443,8 +462,12 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::UndefinedParameter(_, ident) => {
-                assert_eq!(ident, Identifier::new("undefined_param"));
+            VariableResolutionError::UndefinedParameter(model_path, ident) => {
+                assert_eq!(model_path, None);
+
+                let span = get_span_from_ast_span(variable.node_span());
+                assert_eq!(ident.span(), &span);
+                assert_eq!(ident.value(), &Identifier::new("undefined_param"));
             }
             error => panic!("Expected undefined parameter error, got {:?}", error),
         }
@@ -486,6 +509,7 @@ mod tests {
         // create an accessor variable for undefined submodel
         let inner_var = helper::create_identifier_variable("parameter");
         let variable = helper::create_accessor_variable("undefined_submodel", inner_var);
+        let undefined_submodel_span = helper::get_accessor_parent_identifier_span(&variable);
 
         let local_vars = HashSet::new();
 
@@ -503,7 +527,9 @@ mod tests {
         match result.unwrap_err() {
             VariableResolutionError::UndefinedSubmodel(submodel_path, ident) => {
                 assert_eq!(submodel_path, None);
-                assert_eq!(ident, Identifier::new("undefined_submodel"));
+
+                assert_eq!(ident.span(), &undefined_submodel_span);
+                assert_eq!(ident.value(), &Identifier::new("undefined_submodel"));
             }
             error => panic!("Expected undefined submodel error, got {:?}", error),
         }
@@ -641,6 +667,7 @@ mod tests {
     fn test_resolve_undefined_parameter_in_submodel() {
         // create an accessor variable for undefined parameter in submodel
         let inner_var = helper::create_identifier_variable("undefined_param");
+        let inner_var_span = get_span_from_ast_span(inner_var.node_span());
         let variable = helper::create_accessor_variable("submodel", inner_var);
 
         let local_vars = HashSet::new();
@@ -680,7 +707,9 @@ mod tests {
         match result.unwrap_err() {
             VariableResolutionError::UndefinedParameter(Some(path), ident) => {
                 assert_eq!(path, submodel_path);
-                assert_eq!(ident, Identifier::new("undefined_param"));
+
+                assert_eq!(ident.span(), &inner_var_span);
+                assert_eq!(ident.value(), &Identifier::new("undefined_param"));
             }
             error => panic!(
                 "Expected undefined parameter in submodel error, got {:?}",
@@ -693,8 +722,10 @@ mod tests {
     fn test_resolve_undefined_submodel_in_submodel() {
         // create a nested accessor variable for undefined submodel in submodel
         let inner_var = helper::create_identifier_variable("parameter");
-        let variable = helper::create_accessor_variable("undefined_submodel", inner_var);
-        let variable = helper::create_accessor_variable("submodel", variable);
+        let undefined_submodel = helper::create_accessor_variable("undefined_submodel", inner_var);
+        let undefined_submodel_span =
+            helper::get_accessor_parent_identifier_span(&undefined_submodel);
+        let variable = helper::create_accessor_variable("submodel", undefined_submodel);
 
         let local_vars = HashSet::new();
 
@@ -733,7 +764,9 @@ mod tests {
         match result.unwrap_err() {
             VariableResolutionError::UndefinedSubmodel(Some(path), ident) => {
                 assert_eq!(path, submodel_path);
-                assert_eq!(ident, Identifier::new("undefined_submodel"));
+
+                assert_eq!(ident.value(), &Identifier::new("undefined_submodel"));
+                assert_eq!(ident.span(), &undefined_submodel_span);
             }
             error => panic!(
                 "Expected undefined submodel in submodel error, got {:?}",

@@ -5,7 +5,8 @@ use oneil_model_loader::{
     ModelErrorMap,
     error::{
         CircularDependencyError, ImportResolutionError, LoadError, ParameterResolutionError,
-        ResolutionErrors, SubmodelResolutionError, VariableResolutionError,
+        ResolutionErrors, SubmodelResolutionError, SubmodelTestInputResolutionError,
+        VariableResolutionError,
     },
 };
 
@@ -159,12 +160,12 @@ fn convert_resolution_errors(
                 }
 
                 ParameterResolutionError::VariableResolution(variable_resolution_error) => {
-                    let error = convert_variable_resolution_error(
-                        path,
-                        identifier,
-                        variable_resolution_error,
-                    );
-                    errors.push(error);
+                    let error =
+                        convert_variable_resolution_error(path, source, variable_resolution_error);
+
+                    if let Some(error) = error {
+                        errors.push(error);
+                    }
                 }
             }
         }
@@ -174,12 +175,12 @@ fn convert_resolution_errors(
     for (test_index, test_resolution_errors) in resolution_errors.get_model_test_resolution_errors()
     {
         for test_resolution_error in test_resolution_errors {
-            let error = convert_variable_resolution_error(
-                path,
-                test_index,
-                test_resolution_error.get_error(),
-            );
-            errors.push(error);
+            let error =
+                convert_variable_resolution_error(path, source, test_resolution_error.get_error());
+
+            if let Some(error) = error {
+                errors.push(error);
+            }
         }
     }
 
@@ -188,11 +189,16 @@ fn convert_resolution_errors(
         resolution_errors.get_submodel_test_input_resolution_errors()
     {
         for submodel_test_input_resolution_error in submodel_test_input_resolution_errors {
-            let message = submodel_test_input_resolution_error.to_string();
-            let (start, length): (usize, usize) = todo!();
-            let location = source.as_ref().map(|source| (source, start, length));
-            let error = Error::new_from_span(path.to_path_buf(), message, location);
-            errors.push(error);
+            match submodel_test_input_resolution_error {
+                SubmodelTestInputResolutionError::VariableResolution(variable_resolution_error) => {
+                    let error =
+                        convert_variable_resolution_error(path, source, variable_resolution_error);
+
+                    if let Some(error) = error {
+                        errors.push(error);
+                    }
+                }
+            }
         }
     }
 
@@ -201,10 +207,25 @@ fn convert_resolution_errors(
 
 fn convert_variable_resolution_error(
     path: &Path,
-    identifier: &Identifier,
+    source: Option<&str>,
     variable_resolution_error: &VariableResolutionError,
-) -> Error {
-    todo!()
+) -> Option<Error> {
+    match variable_resolution_error {
+        // these errors are propagated from other errors and are not relevant to the user
+        VariableResolutionError::ModelHasError(_model_path) => None,
+        VariableResolutionError::ParameterHasError(_identifier) => None,
+        VariableResolutionError::SubmodelResolutionFailed(_identifier) => None,
+
+        VariableResolutionError::UndefinedParameter(_model_path, identifier)
+        | VariableResolutionError::UndefinedSubmodel(_model_path, identifier) => {
+            let message = variable_resolution_error.to_string();
+            let start = identifier.span().start();
+            let length = identifier.span().length();
+            let location = source.map(|source| (source, start, length));
+            let error = Error::new_from_span(path.to_path_buf(), message, location);
+            Some(error)
+        }
+    }
 }
 
 // This function is used to ignore errors that are not relevant to the user.

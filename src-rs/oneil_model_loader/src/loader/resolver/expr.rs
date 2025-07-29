@@ -870,7 +870,9 @@ mod tests {
                 assert_eq!(errors.len(), 1);
                 match &errors[0] {
                     VariableResolutionError::UndefinedParameter(None, ident) => {
-                        assert_eq!(ident, &Identifier::new("undefined"));
+                        let span = get_span_from_ast_span(ast_variable.node_span());
+                        assert_eq!(ident.span(), &span);
+                        assert_eq!(ident.value(), &Identifier::new("undefined"));
                     }
                     _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
                 }
@@ -1213,8 +1215,17 @@ mod tests {
                     })
                     .collect();
 
-                assert!(error_identifiers.contains(&Identifier::new("undefined1")));
-                assert!(error_identifiers.contains(&Identifier::new("undefined2")));
+                let undefined1_span = get_span_from_ast_span(ast_left_var.node_span());
+                assert!(error_identifiers.contains(&WithSpan::new(
+                    Identifier::new("undefined1"),
+                    undefined1_span
+                )));
+
+                let undefined2_span = get_span_from_ast_span(ast_right_var.node_span());
+                assert!(error_identifiers.contains(&WithSpan::new(
+                    Identifier::new("undefined2"),
+                    undefined2_span
+                )));
             }
             _ => panic!("Expected error, got {:?}", result),
         }

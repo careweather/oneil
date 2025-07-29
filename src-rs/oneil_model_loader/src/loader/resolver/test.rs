@@ -524,16 +524,14 @@ mod tests {
     #[test]
     fn test_resolve_model_tests_with_undefined_variable() {
         // create the model tests with undefined variable
+        let undefined_var = helper::create_identifier_variable("undefined_var");
+        let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let tests = vec![
             // test {x}: undefined_var
             helper::create_test_node(
                 None,
                 Some(vec!["x"]),
-                helper::create_variable_expr_node(
-                    helper::create_identifier_variable("undefined_var"),
-                    0,
-                    13,
-                ),
+                helper::create_variable_expr_node(undefined_var, 0, 13),
                 0,
                 13,
             ),
@@ -556,7 +554,7 @@ mod tests {
         assert_eq!(
             test_errors[0],
             ModelTestResolutionError::new(VariableResolutionError::undefined_parameter(
-                Identifier::new("undefined_var"),
+                WithSpan::new(Identifier::new("undefined_var"), undefined_var_span),
             )),
         );
 
@@ -567,6 +565,8 @@ mod tests {
     #[test]
     fn test_resolve_model_tests_mixed_success_and_error() {
         // create the model tests with mixed success and error cases
+        let undefined_var = helper::create_identifier_variable("undefined_var");
+        let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let tests = vec![
             // test {x}: true
             helper::create_test_node(
@@ -606,7 +606,7 @@ mod tests {
         assert_eq!(
             test_errors[0],
             ModelTestResolutionError::new(VariableResolutionError::undefined_parameter(
-                Identifier::new("undefined_var"),
+                WithSpan::new(Identifier::new("undefined_var"), undefined_var_span),
             )),
         );
 
@@ -777,14 +777,12 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_with_undefined_variable() {
         // create the submodel tests with undefined variable
+        let undefined_var = helper::create_identifier_variable("undefined_var");
+        let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let input_list = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param",
-                helper::create_variable_expr_node(
-                    helper::create_identifier_variable("undefined_var"),
-                    0,
-                    13,
-                ),
+                helper::create_variable_expr_node(undefined_var, 0, 13),
                 0,
                 13,
             )],
@@ -816,7 +814,10 @@ mod tests {
         assert_eq!(
             test_errors[0],
             SubmodelTestInputResolutionError::VariableResolution(
-                VariableResolutionError::undefined_parameter(Identifier::new("undefined_var"),)
+                VariableResolutionError::undefined_parameter(WithSpan::new(
+                    Identifier::new("undefined_var"),
+                    undefined_var_span
+                ),),
             ),
         );
 
@@ -827,6 +828,8 @@ mod tests {
     #[test]
     fn test_resolve_submodel_tests_mixed_success_and_error() {
         // create the submodel tests with mixed success and error cases
+        let undefined_var = helper::create_identifier_variable("undefined_var");
+        let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let input_list1 = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param1",
@@ -840,11 +843,7 @@ mod tests {
         let input_list2 = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param2",
-                helper::create_variable_expr_node(
-                    helper::create_identifier_variable("undefined_var"),
-                    0,
-                    13,
-                ),
+                helper::create_variable_expr_node(undefined_var, 0, 13),
                 0,
                 13,
             )],
@@ -881,7 +880,10 @@ mod tests {
         assert_eq!(
             test_errors[0],
             SubmodelTestInputResolutionError::VariableResolution(
-                VariableResolutionError::undefined_parameter(Identifier::new("undefined_var"),)
+                VariableResolutionError::undefined_parameter(WithSpan::new(
+                    Identifier::new("undefined_var"),
+                    undefined_var_span
+                ),),
             ),
         );
 

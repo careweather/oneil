@@ -124,6 +124,7 @@ pub fn submodel_test_resolution_error_to_string(
 ///
 /// A string containing a user-friendly error message for the variable resolution error.
 pub fn variable_resolution_error_to_string(error: &VariableResolutionError) -> String {
+    todo!("improve error messages");
     match error {
         VariableResolutionError::ModelHasError(model_path) => {
             format!("model `{:?}` has errors", model_path)

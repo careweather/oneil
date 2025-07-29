@@ -402,9 +402,15 @@ pub enum VariableResolutionError {
     /// The resolution of a submodel that is referenced by a variable has failed.
     SubmodelResolutionFailed(Identifier),
     /// The parameter is not defined in the current context.
-    UndefinedParameter(Option<ModelPath>, Identifier),
+    ///
+    /// Note that the span associated with the identifier is the span of the identifier
+    /// in the expression that references the parameter.
+    UndefinedParameter(Option<ModelPath>, WithSpan<Identifier>),
     /// The submodel is not defined in the current context.
-    UndefinedSubmodel(Option<ModelPath>, Identifier),
+    ///
+    /// Note that the span associated with the identifier is the span of the identifier
+    /// in the expression that references the submodel.
+    UndefinedSubmodel(Option<ModelPath>, WithSpan<Identifier>),
 }
 
 impl VariableResolutionError {
@@ -457,7 +463,7 @@ impl VariableResolutionError {
     /// # Returns
     ///
     /// A new `VariableResolutionError::UndefinedParameter` variant.
-    pub fn undefined_parameter(identifier: Identifier) -> Self {
+    pub fn undefined_parameter(identifier: WithSpan<Identifier>) -> Self {
         Self::UndefinedParameter(None, identifier)
     }
 
@@ -473,7 +479,7 @@ impl VariableResolutionError {
     /// A new `VariableResolutionError::UndefinedParameter` variant.
     pub fn undefined_parameter_in_submodel(
         submodel_path: ModelPath,
-        identifier: Identifier,
+        identifier: WithSpan<Identifier>,
     ) -> Self {
         Self::UndefinedParameter(Some(submodel_path), identifier)
     }
@@ -487,7 +493,7 @@ impl VariableResolutionError {
     /// # Returns
     ///
     /// A new `VariableResolutionError::UndefinedSubmodel` variant.
-    pub fn undefined_submodel(identifier: Identifier) -> Self {
+    pub fn undefined_submodel(identifier: WithSpan<Identifier>) -> Self {
         Self::UndefinedSubmodel(None, identifier)
     }
 
@@ -503,7 +509,7 @@ impl VariableResolutionError {
     /// A new `VariableResolutionError::UndefinedSubmodel` variant.
     pub fn undefined_submodel_in_submodel(
         parent_model_path: ModelPath,
-        identifier: Identifier,
+        identifier: WithSpan<Identifier>,
     ) -> Self {
         Self::UndefinedSubmodel(Some(parent_model_path), identifier)
     }
