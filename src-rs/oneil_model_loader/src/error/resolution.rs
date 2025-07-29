@@ -182,6 +182,14 @@ impl ImportResolutionError {
         Self
     }
 
+    /// Converts the import resolution error to a string representation.
+    ///
+    /// This method delegates to the display module to format the error message
+    /// in a user-friendly way.
+    ///
+    /// # Returns
+    ///
+    /// A string representation of the import resolution error.
     pub fn to_string(&self) -> String {
         display::import_resolution_error_to_string(self)
     }
@@ -237,6 +245,14 @@ impl SubmodelResolutionError {
         Self::UndefinedSubmodel(Some(parent_model_path), identifier)
     }
 
+    /// Converts the submodel resolution error to a string representation.
+    ///
+    /// This method delegates to the display module to format the error message
+    /// in a user-friendly way.
+    ///
+    /// # Returns
+    ///
+    /// A string representation of the submodel resolution error.
     pub fn to_string(&self) -> String {
         display::submodel_resolution_error_to_string(self)
     }
@@ -288,6 +304,14 @@ impl ParameterResolutionError {
         Self::VariableResolution(error)
     }
 
+    /// Converts the parameter resolution error to a string representation.
+    ///
+    /// This method delegates to the display module to format the error message
+    /// in a user-friendly way.
+    ///
+    /// # Returns
+    ///
+    /// A string representation of the parameter resolution error.
     pub fn to_string(&self) -> String {
         display::parameter_resolution_error_to_string(self)
     }
@@ -326,12 +350,25 @@ impl ModelTestResolutionError {
         Self(error)
     }
 
-    pub fn to_string(&self) -> String {
-        display::model_test_resolution_error_to_string(self)
-    }
-
+    /// Returns a reference to the variable resolution error that occurred.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the variable resolution error.
     pub fn get_error(&self) -> &VariableResolutionError {
         &self.0
+    }
+
+    /// Converts the model test resolution error to a string representation.
+    ///
+    /// This method delegates to the display module to format the error message
+    /// in a user-friendly way.
+    ///
+    /// # Returns
+    ///
+    /// A string representation of the model test resolution error.
+    pub fn to_string(&self) -> String {
+        display::model_test_resolution_error_to_string(self)
     }
 }
 
@@ -371,6 +408,14 @@ impl SubmodelTestInputResolutionError {
         Self::VariableResolution(error)
     }
 
+    /// Converts the submodel test input resolution error to a string representation.
+    ///
+    /// This method delegates to the display module to format the error message
+    /// in a user-friendly way.
+    ///
+    /// # Returns
+    ///
+    /// A string representation of the submodel test input resolution error.
     pub fn to_string(&self) -> String {
         display::submodel_test_resolution_error_to_string(self)
     }
@@ -514,6 +559,14 @@ impl VariableResolutionError {
         Self::UndefinedSubmodel(Some(parent_model_path), identifier)
     }
 
+    /// Converts the variable resolution error to a string representation.
+    ///
+    /// This method delegates to the display module to format the error message
+    /// in a user-friendly way.
+    ///
+    /// # Returns
+    ///
+    /// A string representation of the variable resolution error.
     pub fn to_string(&self) -> String {
         display::variable_resolution_error_to_string(self)
     }
