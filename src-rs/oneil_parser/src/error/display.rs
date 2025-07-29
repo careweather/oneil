@@ -1,6 +1,9 @@
-use crate::error::reason::{
-    DeclKind, ExpectKind, ExprKind, FromKind, ImportKind, IncompleteKind, ParameterKind,
-    ParserErrorReason, SectionKind, TestKind, UnitKind, UseKind,
+use crate::{
+    error::reason::{
+        DeclKind, ExpectKind, ExprKind, FromKind, ImportKind, IncompleteKind, ParameterKind,
+        ParserErrorReason, SectionKind, TestKind, UnitKind, UseKind,
+    },
+    token::error::{IncompleteKind as TokenIncompleteKind, TokenErrorKind},
 };
 
 pub fn reason_to_string(reason: &ParserErrorReason) -> String {
@@ -20,12 +23,13 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                 DeclKind::Import(import_kind) => match import_kind {
                     ImportKind::MissingPath => "expected path after `import`".to_string(),
                     ImportKind::MissingEndOfLine => {
+                        // TODO: maybe these kinds of newline errors should say "unexpected character" instead?
                         "import declaration must be followed by a new line".to_string()
                     }
                 },
                 DeclKind::From(from_kind) => match from_kind {
-                    FromKind::MissingPath => "expected path after `from`".to_string(),
-                    FromKind::MissingUse => "expected `use` after path".to_string(),
+                    FromKind::MissingPath => "expected model path after `from`".to_string(),
+                    FromKind::MissingUse => "expected `use` after model path".to_string(),
                     FromKind::MissingUseModel => "expected model after `use`".to_string(),
                     FromKind::MissingAs => "expected `as` after model".to_string(),
                     FromKind::MissingAlias => "expected model alias after `as`".to_string(),
@@ -34,16 +38,20 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                     }
                 },
                 DeclKind::Use(use_kind) => match use_kind {
-                    UseKind::MissingPath => "expected path after `use`".to_string(),
-                    UseKind::MissingAs => "expected `as` after path".to_string(),
+                    UseKind::MissingPath => "expected model path after `use`".to_string(),
+                    UseKind::MissingAs => "expected `as` after model path".to_string(),
                     UseKind::MissingAlias => "expected model alias after `as`".to_string(),
                     UseKind::MissingEndOfLine => {
                         "use declaration must be followed by a new line".to_string()
                     }
                 },
                 DeclKind::ModelInputMissingEquals => "expected `=`".to_string(),
-                DeclKind::ModelInputMissingValue => "expected value after `=`".to_string(),
-                DeclKind::ModelPathMissingSubcomponent => "expected model after `.`".to_string(),
+                DeclKind::ModelInputMissingValue => {
+                    "expected test input value after `=`".to_string()
+                }
+                DeclKind::ModelPathMissingSubcomponent => {
+                    "expected submodel name after `.`".to_string()
+                }
             },
             IncompleteKind::Expr(expr_kind) => match expr_kind {
                 ExprKind::BinaryOpMissingSecondOperand { operator } => {
@@ -77,7 +85,7 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                     format!("expected operand after `{}`", operator_str)
                 }
                 ExprKind::VariableMissingParentModel => {
-                    "expected parent model after `.`".to_string()
+                    "expected parent model name after `.`".to_string()
                 }
             },
             IncompleteKind::Section(section_kind) => match section_kind {
@@ -87,28 +95,28 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                 }
             },
             IncompleteKind::Parameter(parameter_kind) => match parameter_kind {
-                ParameterKind::MissingIdentifier => "expected identifier".to_string(),
+                ParameterKind::MissingIdentifier => "expected parameter identifier".to_string(),
                 ParameterKind::MissingEqualsSign => "expected `=`".to_string(),
-                ParameterKind::MissingValue => "expected value after `=`".to_string(),
+                ParameterKind::MissingValue => "expected parameter value after `=`".to_string(),
                 ParameterKind::MissingEndOfLine => {
                     "parameter must be followed by a new line".to_string()
                 }
                 ParameterKind::MissingUnit => "expected unit after `:`".to_string(),
-                ParameterKind::LimitMissingMin => "expected minimum value".to_string(),
+                ParameterKind::LimitMissingMin => "expected limit minimum value".to_string(),
                 ParameterKind::LimitMissingComma => "expected `,`".to_string(),
-                ParameterKind::LimitMissingMax => "expected maximum value".to_string(),
-                ParameterKind::LimitMissingValues => "expected values".to_string(),
-                ParameterKind::PiecewiseMissingExpr => "expected expression".to_string(),
+                ParameterKind::LimitMissingMax => "expected limit maximum value".to_string(),
+                ParameterKind::LimitMissingValues => "expected limit values".to_string(),
+                ParameterKind::PiecewiseMissingExpr => "expected piecewise expression".to_string(),
                 ParameterKind::PiecewiseMissingIf => "expected `if`".to_string(),
                 ParameterKind::PiecewiseMissingIfExpr => {
-                    "piecewise missing conditional expression after `if`".to_string()
+                    "expected piecewise conditional expression after `if`".to_string()
                 }
             },
             IncompleteKind::Test(test_kind) => match test_kind {
                 TestKind::MissingColon => "expected `:`".to_string(),
                 TestKind::MissingExpr => "expected test expression".to_string(),
                 TestKind::MissingEndOfLine => "test must be followed by a new line".to_string(),
-                TestKind::MissingInputs => "expected inputs in `{}`".to_string(),
+                TestKind::MissingInputs => "expected test inputs in `{}`".to_string(),
             },
             IncompleteKind::Unit(unit_kind) => match unit_kind {
                 UnitKind::MissingSecondTerm { operator } => {
@@ -126,12 +134,37 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
             IncompleteKind::UnclosedParen => "unclosed `(`".to_string(),
         },
         ParserErrorReason::UnexpectedToken => "unexpected token".to_string(),
-        ParserErrorReason::TokenError(token_error_kind) => {
-            format!(
+        ParserErrorReason::TokenError(token_error_kind) => match token_error_kind {
+            TokenErrorKind::Incomplete(incomplete_kind) => match incomplete_kind {
+                TokenIncompleteKind::UnclosedNote {
+                    delimiter_start_offset: _,
+                    delimiter_end_offset: _,
+                } => {
+                    // TODO: this error needs context indicating where the note opened
+                    format!("unclosed note")
+                }
+                TokenIncompleteKind::UnclosedString {
+                    open_quote_offset: _,
+                } => {
+                    // TODO: this error needs context indicating where the string opened
+                    format!("unclosed string")
+                }
+                TokenIncompleteKind::InvalidDecimalPart {
+                    decimal_point_offset: _,
+                } => {
+                    // TODO: this error needs context indicating where the decimal point is
+                    format!("invalid decimal part")
+                }
+                TokenIncompleteKind::InvalidExponentPart { e_offset: _ } => {
+                    // TODO: this error needs context indicating where the exponent part is
+                    format!("invalid exponent part")
+                }
+            },
+            _ => format!(
                 "unexpected token error `{:?}`. please submit an issue at https://github.com/oneil-lang/oneil/issues",
                 token_error_kind
-            )
-        }
+            ),
+        },
         ParserErrorReason::NomError(error_kind) => {
             format!(
                 "unexpected nom parser error `{:?}`. please submit an issue at https://github.com/oneil-lang/oneil/issues",

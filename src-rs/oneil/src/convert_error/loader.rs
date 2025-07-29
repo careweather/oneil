@@ -232,4 +232,5 @@ fn convert_variable_resolution_error(
 //
 // Usually, this is because the error is a propagated error from another error,
 // such as `ImportResolutionError` or `SubmodelResolutionError::ModelHasError`.
+// TODO: add an option to convert *all* errors, don't ignore any
 pub fn ignore_error() {}
