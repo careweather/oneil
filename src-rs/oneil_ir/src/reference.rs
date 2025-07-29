@@ -111,11 +111,11 @@ impl ModelPath {
         let mut path = path.as_ref().to_path_buf();
 
         match path.extension() {
-            Some(ext) => panic!(
+            Some(ext) if ext != "on" => panic!(
                 "Model paths must not have an extension other than .on: '{:?}'",
                 ext
             ),
-            None => {
+            _ => {
                 path.set_extension("on");
                 Self(path)
             }
@@ -213,11 +213,11 @@ impl PythonPath {
     /// ```
     pub fn new(mut path: PathBuf) -> Self {
         match path.extension() {
-            Some(ext) => panic!(
+            Some(ext) if ext != "py" => panic!(
                 "Python paths must not have an extension other than .py: '{:?}'",
                 ext
             ),
-            None => {
+            _ => {
                 path.set_extension("py");
                 Self(path)
             }
