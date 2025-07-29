@@ -1,12 +1,11 @@
 use std::{fs, path::Path};
 
-use oneil_ir::reference::{Identifier, ModelPath, PythonPath};
+use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, ImportResolutionError, LoadError, ParameterResolutionError,
-        ResolutionErrors, SubmodelResolutionError, SubmodelTestInputResolutionError,
-        VariableResolutionError,
+        CircularDependencyError, LoadError, ParameterResolutionError, ResolutionErrors,
+        SubmodelResolutionError, SubmodelTestInputResolutionError, VariableResolutionError,
     },
 };
 
@@ -108,7 +107,7 @@ fn convert_resolution_errors(
     let path = model_path.as_ref();
 
     let source = fs::read_to_string(path);
-    let source = match source {
+    let source = match &source {
         Ok(source) => Some(source.as_str()),
         Err(error) => {
             let file_error = file::convert(path, &error);
@@ -118,7 +117,7 @@ fn convert_resolution_errors(
     };
 
     // convert import errors
-    for (python_path, import_error) in resolution_errors.get_import_errors() {
+    for (_python_path, _import_error) in resolution_errors.get_import_errors() {
         // These are intentionally ignored because they indicate that a python
         // file failed to resolve correctly. These errors should be indicated
         // by corresponding import errors in `convert_import_error`.
@@ -126,15 +125,15 @@ fn convert_resolution_errors(
     }
 
     // convert submodel resolution errors
-    for (identifier, submodel_resolution_error) in
+    for (_identifier, submodel_resolution_error) in
         resolution_errors.get_submodel_resolution_errors()
     {
         match submodel_resolution_error {
-            SubmodelResolutionError::ModelHasError(model_path) => {
+            SubmodelResolutionError::ModelHasError(_model_path) => {
                 ignore_error();
             }
 
-            SubmodelResolutionError::UndefinedSubmodel(model_path, identifier) => {
+            SubmodelResolutionError::UndefinedSubmodel(_model_path, identifier) => {
                 let message = submodel_resolution_error.to_string();
                 let start = identifier.span().start();
                 let length = identifier.span().length();
@@ -146,12 +145,12 @@ fn convert_resolution_errors(
     }
 
     // convert parameter resolution errors
-    for (identifier, parameter_resolution_errors) in
+    for (_identifier, parameter_resolution_errors) in
         resolution_errors.get_parameter_resolution_errors()
     {
         for parameter_resolution_error in parameter_resolution_errors {
             match parameter_resolution_error {
-                ParameterResolutionError::CircularDependency(identifiers) => {
+                ParameterResolutionError::CircularDependency(_identifiers) => {
                     // because this is a circular dependency, we don't have a specific
                     // location to report within the model
                     let message = parameter_resolution_error.to_string();
@@ -172,7 +171,8 @@ fn convert_resolution_errors(
     }
 
     // convert model test resolution errors
-    for (test_index, test_resolution_errors) in resolution_errors.get_model_test_resolution_errors()
+    for (_test_index, test_resolution_errors) in
+        resolution_errors.get_model_test_resolution_errors()
     {
         for test_resolution_error in test_resolution_errors {
             let error =
@@ -185,7 +185,7 @@ fn convert_resolution_errors(
     }
 
     // convert submodel test input resolution errors
-    for (submodel_identifier, submodel_test_input_resolution_errors) in
+    for (_submodel_identifier, submodel_test_input_resolution_errors) in
         resolution_errors.get_submodel_test_input_resolution_errors()
     {
         for submodel_test_input_resolution_error in submodel_test_input_resolution_errors {
