@@ -11,5 +11,5 @@ section My Section
 import pyfile
 use submodel3 as s3
 
-Z: z = x - Y
+Z: z = x - y
 
