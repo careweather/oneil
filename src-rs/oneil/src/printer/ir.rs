@@ -452,12 +452,37 @@ fn print_model_tests(
 
 /// Prints a single model test
 fn print_model_test(test: &ModelTest, writer: &mut impl Write, indent: usize) -> io::Result<()> {
-    // Print test details - this would depend on the ModelTest structure
+    // Print trace level
     writeln!(
         writer,
-        "{}    └── [Model test details]",
-        "  ".repeat(indent)
+        "{}    ├── Trace Level: {:?}",
+        "  ".repeat(indent),
+        test.trace_level()
     )?;
+
+    // Print inputs
+    let inputs = test.inputs();
+    if inputs.is_empty() {
+        writeln!(writer, "{}    ├── Inputs: [none]", "  ".repeat(indent))?;
+    } else {
+        writeln!(writer, "{}    ├── Inputs:", "  ".repeat(indent))?;
+        for (i, input) in inputs.iter().enumerate() {
+            let is_last = i == inputs.len() - 1;
+            let prefix = if is_last { "└──" } else { "├──" };
+            writeln!(
+                writer,
+                "{}        {}Input: \"{}\"",
+                "  ".repeat(indent),
+                prefix,
+                input.as_str()
+            )?;
+        }
+    }
+
+    // Print test expression
+    writeln!(writer, "{}    └── Test Expression:", "  ".repeat(indent))?;
+    print_expression(test.test_expr(), writer, indent + 2)?;
+
     Ok(())
 }
 
@@ -488,11 +513,33 @@ fn print_submodel_test(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    // Print test details - this would depend on the SubmodelTest structure
+    // Print submodel name
     writeln!(
         writer,
-        "{}    └── [Submodel test details]",
-        "  ".repeat(indent)
+        "{}    ├── Submodel: \"{}\"",
+        "  ".repeat(indent),
+        test.submodel_name().as_str()
     )?;
+
+    // Print inputs
+    let inputs = test.inputs();
+    if inputs.is_empty() {
+        writeln!(writer, "{}    └── Inputs: [none]", "  ".repeat(indent))?;
+    } else {
+        writeln!(writer, "{}    ├── Inputs:", "  ".repeat(indent))?;
+        for (i, (input_id, input_expr)) in inputs.iter().enumerate() {
+            let is_last = i == inputs.len() - 1;
+            let prefix = if is_last { "└──" } else { "├──" };
+            writeln!(
+                writer,
+                "{}        {}Input \"{}\":",
+                "  ".repeat(indent),
+                prefix,
+                input_id.as_str()
+            )?;
+            print_expression(input_expr, writer, indent + 4)?;
+        }
+    }
+
     Ok(())
 }
