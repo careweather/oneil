@@ -219,7 +219,7 @@ impl SubmodelTest {
     ///     SubmodelTestInputs::new(HashMap::new())
     /// );
     ///
-    /// assert_eq!(test.submodel_name().value(), "my_submodel");
+    /// assert_eq!(test.submodel_name().as_str(), "my_submodel");
     /// ```
     pub fn submodel_name(&self) -> &Identifier {
         &self.submodel_name

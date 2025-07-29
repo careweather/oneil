@@ -109,7 +109,7 @@ impl Span {
 ///
 /// let span = Span::new(10, 5);
 /// let value = WithSpan::new("hello", span);
-/// assert_eq!(value.value(), "hello");
+/// assert_eq!(value.value(), &"hello");
 /// assert_eq!(value.span().start(), 10);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -180,7 +180,7 @@ impl<T> WithSpan<T> {
     /// use oneil_ir::span::{Span, WithSpan};
     ///
     /// let wrapped = WithSpan::new("hello", Span::new(0, 5));
-    /// assert_eq!(wrapped.value(), "hello");
+    /// assert_eq!(wrapped.value(), &"hello");
     /// ```
     pub fn value(&self) -> &T {
         &self.value

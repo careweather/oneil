@@ -33,8 +33,8 @@ impl Identifier {
     /// let id1 = Identifier::new("radius");
     /// let id2 = Identifier::new(String::from("area"));
     ///
-    /// assert_eq!(id1.value(), "radius");
-    /// assert_eq!(id2.value(), "area");
+    /// assert_eq!(id1.as_str(), "radius");
+    /// assert_eq!(id2.as_str(), "area");
     /// ```
     pub fn new(identifier: impl AsRef<str>) -> Self {
         Self(identifier.as_ref().to_string())
