@@ -53,18 +53,18 @@ mod resolver;
 ///
 /// Returns the updated model collection builder containing all loaded models and any errors.
 ///
-/// # Errors
+/// # Error Handling
 ///
 /// The function handles various error conditions:
 ///
 /// - **Circular dependencies**: Returns early with a circular dependency error
-/// - **Parse errors**: Adds parse errors to the builder and returns early
-/// - **Resolution errors**: Collects all resolution errors and adds them to the builder
+/// - **Parse errors**: Adds parse errors to the builder and returns early without attempting recovery
+/// - **Resolution errors**: Collects all resolution errors and adds them to the builder, but continues processing
 ///
 /// # Circular Dependency Detection
 ///
 /// The function detects circular dependencies by maintaining a loading stack. If a model
-/// appears in the stack while it's being loaded, a circular dependency is detected:
+/// appears in the stack while it's being loaded, a circular dependency is detected.
 ///
 /// # Model Visitation
 ///
@@ -203,6 +203,31 @@ where
 /// - `Vec<ast::declaration::UseModel>` - All use model declarations
 /// - `Vec<ast::Parameter>` - All parameter declarations
 /// - `Vec<ast::Test>` - All test declarations
+/// Splits a model AST into its constituent declaration types.
+///
+/// This function processes the declarations in a model AST and categorizes them into
+/// separate collections for imports, use models, parameters, and tests. It processes
+/// both top-level declarations and declarations within sections.
+///
+/// # Arguments
+///
+/// * `model_ast` - The parsed model AST containing all declarations
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * `Vec<&ImportNode>` - All import declarations from the model
+/// * `Vec<&UseModelNode>` - All use model declarations from the model
+/// * `Vec<&ParameterNode>` - All parameter declarations from the model
+/// * `Vec<&TestNode>` - All test declarations from the model
+///
+/// # Behavior
+///
+/// The function processes declarations in the following order:
+/// 1. Top-level declarations in the model
+/// 2. Declarations within each section of the model
+///
+/// This separation is necessary for the different processing steps in model loading.
 fn split_model_ast(
     model_ast: &ast::model::ModelNode,
 ) -> (
