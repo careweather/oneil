@@ -115,6 +115,15 @@ impl Model {
         self.submodels.get(identifier)
     }
 
+    /// Returns a reference to all submodels in this model.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the mapping of submodel identifiers to their corresponding model paths.
+    pub fn get_submodels(&self) -> &HashMap<Identifier, WithSpan<ModelPath>> {
+        &self.submodels
+    }
+
     /// Looks up a parameter by its identifier.
     ///
     /// Returns `Some(Parameter)` if the parameter exists, `None` otherwise.
@@ -124,6 +133,15 @@ impl Model {
     /// * `identifier` - The identifier of the parameter to look up
     pub fn get_parameter(&self, identifier: &Identifier) -> Option<&Parameter> {
         self.parameters.get(identifier)
+    }
+
+    /// Returns a reference to all parameters in this model.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the parameter collection.
+    pub fn get_parameters(&self) -> &ParameterCollection {
+        &self.parameters
     }
 
     /// Returns a reference to all model tests in this model.
@@ -259,5 +277,28 @@ impl ModelCollection {
             .values()
             .flat_map(|model| model.python_imports.iter().map(|ws| &**ws))
             .collect()
+    }
+
+    /// Returns all models in the collection.
+    ///
+    /// This method provides access to all models in the collection.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the mapping of model paths to their corresponding models.
+    pub fn get_models(&self) -> &HashMap<ModelPath, Model> {
+        &self.models
+    }
+
+    /// Returns the initial models (entry points).
+    ///
+    /// Initial models are the entry points for the model collection,
+    /// typically representing the main models that were originally loaded.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the set of initial model paths.
+    pub fn get_initial_models(&self) -> &HashSet<ModelPath> {
+        &self.initial_models
     }
 }

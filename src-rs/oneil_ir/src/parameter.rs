@@ -168,6 +168,51 @@ impl Parameter {
     pub fn dependencies(&self) -> &HashSet<Identifier> {
         &self.dependencies
     }
+
+    /// Returns the identifier of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the parameter's identifier.
+    pub fn identifier(&self) -> &IdentifierWithSpan {
+        &self.ident
+    }
+
+    /// Returns the value of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the parameter's value.
+    pub fn value(&self) -> &ParameterValue {
+        &self.value
+    }
+
+    /// Returns the limits of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the parameter's limits.
+    pub fn limits(&self) -> &Limits {
+        &self.limits
+    }
+
+    /// Returns whether this parameter is a performance parameter.
+    ///
+    /// # Returns
+    ///
+    /// `true` if this parameter is a performance parameter, `false` otherwise.
+    pub fn is_performance(&self) -> bool {
+        self.is_performance
+    }
+
+    /// Returns the trace level of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// The trace level for this parameter.
+    pub fn trace_level(&self) -> &TraceLevel {
+        &self.trace_level
+    }
 }
 
 /// The value of a parameter, which can be either a simple expression or a piecewise function.
@@ -263,6 +308,24 @@ impl PiecewiseExpr {
     /// ```
     pub fn new(expr: ExprWithSpan, if_expr: ExprWithSpan) -> Self {
         Self { expr, if_expr }
+    }
+
+    /// Returns the expression value.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the expression that defines the value.
+    pub fn expr(&self) -> &ExprWithSpan {
+        &self.expr
+    }
+
+    /// Returns the condition expression.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the condition expression.
+    pub fn if_expr(&self) -> &ExprWithSpan {
+        &self.if_expr
     }
 }
 
