@@ -40,9 +40,15 @@ fn main() -> io::Result<()> {
                 no_colors,
             } => {
                 let use_colors = !no_colors;
-                // TODO: have a separate out/err writer
-                let mut writer = std::io::stdout();
-                let mut printer = printer::Printer::new(use_colors, print_debug, &mut writer);
+
+                let mut stdout_writer = std::io::stdout();
+                let mut stderr_writer = std::io::stderr();
+                let mut printer = printer::Printer::new(
+                    use_colors,
+                    print_debug,
+                    &mut stdout_writer,
+                    &mut stderr_writer,
+                );
 
                 let ast = file_parser::FileLoader.parse_ast(&file);
                 match ast {
@@ -71,9 +77,15 @@ fn main() -> io::Result<()> {
                 no_colors,
             } => {
                 let use_colors = !no_colors;
-                // TODO: have a separate out/err writer
-                let mut writer = std::io::stdout();
-                let mut printer = printer::Printer::new(use_colors, print_debug, &mut writer);
+
+                let mut stdout_writer = std::io::stdout();
+                let mut stderr_writer = std::io::stderr();
+                let mut printer = printer::Printer::new(
+                    use_colors,
+                    print_debug,
+                    &mut stdout_writer,
+                    &mut stderr_writer,
+                );
 
                 let model_collection =
                     oneil_model_loader::load_model(file, &file_parser::FileLoader);

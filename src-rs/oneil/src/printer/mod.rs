@@ -40,21 +40,25 @@ use crate::convert_error::Error;
 /// let mut printer = Printer::new(true, false, &mut writer);
 /// // Use printer to output formatted data
 /// ```
-pub struct Printer<'a, W>
+pub struct Printer<'a, W1, W2>
 where
-    W: Write,
+    W1: Write,
+    W2: Write,
 {
     /// Color choice configuration for output formatting
     color_choice: ColorChoice,
     /// Whether to print in debug format (raw representation)
     print_debug: bool,
     /// The writer to output formatted data to
-    writer: &'a mut W,
+    writer: &'a mut W1,
+    /// The writer to output error messages to
+    error_writer: &'a mut W2,
 }
 
-impl<'a, W> Printer<'a, W>
+impl<'a, W1, W2> Printer<'a, W1, W2>
 where
-    W: Write,
+    W1: Write,
+    W2: Write,
 {
     /// Creates a new printer with the specified configuration
     ///
@@ -69,7 +73,12 @@ where
     /// # Returns
     ///
     /// A new `Printer` instance configured with the specified options.
-    pub fn new(use_colors: bool, print_debug: bool, writer: &'a mut W) -> Self {
+    pub fn new(
+        use_colors: bool,
+        print_debug: bool,
+        writer: &'a mut W1,
+        error_writer: &'a mut W2,
+    ) -> Self {
         let color_choice = if use_colors {
             ColorChoice::EnableColors
         } else {
@@ -80,6 +89,7 @@ where
             color_choice,
             print_debug,
             writer,
+            error_writer,
         }
     }
 
@@ -153,9 +163,9 @@ where
     /// Returns an error if writing to the underlying writer fails.
     pub fn print_error(&mut self, error: &Error) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "Error: {:?}", error)?;
+            writeln!(self.error_writer, "Error: {:?}", error)?;
         } else {
-            error::print(error, &self.color_choice, self.writer)?;
+            error::print(error, &self.color_choice, self.error_writer)?;
         }
 
         Ok(())
@@ -181,7 +191,7 @@ where
     pub fn print_errors(&mut self, errors: &[Error]) -> io::Result<()> {
         for error in errors {
             self.print_error(error)?;
-            writeln!(self.writer)?;
+            writeln!(self.error_writer)?;
         }
 
         Ok(())
