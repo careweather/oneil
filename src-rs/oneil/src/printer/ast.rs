@@ -403,12 +403,42 @@ fn print_unit_expression(
     writer: &mut impl Write,
     indent: usize,
 ) {
-    // This is a placeholder - implement based on UnitExpr structure
-    writeln!(
-        writer,
-        "{}UnitExpr: {:?}",
-        "  ".repeat(indent),
-        unit_expr.node_value()
-    )
-    .unwrap();
+    match unit_expr.node_value() {
+        oneil_ast::unit::UnitExpr::BinaryOp { op, left, right } => {
+            writeln!(
+                writer,
+                "{}BinaryOp: {:?}",
+                "  ".repeat(indent),
+                op.node_value()
+            )
+            .unwrap();
+            print_unit_expression(left, writer, indent + 2);
+            print_unit_expression(right, writer, indent + 2);
+        }
+        oneil_ast::unit::UnitExpr::Parenthesized { expr } => {
+            writeln!(writer, "{}Parenthesized:", "  ".repeat(indent)).unwrap();
+            print_unit_expression(expr, writer, indent + 2);
+        }
+        oneil_ast::unit::UnitExpr::Unit {
+            identifier,
+            exponent,
+        } => {
+            writeln!(
+                writer,
+                "{}Unit: \"{}\"",
+                "  ".repeat(indent),
+                identifier.node_value().as_str()
+            )
+            .unwrap();
+            if let Some(exp) = exponent {
+                writeln!(
+                    writer,
+                    "{}    └── Exponent: {}",
+                    "  ".repeat(indent),
+                    exp.node_value().value()
+                )
+                .unwrap();
+            }
+        }
+    }
 }
