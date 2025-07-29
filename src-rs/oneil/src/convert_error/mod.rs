@@ -70,33 +70,44 @@ pub struct ErrorLocation {
     offset: usize,
     line: usize,
     column: usize,
-    length: usize,
+    length: Option<usize>,
     line_source: String,
 }
 
 impl ErrorLocation {
-    pub fn from_source_and_offset(source: &str, offset: usize) -> Self {
-        Self::from_source_and_span(source, offset, 1)
-    }
-
-    pub fn from_source_and_span(source: &str, offset: usize, length: usize) -> Self {
-        assert!(length > 0, "length must be greater than 0");
-
+    fn new(source: &str, offset: usize, length: Option<usize>) -> Self {
         // offset must be less than or equal to the length of the source because
         // the offset may be at the very end of the source (after the last
         // character), and the length may be 1 (for a single character).
         assert!(
             offset <= source.len(),
-            "offset must be less than or equal to the length of the source"
+            "offset ({}) must be less than or equal to the length of the source ({})",
+            offset,
+            source.len()
         );
 
-        // offset + length must be less than or equal to the length of the source + 1
-        // because the offset may be at the very end of the source (after the last
-        // character), in which case the length must be 1 (for a single character).
-        assert!(
-            offset + length <= source.len() + 1,
-            "offset + length must be less than or equal to the length of the source + 1"
-        );
+        if let Some(length) = length {
+            assert!(length > 0, "length must not be 0");
+
+            // if an offset and length are provided, the offset + length must be
+            // less than or equal to the length of the source because including
+            // a length indicates that the error is attempting to highlight a
+            // range of characters, and the range must be within the source
+            assert!(
+                offset + length <= source.len(),
+                "offset + length ({}) must be less than or equal to the length of the source ({})",
+                offset + length,
+                source.len()
+            );
+
+            // make sure that there are no newlines in the range, since
+            // multi-line errors are not currently supported
+            assert!(
+                !source[offset..offset + length].contains('\n'),
+                "span ({:?}) must not contain newlines",
+                &source[offset..offset + length]
+            );
+        }
 
         // Find the offset of the first newline before the given offset.
         // The beginning of the file (offset 0) is assumed if there is no
@@ -125,6 +136,14 @@ impl ErrorLocation {
         }
     }
 
+    pub fn from_source_and_offset(source: &str, offset: usize) -> Self {
+        Self::new(source, offset, None)
+    }
+
+    pub fn from_source_and_span(source: &str, offset: usize, length: usize) -> Self {
+        Self::new(source, offset, Some(length))
+    }
+
     pub fn offset(&self) -> usize {
         self.offset
     }
@@ -138,7 +157,8 @@ impl ErrorLocation {
     }
 
     pub fn length(&self) -> usize {
-        self.length
+        // if no length is provided, assume a single character
+        self.length.unwrap_or(1)
     }
 
     pub fn line_source(&self) -> &str {
