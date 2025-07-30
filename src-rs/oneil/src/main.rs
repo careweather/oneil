@@ -3,7 +3,7 @@
 //! This module provides the main entry point for the Oneil CLI tool, which offers
 //! development utilities for parsing, analyzing, and debugging Oneil source files.
 
-use std::io;
+use std::io::{self, Write};
 
 use clap::Parser;
 use oneil_model_loader::FileLoader;
@@ -34,7 +34,7 @@ fn main() -> io::Result<()> {
     match cli.command {
         Commands::Dev { command } => match command {
             DevCommands::PrintAst {
-                file,
+                files,
                 display_partial,
                 print_debug,
                 no_colors,
@@ -50,20 +50,25 @@ fn main() -> io::Result<()> {
                     &mut stderr_writer,
                 );
 
-                let ast = file_parser::FileLoader.parse_ast(&file);
-                match ast {
-                    Ok(ast) => printer.print_ast(&ast)?,
-                    Err(LoadingError::InvalidFile(error)) => {
-                        let error = convert_error::file::convert(&file, &error);
-                        printer.print_error(&error)?;
-                    }
-                    Err(LoadingError::Parser(error_with_partial)) => {
-                        let errors =
-                            convert_error::parser::convert_all(&file, &error_with_partial.errors);
-                        printer.print_errors(&errors)?;
+                for file in files {
+                    writeln!(printer.writer(), "File: {}", file.display())?;
+                    let ast = file_parser::FileLoader.parse_ast(&file);
+                    match ast {
+                        Ok(ast) => printer.print_ast(&ast)?,
+                        Err(LoadingError::InvalidFile(error)) => {
+                            let error = convert_error::file::convert(&file, &error);
+                            printer.print_error(&error)?;
+                        }
+                        Err(LoadingError::Parser(error_with_partial)) => {
+                            let errors = convert_error::parser::convert_all(
+                                &file,
+                                &error_with_partial.errors,
+                            );
+                            printer.print_errors(&errors)?;
 
-                        if display_partial {
-                            printer.print_ast(&error_with_partial.partial_result)?;
+                            if display_partial {
+                                printer.print_ast(&error_with_partial.partial_result)?;
+                            }
                         }
                     }
                 }

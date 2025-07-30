@@ -47,9 +47,9 @@ pub enum DevCommands {
     /// Parses the specified file and displays its AST in a hierarchical tree format.
     /// Useful for understanding the structure of Oneil code and debugging parsing issues.
     PrintAst {
-        /// Path to the Oneil source file to parse and display
+        /// Path to the Oneil source file(s) to parse and display
         #[arg(value_name = "FILE")]
-        file: PathBuf,
+        files: Vec<PathBuf>,
 
         /// Display partial AST even if there are parsing errors
         ///

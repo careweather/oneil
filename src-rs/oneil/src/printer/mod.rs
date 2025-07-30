@@ -196,4 +196,28 @@ where
 
         Ok(())
     }
+
+    /// Returns a mutable reference to the standard output writer
+    ///
+    /// Provides access to the underlying writer used for standard output,
+    /// allowing direct writing operations when needed.
+    ///
+    /// # Returns
+    ///
+    /// Returns a mutable reference to the writer of type `W1`
+    pub fn writer(&mut self) -> &mut W1 {
+        self.writer
+    }
+
+    // /// Returns a mutable reference to the error writer
+    // ///
+    // /// Provides access to the underlying writer used for error messages,
+    // /// allowing direct writing operations when needed.
+    // ///
+    // /// # Returns
+    // ///
+    // /// Returns a mutable reference to the writer of type `W2`
+    // pub fn error_writer(&mut self) -> &mut W2 {
+    //     self.error_writer
+    // }
 }
