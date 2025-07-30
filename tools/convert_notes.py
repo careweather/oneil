@@ -82,14 +82,13 @@ def convert_file_content(content: str) -> str:
     groups = merge_groups(groups)
 
     for is_note_group, group in groups:
-        print(is_note_group, group)
         if is_note_group:
             note = process_note_group(group)
             result.append(format_note(note))
         else:
             result.extend(group)
     
-    return '\n'.join(result)
+    return '\n'.join(result) + '\n'
 
 def process_file(file_path: Path) -> None:
     """Process a single file, backing up the original and writing the converted content."""
