@@ -207,9 +207,19 @@ impl ErrorLocation {
             .rfind('\n')
             .map_or(0, |newline_idx| newline_idx + 1);
 
+        // Count the number of tabs before the offset
+        let num_tabs = source[line_start..offset]
+            .chars()
+            .filter(|c| *c == '\t')
+            .count();
+
         // The column is the offset of the error from the beginning of the line
         // (+ 1 because the column is 1-indexed)
-        let column = offset - line_start + 1;
+        let column_without_tabs = offset - line_start + 1;
+
+        // The tab characters are already counted as 1 character, so we need to
+        // add 3 spaces for each tab, for a total of 4 characters per tab
+        let column = column_without_tabs + num_tabs * 3;
 
         // Count the number of newlines before the offset to get the line number
         // (+ 1 because the line is 1-indexed)
@@ -217,6 +227,9 @@ impl ErrorLocation {
 
         // The line is 1-indexed, so we need to subtract 1 to get the correct line
         let line_source = source.lines().nth(line - 1).unwrap().to_string();
+
+        // Replace tabs with 4 spaces
+        let line_source = line_source.replace('\t', "    ");
 
         Self {
             offset,
