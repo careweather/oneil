@@ -13,6 +13,9 @@
 			"include": "#numbers"
 		},
 		{
+			"include": "#strings"
+		},
+		{
 			"include": "#operators"
 		},
 		{
@@ -45,7 +48,31 @@
 					]
 				},
 				{
-					"comment": "notes",
+					"comment": "single-line notes",
+					"name": "comment.line.documentation.oneil",
+					"begin": "^\\s*~(?!~)",
+					"end": "$",
+					"contentName": "meta.embedded.latex",
+					"patterns": [
+						{
+							"include": "text.tex.latex"
+						}
+					]
+				},
+				{
+					"comment": "multi-line notes",
+					"name": "comment.block.documentation.oneil",
+					"begin": "~~~~*",
+					"end": "~~~~*",
+					"contentName": "meta.embedded.latex",
+					"patterns": [
+						{
+							"include": "text.tex.latex"
+						}
+					]
+				},
+				{
+					"comment": "indented notes (deprecated)",
 					"name": "comment.block.documentation.oneil",
 					"begin": "^\\s+(?=[^{#\\s])",
 					"end": "$",
@@ -79,6 +106,14 @@
 				{
 					"name": "constant.numeric.integer.oneil",
 					"match": "\\b[0-9]+\\b"
+				}
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"name": "string.quoted.single.oneil",
+					"match": "\\'[^\\']*\\'"
 				}
 			]
 		},
