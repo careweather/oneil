@@ -11,6 +11,16 @@ use oneil_parser::error::ParserError;
 
 use crate::convert_error::{Error, convert_file_error};
 
+// TODO: maybe find a way to move conversions to the parser library?
+//       - move the `Error` type to its own crate?
+
+// TODO: add notes/hints for certain parser errors
+//       - ExpectDecl + string starts with `~` => "Notes are only allowed at the beginning of model files and sections and after parameters and tests"
+//       - ExpectDecl + string starts with `<ident> =` => "Parameters must have a label" (need to check on this one)
+//       - ExpectDecl + string starts with `.*:` => "Section labels must only contain the characters [insert allowed characters]"
+//       - string starts with `"` => "String literals use single quotes"
+//       - string starts with `.` => "Decimal literals are not allowed to start with a `.`, try adding a leading `0`" (need to check on this one)
+
 /// Converts all parser errors for a file into unified CLI errors
 ///
 /// Takes a file path and a collection of parser errors, then converts each one
