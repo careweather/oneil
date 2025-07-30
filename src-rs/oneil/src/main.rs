@@ -50,8 +50,12 @@ fn main() -> io::Result<()> {
                     &mut stderr_writer,
                 );
 
+                let is_multiple_files = files.len() > 1;
                 for file in files {
-                    writeln!(printer.writer(), "File: {}", file.display())?;
+                    if is_multiple_files {
+                        writeln!(printer.writer(), "===== {} =====", file.display())?;
+                    }
+
                     let ast = file_parser::FileLoader.parse_ast(&file);
                     match ast {
                         Ok(ast) => printer.print_ast(&ast)?,
