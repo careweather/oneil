@@ -22,10 +22,7 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
             IncompleteKind::Decl(decl_kind) => match decl_kind {
                 DeclKind::Import(import_kind) => match import_kind {
                     ImportKind::MissingPath => "expected path after `import`".to_string(),
-                    ImportKind::MissingEndOfLine => {
-                        // TODO: maybe these kinds of newline errors should say "unexpected character" instead?
-                        "import declaration must be followed by a new line".to_string()
-                    }
+                    ImportKind::MissingEndOfLine => "unexpected character".to_string(),
                 },
                 DeclKind::From(from_kind) => match from_kind {
                     FromKind::MissingPath => "expected model path after `from`".to_string(),
@@ -33,17 +30,13 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                     FromKind::MissingUseModel => "expected model after `use`".to_string(),
                     FromKind::MissingAs => "expected `as` after model".to_string(),
                     FromKind::MissingAlias => "expected model alias after `as`".to_string(),
-                    FromKind::MissingEndOfLine => {
-                        "from declaration must be followed by a new line".to_string()
-                    }
+                    FromKind::MissingEndOfLine => "unexpected character".to_string(),
                 },
                 DeclKind::Use(use_kind) => match use_kind {
                     UseKind::MissingPath => "expected model path after `use`".to_string(),
                     UseKind::MissingAs => "expected `as` after model path".to_string(),
                     UseKind::MissingAlias => "expected model alias after `as`".to_string(),
-                    UseKind::MissingEndOfLine => {
-                        "use declaration must be followed by a new line".to_string()
-                    }
+                    UseKind::MissingEndOfLine => "unexpected character".to_string(),
                 },
                 DeclKind::ModelInputMissingEquals => "expected `=`".to_string(),
                 DeclKind::ModelInputMissingValue => {
@@ -90,17 +83,13 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
             },
             IncompleteKind::Section(section_kind) => match section_kind {
                 SectionKind::MissingLabel => "expected label after `section`".to_string(),
-                SectionKind::MissingEndOfLine => {
-                    "section must be followed by a new line".to_string()
-                }
+                SectionKind::MissingEndOfLine => "unexpected character".to_string(),
             },
             IncompleteKind::Parameter(parameter_kind) => match parameter_kind {
                 ParameterKind::MissingIdentifier => "expected parameter identifier".to_string(),
                 ParameterKind::MissingEqualsSign => "expected `=`".to_string(),
                 ParameterKind::MissingValue => "expected parameter value after `=`".to_string(),
-                ParameterKind::MissingEndOfLine => {
-                    "parameter must be followed by a new line".to_string()
-                }
+                ParameterKind::MissingEndOfLine => "unexpected character".to_string(),
                 ParameterKind::MissingUnit => "expected unit after `:`".to_string(),
                 ParameterKind::LimitMissingMin => "expected limit minimum value".to_string(),
                 ParameterKind::LimitMissingComma => "expected `,`".to_string(),
@@ -115,7 +104,7 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
             IncompleteKind::Test(test_kind) => match test_kind {
                 TestKind::MissingColon => "expected `:`".to_string(),
                 TestKind::MissingExpr => "expected test expression".to_string(),
-                TestKind::MissingEndOfLine => "test must be followed by a new line".to_string(),
+                TestKind::MissingEndOfLine => "unexpected character".to_string(),
                 TestKind::MissingInputs => "expected test inputs in `{}`".to_string(),
             },
             IncompleteKind::Unit(unit_kind) => match unit_kind {
