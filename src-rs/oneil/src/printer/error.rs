@@ -109,8 +109,12 @@ fn get_location_line(error: &Error, color_choice: &ColorChoice) -> String {
     let arrow = color_choice.bold_blue("-->");
     let path = error.path().display();
     let location_line = match &error.location() {
+        // This format is technically less readable than " --> <path> (line <line>, column <column>)"
+        // but IDEs like VSCode and Cursor allow you to <ctrl> + click on the error to jump to the
+        // location in the file. In addition, the line and column will be displayed in the source
+        // code snippet.
         Some(location) => format!(
-            " {} {} (line {}, column {})",
+            " {} {}:{}:{}",
             arrow,
             path,
             location.line(),
