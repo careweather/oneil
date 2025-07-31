@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use oneil_error::Error;
+use oneil_error::OneilError;
 use oneil_parser::error::ParserError;
 
 use crate::convert_error::file::convert as convert_file_error;
@@ -44,7 +44,7 @@ use crate::convert_error::file::convert as convert_file_error;
 /// This function attempts to read the source file to provide source location
 /// information for the errors. If the file cannot be read, it still processes
 /// the parser errors but without location information.
-pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<Error> {
+pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<OneilError> {
     let mut errors = Vec::new();
 
     let file_contents = std::fs::read_to_string(path);
@@ -87,9 +87,9 @@ pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<Error> {
 ///
 /// If `file_contents` is `None`, the error will be created without source
 /// location information, but the error message will still be included.
-pub fn convert(path: &Path, file_contents: Option<&str>, error: &ParserError) -> Error {
+pub fn convert(path: &Path, file_contents: Option<&str>, error: &ParserError) -> OneilError {
     let message = error.to_string();
     let location = file_contents.map(|contents| (contents, error.error_offset));
 
-    Error::new_from_offset(path.to_path_buf(), message, location)
+    OneilError::new_from_offset(path.to_path_buf(), message, location)
 }

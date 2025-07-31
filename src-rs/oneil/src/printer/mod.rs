@@ -20,7 +20,7 @@ pub use util::ColorChoice;
 use std::io::{self, Write};
 
 use oneil_ast::Model as AstModel;
-use oneil_error::Error;
+use oneil_error::OneilError;
 use oneil_ir::model::ModelCollection as IrModelCollection;
 
 /// Main printer for formatting and displaying Oneil CLI output
@@ -160,7 +160,7 @@ where
     /// # Errors
     ///
     /// Returns an error if writing to the underlying writer fails.
-    pub fn print_error(&mut self, error: &Error) -> io::Result<()> {
+    pub fn print_error(&mut self, error: &OneilError) -> io::Result<()> {
         if self.print_debug {
             writeln!(self.error_writer, "Error: {:?}", error)?;
         } else {
@@ -187,7 +187,7 @@ where
     /// # Errors
     ///
     /// Returns an error if writing to the underlying writer fails.
-    pub fn print_errors(&mut self, errors: &[Error]) -> io::Result<()> {
+    pub fn print_errors(&mut self, errors: &[OneilError]) -> io::Result<()> {
         for error in errors {
             self.print_error(error)?;
             writeln!(self.error_writer)?;

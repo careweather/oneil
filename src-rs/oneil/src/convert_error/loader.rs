@@ -14,7 +14,7 @@
 
 use std::{fs, path::Path};
 
-use oneil_error::Error;
+use oneil_error::OneilError;
 use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
@@ -50,7 +50,7 @@ use crate::{
 /// 1. Import errors (Python file validation)
 /// 2. Circular dependency errors
 /// 3. Model errors (parsing and resolution)
-pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -> Vec<Error> {
+pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -> Vec<OneilError> {
     let mut errors = Vec::new();
 
     for (path, import_error) in error_map.get_import_errors() {
@@ -99,7 +99,7 @@ pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -
 ///
 /// Panics if the Python path and error path do not match, which should never happen
 /// in normal operation.
-fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> Error {
+fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> OneilError {
     assert_eq!(
         python_path.as_ref(),
         error.path(),
@@ -109,7 +109,7 @@ fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> 
     let path = error.path();
     let message = format!("python file '{}' does not exist", path.display());
 
-    Error::new(path.to_path_buf(), message)
+    OneilError::new(path.to_path_buf(), message)
 }
 
 /// Converts a circular dependency error into a unified CLI error format
@@ -129,7 +129,7 @@ fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> 
 fn convert_circular_dependency_error(
     model_path: &ModelPath,
     error: &CircularDependencyError,
-) -> Error {
+) -> OneilError {
     let path = model_path.as_ref();
 
     let circular_dependency = error.circular_dependency();
@@ -143,7 +143,7 @@ fn convert_circular_dependency_error(
         circular_dependency_str
     );
 
-    Error::new(path.to_path_buf(), message)
+    OneilError::new(path.to_path_buf(), message)
 }
 
 /// Converts model loading errors into unified CLI errors
@@ -160,7 +160,10 @@ fn convert_circular_dependency_error(
 /// # Returns
 ///
 /// Returns a vector of `Error` instances for all errors found in the model.
-fn convert_model_errors(model_path: &ModelPath, errors: &LoadError<LoadingError>) -> Vec<Error> {
+fn convert_model_errors(
+    model_path: &ModelPath,
+    errors: &LoadError<LoadingError>,
+) -> Vec<OneilError> {
     let path = model_path.as_ref();
 
     match errors {
@@ -203,7 +206,7 @@ fn convert_model_errors(model_path: &ModelPath, errors: &LoadError<LoadingError>
 fn convert_resolution_errors(
     model_path: &ModelPath,
     resolution_errors: &ResolutionErrors,
-) -> Vec<Error> {
+) -> Vec<OneilError> {
     let mut errors = Vec::new();
 
     let path = model_path.as_ref();
@@ -240,7 +243,7 @@ fn convert_resolution_errors(
                 let start = identifier.span().start();
                 let length = identifier.span().length();
                 let location = source.map(|source| (source, start, length));
-                let error = Error::new_from_span(path.to_path_buf(), message, location);
+                let error = OneilError::new_from_span(path.to_path_buf(), message, location);
                 errors.push(error);
             }
         }
@@ -256,7 +259,7 @@ fn convert_resolution_errors(
                     // because this is a circular dependency, we don't have a specific
                     // location to report within the model
                     let message = parameter_resolution_error.to_string();
-                    let error = Error::new(path.to_path_buf(), message);
+                    let error = OneilError::new(path.to_path_buf(), message);
                     errors.push(error);
                 }
 
@@ -333,7 +336,7 @@ fn convert_variable_resolution_error(
     path: &Path,
     source: Option<&str>,
     variable_resolution_error: &VariableResolutionError,
-) -> Option<Error> {
+) -> Option<OneilError> {
     match variable_resolution_error {
         VariableResolutionError::UndefinedParameter(_model_path, identifier)
         | VariableResolutionError::UndefinedSubmodel(_model_path, identifier) => {
@@ -341,7 +344,7 @@ fn convert_variable_resolution_error(
             let start = identifier.span().start();
             let length = identifier.span().length();
             let location = source.map(|source| (source, start, length));
-            let error = Error::new_from_span(path.to_path_buf(), message, location);
+            let error = OneilError::new_from_span(path.to_path_buf(), message, location);
             Some(error)
         }
         VariableResolutionError::ModelHasError(_model_path) => {

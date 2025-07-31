@@ -7,7 +7,7 @@
 
 use std::{io::Error as IoError, path::Path};
 
-use oneil_error::Error;
+use oneil_error::OneilError;
 
 /// Converts a file I/O error into a unified CLI error format
 ///
@@ -36,7 +36,7 @@ use oneil_error::Error;
 /// let error = file::convert(path, &io_error);
 /// assert!(error.message().contains("couldn't read"));
 /// ```
-pub fn convert(path: &Path, error: &IoError) -> Error {
+pub fn convert(path: &Path, error: &IoError) -> OneilError {
     let message = format!("couldn't read `{}` - {}", path.display(), error);
-    Error::new(path.to_path_buf(), message)
+    OneilError::new(path.to_path_buf(), message)
 }

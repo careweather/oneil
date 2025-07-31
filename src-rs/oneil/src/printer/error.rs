@@ -12,7 +12,7 @@
 
 use std::io::{self, Write};
 
-use oneil_error::Error;
+use oneil_error::OneilError;
 
 use crate::printer::ColorChoice;
 
@@ -34,7 +34,7 @@ use crate::printer::ColorChoice;
 /// # Errors
 ///
 /// Returns an error if writing to the writer fails.
-pub fn print(error: &Error, color_choice: &ColorChoice, writer: &mut impl Write) -> io::Result<()> {
+pub fn print(error: &OneilError, color_choice: &ColorChoice, writer: &mut impl Write) -> io::Result<()> {
     let error_string = error_to_string(error, color_choice);
     writeln!(writer, "{}", error_string)?;
 
@@ -54,7 +54,7 @@ pub fn print(error: &Error, color_choice: &ColorChoice, writer: &mut impl Write)
 /// # Returns
 ///
 /// Returns a formatted string representation of the error.
-fn error_to_string(error: &Error, color_choice: &ColorChoice) -> String {
+fn error_to_string(error: &OneilError, color_choice: &ColorChoice) -> String {
     let message_line = get_message_line(error, color_choice);
     let location_line = get_location_line(error, color_choice);
     let source_line = get_source_lines(error, color_choice);
@@ -80,7 +80,7 @@ fn error_to_string(error: &Error, color_choice: &ColorChoice) -> String {
 /// # Returns
 ///
 /// Returns the formatted error message line as a string.
-fn get_message_line(error: &Error, color_choice: &ColorChoice) -> String {
+fn get_message_line(error: &OneilError, color_choice: &ColorChoice) -> String {
     // message line
     // error: <message>
     let error_str = color_choice.bold_red("error");
@@ -103,7 +103,7 @@ fn get_message_line(error: &Error, color_choice: &ColorChoice) -> String {
 /// # Returns
 ///
 /// Returns the formatted location line as a string.
-fn get_location_line(error: &Error, color_choice: &ColorChoice) -> String {
+fn get_location_line(error: &OneilError, color_choice: &ColorChoice) -> String {
     // location line (line and column are optional)
     //  --> <path>
     // OR
@@ -143,7 +143,7 @@ fn get_location_line(error: &Error, color_choice: &ColorChoice) -> String {
 ///
 /// Returns `Some(String)` with the formatted source code snippet if location
 /// information is available, or `None` if no location information exists.
-fn get_source_lines(error: &Error, color_choice: &ColorChoice) -> Option<String> {
+fn get_source_lines(error: &OneilError, color_choice: &ColorChoice) -> Option<String> {
     // source line (if available)
     //   |
     // 1 | use foo bar
