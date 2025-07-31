@@ -22,7 +22,6 @@
 use oneil_ir::reference::ModelPath;
 
 pub mod collection;
-pub mod display;
 pub mod resolution;
 pub mod util;
 
