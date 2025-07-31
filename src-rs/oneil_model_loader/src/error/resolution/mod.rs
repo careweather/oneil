@@ -30,7 +30,6 @@ use std::collections::HashMap;
 
 use oneil_ir::{
     reference::{Identifier, PythonPath},
-    span::WithSpan,
     test::TestIndex,
 };
 
@@ -48,7 +47,7 @@ pub use variable::VariableResolutionError;
 /// for checking if any errors occurred and accessing the different error categories.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolutionErrors {
-    import_errors: HashMap<WithSpan<PythonPath>, ImportResolutionError>,
+    import_errors: HashMap<PythonPath, ImportResolutionError>,
     submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
     parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
     model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
@@ -70,7 +69,7 @@ impl ResolutionErrors {
     ///
     /// A new `ResolutionErrors` instance containing all the specified errors.
     pub fn new(
-        import_errors: HashMap<WithSpan<PythonPath>, ImportResolutionError>,
+        import_errors: HashMap<PythonPath, ImportResolutionError>,
         submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
         parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
         model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
@@ -107,7 +106,7 @@ impl ResolutionErrors {
     /// # Returns
     ///
     /// A reference to the HashMap containing Python paths and their associated import resolution errors.
-    pub fn get_import_errors(&self) -> &HashMap<WithSpan<PythonPath>, ImportResolutionError> {
+    pub fn get_import_errors(&self) -> &HashMap<PythonPath, ImportResolutionError> {
         &self.import_errors
     }
 

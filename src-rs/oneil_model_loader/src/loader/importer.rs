@@ -43,7 +43,7 @@ pub fn validate_imports<F>(
     file_loader: &F,
 ) -> (
     HashSet<WithSpan<PythonPath>>,
-    HashMap<WithSpan<PythonPath>, ImportResolutionError>,
+    HashMap<PythonPath, ImportResolutionError>,
     ModelCollectionBuilder<F::ParseError, F::PythonError>,
 )
 where
@@ -67,7 +67,7 @@ where
                 Err(error) => {
                     builder.add_import_error(python_path.clone(), error);
                     import_resolution_errors.insert(
-                        python_path_with_span,
+                        python_path.clone(),
                         ImportResolutionError::new(span, python_path),
                     );
                     (python_imports, import_resolution_errors, builder)
