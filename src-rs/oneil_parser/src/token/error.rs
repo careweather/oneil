@@ -149,8 +149,8 @@ pub enum IncompleteKind {
     UnclosedNote {
         /// The offset of the note delimiter start
         delimiter_start_offset: usize,
-        /// The offset of the note delimiter end
-        delimiter_end_offset: usize,
+        /// The length of the note delimiter
+        delimiter_length: usize,
     },
     /// Unclosed string
     UnclosedString {
@@ -242,10 +242,10 @@ impl TokenError {
     pub fn unclosed_note(delimiter_span: Span) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let delimiter_start_offset = delimiter_span.location_offset();
-            let delimiter_end_offset = delimiter_start_offset + delimiter_span.len();
+            let delimiter_length = delimiter_span.len();
             error.update_kind(TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote {
                 delimiter_start_offset,
-                delimiter_end_offset,
+                delimiter_length,
             }))
         }
     }

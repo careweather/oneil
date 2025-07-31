@@ -243,11 +243,11 @@ mod tests {
                             ParserErrorReason::TokenError(TokenErrorKind::Incomplete(
                                 IncompleteKind::UnclosedNote {
                                     delimiter_start_offset,
-                                    delimiter_end_offset,
+                                    delimiter_length,
                                 },
                             )) => {
                                 assert_eq!(delimiter_start_offset, 0);
-                                assert_eq!(delimiter_end_offset, 3);
+                                assert_eq!(delimiter_length, 3);
                             }
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }

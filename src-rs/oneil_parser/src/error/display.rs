@@ -127,7 +127,7 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
             TokenErrorKind::Incomplete(incomplete_kind) => match incomplete_kind {
                 TokenIncompleteKind::UnclosedNote {
                     delimiter_start_offset: _,
-                    delimiter_end_offset: _,
+                    delimiter_length: _,
                 } => {
                     // TODO: this error needs context indicating where the note opened
                     format!("unclosed note")
