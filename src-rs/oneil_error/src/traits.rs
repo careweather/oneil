@@ -23,7 +23,9 @@ pub trait AsOneilError {
     /// - Examples of correct usage
     ///
     /// Returns an empty vector if no context is available.
-    fn context(&self) -> Vec<Context>;
+    fn context(&self) -> Vec<Context> {
+        vec![]
+    }
 }
 
 /// Trait for error types that can provide source code location information.
@@ -65,5 +67,8 @@ pub trait AsOneilErrorWithSource: AsOneilError {
     ///
     /// A vector of tuples containing the context and an optional location.
     /// If a context item doesn't have a specific location, the location should be `None`.
-    fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)>;
+    fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
+        let _ = source;
+        vec![]
+    }
 }

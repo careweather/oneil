@@ -620,10 +620,6 @@ impl AsOneilError for ParserError {
     fn message(&self) -> String {
         self.to_string()
     }
-
-    fn context(&self) -> Vec<Context> {
-        Vec::new()
-    }
 }
 
 impl AsOneilErrorWithSource for ParserError {
