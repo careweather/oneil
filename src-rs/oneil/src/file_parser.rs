@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use oneil_ast as ast;
+use oneil_error::AsOneilError;
 use oneil_model_loader::FileLoader as ModelFileLoader;
 use oneil_parser as parser;
 
@@ -65,6 +66,16 @@ impl DoesNotExistError {
     /// A reference to the `PathBuf` containing the path of the missing file.
     pub fn path(&self) -> &Path {
         &self.0
+    }
+}
+
+impl AsOneilError for DoesNotExistError {
+    fn message(&self) -> String {
+        format!("python file '{}' does not exist", self.0.display())
+    }
+
+    fn context(&self) -> Vec<oneil_error::Context> {
+        vec![]
     }
 }
 

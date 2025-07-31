@@ -106,10 +106,7 @@ fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> 
         "python path and error path should match"
     );
 
-    let path = error.path();
-    let message = format!("python file '{}' does not exist", path.display());
-
-    OneilError::new(path.to_path_buf(), message, vec![])
+    OneilError::from_error(error, python_path.as_ref().to_path_buf())
 }
 
 /// Converts a circular dependency error into a unified CLI error format
