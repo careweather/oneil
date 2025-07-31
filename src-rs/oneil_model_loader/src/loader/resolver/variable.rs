@@ -39,7 +39,7 @@ use oneil_ast as ast;
 use oneil_ir::{
     expr::{Expr, ExprWithSpan},
     reference::{Identifier, ModelPath},
-    span::WithSpan,
+    span::{Span, WithSpan},
 };
 
 use crate::{
@@ -113,13 +113,16 @@ pub fn resolve_variable(
                         Ok(WithSpan::new(expr, span))
                     }
                     InfoResult::HasError => {
-                        return Err(VariableResolutionError::parameter_has_error(var_identifier));
-                    }
-                    InfoResult::NotFound => {
-                        return Err(VariableResolutionError::undefined_parameter(WithSpan::new(
+                        return Err(VariableResolutionError::parameter_has_error(
                             var_identifier,
                             var_identifier_span,
-                        )));
+                        ));
+                    }
+                    InfoResult::NotFound => {
+                        return Err(VariableResolutionError::undefined_parameter(
+                            var_identifier,
+                            var_identifier_span,
+                        ));
                     }
                 }
             }
@@ -132,19 +135,21 @@ pub fn resolve_variable(
                 InfoResult::HasError => {
                     return Err(VariableResolutionError::submodel_resolution_failed(
                         parent_identifier,
+                        parent_identifier_span,
                     ));
                 }
                 InfoResult::NotFound => {
-                    return Err(VariableResolutionError::undefined_submodel(WithSpan::new(
+                    return Err(VariableResolutionError::undefined_submodel(
                         parent_identifier,
                         parent_identifier_span,
-                    )));
+                    ));
                 }
             };
 
             let (model_path, ident) = resolve_variable_recursive(
                 submodel_path,
                 component,
+                parent_identifier_span,
                 defined_parameters,
                 submodel_info,
                 model_info,
@@ -171,6 +176,7 @@ pub fn resolve_variable(
 fn resolve_variable_recursive(
     submodel_path: &ModelPath,
     variable: &ast::expression::Variable,
+    parent_identifier_span: Span,
     defined_parameters: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
@@ -180,6 +186,7 @@ fn resolve_variable_recursive(
         InfoResult::HasError => {
             return Err(VariableResolutionError::model_has_error(
                 submodel_path.clone(),
+                parent_identifier_span,
             ));
         }
         InfoResult::NotFound => panic!("submodel should have been visited already"),
@@ -195,7 +202,8 @@ fn resolve_variable_recursive(
             } else {
                 return Err(VariableResolutionError::undefined_parameter_in_submodel(
                     submodel_path.clone(),
-                    WithSpan::new(var_identifier, var_identifier_span),
+                    var_identifier,
+                    var_identifier_span,
                 ));
             }
         }
@@ -209,7 +217,8 @@ fn resolve_variable_recursive(
                 None => {
                     let source = VariableResolutionError::undefined_submodel_in_submodel(
                         submodel_path.clone(),
-                        WithSpan::new(parent_identifier, parent_identifier_span),
+                        parent_identifier,
+                        parent_identifier_span,
                     );
                     return Err(source);
                 }
@@ -218,6 +227,7 @@ fn resolve_variable_recursive(
             resolve_variable_recursive(
                 submodel_path,
                 component,
+                parent_identifier_span,
                 defined_parameters,
                 submodel_info,
                 model_info,
@@ -462,12 +472,16 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::UndefinedParameter(model_path, ident) => {
+            VariableResolutionError::UndefinedParameter {
+                model_path,
+                parameter,
+                reference_span,
+            } => {
                 assert_eq!(model_path, None);
 
                 let span = get_span_from_ast_span(variable.node_span());
-                assert_eq!(ident.span(), &span);
-                assert_eq!(ident.value(), &Identifier::new("undefined_param"));
+                assert_eq!(reference_span, span);
+                assert_eq!(parameter, Identifier::new("undefined_param"));
             }
             error => panic!("Expected undefined parameter error, got {:?}", error),
         }
@@ -477,6 +491,7 @@ mod tests {
     fn test_resolve_parameter_with_error() {
         // create a variable for parameter with error
         let variable = helper::create_identifier_variable("error_param");
+        let variable_span = get_span_from_ast_span(variable.node_span());
         let local_vars = HashSet::new();
 
         // create parameter info with error parameter
@@ -497,8 +512,12 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::ParameterHasError(ident) => {
-                assert_eq!(ident, Identifier::new("error_param"));
+            VariableResolutionError::ParameterHasError {
+                identifier,
+                reference_span,
+            } => {
+                assert_eq!(identifier, Identifier::new("error_param"));
+                assert_eq!(reference_span, variable_span);
             }
             error => panic!("Expected parameter has error, got {:?}", error),
         }
@@ -525,11 +544,15 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::UndefinedSubmodel(submodel_path, ident) => {
-                assert_eq!(submodel_path, None);
+            VariableResolutionError::UndefinedSubmodel {
+                model_path,
+                submodel,
+                reference_span,
+            } => {
+                assert_eq!(model_path, None);
 
-                assert_eq!(ident.span(), &undefined_submodel_span);
-                assert_eq!(ident.value(), &Identifier::new("undefined_submodel"));
+                assert_eq!(reference_span, undefined_submodel_span);
+                assert_eq!(submodel, Identifier::new("undefined_submodel"));
             }
             error => panic!("Expected undefined submodel error, got {:?}", error),
         }
@@ -540,6 +563,7 @@ mod tests {
         // create an accessor variable for submodel with error
         let inner_var = helper::create_identifier_variable("parameter");
         let variable = helper::create_accessor_variable("error_submodel", inner_var);
+        let error_submodel_span = helper::get_accessor_parent_identifier_span(&variable);
 
         let local_vars = HashSet::new();
 
@@ -561,8 +585,12 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::SubmodelResolutionFailed(ident) => {
-                assert_eq!(ident, Identifier::new("error_submodel"));
+            VariableResolutionError::SubmodelResolutionFailed {
+                identifier,
+                reference_span,
+            } => {
+                assert_eq!(identifier, Identifier::new("error_submodel"));
+                assert_eq!(reference_span, error_submodel_span);
             }
             error => panic!("Expected submodel has error, got {:?}", error),
         }
@@ -705,11 +733,15 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::UndefinedParameter(Some(path), ident) => {
-                assert_eq!(path, submodel_path);
+            VariableResolutionError::UndefinedParameter {
+                model_path,
+                parameter,
+                reference_span,
+            } => {
+                assert_eq!(model_path, Some(submodel_path));
 
-                assert_eq!(ident.span(), &inner_var_span);
-                assert_eq!(ident.value(), &Identifier::new("undefined_param"));
+                assert_eq!(reference_span, inner_var_span);
+                assert_eq!(parameter, Identifier::new("undefined_param"));
             }
             error => panic!(
                 "Expected undefined parameter in submodel error, got {:?}",
@@ -762,11 +794,15 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::UndefinedSubmodel(Some(path), ident) => {
-                assert_eq!(path, submodel_path);
+            VariableResolutionError::UndefinedSubmodel {
+                model_path,
+                submodel,
+                reference_span,
+            } => {
+                assert_eq!(model_path, Some(submodel_path));
 
-                assert_eq!(ident.value(), &Identifier::new("undefined_submodel"));
-                assert_eq!(ident.span(), &undefined_submodel_span);
+                assert_eq!(reference_span, undefined_submodel_span);
+                assert_eq!(submodel, Identifier::new("undefined_submodel"));
             }
             error => panic!(
                 "Expected undefined submodel in submodel error, got {:?}",
@@ -780,6 +816,7 @@ mod tests {
         // create an accessor variable for model with error
         let inner_var = helper::create_identifier_variable("parameter");
         let variable = helper::create_accessor_variable("submodel", inner_var);
+        let variable_span = helper::get_accessor_parent_identifier_span(&variable);
 
         let local_vars = HashSet::new();
 
@@ -809,8 +846,12 @@ mod tests {
         // check the result
         assert!(result.is_err());
         match result.unwrap_err() {
-            VariableResolutionError::ModelHasError(path) => {
+            VariableResolutionError::ModelHasError {
+                path,
+                reference_span,
+            } => {
                 assert_eq!(path, submodel_path);
+                assert_eq!(reference_span, variable_span);
             }
             error => panic!("Expected model has error, got {:?}", error),
         }

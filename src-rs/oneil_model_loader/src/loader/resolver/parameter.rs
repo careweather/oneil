@@ -796,17 +796,23 @@ mod tests {
         assert!(a_errors.iter().any(|e| matches!(
             e,
             ParameterResolutionError::VariableResolution(
-                VariableResolutionError::ParameterHasError(ident)
+                VariableResolutionError::ParameterHasError {
+                    identifier,
+                    reference_span: _,
+                }
             )
-            if ident == &Identifier::new("b")
+            if identifier == &Identifier::new("b"),
         )));
 
         assert!(b_errors.iter().any(|e| matches!(
             e,
             ParameterResolutionError::VariableResolution(
-                VariableResolutionError::ParameterHasError(ident)
+                VariableResolutionError::ParameterHasError {
+                    identifier,
+                    reference_span: _,
+                }
             )
-            if ident == &Identifier::new("a")
+            if identifier == &Identifier::new("a"),
         )));
 
         // check the resolved parameters

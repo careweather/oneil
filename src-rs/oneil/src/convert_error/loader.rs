@@ -341,27 +341,32 @@ fn convert_variable_resolution_error(
     variable_resolution_error: &VariableResolutionError,
 ) -> Option<OneilError> {
     match variable_resolution_error {
-        VariableResolutionError::UndefinedParameter(_model_path, identifier)
-        | VariableResolutionError::UndefinedSubmodel(_model_path, identifier) => {
-            let message = variable_resolution_error.to_string();
-            let start = identifier.span().start();
-            let length = identifier.span().length();
-            let location = source.map(|source| (source, start, length));
-            let error =
-                OneilError::new_from_span(path.to_path_buf(), message, location, vec![], vec![]);
-            Some(error)
-        }
-        VariableResolutionError::ModelHasError(_model_path) => {
+        VariableResolutionError::UndefinedParameter { .. }
+        | VariableResolutionError::UndefinedSubmodel { .. } => match source {
+            Some(source) => {
+                let error = OneilError::from_error_with_source(
+                    variable_resolution_error,
+                    path.to_path_buf(),
+                    source,
+                );
+                Some(error)
+            }
+            None => {
+                let error = OneilError::from_error(variable_resolution_error, path.to_path_buf());
+                Some(error)
+            }
+        },
+        VariableResolutionError::ModelHasError { .. } => {
             // This error is intentionally ignored because it indicates that the
             // model being referenced has errors, which will be reported separately.
             None
         }
-        VariableResolutionError::ParameterHasError(_identifier) => {
+        VariableResolutionError::ParameterHasError { .. } => {
             // This error is intentionally ignored because it indicates that the
             // parameter has errors, which will be reported separately.
             None
         }
-        VariableResolutionError::SubmodelResolutionFailed(_identifier) => {
+        VariableResolutionError::SubmodelResolutionFailed { .. } => {
             // This error is intentionally ignored because it indicates that the
             // submodel resolution failed, which will be reported separately.
             None

@@ -554,7 +554,8 @@ mod tests {
         assert_eq!(
             test_errors[0],
             ModelTestResolutionError::new(VariableResolutionError::undefined_parameter(
-                WithSpan::new(Identifier::new("undefined_var"), undefined_var_span),
+                Identifier::new("undefined_var"),
+                undefined_var_span,
             )),
         );
 
@@ -606,7 +607,8 @@ mod tests {
         assert_eq!(
             test_errors[0],
             ModelTestResolutionError::new(VariableResolutionError::undefined_parameter(
-                WithSpan::new(Identifier::new("undefined_var"), undefined_var_span),
+                Identifier::new("undefined_var"),
+                undefined_var_span,
             )),
         );
 
@@ -814,10 +816,10 @@ mod tests {
         assert_eq!(
             test_errors[0],
             SubmodelTestInputResolutionError::VariableResolution(
-                VariableResolutionError::undefined_parameter(WithSpan::new(
+                VariableResolutionError::undefined_parameter(
                     Identifier::new("undefined_var"),
-                    undefined_var_span
-                ),),
+                    undefined_var_span,
+                ),
             ),
         );
 
@@ -880,10 +882,10 @@ mod tests {
         assert_eq!(
             test_errors[0],
             SubmodelTestInputResolutionError::VariableResolution(
-                VariableResolutionError::undefined_parameter(WithSpan::new(
+                VariableResolutionError::undefined_parameter(
                     Identifier::new("undefined_var"),
-                    undefined_var_span
-                ),),
+                    undefined_var_span,
+                ),
             ),
         );
 

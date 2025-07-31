@@ -869,10 +869,14 @@ mod tests {
             Err(errors) => {
                 assert_eq!(errors.len(), 1);
                 match &errors[0] {
-                    VariableResolutionError::UndefinedParameter(None, ident) => {
+                    VariableResolutionError::UndefinedParameter {
+                        model_path: None,
+                        parameter,
+                        reference_span,
+                    } => {
                         let span = get_span_from_ast_span(ast_variable.node_span());
-                        assert_eq!(ident.span(), &span);
-                        assert_eq!(ident.value(), &Identifier::new("undefined"));
+                        assert_eq!(reference_span, &span);
+                        assert_eq!(parameter, &Identifier::new("undefined"));
                     }
                     _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
                 }
@@ -1207,8 +1211,13 @@ mod tests {
                 let error_identifiers: Vec<_> = errors
                     .iter()
                     .filter_map(|e| {
-                        if let VariableResolutionError::UndefinedParameter(None, ident) = e {
-                            Some(ident.clone())
+                        if let VariableResolutionError::UndefinedParameter {
+                            model_path: None,
+                            parameter,
+                            reference_span: _,
+                        } = e
+                        {
+                            Some(parameter.clone())
                         } else {
                             None
                         }
