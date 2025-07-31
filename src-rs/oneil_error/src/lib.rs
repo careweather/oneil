@@ -1,8 +1,12 @@
+mod context;
 mod location;
+mod traits;
 
 use std::path::PathBuf;
 
+pub use context::Context;
 pub use location::ErrorLocation;
+pub use traits::{AsOneilError, AsOneilErrorWithSource};
 
 /// Unified error representation for Oneil
 ///
