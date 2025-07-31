@@ -10,9 +10,12 @@
 //! - Source code snippet with error highlighting
 //! - Visual indicators pointing to the error location
 
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    path::Path,
+};
 
-use oneil_error::OneilError;
+use oneil_error::{Context, ErrorLocation, OneilError};
 
 use crate::printer::ColorChoice;
 
@@ -34,7 +37,11 @@ use crate::printer::ColorChoice;
 /// # Errors
 ///
 /// Returns an error if writing to the writer fails.
-pub fn print(error: &OneilError, color_choice: &ColorChoice, writer: &mut impl Write) -> io::Result<()> {
+pub fn print(
+    error: &OneilError,
+    color_choice: &ColorChoice,
+    writer: &mut impl Write,
+) -> io::Result<()> {
     let error_string = error_to_string(error, color_choice);
     writeln!(writer, "{}", error_string)?;
 
@@ -55,14 +62,17 @@ pub fn print(error: &OneilError, color_choice: &ColorChoice, writer: &mut impl W
 ///
 /// Returns a formatted string representation of the error.
 fn error_to_string(error: &OneilError, color_choice: &ColorChoice) -> String {
-    let message_line = get_message_line(error, color_choice);
-    let location_line = get_location_line(error, color_choice);
-    let source_line = get_source_lines(error, color_choice);
+    let message_line = get_error_message_line(error.message(), color_choice);
+    let location_line = get_location_line(error.path(), error.location(), color_choice);
+    let empty_line = String::new();
+    let source_line = get_source_lines(error.location(), error.context(), color_choice);
+    let context_with_source_lines =
+        get_context_with_source_lines(error.path(), error.context_with_source(), color_choice);
 
     let mut lines = vec![message_line, location_line];
-    if let Some(source_line) = source_line {
-        lines.push(source_line);
-    }
+    lines.extend(source_line);
+    lines.push(empty_line);
+    lines.extend(context_with_source_lines);
 
     lines.join("\n")
 }
@@ -80,12 +90,80 @@ fn error_to_string(error: &OneilError, color_choice: &ColorChoice) -> String {
 /// # Returns
 ///
 /// Returns the formatted error message line as a string.
-fn get_message_line(error: &OneilError, color_choice: &ColorChoice) -> String {
-    // message line
-    // error: <message>
-    let error_str = color_choice.bold_red("error");
-    let message = error.message();
-    let message_line = format!("{}: {}", error_str, message);
+fn get_error_message_line(message: &str, color_choice: &ColorChoice) -> String {
+    get_message_line("error", ColorChoice::bold_red, message, color_choice)
+}
+
+/// Formats a note message line
+///
+/// Creates a note message line in the format "note: <message>" with blue coloring
+/// for the "note" prefix.
+///
+/// # Arguments
+///
+/// * `message` - The note message to format
+/// * `color_choice` - Color configuration for the output
+///
+/// # Returns
+///
+/// Returns the formatted note message line as a string.
+fn get_note_message_line(message: &str, color_choice: &ColorChoice) -> String {
+    get_message_line("note", ColorChoice::bold_blue, message, color_choice)
+}
+
+/// Formats a help message line
+///
+/// Creates a help message line in the format "help: <message>" with blue coloring
+/// for the "help" prefix.
+///
+/// # Arguments
+///
+/// * `message` - The help message to format
+/// * `color_choice` - Color configuration for the output
+///
+/// # Returns
+///
+/// Returns the formatted help message line as a string.
+fn get_help_message_line(message: &str, color_choice: &ColorChoice) -> String {
+    get_message_line("help", ColorChoice::bold_blue, message, color_choice)
+}
+
+/// Formats a message line with a colored prefix
+///
+/// Creates a message line in the format "<kind>: <message>" where the kind prefix
+/// is colored according to the provided color function and the entire line is bold.
+///
+/// # Arguments
+///
+/// * `kind` - The prefix text (e.g. "error", "note", "help")
+/// * `kind_color` - Function to apply color formatting to the kind prefix
+/// * `message` - The message text to display
+/// * `color_choice` - Color configuration for the output
+///
+/// # Returns
+///
+/// Returns the formatted message line as a string with appropriate coloring.
+///
+/// # Examples
+///
+/// ```
+/// let message = get_message_line(
+///     "error",
+///     ColorChoice::bold_red,
+///     "invalid syntax",
+///     &color_choice
+/// );
+/// // Returns bold "error: invalid syntax" with red "error"
+/// ```
+fn get_message_line(
+    kind: &str,
+    kind_color: impl FnOnce(&ColorChoice, &str) -> String,
+    message: &str,
+    color_choice: &ColorChoice,
+) -> String {
+    // <kind>: <message>
+    let kind_str = kind_color(color_choice, kind);
+    let message_line = format!("{}: {}", kind_str, message);
     let message_line = color_choice.bold(&message_line);
     message_line
 }
@@ -103,14 +181,18 @@ fn get_message_line(error: &OneilError, color_choice: &ColorChoice) -> String {
 /// # Returns
 ///
 /// Returns the formatted location line as a string.
-fn get_location_line(error: &OneilError, color_choice: &ColorChoice) -> String {
+fn get_location_line(
+    path: &Path,
+    location: Option<&ErrorLocation>,
+    color_choice: &ColorChoice,
+) -> String {
     // location line (line and column are optional)
     //  --> <path>
     // OR
     //  --> <path> (line <line>, column <column>)
     let arrow = color_choice.bold_blue("-->");
-    let path = error.path().display();
-    let location_line = match &error.location() {
+    let path = path.display();
+    let location_line = match location {
         // This format is technically less readable than " --> <path> (line <line>, column <column>)"
         // but IDEs like VSCode and Cursor allow you to <ctrl> + click on the error to jump to the
         // location in the file. In addition, the line and column will be displayed in the source
@@ -143,13 +225,17 @@ fn get_location_line(error: &OneilError, color_choice: &ColorChoice) -> String {
 ///
 /// Returns `Some(String)` with the formatted source code snippet if location
 /// information is available, or `None` if no location information exists.
-fn get_source_lines(error: &OneilError, color_choice: &ColorChoice) -> Option<String> {
+fn get_source_lines(
+    location: Option<&ErrorLocation>,
+    context: &[Context],
+    color_choice: &ColorChoice,
+) -> Option<String> {
     // source line (if available)
     //   |
     // 1 | use foo bar
     //   |         ^
     //   |
-    match &error.location() {
+    match location {
         Some(location) => {
             let line = location.line();
             let column = location.column();
@@ -180,11 +266,45 @@ fn get_source_lines(error: &OneilError, color_choice: &ColorChoice) -> Option<St
                 margin, bar, pointer_indent, pointer, pointer_rest
             );
 
-            let source_lines = vec![blank_line, source_line, pointer_line];
+            let context_lines = context.iter().map(|context| {
+                let equals = color_choice.bold_blue("=");
+                let context_message = match context {
+                    Context::Note(message) => get_note_message_line(message, color_choice),
+                    Context::Help(message) => get_help_message_line(message, color_choice),
+                };
+                let context_line = format!("{} {} {}", margin, equals, context_message);
+                context_line
+            });
+
+            let mut source_lines = vec![blank_line, source_line, pointer_line];
+            source_lines.extend(context_lines);
             let source_lines = source_lines.join("\n");
 
             Some(source_lines)
         }
         None => None,
     }
+}
+
+fn get_context_with_source_lines(
+    path: &Path,
+    contexts: &[(Context, ErrorLocation)],
+    color_choice: &ColorChoice,
+) -> Vec<String> {
+    contexts
+        .iter()
+        .map(|(context, location)| {
+            let context_message = match context {
+                Context::Note(message) => get_note_message_line(message, color_choice),
+                Context::Help(message) => get_help_message_line(message, color_choice),
+            };
+            let location_line = get_location_line(path, Some(location), color_choice);
+            let source_lines = get_source_lines(Some(location), &[], color_choice);
+            let empty_line = String::new();
+            let mut lines = vec![context_message, location_line];
+            lines.extend(source_lines);
+            lines.push(empty_line);
+            lines.join("\n")
+        })
+        .collect()
 }
