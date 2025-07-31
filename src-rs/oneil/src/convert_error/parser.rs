@@ -12,16 +12,6 @@ use oneil_parser::error::ParserError;
 
 use crate::convert_error::file::convert as convert_file_error;
 
-// TODO: maybe find a way to move conversions to the parser library?
-//       - move the `Error` type to its own crate?
-
-// TODO: add notes/hints for certain parser errors
-//       - ExpectDecl + string starts with `~` => "Notes are only allowed at the beginning of model files and sections and after parameters and tests"
-//       - ExpectDecl + string starts with `<ident> =` => "Parameters must have a label" (need to check on this one)
-//       - ExpectDecl + string starts with `.*:` => "Section labels must only contain the characters [insert allowed characters]"
-//       - string starts with `"` => "String literals use single quotes"
-//       - string starts with `.` => "Decimal literals are not allowed to start with a `.`, try adding a leading `0`" (need to check on this one)
-
 /// Converts all parser errors for a file into unified CLI errors
 ///
 /// Takes a file path and a collection of parser errors, then converts each one
@@ -59,37 +49,24 @@ pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<OneilError
         }
     };
 
-    for parser_error in parser_errors {
-        let error = convert(path, file_contents.as_deref(), parser_error);
-        errors.push(error);
+    match file_contents {
+        Some(file_contents) => {
+            for parser_error in parser_errors {
+                let error = OneilError::from_error_with_source(
+                    parser_error,
+                    path.to_path_buf(),
+                    &file_contents,
+                );
+                errors.push(error);
+            }
+        }
+        None => {
+            for parser_error in parser_errors {
+                let error = OneilError::from_error(parser_error, path.to_path_buf());
+                errors.push(error);
+            }
+        }
     }
 
     errors
-}
-
-/// Converts a single parser error into a unified CLI error format
-///
-/// Takes a file path, optional file contents, and a parser error, then creates
-/// a user-friendly error message with source location information if available.
-///
-/// # Arguments
-///
-/// * `path` - The path to the file that contains the parser error
-/// * `file_contents` - Optional file contents for source location calculation
-/// * `error` - The parser error to convert
-///
-/// # Returns
-///
-/// Returns a new `Error` instance with the parser error message and optional
-/// source location information if file contents are available.
-///
-/// # Note
-///
-/// If `file_contents` is `None`, the error will be created without source
-/// location information, but the error message will still be included.
-pub fn convert(path: &Path, file_contents: Option<&str>, error: &ParserError) -> OneilError {
-    let message = error.to_string();
-    let location = file_contents.map(|contents| (contents, error.error_offset));
-
-    OneilError::new_from_offset(path.to_path_buf(), message, location)
 }

@@ -109,7 +109,7 @@ fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> 
     let path = error.path();
     let message = format!("python file '{}' does not exist", path.display());
 
-    OneilError::new(path.to_path_buf(), message)
+    OneilError::new(path.to_path_buf(), message, vec![])
 }
 
 /// Converts a circular dependency error into a unified CLI error format
@@ -143,7 +143,7 @@ fn convert_circular_dependency_error(
         circular_dependency_str
     );
 
-    OneilError::new(path.to_path_buf(), message)
+    OneilError::new(path.to_path_buf(), message, vec![])
 }
 
 /// Converts model loading errors into unified CLI errors
@@ -243,7 +243,13 @@ fn convert_resolution_errors(
                 let start = identifier.span().start();
                 let length = identifier.span().length();
                 let location = source.map(|source| (source, start, length));
-                let error = OneilError::new_from_span(path.to_path_buf(), message, location);
+                let error = OneilError::new_from_span(
+                    path.to_path_buf(),
+                    message,
+                    location,
+                    vec![],
+                    vec![],
+                );
                 errors.push(error);
             }
         }
@@ -259,7 +265,7 @@ fn convert_resolution_errors(
                     // because this is a circular dependency, we don't have a specific
                     // location to report within the model
                     let message = parameter_resolution_error.to_string();
-                    let error = OneilError::new(path.to_path_buf(), message);
+                    let error = OneilError::new(path.to_path_buf(), message, vec![]);
                     errors.push(error);
                 }
 
@@ -344,7 +350,8 @@ fn convert_variable_resolution_error(
             let start = identifier.span().start();
             let length = identifier.span().length();
             let location = source.map(|source| (source, start, length));
-            let error = OneilError::new_from_span(path.to_path_buf(), message, location);
+            let error =
+                OneilError::new_from_span(path.to_path_buf(), message, location, vec![], vec![]);
             Some(error)
         }
         VariableResolutionError::ModelHasError(_model_path) => {

@@ -38,5 +38,5 @@ use oneil_error::OneilError;
 /// ```
 pub fn convert(path: &Path, error: &IoError) -> OneilError {
     let message = format!("couldn't read `{}` - {}", path.display(), error);
-    OneilError::new(path.to_path_buf(), message)
+    OneilError::new(path.to_path_buf(), message, vec![])
 }
