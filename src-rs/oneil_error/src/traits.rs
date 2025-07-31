@@ -51,6 +51,7 @@ pub trait AsOneilErrorWithSource: AsOneilError {
     ///
     /// An `ErrorLocation` containing the line and column information for
     /// the error position.
+    // TODO: make `ErrorLocation` optional in case some variations of an error don't have a location
     fn error_location(&self, source: &str) -> ErrorLocation;
 
     /// Returns context with optional source code locations.

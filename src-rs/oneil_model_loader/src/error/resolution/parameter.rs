@@ -1,4 +1,5 @@
-use oneil_ir::reference::Identifier;
+use oneil_error::{AsOneilError, AsOneilErrorWithSource, ErrorLocation};
+use oneil_ir::{reference::Identifier, span::Span};
 
 use crate::error::VariableResolutionError;
 
@@ -10,7 +11,12 @@ use crate::error::VariableResolutionError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterResolutionError {
     /// A circular dependency was detected during parameter resolution.
-    CircularDependency(Vec<Identifier>),
+    CircularDependency {
+        /// The list of parameter identifiers that form the circular dependency.
+        circular_dependency: Vec<Identifier>,
+        /// The span of the parameter that caused the circular dependency.
+        reference_span: Span,
+    },
     /// A variable resolution error occurred within the parameter's value.
     VariableResolution(VariableResolutionError),
 }
@@ -25,8 +31,11 @@ impl ParameterResolutionError {
     /// # Returns
     ///
     /// A new `ParameterResolutionError::CircularDependency` variant.
-    pub fn circular_dependency(circular_dependency: Vec<Identifier>) -> Self {
-        Self::CircularDependency(circular_dependency)
+    pub fn circular_dependency(circular_dependency: Vec<Identifier>, reference_span: Span) -> Self {
+        Self::CircularDependency {
+            circular_dependency,
+            reference_span,
+        }
     }
 
     /// Creates a new error indicating a variable resolution error within a parameter.
@@ -52,7 +61,10 @@ impl ParameterResolutionError {
     /// A string representation of the parameter resolution error.
     pub fn to_string(&self) -> String {
         match self {
-            ParameterResolutionError::CircularDependency(circular_dependency) => {
+            ParameterResolutionError::CircularDependency {
+                circular_dependency,
+                reference_span: _,
+            } => {
                 let dependency_chain = circular_dependency
                     .iter()
                     .map(|id| format!("{}", id.as_str()))
@@ -73,5 +85,27 @@ impl ParameterResolutionError {
 impl From<VariableResolutionError> for ParameterResolutionError {
     fn from(error: VariableResolutionError) -> Self {
         Self::variable_resolution(error)
+    }
+}
+
+impl AsOneilError for ParameterResolutionError {
+    fn message(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl AsOneilErrorWithSource for ParameterResolutionError {
+    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+        match self {
+            ParameterResolutionError::CircularDependency {
+                circular_dependency: _,
+                reference_span,
+            } => {
+                let offset_start = reference_span.start();
+                let length = reference_span.length();
+                ErrorLocation::from_source_and_span(source, offset_start, length)
+            }
+            ParameterResolutionError::VariableResolution(error) => error.error_location(source),
+        }
     }
 }

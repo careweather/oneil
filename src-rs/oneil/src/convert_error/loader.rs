@@ -19,8 +19,8 @@ use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, LoadError, ParameterResolutionError, ResolutionErrors,
-        SubmodelResolutionError, SubmodelTestInputResolutionError, VariableResolutionError,
+        CircularDependencyError, LoadError, ResolutionErrors, SubmodelResolutionError,
+        SubmodelTestInputResolutionError, VariableResolutionError,
     },
 };
 
@@ -254,24 +254,15 @@ fn convert_resolution_errors(
         resolution_errors.get_parameter_resolution_errors()
     {
         for parameter_resolution_error in parameter_resolution_errors {
-            match parameter_resolution_error {
-                ParameterResolutionError::CircularDependency(_identifiers) => {
-                    // because this is a circular dependency, we don't have a specific
-                    // location to report within the model
-                    let message = parameter_resolution_error.to_string();
-                    let error = OneilError::new(path.to_path_buf(), message, vec![]);
-                    errors.push(error);
-                }
-
-                ParameterResolutionError::VariableResolution(variable_resolution_error) => {
-                    let error =
-                        convert_variable_resolution_error(path, source, variable_resolution_error);
-
-                    if let Some(error) = error {
-                        errors.push(error);
-                    }
-                }
-            }
+            let error = match source {
+                Some(source) => OneilError::from_error_with_source(
+                    parameter_resolution_error,
+                    path.to_path_buf(),
+                    source,
+                ),
+                None => OneilError::from_error(parameter_resolution_error, path.to_path_buf()),
+            };
+            errors.push(error);
         }
     }
 

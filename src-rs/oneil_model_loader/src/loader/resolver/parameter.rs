@@ -26,6 +26,7 @@ use oneil_ast as ast;
 use oneil_ir::{
     parameter::{Parameter, ParameterCollection, ParameterValue, PiecewiseExpr},
     reference::Identifier,
+    span::{Span, WithSpan},
 };
 
 use crate::{
@@ -76,7 +77,11 @@ pub fn resolve_parameters(
 
     let parameter_map: HashMap<_, _> = parameters
         .into_iter()
-        .map(|parameter| (Identifier::new(parameter.ident().as_str()), parameter))
+        .map(|parameter| {
+            let ident = Identifier::new(parameter.ident().as_str());
+            let ident_span = get_span_from_ast_span(parameter.ident().node_span());
+            (ident, (ident_span, parameter))
+        })
         .collect();
 
     // note that an 'internal dependency' is a dependency on a parameter
@@ -86,13 +91,16 @@ pub fn resolve_parameters(
     let resolved_parameters = ParameterCollectionBuilder::new();
     let visited = HashSet::new();
 
-    let (resolved_parameters, _visited) = parameter_map.keys().fold(
+    let (resolved_parameters, _visited) = parameter_map.iter().fold(
         (resolved_parameters, visited),
-        |(resolved_parameters, visited), parameter_identifier| {
+        |(resolved_parameters, visited), (parameter_identifier, (parameter_span, _parameter))| {
             let mut parameter_stack = Stack::new();
 
+            let parameter_identifier_with_span =
+                WithSpan::new(parameter_identifier.clone(), parameter_span.clone());
+
             resolve_parameter(
-                parameter_identifier,
+                parameter_identifier_with_span,
                 &parameter_map,
                 &dependencies,
                 submodel_info,
@@ -125,14 +133,14 @@ pub fn resolve_parameters(
 ///
 /// A map from parameter identifier to its set of internal dependencies
 fn get_all_parameter_internal_dependencies<'a>(
-    parameter_map: &'a HashMap<Identifier, &'a ast::parameter::ParameterNode>,
-) -> HashMap<&'a Identifier, HashSet<Identifier>> {
+    parameter_map: &'a HashMap<Identifier, (Span, &'a ast::parameter::ParameterNode)>,
+) -> HashMap<&'a Identifier, HashSet<WithSpan<Identifier>>> {
     let dependencies = HashMap::new();
 
     parameter_map
         .keys()
         .fold(dependencies, |mut dependencies, identifier| {
-            let parameter = parameter_map
+            let (_, parameter) = parameter_map
                 .get(identifier)
                 .expect("parameter should exist");
 
@@ -156,7 +164,9 @@ fn get_all_parameter_internal_dependencies<'a>(
 /// # Returns
 ///
 /// A set of parameter identifiers that this parameter depends on
-fn get_parameter_internal_dependencies(parameter: &ast::Parameter) -> HashSet<Identifier> {
+fn get_parameter_internal_dependencies(
+    parameter: &ast::Parameter,
+) -> HashSet<WithSpan<Identifier>> {
     let dependencies = HashSet::new();
 
     let limits = parameter.limits().map(|l| l.node_value());
@@ -206,8 +216,8 @@ fn get_parameter_internal_dependencies(parameter: &ast::Parameter) -> HashSet<Id
 /// Updated set of dependencies including any found in this expression
 fn get_expr_internal_dependencies(
     expr: &ast::Expr,
-    mut dependencies: HashSet<Identifier>,
-) -> HashSet<Identifier> {
+    mut dependencies: HashSet<WithSpan<Identifier>>,
+) -> HashSet<WithSpan<Identifier>> {
     match expr {
         ast::Expr::BinaryOp { op: _, left, right } => {
             let dependencies = get_expr_internal_dependencies(&left, dependencies);
@@ -226,8 +236,9 @@ fn get_expr_internal_dependencies(
 
         ast::Expr::Variable(variable) => match variable.node_value() {
             ast::expression::Variable::Identifier(identifier) => {
+                let identifier_span = get_span_from_ast_span(identifier.node_span());
                 let identifier = Identifier::new(identifier.as_str());
-                dependencies.insert(identifier);
+                dependencies.insert(WithSpan::new(identifier, identifier_span));
                 dependencies
             }
 
@@ -271,17 +282,20 @@ fn get_expr_internal_dependencies(
 /// - Updated visited set
 /// - Result indicating success or resolution errors
 fn resolve_parameter(
-    parameter_identifier: &Identifier,
-    parameter_map: &HashMap<Identifier, &ast::parameter::ParameterNode>,
-    dependencies: &HashMap<&Identifier, HashSet<Identifier>>,
+    parameter_identifier: WithSpan<Identifier>,
+    parameter_map: &HashMap<Identifier, (Span, &ast::parameter::ParameterNode)>,
+    dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
     parameter_stack: &mut Stack<Identifier>,
     mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: HashSet<Identifier>,
 ) -> (ParameterCollectionBuilder, HashSet<Identifier>) {
+    let parameter_identifier_span = parameter_identifier.span().clone();
+    let parameter_identifier = parameter_identifier.take_value();
+
     // check that the parameter exists
-    if !parameter_map.contains_key(parameter_identifier) {
+    if !parameter_map.contains_key(&parameter_identifier) {
         // This is technically a resolution error. However, this error will
         // be caught later when the variable is resolved. In order to avoid
         // duplicate errors, we return Ok(()) and let the variable resolution
@@ -290,32 +304,34 @@ fn resolve_parameter(
     }
 
     assert!(
-        dependencies.contains_key(parameter_identifier),
+        dependencies.contains_key(&parameter_identifier),
         "parameter dependencies for '{:?}' not found",
         parameter_identifier
     );
 
     // check for circular dependencies
     if let Some(circular_dependency) =
-        parameter_stack.find_circular_dependency(parameter_identifier)
+        parameter_stack.find_circular_dependency(&parameter_identifier)
     {
+        let reference_span = parameter_identifier_span;
         resolved_parameters.add_error_list(
             parameter_identifier.clone(),
             vec![ParameterResolutionError::circular_dependency(
                 circular_dependency,
+                reference_span,
             )],
         );
         return (resolved_parameters, visited);
     }
 
     // check if the parameter has already been visited
-    if visited.contains(parameter_identifier) {
+    if visited.contains(&parameter_identifier) {
         return (resolved_parameters, visited);
     }
     visited.insert(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    let parameter_dependencies = dependencies.get(parameter_identifier).unwrap();
+    let parameter_dependencies = dependencies.get(&parameter_identifier).unwrap();
 
     // add the parameter to the stack
     parameter_stack.push(parameter_identifier.clone());
@@ -325,7 +341,7 @@ fn resolve_parameter(
         (resolved_parameters, visited),
         |(resolved_parameters, visited), dependency| {
             resolve_parameter(
-                dependency,
+                dependency.clone(),
                 parameter_map,
                 dependencies,
                 submodel_info,
@@ -341,9 +357,9 @@ fn resolve_parameter(
     parameter_stack.pop();
 
     // resolve the parameter
-    let parameter = parameter_map.get(parameter_identifier).unwrap();
+    let (_, parameter) = parameter_map.get(&parameter_identifier).unwrap();
 
-    let ident = Identifier::new(parameter.ident().as_str());
+    let ident = parameter_identifier.clone();
 
     let defined_parameters = resolved_parameters.get_defined_parameters();
     let defined_parameters_with_errors = resolved_parameters.get_parameters_with_errors();
@@ -374,8 +390,14 @@ fn resolve_parameter(
         Ok((value, limits)) => {
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
             let ident_with_span = oneil_ir::span::WithSpan::new(ident, ident_span);
+
+            let parameter_dependencies = parameter_dependencies
+                .iter()
+                .map(|dependency| dependency.value().clone())
+                .collect();
+
             let parameter = Parameter::new(
-                parameter_dependencies.clone(),
+                parameter_dependencies,
                 ident_with_span,
                 value,
                 limits,
@@ -787,10 +809,10 @@ mod tests {
         // so we need to check for a circular dependency error in either
         let a_has_circular_dependency = a_errors
             .iter()
-            .any(|e| matches!(e, ParameterResolutionError::CircularDependency(_)));
+            .any(|e| matches!(e, ParameterResolutionError::CircularDependency { .. }));
         let b_has_circular_dependency = b_errors
             .iter()
-            .any(|e| matches!(e, ParameterResolutionError::CircularDependency(_)));
+            .any(|e| matches!(e, ParameterResolutionError::CircularDependency { .. }));
         assert!(a_has_circular_dependency || b_has_circular_dependency);
 
         assert!(a_errors.iter().any(|e| matches!(
@@ -826,6 +848,10 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
+        let dependencies: HashSet<_> = dependencies
+            .into_iter()
+            .map(|dep| dep.take_value())
+            .collect();
 
         // check the dependencies
         assert!(dependencies.is_empty());
@@ -838,6 +864,10 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
+        let dependencies: HashSet<_> = dependencies
+            .into_iter()
+            .map(|dep| dep.take_value())
+            .collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 1);
@@ -883,6 +913,10 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
+        let dependencies: HashSet<_> = dependencies
+            .into_iter()
+            .map(|dep| dep.take_value())
+            .collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
@@ -897,6 +931,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
 
         // check the dependencies
         assert!(result.is_empty());
@@ -910,6 +945,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 1);
@@ -933,6 +969,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -952,6 +989,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -977,6 +1015,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
 
         // check the dependencies - accessors don't count as internal dependencies
         assert!(result.is_empty());
