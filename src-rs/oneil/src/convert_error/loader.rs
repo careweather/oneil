@@ -231,22 +231,19 @@ fn convert_resolution_errors(
         resolution_errors.get_submodel_resolution_errors()
     {
         match submodel_resolution_error {
-            SubmodelResolutionError::ModelHasError(_model_path) => {
+            SubmodelResolutionError::ModelHasError { .. } => {
                 ignore_error();
             }
 
-            SubmodelResolutionError::UndefinedSubmodel(_model_path, identifier) => {
-                let message = submodel_resolution_error.to_string();
-                let start = identifier.span().start();
-                let length = identifier.span().length();
-                let location = source.map(|source| (source, start, length));
-                let error = OneilError::new_from_span(
-                    path.to_path_buf(),
-                    message,
-                    location,
-                    vec![],
-                    vec![],
-                );
+            SubmodelResolutionError::UndefinedSubmodel { .. } => {
+                let error = match source {
+                    Some(source) => OneilError::from_error_with_source(
+                        submodel_resolution_error,
+                        path.to_path_buf(),
+                        source,
+                    ),
+                    None => OneilError::from_error(submodel_resolution_error, path.to_path_buf()),
+                };
                 errors.push(error);
             }
         }

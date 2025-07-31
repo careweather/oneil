@@ -321,13 +321,17 @@ where
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use crate::{
         error::{CircularDependencyError, SubmodelResolutionError},
         test::TestFileParser,
+        util::get_span_from_ast_span,
     };
     use std::collections::{HashMap, HashSet};
     use std::path::PathBuf;
+
+    use oneil_ir::span::Span;
 
     // re-export ast types for testing convenience
     mod ast {
@@ -342,6 +346,10 @@ mod tests {
 
     fn unimportant_span() -> ast::Span {
         ast::Span::new(0, 0, 0)
+    }
+
+    fn unimportant_ir_span() -> Span {
+        get_span_from_ast_span(&unimportant_span())
     }
 
     fn span_from_str(s: &str) -> ast::Span {
@@ -472,9 +480,11 @@ mod tests {
         let mut load_stack = Stack::new();
 
         // create a circular dependency: main.on -> sub.on -> main.on
+        let main_test_model = create_test_model(&["main"]);
+        let sub_test_model = create_test_model(&["sub"]);
         let file_loader = TestFileParser::new(vec![
-            (PathBuf::from("main.on"), create_test_model(&["sub"])),
-            (PathBuf::from("sub.on"), create_test_model(&["main"])),
+            (PathBuf::from("main.on"), sub_test_model),
+            (PathBuf::from("sub.on"), main_test_model),
         ]);
 
         // load the model
@@ -482,6 +492,7 @@ mod tests {
 
         // check the errors
         let errors = result.get_model_errors();
+        eprintln!("errors: {:?}", errors);
         assert_eq!(errors.len(), 2);
 
         let main_errors = errors.get(&ModelPath::new("main")).unwrap();
@@ -491,7 +502,10 @@ mod tests {
                 HashMap::new(),
                 HashMap::from([(
                     Identifier::new("sub"),
-                    SubmodelResolutionError::model_has_error(ModelPath::new("sub"))
+                    SubmodelResolutionError::model_has_error(
+                        ModelPath::new("sub"),
+                        unimportant_ir_span()
+                    )
                 )]),
                 HashMap::new(),
                 HashMap::new(),
@@ -506,7 +520,10 @@ mod tests {
                 HashMap::new(),
                 HashMap::from([(
                     Identifier::new("main"),
-                    SubmodelResolutionError::model_has_error(ModelPath::new("main"))
+                    SubmodelResolutionError::model_has_error(
+                        ModelPath::new("main"),
+                        unimportant_ir_span()
+                    )
                 )]),
                 HashMap::new(),
                 HashMap::new(),

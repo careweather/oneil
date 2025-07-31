@@ -127,6 +127,7 @@ pub fn resolve_submodels_and_tests<'a>(
             // resolve the use model path
             let resolved_use_model_path = resolve_model_path(
                 use_model_path.clone(),
+                get_span_from_ast_span(use_model.node_span()),
                 use_model.subcomponents(),
                 model_info,
             );
@@ -195,6 +196,7 @@ pub fn resolve_submodels_and_tests<'a>(
 /// will panic, indicating a bug in the model loading process.
 fn resolve_model_path(
     model_path: ModelPath,
+    parent_component_span: Span,
     subcomponents: &[ast::naming::IdentifierNode],
     model_info: &ModelInfo,
 ) -> Result<ModelPath, SubmodelResolutionError> {
@@ -202,7 +204,12 @@ fn resolve_model_path(
     // operation should fail
     let model = match model_info.get(&model_path) {
         InfoResult::Found(model) => model,
-        InfoResult::HasError => return Err(SubmodelResolutionError::model_has_error(model_path)),
+        InfoResult::HasError => {
+            return Err(SubmodelResolutionError::model_has_error(
+                model_path,
+                parent_component_span,
+            ));
+        }
         InfoResult::NotFound => panic!("model should have been visited already"),
     };
 
@@ -217,12 +224,18 @@ fn resolve_model_path(
         .get_submodel(&submodel_name)
         .ok_or(SubmodelResolutionError::undefined_submodel_in_submodel(
             model_path.clone(),
-            WithSpan::new(submodel_name, submodel_name_span),
+            submodel_name,
+            submodel_name_span,
         ))?
         .clone()
         .take_value();
 
-    resolve_model_path(submodel_path, &subcomponents[1..], model_info)
+    resolve_model_path(
+        submodel_path,
+        submodel_name_span,
+        &subcomponents[1..],
+        model_info,
+    )
 }
 
 #[cfg(test)]
@@ -590,6 +603,7 @@ mod tests {
         // use error_model as error
         let use_model =
             helper::create_use_model_node("error_model", vec![], None, Some("error"), 0, 25);
+        let use_model_span = get_span_from_ast_span(&use_model.node_span());
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -611,8 +625,12 @@ mod tests {
         let error = errors.get(&error_id).unwrap();
 
         match error {
-            SubmodelResolutionError::ModelHasError(path) => {
-                assert_eq!(path, &error_path);
+            SubmodelResolutionError::ModelHasError {
+                model_path,
+                reference_span,
+            } => {
+                assert_eq!(model_path, &error_path);
+                assert_eq!(reference_span, &use_model_span);
             }
             _ => panic!("Expected ModelHasError, got {:?}", error),
         }
@@ -656,15 +674,16 @@ mod tests {
 
         let error = errors.get(&weather_id).unwrap();
         match error {
-            SubmodelResolutionError::UndefinedSubmodel(parent_path, submodel_name) => {
-                assert_eq!(parent_path, &Some(weather_path));
+            SubmodelResolutionError::UndefinedSubmodel {
+                parent_model_path,
+                submodel,
+                reference_span,
+            } => {
+                assert_eq!(parent_model_path, &weather_path);
+                assert_eq!(submodel.as_str(), "undefined_submodel");
                 assert_eq!(
-                    submodel_name.span(),
+                    reference_span,
                     &get_span_from_ast_span(&undefined_identifier_span)
-                );
-                assert_eq!(
-                    submodel_name.value(),
-                    &Identifier::new("undefined_submodel")
                 );
             }
             _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
@@ -721,13 +740,17 @@ mod tests {
 
         let error = errors.get(&undefined_id).unwrap();
         match error {
-            SubmodelResolutionError::UndefinedSubmodel(parent_path, submodel_name) => {
-                assert_eq!(parent_path, &Some(atmosphere_path));
+            SubmodelResolutionError::UndefinedSubmodel {
+                parent_model_path,
+                submodel,
+                reference_span,
+            } => {
+                assert_eq!(parent_model_path, &atmosphere_path);
+                assert_eq!(submodel.as_str(), "undefined");
                 assert_eq!(
-                    submodel_name.span(),
+                    reference_span,
                     &get_span_from_ast_span(&undefined_identifier_span)
                 );
-                assert_eq!(submodel_name.value(), &Identifier::new("undefined"));
             }
             _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
         }
@@ -834,6 +857,7 @@ mod tests {
         // use error_model as error
         let error_model =
             helper::create_use_model_node("error_model", vec![], None, Some("error"), 0, 25);
+        let error_model_ident_span = get_span_from_ast_span(&error_model.node_span());
 
         let use_models = vec![&temp_model, &error_model];
 
@@ -866,8 +890,12 @@ mod tests {
 
         let error = errors.get(&error_id).unwrap();
         match error {
-            SubmodelResolutionError::ModelHasError(path) => {
-                assert_eq!(path, &error_path);
+            SubmodelResolutionError::ModelHasError {
+                model_path,
+                reference_span,
+            } => {
+                assert_eq!(model_path, &error_path);
+                assert_eq!(reference_span, &error_model_ident_span);
             }
             _ => panic!("Expected ModelHasError, got {:?}", error),
         }
