@@ -197,6 +197,7 @@ dependencies = [
  "nom",
  "nom_locate",
  "oneil_ast",
+ "oneil_error",
 ]
 
 [[package]]

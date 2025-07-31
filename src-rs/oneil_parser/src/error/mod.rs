@@ -22,18 +22,13 @@
 //! 2. Parser-level errors (`ParserError`): For higher-level issues like
 //!    invalid syntax or unexpected tokens
 
-use std::{
-    error::Error,
-    fmt::{self, Display},
-};
-
-use nom::error::ParseError;
 use oneil_ast::{
     Span as AstSpan,
     expression::{BinaryOpNode, UnaryOpNode},
     span::SpanLike,
     unit::UnitOpNode,
 };
+use oneil_error::{AsOneilError, AsOneilErrorWithSource, Context, ErrorLocation};
 
 use crate::{
     Span,
@@ -42,6 +37,8 @@ use crate::{
         error::{TokenError, TokenErrorKind},
     },
 };
+
+mod context;
 
 mod display;
 
@@ -587,7 +584,7 @@ impl ParserError {
     }
 }
 
-impl<'a> ParseError<Span<'a>> for ParserError {
+impl<'a> nom::error::ParseError<Span<'a>> for ParserError {
     fn from_error_kind(input: Span<'a>, reason: nom::error::ErrorKind) -> Self {
         let reason = match reason {
             // If `all_consuming` is used, we expect the parser to consume the entire input
@@ -619,10 +616,22 @@ impl From<TokenError> for ParserError {
     }
 }
 
-impl Display for ParserError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+impl AsOneilError for ParserError {
+    fn message(&self) -> String {
+        self.to_string()
+    }
+
+    fn context(&self) -> Vec<Context> {
+        Vec::new()
     }
 }
 
-impl Error for ParserError {}
+impl AsOneilErrorWithSource for ParserError {
+    fn error_location(&self, source: &str) -> ErrorLocation {
+        ErrorLocation::from_source_and_offset(source, self.error_offset)
+    }
+
+    fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
+        context::from_source(self.error_offset, &self.reason, source)
+    }
+}
