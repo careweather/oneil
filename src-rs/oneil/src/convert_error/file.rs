@@ -7,7 +7,7 @@
 
 use std::{io::Error as IoError, path::Path};
 
-use oneil_error::OneilError;
+use oneil_error::{AsOneilError, OneilError};
 
 /// Converts a file I/O error into a unified CLI error format
 ///
@@ -34,9 +34,30 @@ use oneil_error::OneilError;
 /// let path = Path::new("nonexistent.on");
 /// let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
 /// let error = file::convert(path, &io_error);
-/// assert!(error.message().contains("couldn't read"));
+/// assert!(error.message().contains("couldn't read `nonexistent.on`"));
 /// ```
 pub fn convert(path: &Path, error: &IoError) -> OneilError {
-    let message = format!("couldn't read `{}` - {}", path.display(), error);
-    OneilError::new(path.to_path_buf(), message, vec![])
+    let error = FileError::new(path, error);
+    OneilError::from_error(&error, path.to_path_buf())
+}
+
+struct FileError<'a> {
+    path: &'a Path,
+    error: &'a IoError,
+}
+
+impl<'a> FileError<'a> {
+    fn new(path: &'a Path, error: &'a IoError) -> Self {
+        Self { path, error }
+    }
+}
+
+impl<'a> AsOneilError for FileError<'a> {
+    fn message(&self) -> String {
+        format!("couldn't read `{}` - {}", self.path.display(), self.error)
+    }
+
+    fn context(&self) -> Vec<oneil_error::Context> {
+        vec![]
+    }
 }
