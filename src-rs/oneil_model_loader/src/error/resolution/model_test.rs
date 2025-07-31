@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, AsOneilErrorWithSource};
+use oneil_error::{AsOneilError, ErrorLocation};
 
 use crate::error::VariableResolutionError;
 
@@ -55,10 +55,8 @@ impl AsOneilError for ModelTestResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }
-}
 
-impl AsOneilErrorWithSource for ModelTestResolutionError {
-    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         self.get_error().error_location(source)
     }
 }

@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, AsOneilErrorWithSource, ErrorLocation};
+use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{
     reference::{Identifier, ModelPath},
     span::Span,
@@ -263,9 +263,7 @@ impl AsOneilError for VariableResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }
-}
 
-impl AsOneilErrorWithSource for VariableResolutionError {
     /// Returns the error location within the source code for this variable resolution error.
     ///
     /// This method extracts the span information from the error variant and converts
@@ -278,7 +276,7 @@ impl AsOneilErrorWithSource for VariableResolutionError {
     /// # Returns
     ///
     /// An `ErrorLocation` representing where the error occurred in the source code.
-    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             VariableResolutionError::ModelHasError {
                 path: _,
@@ -286,7 +284,8 @@ impl AsOneilErrorWithSource for VariableResolutionError {
             } => {
                 let start_offset = reference_span.start();
                 let length = reference_span.length();
-                ErrorLocation::from_source_and_span(source, start_offset, length)
+                let location = ErrorLocation::from_source_and_span(source, start_offset, length);
+                Some(location)
             }
             VariableResolutionError::ParameterHasError {
                 identifier: _,
@@ -294,7 +293,8 @@ impl AsOneilErrorWithSource for VariableResolutionError {
             } => {
                 let start_offset = reference_span.start();
                 let length = reference_span.length();
-                ErrorLocation::from_source_and_span(source, start_offset, length)
+                let location = ErrorLocation::from_source_and_span(source, start_offset, length);
+                Some(location)
             }
             VariableResolutionError::SubmodelResolutionFailed {
                 identifier: _,
@@ -302,7 +302,8 @@ impl AsOneilErrorWithSource for VariableResolutionError {
             } => {
                 let start_offset = reference_span.start();
                 let length = reference_span.length();
-                ErrorLocation::from_source_and_span(source, start_offset, length)
+                let location = ErrorLocation::from_source_and_span(source, start_offset, length);
+                Some(location)
             }
             VariableResolutionError::UndefinedParameter {
                 model_path: _,
@@ -311,7 +312,8 @@ impl AsOneilErrorWithSource for VariableResolutionError {
             } => {
                 let start_offset = reference_span.start();
                 let length = reference_span.length();
-                ErrorLocation::from_source_and_span(source, start_offset, length)
+                let location = ErrorLocation::from_source_and_span(source, start_offset, length);
+                Some(location)
             }
             VariableResolutionError::UndefinedSubmodel {
                 model_path: _,
@@ -320,7 +322,8 @@ impl AsOneilErrorWithSource for VariableResolutionError {
             } => {
                 let start_offset = reference_span.start();
                 let length = reference_span.length();
-                ErrorLocation::from_source_and_span(source, start_offset, length)
+                let location = ErrorLocation::from_source_and_span(source, start_offset, length);
+                Some(location)
             }
         }
     }

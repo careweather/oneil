@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, AsOneilErrorWithSource};
+use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{
     reference::{Identifier, ModelPath},
     span::Span,
@@ -107,10 +107,8 @@ impl AsOneilError for SubmodelResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }
-}
 
-impl AsOneilErrorWithSource for SubmodelResolutionError {
-    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             SubmodelResolutionError::ModelHasError {
                 model_path: _,
@@ -118,7 +116,8 @@ impl AsOneilErrorWithSource for SubmodelResolutionError {
             } => {
                 let start = reference_span.start();
                 let length = reference_span.length();
-                oneil_error::ErrorLocation::from_source_and_span(source, start, length)
+                let location = ErrorLocation::from_source_and_span(source, start, length);
+                Some(location)
             }
             SubmodelResolutionError::UndefinedSubmodel {
                 parent_model_path: _,
@@ -127,7 +126,8 @@ impl AsOneilErrorWithSource for SubmodelResolutionError {
             } => {
                 let start = reference_span.start();
                 let length = reference_span.length();
-                oneil_error::ErrorLocation::from_source_and_span(source, start, length)
+                let location = ErrorLocation::from_source_and_span(source, start, length);
+                Some(location)
             }
         }
     }

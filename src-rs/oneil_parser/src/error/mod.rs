@@ -28,7 +28,7 @@ use oneil_ast::{
     span::SpanLike,
     unit::UnitOpNode,
 };
-use oneil_error::{AsOneilError, AsOneilErrorWithSource, Context, ErrorLocation};
+use oneil_error::{AsOneilError, Context, ErrorLocation};
 
 use crate::{
     Span,
@@ -620,11 +620,10 @@ impl AsOneilError for ParserError {
     fn message(&self) -> String {
         self.to_string()
     }
-}
 
-impl AsOneilErrorWithSource for ParserError {
-    fn error_location(&self, source: &str) -> ErrorLocation {
-        ErrorLocation::from_source_and_offset(source, self.error_offset)
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
+        let location = ErrorLocation::from_source_and_offset(source, self.error_offset);
+        Some(location)
     }
 
     fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {

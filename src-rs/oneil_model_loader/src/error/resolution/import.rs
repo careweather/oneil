@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, AsOneilErrorWithSource, ErrorLocation};
+use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{reference::PythonPath, span::Span};
 
 /// Represents an error that occurred during Python import validation.
@@ -42,12 +42,11 @@ impl AsOneilError for ImportResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }
-}
 
-impl AsOneilErrorWithSource for ImportResolutionError {
-    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         let offset = self.ident_span.start();
         let length = self.ident_span.length();
-        ErrorLocation::from_source_and_span(source, offset, length)
+        let location = ErrorLocation::from_source_and_span(source, offset, length);
+        Some(location)
     }
 }

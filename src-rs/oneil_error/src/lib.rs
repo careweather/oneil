@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 pub use context::Context;
 pub use location::ErrorLocation;
-pub use traits::{AsOneilError, AsOneilErrorWithSource};
+pub use traits::AsOneilError;
 
 /// Unified error representation for Oneil
 ///
@@ -123,13 +123,9 @@ impl OneilError {
         }
     }
 
-    pub fn from_error_with_source(
-        error: &impl AsOneilErrorWithSource,
-        path: PathBuf,
-        source: &str,
-    ) -> Self {
+    pub fn from_error_with_source(error: &impl AsOneilError, path: PathBuf, source: &str) -> Self {
         let message = error.message();
-        let location = Some(error.error_location(source));
+        let location = error.error_location(source);
         // TODO: this can be more efficient, ponder this once the refactoring is done
         let (context_without_source, context_with_source) =
             error.context_with_source(source).into_iter().fold(
@@ -158,6 +154,17 @@ impl OneilError {
             location,
             context,
             context_with_source,
+        }
+    }
+
+    pub fn from_error_with_maybe_source(
+        error: &impl AsOneilError,
+        path: PathBuf,
+        source: Option<&str>,
+    ) -> Self {
+        match source {
+            Some(source) => Self::from_error_with_source(error, path, source),
+            None => Self::from_error(error, path),
         }
     }
 

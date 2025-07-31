@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, AsOneilErrorWithSource, ErrorLocation};
+use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{reference::Identifier, span::Span};
 
 use crate::error::VariableResolutionError;
@@ -92,10 +92,8 @@ impl AsOneilError for ParameterResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }
-}
 
-impl AsOneilErrorWithSource for ParameterResolutionError {
-    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             ParameterResolutionError::CircularDependency {
                 circular_dependency: _,
@@ -103,7 +101,8 @@ impl AsOneilErrorWithSource for ParameterResolutionError {
             } => {
                 let offset_start = reference_span.start();
                 let length = reference_span.length();
-                ErrorLocation::from_source_and_span(source, offset_start, length)
+                let location = ErrorLocation::from_source_and_span(source, offset_start, length);
+                Some(location)
             }
             ParameterResolutionError::VariableResolution(error) => error.error_location(source),
         }

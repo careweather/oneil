@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, AsOneilErrorWithSource};
+use oneil_error::{AsOneilError, ErrorLocation};
 
 use crate::error::VariableResolutionError;
 
@@ -53,10 +53,8 @@ impl AsOneilError for SubmodelTestInputResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }
-}
 
-impl AsOneilErrorWithSource for SubmodelTestInputResolutionError {
-    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             SubmodelTestInputResolutionError::VariableResolution(variable_error) => {
                 variable_error.error_location(source)

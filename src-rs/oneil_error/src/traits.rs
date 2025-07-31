@@ -26,16 +26,7 @@ pub trait AsOneilError {
     fn context(&self) -> Vec<Context> {
         vec![]
     }
-}
 
-/// Trait for error types that can provide source code location information.
-///
-/// This trait extends `AsOneilError` to include source code location capabilities.
-/// It's used when errors need to be displayed with specific line and column
-/// information from the source code, enabling better error reporting with
-/// precise location highlighting.
-///
-pub trait AsOneilErrorWithSource: AsOneilError {
     /// Returns the location of the error in the source code.
     ///
     /// This method should analyze the provided source code and return the
@@ -51,8 +42,10 @@ pub trait AsOneilErrorWithSource: AsOneilError {
     ///
     /// An `ErrorLocation` containing the line and column information for
     /// the error position.
-    // TODO: make `ErrorLocation` optional in case some variations of an error don't have a location
-    fn error_location(&self, source: &str) -> ErrorLocation;
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
+        let _ = source;
+        None
+    }
 
     /// Returns context with optional source code locations.
     ///
