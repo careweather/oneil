@@ -9,4 +9,5 @@ repository.workspace = true
 
 [dependencies]
 oneil_ast = { path = "../oneil_ast" }
+oneil_error = { path = "../oneil_error" }
 oneil_ir = { path = "../oneil_ir" }

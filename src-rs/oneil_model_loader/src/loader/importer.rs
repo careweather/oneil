@@ -66,8 +66,10 @@ where
                 }
                 Err(error) => {
                     builder.add_import_error(python_path.clone(), error);
-                    import_resolution_errors
-                        .insert(python_path_with_span, ImportResolutionError::new());
+                    import_resolution_errors.insert(
+                        python_path_with_span,
+                        ImportResolutionError::new(span, python_path),
+                    );
                     (python_imports, import_resolution_errors, builder)
                 }
             }
