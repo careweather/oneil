@@ -19,6 +19,7 @@
 //! The module provides utilities for collecting and managing errors across multiple
 //! models and resolution phases, allowing for comprehensive error reporting.
 
+use oneil_error::AsOneilError;
 use oneil_ir::reference::ModelPath;
 
 pub mod collection;
@@ -103,5 +104,51 @@ impl CircularDependencyError {
     /// A vector of model paths that form the circular dependency.
     pub fn circular_dependency(&self) -> &[ModelPath] {
         &self.0
+    }
+    /// Converts the circular dependency error to a string representation.
+    ///
+    /// This method formats the circular dependency path into a user-friendly error message
+    /// by joining the model paths with arrows (`->`) to show the dependency chain.
+    ///
+    /// # Returns
+    ///
+    /// A string containing the formatted error message showing the circular dependency chain.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use oneil_model_loader::error::CircularDependencyError;
+    /// use oneil_ir::reference::ModelPath;
+    /// use std::path::PathBuf;
+    ///
+    /// let paths = vec![
+    ///     ModelPath::new(PathBuf::from("model_a.on")),
+    ///     ModelPath::new(PathBuf::from("model_b.on")),
+    ///     ModelPath::new(PathBuf::from("model_a.on"))
+    /// ];
+    /// let error = CircularDependencyError::new(paths);
+    /// assert_eq!(
+    ///     error.to_string(),
+    ///     "circular dependency found in models - model_a.on -> model_b.on -> model_a.on"
+    /// );
+    /// ```
+    pub fn to_string(&self) -> String {
+        let circular_dependency_str = self
+            .0
+            .iter()
+            .map(|path| path.as_ref().display().to_string())
+            .collect::<Vec<_>>()
+            .join(" -> ");
+        let message = format!(
+            "circular dependency found in models - {}",
+            circular_dependency_str
+        );
+        message
+    }
+}
+
+impl AsOneilError for CircularDependencyError {
+    fn message(&self) -> String {
+        self.to_string()
     }
 }
