@@ -56,8 +56,4 @@ impl<'a> AsOneilError for FileError<'a> {
     fn message(&self) -> String {
         format!("couldn't read `{}` - {}", self.path.display(), self.error)
     }
-
-    fn context(&self) -> Vec<oneil_error::Context> {
-        vec![]
-    }
 }

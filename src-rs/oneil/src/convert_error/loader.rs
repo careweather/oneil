@@ -129,18 +129,7 @@ fn convert_circular_dependency_error(
 ) -> OneilError {
     let path = model_path.as_ref();
 
-    let circular_dependency = error.circular_dependency();
-    let circular_dependency_str = circular_dependency
-        .iter()
-        .map(|path| path.as_ref().display().to_string())
-        .collect::<Vec<_>>()
-        .join(" -> ");
-    let message = format!(
-        "circular dependency found in models - {}",
-        circular_dependency_str
-    );
-
-    OneilError::new(path.to_path_buf(), message, vec![])
+    OneilError::from_error(error, path.to_path_buf())
 }
 
 /// Converts model loading errors into unified CLI errors
