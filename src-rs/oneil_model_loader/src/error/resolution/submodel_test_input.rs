@@ -1,3 +1,5 @@
+use oneil_error::{AsOneilError, AsOneilErrorWithSource};
+
 use crate::error::VariableResolutionError;
 
 /// Represents an error that occurred during submodel test input resolution.
@@ -44,5 +46,21 @@ impl SubmodelTestInputResolutionError {
 impl From<VariableResolutionError> for SubmodelTestInputResolutionError {
     fn from(error: VariableResolutionError) -> Self {
         Self::variable_resolution(error)
+    }
+}
+
+impl AsOneilError for SubmodelTestInputResolutionError {
+    fn message(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl AsOneilErrorWithSource for SubmodelTestInputResolutionError {
+    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+        match self {
+            SubmodelTestInputResolutionError::VariableResolution(variable_error) => {
+                variable_error.error_location(source)
+            }
+        }
     }
 }

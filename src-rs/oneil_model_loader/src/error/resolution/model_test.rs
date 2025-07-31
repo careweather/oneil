@@ -1,3 +1,5 @@
+use oneil_error::{AsOneilError, AsOneilErrorWithSource};
+
 use crate::error::VariableResolutionError;
 
 /// Represents an error that occurred during model test resolution.
@@ -46,5 +48,17 @@ impl ModelTestResolutionError {
 impl From<VariableResolutionError> for ModelTestResolutionError {
     fn from(error: VariableResolutionError) -> Self {
         Self::new(error)
+    }
+}
+
+impl AsOneilError for ModelTestResolutionError {
+    fn message(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl AsOneilErrorWithSource for ModelTestResolutionError {
+    fn error_location(&self, source: &str) -> oneil_error::ErrorLocation {
+        self.get_error().error_location(source)
     }
 }
