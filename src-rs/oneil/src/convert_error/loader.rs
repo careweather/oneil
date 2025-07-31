@@ -14,6 +14,7 @@
 
 use std::{fs, path::Path};
 
+use oneil_error::Error;
 use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
@@ -24,7 +25,7 @@ use oneil_model_loader::{
 };
 
 use crate::{
-    convert_error::{Error, file, parser},
+    convert_error::{file, parser},
     file_parser::{DoesNotExistError, LoadingError},
 };
 

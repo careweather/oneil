@@ -7,9 +7,10 @@
 
 use std::path::Path;
 
+use oneil_error::Error;
 use oneil_parser::error::ParserError;
 
-use crate::convert_error::{Error, convert_file_error};
+use crate::convert_error::file::convert as convert_file_error;
 
 // TODO: maybe find a way to move conversions to the parser library?
 //       - move the `Error` type to its own crate?

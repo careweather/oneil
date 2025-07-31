@@ -20,9 +20,8 @@ pub use util::ColorChoice;
 use std::io::{self, Write};
 
 use oneil_ast::Model as AstModel;
+use oneil_error::Error;
 use oneil_ir::model::ModelCollection as IrModelCollection;
-
-use crate::convert_error::Error;
 
 /// Main printer for formatting and displaying Oneil CLI output
 ///

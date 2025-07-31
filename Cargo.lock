@@ -164,6 +164,7 @@ dependencies = [
  "clap",
  "colored",
  "oneil_ast",
+ "oneil_error",
  "oneil_ir",
  "oneil_model_loader",
  "oneil_parser",
@@ -171,6 +172,10 @@ dependencies = [
 
 [[package]]
 name = "oneil_ast"
+version = "0.15.0"
+
+[[package]]
+name = "oneil_error"
 version = "0.15.0"
 
 [[package]]

@@ -12,7 +12,9 @@
 
 use std::io::{self, Write};
 
-use crate::{convert_error::Error, printer::ColorChoice};
+use oneil_error::Error;
+
+use crate::printer::ColorChoice;
 
 /// Prints a formatted error message to the specified writer
 ///

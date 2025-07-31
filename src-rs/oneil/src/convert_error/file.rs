@@ -7,7 +7,7 @@
 
 use std::{io::Error as IoError, path::Path};
 
-use crate::convert_error::Error;
+use oneil_error::Error;
 
 /// Converts a file I/O error into a unified CLI error format
 ///
