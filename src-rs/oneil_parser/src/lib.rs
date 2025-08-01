@@ -79,11 +79,6 @@
 //! ```
 #![warn(missing_docs)]
 
-// TODO: add tests for the errors that are produced by the parser. Right now, we
-//       only test whether the parser succeeds on parsing valid input. We should
-//       also add tests later to ensure that the parser produces errors when
-//       parsing invalid input and that the errors are correct and clear.
-
 use oneil_ast::{
     Model, declaration::DeclNode, expression::ExprNode, model::ModelNode, note::NoteNode,
     parameter::ParameterNode, test::TestNode, unit::UnitExprNode,

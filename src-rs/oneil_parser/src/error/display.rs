@@ -129,23 +129,19 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                     delimiter_start_offset: _,
                     delimiter_length: _,
                 } => {
-                    // TODO: this error needs context indicating where the note opened
                     format!("unclosed note")
                 }
                 TokenIncompleteKind::UnclosedString {
                     open_quote_offset: _,
                 } => {
-                    // TODO: this error needs context indicating where the string opened
                     format!("unclosed string")
                 }
                 TokenIncompleteKind::InvalidDecimalPart {
                     decimal_point_offset: _,
                 } => {
-                    // TODO: this error needs context indicating where the decimal point is
                     format!("invalid decimal part")
                 }
                 TokenIncompleteKind::InvalidExponentPart { e_offset: _ } => {
-                    // TODO: this error needs context indicating where the exponent part is
                     format!("invalid exponent part")
                 }
             },

@@ -795,7 +795,7 @@ mod tests {
 
             #[test]
             fn test_invalid_path_identifier() {
-                // TODO: Could we have a better error message here? "Invalid path identifier"
+                // TODO: Add context to this error (in error module): "invalid path identifier"
                 let input = Span::new_extra("use 123.bar as baz\n", Config::default());
                 let result = parse(input);
                 let expected_use_span = AstSpan::new(0, 3, 1);
@@ -820,7 +820,7 @@ mod tests {
 
             #[test]
             fn test_invalid_alias_identifier() {
-                // TODO: Could we have a better error message here? "Invalid alias identifier"
+                // TODO: Add context to this error (in error module): "invalid alias identifier"
                 let input = Span::new_extra("use foo.bar as 123\n", Config::default());
                 let result = parse(input);
                 let expected_as_span = AstSpan::new(12, 2, 1);
@@ -917,7 +917,7 @@ mod tests {
 
             #[test]
             fn test_missing_comma_between_inputs() {
-                // TODO: Could we have a better error message here?
+                // TODO: Add context to this error (in error module): "missing comma between inputs"
                 let input = Span::new_extra("use foo.bar(x=1 y=2) as baz\n", Config::default());
                 let result = parse(input);
                 let expected_paren_span = AstSpan::new(11, 1, 0);
@@ -1487,7 +1487,7 @@ mod tests {
 
             #[test]
             fn test_trailing_comma() {
-                // TODO: Improve this error: "missing test input"
+                // TODO: Add context to this error (in error module): "missing test input"
                 let input = Span::new_extra("(x = 1,)", Config::default());
                 let result = model_inputs(input);
                 let expected_paren_span = AstSpan::new(0, 1, 0);
@@ -1511,7 +1511,7 @@ mod tests {
 
             #[test]
             fn test_invalid_identifier_in_input() {
-                // TODO: Improve this error: "invalid identifier"
+                // TODO: Add context to this error (in error module): "invalid identifier"
                 let input = Span::new_extra("(123 = 1)", Config::default());
                 let result = model_inputs(input);
                 let expected_paren_span = AstSpan::new(0, 1, 0);
@@ -1625,7 +1625,7 @@ mod tests {
 
             #[test]
             fn test_invalid_identifier() {
-                // TODO: Improve this error: "invalid identifier"
+                // TODO: Add context to this error (in error module): "invalid identifier"
                 let input = Span::new_extra("123 = 1", Config::default());
                 let result = model_input(input);
                 match result {
@@ -1644,7 +1644,7 @@ mod tests {
 
             #[test]
             fn test_invalid_value_expression() {
-                // TODO: Improve this error: "invalid value expression"
+                // TODO: Add context to this error (in error module): "invalid value expression"
                 let input = Span::new_extra("x = @", Config::default());
                 let result = model_input(input);
                 let expected_equals_span = AstSpan::new(2, 1, 1);
