@@ -180,27 +180,20 @@ impl OneilError {
     pub fn from_error_with_source(error: &impl AsOneilError, path: PathBuf, source: &str) -> Self {
         let message = error.message();
         let location = error.error_location(source);
-        // TODO: this can be more efficient, ponder this once the refactoring is done
-        let (context_without_source, context_with_source) =
-            error.context_with_source(source).into_iter().fold(
-                (vec![], vec![]),
-                |(mut context_without_source, mut context_with_source), (context, location)| {
-                    match location {
-                        Some(location) => {
-                            context_with_source.push((context, location));
-                        }
-                        None => {
-                            context_without_source.push(context);
-                        }
-                    }
-                    (context_without_source, context_with_source)
-                },
-            );
-        let context = error
-            .context()
-            .into_iter()
-            .chain(context_without_source)
-            .collect();
+
+        let mut context = error.context();
+        let mut context_with_source = vec![];
+
+        for (context_item, location) in error.context_with_source(source) {
+            match location {
+                Some(location) => {
+                    context_with_source.push((context_item, location));
+                }
+                None => {
+                    context.push(context_item);
+                }
+            }
+        }
 
         Self {
             path,
