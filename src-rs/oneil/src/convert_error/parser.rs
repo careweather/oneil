@@ -49,23 +49,13 @@ pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<OneilError
         }
     };
 
-    match file_contents {
-        Some(file_contents) => {
-            for parser_error in parser_errors {
-                let error = OneilError::from_error_with_source(
-                    parser_error,
-                    path.to_path_buf(),
-                    &file_contents,
-                );
-                errors.push(error);
-            }
-        }
-        None => {
-            for parser_error in parser_errors {
-                let error = OneilError::from_error(parser_error, path.to_path_buf());
-                errors.push(error);
-            }
-        }
+    for parser_error in parser_errors {
+        let error = OneilError::from_error_with_optional_source(
+            parser_error,
+            path.to_path_buf(),
+            file_contents.as_deref(),
+        );
+        errors.push(error);
     }
 
     errors

@@ -19,8 +19,8 @@ use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, LoadError, ResolutionErrors, SubmodelResolutionError,
-        SubmodelTestInputResolutionError, VariableResolutionError,
+        CircularDependencyError, LoadError, ParameterResolutionError, ResolutionErrors,
+        SubmodelResolutionError, SubmodelTestInputResolutionError, VariableResolutionError,
     },
 };
 
@@ -225,14 +225,11 @@ fn convert_resolution_errors(
             }
 
             SubmodelResolutionError::UndefinedSubmodel { .. } => {
-                let error = match source {
-                    Some(source) => OneilError::from_error_with_source(
-                        submodel_resolution_error,
-                        path.to_path_buf(),
-                        source,
-                    ),
-                    None => OneilError::from_error(submodel_resolution_error, path.to_path_buf()),
-                };
+                let error = OneilError::from_error_with_optional_source(
+                    submodel_resolution_error,
+                    path.to_path_buf(),
+                    source,
+                );
                 errors.push(error);
             }
         }
@@ -243,15 +240,26 @@ fn convert_resolution_errors(
         resolution_errors.get_parameter_resolution_errors()
     {
         for parameter_resolution_error in parameter_resolution_errors {
-            let error = match source {
-                Some(source) => OneilError::from_error_with_source(
-                    parameter_resolution_error,
-                    path.to_path_buf(),
-                    source,
-                ),
-                None => OneilError::from_error(parameter_resolution_error, path.to_path_buf()),
-            };
-            errors.push(error);
+            match parameter_resolution_error {
+                ParameterResolutionError::CircularDependency { .. } => {
+                    let error = OneilError::from_error_with_optional_source(
+                        parameter_resolution_error,
+                        path.to_path_buf(),
+                        source,
+                    );
+                    errors.push(error);
+                }
+                ParameterResolutionError::VariableResolution(variable_resolution_error) => {
+                    // we call `convert_variable_resolution_error` here rather than
+                    // `OneilError::from_error_with_optional_source` because it
+                    // skips certain errors that are not relevant to the user
+                    let error =
+                        convert_variable_resolution_error(path, source, variable_resolution_error);
+                    if let Some(error) = error {
+                        errors.push(error);
+                    }
+                }
+            }
         }
     }
 
@@ -260,6 +268,9 @@ fn convert_resolution_errors(
         resolution_errors.get_model_test_resolution_errors()
     {
         for test_resolution_error in test_resolution_errors {
+            // we call `convert_variable_resolution_error` here rather than
+            // `OneilError::from_error_with_optional_source` because it
+            // skips certain errors that are not relevant to the user
             let error =
                 convert_variable_resolution_error(path, source, test_resolution_error.get_error());
 
@@ -276,6 +287,9 @@ fn convert_resolution_errors(
         for submodel_test_input_resolution_error in submodel_test_input_resolution_errors {
             match submodel_test_input_resolution_error {
                 SubmodelTestInputResolutionError::VariableResolution(variable_resolution_error) => {
+                    // we call `convert_variable_resolution_error` here rather than
+                    // `OneilError::from_error_with_optional_source` because it
+                    // skips certain errors that are not relevant to the user
                     let error =
                         convert_variable_resolution_error(path, source, variable_resolution_error);
 
@@ -319,20 +333,14 @@ fn convert_variable_resolution_error(
 ) -> Option<OneilError> {
     match variable_resolution_error {
         VariableResolutionError::UndefinedParameter { .. }
-        | VariableResolutionError::UndefinedSubmodel { .. } => match source {
-            Some(source) => {
-                let error = OneilError::from_error_with_source(
-                    variable_resolution_error,
-                    path.to_path_buf(),
-                    source,
-                );
-                Some(error)
-            }
-            None => {
-                let error = OneilError::from_error(variable_resolution_error, path.to_path_buf());
-                Some(error)
-            }
-        },
+        | VariableResolutionError::UndefinedSubmodel { .. } => {
+            let error = OneilError::from_error_with_optional_source(
+                variable_resolution_error,
+                path.to_path_buf(),
+                source,
+            );
+            Some(error)
+        }
         VariableResolutionError::ModelHasError { .. } => {
             // This error is intentionally ignored because it indicates that the
             // model being referenced has errors, which will be reported separately.

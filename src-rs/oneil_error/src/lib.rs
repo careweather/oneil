@@ -28,86 +28,6 @@ pub struct OneilError {
 }
 
 impl OneilError {
-    /// Creates a new error without source location information
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - The path to the file where the error occurred
-    /// * `message` - Human-readable error message
-    ///
-    /// # Returns
-    ///
-    /// Returns a new `Error` instance without location information.
-    pub fn new(path: PathBuf, message: String, context: Vec<Context>) -> Self {
-        Self {
-            path,
-            message,
-            location: None,
-            context,
-            context_with_source: vec![],
-        }
-    }
-
-    /// Creates a new error with source location information from an offset
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - The path to the file where the error occurred
-    /// * `message` - Human-readable error message
-    /// * `location` - Optional tuple of (source_contents, offset) for location calculation
-    ///
-    /// # Returns
-    ///
-    /// Returns a new `Error` instance with calculated location information.
-    pub fn new_from_offset(
-        path: PathBuf,
-        message: String,
-        location: Option<(&str, usize)>,
-        context: Vec<Context>,
-        context_with_source: Vec<(Context, ErrorLocation)>,
-    ) -> Self {
-        let location = location
-            .map(|(contents, offset)| ErrorLocation::from_source_and_offset(contents, offset));
-
-        Self {
-            path,
-            message,
-            location,
-            context,
-            context_with_source,
-        }
-    }
-
-    /// Creates a new error with source location information from a span
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - The path to the file where the error occurred
-    /// * `message` - Human-readable error message
-    /// * `location` - Optional tuple of (source_contents, offset, length) for span calculation
-    ///
-    /// # Returns
-    ///
-    /// Returns a new `Error` instance with calculated span location information.
-    pub fn new_from_span(
-        path: PathBuf,
-        message: String,
-        location: Option<(&str, usize, usize)>,
-        context: Vec<Context>,
-        context_with_source: Vec<(Context, ErrorLocation)>,
-    ) -> Self {
-        let location = location.map(|(contents, offset, length)| {
-            ErrorLocation::from_source_and_span(contents, offset, length)
-        });
-        Self {
-            path,
-            message,
-            location,
-            context,
-            context_with_source,
-        }
-    }
-
     pub fn from_error(error: &impl AsOneilError, path: PathBuf) -> Self {
         let message = error.message();
         let location = None;
@@ -157,7 +77,7 @@ impl OneilError {
         }
     }
 
-    pub fn from_error_with_maybe_source(
+    pub fn from_error_with_optional_source(
         error: &impl AsOneilError,
         path: PathBuf,
         source: Option<&str>,
