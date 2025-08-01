@@ -10,6 +10,23 @@
 //! - Source code snippet with error highlighting
 //! - Visual indicators pointing to the error location
 
+// TODO: create a unified function for the full message format so that errors with source and
+//       context with source can be formatted reusing the same code
+//
+//       error: expected parameter or test
+//        --> /home/careweather/Projects/veery/model/radar_chain.on:7:1
+//         |
+//       7 | PMA3-63GLN+ Gain: Gain_PMA3 = 25 : dB
+//         | ^
+//         = note: parameter labels must only contain the following characters: `a-z`, `A-Z`, `0-9`, `_`, `-`, `'`
+//
+//       note: invalid character found here
+//        --> /home/careweather/Projects/veery/model/radar_chain.on:7:11
+//         |
+//       7 | PMA3-63GLN+ Gain: Gain_PMA3 = 25 : dB
+//         |           ^
+//
+
 use std::{
     io::{self, Write},
     path::Path,
