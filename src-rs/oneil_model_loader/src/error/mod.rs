@@ -27,8 +27,8 @@ pub mod resolution;
 pub mod util;
 
 pub use resolution::{
-    ImportResolutionError, ModelTestResolutionError, ParameterResolutionError, ResolutionErrors,
-    SubmodelResolutionError, SubmodelTestInputResolutionError, VariableResolutionError,
+    ImportResolutionError, ModelTestInputResolutionError, ModelTestResolutionError,
+    ParameterResolutionError, ResolutionErrors, SubmodelResolutionError, VariableResolutionError,
 };
 pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_errors};
 

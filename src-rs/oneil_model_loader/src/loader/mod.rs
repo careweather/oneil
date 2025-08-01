@@ -146,24 +146,20 @@ where
     let parameter_info: InfoMap<&Identifier, &Parameter> =
         InfoMap::new(parameters.iter().collect(), parameters_with_errors);
 
+    // resolve tests
+    let (tests, test_resolution_errors) =
+        resolver::resolve_tests(tests, &parameter_info, &submodel_info, &model_info);
+
     // resolve model tests
     let (model_tests, model_test_resolution_errors) =
-        resolver::resolve_model_tests(tests, &parameter_info, &submodel_info, &model_info);
-
-    // resolve submodel tests
-    let (submodel_tests, submodel_test_resolution_errors) = resolver::resolve_submodel_tests(
-        submodel_tests,
-        &parameter_info,
-        &submodel_info,
-        &model_info,
-    );
+        resolver::resolve_model_tests(submodel_tests, &parameter_info, &submodel_info, &model_info);
 
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,
         submodel_resolution_errors,
         parameter_resolution_errors,
+        test_resolution_errors,
         model_test_resolution_errors,
-        submodel_test_resolution_errors,
     );
 
     if !resolution_errors.is_empty() {
@@ -172,13 +168,7 @@ where
     }
 
     // build model
-    let model = Model::new(
-        python_imports,
-        submodels,
-        parameters,
-        model_tests,
-        submodel_tests,
-    );
+    let model = Model::new(python_imports, submodels, parameters, tests, model_tests);
 
     // add model to builder
     builder.add_model(model_path, model);

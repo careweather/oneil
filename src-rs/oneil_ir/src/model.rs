@@ -11,7 +11,7 @@ use crate::{
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
     span::WithSpan,
-    test::{ModelTest, SubmodelTest, TestIndex},
+    test::{ModelTest, Test, TestIndex},
 };
 
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
@@ -30,8 +30,8 @@ pub struct Model {
     python_imports: HashSet<WithSpan<PythonPath>>,
     submodels: HashMap<Identifier, WithSpan<ModelPath>>,
     parameters: ParameterCollection,
-    model_tests: HashMap<TestIndex, ModelTest>,
-    submodel_tests: Vec<WithSpan<SubmodelTest>>,
+    tests: HashMap<TestIndex, Test>,
+    model_tests: Vec<WithSpan<ModelTest>>,
 }
 
 impl Model {
@@ -42,8 +42,8 @@ impl Model {
     /// * `python_imports` - Set of Python modules to import
     /// * `submodels` - Mapping of submodel identifiers to their model paths
     /// * `parameters` - Collection of parameters defined in this model
-    /// * `model_tests` - Tests for the entire model
-    /// * `submodel_tests` - Tests for individual submodels
+    /// * `tests` - Tests for the entire model
+    /// * `model_tests` - Tests for individual models
     ///
     /// # Example
     ///
@@ -55,7 +55,7 @@ impl Model {
     ///     HashSet::new(), // no Python imports
     ///     HashMap::new(),  // no submodels
     ///     ParameterCollection::new(HashMap::new()),
-    ///     HashMap::new(),  // no model tests
+    ///     HashMap::new(),  // no tests
     ///     Vec::new(),      // no submodel tests
     /// );
     /// ```
@@ -63,15 +63,15 @@ impl Model {
         python_imports: HashSet<WithSpan<PythonPath>>,
         submodels: HashMap<Identifier, WithSpan<ModelPath>>,
         parameters: ParameterCollection,
-        model_tests: HashMap<TestIndex, ModelTest>,
-        submodel_tests: Vec<WithSpan<SubmodelTest>>,
+        tests: HashMap<TestIndex, Test>,
+        model_tests: Vec<WithSpan<ModelTest>>,
     ) -> Self {
         Self {
             python_imports,
             submodels,
             parameters,
+            tests,
             model_tests,
-            submodel_tests,
         }
     }
 
@@ -144,20 +144,20 @@ impl Model {
         &self.parameters
     }
 
-    /// Returns a reference to all model tests in this model.
+    /// Returns a reference to all tests in this model.
     ///
-    /// Model tests validate the behavior of the entire model and are
+    /// Tests validate the behavior of the entire model and are
     /// indexed by test indices for easy lookup.
-    pub fn get_model_tests(&self) -> &HashMap<TestIndex, ModelTest> {
-        &self.model_tests
+    pub fn get_tests(&self) -> &HashMap<TestIndex, Test> {
+        &self.tests
     }
 
-    /// Returns a reference to all submodel tests in this model.
+    /// Returns a reference to all model tests in this model.
     ///
-    /// Submodel tests validate the behavior of individual submodels
+    /// Model tests validate the behavior of individual submodels
     /// and are stored in a vector since they don't need indexed access.
-    pub fn get_submodel_tests(&self) -> &[WithSpan<SubmodelTest>] {
-        &self.submodel_tests
+    pub fn get_model_tests(&self) -> &[WithSpan<ModelTest>] {
+        &self.model_tests
     }
 
     /// Checks if this model is empty (contains no components).
@@ -185,8 +185,8 @@ impl Model {
         self.python_imports.is_empty()
             && self.submodels.is_empty()
             && self.parameters.is_empty()
+            && self.tests.is_empty()
             && self.model_tests.is_empty()
-            && self.submodel_tests.is_empty()
     }
 }
 

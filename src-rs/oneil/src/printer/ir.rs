@@ -18,7 +18,7 @@ use oneil_ir::{
     model::ModelCollection,
     parameter::{Limits, Parameter, ParameterValue},
     reference::Identifier,
-    test::{ModelTest, SubmodelTest},
+    test::{ModelTest, Test},
     unit::CompositeUnit,
 };
 
@@ -109,16 +109,16 @@ fn print_model(
         sections.push(("Parameters", parameters.len()));
     }
 
+    // Collect tests
+    let tests = model.get_tests();
+    if !tests.is_empty() {
+        sections.push(("Tests", tests.len()));
+    }
+
     // Collect model tests
     let model_tests = model.get_model_tests();
     if !model_tests.is_empty() {
         sections.push(("Model Tests", model_tests.len()));
-    }
-
-    // Collect submodel tests
-    let submodel_tests = model.get_submodel_tests();
-    if !submodel_tests.is_empty() {
-        sections.push(("Submodel Tests", submodel_tests.len()));
     }
 
     // Print sections
@@ -137,8 +137,8 @@ fn print_model(
         match *section_name {
             "Submodels" => print_submodels(submodels, writer, indent + 2)?,
             "Parameters" => print_parameters(parameters, writer, indent + 2)?,
+            "Tests" => print_tests(tests, writer, indent + 2)?,
             "Model Tests" => print_model_tests(model_tests, writer, indent + 2)?,
-            "Submodel Tests" => print_submodel_tests(submodel_tests, writer, indent + 2)?,
             _ => {}
         }
     }
@@ -430,13 +430,13 @@ fn print_unit(unit: &CompositeUnit, writer: &mut impl Write, indent: usize) -> i
 }
 
 /// Prints model tests
-fn print_model_tests(
-    model_tests: &std::collections::HashMap<oneil_ir::test::TestIndex, ModelTest>,
+fn print_tests(
+    tests: &std::collections::HashMap<oneil_ir::test::TestIndex, Test>,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    for (i, (test_index, test)) in model_tests.iter().enumerate() {
-        let is_last = i == model_tests.len() - 1;
+    for (i, (test_index, test)) in tests.iter().enumerate() {
+        let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         writeln!(
             writer,
@@ -445,13 +445,13 @@ fn print_model_tests(
             prefix,
             test_index
         )?;
-        print_model_test(test, writer, indent + 2)?;
+        print_test(test, writer, indent + 2)?;
     }
     Ok(())
 }
 
-/// Prints a single model test
-fn print_model_test(test: &ModelTest, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+/// Prints a single test
+fn print_test(test: &Test, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     // Print trace level
     writeln!(
         writer,
@@ -486,39 +486,39 @@ fn print_model_test(test: &ModelTest, writer: &mut impl Write, indent: usize) ->
     Ok(())
 }
 
-/// Prints submodel tests
-fn print_submodel_tests(
-    submodel_tests: &[oneil_ir::span::WithSpan<SubmodelTest>],
+/// Prints model tests
+fn print_model_tests(
+    model_tests: &[oneil_ir::span::WithSpan<ModelTest>],
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    for (i, test) in submodel_tests.iter().enumerate() {
-        let is_last = i == submodel_tests.len() - 1;
+    for (i, test) in model_tests.iter().enumerate() {
+        let is_last = i == model_tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         writeln!(
             writer,
-            "{}    {}Submodel Test {}:",
+            "{}    {}Model Test {}:",
             "  ".repeat(indent),
             prefix,
             i + 1
         )?;
-        print_submodel_test(test, writer, indent + 2)?;
+        print_model_test(test, writer, indent + 2)?;
     }
     Ok(())
 }
 
-/// Prints a single submodel test
-fn print_submodel_test(
-    test: &oneil_ir::span::WithSpan<SubmodelTest>,
+/// Prints a single model test
+fn print_model_test(
+    test: &oneil_ir::span::WithSpan<ModelTest>,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    // Print submodel name
+    // Print model name
     writeln!(
         writer,
-        "{}    ├── Submodel: \"{}\"",
+        "{}    ├── Model: \"{}\"",
         "  ".repeat(indent),
-        test.submodel_name().as_str()
+        test.model_name().as_str()
     )?;
 
     // Print inputs

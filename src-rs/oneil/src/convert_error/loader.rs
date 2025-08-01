@@ -19,8 +19,9 @@ use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, LoadError, ParameterResolutionError, ResolutionErrors,
-        SubmodelResolutionError, SubmodelTestInputResolutionError, VariableResolutionError,
+        CircularDependencyError, LoadError, ModelTestInputResolutionError,
+        ParameterResolutionError, ResolutionErrors, SubmodelResolutionError,
+        VariableResolutionError,
     },
 };
 
@@ -282,11 +283,11 @@ fn convert_resolution_errors(
 
     // convert submodel test input resolution errors
     for (_submodel_identifier, submodel_test_input_resolution_errors) in
-        resolution_errors.get_submodel_test_input_resolution_errors()
+        resolution_errors.get_model_test_input_resolution_errors()
     {
         for submodel_test_input_resolution_error in submodel_test_input_resolution_errors {
             match submodel_test_input_resolution_error {
-                SubmodelTestInputResolutionError::VariableResolution(variable_resolution_error) => {
+                ModelTestInputResolutionError::VariableResolution(variable_resolution_error) => {
                     // we call `convert_variable_resolution_error` here rather than
                     // `OneilError::from_error_with_optional_source` because it
                     // skips certain errors that are not relevant to the user

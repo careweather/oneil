@@ -47,11 +47,11 @@ use oneil_ast as ast;
 use oneil_ir::{
     reference::Identifier,
     span::{Span, WithSpan},
-    test::{ModelTest, SubmodelTest, SubmodelTestInputs, TestIndex},
+    test::{ModelTest, ModelTestInputs, Test, TestIndex},
 };
 
 use crate::{
-    error::{self, ModelTestResolutionError, SubmodelTestInputResolutionError},
+    error::{self, ModelTestInputResolutionError, ModelTestResolutionError},
     loader::resolver::{
         ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
         trace_level::resolve_trace_level,
@@ -59,10 +59,10 @@ use crate::{
     util::get_span_from_ast_span,
 };
 
-/// Resolves model tests from AST test declarations.
+/// Resolves tests from AST test declarations.
 ///
 /// This function processes a collection of `ast::Test` declarations and resolves
-/// them into executable `ModelTest` structures with proper variable scoping and
+/// them into executable `Test` structures with proper variable scoping and
 /// error handling.
 ///
 /// # Arguments
@@ -75,20 +75,20 @@ use crate::{
 /// # Returns
 ///
 /// A tuple containing:
-/// * `HashMap<TestIndex, ModelTest>` - Successfully resolved model tests mapped to their indices
+/// * `HashMap<TestIndex, Test>` - Successfully resolved tests mapped to their indices
 /// * `HashMap<TestIndex, Vec<ModelTestResolutionError>>` - Any resolution errors that occurred
 ///
 /// # Error Handling
 ///
 /// All errors are collected and returned rather than causing the function to fail.
 /// Each test is processed independently, so errors in one test don't affect others.
-pub fn resolve_model_tests(
+pub fn resolve_tests(
     tests: Vec<&ast::test::TestNode>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
 ) -> (
-    HashMap<TestIndex, ModelTest>,
+    HashMap<TestIndex, Test>,
     HashMap<TestIndex, Vec<ModelTestResolutionError>>,
 ) {
     let tests = tests.into_iter().enumerate().map(|(test_index, test)| {
@@ -121,21 +121,21 @@ pub fn resolve_model_tests(
         )
         .map_err(|errors| (test_index.clone(), error::convert_errors(errors)))?;
 
-        Ok((test_index, ModelTest::new(trace_level, inputs, test_expr)))
+        Ok((test_index, Test::new(trace_level, inputs, test_expr)))
     });
 
     error::split_ok_and_errors(tests)
 }
 
-/// Resolves submodel tests from submodel test input declarations.
+/// Resolves model tests from model test input declarations.
 ///
-/// This function processes a collection of submodel test inputs and resolves
-/// them into executable `SubmodelTest` structures. These tests are typically
+/// This function processes a collection of model test inputs and resolves
+/// them into executable `ModelTest` structures. These tests are typically
 /// created from `use` declarations that include input parameters.
 ///
 /// # Arguments
 ///
-/// * `submodel_tests` - A vector of submodel test inputs, each containing a submodel
+/// * `model_tests` - A vector of model test inputs, each containing a model
 ///   identifier and a list of model input declarations
 /// * `defined_parameters_info` - Information about available parameters in the model
 /// * `submodel_info` - Information about available submodels in the model
@@ -144,15 +144,15 @@ pub fn resolve_model_tests(
 /// # Returns
 ///
 /// A tuple containing:
-/// * `Vec<SubmodelTest>` - Successfully resolved submodel tests
-/// * `HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>` - Any resolution errors that occurred
+/// * `Vec<ModelTest>` - Successfully resolved model tests
+/// * `HashMap<Identifier, Vec<ModelTestInputResolutionError>>` - Any resolution errors that occurred
 ///
 /// # Error Handling
 ///
 /// All errors are collected and returned rather than causing the function to fail.
-/// Each submodel test is processed independently, so errors in one test don't affect others.
-pub fn resolve_submodel_tests(
-    submodel_tests: Vec<(
+/// Each model test is processed independently, so errors in one test don't affect others.
+pub fn resolve_model_tests(
+    model_tests: Vec<(
         Identifier,
         Span,
         Option<&ast::declaration::ModelInputListNode>,
@@ -161,48 +161,47 @@ pub fn resolve_submodel_tests(
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
 ) -> (
-    Vec<WithSpan<SubmodelTest>>,
-    HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>,
+    Vec<WithSpan<ModelTest>>,
+    HashMap<Identifier, Vec<ModelTestInputResolutionError>>,
 ) {
-    let submodel_tests =
-        submodel_tests
-            .into_iter()
-            .map(|(submodel_name, use_model_span, inputs)| {
-                // TODO: verify that there are no duplicate inputs
-                let inputs: Vec<_> = inputs
-                    .map(|inputs| {
-                        inputs
-                            .inputs()
-                            .iter()
-                            .map(|input| {
-                                let identifier = Identifier::new(input.ident().as_str());
-                                let span = get_span_from_ast_span(input.ident().node_span());
-                                let identifier_with_span = WithSpan::new(identifier, span);
-                                let value = resolve_expr(
-                                    &input.value(),
-                                    &HashSet::new(),
-                                    defined_parameters_info,
-                                    submodel_info,
-                                    model_info,
-                                )?;
+    let model_tests = model_tests
+        .into_iter()
+        .map(|(model_name, use_model_span, inputs)| {
+            // TODO: verify that there are no duplicate inputs
+            let inputs: Vec<_> = inputs
+                .map(|inputs| {
+                    inputs
+                        .inputs()
+                        .iter()
+                        .map(|input| {
+                            let identifier = Identifier::new(input.ident().as_str());
+                            let span = get_span_from_ast_span(input.ident().node_span());
+                            let identifier_with_span = WithSpan::new(identifier, span);
+                            let value = resolve_expr(
+                                &input.value(),
+                                &HashSet::new(),
+                                defined_parameters_info,
+                                submodel_info,
+                                model_info,
+                            )?;
 
-                                Ok((identifier_with_span, value))
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
+                            Ok((identifier_with_span, value))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
 
-                let inputs = error::combine_error_list(inputs)
-                    .map_err(|errors| (submodel_name.clone(), error::convert_errors(errors)))?;
-                let inputs = HashMap::from_iter(inputs);
-                let inputs = SubmodelTestInputs::new(inputs);
+            let inputs = error::combine_error_list(inputs)
+                .map_err(|errors| (model_name.clone(), error::convert_errors(errors)))?;
+            let inputs = HashMap::from_iter(inputs);
+            let inputs = ModelTestInputs::new(inputs);
 
-                let submodel_test = SubmodelTest::new(submodel_name, inputs);
+            let model_test = ModelTest::new(model_name, inputs);
 
-                Ok(WithSpan::new(submodel_test, use_model_span))
-            });
+            Ok(WithSpan::new(model_test, use_model_span))
+        });
 
-    error::split_ok_and_errors(submodel_tests)
+    error::split_ok_and_errors(model_tests)
 }
 
 #[cfg(test)]
@@ -374,13 +373,13 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_empty() {
-        // create the model tests
+    fn test_resolve_tests_empty() {
+        // create the tests
         let tests = vec![];
         let tests_refs = tests.iter().collect();
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests_refs,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -395,8 +394,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_basic() {
-        // create the model tests with various configurations
+    fn test_resolve_tests_basic() {
+        // create the tests with various configurations
         let tests = vec![
             // test: true
             helper::create_test_node(
@@ -445,8 +444,8 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests_refs,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -485,8 +484,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_with_debug_trace() {
-        // create the model tests with debug trace level
+    fn test_resolve_tests_with_debug_trace() {
+        // create the tests with debug trace level
         let tests = vec![
             // ** test {x}: true
             helper::create_test_node(
@@ -499,8 +498,8 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests_refs,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -522,8 +521,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_tests_with_undefined_variable() {
-        // create the model tests with undefined variable
+    fn test_resolve_tests_with_undefined_variable() {
+        // create the tests with undefined variable
         let undefined_var = helper::create_identifier_variable("undefined_var");
         let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let tests = vec![
@@ -538,8 +537,8 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests_refs,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -592,8 +591,8 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
-        // resolve the model tests
-        let (resolved_tests, errors) = resolve_model_tests(
+        // resolve the tests
+        let (resolved_tests, errors) = resolve_tests(
             tests_refs,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -624,13 +623,13 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_tests_empty() {
-        // create the submodel tests
-        let submodel_tests = vec![];
+    fn test_resolve_model_tests_empty() {
+        // create the model tests
+        let model_tests = vec![];
 
-        // resolve the submodel tests
-        let (resolved_tests, errors) = resolve_submodel_tests(
-            submodel_tests,
+        // resolve the model tests
+        let (resolved_tests, errors) = resolve_model_tests(
+            model_tests,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
             &helper::create_empty_model_info(),
@@ -644,8 +643,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_tests_basic() {
-        // create the submodel tests with basic inputs
+    fn test_resolve_model_tests_basic() {
+        // create the model tests with basic inputs
         let input_list = helper::create_model_input_list_node(
             vec![
                 helper::create_model_input_node(
@@ -677,8 +676,8 @@ mod tests {
             ),
         ];
 
-        // resolve the submodel tests
-        let (resolved_tests, errors) = resolve_submodel_tests(
+        // resolve the model tests
+        let (resolved_tests, errors) = resolve_model_tests(
             submodel_tests,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -691,7 +690,7 @@ mod tests {
         // check the resolved tests
         assert!(resolved_tests.len() == 1);
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
+        assert_eq!(test.model_name(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 2);
         assert!(test.inputs().contains_key(&WithSpan::new(
             Identifier::new("location"),
@@ -704,8 +703,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_tests_multiple() {
-        // create the submodel tests with multiple inputs
+    fn test_resolve_model_tests_multiple() {
+        // create the model tests with multiple inputs
         let input_list1 = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param1",
@@ -745,8 +744,8 @@ mod tests {
             ),
         ];
 
-        // resolve the submodel tests
-        let (resolved_tests, errors) = resolve_submodel_tests(
+        // resolve the model tests
+        let (resolved_tests, errors) = resolve_model_tests(
             submodel_tests,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -760,7 +759,7 @@ mod tests {
         assert_eq!(resolved_tests.len(), 2);
 
         let test_0 = &resolved_tests[0];
-        assert_eq!(test_0.submodel_name(), &Identifier::new("sensor1"));
+        assert_eq!(test_0.model_name(), &Identifier::new("sensor1"));
         assert_eq!(test_0.inputs().len(), 1);
         assert!(test_0.inputs().contains_key(&WithSpan::new(
             Identifier::new("param1"),
@@ -768,7 +767,7 @@ mod tests {
         )));
 
         let test_1 = &resolved_tests[1];
-        assert_eq!(test_1.submodel_name(), &Identifier::new("sensor2"));
+        assert_eq!(test_1.model_name(), &Identifier::new("sensor2"));
         assert_eq!(test_1.inputs().len(), 1);
         assert!(test_1.inputs().contains_key(&WithSpan::new(
             Identifier::new("param2"),
@@ -777,8 +776,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_tests_with_undefined_variable() {
-        // create the submodel tests with undefined variable
+    fn test_resolve_model_tests_with_undefined_variable() {
+        // create the model tests with undefined variable
         let undefined_var = helper::create_identifier_variable("undefined_var");
         let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let input_list = helper::create_model_input_list_node(
@@ -800,8 +799,8 @@ mod tests {
             ),
         ];
 
-        // resolve the submodel tests
-        let (resolved_tests, errors) = resolve_submodel_tests(
+        // resolve the model tests
+        let (resolved_tests, errors) = resolve_model_tests(
             submodel_tests,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -815,7 +814,7 @@ mod tests {
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
-            SubmodelTestInputResolutionError::VariableResolution(
+            ModelTestInputResolutionError::VariableResolution(
                 VariableResolutionError::undefined_parameter(
                     Identifier::new("undefined_var"),
                     undefined_var_span,
@@ -867,8 +866,8 @@ mod tests {
             ),
         ];
 
-        // resolve the submodel tests
-        let (resolved_tests, errors) = resolve_submodel_tests(
+        // resolve the model tests
+        let (resolved_tests, errors) = resolve_model_tests(
             submodel_tests,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -881,7 +880,7 @@ mod tests {
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
-            SubmodelTestInputResolutionError::VariableResolution(
+            ModelTestInputResolutionError::VariableResolution(
                 VariableResolutionError::undefined_parameter(
                     Identifier::new("undefined_var"),
                     undefined_var_span,
@@ -892,7 +891,7 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor1"));
+        assert_eq!(test.model_name(), &Identifier::new("sensor1"));
         assert_eq!(test.inputs().len(), 1);
         assert!(test.inputs().contains_key(&WithSpan::new(
             Identifier::new("param1"),
@@ -901,8 +900,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_tests_with_complex_expressions() {
-        // create the submodel tests with complex expressions
+    fn test_resolve_model_tests_with_complex_expressions() {
+        // create the model tests with complex expressions
         let input_list = helper::create_model_input_list_node(
             vec![
                 helper::create_model_input_node(
@@ -958,8 +957,8 @@ mod tests {
             ),
         ];
 
-        // resolve the submodel tests
-        let (resolved_tests, errors) = resolve_submodel_tests(
+        // resolve the model tests
+        let (resolved_tests, errors) = resolve_model_tests(
             submodel_tests,
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
@@ -973,7 +972,7 @@ mod tests {
         assert_eq!(resolved_tests.len(), 1);
 
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
+        assert_eq!(test.model_name(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 2);
         assert!(test.inputs().contains_key(&WithSpan::new(
             Identifier::new("calculation"),
@@ -986,8 +985,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_tests_with_parameter_reference() {
-        // create the submodel tests with parameter reference
+    fn test_resolve_model_tests_with_parameter_reference() {
+        // create the model tests with parameter reference
         let input_list = helper::create_model_input_list_node(
             vec![helper::create_model_input_node(
                 "param",
@@ -1028,8 +1027,8 @@ mod tests {
             HashSet::new(),
         );
 
-        // resolve the submodel tests
-        let (resolved_tests, errors) = resolve_submodel_tests(
+        // resolve the model tests
+        let (resolved_tests, errors) = resolve_model_tests(
             submodel_tests,
             &parameter_info,
             &helper::create_empty_submodel_info(),
@@ -1042,7 +1041,7 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = &resolved_tests[0];
-        assert_eq!(test.submodel_name(), &Identifier::new("sensor"));
+        assert_eq!(test.model_name(), &Identifier::new("sensor"));
         assert_eq!(test.inputs().len(), 1);
         assert!(test.inputs().contains_key(&WithSpan::new(
             Identifier::new("param"),

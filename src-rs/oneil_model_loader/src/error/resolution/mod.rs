@@ -21,9 +21,9 @@
 
 mod import;
 mod model_test;
+mod model_test_input;
 mod parameter;
 mod submodel;
-mod submodel_test_input;
 mod variable;
 
 use std::collections::HashMap;
@@ -35,9 +35,9 @@ use oneil_ir::{
 
 pub use import::ImportResolutionError;
 pub use model_test::ModelTestResolutionError;
+pub use model_test_input::ModelTestInputResolutionError;
 pub use parameter::ParameterResolutionError;
 pub use submodel::SubmodelResolutionError;
-pub use submodel_test_input::SubmodelTestInputResolutionError;
 pub use variable::VariableResolutionError;
 
 /// A collection of all resolution errors that occurred during model loading.
@@ -51,7 +51,7 @@ pub struct ResolutionErrors {
     submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
     parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
     model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
-    submodel_test_resolution_errors: HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>,
+    model_test_input_resolution_errors: HashMap<Identifier, Vec<ModelTestInputResolutionError>>,
 }
 
 impl ResolutionErrors {
@@ -63,7 +63,7 @@ impl ResolutionErrors {
     /// * `submodel_resolution_errors` - Errors that occurred during submodel resolution
     /// * `parameter_resolution_errors` - Errors that occurred during parameter resolution
     /// * `model_test_resolution_errors` - Errors that occurred during model test resolution
-    /// * `submodel_test_resolution_errors` - Errors that occurred during submodel test resolution
+    /// * `model_test_input_resolution_errors` - Errors that occurred during model test input resolution
     ///
     /// # Returns
     ///
@@ -73,14 +73,14 @@ impl ResolutionErrors {
         submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
         parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
         model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
-        submodel_test_resolution_errors: HashMap<Identifier, Vec<SubmodelTestInputResolutionError>>,
+        model_test_input_resolution_errors: HashMap<Identifier, Vec<ModelTestInputResolutionError>>,
     ) -> Self {
         Self {
             import_errors,
             submodel_resolution_errors,
             parameter_resolution_errors,
             model_test_resolution_errors,
-            submodel_test_resolution_errors,
+            model_test_input_resolution_errors,
         }
     }
 
@@ -94,7 +94,7 @@ impl ResolutionErrors {
             && self.submodel_resolution_errors.is_empty()
             && self.parameter_resolution_errors.is_empty()
             && self.model_test_resolution_errors.is_empty()
-            && self.submodel_test_resolution_errors.is_empty()
+            && self.model_test_input_resolution_errors.is_empty()
     }
 
     /// Returns a reference to the map of import resolution errors.
@@ -156,19 +156,19 @@ impl ResolutionErrors {
         &self.model_test_resolution_errors
     }
 
-    /// Returns a reference to the map of submodel test resolution errors.
+    /// Returns a reference to the map of model test input resolution errors.
     ///
-    /// This method provides access to any errors that occurred during submodel test input resolution.
-    /// The errors are mapped from the submodel identifier to a vector of `SubmodelTestInputResolutionError`s.
-    /// These errors occur when test inputs for a submodel cannot be resolved, for example when the input
+    /// This method provides access to any errors that occurred during model test input resolution.
+    /// The errors are mapped from the model identifier to a vector of `ModelTestInputResolutionError`s.
+    /// These errors occur when test inputs for a model cannot be resolved, for example when the input
     /// references undefined variables or has invalid values.
     ///
     /// # Returns
     ///
-    /// A reference to the HashMap containing submodel identifiers and their associated test input resolution errors.
-    pub fn get_submodel_test_input_resolution_errors(
+    /// A reference to the HashMap containing model identifiers and their associated test input resolution errors.
+    pub fn get_model_test_input_resolution_errors(
         &self,
-    ) -> &HashMap<Identifier, Vec<SubmodelTestInputResolutionError>> {
-        &self.submodel_test_resolution_errors
+    ) -> &HashMap<Identifier, Vec<ModelTestInputResolutionError>> {
+        &self.model_test_input_resolution_errors
     }
 }

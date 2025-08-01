@@ -36,8 +36,8 @@
 //! - [`expr::Variable`] - Local, parameter, and external variable references
 //!
 //! ### Testing
+//! - [`test::Test`] - Tests for model parameters
 //! - [`test::ModelTest`] - Tests for entire models
-//! - [`test::SubmodelTest`] - Tests for individual submodels
 //!
 //! ### Units
 //! - [`unit::CompositeUnit`] - Complex units composed of multiple base units
@@ -73,7 +73,7 @@
 //!     HashSet::new(), // no Python imports
 //!     HashMap::new(),  // no submodels
 //!     ParameterCollection::new(params),
-//!     HashMap::new(),  // no model tests
+//!     HashMap::new(),  // no tests
 //!     Vec::new(),      // no submodel tests
 //! );
 //! ```
