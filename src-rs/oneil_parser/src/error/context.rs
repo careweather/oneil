@@ -132,8 +132,14 @@ fn decimal_literal_starts_with_dot(
     remaining_source: &str,
 ) -> Vec<(Context, Option<ErrorLocation>)> {
     let starts_with_dot = remaining_source.starts_with('.');
+    let is_followed_by_digit = remaining_source
+        .chars()
+        .skip(1) // skip the decimal point
+        .next()
+        .map(|c| c.is_ascii_digit())
+        .unwrap_or(false);
 
-    if starts_with_dot {
+    if starts_with_dot && is_followed_by_digit {
         let note_message = "decimal literals are not allowed to start with a `.`";
         let help_message = "add a leading `0`";
         vec![
