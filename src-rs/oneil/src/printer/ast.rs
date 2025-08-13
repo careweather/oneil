@@ -99,20 +99,6 @@ fn print_decl(
                     subcomps.join(", ")
                 )?;
             }
-
-            // Print inputs if any
-            if let Some(inputs) = use_model.inputs() {
-                writeln!(writer, "{}    └── Inputs:", "  ".repeat(indent))?;
-                for input in inputs.inputs() {
-                    writeln!(
-                        writer,
-                        "{}        └── {} = ",
-                        "  ".repeat(indent),
-                        input.ident().node_value().as_str()
-                    )?;
-                    print_expression(input.value(), writer, indent + 6)?;
-                }
-            }
         }
         Decl::Parameter(param) => {
             writeln!(

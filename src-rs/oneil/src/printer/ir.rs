@@ -18,7 +18,7 @@ use oneil_ir::{
     model::ModelCollection,
     parameter::{Limits, Parameter, ParameterValue},
     reference::Identifier,
-    test::{ModelTest, Test},
+    test::Test,
     unit::CompositeUnit,
 };
 
@@ -115,12 +115,6 @@ fn print_model(
         sections.push(("Tests", tests.len()));
     }
 
-    // Collect model tests
-    let model_tests = model.get_model_tests();
-    if !model_tests.is_empty() {
-        sections.push(("Model Tests", model_tests.len()));
-    }
-
     // Print sections
     for (i, (section_name, count)) in sections.iter().enumerate() {
         let is_last = i == sections.len() - 1;
@@ -138,7 +132,6 @@ fn print_model(
             "Submodels" => print_submodels(submodels, writer, indent + 2)?,
             "Parameters" => print_parameters(parameters, writer, indent + 2)?,
             "Tests" => print_tests(tests, writer, indent + 2)?,
-            "Model Tests" => print_model_tests(model_tests, writer, indent + 2)?,
             _ => {}
         }
     }
@@ -429,7 +422,7 @@ fn print_unit(unit: &CompositeUnit, writer: &mut impl Write, indent: usize) -> i
     Ok(())
 }
 
-/// Prints model tests
+/// Prints tests
 fn print_tests(
     tests: &std::collections::HashMap<oneil_ir::test::TestIndex, Test>,
     writer: &mut impl Write,
@@ -482,64 +475,6 @@ fn print_test(test: &Test, writer: &mut impl Write, indent: usize) -> io::Result
     // Print test expression
     writeln!(writer, "{}    └── Test Expression:", "  ".repeat(indent))?;
     print_expression(test.test_expr(), writer, indent + 2)?;
-
-    Ok(())
-}
-
-/// Prints model tests
-fn print_model_tests(
-    model_tests: &[oneil_ir::span::WithSpan<ModelTest>],
-    writer: &mut impl Write,
-    indent: usize,
-) -> io::Result<()> {
-    for (i, test) in model_tests.iter().enumerate() {
-        let is_last = i == model_tests.len() - 1;
-        let prefix = if is_last { "└──" } else { "├──" };
-        writeln!(
-            writer,
-            "{}    {}Model Test {}:",
-            "  ".repeat(indent),
-            prefix,
-            i + 1
-        )?;
-        print_model_test(test, writer, indent + 2)?;
-    }
-    Ok(())
-}
-
-/// Prints a single model test
-fn print_model_test(
-    test: &oneil_ir::span::WithSpan<ModelTest>,
-    writer: &mut impl Write,
-    indent: usize,
-) -> io::Result<()> {
-    // Print model name
-    writeln!(
-        writer,
-        "{}    ├── Model: \"{}\"",
-        "  ".repeat(indent),
-        test.model_name().as_str()
-    )?;
-
-    // Print inputs
-    let inputs = test.inputs();
-    if inputs.is_empty() {
-        writeln!(writer, "{}    └── Inputs: [none]", "  ".repeat(indent))?;
-    } else {
-        writeln!(writer, "{}    ├── Inputs:", "  ".repeat(indent))?;
-        for (i, (input_id, input_expr)) in inputs.iter().enumerate() {
-            let is_last = i == inputs.len() - 1;
-            let prefix = if is_last { "└──" } else { "├──" };
-            writeln!(
-                writer,
-                "{}        {}Input \"{}\":",
-                "  ".repeat(indent),
-                prefix,
-                input_id.as_str()
-            )?;
-            print_expression(input_expr, writer, indent + 4)?;
-        }
-    }
 
     Ok(())
 }
