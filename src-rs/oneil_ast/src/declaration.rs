@@ -3,10 +3,7 @@
 //! This module contains structures for representing declarations in Oneil programs,
 //! including imports, model usage, parameters, and tests.
 
-use crate::{
-    expression::ExprNode, naming::IdentifierNode, node::Node, parameter::ParameterNode,
-    test::TestNode,
-};
+use crate::{naming::IdentifierNode, node::Node, parameter::ParameterNode, test::TestNode};
 
 /// A declaration in an Oneil program
 ///
@@ -77,7 +74,6 @@ impl Import {
 pub struct UseModel {
     model_name: IdentifierNode,
     subcomponents: Vec<IdentifierNode>,
-    inputs: Option<ModelInputListNode>,
     alias: Option<IdentifierNode>,
 }
 
@@ -89,13 +85,11 @@ impl UseModel {
     pub fn new(
         model_name: IdentifierNode,
         subcomponents: Vec<IdentifierNode>,
-        inputs: Option<ModelInputListNode>,
         alias: Option<IdentifierNode>,
     ) -> Self {
         Self {
             model_name,
             subcomponents,
-            inputs,
             alias,
         }
     }
@@ -110,59 +104,8 @@ impl UseModel {
         &self.subcomponents
     }
 
-    /// Returns the optional inputs for the model usage
-    pub fn inputs(&self) -> Option<&ModelInputListNode> {
-        self.inputs.as_ref()
-    }
-
     /// Returns the optional alias for the model usage
     pub fn alias(&self) -> Option<&IdentifierNode> {
         self.alias.as_ref()
-    }
-}
-
-/// A list of model inputs for a model usage declaration
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelInputList(Vec<ModelInputNode>);
-
-/// A node containing a list of model inputs
-pub type ModelInputListNode = Node<ModelInputList>;
-
-impl ModelInputList {
-    /// Creates a new model input list
-    pub fn new(inputs: Vec<ModelInputNode>) -> Self {
-        Self(inputs)
-    }
-
-    /// Returns a slice of the model inputs
-    pub fn inputs(&self) -> &[ModelInputNode] {
-        &self.0
-    }
-}
-
-/// A single model input with an identifier and value
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelInput {
-    ident: IdentifierNode,
-    value: ExprNode,
-}
-
-/// A node containing a model input
-pub type ModelInputNode = Node<ModelInput>;
-
-impl ModelInput {
-    /// Creates a new model input
-    pub fn new(ident: IdentifierNode, value: ExprNode) -> Self {
-        Self { ident, value }
-    }
-
-    /// Returns the identifier of the model input
-    pub fn ident(&self) -> &IdentifierNode {
-        &self.ident
-    }
-
-    /// Returns the value expression of the model input
-    pub fn value(&self) -> &ExprNode {
-        &self.value
     }
 }

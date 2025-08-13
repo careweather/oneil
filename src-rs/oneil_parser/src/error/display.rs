@@ -38,10 +38,6 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                     UseKind::MissingAlias => "expected model alias after `as`".to_string(),
                     UseKind::MissingEndOfLine => "unexpected character".to_string(),
                 },
-                DeclKind::ModelInputMissingEquals => "expected `=`".to_string(),
-                DeclKind::ModelInputMissingValue => {
-                    "expected test input value after `=`".to_string()
-                }
                 DeclKind::ModelPathMissingSubcomponent => {
                     "expected submodel name after `.`".to_string()
                 }

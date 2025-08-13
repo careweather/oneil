@@ -104,9 +104,9 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn from_missing_as(use_model_or_inputs_span: AstSpan) -> Self {
+    pub(crate) fn from_missing_as(use_model_span: AstSpan) -> Self {
         Self::Incomplete {
-            cause: use_model_or_inputs_span,
+            cause: use_model_span,
             kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAs)),
         }
     }
@@ -132,9 +132,9 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn use_missing_as(use_path_or_inputs_span: AstSpan) -> Self {
+    pub(crate) fn use_missing_as(use_path_span: AstSpan) -> Self {
         Self::Incomplete {
-            cause: use_path_or_inputs_span,
+            cause: use_path_span,
             kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAs)),
         }
     }
@@ -150,20 +150,6 @@ impl ParserErrorReason {
         Self::Incomplete {
             cause: alias_span,
             kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingEndOfLine)),
-        }
-    }
-
-    pub(crate) fn model_input_missing_equals(ident_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: ident_span,
-            kind: IncompleteKind::Decl(DeclKind::ModelInputMissingEquals),
-        }
-    }
-
-    pub(crate) fn model_input_missing_value(equals_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: equals_span,
-            kind: IncompleteKind::Decl(DeclKind::ModelInputMissingValue),
         }
     }
 
@@ -444,10 +430,6 @@ pub enum DeclKind {
         /// The kind of use error
         UseKind,
     ),
-    /// Model input is missing an equals sign
-    ModelInputMissingEquals,
-    /// Model input is missing a value
-    ModelInputMissingValue,
     /// Found an incomplete model path
     ModelPathMissingSubcomponent,
 }

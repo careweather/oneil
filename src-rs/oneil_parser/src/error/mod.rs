@@ -173,15 +173,10 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing as keyword in a from declaration
-    pub(crate) fn from_missing_as(
-        use_model_or_inputs: &impl SpanLike,
-    ) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn from_missing_as(use_model: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
-            let use_model_or_inputs_span = AstSpan::from(use_model_or_inputs);
-            Self::new_from_token_error(
-                error,
-                ParserErrorReason::from_missing_as(use_model_or_inputs_span),
-            )
+            let use_model_span = AstSpan::from(use_model);
+            Self::new_from_token_error(error, ParserErrorReason::from_missing_as(use_model_span))
         }
     }
 
@@ -215,15 +210,10 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a missing as keyword in a use declaration
-    pub(crate) fn use_missing_as(
-        use_path_or_inputs: &impl SpanLike,
-    ) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn use_missing_as(use_path: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
-            let use_path_or_inputs_span = AstSpan::from(use_path_or_inputs);
-            Self::new_from_token_error(
-                error,
-                ParserErrorReason::use_missing_as(use_path_or_inputs_span),
-            )
+            let use_path_span = AstSpan::from(use_path);
+            Self::new_from_token_error(error, ParserErrorReason::use_missing_as(use_path_span))
         }
     }
 
@@ -245,27 +235,6 @@ impl ParserError {
                 error,
                 ParserErrorReason::use_missing_end_of_line(alias_span),
             )
-        }
-    }
-
-    /// Creates a new ParserError for a missing equals sign in a model input
-    pub(crate) fn model_input_missing_equals(
-        ident_span: &impl SpanLike,
-    ) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let ident_span = AstSpan::from(ident_span);
-            Self::new_from_token_error(
-                error,
-                ParserErrorReason::model_input_missing_equals(ident_span),
-            )
-        }
-    }
-
-    /// Creates a new ParserError for a missing value in a model input
-    pub(crate) fn model_input_missing_value(equals_span: &impl SpanLike) -> impl Fn(Self) -> Self {
-        move |error| {
-            let equals_span = AstSpan::from(equals_span);
-            error.convert_reason(ParserErrorReason::model_input_missing_value(equals_span))
         }
     }
 

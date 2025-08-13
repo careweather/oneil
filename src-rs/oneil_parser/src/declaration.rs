@@ -1,32 +1,23 @@
 //! Parser for declarations in an Oneil program.
 
-use nom::{
-    Parser as _,
-    branch::alt,
-    combinator::{all_consuming, opt},
-    multi::{many0, separated_list0},
-};
+use nom::{Parser as _, branch::alt, combinator::all_consuming, multi::many0};
 
 use oneil_ast::{
     Span as AstSpan,
-    declaration::{
-        Decl, DeclNode, Import, ModelInput, ModelInputList, ModelInputListNode, ModelInputNode,
-        UseModel,
-    },
+    declaration::{Decl, DeclNode, Import, UseModel},
     naming::{Identifier, IdentifierNode},
     node::Node,
 };
 
 use crate::{
     error::{ErrorHandlingParser, ParserError},
-    expression::parse as parse_expr,
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
         keyword::{as_, from, import, use_},
         naming::identifier,
         structure::end_of_line,
-        symbol::{comma, dot, equals, paren_left, paren_right},
+        symbol::dot,
     },
     util::{Result, Span},
 };
@@ -166,15 +157,8 @@ fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
     let use_model_span = AstSpan::from(&use_model);
     subcomponents.push(use_model);
 
-    let (rest, inputs) = opt(model_inputs).parse(rest)?;
-
-    // for error reporting
-    let use_model_or_inputs_span = inputs
-        .as_ref()
-        .map_or(use_model_span, |inputs| AstSpan::from(inputs));
-
     let (rest, as_token) = as_
-        .or_fail_with(ParserError::from_missing_as(&use_model_or_inputs_span))
+        .or_fail_with(ParserError::from_missing_as(&use_model_span))
         .parse(rest)?;
 
     let (rest, alias) = identifier
@@ -188,10 +172,7 @@ fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
 
     let span = AstSpan::calc_span_with_whitespace(&from_token, &alias, &end_of_line_token);
 
-    let use_model_node = Node::new(
-        span,
-        UseModel::new(from_path, subcomponents, inputs, Some(alias)),
-    );
+    let use_model_node = Node::new(span, UseModel::new(from_path, subcomponents, Some(alias)));
 
     let decl_node = Node::new(span, Decl::UseModel(use_model_node));
 
@@ -231,20 +212,14 @@ fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
         .or_fail_with(ParserError::use_missing_path(&use_token))
         .parse(rest)?;
 
-    let (rest, inputs) = opt(model_inputs).parse(rest)?;
-
     // for error reporting
     let use_path_span = match subcomponents.last() {
         Some(last) => AstSpan::calc_span(&path, last),
         None => AstSpan::from(&path),
     };
-    let use_path_or_inputs_span = inputs
-        .as_ref()
-        .map(|inputs| AstSpan::from(inputs))
-        .unwrap_or(use_path_span);
 
     let (rest, as_token) = as_
-        .or_fail_with(ParserError::use_missing_as(&use_path_or_inputs_span))
+        .or_fail_with(ParserError::use_missing_as(&use_path_span))
         .parse(rest)?;
 
     let (rest, alias) = identifier
@@ -258,10 +233,7 @@ fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
 
     let span = AstSpan::calc_span_with_whitespace(&use_token, &alias, &end_of_line_token);
 
-    let use_model_node = Node::new(
-        span,
-        UseModel::new(path, subcomponents, inputs, Some(alias)),
-    );
+    let use_model_node = Node::new(span, UseModel::new(path, subcomponents, Some(alias)));
 
     let decl_node = Node::new(span, Decl::UseModel(use_model_node));
 
@@ -310,85 +282,6 @@ fn model_path(input: Span) -> Result<(IdentifierNode, Vec<IdentifierNode>), Pars
     .parse(rest)?;
 
     Ok((rest, (path, subcomponents)))
-}
-
-/// Parses model inputs (e.g., "(x=1, y=2)")
-///
-/// Model inputs are optional parameters passed to a model when importing it.
-/// They are enclosed in parentheses and consist of a comma-separated list
-/// of name-value pairs.
-///
-/// Examples:
-/// - `(x=1)` (single input)
-/// - `(x=1, y=2)` (two inputs)
-/// - `(width=10, height=20, color='red')` (multiple inputs)
-/// - `()` (empty inputs)
-///
-/// The parser requires:
-/// - Opening parenthesis `(`
-/// - Zero or more comma-separated model inputs
-/// - Closing parenthesis `)`
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a model input list node containing the parsed inputs, or an error if
-/// the input list is malformed (e.g., unclosed parentheses).
-fn model_inputs(input: Span) -> Result<ModelInputListNode, ParserError> {
-    let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
-    let (rest, inputs) = separated_list0(comma.convert_errors(), model_input).parse(rest)?;
-    let (rest, paren_right_span) = paren_right
-        .or_fail_with(ParserError::unclosed_paren(&paren_left_span))
-        .parse(rest)?;
-
-    let span = AstSpan::calc_span(&paren_left_span, &paren_right_span);
-
-    Ok((rest, Node::new(span, ModelInputList::new(inputs))))
-}
-
-/// Parses a single model input (e.g., "x=1")
-///
-/// A model input consists of an identifier followed by an equals sign and an expression.
-/// The identifier is the parameter name, and the expression is the value to assign to it.
-///
-/// Examples:
-/// - `x=1` (simple numeric value)
-/// - `name='John'` (string value)
-/// - `enabled=true` (boolean value)
-/// - `size=width * height` (expression value)
-/// - `config={x: 1, y: 2}` (complex expression)
-///
-/// The parser requires:
-/// - A valid identifier as the parameter name
-/// - An equals sign `=`
-/// - A valid expression as the parameter value
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a model input node containing the parsed name-value pair, or an error if
-/// the input is malformed (e.g., missing equals sign or invalid expression).
-fn model_input(input: Span) -> Result<ModelInputNode, ParserError> {
-    let (rest, ident) = identifier.convert_errors().parse(input)?;
-    let ident_node = Node::new(ident, Identifier::new(ident.lexeme().to_string()));
-
-    let (rest, equals_span) = equals
-        .or_fail_with(ParserError::model_input_missing_equals(&ident_node))
-        .parse(rest)?;
-
-    let (rest, value) = parse_expr
-        .or_fail_with(ParserError::model_input_missing_value(&equals_span))
-        .parse(rest)?;
-
-    let span = AstSpan::calc_span(&ident, &value);
-
-    Ok((rest, Node::new(span, ModelInput::new(ident_node, value))))
 }
 
 /// Parses a parameter declaration by delegating to the parameter parser.
@@ -465,27 +358,9 @@ mod tests {
                     let use_model = use_model_node.node_value();
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert!(use_model.inputs().is_none());
                     assert_eq!(use_model.alias().unwrap().as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
-            }
-            assert_eq!(rest.fragment(), &"");
-        }
-
-        #[test]
-        fn test_use_decl_with_inputs() {
-            let input = Span::new_extra("use foo.bar(x=1, y=2) as baz\n", Config::default());
-            let (rest, decl) = parse(input).unwrap();
-            match decl.node_value() {
-                Decl::UseModel(use_model_node) => {
-                    let use_model = use_model_node.node_value();
-                    assert_eq!(use_model.model_name().as_str(), "foo");
-                    assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert!(use_model.inputs().is_some());
-                    assert_eq!(use_model.alias().unwrap().as_str(), "baz");
-                }
-                _ => panic!("Expected use declaration with inputs"),
             }
             assert_eq!(rest.fragment(), &"");
         }
@@ -499,30 +374,9 @@ mod tests {
                     let use_model = use_model_node.node_value();
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert!(use_model.inputs().is_none());
                     assert_eq!(use_model.alias().unwrap().as_str(), "baz");
                 }
                 _ => panic!("Expected from declaration"),
-            }
-            assert_eq!(rest.fragment(), &"");
-        }
-
-        #[test]
-        fn test_from_decl_with_inputs() {
-            let input = Span::new_extra(
-                "from foo.bar use model(x=1, y=2) as baz\n",
-                Config::default(),
-            );
-            let (rest, decl) = parse(input).unwrap();
-            match decl.node_value() {
-                Decl::UseModel(use_model_node) => {
-                    let use_model = use_model_node.node_value();
-                    assert_eq!(use_model.model_name().as_str(), "foo");
-                    assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert!(use_model.inputs().is_some());
-                    assert_eq!(use_model.alias().unwrap().as_str(), "baz");
-                }
-                _ => panic!("Expected from declaration with inputs"),
             }
             assert_eq!(rest.fragment(), &"");
         }
@@ -549,7 +403,6 @@ mod tests {
                     let use_model = use_model_node.node_value();
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert!(use_model.inputs().is_none());
                     assert_eq!(use_model.alias().unwrap().as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
@@ -559,14 +412,13 @@ mod tests {
 
         #[test]
         fn test_parse_complete_from_success() {
-            let input = Span::new_extra("from foo.bar use model(x=1) as baz\n", Config::default());
+            let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
             let (rest, decl) = parse_complete(input).unwrap();
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model = use_model_node.node_value();
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert!(use_model.inputs().is_some());
                     assert_eq!(use_model.alias().unwrap().as_str(), "baz");
                 }
                 _ => panic!("Expected from declaration"),
@@ -842,103 +694,6 @@ mod tests {
                     _ => panic!("Unexpected result {:?}", result),
                 }
             }
-
-            #[test]
-            fn test_unclosed_parentheses() {
-                let input = Span::new_extra("use foo.bar(x = 1 as baz\n", Config::default());
-                let result = parse(input);
-                let expected_paren_span = AstSpan::new(11, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 18);
-
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_missing_equals_in_input() {
-                let input = Span::new_extra("use foo.bar(x 1) as baz\n", Config::default());
-                let result = parse(input);
-                let expected_x_span = AstSpan::new(12, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 14);
-
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingEquals),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_x_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_invalid_model_input() {
-                let input = Span::new_extra("use foo.bar(x = ) as baz\n", Config::default());
-                let result = parse(input);
-                let expected_equals_span = AstSpan::new(14, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 16);
-
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingValue),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_equals_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_missing_comma_between_inputs() {
-                // TODO: Add context to this error (in error module): "missing comma between inputs"
-                let input = Span::new_extra("use foo.bar(x=1 y=2) as baz\n", Config::default());
-                let result = parse(input);
-                let expected_paren_span = AstSpan::new(11, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 16);
-
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
         }
 
         mod from_error_tests {
@@ -1126,104 +881,6 @@ mod tests {
                     _ => panic!("Unexpected result {:?}", result),
                 }
             }
-
-            #[test]
-            fn test_unclosed_parentheses() {
-                let input =
-                    Span::new_extra("from foo.bar use model(x = 1 as baz\n", Config::default());
-                let result = parse(input);
-                let expected_paren_span = AstSpan::new(22, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 29);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_invalid_model_input() {
-                let input =
-                    Span::new_extra("from foo.bar use model(x = ) as baz\n", Config::default());
-                let result = parse(input);
-                let expected_equals_span = AstSpan::new(25, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 27);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingValue),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_equals_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_missing_equals_in_input() {
-                let input =
-                    Span::new_extra("from foo.bar use model(x 1) as baz\n", Config::default());
-                let result = parse(input);
-                let expected_x_span = AstSpan::new(23, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 25);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingEquals),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_x_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_missing_comma_between_inputs() {
-                let input = Span::new_extra(
-                    "from foo.bar use model(x=1 y=2) as baz\n",
-                    Config::default(),
-                );
-                let result = parse(input);
-                let expected_paren_span = AstSpan::new(22, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 27);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
         }
 
         mod model_path_error_tests {
@@ -1352,312 +1009,6 @@ mod tests {
                                 cause,
                             } => {
                                 assert_eq!(cause, expected_dot_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-        }
-
-        mod model_inputs_error_tests {
-            use crate::error::reason::{DeclKind, IncompleteKind, ParserErrorReason};
-            use crate::token::error::{ExpectKind, ExpectSymbol, TokenErrorKind};
-
-            use super::*;
-
-            #[test]
-            fn test_missing_opening_paren() {
-                let input = Span::new_extra("x = 1)", Config::default());
-                let result = model_inputs(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::TokenError(TokenErrorKind::Expect(
-                                ExpectKind::Symbol(ExpectSymbol::ParenLeft)
-                            ))
-                        ));
-                    }
-                    _ => panic!("Expected error for missing opening paren"),
-                }
-            }
-
-            #[test]
-            fn test_missing_closing_paren() {
-                let input = Span::new_extra("(x = 1", Config::default());
-                let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 6);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_empty_parentheses() {
-                let input = Span::new_extra("()", Config::default());
-                let (rest, inputs) = model_inputs(input).unwrap();
-                assert_eq!(inputs.node_value().inputs().len(), 0);
-                assert_eq!(rest.fragment(), &"");
-            }
-
-            #[test]
-            fn test_missing_equals_in_input() {
-                let input = Span::new_extra("(x 1)", Config::default());
-                let result = model_inputs(input);
-                let expected_x_span = AstSpan::new(1, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 3);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingEquals),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_x_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_missing_value_in_input() {
-                let input = Span::new_extra("(x = )", Config::default());
-                let result = model_inputs(input);
-                let expected_equals_span = AstSpan::new(3, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 5);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingValue),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_equals_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_missing_comma_between_inputs() {
-                let input = Span::new_extra("(x = 1 y = 2)", Config::default());
-                let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 7);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_trailing_comma() {
-                // TODO: Add context to this error (in error module): "missing test input"
-                let input = Span::new_extra("(x = 1,)", Config::default());
-                let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 6);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_invalid_identifier_in_input() {
-                // TODO: Add context to this error (in error module): "invalid identifier"
-                let input = Span::new_extra("(123 = 1)", Config::default());
-                let result = model_inputs(input);
-                let expected_paren_span = AstSpan::new(0, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 1);
-
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::UnclosedParen,
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_paren_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-        }
-
-        mod model_input_error_tests {
-            use crate::error::reason::{DeclKind, IncompleteKind, ParserErrorReason};
-            use crate::token::error::{ExpectKind, TokenErrorKind};
-
-            use super::*;
-
-            #[test]
-            fn test_empty_input() {
-                let input = Span::new_extra("", Config::default());
-                let result = model_input(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::TokenError(TokenErrorKind::Expect(
-                                ExpectKind::Identifier
-                            ))
-                        ));
-                    }
-                    _ => panic!("Expected error for empty input"),
-                }
-            }
-
-            #[test]
-            fn test_missing_identifier() {
-                let input = Span::new_extra("= 1", Config::default());
-                let result = model_input(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::TokenError(TokenErrorKind::Expect(
-                                ExpectKind::Identifier
-                            ))
-                        ));
-                    }
-                    _ => panic!("Expected error for missing identifier"),
-                }
-            }
-
-            #[test]
-            fn test_missing_equals() {
-                let input = Span::new_extra("x 1", Config::default());
-                let result = model_input(input);
-                let expected_x_span = AstSpan::new(0, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 2);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingEquals),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_x_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_missing_value() {
-                let input = Span::new_extra("x =", Config::default());
-                let result = model_input(input);
-                let expected_equals_span = AstSpan::new(2, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 3);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingValue),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_equals_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_invalid_identifier() {
-                // TODO: Add context to this error (in error module): "invalid identifier"
-                let input = Span::new_extra("123 = 1", Config::default());
-                let result = model_input(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::TokenError(TokenErrorKind::Expect(
-                                ExpectKind::Identifier
-                            ))
-                        ));
-                    }
-                    _ => panic!("Expected error for invalid identifier"),
-                }
-            }
-
-            #[test]
-            fn test_invalid_value_expression() {
-                // TODO: Add context to this error (in error module): "invalid value expression"
-                let input = Span::new_extra("x = @", Config::default());
-                let result = model_input(input);
-                let expected_equals_span = AstSpan::new(2, 1, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 4);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelInputMissingValue),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_equals_span);
                             }
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
