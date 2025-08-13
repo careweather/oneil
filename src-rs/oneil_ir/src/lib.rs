@@ -14,7 +14,7 @@
 //! - **Model Structure**: Defining how Oneil models are organized and composed
 //! - **Parameter Management**: Handling parameter definitions, dependencies, and values
 //! - **Expression System**: Providing a rich expression language for calculations
-//! - **Testing Framework**: Supporting model and submodel testing capabilities
+//! - **Testing Framework**: Supporting testing capabilities
 //! - **Unit System**: Managing physical units and dimensional analysis
 //! - **Reference System**: Handling identifiers, model paths, and Python imports
 //!
@@ -37,7 +37,6 @@
 //!
 //! ### Testing
 //! - [`test::Test`] - Tests for model parameters
-//! - [`test::ModelTest`] - Tests for entire models
 //!
 //! ### Units
 //! - [`unit::CompositeUnit`] - Complex units composed of multiple base units
@@ -74,7 +73,6 @@
 //!     HashMap::new(),  // no submodels
 //!     ParameterCollection::new(params),
 //!     HashMap::new(),  // no tests
-//!     Vec::new(),      // no submodel tests
 //! );
 //! ```
 //!

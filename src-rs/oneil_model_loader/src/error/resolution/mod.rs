@@ -20,10 +20,9 @@
 //! error reporting while maintaining a clean error structure.
 
 mod import;
-mod model_test;
-mod model_test_input;
 mod parameter;
 mod submodel;
+mod test;
 mod variable;
 
 use std::collections::HashMap;
@@ -34,10 +33,9 @@ use oneil_ir::{
 };
 
 pub use import::ImportResolutionError;
-pub use model_test::ModelTestResolutionError;
-pub use model_test_input::ModelTestInputResolutionError;
 pub use parameter::ParameterResolutionError;
 pub use submodel::SubmodelResolutionError;
+pub use test::TestResolutionError;
 pub use variable::VariableResolutionError;
 
 /// A collection of all resolution errors that occurred during model loading.
@@ -50,8 +48,7 @@ pub struct ResolutionErrors {
     import_errors: HashMap<PythonPath, ImportResolutionError>,
     submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
     parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
-    model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
-    model_test_input_resolution_errors: HashMap<Identifier, Vec<ModelTestInputResolutionError>>,
+    test_resolution_errors: HashMap<TestIndex, Vec<TestResolutionError>>,
 }
 
 impl ResolutionErrors {
@@ -62,8 +59,7 @@ impl ResolutionErrors {
     /// * `import_errors` - Errors that occurred during Python import validation
     /// * `submodel_resolution_errors` - Errors that occurred during submodel resolution
     /// * `parameter_resolution_errors` - Errors that occurred during parameter resolution
-    /// * `model_test_resolution_errors` - Errors that occurred during model test resolution
-    /// * `model_test_input_resolution_errors` - Errors that occurred during model test input resolution
+    /// * `test_resolution_errors` - Errors that occurred during test resolution
     ///
     /// # Returns
     ///
@@ -72,15 +68,13 @@ impl ResolutionErrors {
         import_errors: HashMap<PythonPath, ImportResolutionError>,
         submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
         parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
-        model_test_resolution_errors: HashMap<TestIndex, Vec<ModelTestResolutionError>>,
-        model_test_input_resolution_errors: HashMap<Identifier, Vec<ModelTestInputResolutionError>>,
+        test_resolution_errors: HashMap<TestIndex, Vec<TestResolutionError>>,
     ) -> Self {
         Self {
             import_errors,
             submodel_resolution_errors,
             parameter_resolution_errors,
-            model_test_resolution_errors,
-            model_test_input_resolution_errors,
+            test_resolution_errors,
         }
     }
 
@@ -93,8 +87,7 @@ impl ResolutionErrors {
         self.import_errors.is_empty()
             && self.submodel_resolution_errors.is_empty()
             && self.parameter_resolution_errors.is_empty()
-            && self.model_test_resolution_errors.is_empty()
-            && self.model_test_input_resolution_errors.is_empty()
+            && self.test_resolution_errors.is_empty()
     }
 
     /// Returns a reference to the map of import resolution errors.
@@ -140,35 +133,17 @@ impl ResolutionErrors {
         &self.parameter_resolution_errors
     }
 
-    /// Returns a reference to the map of model test resolution errors.
+    /// Returns a reference to the map of test resolution errors.
     ///
-    /// This method provides access to any errors that occurred during model test resolution.
-    /// The errors are mapped from the test index to a vector of `ModelTestResolutionError`s.
+    /// This method provides access to any errors that occurred during test resolution.
+    /// The errors are mapped from the test index to a vector of `TestResolutionError`s.
     /// Multiple errors can occur for a single test, for example when a test references
     /// undefined variables or has invalid assertions.
     ///
     /// # Returns
     ///
     /// A reference to the HashMap containing test indices and their associated resolution errors.
-    pub fn get_model_test_resolution_errors(
-        &self,
-    ) -> &HashMap<TestIndex, Vec<ModelTestResolutionError>> {
-        &self.model_test_resolution_errors
-    }
-
-    /// Returns a reference to the map of model test input resolution errors.
-    ///
-    /// This method provides access to any errors that occurred during model test input resolution.
-    /// The errors are mapped from the model identifier to a vector of `ModelTestInputResolutionError`s.
-    /// These errors occur when test inputs for a model cannot be resolved, for example when the input
-    /// references undefined variables or has invalid values.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap containing model identifiers and their associated test input resolution errors.
-    pub fn get_model_test_input_resolution_errors(
-        &self,
-    ) -> &HashMap<Identifier, Vec<ModelTestInputResolutionError>> {
-        &self.model_test_input_resolution_errors
+    pub fn get_test_resolution_errors(&self) -> &HashMap<TestIndex, Vec<TestResolutionError>> {
+        &self.test_resolution_errors
     }
 }

@@ -11,7 +11,7 @@ use crate::{
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
     span::WithSpan,
-    test::{ModelTest, Test, TestIndex},
+    test::{Test, TestIndex},
 };
 
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
@@ -31,7 +31,6 @@ pub struct Model {
     submodels: HashMap<Identifier, WithSpan<ModelPath>>,
     parameters: ParameterCollection,
     tests: HashMap<TestIndex, Test>,
-    model_tests: Vec<WithSpan<ModelTest>>,
 }
 
 impl Model {
@@ -43,7 +42,6 @@ impl Model {
     /// * `submodels` - Mapping of submodel identifiers to their model paths
     /// * `parameters` - Collection of parameters defined in this model
     /// * `tests` - Tests for the entire model
-    /// * `model_tests` - Tests for individual models
     ///
     /// # Example
     ///
@@ -56,7 +54,6 @@ impl Model {
     ///     HashMap::new(),  // no submodels
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),  // no tests
-    ///     Vec::new(),      // no submodel tests
     /// );
     /// ```
     pub fn new(
@@ -64,14 +61,12 @@ impl Model {
         submodels: HashMap<Identifier, WithSpan<ModelPath>>,
         parameters: ParameterCollection,
         tests: HashMap<TestIndex, Test>,
-        model_tests: Vec<WithSpan<ModelTest>>,
     ) -> Self {
         Self {
             python_imports,
             submodels,
             parameters,
             tests,
-            model_tests,
         }
     }
 
@@ -105,7 +100,6 @@ impl Model {
     ///     submodels,
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),
-    ///     Vec::new(),
     /// );
     ///
     /// assert!(model.get_submodel(&Identifier::new("sub")).is_some());
@@ -152,18 +146,10 @@ impl Model {
         &self.tests
     }
 
-    /// Returns a reference to all model tests in this model.
-    ///
-    /// Model tests validate the behavior of individual submodels
-    /// and are stored in a vector since they don't need indexed access.
-    pub fn get_model_tests(&self) -> &[WithSpan<ModelTest>] {
-        &self.model_tests
-    }
-
     /// Checks if this model is empty (contains no components).
     ///
     /// A model is considered empty if it has no Python imports, submodels,
-    /// parameters, model tests, or submodel tests.
+    /// parameters, or tests.
     ///
     /// # Example
     ///
@@ -176,7 +162,6 @@ impl Model {
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),
-    ///     Vec::new(),
     /// );
     ///
     /// assert!(empty_model.is_empty());
@@ -186,7 +171,6 @@ impl Model {
             && self.submodels.is_empty()
             && self.parameters.is_empty()
             && self.tests.is_empty()
-            && self.model_tests.is_empty()
     }
 }
 
@@ -225,7 +209,6 @@ impl ModelCollection {
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),
-    ///     Vec::new(),
     /// ));
     ///
     /// let collection = ModelCollection::new(initial_models, models);
@@ -265,7 +248,6 @@ impl ModelCollection {
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),
-    ///     Vec::new(),
     /// ));
     ///
     /// let collection = ModelCollection::new(initial_models, models);

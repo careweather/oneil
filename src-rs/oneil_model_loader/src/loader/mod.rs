@@ -129,8 +129,8 @@ where
     );
 
     // resolve submodels
-    let (submodels, submodel_tests, submodel_resolution_errors) =
-        resolver::resolve_submodels_and_tests(use_models, &model_path, &model_info);
+    let (submodels, submodel_resolution_errors) =
+        resolver::resolve_submodels(use_models, &model_path, &model_info);
 
     let submodels_with_errors: HashSet<&Identifier> = submodel_resolution_errors.keys().collect();
 
@@ -150,16 +150,11 @@ where
     let (tests, test_resolution_errors) =
         resolver::resolve_tests(tests, &parameter_info, &submodel_info, &model_info);
 
-    // resolve model tests
-    let (model_tests, model_test_resolution_errors) =
-        resolver::resolve_model_tests(submodel_tests, &parameter_info, &submodel_info, &model_info);
-
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,
         submodel_resolution_errors,
         parameter_resolution_errors,
         test_resolution_errors,
-        model_test_resolution_errors,
     );
 
     if !resolution_errors.is_empty() {
@@ -168,7 +163,7 @@ where
     }
 
     // build model
-    let model = Model::new(python_imports, submodels, parameters, tests, model_tests);
+    let model = Model::new(python_imports, submodels, parameters, tests);
 
     // add model to builder
     builder.add_model(model_path, model);
@@ -362,7 +357,7 @@ mod tests {
             .map(|name| {
                 let use_model_name = ast::Identifier::new(name.to_string());
                 let use_model_name_node = ast::Node::new(span_from_str(name), use_model_name);
-                let use_model = ast::UseModel::new(use_model_name_node, vec![], None, None);
+                let use_model = ast::UseModel::new(use_model_name_node, vec![], None);
                 let use_model_node = ast::Node::new(unimportant_span(), use_model);
                 let use_model_decl =
                     ast::Node::new(unimportant_span(), ast::Decl::use_model(use_model_node));
@@ -499,7 +494,6 @@ mod tests {
                 )]),
                 HashMap::new(),
                 HashMap::new(),
-                HashMap::new(),
             ))
         );
 
@@ -515,7 +509,6 @@ mod tests {
                         unimportant_ir_span()
                     )
                 )]),
-                HashMap::new(),
                 HashMap::new(),
                 HashMap::new(),
             ))
@@ -614,8 +607,8 @@ mod tests {
         let child2_identifier_node = ast::Node::new(span_from_str("child2"), child2_identifier);
 
         let use_models = vec![
-            ast::UseModel::new(child1_identifier_node, vec![], None, None),
-            ast::UseModel::new(child2_identifier_node, vec![], None, None),
+            ast::UseModel::new(child1_identifier_node, vec![], None),
+            ast::UseModel::new(child2_identifier_node, vec![], None),
         ];
         let use_models = use_models
             .into_iter()
@@ -655,7 +648,7 @@ mod tests {
         let use_model_name = ast::Identifier::new("nonexistent".to_string());
         let use_model_name_node = ast::Node::new(span_from_str("nonexistent"), use_model_name);
 
-        let use_models = vec![ast::UseModel::new(use_model_name_node, vec![], None, None)];
+        let use_models = vec![ast::UseModel::new(use_model_name_node, vec![], None)];
         let use_models = use_models
             .into_iter()
             .map(|use_model| ast::Node::new(unimportant_span(), use_model))
@@ -739,7 +732,7 @@ mod tests {
         // Create a use model declaration
         let use_model_name = ast::Identifier::new("submodel".to_string());
         let use_model_name_node = ast::Node::new(span_from_str("submodel"), use_model_name);
-        let use_model = ast::UseModel::new(use_model_name_node, vec![], None, None);
+        let use_model = ast::UseModel::new(use_model_name_node, vec![], None);
         let use_model_node = ast::Node::new(unimportant_span(), use_model);
         let use_model_decl =
             ast::Node::new(unimportant_span(), ast::Decl::use_model(use_model_node));

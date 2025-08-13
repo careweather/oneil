@@ -50,8 +50,8 @@ mod unit;
 mod variable;
 
 pub use parameter::resolve_parameters;
-pub use submodel::resolve_submodels_and_tests;
-pub use test::{resolve_model_tests, resolve_tests};
+pub use submodel::resolve_submodels;
+pub use test::resolve_tests;
 
 // TODO: in all resolver tests, seperate out tests that test spans and tests that test values
 

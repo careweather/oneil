@@ -2,15 +2,15 @@ use oneil_error::{AsOneilError, ErrorLocation};
 
 use crate::error::VariableResolutionError;
 
-/// Represents an error that occurred during model test resolution.
+/// Represents an error that occurred during test resolution.
 ///
-/// This error type is used when a model test cannot be resolved, typically due
+/// This error type is used when a test cannot be resolved, typically due
 /// to variable resolution errors within the test's expressions.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelTestResolutionError(VariableResolutionError);
+pub struct TestResolutionError(VariableResolutionError);
 
-impl ModelTestResolutionError {
-    /// Creates a new model test resolution error.
+impl TestResolutionError {
+    /// Creates a new test resolution error.
     ///
     /// # Arguments
     ///
@@ -18,7 +18,7 @@ impl ModelTestResolutionError {
     ///
     /// # Returns
     ///
-    /// A new `ModelTestResolutionError` instance.
+    /// A new `TestResolutionError` instance.
     pub fn new(error: VariableResolutionError) -> Self {
         Self(error)
     }
@@ -32,26 +32,26 @@ impl ModelTestResolutionError {
         &self.0
     }
 
-    /// Converts the model test resolution error to a string representation.
+    /// Converts the test resolution error to a string representation.
     ///
     /// This method delegates to the display module to format the error message
     /// in a user-friendly way.
     ///
     /// # Returns
     ///
-    /// A string representation of the model test resolution error.
+    /// A string representation of the test resolution error.
     pub fn to_string(&self) -> String {
         self.get_error().to_string()
     }
 }
 
-impl From<VariableResolutionError> for ModelTestResolutionError {
+impl From<VariableResolutionError> for TestResolutionError {
     fn from(error: VariableResolutionError) -> Self {
         Self::new(error)
     }
 }
 
-impl AsOneilError for ModelTestResolutionError {
+impl AsOneilError for TestResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }

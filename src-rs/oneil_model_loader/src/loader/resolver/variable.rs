@@ -344,7 +344,6 @@ mod tests {
                 HashMap::new(),
                 param_collection,
                 HashMap::new(),
-                Vec::new(),
             )
         }
 
@@ -361,7 +360,6 @@ mod tests {
                 submodel_map,
                 oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
                 HashMap::new(),
-                Vec::new(),
             )
         }
 
@@ -716,7 +714,6 @@ mod tests {
             HashMap::new(),
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
             HashMap::new(),
-            Vec::new(),
         );
         modelmap.insert(&submodel_path, &submodel_model);
         let modelinfo = ModelInfo::new(modelmap, HashSet::new());
@@ -777,7 +774,6 @@ mod tests {
             HashMap::new(),
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
             HashMap::new(),
-            Vec::new(),
         );
         model_map.insert(&submodel_path, &submodel_model);
         let modelinfo = ModelInfo::new(model_map, HashSet::new());
