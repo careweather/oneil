@@ -250,7 +250,7 @@ mod tests {
             let inputs_node =
                 inputs.map(|input_list| create_test_inputs_node(input_list, start, end));
 
-            let test = ast::test::Test::new(trace_level_node, inputs_node, expr);
+            let test = ast::test::Test::new(trace_level_node, inputs_node, expr, None);
             ast::node::Node::new(test_ast_span(start, end), test)
         }
     }

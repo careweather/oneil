@@ -48,6 +48,7 @@ use oneil_ast::test::{TestInputs, TestInputsNode, TestNode};
 
 use crate::error::{ErrorHandlingParser, ParserError};
 use crate::expression::parse as parse_expr;
+use crate::note::parse as parse_note;
 use crate::token::{
     keyword::test as test_keyword,
     naming::identifier,
@@ -148,14 +149,23 @@ fn test_decl(input: Span) -> Result<TestNode, ParserError> {
         .or_fail_with(ParserError::test_missing_end_of_line(&expr))
         .parse(rest)?;
 
-    let span = match &trace_level {
-        Some(trace_level) => {
-            AstSpan::calc_span_with_whitespace(trace_level, &expr, &linebreak_token)
-        }
-        None => AstSpan::calc_span_with_whitespace(&test_keyword_token, &expr, &linebreak_token),
+    let (rest, note) = opt(parse_note).parse(rest)?;
+
+    // note that for the purposes of span calculation, the note is considered
+    // "whitespace"
+    let whitespace_span = match &note {
+        Some(note) => AstSpan::calc_span(&linebreak_token, note),
+        None => AstSpan::from(&linebreak_token),
     };
 
-    let test = Test::new(trace_level, inputs, expr);
+    let span = match &trace_level {
+        Some(trace_level) => {
+            AstSpan::calc_span_with_whitespace(trace_level, &expr, &whitespace_span)
+        }
+        None => AstSpan::calc_span_with_whitespace(&test_keyword_token, &expr, &whitespace_span),
+    };
+
+    let test = Test::new(trace_level, inputs, expr, note);
 
     Ok((rest, Node::new(span, test)))
 }
@@ -264,6 +274,8 @@ mod tests {
     use oneil_ast::expression::{Expr, Literal};
 
     mod success_tests {
+        use oneil_ast::Note;
+
         use super::*;
 
         #[test]
@@ -355,6 +367,21 @@ mod tests {
                 test.inputs().map(|i| i.node_value()),
                 Some(&TestInputs::new(expected_test_inputs))
             );
+
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_decl_with_note() {
+            let input = Span::new_extra("test: true\n~ This is a note\n", Config::default());
+            let (rest, test) = parse(input).unwrap();
+
+            let expected_span = AstSpan::new(0, 10, 18);
+
+            assert_eq!(test.node_span(), &expected_span);
+
+            let note = test.note().expect("note should be present");
+            assert_eq!(note.node_value(), &Note::new("This is a note".to_string()));
 
             assert_eq!(rest.fragment(), &"");
         }

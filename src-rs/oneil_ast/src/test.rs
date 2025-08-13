@@ -5,7 +5,10 @@
 
 use std::ops::Deref;
 
-use crate::{debug_info::TraceLevelNode, expression::ExprNode, naming::IdentifierNode, node::Node};
+use crate::{
+    debug_info::TraceLevelNode, expression::ExprNode, naming::IdentifierNode, node::Node,
+    note::NoteNode,
+};
 
 /// A test declaration in an Oneil program
 ///
@@ -16,6 +19,7 @@ pub struct Test {
     trace_level: Option<TraceLevelNode>,
     inputs: Option<TestInputsNode>,
     expr: ExprNode,
+    note: Option<NoteNode>,
 }
 
 /// A node containing a test definition
@@ -27,11 +31,13 @@ impl Test {
         trace_level: Option<TraceLevelNode>,
         inputs: Option<TestInputsNode>,
         expr: ExprNode,
+        note: Option<NoteNode>,
     ) -> Self {
         Self {
             trace_level,
             inputs,
             expr,
+            note,
         }
     }
 
@@ -48,6 +54,11 @@ impl Test {
     /// Returns the test expression
     pub fn expr(&self) -> &ExprNode {
         &self.expr
+    }
+
+    /// Returns the note for this test, if any
+    pub fn note(&self) -> Option<&NoteNode> {
+        self.note.as_ref()
     }
 }
 
