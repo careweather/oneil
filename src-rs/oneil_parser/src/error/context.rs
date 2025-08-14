@@ -86,13 +86,19 @@ fn parameter_label_has_invalid_characters(
         .map(|(before_equals, _)| before_equals)
         .and_then(|before_equals| before_equals.split_once(':'))
         .and_then(|(label, _)| {
-            label.find(|c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '-' && c != '\'')
+            label.find(|c: char| {
+                !c.is_ascii_alphanumeric()
+                    && !c.is_whitespace()
+                    && c != '_'
+                    && c != '-'
+                    && c != '\''
+            })
         })
         .map(|index| index + remaining_source_offset);
 
     match invalid_char_index {
         Some(index) => {
-            let note_message = "parameter labels must only contain the following characters: `a-z`, `A-Z`, `0-9`, `_`, `-`, `'`";
+            let note_message = "parameter labels must only contain `a-z`, `A-Z`, `0-9`, `_`, `-`, `'`, and whitespace";
 
             let invalid_char_note_message = "invalid character found here";
             let invalid_char_location = ErrorLocation::from_source_and_offset(source, index);
