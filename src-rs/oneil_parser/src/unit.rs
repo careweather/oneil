@@ -17,7 +17,7 @@ use oneil_ast::{
 use crate::{
     error::{ErrorHandlingParser, ParserError},
     token::{
-        literal::number,
+        literal::{number, unit_one},
         naming::unit_identifier,
         symbol::{caret, paren_left, paren_right, slash, star},
     },
@@ -140,6 +140,14 @@ fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
         Ok((rest, expr))
     };
 
+    let parse_unit_one = |input| {
+        let (rest, unit_one_token) = unit_one.convert_errors().parse(input)?;
+        let unit_one_value = UnitExpr::unit_one();
+        let unit_one = Node::new(unit_one_token, unit_one_value);
+
+        Ok((rest, unit_one))
+    };
+
     let parse_parenthesized = |input| {
         let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
@@ -161,7 +169,10 @@ fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
         Ok((rest, expr))
     };
 
-    parse_unit.or(parse_parenthesized).parse(input)
+    parse_unit
+        .or(parse_unit_one)
+        .or(parse_parenthesized)
+        .parse(input)
 }
 
 #[cfg(test)]
@@ -182,6 +193,92 @@ mod tests {
 
             let expected_id = Node::new(AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
             let expected_unit = Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_id, None));
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_unit_one() {
+            let input = Span::new_extra("1", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            let expected_unit = Node::new(AstSpan::new(0, 1, 0), UnitExpr::UnitOne);
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_unit_one_with_whitespace() {
+            let input = Span::new_extra("1 ", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            // The span should include the whitespace length
+            let expected_unit = Node::new(AstSpan::new(0, 1, 1), UnitExpr::UnitOne);
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_unit_one_in_compound_expression() {
+            let input = Span::new_extra("1/s", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            // 1
+            let expected_one = Node::new(AstSpan::new(0, 1, 0), UnitExpr::UnitOne);
+
+            // s
+            let expected_s_id = Node::new(AstSpan::new(2, 1, 0), Identifier::new("s".to_string()));
+            let expected_s = Node::new(AstSpan::new(2, 1, 0), UnitExpr::unit(expected_s_id, None));
+
+            // /
+            let expected_div = Node::new(AstSpan::new(1, 1, 0), UnitOp::Divide);
+
+            // 1/s
+            let expected_unit = Node::new(
+                AstSpan::new(0, 3, 0),
+                UnitExpr::binary_op(expected_div, expected_one, expected_s),
+            );
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_unit_one_in_complex_expression() {
+            let input = Span::new_extra("kg*1/s^2", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            // kg
+            let expected_kg_id =
+                Node::new(AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
+            let expected_kg =
+                Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_kg_id, None));
+
+            // 1
+            let expected_one = Node::new(AstSpan::new(3, 1, 0), UnitExpr::UnitOne);
+
+            // kg * 1
+            let expected_mult = Node::new(AstSpan::new(2, 1, 0), UnitOp::Multiply);
+            let expected_left = Node::new(
+                AstSpan::new(0, 4, 0),
+                UnitExpr::binary_op(expected_mult, expected_kg, expected_one),
+            );
+
+            // s
+            let expected_s_id = Node::new(AstSpan::new(5, 1, 0), Identifier::new("s".to_string()));
+            let expected_s_exp = Node::new(AstSpan::new(7, 1, 0), UnitExponent::new(2.0));
+            let expected_s = Node::new(
+                AstSpan::new(5, 3, 0),
+                UnitExpr::unit(expected_s_id, Some(expected_s_exp)),
+            );
+
+            // /
+            let expected_div = Node::new(AstSpan::new(4, 1, 0), UnitOp::Divide);
+
+            // (kg*1)/s^2
+            let expected_unit = Node::new(
+                AstSpan::new(0, 8, 0),
+                UnitExpr::binary_op(expected_div, expected_left, expected_s),
+            );
 
             assert_eq!(unit, expected_unit);
         }
@@ -702,6 +799,47 @@ mod tests {
             // This test should actually succeed because the parser can handle
             // invalid operators by parsing the first valid unit
             assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_error_unit_one_with_digits() {
+            let input = Span::new_extra("123", Config::default());
+            let result = parse(input);
+
+            // This should fail because "123" should not be parsed as a unit_one
+            // The parser should try to parse it as a unit identifier instead
+            match result {
+                Err(nom::Err::Error(error)) => {
+                    assert_eq!(error.error_offset, 0);
+                    assert!(matches!(
+                        error.reason,
+                        ParserErrorReason::Expect(ExpectKind::Unit)
+                    ));
+                }
+                _ => panic!("Unexpected result {:?}", result),
+            }
+        }
+
+        #[test]
+        fn test_unit_one_with_decimal_parses_partially() {
+            let input = Span::new_extra("1.5", Config::default());
+            let (rest, unit) = parse(input).unwrap();
+
+            // Should parse "1" as unit_one and leave ".5" as remainder
+            let expected_unit = Node::new(AstSpan::new(0, 1, 0), UnitExpr::UnitOne);
+            assert_eq!(unit, expected_unit);
+            assert_eq!(rest.fragment(), &".5");
+        }
+
+        #[test]
+        fn test_unit_one_with_exponent_parses_partially() {
+            let input = Span::new_extra("1^2", Config::default());
+            let (rest, unit) = parse(input).unwrap();
+
+            // Should parse "1" as unit_one and leave "^2" as remainder
+            let expected_unit = Node::new(AstSpan::new(0, 1, 0), UnitExpr::UnitOne);
+            assert_eq!(unit, expected_unit);
+            assert_eq!(rest.fragment(), &"^2");
         }
     }
 }

@@ -72,6 +72,7 @@ fn resolve_unit_recursive(
             units.push(unit);
             units
         }
+        ast::UnitExpr::UnitOne => units,
         ast::UnitExpr::Parenthesized { expr } => resolve_unit_recursive(expr, is_inverse, units),
     }
 }
@@ -148,6 +149,12 @@ mod tests {
             let unit_expr = UnitExpr::Parenthesized {
                 expr: Box::new(expr),
             };
+            ast::node::Node::new(test_span(start, end), unit_expr)
+        }
+
+        /// Helper function to create a UnitOne node
+        pub fn create_unit_one_node(start: usize, end: usize) -> ast::unit::UnitExprNode {
+            let unit_expr = UnitExpr::UnitOne;
             ast::node::Node::new(test_span(start, end), unit_expr)
         }
 
@@ -594,5 +601,87 @@ mod tests {
 
         // check the result - the unit with exponent should be resolved correctly regardless of parentheses
         helper::assert_units_match(composite.units(), &[("m", 2.0)]);
+    }
+
+    #[test]
+    fn test_unit_one() {
+        // create a UnitOne expression
+        let unit_expr = helper::create_unit_one_node(0, 1);
+
+        // resolve the unit
+        let composite = resolve_unit(&unit_expr);
+
+        // check the result - UnitOne should result in an empty composite unit
+        assert_eq!(
+            composite.units().len(),
+            0,
+            "UnitOne should result in no units"
+        );
+    }
+
+    #[test]
+    fn test_unit_one_in_multiplication() {
+        // create a multiplication expression with UnitOne: 1 * m
+        let unit_expr = helper::create_binary_op_node(
+            UnitOp::Multiply,
+            helper::create_unit_one_node(0, 1),
+            helper::create_unit_node("m", Some(1.0), 4, 5),
+            0,
+            5,
+        );
+
+        // resolve the unit
+        let composite = resolve_unit(&unit_expr);
+
+        // check the result - UnitOne should be ignored in multiplication
+        helper::assert_units_match(composite.units(), &[("m", 1.0)]);
+    }
+
+    #[test]
+    fn test_unit_one_in_division() {
+        // create a division expression with UnitOne: m / 1
+        let unit_expr = helper::create_binary_op_node(
+            UnitOp::Divide,
+            helper::create_unit_node("m", Some(1.0), 0, 1),
+            helper::create_unit_one_node(4, 5),
+            0,
+            5,
+        );
+
+        // resolve the unit
+        let composite = resolve_unit(&unit_expr);
+
+        // check the result - UnitOne should be ignored in division
+        helper::assert_units_match(composite.units(), &[("m", 1.0)]);
+    }
+
+    #[test]
+    fn test_unit_one_in_complex_expression() {
+        // create a complex expression: (UnitOne * m) / (kg * UnitOne)
+        let unit_expr = helper::create_binary_op_node(
+            UnitOp::Divide,
+            helper::create_binary_op_node(
+                UnitOp::Multiply,
+                helper::create_unit_one_node(1, 2),
+                helper::create_unit_node("m", Some(1.0), 5, 6),
+                1,
+                6,
+            ),
+            helper::create_binary_op_node(
+                UnitOp::Multiply,
+                helper::create_unit_node("kg", Some(1.0), 10, 12),
+                helper::create_unit_one_node(15, 16),
+                10,
+                16,
+            ),
+            0,
+            16,
+        );
+
+        // resolve the unit
+        let composite = resolve_unit(&unit_expr);
+
+        // check the result - UnitOne should be ignored in complex expressions
+        helper::assert_units_match(composite.units(), &[("m", 1.0), ("kg", -1.0)]);
     }
 }

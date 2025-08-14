@@ -431,6 +431,9 @@ fn print_unit_expression(
                 )?;
             }
         }
+        oneil_ast::unit::UnitExpr::UnitOne => {
+            writeln!(writer, "{}Unit: 1", "  ".repeat(indent))?;
+        }
     }
     Ok(())
 }

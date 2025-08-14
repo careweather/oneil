@@ -54,6 +54,8 @@ pub enum ExpectKind {
     Symbol(ExpectSymbol),
     /// Expected a unit identifier
     UnitIdentifier,
+    /// Expected a unit one
+    UnitOne,
 }
 
 /// The different keywords that could have been expected.
@@ -247,6 +249,11 @@ impl TokenError {
     /// Creates a new TokenError instance for an expected unit identifier
     pub fn expected_unit_identifier(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitIdentifier))
+    }
+
+    /// Creates a new TokenError instance for an expected unit one
+    pub fn expected_unit_one(error: Self) -> Self {
+        error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitOne))
     }
 
     /// Creates a new TokenError instance for an unclosed note

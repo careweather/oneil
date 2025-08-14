@@ -22,6 +22,8 @@ pub enum UnitExpr {
         /// The expression inside parentheses
         expr: Box<UnitExprNode>,
     },
+    /// A unitless 1, usually used for units like 1/s
+    UnitOne,
     /// A unit with optional exponent
     Unit {
         /// The unit identifier
@@ -47,6 +49,11 @@ impl UnitExpr {
         Self::Parenthesized {
             expr: Box::new(expr),
         }
+    }
+
+    /// Creates a unitless 1, usually used for units like 1/s
+    pub fn unit_one() -> Self {
+        Self::UnitOne
     }
 
     /// Creates a unit expression with optional exponent
@@ -81,16 +88,6 @@ impl UnitOp {
         Self::Divide
     }
 }
-
-/// A unit with an optional exponent
-#[derive(Debug, Clone, PartialEq)]
-pub struct Unit {
-    identifier: IdentifierNode,
-    exponent: Option<f64>,
-}
-
-/// A node containing a unit definition
-pub type UnitNode = Node<Unit>;
 
 /// A unit exponent value
 ///

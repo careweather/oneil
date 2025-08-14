@@ -83,7 +83,8 @@ FunctionCall = Identifier, "(", [ Expr, { ",", Expr } ], ")" ;
 
 (* Units *)
 UnitExpr = [ UnitExpr, ( "*" | "/" ) ], UnitTerm ;
-UnitTerm = UnitIdentifier, [ "^", Number ] | ParenthesizedUnitExpr ;
+UnitTerm = UnitIdentifier, [ "^", Number ] | UnitOne | ParenthesizedUnitExpr ;
+UnitOne = "1" ; (* represents a unitless 1, usually used for units like 1/s *)
 ParenthesizedUnitExpr = "(", UnitExpr, ")" ;
 
 (* Basic Elements *)

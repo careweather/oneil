@@ -5,10 +5,10 @@
 //! The string parser handles double-quoted string literals.
 
 use nom::{
-    Parser as _,
+    AsChar, Parser as NomParser,
     bytes::complete::{tag, take_while},
-    character::complete::{digit1, one_of},
-    combinator::opt,
+    character::complete::{digit1, one_of, satisfy},
+    combinator::{eof, opt, peek},
 };
 
 use crate::token::{
@@ -108,6 +108,42 @@ pub fn string(input: Span) -> Result<Token, TokenError> {
             Ok((rest, ()))
         },
         TokenError::expected_string,
+    )
+    .parse(input)
+}
+
+/// Parses a unit one literal, which is simply the character "1".
+///
+/// A unit one represents a unitless 1, usually used for units like 1/s.
+/// According to the grammar, this is just the literal "1" character.
+///
+/// Examples of valid unit ones:
+/// - `1`
+///
+/// The parser will fail if:
+/// - The input doesn't start with "1"
+/// - The input is empty
+/// - The "1" is followed by additional digits (e.g., "123" should fail)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the parsed unit one literal.
+pub fn unit_one(input: Span) -> Result<Token, TokenError> {
+    token(
+        |input| {
+            let next_char_is_not_digit = satisfy(|c: char| !c.is_dec_digit()).map(|_| ());
+            let is_at_end_of_file = eof.map(|_| ());
+
+            let (rest, _) = tag("1").parse(input)?;
+            // Ensure the next character is not a digit
+            let (rest, _) = peek(next_char_is_not_digit.or(is_at_end_of_file)).parse(rest)?;
+            Ok((rest, ()))
+        },
+        TokenError::expected_unit_one,
     )
     .parse(input)
 }
@@ -745,6 +781,152 @@ mod tests {
             } else {
                 panic!(
                     "expected TokenError Failure but got different error type: {:?}",
+                    res
+                );
+            }
+        }
+    }
+
+    mod unit_one_tests {
+        use super::*;
+
+        // Success cases
+        #[test]
+        fn test_simple() {
+            let input = Span::new_extra("1 rest", Config::default());
+            let (rest, matched) = unit_one(input).expect("should parse unit one");
+            assert_eq!(matched.lexeme(), "1");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_at_end_of_file() {
+            let input = Span::new_extra("1", Config::default());
+            let (rest, matched) = unit_one(input).expect("should parse unit one at end of file");
+            assert_eq!(matched.lexeme(), "1");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_with_whitespace() {
+            let input = Span::new_extra("1  ", Config::default());
+            let (rest, matched) = unit_one(input).expect("should parse unit one with whitespace");
+            assert_eq!(matched.lexeme(), "1");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_with_other_digits() {
+            let input = Span::new_extra("123", Config::default());
+            let res = unit_one(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::UnitOne)
+                )),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_with_letters() {
+            let input = Span::new_extra("1abc", Config::default());
+            let (rest, matched) = unit_one(input).expect("should parse unit one with letters");
+            assert_eq!(matched.lexeme(), "1");
+            assert_eq!(rest.fragment(), &"abc");
+        }
+
+        #[test]
+        fn test_with_symbols() {
+            let input = Span::new_extra("1+2", Config::default());
+            let (rest, matched) = unit_one(input).expect("should parse unit one with symbols");
+            assert_eq!(matched.lexeme(), "1");
+            assert_eq!(rest.fragment(), &"+2");
+        }
+
+        // Error cases
+        #[test]
+        fn test_empty_input() {
+            let input = Span::new_extra("", Config::default());
+            let res = unit_one(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::UnitOne)
+                )),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_whitespace_only() {
+            let input = Span::new_extra("   ", Config::default());
+            let res = unit_one(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::UnitOne)
+                )),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_other_digits() {
+            let input = Span::new_extra("2", Config::default());
+            let res = unit_one(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::UnitOne)
+                )),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_letters_only() {
+            let input = Span::new_extra("abc", Config::default());
+            let res = unit_one(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::UnitOne)
+                )),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_symbols_only() {
+            let input = Span::new_extra("+-", Config::default());
+            let res = unit_one(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::UnitOne)
+                )),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_error_messages_are_specific() {
+            let input = Span::new_extra("abc", Config::default());
+            let res = unit_one(input);
+            assert!(res.is_err(), "should fail with specific error");
+
+            if let Err(nom::Err::Error(token_error)) = res {
+                assert!(
+                    matches!(
+                        token_error.kind,
+                        TokenErrorKind::Expect(ExpectKind::UnitOne)
+                    ),
+                    "error should be for UnitOne"
+                );
+            } else {
+                panic!(
+                    "expected TokenError but got different error type: {:?}",
                     res
                 );
             }
