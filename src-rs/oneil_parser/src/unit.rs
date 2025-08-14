@@ -18,7 +18,7 @@ use crate::{
     error::{ErrorHandlingParser, ParserError},
     token::{
         literal::number,
-        naming::identifier,
+        naming::unit_identifier,
         symbol::{caret, paren_left, paren_right, slash, star},
     },
     util::{Result, Span},
@@ -105,7 +105,7 @@ fn unit_expr(input: Span) -> Result<UnitExprNode, ParserError> {
 /// Returns a unit expression node representing the parsed term.
 fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
     let parse_unit = |input| {
-        let (rest, id_token) = identifier.convert_errors().parse(input)?;
+        let (rest, id_token) = unit_identifier.convert_errors().parse(input)?;
         let id_value = Identifier::new(id_token.lexeme().to_string());
         let id = Node::new(id_token, id_value);
 
@@ -289,6 +289,69 @@ mod tests {
             let expected_unit = Node::new(
                 AstSpan::new(0, 10, 0),
                 UnitExpr::binary_op(expected_div, expected_left, expected_s),
+            );
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_unit_with_dollar_terminator() {
+            let input = Span::new_extra("k$", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            let expected_id = Node::new(AstSpan::new(0, 2, 0), Identifier::new("k$".to_string()));
+            let expected_unit = Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_id, None));
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_unit_with_percent_terminator() {
+            let input = Span::new_extra("%", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            let expected_id = Node::new(AstSpan::new(0, 1, 0), Identifier::new("%".to_string()));
+            let expected_unit = Node::new(AstSpan::new(0, 1, 0), UnitExpr::unit(expected_id, None));
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_unit_with_terminator_and_exponent() {
+            let input = Span::new_extra("k$^2", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            let expected_id = Node::new(AstSpan::new(0, 2, 0), Identifier::new("k$".to_string()));
+            let expected_exp = Node::new(AstSpan::new(3, 1, 0), UnitExponent::new(2.0));
+            let expected_unit = Node::new(
+                AstSpan::new(0, 4, 0),
+                UnitExpr::unit(expected_id, Some(expected_exp)),
+            );
+
+            assert_eq!(unit, expected_unit);
+        }
+
+        #[test]
+        fn test_compound_unit_with_terminators() {
+            let input = Span::new_extra("k$*%", Config::default());
+            let (_, unit) = parse(input).unwrap();
+
+            let expected_k_id = Node::new(AstSpan::new(0, 2, 0), Identifier::new("k$".to_string()));
+            let expected_left =
+                Node::new(AstSpan::new(0, 2, 0), UnitExpr::unit(expected_k_id, None));
+
+            let expected_percent_id =
+                Node::new(AstSpan::new(3, 1, 0), Identifier::new("%".to_string()));
+            let expected_right = Node::new(
+                AstSpan::new(3, 1, 0),
+                UnitExpr::unit(expected_percent_id, None),
+            );
+
+            let expected_op = Node::new(AstSpan::new(2, 1, 0), UnitOp::Multiply);
+
+            let expected_unit = Node::new(
+                AstSpan::new(0, 4, 0),
+                UnitExpr::binary_op(expected_op, expected_left, expected_right),
             );
 
             assert_eq!(unit, expected_unit);

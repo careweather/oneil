@@ -6,9 +6,10 @@
 
 use nom::{
     Parser as _,
-    bytes::complete::{take_while, take_while1},
-    character::complete::satisfy,
-    combinator::verify,
+    branch::alt,
+    bytes::complete::{tag, take_while, take_while1},
+    character::complete::{one_of, satisfy},
+    combinator::{opt, recognize, verify},
     multi::many0,
 };
 
@@ -18,6 +19,32 @@ use crate::token::{
     keyword,
     util::{Token, token},
 };
+
+/// Parses an identifier span (alphabetic or underscore, then alphanumeric or underscore).
+///
+/// This function is used to parse the span of an identifier, which is used to
+/// create a token.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a span containing the parsed identifier, or an error if the input
+/// is not a valid identifier or is a reserved keyword.
+fn identifier_span(input: Span) -> Result<Span, TokenError> {
+    verify(
+        recognize(|input| {
+            let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_').parse(input)?;
+            let (rest, _) = take_while(|c: char| c.is_alphanumeric() || c == '_').parse(rest)?;
+            Ok((rest, ()))
+        }),
+        // Ensure the identifier is not a reserved keyword
+        |identifier: &Span| !keyword::KEYWORDS.contains(&identifier.fragment()),
+    )
+    .parse(input)
+}
 
 /// Parses an identifier (alphabetic or underscore, then alphanumeric or underscore).
 ///
@@ -46,20 +73,43 @@ use crate::token::{
 /// Returns a token containing the parsed identifier, or an error if the input
 /// is not a valid identifier or is a reserved keyword.
 pub fn identifier(input: Span) -> Result<Token, TokenError> {
-    verify(
-        token(
+    token(identifier_span, TokenError::expected_identifier).parse(input)
+}
+
+/// Parses a unit identifier (identifier optionally terminated by '$' or '%').
+///
+/// Unit identifiers in Oneil follow the same rules as regular identifiers but may
+/// optionally be terminated by a dollar sign ($) or percent sign (%).
+///
+/// Unit identifier syntax:
+/// - Must start with an alphabetic character or underscore
+/// - Can be followed by any number of alphanumeric characters or underscores
+/// - Cannot be a reserved keyword
+/// - May optionally be terminated by '$' or '%'
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a token containing the parsed unit identifier, or an error if the input
+/// is not a valid unit identifier or is a reserved keyword.
+pub fn unit_identifier(input: Span) -> Result<Token, TokenError> {
+    token(
+        alt((
+            // either an identifier (optionally followed by $ or %)
             |input| {
-                // First character must be alphabetic or underscore
-                let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_').parse(input)?;
-                // Remaining characters can be alphanumeric or underscore
-                let (rest, _) =
-                    take_while(|c: char| c.is_alphanumeric() || c == '_').parse(rest)?;
+                // Parse an identifier
+                let (rest, _) = identifier_span(input)?;
+                // Optionally followed by $
+                let (rest, _) = opt(tag("$")).parse(rest)?;
                 Ok((rest, ()))
             },
-            TokenError::expected_identifier,
-        ),
-        // Ensure the identifier is not a reserved keyword
-        |identifier| !keyword::KEYWORDS.contains(&identifier.lexeme()),
+            // or just a $ or %
+            one_of("$%").map(|_| ()),
+        )),
+        TokenError::expected_unit_identifier,
     )
     .parse(input)
 }
@@ -270,14 +320,13 @@ mod tests {
                 let res = identifier(input);
                 match res {
                     Err(nom::Err::Error(token_error)) => {
-                        // The verify function fails with NomError(Verify) when a keyword is provided
                         assert!(matches!(
                             token_error.kind,
-                            TokenErrorKind::NomError(nom::error::ErrorKind::Verify)
+                            TokenErrorKind::Expect(ExpectKind::Identifier)
                         ));
                     }
                     _ => panic!(
-                        "expected TokenError::NomError(Verify) for keyword {:?}, got {:?}",
+                        "expected TokenError::Expect(Identifier) for keyword {:?}, got {:?}",
                         keyword, res
                     ),
                 }
@@ -489,6 +538,108 @@ mod tests {
             let (rest, matched) =
                 label(input).expect("should parse label with trailing whitespace");
             assert_eq!(matched.lexeme(), "foo");
+            assert_eq!(matched.whitespace(), "   ");
+            assert_eq!(rest.fragment(), &"");
+        }
+    }
+
+    mod unit_identifier_tests {
+        use super::*;
+
+        #[test]
+        fn test_basic_unit_identifier() {
+            let input = Span::new_extra("kg rest", Config::default());
+            let (rest, matched) =
+                unit_identifier(input).expect("should parse basic unit identifier");
+            assert_eq!(matched.lexeme(), "kg");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_unit_identifier_with_dollar() {
+            let input = Span::new_extra("k$ rest", Config::default());
+            let (rest, matched) =
+                unit_identifier(input).expect("should parse unit identifier with dollar");
+            assert_eq!(matched.lexeme(), "k$");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_unit_identifier_with_percent() {
+            let input = Span::new_extra("% rest", Config::default());
+            let (rest, matched) =
+                unit_identifier(input).expect("should parse unit identifier with percent");
+            assert_eq!(matched.lexeme(), "%");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_unit_identifier_underscore() {
+            let input = Span::new_extra("_private_unit rest", Config::default());
+            let (rest, matched) =
+                unit_identifier(input).expect("should parse unit identifier with underscore");
+            assert_eq!(matched.lexeme(), "_private_unit");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_unit_identifier_numbers() {
+            let input = Span::new_extra("unit123 rest", Config::default());
+            let (rest, matched) =
+                unit_identifier(input).expect("should parse unit identifier with numbers");
+            assert_eq!(matched.lexeme(), "unit123");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_unit_identifier_with_dollar_and_numbers() {
+            let input = Span::new_extra("test123$ rest", Config::default());
+            let (rest, matched) = unit_identifier(input)
+                .expect("should parse unit identifier with numbers and dollar");
+            assert_eq!(matched.lexeme(), "test123$");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_unit_identifier_starts_with_digit_fails() {
+            let input = Span::new_extra("123kg", Config::default());
+            let res = unit_identifier(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::UnitIdentifier)
+                )),
+                _ => panic!("expected TokenError::Expect(UnitIdentifier), got {:?}", res),
+            }
+        }
+
+        #[test]
+        fn test_unit_identifier_keyword_fails() {
+            for keyword in keyword::KEYWORDS {
+                let input = Span::new_extra(keyword, Config::default());
+                let res = unit_identifier(input);
+                match res {
+                    Err(nom::Err::Error(token_error)) => {
+                        // The verify function fails with NomError(Verify) when a keyword is provided
+                        assert!(matches!(
+                            token_error.kind,
+                            TokenErrorKind::Expect(ExpectKind::UnitIdentifier)
+                        ));
+                    }
+                    _ => panic!(
+                        "expected TokenError::Expect(UnitIdentifier) for keyword {:?}, got {:?}",
+                        keyword, res
+                    ),
+                }
+            }
+        }
+
+        #[test]
+        fn test_unit_identifier_with_whitespace() {
+            let input = Span::new_extra("kg   ", Config::default());
+            let (rest, matched) = unit_identifier(input)
+                .expect("should parse unit identifier with trailing whitespace");
+            assert_eq!(matched.lexeme(), "kg");
             assert_eq!(matched.whitespace(), "   ");
             assert_eq!(rest.fragment(), &"");
         }

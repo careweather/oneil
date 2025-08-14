@@ -83,10 +83,12 @@ FunctionCall = Identifier, "(", [ Expr, { ",", Expr } ], ")" ;
 
 (* Units *)
 UnitExpr = [ UnitExpr, ( "*" | "/" ) ], UnitTerm ;
-UnitTerm = Identifier, [ "^", Number ] | "(" UnitExpr, ")" ;
+UnitTerm = UnitIdentifier, [ "^", Number ] | ParenthesizedUnitExpr ;
+ParenthesizedUnitExpr = "(", UnitExpr, ")" ;
 
 (* Basic Elements *)
 Identifier = Letter, { Letter | Digit | "_" } ;
+UnitIdentifier = Identifier, [ "$" ] | "$" | "%" ; (* A unit identifier may optionally be terminated by a dollar sign or may be a percent sign *)
 (* note: labels are context sensitive since they can contain spaces and tabs *)
 Label = ( Letter | Digit | "_" ) { { " " | "\t" } LabelLetter { LabelLetter } } ;
 LabelLetter = Letter | Digit | "_" | "-" | "'" ;

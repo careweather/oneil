@@ -52,6 +52,8 @@ pub enum ExpectKind {
     String,
     /// Expected a symbol
     Symbol(ExpectSymbol),
+    /// Expected a unit identifier
+    UnitIdentifier,
 }
 
 /// The different keywords that could have been expected.
@@ -180,8 +182,12 @@ impl TokenError {
 
     /// Updates the error kind
     ///
-    /// This should only be happening if the error is
-    /// a nom error, so it panics if it's not.
+    /// This should only be happening if the error is a nom error, so it panics
+    /// if it's not.
+    ///
+    /// This is because if it's any other token error, that likely means that
+    /// the `token` function was used multiple times, meaning that there might
+    /// be whitespace in the middle of the token
     fn update_kind(self, kind: TokenErrorKind) -> Self {
         let is_nom_error = matches!(self.kind, TokenErrorKind::NomError(_));
         assert!(
@@ -236,6 +242,11 @@ impl TokenError {
     /// Creates a new TokenError instance for an expected symbol
     pub fn expected_symbol(symbol: ExpectSymbol) -> impl Fn(Self) -> Self {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Symbol(symbol)))
+    }
+
+    /// Creates a new TokenError instance for an expected unit identifier
+    pub fn expected_unit_identifier(error: Self) -> Self {
+        error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitIdentifier))
     }
 
     /// Creates a new TokenError instance for an unclosed note
