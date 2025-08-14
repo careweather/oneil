@@ -369,6 +369,8 @@ fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
 /// section headers. It skips all characters until it finds a newline or
 /// end of file, then consumes the newline character itself.
 ///
+/// It also optionally skips a note that follows the line break.
+///
 /// # Arguments
 ///
 /// * `input` - The input span to skip from
@@ -384,6 +386,10 @@ fn skip_to_next_line_with_content(input: Span) -> Span {
     let (rest, _) = end_of_line
         .parse(rest)
         .expect("should always parse either a line break or EOF");
+
+    let (rest, _) = opt(parse_note)
+        .parse(rest)
+        .expect("should always parse because its optional");
 
     rest
 }
