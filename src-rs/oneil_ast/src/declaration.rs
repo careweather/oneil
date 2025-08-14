@@ -51,7 +51,7 @@ impl Decl {
 /// An import declaration that specifies a module to include
 #[derive(Debug, Clone, PartialEq)]
 pub struct Import {
-    path: String,
+    path: Node<String>,
 }
 
 /// A node containing an import declaration
@@ -59,12 +59,12 @@ pub type ImportNode = Node<Import>;
 
 impl Import {
     /// Creates a new import with the given path
-    pub fn new(path: String) -> Self {
+    pub fn new(path: Node<String>) -> Self {
         Self { path }
     }
 
     /// Returns the import path as a string slice
-    pub fn path(&self) -> &str {
+    pub fn path(&self) -> &Node<String> {
         &self.path
     }
 }

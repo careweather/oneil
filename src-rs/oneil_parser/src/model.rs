@@ -427,7 +427,7 @@ mod tests {
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 1);
         match &model.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path(), "foo"),
+            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), &"foo"),
             _ => panic!("Expected import declaration"),
         }
         assert!(model.sections().is_empty());
@@ -445,7 +445,7 @@ mod tests {
         assert_eq!(section.header().label().as_str(), "foo");
         assert_eq!(section.decls().len(), 1);
         match &section.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path(), "bar"),
+            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "bar"),
             _ => panic!("Expected import declaration"),
         }
         assert_eq!(rest.fragment(), &"");
@@ -466,7 +466,7 @@ mod tests {
         assert_eq!(section1.header().label().as_str(), "foo");
         assert_eq!(section1.decls().len(), 1);
         match &section1.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path(), "bar"),
+            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "bar"),
             _ => panic!("Expected import declaration"),
         }
 
@@ -474,7 +474,7 @@ mod tests {
         assert_eq!(section2.header().label().as_str(), "baz");
         assert_eq!(section2.decls().len(), 1);
         match &section2.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path(), "qux"),
+            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "qux"),
             _ => panic!("Expected import declaration"),
         }
 
@@ -497,11 +497,11 @@ mod tests {
         let (rest, model) = parse_complete(input).unwrap();
         assert_eq!(model.decls().len(), 2);
         match &model.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path(), "foo"),
+            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "foo"),
             _ => panic!("Expected import declaration"),
         }
         match &model.decls()[1].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path(), "bar"),
+            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "bar"),
             _ => panic!("Expected import declaration"),
         }
         assert_eq!(rest.fragment(), &"");
@@ -975,7 +975,9 @@ mod tests {
 
                         // Check that the valid declarations were parsed
                         match &model.decls()[0].node_value() {
-                            Decl::Import(import_node) => assert_eq!(import_node.path(), "valid"),
+                            Decl::Import(import_node) => {
+                                assert_eq!(import_node.path().node_value(), "valid")
+                            }
                             _ => panic!("Expected import declaration"),
                         }
                         match &model.decls()[1].node_value() {

@@ -98,7 +98,8 @@ fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
     let span =
         AstSpan::calc_span_with_whitespace(&import_token, &import_path_token, &end_of_line_token);
 
-    let import_node = Node::new(span, Import::new(import_path_token.lexeme().to_string()));
+    let import_path = Node::new(import_path_token, import_path_token.lexeme().to_string());
+    let import_node = Node::new(span, Import::new(import_path));
 
     let decl_node = Node::new(span, Decl::Import(import_node));
 
@@ -342,7 +343,10 @@ mod tests {
             let (rest, decl) = parse(input).unwrap();
             match decl.node_value() {
                 Decl::Import(import_node) => {
-                    assert_eq!(import_node.path(), "foo");
+                    let import_path = import_node.path();
+
+                    assert_eq!(import_path.node_value(), "foo");
+                    assert_eq!(import_path.node_span(), &AstSpan::new(7, 3, 0));
                 }
                 _ => panic!("Expected import declaration"),
             }
@@ -387,7 +391,9 @@ mod tests {
             let (rest, decl) = parse_complete(input).unwrap();
             match decl.node_value() {
                 Decl::Import(import_node) => {
-                    assert_eq!(import_node.path(), "foo");
+                    let import_path = import_node.path();
+                    assert_eq!(import_path.node_value(), "foo");
+                    assert_eq!(import_path.node_span(), &AstSpan::new(7, 3, 0));
                 }
                 _ => panic!("Expected import declaration"),
             }

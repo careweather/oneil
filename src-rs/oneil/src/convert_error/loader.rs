@@ -19,8 +19,8 @@ use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, LoadError, ParameterResolutionError, ResolutionErrors,
-        SubmodelResolutionError, VariableResolutionError,
+        CircularDependencyError, ImportResolutionError, LoadError, ParameterResolutionError,
+        ResolutionErrors, SubmodelResolutionError, VariableResolutionError,
     },
 };
 
@@ -208,11 +208,22 @@ fn convert_resolution_errors(
     };
 
     // convert import errors
-    for (_python_path, _import_error) in resolution_errors.get_import_errors() {
-        // These are intentionally ignored because they indicate that a python
-        // file failed to resolve correctly. These errors should be indicated
-        // by corresponding import errors in `convert_import_error`.
-        ignore_error();
+    for (_python_path, import_error) in resolution_errors.get_import_errors() {
+        match import_error {
+            ImportResolutionError::FailedValidation { .. } => {
+                // this error is intentionally ignored because it indicates that the
+                // python file failed to validate, which will be reported separately.
+                ignore_error();
+            }
+            ImportResolutionError::DuplicateImport { .. } => {
+                let error = OneilError::from_error_with_optional_source(
+                    import_error,
+                    path.to_path_buf(),
+                    source,
+                );
+                errors.push(error);
+            }
+        }
     }
 
     // convert submodel resolution errors

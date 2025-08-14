@@ -68,7 +68,7 @@ fn print_decl(
                 "{}{} Import: \"{}\"",
                 "  ".repeat(indent),
                 prefix,
-                import.path()
+                import.path().node_value()
             )?;
         }
         Decl::UseModel(use_model) => {
