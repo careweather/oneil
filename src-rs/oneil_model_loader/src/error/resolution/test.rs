@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, ErrorLocation};
+use oneil_error::{AsOneilError, Context, ErrorLocation};
 
 use crate::error::VariableResolutionError;
 
@@ -58,5 +58,13 @@ impl AsOneilError for TestResolutionError {
 
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         self.get_error().error_location(source)
+    }
+
+    fn context(&self) -> Vec<Context> {
+        self.get_error().context()
+    }
+
+    fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
+        self.get_error().context_with_source(source)
     }
 }
