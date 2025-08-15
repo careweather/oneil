@@ -252,7 +252,8 @@ fn convert_resolution_errors(
     {
         for parameter_resolution_error in parameter_resolution_errors {
             match parameter_resolution_error {
-                ParameterResolutionError::CircularDependency { .. } => {
+                ParameterResolutionError::CircularDependency { .. }
+                | ParameterResolutionError::DuplicateParameter { .. } => {
                     let error = OneilError::from_error_with_optional_source(
                         parameter_resolution_error,
                         path.to_path_buf(),

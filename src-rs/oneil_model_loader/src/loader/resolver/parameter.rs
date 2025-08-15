@@ -73,16 +73,30 @@ pub fn resolve_parameters(
     ParameterCollection,
     HashMap<Identifier, Vec<ParameterResolutionError>>,
 ) {
-    // TODO: verify that no duplicate parameters are defined
-
-    let parameter_map: HashMap<_, _> = parameters
-        .into_iter()
-        .map(|parameter| {
+    let (parameter_map, duplicate_errors) = parameters.into_iter().fold(
+        (HashMap::new(), HashMap::new()),
+        |(mut parameter_map, mut duplicate_errors), parameter| {
             let ident = Identifier::new(parameter.ident().as_str());
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
-            (ident, (ident_span, parameter))
-        })
-        .collect();
+
+            let original_parameter = parameter_map.get(&ident);
+            if let Some((original_ident_span, _)) = original_parameter {
+                let original_ident_span: &Span = original_ident_span; // to help type inference
+                duplicate_errors.insert(
+                    ident.clone(),
+                    vec![ParameterResolutionError::duplicate_parameter(
+                        ident,
+                        original_ident_span.clone(),
+                        ident_span.clone(),
+                    )],
+                );
+            } else {
+                parameter_map.insert(ident, (ident_span, parameter));
+            }
+
+            (parameter_map, duplicate_errors)
+        },
+    );
 
     // note that an 'internal dependency' is a dependency on a parameter
     // that is defined within the current model
@@ -115,8 +129,19 @@ pub fn resolve_parameters(
     let resolved_parameters = resolved_parameters.try_into();
 
     match resolved_parameters {
-        Ok(resolved_parameters) => (resolved_parameters, HashMap::new()),
-        Err((resolved_parameters, resolution_errors)) => (resolved_parameters, resolution_errors),
+        Ok(resolved_parameters) => (resolved_parameters, duplicate_errors),
+        Err((resolved_parameters, resolution_errors)) => {
+            // combine the duplicate errors with the resolution errors
+            let mut errors = resolution_errors;
+            for (identifier, duplicate_errors) in duplicate_errors {
+                errors
+                    .entry(identifier)
+                    .or_insert(vec![])
+                    .extend(duplicate_errors);
+            }
+
+            (resolved_parameters, errors)
+        }
     }
 }
 
@@ -660,6 +685,33 @@ mod tests {
             ast::node::Node::new(test_span(0, ident.len()), parameter)
         }
 
+        /// Helper function to create a parameter with a specific span for testing duplicates
+        pub fn create_simple_parameter_with_span(
+            ident: &str,
+            value: f64,
+            start: usize,
+            end: usize,
+        ) -> ast::parameter::ParameterNode {
+            let label = ast::naming::Label::new(format!("Parameter {}", ident));
+            let label_node = ast::node::Node::new(test_span(start, start), label);
+            let identifier = ast::naming::Identifier::new(ident.to_string());
+            let ident_node =
+                ast::node::Node::new(test_span(start, start + ident.len()), identifier);
+
+            let literal = ast::expression::Literal::Number(value);
+            let literal_node = ast::node::Node::new(test_span(start, start + 1), literal);
+            let expr = ast::expression::Expr::Literal(literal_node);
+            let expr_node = ast::node::Node::new(test_span(start, start + 1), expr);
+            let value_node = ast::node::Node::new(
+                test_span(start, start + 1),
+                ast::parameter::ParameterValue::Simple(expr_node, None),
+            );
+
+            let parameter =
+                ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
+            ast::node::Node::new(test_span(start, end), parameter)
+        }
+
         /// Helper function to create a dependent parameter that references another parameter
         pub fn create_dependent_parameter(
             ident: &str,
@@ -1113,5 +1165,185 @@ mod tests {
         assert!(result.is_ok());
         let resolved_limits = result.unwrap();
         assert!(matches!(resolved_limits, Limits::Discrete { .. }));
+    }
+
+    #[test]
+    fn test_resolve_parameters_duplicate_parameters() {
+        // create the parameters with duplicate identifiers
+        let param_a1 = helper::create_simple_parameter_with_span("a", 10.0, 0, 10);
+        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
+        let param_a2 = helper::create_simple_parameter_with_span("a", 20.0, 15, 25);
+        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
+        let parameters = vec![&param_a1, &param_a2];
+
+        // create the submodel and model info
+        let (submodel_info, model_info) = helper::create_mock_info();
+
+        // resolve the parameters
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
+
+        // check the errors - should have one duplicate parameter error
+        assert_eq!(errors.len(), 1);
+        assert!(errors.contains_key(&Identifier::new("a")));
+
+        let a_errors = errors.get(&Identifier::new("a")).unwrap();
+        assert_eq!(a_errors.len(), 1);
+
+        // check that the error is a duplicate parameter error
+        let duplicate_error = &a_errors[0];
+        assert_eq!(
+            duplicate_error,
+            &ParameterResolutionError::DuplicateParameter {
+                identifier: Identifier::new("a"),
+                original_span: param_a1_span.clone(),
+                duplicate_span: param_a2_span.clone()
+            }
+        );
+
+        // check the resolved parameters - should have one parameter, the
+        //     parameter that is present is left unspecified
+        assert_eq!(resolved_params.len(), 1);
+        assert!(resolved_params.contains_key(&Identifier::new("a")));
+    }
+
+    #[test]
+    fn test_resolve_parameters_multiple_duplicate_parameters() {
+        // create the parameters with multiple duplicates
+        let param_a1 = helper::create_simple_parameter_with_span("a", 10.0, 0, 10);
+        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
+        let param_b1 = helper::create_simple_parameter_with_span("b", 20.0, 15, 25);
+        let param_b1_span = get_span_from_ast_span(param_b1.ident().node_span());
+        let param_a2 = helper::create_simple_parameter_with_span("a", 30.0, 30, 40);
+        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
+        let param_b2 = helper::create_simple_parameter_with_span("b", 40.0, 45, 55);
+        let param_b2_span = get_span_from_ast_span(param_b2.ident().node_span());
+        let parameters = vec![&param_a1, &param_b1, &param_a2, &param_b2];
+
+        // create the submodel and model info
+        let (submodel_info, model_info) = helper::create_mock_info();
+
+        // resolve the parameters
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
+
+        // check the errors - should have two duplicate parameter errors
+        assert_eq!(errors.len(), 2);
+        assert!(errors.contains_key(&Identifier::new("a")));
+        assert!(errors.contains_key(&Identifier::new("b")));
+
+        let a_errors = errors.get(&Identifier::new("a")).unwrap();
+        let b_errors = errors.get(&Identifier::new("b")).unwrap();
+        assert_eq!(a_errors.len(), 1);
+        assert_eq!(b_errors.len(), 1);
+
+        // check that both errors are duplicate parameter errors
+        let a_duplicate_error = &a_errors[0];
+        assert_eq!(
+            a_duplicate_error,
+            &ParameterResolutionError::DuplicateParameter {
+                identifier: Identifier::new("a"),
+                original_span: param_a1_span.clone(),
+                duplicate_span: param_a2_span.clone()
+            }
+        );
+
+        let b_duplicate_error = &b_errors[0];
+        assert_eq!(
+            b_duplicate_error,
+            &ParameterResolutionError::DuplicateParameter {
+                identifier: Identifier::new("b"),
+                original_span: param_b1_span.clone(),
+                duplicate_span: param_b2_span.clone()
+            }
+        );
+
+        // check the resolved parameters - should have two parameters, the
+        //     parameters that are present are left unspecified
+        assert_eq!(resolved_params.len(), 2);
+        assert!(resolved_params.contains_key(&Identifier::new("a")));
+        assert!(resolved_params.contains_key(&Identifier::new("b")));
+    }
+
+    #[test]
+    fn test_resolve_parameters_duplicate_parameters_with_valid_parameters() {
+        // create the parameters with duplicates and valid parameters
+        let param_a1 = helper::create_simple_parameter_with_span("a", 10.0, 0, 10);
+        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
+        let param_b = helper::create_simple_parameter("b", 20.0);
+        let param_a2 = helper::create_simple_parameter_with_span("a", 30.0, 15, 25);
+        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
+        let param_c = helper::create_simple_parameter("c", 40.0);
+        let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
+
+        // create the submodel and model info
+        let (submodel_info, model_info) = helper::create_mock_info();
+
+        // resolve the parameters
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
+
+        // check the errors - should have one duplicate parameter error
+        assert_eq!(errors.len(), 1);
+        assert!(errors.contains_key(&Identifier::new("a")));
+
+        let a_errors = errors.get(&Identifier::new("a")).unwrap();
+        assert_eq!(a_errors.len(), 1);
+
+        // check that the error is a duplicate parameter error
+        let duplicate_error = &a_errors[0];
+        assert_eq!(
+            duplicate_error,
+            &ParameterResolutionError::DuplicateParameter {
+                identifier: Identifier::new("a"),
+                original_span: param_a1_span.clone(),
+                duplicate_span: param_a2_span.clone()
+            }
+        );
+
+        // check the resolved parameters
+        assert_eq!(resolved_params.len(), 3);
+        assert!(resolved_params.contains_key(&Identifier::new("a")));
+        assert!(resolved_params.contains_key(&Identifier::new("b")));
+        assert!(resolved_params.contains_key(&Identifier::new("c")));
+    }
+
+    #[test]
+    fn test_resolve_parameters_duplicate_parameters_with_dependencies() {
+        // create the parameters with duplicates and dependencies
+        let param_a1 = helper::create_simple_parameter_with_span("a", 10.0, 0, 10);
+        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
+        let param_b = helper::create_dependent_parameter("b", "a");
+        let param_a2 = helper::create_simple_parameter_with_span("a", 20.0, 15, 25);
+        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
+        let param_c = helper::create_dependent_parameter("c", "b");
+        let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
+
+        // create the submodel and model info
+        let (submodel_info, model_info) = helper::create_mock_info();
+
+        // resolve the parameters
+        let (resolved_params, errors) = resolve_parameters(parameters, &submodel_info, &model_info);
+
+        // check the errors - should have one duplicate parameter error
+        assert_eq!(errors.len(), 1);
+        assert!(errors.contains_key(&Identifier::new("a")));
+
+        let a_errors = errors.get(&Identifier::new("a")).unwrap();
+        assert_eq!(a_errors.len(), 1);
+
+        // check that the error is a duplicate parameter error
+        let duplicate_error = &a_errors[0];
+        assert_eq!(
+            duplicate_error,
+            &ParameterResolutionError::DuplicateParameter {
+                identifier: Identifier::new("a"),
+                original_span: param_a1_span.clone(),
+                duplicate_span: param_a2_span.clone()
+            }
+        );
+
+        // check the resolved parameters
+        assert_eq!(resolved_params.len(), 3);
+        assert!(resolved_params.contains_key(&Identifier::new("a")));
+        assert!(resolved_params.contains_key(&Identifier::new("b")));
+        assert!(resolved_params.contains_key(&Identifier::new("c")));
     }
 }

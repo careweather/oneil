@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, ErrorLocation};
+use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{reference::Identifier, span::Span};
 
 use crate::error::VariableResolutionError;
@@ -19,6 +19,15 @@ pub enum ParameterResolutionError {
     },
     /// A variable resolution error occurred within the parameter's value.
     VariableResolution(VariableResolutionError),
+    /// A duplicate parameter was detected.
+    DuplicateParameter {
+        /// The identifier of the parameter.
+        identifier: Identifier,
+        /// The span of the original parameter.
+        original_span: Span,
+        /// The span of the duplicate parameter.
+        duplicate_span: Span,
+    },
 }
 
 impl ParameterResolutionError {
@@ -51,6 +60,26 @@ impl ParameterResolutionError {
         Self::VariableResolution(error)
     }
 
+    /// Creates a new error indicating a duplicate parameter was detected.
+    /// # Arguments
+    ///
+    /// * `error` - The duplicate parameter error that occurred
+    ///
+    /// # Returns
+    ///
+    /// A new `ParameterResolutionError::DuplicateParameter` variant.
+    pub fn duplicate_parameter(
+        identifier: Identifier,
+        original_span: Span,
+        duplicate_span: Span,
+    ) -> Self {
+        Self::DuplicateParameter {
+            identifier,
+            original_span,
+            duplicate_span,
+        }
+    }
+
     /// Converts the parameter resolution error to a string representation.
     ///
     /// This method delegates to the display module to format the error message
@@ -77,6 +106,9 @@ impl ParameterResolutionError {
             }
             ParameterResolutionError::VariableResolution(variable_error) => {
                 variable_error.to_string()
+            }
+            ParameterResolutionError::DuplicateParameter { identifier, .. } => {
+                format!("duplicate parameter `{}`", identifier.as_str())
             }
         }
     }
@@ -105,6 +137,33 @@ impl AsOneilError for ParameterResolutionError {
                 Some(location)
             }
             ParameterResolutionError::VariableResolution(error) => error.error_location(source),
+            ParameterResolutionError::DuplicateParameter { duplicate_span, .. } => {
+                let offset_start = duplicate_span.start();
+                let length = duplicate_span.length();
+                let location = ErrorLocation::from_source_and_span(source, offset_start, length);
+                Some(location)
+            }
+        }
+    }
+
+    fn context_with_source(
+        &self,
+        source: &str,
+    ) -> Vec<(oneil_error::Context, Option<ErrorLocation>)> {
+        match self {
+            ParameterResolutionError::DuplicateParameter { original_span, .. } => {
+                let original_location = ErrorLocation::from_source_and_span(
+                    source,
+                    original_span.start(),
+                    original_span.length(),
+                );
+                let context = Context::Note("original parameter found here".to_string());
+                vec![(context, Some(original_location))]
+            }
+            ParameterResolutionError::CircularDependency { .. } => vec![],
+            ParameterResolutionError::VariableResolution(error) => {
+                error.context_with_source(source)
+            }
         }
     }
 }
