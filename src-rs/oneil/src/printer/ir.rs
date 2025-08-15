@@ -143,12 +143,12 @@ fn print_model(
 fn print_submodels(
     submodels: &std::collections::HashMap<
         Identifier,
-        oneil_ir::span::WithSpan<oneil_ir::reference::ModelPath>,
+        (oneil_ir::reference::ModelPath, oneil_ir::span::Span),
     >,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    for (i, (identifier, model_path)) in submodels.iter().enumerate() {
+    for (i, (identifier, (model_path, _span))) in submodels.iter().enumerate() {
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         writeln!(

@@ -62,7 +62,7 @@ use std::collections::HashMap;
 use oneil_ast as ast;
 use oneil_ir::{
     reference::{Identifier, ModelPath},
-    span::{Span, WithSpan},
+    span::Span,
 };
 
 use crate::{
@@ -101,7 +101,7 @@ pub fn resolve_submodels<'a>(
     model_path: &ModelPath,
     model_info: &ModelInfo,
 ) -> (
-    HashMap<Identifier, WithSpan<ModelPath>>,
+    HashMap<Identifier, (ModelPath, Span)>,
     HashMap<Identifier, SubmodelResolutionError>,
 ) {
     use_models.into_iter().fold(
@@ -132,8 +132,7 @@ pub fn resolve_submodels<'a>(
                 Ok(resolved_use_model_path) => {
                     // create a span for the submodel
                     let span = get_span_from_ast_span(use_model.node_span());
-                    let model_path_with_span = WithSpan::new(resolved_use_model_path.clone(), span);
-                    submodels.insert(submodel_name.clone(), model_path_with_span);
+                    submodels.insert(submodel_name.clone(), (resolved_use_model_path, span));
                 }
                 Err(error) => {
                     resolution_errors.insert(submodel_name, error);
@@ -210,13 +209,13 @@ fn resolve_model_path(
     let submodel_name_span = get_span_from_ast_span(subcomponents[0].node_span());
     let submodel_path = model
         .get_submodel(&submodel_name)
+        .map(|(path, _)| path)
         .ok_or(SubmodelResolutionError::undefined_submodel_in_submodel(
             model_path.clone(),
             submodel_name,
             submodel_name_span,
         ))?
-        .clone()
-        .take_value();
+        .clone();
 
     resolve_model_path(
         submodel_path,
@@ -270,7 +269,7 @@ mod tests {
         }
 
         /// Helper function to create a test model with specified submodels
-        pub fn create_test_model(submodels: Vec<(&str, WithSpan<ModelPath>)>) -> Model {
+        pub fn create_test_model(submodels: Vec<(&str, (ModelPath, Span))>) -> Model {
             let mut submodel_map = HashMap::new();
             for (name, path) in submodels {
                 let identifier = Identifier::new(name);
@@ -278,7 +277,7 @@ mod tests {
             }
 
             Model::new(
-                HashSet::new(),                                                // python_imports
+                HashMap::new(),                                                // python_imports
                 submodel_map,                                                  // submodels
                 oneil_ir::parameter::ParameterCollection::new(HashMap::new()), // parameters
                 HashMap::new(),                                                // tests
@@ -311,9 +310,9 @@ mod tests {
         // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&temperature_id);
-        let submodel_path = submodel_path.expect("submodel path should be present");
-        assert_eq!(submodel_path.value(), &temperature_path);
+        let result = submodels.get(&temperature_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &temperature_path);
     }
 
     #[test]
@@ -342,12 +341,12 @@ mod tests {
         let atmosphere_path = ModelPath::new("/atmosphere");
         let atmosphere_model = helper::create_test_model(vec![(
             "temperature",
-            WithSpan::new(ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
+            (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
         )]);
         let weather_path = ModelPath::new("/weather");
         let weather_model = helper::create_test_model(vec![(
             "atmosphere",
-            WithSpan::new(ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
         let model_map = HashMap::from([
             (&weather_path, &weather_model),
@@ -365,9 +364,9 @@ mod tests {
         // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&temperature_id);
-        let submodel_path = submodel_path.expect("submodel path should be present");
-        assert_eq!(submodel_path.value(), &temperature_path);
+        let result = submodels.get(&temperature_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &temperature_path);
     }
 
     #[test]
@@ -396,9 +395,9 @@ mod tests {
         // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&temperature_id);
-        let submodel_path = submodel_path.expect("submodel path should be present");
-        assert_eq!(submodel_path.value(), &temperature_path);
+        let result = submodels.get(&temperature_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &temperature_path);
     }
 
     #[test]
@@ -423,7 +422,7 @@ mod tests {
         let weather_path = ModelPath::new("/weather");
         let weather_submodel = helper::create_test_model(vec![(
             "atmosphere",
-            WithSpan::new(ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
 
         // create the model map
@@ -442,9 +441,9 @@ mod tests {
         // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&atmosphere_id);
-        let submodel_path = submodel_path.expect("submodel path should be present");
-        assert_eq!(submodel_path.value(), &atmosphere_path);
+        let result = submodels.get(&atmosphere_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &atmosphere_path);
     }
 
     #[test]
@@ -564,7 +563,7 @@ mod tests {
         let weather_path = ModelPath::new("/weather");
         let weather_model = helper::create_test_model(vec![(
             "atmosphere",
-            WithSpan::new(ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
         let model_map = HashMap::from([
             (&weather_path, &weather_model),
@@ -635,13 +634,13 @@ mod tests {
         // check the submodels
         assert_eq!(submodels.len(), 2);
 
-        let temp_submodel_path = submodels.get(&temperature_id);
-        let temp_submodel_path = temp_submodel_path.expect("submodel path should be present");
-        assert_eq!(temp_submodel_path.value(), &temperature_path);
+        let result = submodels.get(&temperature_id);
+        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(temp_submodel_path, &temperature_path);
 
-        let press_submodel_path = submodels.get(&pressure_id);
-        let press_submodel_path = press_submodel_path.expect("submodel path should be present");
-        assert_eq!(press_submodel_path.value(), &pressure_path);
+        let result = submodels.get(&pressure_id);
+        let (press_submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(press_submodel_path, &pressure_path);
     }
 
     #[test]
@@ -698,8 +697,8 @@ mod tests {
         // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let temp_submodel_path = submodels.get(&temperature_id);
-        let temp_submodel_path = temp_submodel_path.expect("submodel path should be present");
-        assert_eq!(temp_submodel_path.value(), &temperature_path);
+        let result = submodels.get(&temperature_id);
+        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(temp_submodel_path, &temperature_path);
     }
 }

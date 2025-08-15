@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use oneil_ir::{
     reference::{ModelPath, PythonPath},
-    span::WithSpan,
+    span::Span,
 };
 
 use crate::{
@@ -42,7 +42,7 @@ pub fn validate_imports<F>(
     imports: Vec<&oneil_ast::declaration::ImportNode>,
     file_loader: &F,
 ) -> (
-    HashSet<WithSpan<PythonPath>>,
+    HashMap<PythonPath, Span>,
     HashMap<PythonPath, ImportResolutionError>,
     ModelCollectionBuilder<F::ParseError, F::PythonError>,
 )
@@ -50,21 +50,20 @@ where
     F: FileLoader,
 {
     imports.into_iter().fold(
-        (HashSet::new(), HashMap::new(), builder),
+        (HashMap::new(), HashMap::new(), builder),
         |(mut python_imports, mut import_resolution_errors, mut builder), import| {
             let python_path = model_path.get_sibling_path(import.path().node_value());
             let python_path = PythonPath::new(python_path);
-            let span = get_span_from_ast_span(import.path().node_span());
-            let python_path_with_span = WithSpan::new(python_path.clone(), span);
+            let python_path_span = get_span_from_ast_span(import.path().node_span());
 
             // check for duplicate imports
-            let original_import = python_imports.iter().find(|p| p.value() == &python_path);
-            if let Some(original_import) = original_import {
+            let original_import_span = python_imports.get(&python_path);
+            if let Some(original_import_span) = original_import_span {
                 import_resolution_errors.insert(
                     python_path.clone(),
                     ImportResolutionError::duplicate_import(
-                        original_import.span().clone(),
-                        span,
+                        original_import_span.clone(),
+                        python_path_span,
                         python_path,
                     ),
                 );
@@ -75,14 +74,14 @@ where
             let result = file_loader.validate_python_import(&python_path);
             match result {
                 Ok(()) => {
-                    python_imports.insert(python_path_with_span);
+                    python_imports.insert(python_path, python_path_span);
                     (python_imports, import_resolution_errors, builder)
                 }
                 Err(error) => {
                     builder.add_import_error(python_path.clone(), error);
                     import_resolution_errors.insert(
                         python_path.clone(),
-                        ImportResolutionError::failed_validation(span, python_path),
+                        ImportResolutionError::failed_validation(python_path_span, python_path),
                     );
                     (python_imports, import_resolution_errors, builder)
                 }
@@ -101,6 +100,8 @@ mod tests {
     use crate::test::TestPythonValidator;
 
     mod helper {
+        use std::collections::HashSet;
+
         use oneil_ast::{Span, declaration::Import, node::Node};
 
         use super::*;
@@ -171,11 +172,9 @@ mod tests {
         // check the imports
         assert_eq!(valid_imports.len(), 1);
 
-        let valid_path = WithSpan::new(
-            PythonPath::new(PathBuf::from("my_python")),
-            get_span_from_ast_span(&imports[0].node_span()),
-        );
-        assert!(valid_imports.contains(&valid_path));
+        let valid_path = PythonPath::new(PathBuf::from("my_python"));
+        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors
         assert!(errors.is_empty());
@@ -202,11 +201,15 @@ mod tests {
         // check the errors
         assert_eq!(errors.len(), 1);
 
-        let error_path = WithSpan::new(
-            PythonPath::new(PathBuf::from("nonexistent")),
-            get_span_from_ast_span(&imports[0].node_span()),
+        let error_path = PythonPath::new(PathBuf::from("nonexistent"));
+        let error_path_span = get_span_from_ast_span(&imports[0].node_span());
+        assert_eq!(
+            errors.get(&error_path),
+            Some(&ImportResolutionError::failed_validation(
+                error_path_span,
+                error_path
+            ))
         );
-        assert!(errors.contains_key(&error_path));
     }
 
     #[test]
@@ -230,20 +233,22 @@ mod tests {
         // check the imports
         assert_eq!(valid_imports.len(), 1);
 
-        let valid_path = WithSpan::new(
-            PythonPath::new(PathBuf::from("my_python")),
-            get_span_from_ast_span(&imports[0].node_span()),
-        );
-        assert!(valid_imports.contains(&valid_path));
+        let valid_path = PythonPath::new(PathBuf::from("my_python"));
+        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
-        let error_path = WithSpan::new(
-            PythonPath::new(PathBuf::from("nonexistent")),
-            get_span_from_ast_span(&imports[1].node_span()),
+        let error_path = PythonPath::new(PathBuf::from("nonexistent"));
+        let error_path_span = get_span_from_ast_span(&imports[1].node_span());
+        assert_eq!(
+            errors.get(&error_path),
+            Some(&ImportResolutionError::failed_validation(
+                error_path_span,
+                error_path
+            ))
         );
-        assert!(errors.contains_key(&error_path));
     }
 
     #[test]
@@ -267,23 +272,17 @@ mod tests {
 
         // check the imports
         assert_eq!(valid_imports.len(), 3);
-        let valid_path1 = WithSpan::new(
-            PythonPath::new(PathBuf::from("my_python1")),
-            get_span_from_ast_span(&imports[0].node_span()),
-        );
-        assert!(valid_imports.contains(&valid_path1));
+        let valid_path1 = PythonPath::new(PathBuf::from("my_python1"));
+        let valid_path1_span = get_span_from_ast_span(&imports[0].node_span());
+        assert_eq!(valid_imports.get(&valid_path1), Some(&valid_path1_span));
 
-        let valid_path2 = WithSpan::new(
-            PythonPath::new(PathBuf::from("my_python2")),
-            get_span_from_ast_span(&imports[1].node_span()),
-        );
-        assert!(valid_imports.contains(&valid_path2));
+        let valid_path2 = PythonPath::new(PathBuf::from("my_python2"));
+        let valid_path2_span = get_span_from_ast_span(&imports[1].node_span());
+        assert_eq!(valid_imports.get(&valid_path2), Some(&valid_path2_span));
 
-        let valid_path3 = WithSpan::new(
-            PythonPath::new(PathBuf::from("my_python3")),
-            get_span_from_ast_span(&imports[2].node_span()),
-        );
-        assert!(valid_imports.contains(&valid_path3));
+        let valid_path3 = PythonPath::new(PathBuf::from("my_python3"));
+        let valid_path3_span = get_span_from_ast_span(&imports[2].node_span());
+        assert_eq!(valid_imports.get(&valid_path3), Some(&valid_path3_span));
 
         // check the errors
         assert!(errors.is_empty());
@@ -313,17 +312,25 @@ mod tests {
         // check the errors
         assert_eq!(errors.len(), 2);
 
-        let error_path1 = WithSpan::new(
-            PythonPath::new(PathBuf::from("nonexistent1")),
-            get_span_from_ast_span(&imports[0].node_span()),
+        let error_path1 = PythonPath::new(PathBuf::from("nonexistent1"));
+        let error_path1_span = get_span_from_ast_span(&imports[0].node_span());
+        assert_eq!(
+            errors.get(&error_path1),
+            Some(&ImportResolutionError::failed_validation(
+                error_path1_span,
+                error_path1
+            ))
         );
-        assert!(errors.contains_key(&error_path1));
 
-        let error_path2 = WithSpan::new(
-            PythonPath::new(PathBuf::from("nonexistent2")),
-            get_span_from_ast_span(&imports[1].node_span()),
+        let error_path2 = PythonPath::new(PathBuf::from("nonexistent2"));
+        let error_path2_span = get_span_from_ast_span(&imports[1].node_span());
+        assert_eq!(
+            errors.get(&error_path2),
+            Some(&ImportResolutionError::failed_validation(
+                error_path2_span,
+                error_path2
+            ))
         );
-        assert!(errors.contains_key(&error_path2));
     }
 
     #[test]
@@ -367,11 +374,9 @@ mod tests {
         // check the imports
         assert_eq!(valid_imports.len(), 1);
 
-        let valid_path = WithSpan::new(
-            PythonPath::new(PathBuf::from("subdir/my_python")),
-            get_span_from_ast_span(&imports[0].node_span()),
-        );
-        assert!(valid_imports.contains(&valid_path));
+        let valid_path = PythonPath::new(PathBuf::from("subdir/my_python"));
+        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors
         assert!(errors.is_empty());

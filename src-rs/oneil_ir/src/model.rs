@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
-    span::WithSpan,
+    span::Span,
     test::{Test, TestIndex},
 };
 
@@ -25,10 +25,13 @@ use crate::{
 /// - **Python Imports**: External Python modules that provide additional functionality
 ///
 /// Models are immutable by design, following functional programming principles.
+///
+/// Note that the `Span` for python imports and submodels is the span of the
+/// identifier.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
-    python_imports: HashSet<WithSpan<PythonPath>>,
-    submodels: HashMap<Identifier, WithSpan<ModelPath>>,
+    python_imports: HashMap<PythonPath, Span>,
+    submodels: HashMap<Identifier, (ModelPath, Span)>,
     parameters: ParameterCollection,
     tests: HashMap<TestIndex, Test>,
 }
@@ -38,8 +41,8 @@ impl Model {
     ///
     /// # Arguments
     ///
-    /// * `python_imports` - Set of Python modules to import
-    /// * `submodels` - Mapping of submodel identifiers to their model paths
+    /// * `python_imports` - Mapping of Python modules to import to their identifier spans
+    /// * `submodels` - Mapping of submodel identifiers to their model paths and identifier spans
     /// * `parameters` - Collection of parameters defined in this model
     /// * `tests` - Tests for the entire model
     ///
@@ -50,15 +53,15 @@ impl Model {
     /// use std::collections::{HashMap, HashSet};
     ///
     /// let model = Model::new(
-    ///     HashSet::new(), // no Python imports
+    ///     HashMap::new(), // no Python imports
     ///     HashMap::new(),  // no submodels
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),  // no tests
     /// );
     /// ```
     pub fn new(
-        python_imports: HashSet<WithSpan<PythonPath>>,
-        submodels: HashMap<Identifier, WithSpan<ModelPath>>,
+        python_imports: HashMap<PythonPath, Span>,
+        submodels: HashMap<Identifier, (ModelPath, Span)>,
         parameters: ParameterCollection,
         tests: HashMap<TestIndex, Test>,
     ) -> Self {
@@ -74,7 +77,7 @@ impl Model {
     ///
     /// Python imports allow models to use external Python functionality
     /// for complex calculations or data processing.
-    pub fn get_python_imports(&self) -> &HashSet<WithSpan<PythonPath>> {
+    pub fn get_python_imports(&self) -> &HashMap<PythonPath, Span> {
         &self.python_imports
     }
 
@@ -93,10 +96,10 @@ impl Model {
     /// use std::collections::{HashMap, HashSet};
     ///
     /// let mut submodels = HashMap::new();
-    /// submodels.insert(Identifier::new("sub"), WithSpan::new(ModelPath::new("submodel"), oneil_ir::span::Span::new(0, 0)));
+    /// submodels.insert(Identifier::new("sub"), (ModelPath::new("submodel"), oneil_ir::span::Span::new(0, 0)));
     ///
     /// let model = Model::new(
-    ///     HashSet::new(),
+    ///     HashMap::new(),
     ///     submodels,
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),
@@ -105,7 +108,7 @@ impl Model {
     /// assert!(model.get_submodel(&Identifier::new("sub")).is_some());
     /// assert!(model.get_submodel(&Identifier::new("nonexistent")).is_none());
     /// ```
-    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&WithSpan<ModelPath>> {
+    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&(ModelPath, Span)> {
         self.submodels.get(identifier)
     }
 
@@ -114,7 +117,7 @@ impl Model {
     /// # Returns
     ///
     /// A reference to the mapping of submodel identifiers to their corresponding model paths.
-    pub fn get_submodels(&self) -> &HashMap<Identifier, WithSpan<ModelPath>> {
+    pub fn get_submodels(&self) -> &HashMap<Identifier, (ModelPath, Span)> {
         &self.submodels
     }
 
@@ -158,7 +161,7 @@ impl Model {
     /// use std::collections::{HashMap, HashSet};
     ///
     /// let empty_model = Model::new(
-    ///     HashSet::new(),
+    ///     HashMap::new(),
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),
@@ -205,7 +208,7 @@ impl ModelCollection {
     ///
     /// let mut models = HashMap::new();
     /// models.insert(ModelPath::new("main"), Model::new(
-    ///     HashSet::new(),
+    ///     HashMap::new(),
     ///     HashMap::new(),
     ///     ParameterCollection::new(HashMap::new()),
     ///     HashMap::new(),
@@ -239,8 +242,8 @@ impl ModelCollection {
     /// let mut initial_models = HashSet::new();
     /// initial_models.insert(ModelPath::new("main"));
     ///
-    /// let mut python_imports = HashSet::new();
-    /// python_imports.insert(WithSpan::new(PythonPath::new(PathBuf::from("math")), oneil_ir::span::Span::new(0, 0)));
+    /// let mut python_imports = HashMap::new();
+    /// python_imports.insert(PythonPath::new(PathBuf::from("math")), oneil_ir::span::Span::new(0, 0));
     ///
     /// let mut models = HashMap::new();
     /// models.insert(ModelPath::new("main"), Model::new(
@@ -257,7 +260,7 @@ impl ModelCollection {
     pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
         self.models
             .values()
-            .flat_map(|model| model.python_imports.iter().map(|ws| &**ws))
+            .flat_map(|model| model.python_imports.iter().map(|(path, _)| path))
             .collect()
     }
 

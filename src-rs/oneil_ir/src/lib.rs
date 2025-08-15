@@ -69,7 +69,7 @@
 //! let mut params = HashMap::new();
 //! params.insert(Identifier::new("my_param"), param);
 //! let model = Model::new(
-//!     HashSet::new(), // no Python imports
+//!     HashMap::new(), // no Python imports
 //!     HashMap::new(),  // no submodels
 //!     ParameterCollection::new(params),
 //!     HashMap::new(),  // no tests

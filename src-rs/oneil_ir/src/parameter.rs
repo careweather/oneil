@@ -22,6 +22,8 @@ use crate::{
 /// allowing easy lookup and iteration over all parameters in a model.
 /// It implements `Deref` to provide direct access to the underlying
 /// parameter mapping.
+///
+/// The `Span` is the span of the parameter's identifier.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParameterCollection {
     parameters: HashMap<Identifier, Parameter>,

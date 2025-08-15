@@ -36,7 +36,7 @@ use oneil_ir::{
     model::Model,
     parameter::Parameter,
     reference::{Identifier, ModelPath},
-    span::WithSpan,
+    span::Span,
 };
 
 use crate::util::info::InfoMap;
@@ -65,7 +65,7 @@ pub type ParameterInfo<'a> = InfoMap<&'a Identifier, &'a Parameter>;
 ///
 /// This type represents a map from submodel identifiers to their resolved model paths,
 /// along with information about which submodels have errors.
-pub type SubmodelInfo<'a> = InfoMap<&'a Identifier, &'a WithSpan<ModelPath>>;
+pub type SubmodelInfo<'a> = InfoMap<&'a Identifier, &'a (ModelPath, Span)>;
 
 /// Type alias for model information maps used during resolution.
 ///

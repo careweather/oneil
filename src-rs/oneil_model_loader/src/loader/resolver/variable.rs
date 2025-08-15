@@ -131,7 +131,7 @@ pub fn resolve_variable(
             let parent_identifier = Identifier::new(parent.as_str());
             let parent_identifier_span = get_span_from_ast_span(parent.node_span());
             let submodel_path = match submodel_info.get(&parent_identifier) {
-                InfoResult::Found(submodel_path) => submodel_path,
+                InfoResult::Found((submodel_path, _span)) => submodel_path,
                 InfoResult::HasError => {
                     return Err(VariableResolutionError::submodel_resolution_failed(
                         parent_identifier,
@@ -213,7 +213,7 @@ fn resolve_variable_recursive(
             let parent_identifier = Identifier::new(parent.as_str());
             let parent_identifier_span = get_span_from_ast_span(parent.node_span());
             let submodel_path = match model.get_submodel(&parent_identifier) {
-                Some(submodel_path) => submodel_path,
+                Some((submodel_path, _)) => submodel_path,
                 None => {
                     let source = VariableResolutionError::undefined_submodel_in_submodel(
                         submodel_path.clone(),
@@ -340,7 +340,7 @@ mod tests {
             let param_collection = oneil_ir::parameter::ParameterCollection::new(param_map);
 
             Model::new(
-                HashSet::new(),
+                HashMap::new(),
                 HashMap::new(),
                 param_collection,
                 HashMap::new(),
@@ -350,13 +350,13 @@ mod tests {
         /// Helper function to create a model with a submodel
         pub fn create_modelwith_submodel(
             submodel_name: &str,
-            submodel_path: WithSpan<ModelPath>,
+            submodel_path: (ModelPath, Span),
         ) -> Model {
             let mut submodel_map = HashMap::new();
-            submodel_map.insert(Identifier::new(submodel_name), submodel_path.clone());
+            submodel_map.insert(Identifier::new(submodel_name), submodel_path);
 
             Model::new(
-                HashSet::new(),
+                HashMap::new(),
                 submodel_map,
                 oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
                 HashMap::new(),
@@ -605,9 +605,9 @@ mod tests {
         // create submodel info with the submodel
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
+        let submodel_path_span = helper::test_ir_span(0, 10);
+        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
-        let submodel_path_with_span =
-            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
         submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
@@ -650,8 +650,8 @@ mod tests {
         // create submodel info
         let mut submodel_map = HashMap::new();
         let submodel1_path = ModelPath::new("test_submodel1");
-        let submodel1_path_with_span =
-            WithSpan::new(submodel1_path.clone(), helper::test_ir_span(0, 10));
+        let submodel1_path_span = helper::test_ir_span(0, 10);
+        let submodel1_path_with_span = (submodel1_path.clone(), submodel1_path_span);
         let submodel1_id = Identifier::new("submodel1");
         submodel_map.insert(&submodel1_id, &submodel1_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
@@ -659,13 +659,13 @@ mod tests {
         // create model info with nested models
         let mut model_map = HashMap::new();
         let submodel2_path = ModelPath::new("test_submodel2");
-        let submodel2_path_with_span =
-            WithSpan::new(submodel2_path.clone(), helper::test_ir_span(0, 10));
+        let submodel2_path_span = helper::test_ir_span(0, 10);
+        let submodel2_path_with_span = (submodel2_path.clone(), submodel2_path_span);
         let submodel2_model = helper::create_model_with_parameter("parameter");
         let submodel1_model =
-            helper::create_modelwith_submodel("submodel2", submodel2_path_with_span.clone());
+            helper::create_modelwith_submodel("submodel2", submodel2_path_with_span);
         model_map.insert(&submodel1_path, &submodel1_model);
-        model_map.insert(&submodel2_path_with_span, &submodel2_model);
+        model_map.insert(&submodel2_path, &submodel2_model);
         let modelinfo = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the variable
@@ -701,8 +701,8 @@ mod tests {
         // create submodel info
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
-        let submodel_path_with_span =
-            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
+        let submodel_path_span = helper::test_ir_span(0, 10);
+        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
         submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
@@ -710,7 +710,7 @@ mod tests {
         // create model info with empty submodel model
         let mut modelmap = HashMap::new();
         let submodel_model = Model::new(
-            HashSet::new(),
+            HashMap::new(),
             HashMap::new(),
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
             HashMap::new(),
@@ -761,8 +761,8 @@ mod tests {
         // create submodel info
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
-        let submodel_path_with_span =
-            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
+        let submodel_path_span = helper::test_ir_span(0, 10);
+        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
         submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
@@ -770,7 +770,7 @@ mod tests {
         // create model info with empty submodel model
         let mut model_map = HashMap::new();
         let submodel_model = Model::new(
-            HashSet::new(),
+            HashMap::new(),
             HashMap::new(),
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
             HashMap::new(),
@@ -819,8 +819,8 @@ mod tests {
         // create submodel info
         let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
-        let submodel_path_with_span =
-            WithSpan::new(submodel_path.clone(), helper::test_ir_span(0, 10));
+        let submodel_path_span = helper::test_ir_span(0, 10);
+        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
         submodel_map.insert(&submodel_id, &submodel_path_with_span);
         let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
