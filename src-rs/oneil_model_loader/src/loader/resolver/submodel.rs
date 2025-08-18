@@ -111,6 +111,9 @@ pub fn resolve_submodels<'a>(
             let use_model_path = model_path.get_sibling_path(&use_model.model_name().as_str());
             let use_model_path = ModelPath::new(use_model_path);
 
+            // get the submodel span
+            let submodel_name_span = get_span_from_ast_span(use_model.node_span());
+
             // get the submodel name
             let submodel_name = use_model
                 .alias()
@@ -118,10 +121,25 @@ pub fn resolve_submodels<'a>(
                 .unwrap_or(use_model.model_name());
             let submodel_name = Identifier::new(submodel_name.as_str());
 
+            // verify that the submodel name is not a duplicate
+            let maybe_original_submodel = submodels.get(&submodel_name);
+            if let Some((_path, original_submodel_span)) = maybe_original_submodel {
+                resolution_errors.insert(
+                    submodel_name.clone(),
+                    SubmodelResolutionError::duplicate_submodel(
+                        submodel_name,
+                        original_submodel_span.clone(),
+                        submodel_name_span,
+                    ),
+                );
+
+                return (submodels, resolution_errors);
+            }
+
             // resolve the use model path
             let resolved_use_model_path = resolve_model_path(
                 use_model_path.clone(),
-                get_span_from_ast_span(use_model.node_span()),
+                submodel_name_span,
                 use_model.subcomponents(),
                 model_info,
             );

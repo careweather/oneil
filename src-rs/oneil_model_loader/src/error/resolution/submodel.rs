@@ -1,4 +1,4 @@
-use oneil_error::{AsOneilError, ErrorLocation};
+use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{
     reference::{Identifier, ModelPath},
     span::Span,
@@ -26,6 +26,15 @@ pub enum SubmodelResolutionError {
         submodel: Identifier,
         /// The span of where the submodel is referenced
         reference_span: Span,
+    },
+    /// The submodel name is a duplicate.
+    DuplicateSubmodel {
+        /// The identifier of the duplicate submodel
+        submodel: Identifier,
+        /// The span of where the original submodel is referenced
+        original_span: Span,
+        /// The span of where the duplicate submodel is referenced
+        duplicate_span: Span,
     },
 }
 
@@ -70,6 +79,29 @@ impl SubmodelResolutionError {
         }
     }
 
+    /// Creates a new error indicating that the submodel name is a duplicate.
+    ///
+    /// # Arguments
+    ///
+    /// * `submodel` - The identifier of the duplicate submodel
+    /// * `original_span` - The span of where the original submodel is referenced
+    /// * `duplicate_span` - The span of where the duplicate submodel is referenced
+    ///
+    /// # Returns
+    ///
+    /// A new `SubmodelResolutionError::DuplicateSubmodel` variant.
+    pub fn duplicate_submodel(
+        submodel: Identifier,
+        original_span: Span,
+        duplicate_span: Span,
+    ) -> Self {
+        Self::DuplicateSubmodel {
+            submodel,
+            original_span,
+            duplicate_span,
+        }
+    }
+
     /// Converts the submodel resolution error to a string representation.
     ///
     /// This method delegates to the display module to format the error message
@@ -98,6 +130,9 @@ impl SubmodelResolutionError {
                     submodel.as_str(),
                     path
                 )
+            }
+            SubmodelResolutionError::DuplicateSubmodel { submodel, .. } => {
+                format!("submodel `{}` is defined multiple times", submodel.as_str())
             }
         }
     }
@@ -129,6 +164,28 @@ impl AsOneilError for SubmodelResolutionError {
                 let location = ErrorLocation::from_source_and_span(source, start, length);
                 Some(location)
             }
+            SubmodelResolutionError::DuplicateSubmodel { duplicate_span, .. } => {
+                let start = duplicate_span.start();
+                let length = duplicate_span.length();
+                let location = ErrorLocation::from_source_and_span(source, start, length);
+                Some(location)
+            }
+        }
+    }
+
+    fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
+        match self {
+            SubmodelResolutionError::DuplicateSubmodel { duplicate_span, .. } => {
+                let start = duplicate_span.start();
+                let length = duplicate_span.length();
+                let location = ErrorLocation::from_source_and_span(source, start, length);
+                vec![(
+                    Context::Note("submodel is defined multiple times".to_string()),
+                    Some(location),
+                )]
+            }
+            SubmodelResolutionError::ModelHasError { .. } => vec![],
+            SubmodelResolutionError::UndefinedSubmodel { .. } => vec![],
         }
     }
 }

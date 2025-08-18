@@ -235,7 +235,8 @@ fn convert_resolution_errors(
                 ignore_error();
             }
 
-            SubmodelResolutionError::UndefinedSubmodel { .. } => {
+            SubmodelResolutionError::UndefinedSubmodel { .. }
+            | SubmodelResolutionError::DuplicateSubmodel { .. } => {
                 let error = OneilError::from_error_with_optional_source(
                     submodel_resolution_error,
                     path.to_path_buf(),

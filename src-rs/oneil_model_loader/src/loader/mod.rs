@@ -289,7 +289,6 @@ where
 {
     load_stack.push(model_path.clone());
 
-    // TODO: check for duplicate use models
     let builder = use_models.into_iter().fold(builder, |builder, use_model| {
         // get the use model path
         let use_model_path = model_path.get_sibling_path(use_model.model_name().as_str());
