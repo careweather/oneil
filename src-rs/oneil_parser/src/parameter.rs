@@ -1370,23 +1370,6 @@ mod tests {
         }
 
         #[test]
-        fn test_error_invalid_limits_syntax() {
-            let input = Span::new_extra("x{0, 100}: y = 42\n", Config::default());
-            let result = parse(input);
-
-            match result {
-                Err(nom::Err::Error(error)) => {
-                    assert_eq!(error.error_offset, 1); // At "{"
-                    assert!(matches!(
-                        error.reason,
-                        ParserErrorReason::Expect(ExpectKind::Parameter)
-                    ));
-                }
-                _ => panic!("Unexpected result {:?}", result),
-            }
-        }
-
-        #[test]
         fn test_error_mixed_limits_syntax() {
             let input = Span::new_extra("x(0, 100][1, 2]: y = 42\n", Config::default());
             let result = parse(input);

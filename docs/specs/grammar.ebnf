@@ -90,8 +90,9 @@ ParenthesizedUnitExpr = "(", UnitExpr, ")" ;
 Identifier = Letter, { Letter | Digit | "_" } ;
 UnitIdentifier = Identifier, [ "$" ] | "$" | "%" ; (* A unit identifier may optionally be terminated by a dollar sign or may be a percent sign *)
 (* note: labels are context sensitive since they can contain spaces and tabs *)
-Label = ( Letter | Digit | "_" ) { { " " | "\t" } LabelLetter { LabelLetter } } ;
-LabelLetter = Letter | Digit | "_" | "-" | "'" ;
+Label = LabelStartLetter, { LabelLetter }, { { " " | "\t" } LabelLetter { LabelLetter } } ;
+LabelStartLetter = Any character except ( "(" | ")" | "[" | "]" | ":" | "=" | " " | "\t" | "\n" | "*" | "$" );
+LabelLetter = Any character except ( "(" | ")" | "[" | "]" | ":" | "=" | " " | "\t" | "\n" );
 NumberLiteral = [ Sign ], NumberPart, [ ExponentPart ] ;
 NumberPart = DigitSequence, [ ".", DigitSequence ] | ".", DigitSequence ;
 DigitSequence = Digit, { Digit } ;

@@ -652,7 +652,7 @@ mod tests {
 
             #[test]
             fn test_section_missing_end_of_line() {
-                let input = Span::new_extra("section foo *\n import foo", Config::default());
+                let input = Span::new_extra("section foo :\n import foo", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {

@@ -7,10 +7,10 @@
 use nom::{
     Parser as _,
     branch::alt,
-    bytes::complete::{tag, take_while, take_while1},
-    character::complete::{one_of, satisfy},
+    bytes::complete::{tag, take_while},
+    character::complete::{none_of, one_of, satisfy},
     combinator::{opt, recognize, verify},
-    multi::many0,
+    multi::{many0, many1},
 };
 
 use crate::token::{
@@ -114,28 +114,35 @@ pub fn unit_identifier(input: Span) -> Result<Token, TokenError> {
     .parse(input)
 }
 
-/// Parses a label (like an identifier but can contain spaces, tabs, and dashes).
+/// Parses a label (a sequence of word parts separated by whitespace).
 ///
 /// Labels in Oneil are more permissive than identifiers to allow for descriptive names.
 /// They are commonly used for section names, test names, and other human-readable labels.
 ///
 /// Label syntax:
-/// - Must start with an alphanumeric character or underscore
-/// - Can contain alphanumeric characters, underscores, dashes, and apostrophes
-/// - Can contain spaces and tabs between word parts
+/// - Must start with any character except: `(`, `)`, `[`, `]`, `:`, space, tab, newline, `*`, `$`
+/// - Can contain any character except: `(`, `)`, `[`, `]`, `:`, newline
+/// - Word parts can be separated by spaces and tabs
 /// - Cannot be a reserved keyword
 ///
 /// Examples of valid labels:
+/// - `foo`, `bar`, `baz`
 /// - `foo-bar`, `my-section`
 /// - `foo bar`, `test case`
 /// - `foo\tbar` (with tab)
 /// - `user's data`, `test-123`
 /// - `foo bar baz`, `section-name with spaces`
+/// - `123Test` (can start with digits)
+/// - `_` (single underscore)
 ///
 /// Examples of invalid labels:
 /// - `-foo` (starts with dash)
 /// - `if` (reserved keyword)
-/// - `123test` (starts with digit)
+/// - `(section)` (contains parentheses)
+/// - `[test]` (contains brackets)
+/// - `name:` (contains colon)
+/// - `*important` (contains asterisk)
+/// - `$price` (contains dollar sign)
 ///
 /// Note that labels are often followed by a colon as a delimiter, but other
 /// tokens (such as a linebreak) can also be used depending on the context.
@@ -152,18 +159,16 @@ pub fn label(input: Span) -> Result<Token, TokenError> {
     verify(
         token(
             |input| {
-                // First character must be alphanumeric or underscore
-                let (rest, _) = satisfy(|c: char| c.is_alphanumeric() || c == '_').parse(input)?;
+                // First character must be none of the following: ( ) [ ] : \t * $
+                let (rest, _) = none_of("()[]:= \t\n*$").parse(input)?;
 
                 // Parse zero or more word parts separated by whitespace
                 let (rest, _) = many0(|input| {
                     // Consume optional whitespace (spaces and tabs)
-                    let (rest, _) = take_while(|c: char| c == ' ' || c == '\t').parse(input)?;
-                    // Consume at least one word character (alphanumeric, underscore, dash, or apostrophe)
-                    let (rest, _) = take_while1(|c: char| {
-                        c.is_alphanumeric() || c == '_' || c == '-' || c == '\''
-                    })
-                    .parse(rest)?;
+                    let (rest, _) = many0(one_of(" \t")).parse(input)?;
+
+                    // Consume at least one word character
+                    let (rest, _) = many1(none_of("()[]:= \t\n")).parse(rest)?;
                     Ok((rest, ()))
                 })
                 .parse(rest)?;
@@ -444,7 +449,7 @@ mod tests {
 
         #[test]
         fn test_invalid_start() {
-            let input = Span::new_extra("-foo", Config::default());
+            let input = Span::new_extra("*foo", Config::default());
             let res = label(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -457,11 +462,11 @@ mod tests {
 
         #[test]
         fn test_followed_by_special_characters() {
-            let input = Span::new_extra("foo@bar", Config::default());
+            let input = Span::new_extra("foo=bar", Config::default());
             let (rest, matched) =
                 label(input).expect("should parse label followed by special characters");
             assert_eq!(matched.lexeme(), "foo");
-            assert_eq!(rest.fragment(), &"@bar");
+            assert_eq!(rest.fragment(), &"=bar");
         }
 
         #[test]
@@ -470,15 +475,6 @@ mod tests {
             let (rest, matched) = label(input).expect("should parse label followed by newline");
             assert_eq!(matched.lexeme(), "foo");
             assert_eq!(rest.fragment(), &"\nbar");
-        }
-
-        #[test]
-        fn test_followed_by_carriage_return() {
-            let input = Span::new_extra("foo\rbar", Config::default());
-            let (rest, matched) =
-                label(input).expect("should parse label followed by carriage return");
-            assert_eq!(matched.lexeme(), "foo");
-            assert_eq!(rest.fragment(), &"\rbar");
         }
 
         #[test]
