@@ -459,7 +459,7 @@ fn print_test(test: &Test, writer: &mut impl Write, indent: usize) -> io::Result
         writeln!(writer, "{}    ├── Inputs: [none]", "  ".repeat(indent))?;
     } else {
         writeln!(writer, "{}    ├── Inputs:", "  ".repeat(indent))?;
-        for (i, input) in inputs.iter().enumerate() {
+        for (i, (input, _span)) in inputs.iter().enumerate() {
             let is_last = i == inputs.len() - 1;
             let prefix = if is_last { "└──" } else { "├──" };
             writeln!(

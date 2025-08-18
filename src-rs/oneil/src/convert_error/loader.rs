@@ -20,7 +20,7 @@ use oneil_model_loader::{
     ModelErrorMap,
     error::{
         CircularDependencyError, ImportResolutionError, LoadError, ParameterResolutionError,
-        ResolutionErrors, SubmodelResolutionError, VariableResolutionError,
+        ResolutionErrors, SubmodelResolutionError, TestResolutionError, VariableResolutionError,
     },
 };
 
@@ -278,14 +278,26 @@ fn convert_resolution_errors(
     // convert test resolution errors
     for (_test_index, test_resolution_errors) in resolution_errors.get_test_resolution_errors() {
         for test_resolution_error in test_resolution_errors {
-            // we call `convert_variable_resolution_error` here rather than
-            // `OneilError::from_error_with_optional_source` because it
-            // skips certain errors that are not relevant to the user
-            let error =
-                convert_variable_resolution_error(path, source, test_resolution_error.get_error());
+            match test_resolution_error {
+                TestResolutionError::DuplicateInput { .. } => {
+                    let error = OneilError::from_error_with_optional_source(
+                        test_resolution_error,
+                        path.to_path_buf(),
+                        source,
+                    );
+                    errors.push(error);
+                }
+                TestResolutionError::VariableResolution(variable_resolution_error) => {
+                    // we call `convert_variable_resolution_error` here rather than
+                    // `OneilError::from_error_with_optional_source` because it
+                    // skips certain errors that are not relevant to the user
+                    let error =
+                        convert_variable_resolution_error(path, source, variable_resolution_error);
 
-            if let Some(error) = error {
-                errors.push(error);
+                    if let Some(error) = error {
+                        errors.push(error);
+                    }
+                }
             }
         }
     }

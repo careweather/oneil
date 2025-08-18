@@ -3,9 +3,9 @@
 //! This module provides the data structures for defining and managing tests
 //! in Oneil models.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
-use crate::{debug_info::TraceLevel, expr::ExprWithSpan, reference::IdentifierWithSpan};
+use crate::{debug_info::TraceLevel, expr::ExprWithSpan, reference::Identifier, span::Span};
 
 /// An index for identifying tests.
 ///
@@ -47,7 +47,7 @@ impl TestIndex {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
     trace_level: TraceLevel,
-    inputs: HashSet<IdentifierWithSpan>,
+    inputs: HashMap<Identifier, Span>,
     test_expr: ExprWithSpan,
 }
 
@@ -63,18 +63,18 @@ impl Test {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::Test, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier, span::WithSpan};
-    /// use std::collections::HashSet;
+    /// use oneil_ir::{test::Test, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier, span::{Span, WithSpan}};
+    /// use std::collections::HashMap;
     ///
-    /// let mut inputs = HashSet::new();
-    /// inputs.insert(WithSpan::test_new(Identifier::new("radius")));
+    /// let mut inputs = HashMap::new();
+    /// inputs.insert(Identifier::new("radius"), Span::new(0, 0));
     ///
     /// let test_expr = WithSpan::test_new(Expr::literal(Literal::number(78.54))); // Expected area for radius = 5
     /// let test = Test::new(TraceLevel::None, inputs, test_expr);
     /// ```
     pub fn new(
         trace_level: TraceLevel,
-        inputs: HashSet<IdentifierWithSpan>,
+        inputs: HashMap<Identifier, Span>,
         test_expr: ExprWithSpan,
     ) -> Self {
         Self {
@@ -108,19 +108,19 @@ impl Test {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{test::Test, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier, span::WithSpan};
-    /// use std::collections::HashSet;
+    /// use oneil_ir::{test::Test, expr::{Expr, Literal}, debug_info::TraceLevel, reference::Identifier, span::{Span, WithSpan}};
+    /// use std::collections::HashMap;
     ///
-    /// let mut inputs = HashSet::new();
-    /// inputs.insert(WithSpan::test_new(Identifier::new("radius")));
-    /// inputs.insert(WithSpan::test_new(Identifier::new("height")));
+    /// let mut inputs = HashMap::new();
+    /// inputs.insert(Identifier::new("radius"), Span::new(0, 0));
+    /// inputs.insert(Identifier::new("height"), Span::new(0, 0));
     ///
     /// let test = Test::new(TraceLevel::None, inputs, WithSpan::test_new(Expr::literal(Literal::number(0.0))));
     ///
-    /// assert!(test.inputs().contains(&WithSpan::test_new(Identifier::new("radius"))));
-    /// assert!(test.inputs().contains(&WithSpan::test_new(Identifier::new("height"))));
+    /// assert!(test.inputs().contains_key(&Identifier::new("radius")));
+    /// assert!(test.inputs().contains_key(&Identifier::new("height")));
     /// ```
-    pub fn inputs(&self) -> &HashSet<IdentifierWithSpan> {
+    pub fn inputs(&self) -> &HashMap<Identifier, Span> {
         &self.inputs
     }
 
@@ -138,10 +138,10 @@ impl Test {
     ///
     /// ```rust
     /// use oneil_ir::{test::Test, expr::{Expr, Literal}, debug_info::TraceLevel, span::WithSpan};
-    /// use std::collections::HashSet;
+    /// use std::collections::HashMap;
     ///
     /// let expected_area = WithSpan::test_new(Expr::literal(Literal::number(78.54)));
-    /// let test = Test::new(TraceLevel::None, HashSet::new(), expected_area.clone());
+    /// let test = Test::new(TraceLevel::None, HashMap::new(), expected_area.clone());
     ///
     /// assert_eq!(test.test_expr(), &expected_area);
     /// ```

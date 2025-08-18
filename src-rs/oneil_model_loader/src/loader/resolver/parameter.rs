@@ -79,8 +79,8 @@ pub fn resolve_parameters(
             let ident = Identifier::new(parameter.ident().as_str());
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
 
-            let original_parameter = parameter_map.get(&ident);
-            if let Some((original_ident_span, _)) = original_parameter {
+            let maybe_original_parameter = parameter_map.get(&ident);
+            if let Some((original_ident_span, _)) = maybe_original_parameter {
                 let original_ident_span: &Span = original_ident_span; // to help type inference
                 duplicate_errors.insert(
                     ident.clone(),

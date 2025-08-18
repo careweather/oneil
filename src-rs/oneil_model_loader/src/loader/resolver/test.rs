@@ -38,7 +38,7 @@ use std::collections::{HashMap, HashSet};
 use oneil_ast as ast;
 use oneil_ir::{
     reference::Identifier,
-    span::WithSpan,
+    span::Span,
     test::{Test, TestIndex},
 };
 
@@ -89,29 +89,50 @@ pub fn resolve_tests(
         let trace_level = resolve_trace_level(test.trace_level());
 
         // TODO: verify that there are no duplicate inputs
-        let inputs: HashSet<WithSpan<Identifier>> = test
-            .inputs()
-            .map(|inputs| {
-                inputs
-                    .iter()
-                    .map(|input| {
-                        let span = get_span_from_ast_span(input.node_span());
-                        WithSpan::new(Identifier::new(input.as_str()), span)
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let (inputs, duplicate_errors): (HashMap<Identifier, Span>, Vec<TestResolutionError>) =
+            test.inputs()
+                .map(|inputs| {
+                    inputs.iter().fold(
+                        (HashMap::new(), Vec::new()),
+                        |(mut acc, mut errors), input| {
+                            let ident = Identifier::new(input.as_str());
+                            let span = get_span_from_ast_span(input.node_span());
 
-        let local_variables: HashSet<_> = inputs.iter().map(|id| id.value().clone()).collect();
+                            let maybe_original_input = acc.get(&ident);
+                            if let Some(original_input) = maybe_original_input {
+                                let original_input: &Span = original_input; // to help type inference
+                                errors.push(TestResolutionError::duplicate_input(
+                                    ident.clone(),
+                                    original_input.clone(),
+                                    span,
+                                ));
+                            }
 
-        let test_expr = resolve_expr(
+                            acc.insert(ident, span);
+                            (acc, errors)
+                        },
+                    )
+                })
+                .unwrap_or_default();
+
+        let local_variables: HashSet<_> = inputs.keys().cloned().collect();
+
+        let expr_result = resolve_expr(
             &test.expr(),
             &local_variables,
             defined_parameters_info,
             submodel_info,
             model_info,
-        )
-        .map_err(|errors| (test_index.clone(), error::convert_errors(errors)))?;
+        );
+
+        let test_expr = match expr_result {
+            Ok(test_expr) => test_expr,
+            Err(variable_resolution_errors) => {
+                let variable_resolution_errors = error::convert_errors(variable_resolution_errors);
+                let errors = [duplicate_errors, variable_resolution_errors].concat();
+                return Err((test_index, errors));
+            }
+        };
 
         Ok((test_index, Test::new(trace_level, inputs, test_expr)))
     });
@@ -348,22 +369,22 @@ mod tests {
         let test_1 = resolved_tests.get(&TestIndex::new(1)).unwrap();
         assert_eq!(test_1.trace_level(), &ModelTraceLevel::None);
         assert_eq!(test_1.inputs().len(), 2);
-        assert!(test_1.inputs().contains(&WithSpan::new(
-            Identifier::new("x"),
-            helper::test_ir_span(0, 1)
-        )));
-        assert!(test_1.inputs().contains(&WithSpan::new(
-            Identifier::new("y"),
-            helper::test_ir_span(4, 5)
-        )));
+        assert_eq!(
+            test_1.inputs().get(&Identifier::new("x")),
+            Some(&helper::test_ir_span(0, 1))
+        );
+        assert_eq!(
+            test_1.inputs().get(&Identifier::new("y")),
+            Some(&helper::test_ir_span(4, 5))
+        );
 
         let test_2 = resolved_tests.get(&TestIndex::new(2)).unwrap();
         assert_eq!(test_2.trace_level(), &ModelTraceLevel::Trace);
         assert_eq!(test_2.inputs().len(), 1);
-        assert!(test_2.inputs().contains(&WithSpan::new(
-            Identifier::new("param"),
-            helper::test_ir_span(0, 5)
-        )));
+        assert_eq!(
+            test_2.inputs().get(&Identifier::new("param")),
+            Some(&helper::test_ir_span(0, 5))
+        );
     }
 
     #[test]
@@ -397,10 +418,10 @@ mod tests {
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
         assert_eq!(test.trace_level(), &ModelTraceLevel::Debug);
         assert_eq!(test.inputs().len(), 1);
-        assert!(test.inputs().contains(&WithSpan::new(
-            Identifier::new("x"),
-            helper::test_ir_span(0, 1)
-        )));
+        assert_eq!(
+            test.inputs().get(&Identifier::new("x")),
+            Some(&helper::test_ir_span(0, 1))
+        );
     }
 
     #[test]
@@ -435,7 +456,7 @@ mod tests {
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
-            TestResolutionError::new(VariableResolutionError::undefined_parameter(
+            TestResolutionError::variable_resolution(VariableResolutionError::undefined_parameter(
                 Identifier::new("undefined_var"),
                 undefined_var_span,
             )),
@@ -488,7 +509,7 @@ mod tests {
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
-            TestResolutionError::new(VariableResolutionError::undefined_parameter(
+            TestResolutionError::variable_resolution(VariableResolutionError::undefined_parameter(
                 Identifier::new("undefined_var"),
                 undefined_var_span,
             )),
@@ -499,9 +520,9 @@ mod tests {
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
         assert_eq!(test.trace_level(), &ModelTraceLevel::None);
         assert_eq!(test.inputs().len(), 1);
-        assert!(test.inputs().contains(&WithSpan::new(
-            Identifier::new("x"),
-            helper::test_ir_span(0, 1)
-        )));
+        assert_eq!(
+            test.inputs().get(&Identifier::new("x")),
+            Some(&helper::test_ir_span(0, 1))
+        );
     }
 }
