@@ -6,6 +6,7 @@
 
 use nom::{
     AsChar, Parser as NomParser,
+    branch::alt,
     bytes::complete::{tag, take_while},
     character::complete::{digit1, one_of, satisfy},
     combinator::{eof, opt, peek},
@@ -31,7 +32,7 @@ use crate::token::{
 ///
 /// The parser handles the following number formats:
 /// - Integers: `42`, `-17`, `+123`
-/// - Decimals: `3.1415`, `-2.5`, `+0.1`
+/// - Decimals: `3.1415`, `-2.5`, `+0.1`, `.123`
 /// - Exponents: `2.5e10`, `-1.2E-3`, `1e+5`
 /// - Combined: `-1.23e-4`, `+5.67E+2`
 ///
@@ -46,17 +47,7 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
     // Optional sign (+ or -) at the beginning
     let opt_sign = opt(one_of("+-"));
 
-    // Required sequence of digits
-    let digit = digit1;
-
-    // Optional decimal part (e.g., ".1415")
-    let opt_decimal = opt(|input| -> Result<_, TokenError> {
-        let (rest, decimal_point_span) = tag(".").parse(input)?;
-        let (rest, _) = digit1
-            .or_fail_with(TokenError::invalid_decimal_part(decimal_point_span))
-            .parse(rest)?;
-        Ok((rest, ()))
-    });
+    // Number part ()
 
     // Optional exponent part (e.g., "e10", "E-3")
     let opt_exponent = opt(|input| {
@@ -68,8 +59,31 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
         Ok((rest, ()))
     });
 
+    let decimal_part = |input| {
+        let (rest, decimal_point_span) = tag(".").parse(input)?;
+        let (rest, _) = digit1
+            .or_fail_with(TokenError::invalid_decimal_part(decimal_point_span))
+            .parse(rest)?;
+        Ok((rest, ()))
+    };
+
+    // Parse the number part: either digits followed by optional decimal, or just decimal
+    let number_part = |input| {
+        // Try digits first (with optional decimal)
+        let with_digits = |input| {
+            let (rest, _) = digit1.parse(input)?;
+            let (rest, _) = opt(decimal_part).parse(rest)?;
+            Ok((rest, ()))
+        };
+
+        // Try decimal without digits
+        let decimal_only = decimal_part;
+
+        alt((with_digits, decimal_only)).parse(input)
+    };
+
     token(
-        (opt_sign, digit, opt_decimal, opt_exponent),
+        (opt_sign, number_part, opt_exponent),
         TokenError::expected_number,
     )
     .parse(input)
@@ -321,6 +335,38 @@ mod tests {
             assert_eq!(rest.fragment(), &"rest");
         }
 
+        #[test]
+        fn test_decimal_without_digits() {
+            let input = Span::new_extra(".123 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse .123 successfully");
+            assert_eq!(matched.lexeme(), ".123");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_decimal_without_digits_with_sign() {
+            let input = Span::new_extra("-.123 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse -.123 successfully");
+            assert_eq!(matched.lexeme(), "-.123");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_decimal_without_digits_with_exponent() {
+            let input = Span::new_extra(".123e10 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse .123e10 successfully");
+            assert_eq!(matched.lexeme(), ".123e10");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_decimal_without_digits_with_sign_and_exponent() {
+            let input = Span::new_extra("-.123e-10 rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse -.123e-10 successfully");
+            assert_eq!(matched.lexeme(), "-.123e-10");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
         // Error cases
         #[test]
         fn test_empty_input() {
@@ -379,24 +425,14 @@ mod tests {
             let input = Span::new_extra(".", Config::default());
             let res = number(input);
             match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                Err(nom::Err::Failure(token_error)) => assert!(matches!(
                     token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Number)
+                    TokenErrorKind::Incomplete(IncompleteKind::InvalidDecimalPart { .. })
                 )),
-                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
-            }
-        }
-
-        #[test]
-        fn test_decimal_without_digits() {
-            let input = Span::new_extra(".123", Config::default());
-            let res = number(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Number)
-                )),
-                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+                _ => panic!(
+                    "expected TokenError::Incomplete(InvalidDecimalPart), got {:?}",
+                    res
+                ),
             }
         }
 

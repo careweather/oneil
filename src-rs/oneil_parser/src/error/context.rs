@@ -17,7 +17,6 @@ pub fn from_source(
         parameter_missing_label(reason, remaining_source),
         parameter_label_has_invalid_characters(reason, source, remaining_source, offset),
         string_literal_uses_double_quotes(remaining_source),
-        decimal_literal_starts_with_dot(remaining_source),
         unclosed(reason, source),
         invalid_number_literal(reason, source),
     ]
@@ -125,29 +124,6 @@ fn string_literal_uses_double_quotes(
     if starts_with_double_quote {
         let note_message = "string literals in Oneil use single quotes (`'`)";
         let help_message = "use single quotes (`'`) instead of double quotes (`\"`)";
-        vec![
-            (Context::Note(note_message.to_string()), None),
-            (Context::Help(help_message.to_string()), None),
-        ]
-    } else {
-        vec![]
-    }
-}
-
-fn decimal_literal_starts_with_dot(
-    remaining_source: &str,
-) -> Vec<(Context, Option<ErrorLocation>)> {
-    let starts_with_dot = remaining_source.starts_with('.');
-    let is_followed_by_digit = remaining_source
-        .chars()
-        .skip(1) // skip the decimal point
-        .next()
-        .map(|c| c.is_ascii_digit())
-        .unwrap_or(false);
-
-    if starts_with_dot && is_followed_by_digit {
-        let note_message = "decimal literals are not allowed to start with a `.`";
-        let help_message = "add a leading `0`";
         vec![
             (Context::Note(note_message.to_string()), None),
             (Context::Help(help_message.to_string()), None),

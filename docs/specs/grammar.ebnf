@@ -92,10 +92,10 @@ UnitIdentifier = Identifier, [ "$" ] | "$" | "%" ; (* A unit identifier may opti
 (* note: labels are context sensitive since they can contain spaces and tabs *)
 Label = ( Letter | Digit | "_" ) { { " " | "\t" } LabelLetter { LabelLetter } } ;
 LabelLetter = Letter | Digit | "_" | "-" | "'" ;
-NumberLiteral = [ Sign ], ( Integer | Float | Scientific ) ;
-Integer = Digit, { Digit } ;
-Float = Integer , ".", Digit, { Digit } ;
-Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
+NumberLiteral = [ Sign ], NumberPart, [ ExponentPart ] ;
+NumberPart = DigitSequence, [ ".", DigitSequence ] | ".", DigitSequence ;
+DigitSequence = Digit, { Digit } ;
+ExponentPart = ( "e" | "E" ), [ Sign ], DigitSequence ;
 Sign = "+" | "-" ;
 Letter = "A" | ... | "Z" | "a" | ... | "z" ;
 Digit = "0" | "1" | ... | "9" ;
