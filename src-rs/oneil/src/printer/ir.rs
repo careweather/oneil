@@ -453,25 +453,6 @@ fn print_test(test: &Test, writer: &mut impl Write, indent: usize) -> io::Result
         test.trace_level()
     )?;
 
-    // Print inputs
-    let inputs = test.inputs();
-    if inputs.is_empty() {
-        writeln!(writer, "{}    ├── Inputs: [none]", "  ".repeat(indent))?;
-    } else {
-        writeln!(writer, "{}    ├── Inputs:", "  ".repeat(indent))?;
-        for (i, (input, _span)) in inputs.iter().enumerate() {
-            let is_last = i == inputs.len() - 1;
-            let prefix = if is_last { "└──" } else { "├──" };
-            writeln!(
-                writer,
-                "{}        {}Input: \"{}\"",
-                "  ".repeat(indent),
-                prefix,
-                input.as_str()
-            )?;
-        }
-    }
-
     // Print test expression
     writeln!(writer, "{}    └── Test Expression:", "  ".repeat(indent))?;
     print_expression(test.test_expr(), writer, indent + 2)?;

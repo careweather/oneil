@@ -164,19 +164,6 @@ fn print_decl(
                 )?;
             }
 
-            if let Some(inputs) = test.inputs() {
-                let input_names: Vec<String> = inputs
-                    .iter()
-                    .map(|id| id.node_value().as_str().to_string())
-                    .collect();
-                writeln!(
-                    writer,
-                    "{}    ├── Inputs: [{}]",
-                    "  ".repeat(indent),
-                    input_names.join(", ")
-                )?;
-            }
-
             writeln!(writer, "{}    └── Expression:", "  ".repeat(indent))?;
             print_expression(test.expr(), writer, indent + 4)?;
         }

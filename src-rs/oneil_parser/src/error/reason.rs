@@ -289,9 +289,9 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn test_missing_colon(test_kw_or_inputs_span: AstSpan) -> Self {
+    pub(crate) fn test_missing_colon(test_kw_span: AstSpan) -> Self {
         Self::Incomplete {
-            cause: test_kw_or_inputs_span,
+            cause: test_kw_span,
             kind: IncompleteKind::Test(TestKind::MissingColon),
         }
     }
@@ -307,13 +307,6 @@ impl ParserErrorReason {
         Self::Incomplete {
             cause: expr_span,
             kind: IncompleteKind::Test(TestKind::MissingEndOfLine),
-        }
-    }
-
-    pub(crate) fn test_missing_inputs(brace_left_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: brace_left_span,
-            kind: IncompleteKind::Test(TestKind::MissingInputs),
         }
     }
 
@@ -335,13 +328,6 @@ impl ParserErrorReason {
         Self::Incomplete {
             cause: paren_left_span,
             kind: IncompleteKind::Unit(UnitKind::ParenMissingExpr),
-        }
-    }
-
-    pub(crate) fn unclosed_brace(brace_left_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: brace_left_span,
-            kind: IncompleteKind::UnclosedBrace,
         }
     }
 
@@ -404,8 +390,6 @@ pub enum IncompleteKind {
     Test(TestKind),
     /// Found an incomplete unit
     Unit(UnitKind),
-    /// Found an unclosed brace
-    UnclosedBrace,
     /// Found an unclosed bracket
     UnclosedBracket,
     /// Found an unclosed parenthesis
@@ -539,8 +523,6 @@ pub enum TestKind {
     MissingExpr,
     /// Found a missing end of line in a test declaration
     MissingEndOfLine,
-    /// Found missing inputs in a test declaration
-    MissingInputs,
 }
 
 /// The different kind of incomplete unit errors

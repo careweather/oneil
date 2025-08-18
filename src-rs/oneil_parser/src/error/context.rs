@@ -160,11 +160,6 @@ fn decimal_literal_starts_with_dot(
 fn unclosed(reason: &ParserErrorReason, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
     match reason {
         ParserErrorReason::Incomplete { cause, kind } => match kind {
-            IncompleteKind::UnclosedBrace => {
-                let message = "unclosed brace found here";
-                let location = ErrorLocation::from_source_and_offset(source, cause.start());
-                vec![(Context::Note(message.to_string()), Some(location))]
-            }
             IncompleteKind::UnclosedBracket => {
                 let message = "unclosed bracket found here";
                 let location = ErrorLocation::from_source_and_offset(source, cause.start());

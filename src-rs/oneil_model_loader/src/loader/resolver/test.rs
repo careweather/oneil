@@ -36,11 +36,7 @@
 use std::collections::{HashMap, HashSet};
 
 use oneil_ast as ast;
-use oneil_ir::{
-    reference::Identifier,
-    span::Span,
-    test::{Test, TestIndex},
-};
+use oneil_ir::test::{Test, TestIndex};
 
 use crate::{
     error::{self, TestResolutionError},
@@ -48,7 +44,6 @@ use crate::{
         ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
         trace_level::resolve_trace_level,
     },
-    util::get_span_from_ast_span,
 };
 
 /// Resolves tests from AST test declarations.
@@ -88,53 +83,18 @@ pub fn resolve_tests(
 
         let trace_level = resolve_trace_level(test.trace_level());
 
-        // TODO: verify that there are no duplicate inputs
-        let (inputs, duplicate_errors): (HashMap<Identifier, Span>, Vec<TestResolutionError>) =
-            test.inputs()
-                .map(|inputs| {
-                    inputs.iter().fold(
-                        (HashMap::new(), Vec::new()),
-                        |(mut acc, mut errors), input| {
-                            let ident = Identifier::new(input.as_str());
-                            let span = get_span_from_ast_span(input.node_span());
+        let local_variables: HashSet<_> = HashSet::new();
 
-                            let maybe_original_input = acc.get(&ident);
-                            if let Some(original_input) = maybe_original_input {
-                                let original_input: &Span = original_input; // to help type inference
-                                errors.push(TestResolutionError::duplicate_input(
-                                    ident.clone(),
-                                    original_input.clone(),
-                                    span,
-                                ));
-                            }
-
-                            acc.insert(ident, span);
-                            (acc, errors)
-                        },
-                    )
-                })
-                .unwrap_or_default();
-
-        let local_variables: HashSet<_> = inputs.keys().cloned().collect();
-
-        let expr_result = resolve_expr(
+        let test_expr = resolve_expr(
             &test.expr(),
             &local_variables,
             defined_parameters_info,
             submodel_info,
             model_info,
-        );
+        )
+        .map_err(|errors| (test_index.clone(), error::convert_errors(errors)))?;
 
-        let test_expr = match expr_result {
-            Ok(test_expr) => test_expr,
-            Err(variable_resolution_errors) => {
-                let variable_resolution_errors = error::convert_errors(variable_resolution_errors);
-                let errors = [duplicate_errors, variable_resolution_errors].concat();
-                return Err((test_index, errors));
-            }
-        };
-
-        Ok((test_index, Test::new(trace_level, inputs, test_expr)))
+        Ok((test_index, Test::new(trace_level, test_expr)))
     });
 
     error::split_ok_and_errors(tests)
@@ -142,11 +102,11 @@ pub fn resolve_tests(
 
 #[cfg(test)]
 mod tests {
-    use crate::error::VariableResolutionError;
+    use crate::{error::VariableResolutionError, util::get_span_from_ast_span};
 
     use super::*;
 
-    use oneil_ir::debug_info::TraceLevel as ModelTraceLevel;
+    use oneil_ir::{debug_info::TraceLevel as ModelTraceLevel, reference::Identifier};
     use std::collections::HashSet;
 
     // TODO: write tests that test the span of the test inputs
@@ -173,11 +133,6 @@ mod tests {
         /// Helper function to create a test span
         pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
             ast::Span::new(start, end - start, 0)
-        }
-
-        /// Helper function to create a test IR span
-        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::Span {
-            oneil_ir::span::Span::new(start, end - start)
         }
 
         /// Helper function to create an identifier node
@@ -214,53 +169,9 @@ mod tests {
             ast::node::Node::new(test_ast_span(start, end), expr)
         }
 
-        /// Helper function to create a binary operation expression node
-        pub fn create_binary_op_expr_node(
-            left: ast::expression::ExprNode,
-            op: ast::expression::BinaryOp,
-            right: ast::expression::ExprNode,
-            start: usize,
-            end: usize,
-        ) -> ast::expression::ExprNode {
-            let op_node = ast::node::Node::new(test_ast_span(start, end), op);
-            let expr = ast::expression::Expr::BinaryOp {
-                left: Box::new(left),
-                op: op_node,
-                right: Box::new(right),
-            };
-            ast::node::Node::new(test_ast_span(start, end), expr)
-        }
-
-        /// Helper function to create a test inputs node
-        pub fn create_test_inputs_node(
-            inputs: Vec<&str>,
-            start: usize,
-            end: usize,
-        ) -> ast::test::TestInputsNode {
-            let input_nodes = inputs
-                .iter()
-                .enumerate()
-                .map(|(i, name)| {
-                    // Calculate position based on the expected test format
-                    // For "test {x, y}: ...", x should be at start+0, y at start+4
-                    // For "test {x}: ...", x should be at start+0
-                    // For "test {param}: ...", param should be at start+0
-                    let pos = if inputs.len() == 2 && i == 1 {
-                        start + 4 // Second input in a pair
-                    } else {
-                        start + 0 // First input or single input
-                    };
-                    create_identifier_node(name, pos)
-                })
-                .collect();
-            let test_inputs = ast::test::TestInputs::new(input_nodes);
-            ast::node::Node::new(test_ast_span(start, end), test_inputs)
-        }
-
         /// Helper function to create a test node
         pub fn create_test_node(
             trace_level: Option<ast::debug_info::TraceLevel>,
-            inputs: Option<Vec<&str>>,
             expr: ast::expression::ExprNode,
             start: usize,
             end: usize,
@@ -268,10 +179,7 @@ mod tests {
             let trace_level_node =
                 trace_level.map(|tl| ast::node::Node::new(test_ast_span(start, start + 1), tl));
 
-            let inputs_node =
-                inputs.map(|input_list| create_test_inputs_node(input_list, start, end));
-
-            let test = ast::test::Test::new(trace_level_node, inputs_node, expr, None);
+            let test = ast::test::Test::new(trace_level_node, expr, None);
             ast::node::Node::new(test_ast_span(start, end), test)
         }
     }
@@ -304,46 +212,9 @@ mod tests {
             // test: true
             helper::create_test_node(
                 None,
-                None,
                 helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
                 0,
                 4,
-            ),
-            // test {x, y}: x > 0
-            helper::create_test_node(
-                None,
-                Some(vec!["x", "y"]),
-                helper::create_binary_op_expr_node(
-                    helper::create_variable_expr_node(
-                        helper::create_identifier_variable("x"),
-                        0,
-                        1,
-                    ),
-                    ast::expression::BinaryOp::GreaterThan,
-                    helper::create_literal_expr_node(ast::expression::Literal::Number(0.0), 4, 5),
-                    0,
-                    5,
-                ),
-                0,
-                5,
-            ),
-            // * test {param}: param == 42
-            helper::create_test_node(
-                Some(ast::debug_info::TraceLevel::Trace),
-                Some(vec!["param"]),
-                helper::create_binary_op_expr_node(
-                    helper::create_variable_expr_node(
-                        helper::create_identifier_variable("param"),
-                        0,
-                        5,
-                    ),
-                    ast::expression::BinaryOp::Eq,
-                    helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 9, 11),
-                    0,
-                    11,
-                ),
-                0,
-                11,
             ),
         ];
         let tests_refs = tests.iter().collect();
@@ -360,41 +231,19 @@ mod tests {
         assert!(errors.is_empty());
 
         // check the resolved tests
-        assert_eq!(resolved_tests.len(), 3);
+        assert_eq!(resolved_tests.len(), 1);
 
         let test_0 = resolved_tests.get(&TestIndex::new(0)).unwrap();
         assert_eq!(test_0.trace_level(), &ModelTraceLevel::None);
-        assert_eq!(test_0.inputs().len(), 0);
-
-        let test_1 = resolved_tests.get(&TestIndex::new(1)).unwrap();
-        assert_eq!(test_1.trace_level(), &ModelTraceLevel::None);
-        assert_eq!(test_1.inputs().len(), 2);
-        assert_eq!(
-            test_1.inputs().get(&Identifier::new("x")),
-            Some(&helper::test_ir_span(0, 1))
-        );
-        assert_eq!(
-            test_1.inputs().get(&Identifier::new("y")),
-            Some(&helper::test_ir_span(4, 5))
-        );
-
-        let test_2 = resolved_tests.get(&TestIndex::new(2)).unwrap();
-        assert_eq!(test_2.trace_level(), &ModelTraceLevel::Trace);
-        assert_eq!(test_2.inputs().len(), 1);
-        assert_eq!(
-            test_2.inputs().get(&Identifier::new("param")),
-            Some(&helper::test_ir_span(0, 5))
-        );
     }
 
     #[test]
     fn test_resolve_tests_with_debug_trace() {
         // create the tests with debug trace level
         let tests = vec![
-            // ** test {x}: true
+            // ** test: true
             helper::create_test_node(
                 Some(ast::debug_info::TraceLevel::Debug),
-                Some(vec!["x"]),
                 helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
                 0,
                 4,
@@ -417,11 +266,6 @@ mod tests {
         assert_eq!(resolved_tests.len(), 1);
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
         assert_eq!(test.trace_level(), &ModelTraceLevel::Debug);
-        assert_eq!(test.inputs().len(), 1);
-        assert_eq!(
-            test.inputs().get(&Identifier::new("x")),
-            Some(&helper::test_ir_span(0, 1))
-        );
     }
 
     #[test]
@@ -430,10 +274,9 @@ mod tests {
         let undefined_var = helper::create_identifier_variable("undefined_var");
         let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let tests = vec![
-            // test {x}: undefined_var
+            // test: undefined_var
             helper::create_test_node(
                 None,
-                Some(vec!["x"]),
                 helper::create_variable_expr_node(undefined_var, 0, 13),
                 0,
                 13,
@@ -472,18 +315,16 @@ mod tests {
         let undefined_var = helper::create_identifier_variable("undefined_var");
         let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
         let tests = vec![
-            // test {x}: true
+            // test: true
             helper::create_test_node(
                 None,
-                Some(vec!["x"]),
                 helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
                 0,
                 4,
             ),
-            // test {y}: undefined_var
+            // test: undefined_var
             helper::create_test_node(
                 Some(ast::debug_info::TraceLevel::Trace),
-                Some(vec!["y"]),
                 helper::create_variable_expr_node(
                     helper::create_identifier_variable("undefined_var"),
                     0,
@@ -519,10 +360,5 @@ mod tests {
         assert_eq!(resolved_tests.len(), 1);
         let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
         assert_eq!(test.trace_level(), &ModelTraceLevel::None);
-        assert_eq!(test.inputs().len(), 1);
-        assert_eq!(
-            test.inputs().get(&Identifier::new("x")),
-            Some(&helper::test_ir_span(0, 1))
-        );
     }
 }

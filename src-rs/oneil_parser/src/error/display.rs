@@ -101,7 +101,6 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                 TestKind::MissingColon => "expected `:`".to_string(),
                 TestKind::MissingExpr => "expected test expression".to_string(),
                 TestKind::MissingEndOfLine => "unexpected character".to_string(),
-                TestKind::MissingInputs => "expected test inputs in `{}`".to_string(),
             },
             IncompleteKind::Unit(unit_kind) => match unit_kind {
                 UnitKind::MissingSecondTerm { operator } => {
@@ -114,7 +113,6 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                 UnitKind::MissingExponent => "expected exponent".to_string(),
                 UnitKind::ParenMissingExpr => "expected expression inside parentheses".to_string(),
             },
-            IncompleteKind::UnclosedBrace => "unclosed `{`".to_string(),
             IncompleteKind::UnclosedBracket => "unclosed `[`".to_string(),
             IncompleteKind::UnclosedParen => "unclosed `(`".to_string(),
         },

@@ -64,15 +64,6 @@ pub fn brace_left(input: Span) -> Result<Token, TokenError> {
     .parse(input)
 }
 
-/// Parses the '}' symbol token.
-pub fn brace_right(input: Span) -> Result<Token, TokenError> {
-    token(
-        char('}'),
-        TokenError::expected_symbol(ExpectSymbol::BraceRight),
-    )
-    .parse(input)
-}
-
 /// Parses the '[' symbol token.
 pub fn bracket_left(input: Span) -> Result<Token, TokenError> {
     token(
@@ -277,14 +268,6 @@ mod tests {
             let input = Span::new_extra("{ rest", Config::default());
             let (rest, matched) = brace_left(input).expect("should parse '{' symbol");
             assert_eq!(matched.lexeme(), "{");
-            assert_eq!(rest.fragment(), &"rest");
-        }
-
-        #[test]
-        fn test_brace_right() {
-            let input = Span::new_extra("} rest", Config::default());
-            let (rest, matched) = brace_right(input).expect("should parse '}' symbol");
-            assert_eq!(matched.lexeme(), "}");
             assert_eq!(rest.fragment(), &"rest");
         }
 

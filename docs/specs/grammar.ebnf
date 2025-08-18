@@ -45,8 +45,7 @@ DiscreteLimits = "[", Expr, { ",", Expr }, "]" ;
 Assignment = Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
 
 (* Tests *)
-TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expr, EndOfLine ;
-TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
+TestDecl = [ Trace ], "test", ":", Expr, EndOfLine ;
 
 (* Expressions *)
 (* Expression Precedence (highest to lowest):

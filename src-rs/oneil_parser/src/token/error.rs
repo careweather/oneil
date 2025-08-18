@@ -96,8 +96,6 @@ pub enum ExpectSymbol {
     Bar,
     /// Expected '{' symbol
     BraceLeft,
-    /// Expected '}' symbol
-    BraceRight,
     /// Expected '[' symbol
     BracketLeft,
     /// Expected ']' symbol

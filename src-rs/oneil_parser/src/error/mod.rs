@@ -473,19 +473,6 @@ impl ParserError {
         }
     }
 
-    /// Creates a new ParserError for missing inputs in a test declaration
-    pub(crate) fn test_missing_inputs(
-        brace_left_token: &impl SpanLike,
-    ) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let brace_left_span = AstSpan::from(brace_left_token);
-            Self::new_from_token_error(
-                error,
-                ParserErrorReason::test_missing_inputs(brace_left_span),
-            )
-        }
-    }
-
     /// Creates a new ParserError for a missing second term in a unit expression
     pub(crate) fn unit_missing_second_term(operator_node: &UnitOpNode) -> impl Fn(Self) -> Self {
         move |error| {
@@ -515,14 +502,6 @@ impl ParserError {
         move |error| {
             let paren_left_span = AstSpan::from(paren_left_token);
             error.convert_reason(ParserErrorReason::unit_paren_missing_expr(paren_left_span))
-        }
-    }
-
-    /// Creates a new ParserError for an unclosed brace
-    pub(crate) fn unclosed_brace(brace_left_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let brace_left_span = AstSpan::from(brace_left_token);
-            Self::new_from_token_error(error, ParserErrorReason::unclosed_brace(brace_left_span))
         }
     }
 
