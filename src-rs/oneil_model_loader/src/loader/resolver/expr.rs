@@ -51,7 +51,7 @@
 //! fail immediately.
 
 use oneil_ast as ast;
-use oneil_ir::{expr::Expr, span::WithSpan};
+use oneil_ir::{expr::Expr, reference::Identifier, span::WithSpan};
 
 use crate::{
     BuiltinRef,
@@ -183,7 +183,7 @@ pub fn resolve_expr(
             }
         }
         ast::Expr::FunctionCall { name, args } => {
-            let name_with_span = resolve_function_name(name);
+            let name_with_span = resolve_function_name(name, builtin_ref);
             let args = args.iter().map(|arg| {
                 resolve_expr(
                     arg,
@@ -313,42 +313,19 @@ fn resolve_unary_op(op: &ast::expression::UnaryOpNode) -> WithSpan<oneil_ir::exp
 /// # Returns
 ///
 /// A model function name representing either a built-in or imported function
-///
-/// # Built-in Functions
-///
-/// The following functions are recognized as built-in:
-/// - **Mathematical**: `min`, `max`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`
-/// - **Logarithmic**: `sqrt`, `ln`, `log`, `log10`
-/// - **Rounding**: `floor`, `ceiling`
-/// - **Utility**: `extent`, `range`, `abs`, `sign`, `mid`, `strip`, `mnmx`
 fn resolve_function_name(
     name: &ast::naming::IdentifierNode,
+    builtin_ref: &impl BuiltinRef,
 ) -> WithSpan<oneil_ir::expr::FunctionName> {
     let span = get_span_from_ast_span(name.node_span());
-    let name = match name.as_str() {
-        "min" => oneil_ir::expr::FunctionName::min(),
-        "max" => oneil_ir::expr::FunctionName::max(),
-        "sin" => oneil_ir::expr::FunctionName::sin(),
-        "cos" => oneil_ir::expr::FunctionName::cos(),
-        "tan" => oneil_ir::expr::FunctionName::tan(),
-        "asin" => oneil_ir::expr::FunctionName::asin(),
-        "acos" => oneil_ir::expr::FunctionName::acos(),
-        "atan" => oneil_ir::expr::FunctionName::atan(),
-        "sqrt" => oneil_ir::expr::FunctionName::sqrt(),
-        "ln" => oneil_ir::expr::FunctionName::ln(),
-        "log" => oneil_ir::expr::FunctionName::log(),
-        "log10" => oneil_ir::expr::FunctionName::log10(),
-        "floor" => oneil_ir::expr::FunctionName::floor(),
-        "ceiling" => oneil_ir::expr::FunctionName::ceiling(),
-        "extent" => oneil_ir::expr::FunctionName::extent(),
-        "range" => oneil_ir::expr::FunctionName::range(),
-        "abs" => oneil_ir::expr::FunctionName::abs(),
-        "sign" => oneil_ir::expr::FunctionName::sign(),
-        "mid" => oneil_ir::expr::FunctionName::mid(),
-        "strip" => oneil_ir::expr::FunctionName::strip(),
-        "mnmx" => oneil_ir::expr::FunctionName::minmax(),
-        name => oneil_ir::expr::FunctionName::imported(name.to_string()),
+    let name = Identifier::new(name.as_str().to_string());
+
+    let name = if builtin_ref.has_builtin_function(&name) {
+        oneil_ir::expr::FunctionName::builtin(name)
+    } else {
+        oneil_ir::expr::FunctionName::imported(name)
     };
+
     WithSpan::new(name, span)
 }
 
@@ -532,10 +509,20 @@ mod tests {
             (builtin_ref, param_info, submodel_info, model_info)
         }
 
+        pub fn create_empty_test_builtin_ref() -> TestBuiltinRef {
+            TestBuiltinRef::new()
+        }
+
         pub fn create_test_builtin_ref_with_builtin_variables(
             variables: impl IntoIterator<Item = String>,
         ) -> TestBuiltinRef {
             TestBuiltinRef::new().with_builtin_variables(variables)
+        }
+
+        pub fn create_test_builtin_ref_with_builtin_functions(
+            functions: impl IntoIterator<Item = String>,
+        ) -> TestBuiltinRef {
+            TestBuiltinRef::new().with_builtin_functions(functions)
         }
 
         /// Helper function to create a parameter ID with span
@@ -786,7 +773,7 @@ mod tests {
         // create the expression
         let ast_arg =
             helper::create_literal_expr_node(ast::expression::Literal::Number(3.14), 4, 8);
-        let ast_name = helper::create_identifier_node("sin", 0, 3);
+        let ast_name = helper::create_identifier_node("foo", 0, 3);
         let expr =
             helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg.clone()], 0, 8);
 
@@ -812,7 +799,10 @@ mod tests {
                     ir::expr::Expr::FunctionCall { name, args } => {
                         let expected_name_span = get_span_from_ast_span(ast_name.node_span());
                         assert_eq!(name.span(), &expected_name_span);
-                        assert_eq!(name.value(), &FunctionName::sin());
+                        assert_eq!(
+                            name.value(),
+                            &FunctionName::imported(Identifier::new("foo"))
+                        );
 
                         assert_eq!(args.len(), 1);
 
@@ -863,7 +853,7 @@ mod tests {
                         assert_eq!(name.span(), &expected_name_span);
                         assert_eq!(
                             name.value(),
-                            &FunctionName::imported("custom_function".to_string())
+                            &FunctionName::imported(Identifier::new("custom_function"))
                         );
 
                         assert_eq!(args.len(), 1);
@@ -1026,7 +1016,7 @@ mod tests {
 
         let ast_func_arg =
             helper::create_literal_expr_node(ast::expression::Literal::Number(3.14), 12, 16);
-        let ast_func_name = helper::create_identifier_node("sin", 8, 11);
+        let ast_func_name = helper::create_identifier_node("foo", 8, 11);
         let func_call = helper::create_function_call_expr_node(
             ast_func_name.clone(),
             vec![ast_func_arg.clone()],
@@ -1113,13 +1103,16 @@ mod tests {
                             ),
                         }
 
-                        // check right side (sin(3.14))
+                        // check right side (foo(3.14))
                         match right.value() {
                             ir::expr::Expr::FunctionCall { name, args } => {
                                 let expected_name_span =
                                     get_span_from_ast_span(ast_func_name.node_span());
                                 assert_eq!(name.span(), &expected_name_span);
-                                assert_eq!(name.value(), &FunctionName::sin());
+                                assert_eq!(
+                                    name.value(),
+                                    &FunctionName::imported(Identifier::new("foo"))
+                                );
 
                                 assert_eq!(args.len(), 1);
                                 let expected_arg_span =
@@ -1245,39 +1238,27 @@ mod tests {
     fn test_resolve_function_name_builtin() {
         // create the builtin functions
         let builtin_functions = vec![
-            ("min", FunctionName::min()),
-            ("max", FunctionName::max()),
-            ("sin", FunctionName::sin()),
-            ("cos", FunctionName::cos()),
-            ("tan", FunctionName::tan()),
-            ("asin", FunctionName::asin()),
-            ("acos", FunctionName::acos()),
-            ("atan", FunctionName::atan()),
-            ("sqrt", FunctionName::sqrt()),
-            ("ln", FunctionName::ln()),
-            ("log", FunctionName::log()),
-            ("log10", FunctionName::log10()),
-            ("floor", FunctionName::floor()),
-            ("ceiling", FunctionName::ceiling()),
-            ("extent", FunctionName::extent()),
-            ("range", FunctionName::range()),
-            ("abs", FunctionName::abs()),
-            ("sign", FunctionName::sign()),
-            ("mid", FunctionName::mid()),
-            ("strip", FunctionName::strip()),
-            ("mnmx", FunctionName::minmax()),
+            "min".to_string(),
+            "max".to_string(),
+            "sin".to_string(),
+            "cos".to_string(),
+            "tan".to_string(),
         ];
 
+        let builtin_ref =
+            helper::create_test_builtin_ref_with_builtin_functions(builtin_functions.clone());
+
         // resolve the function names
-        for (func_name, expected_func_builtin) in builtin_functions {
+        for func_name in builtin_functions {
             // create the function name node
-            let ast_func_name_node = helper::create_identifier_node(func_name, 0, 1);
+            let ast_func_name_node = helper::create_identifier_node(&func_name, 0, 1);
 
             // resolve the function name
-            let result = resolve_function_name(&ast_func_name_node);
+            let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_func_name_node.node_span());
+            let expected_func_builtin = FunctionName::builtin(Identifier::new(&func_name));
             assert_eq!(result.span(), &expected_span);
             assert_eq!(result.value(), &expected_func_builtin);
         }
@@ -1293,20 +1274,22 @@ mod tests {
             "user_defined_function",
         ];
 
+        let builtin_ref = helper::create_empty_test_builtin_ref();
+
         // resolve the function names
         for func_name in imported_functions {
             // create the function name node
             let ast_func_name_node = helper::create_identifier_node(func_name, 0, 1);
 
             // resolve the function name
-            let result = resolve_function_name(&ast_func_name_node);
+            let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_func_name_node.node_span());
             assert_eq!(result.span(), &expected_span);
             match result.value() {
                 FunctionName::Imported(name) => {
-                    assert_eq!(name, func_name);
+                    assert_eq!(name.as_str(), func_name);
                 }
                 _ => panic!(
                     "Expected imported function for '{}', got {:?}",
@@ -1659,10 +1642,10 @@ mod tests {
 
     #[test]
     fn test_resolve_parenthesized_function_call() {
-        // Test a parenthesized function call: (sin(3.14))
+        // Test a parenthesized function call: (foo(3.14))
         let func_arg =
             helper::create_literal_expr_node(ast::expression::Literal::Number(3.14), 5, 9);
-        let func_name = helper::create_identifier_node("sin", 1, 4);
+        let func_name = helper::create_identifier_node("foo", 1, 4);
         let func_call = helper::create_function_call_expr_node(
             func_name.clone(),
             vec![func_arg.clone()],
@@ -1692,7 +1675,10 @@ mod tests {
                     ir::expr::Expr::FunctionCall { name, args } => {
                         let expected_name_span = get_span_from_ast_span(func_name.node_span());
                         assert_eq!(name.span(), &expected_name_span);
-                        assert_eq!(name.value(), &FunctionName::sin());
+                        assert_eq!(
+                            name.value(),
+                            &FunctionName::imported(Identifier::new("foo"))
+                        );
 
                         assert_eq!(args.len(), 1);
                         let expected_arg_span = get_span_from_ast_span(func_arg.node_span());

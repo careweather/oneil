@@ -118,10 +118,11 @@ pub enum Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, FunctionName, Literal};
+    /// use oneil_ir::reference::Identifier;
     /// use oneil_ir::span::WithSpan;
     ///
     /// let args = vec![WithSpan::test_new(Expr::literal(Literal::number(3.14)))];
-    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::sin()), args);
+    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::imported(Identifier::new("foo"))), args);
     /// ```
     FunctionCall {
         /// The name of the function to call.
@@ -243,11 +244,11 @@ impl Expr {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::expr::{Expr, FunctionName, Literal};
+    /// use oneil_ir::{expr::{Expr, FunctionName, Literal}, reference::Identifier};
     /// use oneil_ir::span::WithSpan;
     ///
     /// let args = vec![WithSpan::test_new(Expr::literal(Literal::number(3.14)))];
-    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::sin()), args);
+    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::imported(Identifier::new("foo"))), args);
     /// ```
     pub fn function_call(name: WithSpan<FunctionName>, args: Vec<ExprWithSpan>) -> Self {
         Self::FunctionCall { name, args }
@@ -427,115 +428,27 @@ pub enum UnaryOp {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionName {
     /// Built-in mathematical function.
-    Builtin(BuiltinFunction),
+    Builtin(Identifier),
     /// Function imported from a Python module.
-    Imported(String),
+    Imported(Identifier),
 }
 
 impl FunctionName {
-    /// Creates a reference to the `min` function.
-    pub fn min() -> Self {
-        Self::Builtin(BuiltinFunction::Min)
-    }
-
-    /// Creates a reference to the `max` function.
-    pub fn max() -> Self {
-        Self::Builtin(BuiltinFunction::Max)
-    }
-
-    /// Creates a reference to the `sin` function.
-    pub fn sin() -> Self {
-        Self::Builtin(BuiltinFunction::Sin)
-    }
-
-    /// Creates a reference to the `cos` function.
-    pub fn cos() -> Self {
-        Self::Builtin(BuiltinFunction::Cos)
-    }
-
-    /// Creates a reference to the `tan` function.
-    pub fn tan() -> Self {
-        Self::Builtin(BuiltinFunction::Tan)
-    }
-
-    /// Creates a reference to the `asin` function.
-    pub fn asin() -> Self {
-        Self::Builtin(BuiltinFunction::Asin)
-    }
-
-    /// Creates a reference to the `acos` function.
-    pub fn acos() -> Self {
-        Self::Builtin(BuiltinFunction::Acos)
-    }
-
-    /// Creates a reference to the `atan` function.
-    pub fn atan() -> Self {
-        Self::Builtin(BuiltinFunction::Atan)
-    }
-
-    /// Creates a reference to the `sqrt` function.
-    pub fn sqrt() -> Self {
-        Self::Builtin(BuiltinFunction::Sqrt)
-    }
-
-    /// Creates a reference to the `ln` function.
-    pub fn ln() -> Self {
-        Self::Builtin(BuiltinFunction::Ln)
-    }
-
-    /// Creates a reference to the `log` function.
-    pub fn log() -> Self {
-        Self::Builtin(BuiltinFunction::Log)
-    }
-
-    /// Creates a reference to the `log10` function.
-    pub fn log10() -> Self {
-        Self::Builtin(BuiltinFunction::Log10)
-    }
-
-    /// Creates a reference to the `floor` function.
-    pub fn floor() -> Self {
-        Self::Builtin(BuiltinFunction::Floor)
-    }
-
-    /// Creates a reference to the `ceiling` function.
-    pub fn ceiling() -> Self {
-        Self::Builtin(BuiltinFunction::Ceiling)
-    }
-
-    /// Creates a reference to the `extent` function.
-    pub fn extent() -> Self {
-        Self::Builtin(BuiltinFunction::Extent)
-    }
-
-    /// Creates a reference to the `range` function.
-    pub fn range() -> Self {
-        Self::Builtin(BuiltinFunction::Range)
-    }
-
-    /// Creates a reference to the `abs` function.
-    pub fn abs() -> Self {
-        Self::Builtin(BuiltinFunction::Abs)
-    }
-
-    /// Creates a reference to the `sign` function.
-    pub fn sign() -> Self {
-        Self::Builtin(BuiltinFunction::Sign)
-    }
-
-    /// Creates a reference to the `mid` function.
-    pub fn mid() -> Self {
-        Self::Builtin(BuiltinFunction::Mid)
-    }
-
-    /// Creates a reference to the `strip` function.
-    pub fn strip() -> Self {
-        Self::Builtin(BuiltinFunction::Strip)
-    }
-
-    /// Creates a reference to the `minmax` function.
-    pub fn minmax() -> Self {
-        Self::Builtin(BuiltinFunction::MinMax)
+    /// Creates a reference to a built-in function.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the built-in function
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::FunctionName, reference::Identifier};
+    ///
+    /// let func = FunctionName::builtin(Identifier::new("sin"));
+    /// ```
+    pub fn builtin(name: Identifier) -> Self {
+        Self::Builtin(name)
     }
 
     /// Creates a reference to an imported Python function.
@@ -547,63 +460,13 @@ impl FunctionName {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::expr::FunctionName;
+    /// use oneil_ir::{expr::FunctionName, reference::Identifier};
     ///
-    /// let func = FunctionName::imported("numpy.random.normal".to_string());
+    /// let func = FunctionName::imported(Identifier::new("numpy.random.normal"));
     /// ```
-    pub fn imported(name: String) -> Self {
+    pub fn imported(name: Identifier) -> Self {
         Self::Imported(name)
     }
-}
-
-/// Built-in mathematical functions available in Oneil.
-///
-/// These functions provide common mathematical operations and are
-/// always available without requiring imports.
-#[derive(Debug, Clone, PartialEq)]
-pub enum BuiltinFunction {
-    /// Minimum of two values: `min(a, b)`
-    Min,
-    /// Maximum of two values: `max(a, b)`
-    Max,
-    /// Sine function: `sin(x)`
-    Sin,
-    /// Cosine function: `cos(x)`
-    Cos,
-    /// Tangent function: `tan(x)`
-    Tan,
-    /// Arcsine function: `asin(x)`
-    Asin,
-    /// Arccosine function: `acos(x)`
-    Acos,
-    /// Arctangent function: `atan(x)`
-    Atan,
-    /// Square root: `sqrt(x)`
-    Sqrt,
-    /// Natural logarithm: `ln(x)`
-    Ln,
-    /// Logarithm (base e): `log(x)`
-    Log,
-    /// Base-10 logarithm: `log10(x)`
-    Log10,
-    /// Floor function: `floor(x)`
-    Floor,
-    /// Ceiling function: `ceiling(x)`
-    Ceiling,
-    /// Extent function: `extent(x)`
-    Extent,
-    /// Range function: `range(x)`
-    Range,
-    /// Absolute value: `abs(x)`
-    Abs,
-    /// Sign function: `sign(x)`
-    Sign,
-    /// Midpoint function: `mid(x)`
-    Mid,
-    /// Strip function: `strip(x)`
-    Strip,
-    /// Min/max function: `mnmx(x)`
-    MinMax,
 }
 
 /// Variable references in expressions.

@@ -231,10 +231,10 @@ impl TestBuiltinRef {
         self
     }
 
-    // pub fn with_builtin_functions(mut self, functions: impl IntoIterator<Item = String>) -> Self {
-    //     self.builtin_functions.extend(functions);
-    //     self
-    // }
+    pub fn with_builtin_functions(mut self, functions: impl IntoIterator<Item = String>) -> Self {
+        self.builtin_functions.extend(functions);
+        self
+    }
 }
 
 impl BuiltinRef for TestBuiltinRef {
