@@ -14,7 +14,7 @@
 //! - **NomError**: Internal nom parsing library errors
 use oneil_ast::{
     Span as AstSpan,
-    expression::{BinaryOp, UnaryOp},
+    expression::{BinaryOp, ComparisonOp, UnaryOp},
     unit::UnitOp,
 };
 
@@ -157,6 +157,16 @@ impl ParserErrorReason {
         Self::Incomplete {
             cause: dot_span,
             kind: IncompleteKind::Decl(DeclKind::ModelPathMissingSubcomponent),
+        }
+    }
+
+    pub(crate) fn expr_comparison_op_missing_second_operand(
+        operator_span: AstSpan,
+        operator: ComparisonOp,
+    ) -> Self {
+        Self::Incomplete {
+            cause: operator_span,
+            kind: IncompleteKind::Expr(ExprKind::ComparisonOpMissingSecondOperand { operator }),
         }
     }
 
@@ -460,6 +470,11 @@ pub enum UseKind {
 /// The different kind of incomplete expression errors
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
+    /// Found a comparison operation missing a second operand
+    ComparisonOpMissingSecondOperand {
+        /// The operator value
+        operator: ComparisonOp,
+    },
     /// Found a binary operation missing a second operand
     BinaryOpMissingSecondOperand {
         /// The operator value

@@ -259,12 +259,13 @@ impl ParameterValue {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::{ParameterValue, PiecewiseExpr}, expr::{Expr, Literal, BinaryOp}, reference::Identifier, span::WithSpan};
+    /// use oneil_ir::{parameter::{ParameterValue, PiecewiseExpr}, expr::{Expr, Literal, ComparisonOp}, reference::Identifier, span::WithSpan};
     ///
-    /// let condition = WithSpan::test_new(Expr::binary_op(
-    ///     WithSpan::test_new(BinaryOp::LessThan),
+    /// let condition = WithSpan::test_new(Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::LessThan),
     ///     WithSpan::test_new(Expr::parameter_variable(Identifier::new("x"))),
-    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0)))
+    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0))),
+    ///     vec![]
     /// ));
     /// let expr = WithSpan::test_new(Expr::literal(Literal::number(-1.0)));
     /// let piecewise = PiecewiseExpr::new(expr, condition);
@@ -297,13 +298,14 @@ impl PiecewiseExpr {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::PiecewiseExpr, expr::{Expr, Literal, BinaryOp}, reference::Identifier, span::WithSpan};
+    /// use oneil_ir::{parameter::PiecewiseExpr, expr::{Expr, Literal, ComparisonOp}, reference::Identifier, span::WithSpan};
     ///
     /// let value = WithSpan::test_new(Expr::literal(Literal::number(1.0)));
-    /// let condition = WithSpan::test_new(Expr::binary_op(
-    ///     WithSpan::test_new(BinaryOp::GreaterThan),
+    /// let condition = WithSpan::test_new(Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::GreaterThan),
     ///     WithSpan::test_new(Expr::parameter_variable(Identifier::new("x"))),
-    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0)))
+    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0))),
+    ///     vec![]
     /// ));
     ///
     /// let piecewise = PiecewiseExpr::new(value, condition);

@@ -360,6 +360,33 @@ fn print_expression(
         Expr::Literal { value } => {
             print_literal(value, writer, indent)?;
         }
+        Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            rest_chained,
+        } => {
+            writeln!(
+                writer,
+                "{}    ├── ComparisonOp: {:?}",
+                "  ".repeat(indent),
+                &**op
+            )?;
+            print_expression(left, writer, indent + 2)?;
+            print_expression(right, writer, indent + 2)?;
+            for (i, (op, expr)) in rest_chained.iter().enumerate() {
+                let is_last = i == rest_chained.len() - 1;
+                let prefix = if is_last { "└──" } else { "├──" };
+                writeln!(
+                    writer,
+                    "{}        {}Chained: {:?}",
+                    "  ".repeat(indent),
+                    prefix,
+                    &**op
+                )?;
+                print_expression(expr, writer, indent + 4)?;
+            }
+        }
     }
     Ok(())
 }

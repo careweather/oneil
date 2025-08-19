@@ -755,7 +755,7 @@ mod tests {
                     ));
                     assert!(matches!(
                         first.node_value().if_expr().node_value(),
-                        Expr::BinaryOp { .. }
+                        Expr::ComparisonOp { .. }
                     ));
 
                     // Second piece: 0 if z <= 0
@@ -766,7 +766,7 @@ mod tests {
                     ));
                     assert!(matches!(
                         second.node_value().if_expr().node_value(),
-                        Expr::BinaryOp { .. }
+                        Expr::ComparisonOp { .. }
                     ));
 
                     assert!(unit.is_none());

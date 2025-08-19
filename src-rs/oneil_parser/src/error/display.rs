@@ -43,6 +43,17 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                 }
             },
             IncompleteKind::Expr(expr_kind) => match expr_kind {
+                ExprKind::ComparisonOpMissingSecondOperand { operator } => {
+                    let operator_str = match operator {
+                        oneil_ast::expression::ComparisonOp::LessThan => "<".to_string(),
+                        oneil_ast::expression::ComparisonOp::LessThanEq => "<=".to_string(),
+                        oneil_ast::expression::ComparisonOp::GreaterThan => ">".to_string(),
+                        oneil_ast::expression::ComparisonOp::GreaterThanEq => ">=".to_string(),
+                        oneil_ast::expression::ComparisonOp::Eq => "==".to_string(),
+                        oneil_ast::expression::ComparisonOp::NotEq => "!=".to_string(),
+                    };
+                    format!("expected operand after `{}`", operator_str)
+                }
                 ExprKind::BinaryOpMissingSecondOperand { operator } => {
                     let operator_str = match operator {
                         oneil_ast::expression::BinaryOp::Add => "+".to_string(),
@@ -53,17 +64,11 @@ pub fn reason_to_string(reason: &ParserErrorReason) -> String {
                         oneil_ast::expression::BinaryOp::TrueDiv => "//".to_string(),
                         oneil_ast::expression::BinaryOp::Mod => "%".to_string(),
                         oneil_ast::expression::BinaryOp::Pow => "^".to_string(),
-                        oneil_ast::expression::BinaryOp::LessThan => "<".to_string(),
-                        oneil_ast::expression::BinaryOp::LessThanEq => "<=".to_string(),
-                        oneil_ast::expression::BinaryOp::GreaterThan => ">".to_string(),
-                        oneil_ast::expression::BinaryOp::GreaterThanEq => ">=".to_string(),
-                        oneil_ast::expression::BinaryOp::Eq => "==".to_string(),
-                        oneil_ast::expression::BinaryOp::NotEq => "!=".to_string(),
                         oneil_ast::expression::BinaryOp::And => "&&".to_string(),
                         oneil_ast::expression::BinaryOp::Or => "||".to_string(),
                         oneil_ast::expression::BinaryOp::MinMax => "|".to_string(),
                     };
-                    format!("expected second operand after `{}`", operator_str)
+                    format!("expected operand after `{}`", operator_str)
                 }
                 ExprKind::ParenMissingExpr => "expected expression inside parentheses".to_string(),
                 ExprKind::UnaryOpMissingOperand { operator } => {

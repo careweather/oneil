@@ -279,6 +279,21 @@ fn get_expr_internal_dependencies(
         },
         ast::Expr::Literal(_) => dependencies,
         ast::Expr::Parenthesized { expr } => get_expr_internal_dependencies(expr, dependencies),
+        ast::Expr::ComparisonOp {
+            op: _,
+            left,
+            right,
+            rest_chained,
+        } => {
+            let dependencies = get_expr_internal_dependencies(&left, dependencies);
+            let dependencies = get_expr_internal_dependencies(&right, dependencies);
+            // Handle chained comparisons
+            rest_chained
+                .iter()
+                .fold(dependencies, |dependencies, (_, expr)| {
+                    get_expr_internal_dependencies(expr, dependencies)
+                })
+        }
     }
 }
 
@@ -1345,5 +1360,274 @@ mod tests {
         assert!(resolved_params.contains_key(&Identifier::new("a")));
         assert!(resolved_params.contains_key(&Identifier::new("b")));
         assert!(resolved_params.contains_key(&Identifier::new("c")));
+    }
+
+    #[test]
+    fn test_get_expr_internal_dependencies_comparison_op() {
+        // create a comparison expression with variables
+        let left_var = helper::create_identifier_variable("a");
+        let left_expr = helper::create_variable_expr_node(left_var, 0, 1);
+        let right_var = helper::create_identifier_variable("b");
+        let right_expr = helper::create_variable_expr_node(right_var, 4, 5);
+
+        let op = ast::expression::ComparisonOp::LessThan;
+        let op_node = ast::node::Node::new(helper::test_span(2, 3), op);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op_node,
+            left: Box::new(left_expr),
+            right: Box::new(right_expr),
+            rest_chained: vec![],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 5), expr);
+
+        // get the dependencies
+        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+
+        // check the dependencies
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&Identifier::new("a")));
+        assert!(result.contains(&Identifier::new("b")));
+    }
+
+    #[test]
+    fn test_get_expr_internal_dependencies_chained_comparison_op() {
+        // create a chained comparison expression: a < b < c
+        let left_var = helper::create_identifier_variable("a");
+        let left_expr = helper::create_variable_expr_node(left_var, 0, 1);
+        let middle_var = helper::create_identifier_variable("b");
+        let middle_expr = helper::create_variable_expr_node(middle_var, 4, 5);
+        let right_var = helper::create_identifier_variable("c");
+        let right_expr = helper::create_variable_expr_node(right_var, 8, 9);
+
+        let op1 = ast::expression::ComparisonOp::LessThan;
+        let op1_node = ast::node::Node::new(helper::test_span(2, 3), op1);
+        let op2 = ast::expression::ComparisonOp::LessThan;
+        let op2_node = ast::node::Node::new(helper::test_span(6, 7), op2);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op1_node,
+            left: Box::new(left_expr),
+            right: Box::new(middle_expr),
+            rest_chained: vec![(op2_node, right_expr)],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 9), expr);
+
+        // get the dependencies
+        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+
+        // check the dependencies
+        assert_eq!(result.len(), 3);
+        assert!(result.contains(&Identifier::new("a")));
+        assert!(result.contains(&Identifier::new("b")));
+        assert!(result.contains(&Identifier::new("c")));
+    }
+
+    #[test]
+    fn test_get_expr_internal_dependencies_comparison_op_with_literals() {
+        // create a comparison expression with one variable and one literal
+        let left_var = helper::create_identifier_variable("x");
+        let left_expr = helper::create_variable_expr_node(left_var, 0, 1);
+        let right_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(10.0), 4, 6);
+
+        let op = ast::expression::ComparisonOp::GreaterThan;
+        let op_node = ast::node::Node::new(helper::test_span(2, 3), op);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op_node,
+            left: Box::new(left_expr),
+            right: Box::new(right_expr),
+            rest_chained: vec![],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 6), expr);
+
+        // get the dependencies
+        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+
+        // check the dependencies - should only contain the variable
+        assert_eq!(result.len(), 1);
+        assert!(result.contains(&Identifier::new("x")));
+    }
+
+    #[test]
+    fn test_get_expr_internal_dependencies_comparison_op_with_complex_expressions() {
+        // create a comparison expression with complex expressions on both sides
+        // (a + b) < (c * d)
+        let a_var = helper::create_identifier_variable("a");
+        let a_expr = helper::create_variable_expr_node(a_var, 1, 2);
+        let b_var = helper::create_identifier_variable("b");
+        let b_expr = helper::create_variable_expr_node(b_var, 5, 6);
+        let c_var = helper::create_identifier_variable("c");
+        let c_expr = helper::create_variable_expr_node(c_var, 11, 12);
+        let d_var = helper::create_identifier_variable("d");
+        let d_expr = helper::create_variable_expr_node(d_var, 15, 16);
+
+        // Create (a + b)
+        let add_op = ast::expression::BinaryOp::Add;
+        let add_op_node = ast::node::Node::new(helper::test_span(3, 4), add_op);
+        let left_binary = ast::expression::Expr::BinaryOp {
+            left: Box::new(a_expr),
+            op: add_op_node,
+            right: Box::new(b_expr),
+        };
+        let left_expr = ast::node::Node::new(helper::test_span(0, 7), left_binary);
+
+        // Create (c * d)
+        let mul_op = ast::expression::BinaryOp::Mul;
+        let mul_op_node = ast::node::Node::new(helper::test_span(13, 14), mul_op);
+        let right_binary = ast::expression::Expr::BinaryOp {
+            left: Box::new(c_expr),
+            op: mul_op_node,
+            right: Box::new(d_expr),
+        };
+        let right_expr = ast::node::Node::new(helper::test_span(10, 17), right_binary);
+
+        // Create the comparison
+        let comp_op = ast::expression::ComparisonOp::LessThan;
+        let comp_op_node = ast::node::Node::new(helper::test_span(8, 9), comp_op);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: comp_op_node,
+            left: Box::new(left_expr),
+            right: Box::new(right_expr),
+            rest_chained: vec![],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 17), expr);
+
+        // get the dependencies
+        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+
+        // check the dependencies
+        assert_eq!(result.len(), 4);
+        assert!(result.contains(&Identifier::new("a")));
+        assert!(result.contains(&Identifier::new("b")));
+        assert!(result.contains(&Identifier::new("c")));
+        assert!(result.contains(&Identifier::new("d")));
+    }
+
+    #[test]
+    fn test_get_parameter_internal_dependencies_with_comparison_conditions() {
+        // create a parameter with a piecewise value that uses comparison conditions
+        let label = ast::naming::Label::new("Test Parameter".to_string());
+        let label_node = ast::node::Node::new(helper::test_span(0, 0), label);
+        let identifier = ast::naming::Identifier::new("test".to_string());
+        let ident_node = ast::node::Node::new(helper::test_span(0, 4), identifier);
+
+        // create the value expression
+        let value_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1);
+
+        // create a comparison condition: x < threshold
+        let x_var = helper::create_identifier_variable("x");
+        let x_expr = helper::create_variable_expr_node(x_var, 0, 1);
+        let threshold_var = helper::create_identifier_variable("threshold");
+        let threshold_expr = helper::create_variable_expr_node(threshold_var, 4, 13);
+
+        let comp_op = ast::expression::ComparisonOp::LessThan;
+        let comp_op_node = ast::node::Node::new(helper::test_span(2, 3), comp_op);
+
+        let condition_expr = ast::expression::Expr::ComparisonOp {
+            op: comp_op_node,
+            left: Box::new(x_expr),
+            right: Box::new(threshold_expr),
+            rest_chained: vec![],
+        };
+        let condition_expr_node = ast::node::Node::new(helper::test_span(0, 13), condition_expr);
+
+        // create the piecewise part
+        let piecewise_part = ast::parameter::PiecewisePart::new(value_expr, condition_expr_node);
+        let piecewise_part_node = ast::node::Node::new(helper::test_span(0, 13), piecewise_part);
+
+        let value_node = ast::node::Node::new(
+            helper::test_span(0, 13),
+            ast::parameter::ParameterValue::Piecewise(vec![piecewise_part_node], None),
+        );
+
+        let parameter =
+            ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
+
+        // get the dependencies
+        let dependencies = get_parameter_internal_dependencies(&parameter);
+        let dependencies: HashSet<_> = dependencies
+            .into_iter()
+            .map(|dep| dep.take_value())
+            .collect();
+
+        // check the dependencies
+        assert_eq!(dependencies.len(), 2);
+        assert!(dependencies.contains(&Identifier::new("x")));
+        assert!(dependencies.contains(&Identifier::new("threshold")));
+    }
+
+    #[test]
+    fn test_get_parameter_internal_dependencies_with_chained_comparison_limits() {
+        // create a parameter with limits that use chained comparisons
+        let label = ast::naming::Label::new("Test Parameter".to_string());
+        let label_node = ast::node::Node::new(helper::test_span(0, 0), label);
+        let identifier = ast::naming::Identifier::new("test".to_string());
+        let ident_node = ast::node::Node::new(helper::test_span(0, 4), identifier);
+
+        // create the value expression
+        let value_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1);
+        let value_node = ast::node::Node::new(
+            helper::test_span(0, 1),
+            ast::parameter::ParameterValue::Simple(value_expr, None),
+        );
+
+        // create limits with chained comparison: min_val < x < max_val
+        let min_var = helper::create_identifier_variable("min_val");
+        let min_expr = helper::create_variable_expr_node(min_var, 0, 7);
+        let x_var = helper::create_identifier_variable("x");
+        let x_expr = helper::create_variable_expr_node(x_var, 4, 5);
+        let max_var = helper::create_identifier_variable("max_val");
+        let max_expr = helper::create_variable_expr_node(max_var, 8, 15);
+
+        let op1 = ast::expression::ComparisonOp::LessThan;
+        let op1_node = ast::node::Node::new(helper::test_span(2, 3), op1);
+        let op2 = ast::expression::ComparisonOp::LessThan;
+        let op2_node = ast::node::Node::new(helper::test_span(6, 7), op2);
+
+        let limits_expr = ast::expression::Expr::ComparisonOp {
+            op: op1_node,
+            left: Box::new(min_expr),
+            right: Box::new(x_expr),
+            rest_chained: vec![(op2_node, max_expr)],
+        };
+        let limits_expr_node = ast::node::Node::new(helper::test_span(0, 15), limits_expr);
+
+        let limits = ast::parameter::Limits::Continuous {
+            min: limits_expr_node.clone(),
+            max: limits_expr_node,
+        };
+        let limits_node = ast::node::Node::new(helper::test_span(0, 15), limits);
+
+        let parameter = ast::Parameter::new(
+            label_node,
+            ident_node,
+            value_node,
+            Some(limits_node),
+            None,
+            None,
+            None,
+        );
+
+        // get the dependencies
+        let dependencies = get_parameter_internal_dependencies(&parameter);
+        let dependencies: HashSet<_> = dependencies
+            .into_iter()
+            .map(|dep| dep.take_value())
+            .collect();
+
+        // check the dependencies
+        assert_eq!(dependencies.len(), 3);
+        assert!(dependencies.contains(&Identifier::new("min_val")));
+        assert!(dependencies.contains(&Identifier::new("x")));
+        assert!(dependencies.contains(&Identifier::new("max_val")));
     }
 }

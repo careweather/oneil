@@ -254,6 +254,33 @@ fn print_expression(expr: &ExprNode, writer: &mut impl Write, indent: usize) -> 
             writeln!(writer, "{}Parenthesized:", "  ".repeat(indent))?;
             print_expression(expr, writer, indent + 2)?;
         }
+        Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            rest_chained,
+        } => {
+            writeln!(
+                writer,
+                "{}ComparisonOp: {:?}",
+                "  ".repeat(indent),
+                op.node_value()
+            )?;
+            print_expression(left, writer, indent + 2)?;
+            print_expression(right, writer, indent + 2)?;
+            for (i, (op, expr)) in rest_chained.iter().enumerate() {
+                let is_last = i == rest_chained.len() - 1;
+                let prefix = if is_last { "└──" } else { "├──" };
+                writeln!(
+                    writer,
+                    "{}    {}Chained: {:?}",
+                    "  ".repeat(indent),
+                    prefix,
+                    op.node_value()
+                )?;
+                print_expression(expr, writer, indent + 4)?;
+            }
+        }
         Expr::Variable(var) => {
             print_variable(var, writer, indent)?;
         }

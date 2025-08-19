@@ -100,6 +100,49 @@ pub fn resolve_expr(
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
     let value_span = get_span_from_ast_span(value.node_span());
     match value.node_value() {
+        ast::Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            rest_chained,
+        } => {
+            let left = resolve_expr(
+                left,
+                local_variables,
+                defined_parameters_info,
+                submodel_info,
+                model_info,
+            );
+            let right = resolve_expr(
+                right,
+                local_variables,
+                defined_parameters_info,
+                submodel_info,
+                model_info,
+            );
+            let op_with_span = resolve_comparison_op(op);
+
+            // Resolve the chained comparisons
+            let rest_chained = rest_chained.into_iter().map(|(op, expr)| {
+                let expr = resolve_expr(
+                    expr,
+                    local_variables,
+                    defined_parameters_info,
+                    submodel_info,
+                    model_info,
+                );
+                let op_with_span = resolve_comparison_op(op);
+                expr.map(|expr| (op_with_span, expr))
+            });
+
+            let left_right_result = error::combine_errors(left, right);
+            let rest_chained_result = error::combine_error_list(rest_chained);
+            let ((left, right), rest_chained) =
+                error::combine_errors(left_right_result, rest_chained_result)?;
+
+            let expr = Expr::comparison_op(op_with_span, left, right, rest_chained);
+            Ok(WithSpan::new(expr, value_span))
+        }
         ast::Expr::BinaryOp { op, left, right } => {
             let left = resolve_expr(
                 left,
@@ -180,6 +223,33 @@ pub fn resolve_expr(
     }
 }
 
+/// Converts an AST comparison operation to a model comparison operation.
+///
+/// This function maps AST comparison operations to their corresponding model comparison operations.
+/// All AST comparison operations have direct equivalents in the model system.
+///
+/// # Arguments
+///
+/// * `op` - The AST comparison operation to convert
+///
+/// # Returns
+///
+/// The corresponding model comparison operation
+fn resolve_comparison_op(
+    op: &ast::expression::ComparisonOpNode,
+) -> WithSpan<oneil_ir::expr::ComparisonOp> {
+    let op_value = match op.node_value() {
+        ast::expression::ComparisonOp::LessThan => oneil_ir::expr::ComparisonOp::LessThan,
+        ast::expression::ComparisonOp::LessThanEq => oneil_ir::expr::ComparisonOp::LessThanEq,
+        ast::expression::ComparisonOp::GreaterThan => oneil_ir::expr::ComparisonOp::GreaterThan,
+        ast::expression::ComparisonOp::GreaterThanEq => oneil_ir::expr::ComparisonOp::GreaterThanEq,
+        ast::expression::ComparisonOp::Eq => oneil_ir::expr::ComparisonOp::Eq,
+        ast::expression::ComparisonOp::NotEq => oneil_ir::expr::ComparisonOp::NotEq,
+    };
+    let op_span = get_span_from_ast_span(op.node_span());
+    WithSpan::new(op_value, op_span)
+}
+
 /// Converts an AST binary operation to a model binary operation.
 ///
 /// This function maps AST binary operations to their corresponding model binary operations.
@@ -202,12 +272,6 @@ fn resolve_binary_op(op: &ast::expression::BinaryOpNode) -> WithSpan<oneil_ir::e
         ast::expression::BinaryOp::TrueDiv => oneil_ir::expr::BinaryOp::TrueDiv,
         ast::expression::BinaryOp::Mod => oneil_ir::expr::BinaryOp::Mod,
         ast::expression::BinaryOp::Pow => oneil_ir::expr::BinaryOp::Pow,
-        ast::expression::BinaryOp::LessThan => oneil_ir::expr::BinaryOp::LessThan,
-        ast::expression::BinaryOp::LessThanEq => oneil_ir::expr::BinaryOp::LessThanEq,
-        ast::expression::BinaryOp::GreaterThan => oneil_ir::expr::BinaryOp::GreaterThan,
-        ast::expression::BinaryOp::GreaterThanEq => oneil_ir::expr::BinaryOp::GreaterThanEq,
-        ast::expression::BinaryOp::Eq => oneil_ir::expr::BinaryOp::Eq,
-        ast::expression::BinaryOp::NotEq => oneil_ir::expr::BinaryOp::NotEq,
         ast::expression::BinaryOp::And => oneil_ir::expr::BinaryOp::And,
         ast::expression::BinaryOp::Or => oneil_ir::expr::BinaryOp::Or,
         ast::expression::BinaryOp::MinMax => oneil_ir::expr::BinaryOp::MinMax,
@@ -358,6 +422,16 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::BinaryOpNode {
+            let op_node = ast::node::Node::new(test_span(start, end), op);
+            op_node
+        }
+
+        /// Helper function to create a comparison operation node
+        pub fn create_comparison_op_node(
+            op: ast::expression::ComparisonOp,
+            start: usize,
+            end: usize,
+        ) -> ast::expression::ComparisonOpNode {
             let op_node = ast::node::Node::new(test_span(start, end), op);
             op_node
         }
@@ -1031,18 +1105,6 @@ mod tests {
             (ast::expression::BinaryOp::TrueDiv, BinaryOp::TrueDiv),
             (ast::expression::BinaryOp::Mod, BinaryOp::Mod),
             (ast::expression::BinaryOp::Pow, BinaryOp::Pow),
-            (ast::expression::BinaryOp::LessThan, BinaryOp::LessThan),
-            (ast::expression::BinaryOp::LessThanEq, BinaryOp::LessThanEq),
-            (
-                ast::expression::BinaryOp::GreaterThan,
-                BinaryOp::GreaterThan,
-            ),
-            (
-                ast::expression::BinaryOp::GreaterThanEq,
-                BinaryOp::GreaterThanEq,
-            ),
-            (ast::expression::BinaryOp::Eq, BinaryOp::Eq),
-            (ast::expression::BinaryOp::NotEq, BinaryOp::NotEq),
             (ast::expression::BinaryOp::And, BinaryOp::And),
             (ast::expression::BinaryOp::Or, BinaryOp::Or),
             (ast::expression::BinaryOp::MinMax, BinaryOp::MinMax),
@@ -1054,6 +1116,46 @@ mod tests {
 
             // resolve the binary operation
             let result = resolve_binary_op(&ast_op_node);
+
+            // check the result
+            let expected_span = get_span_from_ast_span(ast_op_node.node_span());
+            assert_eq!(result.span(), &expected_span);
+            assert_eq!(result.value(), &expected_ir_op);
+        }
+    }
+
+    #[test]
+    fn test_resolve_comparison_op_all_operations() {
+        use oneil_ir::expr::ComparisonOp;
+
+        // create the operations
+        let operations = vec![
+            (
+                ast::expression::ComparisonOp::LessThan,
+                ComparisonOp::LessThan,
+            ),
+            (
+                ast::expression::ComparisonOp::LessThanEq,
+                ComparisonOp::LessThanEq,
+            ),
+            (
+                ast::expression::ComparisonOp::GreaterThan,
+                ComparisonOp::GreaterThan,
+            ),
+            (
+                ast::expression::ComparisonOp::GreaterThanEq,
+                ComparisonOp::GreaterThanEq,
+            ),
+            (ast::expression::ComparisonOp::Eq, ComparisonOp::Eq),
+            (ast::expression::ComparisonOp::NotEq, ComparisonOp::NotEq),
+        ];
+
+        for (ast_op, expected_ir_op) in operations {
+            // create the comparison operation node
+            let ast_op_node = helper::create_comparison_op_node(ast_op, 0, 1);
+
+            // resolve the comparison operation
+            let result = resolve_comparison_op(&ast_op_node);
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_op_node.node_span());
@@ -1558,6 +1660,380 @@ mod tests {
                 }
             }
             _ => panic!("Expected unary operation, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_comparison_expression() {
+        // Test a simple comparison expression: x < 5
+        let left_var = helper::create_identifier_variable("x");
+        let left_expr = helper::create_variable_expr_node(left_var, 0, 1);
+        let right_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 4, 5);
+        let op = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 2, 3);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op.clone(),
+            left: Box::new(left_expr.clone()),
+            right: Box::new(right_expr.clone()),
+            rest_chained: vec![],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 5), expr);
+
+        // create the context
+        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let local_vars = HashSet::from([Identifier::new("x")]);
+
+        // resolve the expression
+        let result = resolve_expr(
+            &expr_node,
+            &local_vars,
+            &param_info,
+            &submodel_info,
+            &model_info,
+        );
+
+        // check the result
+        match result {
+            Ok(result) => {
+                let expected_span = get_span_from_ast_span(expr_node.node_span());
+                assert_eq!(result.span(), &expected_span);
+                match result.value() {
+                    ir::expr::Expr::ComparisonOp {
+                        op: ir_op,
+                        left,
+                        right,
+                        rest_chained,
+                    } => {
+                        let expected_op_span = get_span_from_ast_span(op.node_span());
+                        assert_eq!(ir_op.span(), &expected_op_span);
+                        assert_eq!(ir_op.value(), &ir::expr::ComparisonOp::LessThan);
+
+                        let expected_left_span = get_span_from_ast_span(left_expr.node_span());
+                        assert_eq!(left.span(), &expected_left_span);
+                        match left.value() {
+                            ir::expr::Expr::Variable(variable) => {
+                                assert_eq!(
+                                    variable,
+                                    &ir::expr::Variable::Local(Identifier::new("x"))
+                                );
+                            }
+                            _ => panic!("Expected variable expression, got {:?}", left.value()),
+                        }
+
+                        let expected_right_span = get_span_from_ast_span(right_expr.node_span());
+                        assert_eq!(right.span(), &expected_right_span);
+                        match right.value() {
+                            ir::expr::Expr::Literal { value } => {
+                                assert_eq!(value, &Literal::Number(5.0));
+                            }
+                            _ => panic!("Expected literal expression, got {:?}", right.value()),
+                        }
+
+                        assert_eq!(rest_chained.len(), 0);
+                    }
+                    _ => panic!("Expected comparison operation, got {:?}", result.value()),
+                }
+            }
+            _ => panic!("Expected comparison operation, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_chained_comparison_expression() {
+        // Test a chained comparison expression: 1 < x < 10
+        let left_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 0, 1);
+        let middle_var = helper::create_identifier_variable("x");
+        let middle_expr = helper::create_variable_expr_node(middle_var, 4, 5);
+        let right_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(10.0), 8, 10);
+
+        let op1 = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 2, 3);
+        let op2 = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 6, 7);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op1.clone(),
+            left: Box::new(left_expr.clone()),
+            right: Box::new(middle_expr.clone()),
+            rest_chained: vec![(op2.clone(), right_expr.clone())],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 10), expr);
+
+        // create the context
+        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let local_vars = HashSet::from([Identifier::new("x")]);
+
+        // resolve the expression
+        let result = resolve_expr(
+            &expr_node,
+            &local_vars,
+            &param_info,
+            &submodel_info,
+            &model_info,
+        );
+
+        // check the result
+        match result {
+            Ok(result) => {
+                let expected_span = get_span_from_ast_span(expr_node.node_span());
+                assert_eq!(result.span(), &expected_span);
+                match result.value() {
+                    ir::expr::Expr::ComparisonOp {
+                        op,
+                        left,
+                        right,
+                        rest_chained,
+                    } => {
+                        let expected_op_span = get_span_from_ast_span(op1.node_span());
+                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.value(), &ir::expr::ComparisonOp::LessThan);
+
+                        match left.value() {
+                            ir::expr::Expr::Literal { value } => {
+                                assert_eq!(value, &Literal::Number(1.0));
+                            }
+                            _ => panic!("Expected literal expression, got {:?}", left.value()),
+                        }
+
+                        match right.value() {
+                            ir::expr::Expr::Variable(variable) => {
+                                assert_eq!(
+                                    variable,
+                                    &ir::expr::Variable::Local(Identifier::new("x"))
+                                );
+                            }
+                            _ => panic!("Expected variable expression, got {:?}", right.value()),
+                        }
+
+                        assert_eq!(rest_chained.len(), 1);
+                        let (chained_op, chained_expr) = &rest_chained[0];
+                        let expected_chained_op_span = get_span_from_ast_span(op2.node_span());
+                        assert_eq!(chained_op.span(), &expected_chained_op_span);
+                        assert_eq!(chained_op.value(), &ir::expr::ComparisonOp::LessThan);
+
+                        let expected_chained_expr_span =
+                            get_span_from_ast_span(right_expr.node_span());
+                        assert_eq!(chained_expr.span(), &expected_chained_expr_span);
+                        match chained_expr.value() {
+                            ir::expr::Expr::Literal { value } => {
+                                assert_eq!(value, &Literal::Number(10.0));
+                            }
+                            _ => panic!(
+                                "Expected literal expression in chained comparison, got {:?}",
+                                chained_expr.value()
+                            ),
+                        }
+                    }
+                    _ => panic!("Expected comparison operation, got {:?}", result.value()),
+                }
+            }
+            _ => panic!("Expected comparison operation, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_comparison_expression_error_from_left_operand() {
+        // Test error propagation from left operand of comparison expression
+        let left_var = helper::create_identifier_variable("undefined_left");
+        let left_expr = helper::create_variable_expr_node(left_var, 0, 15);
+        let right_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 18, 19);
+        let op = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 16, 17);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op.clone(),
+            left: Box::new(left_expr.clone()),
+            right: Box::new(right_expr.clone()),
+            rest_chained: vec![],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 19), expr);
+
+        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let local_vars = HashSet::new(); // No local variables defined
+
+        let result = resolve_expr(
+            &expr_node,
+            &local_vars,
+            &param_info,
+            &submodel_info,
+            &model_info,
+        );
+
+        match result {
+            Err(errors) => {
+                assert_eq!(errors.len(), 1);
+                match &errors[0] {
+                    VariableResolutionError::UndefinedParameter {
+                        model_path: None,
+                        parameter,
+                        reference_span: _,
+                    } => {
+                        assert_eq!(parameter, &Identifier::new("undefined_left"));
+                    }
+                    _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
+                }
+            }
+            _ => panic!("Expected error, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_comparison_expression_error_from_right_operand() {
+        // Test error propagation from right operand of comparison expression
+        let left_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 0, 1);
+        let right_var = helper::create_identifier_variable("undefined_right");
+        let right_expr = helper::create_variable_expr_node(right_var, 4, 19);
+        let op =
+            helper::create_comparison_op_node(ast::expression::ComparisonOp::GreaterThan, 2, 3);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op.clone(),
+            left: Box::new(left_expr.clone()),
+            right: Box::new(right_expr.clone()),
+            rest_chained: vec![],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 19), expr);
+
+        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let local_vars = HashSet::new(); // No local variables defined
+
+        let result = resolve_expr(
+            &expr_node,
+            &local_vars,
+            &param_info,
+            &submodel_info,
+            &model_info,
+        );
+
+        match result {
+            Err(errors) => {
+                assert_eq!(errors.len(), 1);
+                match &errors[0] {
+                    VariableResolutionError::UndefinedParameter {
+                        model_path: None,
+                        parameter,
+                        reference_span: _,
+                    } => {
+                        assert_eq!(parameter, &Identifier::new("undefined_right"));
+                    }
+                    _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
+                }
+            }
+            _ => panic!("Expected error, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_comparison_expression_error_from_chained_operand() {
+        // Test error propagation from chained comparison operand
+        let left_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 0, 1);
+        let middle_expr =
+            helper::create_literal_expr_node(ast::expression::Literal::Number(2.0), 4, 5);
+        let chained_var = helper::create_identifier_variable("undefined_chained");
+        let chained_expr = helper::create_variable_expr_node(chained_var, 8, 23);
+
+        let op1 = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 2, 3);
+        let op2 = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 6, 7);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op1.clone(),
+            left: Box::new(left_expr.clone()),
+            right: Box::new(middle_expr.clone()),
+            rest_chained: vec![(op2.clone(), chained_expr.clone())],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 23), expr);
+
+        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let local_vars = HashSet::new(); // No local variables defined
+
+        let result = resolve_expr(
+            &expr_node,
+            &local_vars,
+            &param_info,
+            &submodel_info,
+            &model_info,
+        );
+
+        match result {
+            Err(errors) => {
+                assert_eq!(errors.len(), 1);
+                match &errors[0] {
+                    VariableResolutionError::UndefinedParameter {
+                        model_path: None,
+                        parameter,
+                        reference_span: _,
+                    } => {
+                        assert_eq!(parameter, &Identifier::new("undefined_chained"));
+                    }
+                    _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
+                }
+            }
+            _ => panic!("Expected error, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_resolve_comparison_expression_multiple_errors() {
+        // Test multiple errors from different parts of comparison expression
+        let left_var = helper::create_identifier_variable("undefined_left");
+        let left_expr = helper::create_variable_expr_node(left_var, 0, 15);
+        let right_var = helper::create_identifier_variable("undefined_right");
+        let right_expr = helper::create_variable_expr_node(right_var, 18, 33);
+        let chained_var = helper::create_identifier_variable("undefined_chained");
+        let chained_expr = helper::create_variable_expr_node(chained_var, 36, 51);
+
+        let op1 =
+            helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 16, 17);
+        let op2 =
+            helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 34, 35);
+
+        let expr = ast::expression::Expr::ComparisonOp {
+            op: op1.clone(),
+            left: Box::new(left_expr.clone()),
+            right: Box::new(right_expr.clone()),
+            rest_chained: vec![(op2.clone(), chained_expr.clone())],
+        };
+        let expr_node = ast::node::Node::new(helper::test_span(0, 51), expr);
+
+        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let local_vars = HashSet::new(); // No local variables defined
+
+        let result = resolve_expr(
+            &expr_node,
+            &local_vars,
+            &param_info,
+            &submodel_info,
+            &model_info,
+        );
+
+        match result {
+            Err(errors) => {
+                assert_eq!(errors.len(), 3);
+
+                let error_identifiers: Vec<_> = errors
+                    .iter()
+                    .filter_map(|e| {
+                        if let VariableResolutionError::UndefinedParameter {
+                            model_path: None,
+                            parameter,
+                            reference_span: _,
+                        } = e
+                        {
+                            Some(parameter.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                assert!(error_identifiers.contains(&Identifier::new("undefined_left")));
+                assert!(error_identifiers.contains(&Identifier::new("undefined_right")));
+                assert!(error_identifiers.contains(&Identifier::new("undefined_chained")));
+            }
+            _ => panic!("Expected multiple errors, got {:?}", result),
         }
     }
 }

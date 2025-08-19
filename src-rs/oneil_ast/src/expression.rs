@@ -8,6 +8,17 @@ use crate::{naming::IdentifierNode, node::Node};
 /// An expression in the Oneil language
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
+    /// Comparison operation with left and right operands
+    ComparisonOp {
+        /// The left operand
+        left: Box<ExprNode>,
+        /// The comparison operator
+        op: ComparisonOpNode,
+        /// The right operand
+        right: Box<ExprNode>,
+        /// Chained comparison operations (order matters)
+        rest_chained: Vec<(ComparisonOpNode, ExprNode)>,
+    },
     /// Binary operation with left and right operands
     BinaryOp {
         /// The binary operator
@@ -51,6 +62,21 @@ pub enum Expr {
 pub type ExprNode = Node<Expr>;
 
 impl Expr {
+    /// Creates a comparison operation expression
+    pub fn comparison_op(
+        op: ComparisonOpNode,
+        left: ExprNode,
+        right: ExprNode,
+        rest_chained: Vec<(ComparisonOpNode, ExprNode)>,
+    ) -> Self {
+        Self::ComparisonOp {
+            op,
+            left: Box::new(left),
+            right: Box::new(right),
+            rest_chained,
+        }
+    }
+
     /// Creates a binary operation expression
     pub fn binary_op(op: BinaryOpNode, left: ExprNode, right: ExprNode) -> Self {
         Self::BinaryOp {
@@ -91,6 +117,58 @@ impl Expr {
     }
 }
 
+/// Comparison operators for expressions
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum ComparisonOp {
+    /// Less than comparison (<)
+    LessThan,
+    /// Less than or equal comparison (<=)
+    LessThanEq,
+    /// Greater than comparison (>)
+    GreaterThan,
+    /// Greater than or equal comparison (>=)
+    GreaterThanEq,
+    /// Equality comparison (==)
+    Eq,
+    /// Inequality comparison (!=)
+    NotEq,
+}
+
+/// A node containing a comparison operator
+pub type ComparisonOpNode = Node<ComparisonOp>;
+
+impl ComparisonOp {
+    /// Creates a less than operator
+    pub fn less_than() -> Self {
+        Self::LessThan
+    }
+
+    /// Creates a less than or equal operator
+    pub fn less_than_eq() -> Self {
+        Self::LessThanEq
+    }
+
+    /// Creates a greater than operator
+    pub fn greater_than() -> Self {
+        Self::GreaterThan
+    }
+
+    /// Creates a greater than or equal operator
+    pub fn greater_than_eq() -> Self {
+        Self::GreaterThanEq
+    }
+
+    /// Creates an equality operator
+    pub fn eq() -> Self {
+        Self::Eq
+    }
+
+    /// Creates an inequality operator
+    pub fn not_eq() -> Self {
+        Self::NotEq
+    }
+}
+
 /// Binary operators for expressions
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum BinaryOp {
@@ -110,18 +188,6 @@ pub enum BinaryOp {
     Mod,
     /// Power operator (**)
     Pow,
-    /// Less than comparison (<)
-    LessThan,
-    /// Less than or equal comparison (<=)
-    LessThanEq,
-    /// Greater than comparison (>)
-    GreaterThan,
-    /// Greater than or equal comparison (>=)
-    GreaterThanEq,
-    /// Equality comparison (==)
-    Eq,
-    /// Inequality comparison (!=)
-    NotEq,
     /// Logical AND operator (&&)
     And,
     /// Logical OR operator (||)
@@ -172,36 +238,6 @@ impl BinaryOp {
     /// Creates a power operator
     pub fn pow() -> Self {
         Self::Pow
-    }
-
-    /// Creates a less than operator
-    pub fn less_than() -> Self {
-        Self::LessThan
-    }
-
-    /// Creates a less than or equal operator
-    pub fn less_than_eq() -> Self {
-        Self::LessThanEq
-    }
-
-    /// Creates a greater than operator
-    pub fn greater_than() -> Self {
-        Self::GreaterThan
-    }
-
-    /// Creates a greater than or equal operator
-    pub fn greater_than_eq() -> Self {
-        Self::GreaterThanEq
-    }
-
-    /// Creates an equality operator
-    pub fn eq() -> Self {
-        Self::Eq
-    }
-
-    /// Creates an inequality operator
-    pub fn not_eq() -> Self {
-        Self::NotEq
     }
 
     /// Creates a logical AND operator

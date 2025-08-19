@@ -24,7 +24,7 @@
 
 use oneil_ast::{
     Span as AstSpan,
-    expression::{BinaryOpNode, UnaryOpNode},
+    expression::{BinaryOpNode, ComparisonOpNode, UnaryOpNode},
     span::SpanLike,
     unit::UnitOpNode,
 };
@@ -247,6 +247,22 @@ impl ParserError {
             Self::new_from_token_error(
                 error,
                 ParserErrorReason::model_path_missing_subcomponent(dot_span),
+            )
+        }
+    }
+
+    /// Creates a new ParserError for a comparison operation missing its second operand
+    pub(crate) fn expr_comparison_op_missing_second_operand(
+        operator: &ComparisonOpNode,
+    ) -> impl Fn(Self) -> Self {
+        move |error| {
+            let operator_span = AstSpan::from(operator);
+            let operator = operator.node_value().clone();
+            error.convert_reason(
+                ParserErrorReason::expr_comparison_op_missing_second_operand(
+                    operator_span,
+                    operator,
+                ),
             )
         }
     }

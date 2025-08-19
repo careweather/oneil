@@ -14,6 +14,7 @@ use crate::{
 ///
 /// `Expr` represents the core expression language in Oneil, supporting:
 ///
+/// - **Comparison Operations**: Comparison operations with support for chaining
 /// - **Binary Operations**: Mathematical and logical operations on two operands
 /// - **Unary Operations**: Operations on a single operand (negation, logical NOT)
 /// - **Function Calls**: Built-in and imported function invocations
@@ -23,6 +24,41 @@ use crate::{
 /// All expressions are immutable and can be easily cloned for manipulation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
+    /// Comparison operation with left and right operands, supporting chaining.
+    ///
+    /// # Arguments
+    ///
+    /// * `op` - The comparison operator
+    /// * `left` - The left-hand operand
+    /// * `right` - The right-hand operand
+    /// * `rest_chained` - Additional chained comparison operations (order matters)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::expr::{Expr, ComparisonOp, Literal};
+    /// use oneil_ir::span::WithSpan;
+    ///
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(1.0)));
+    /// let middle = WithSpan::test_new(Expr::literal(Literal::number(2.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::LessThan),
+    ///     left,
+    ///     middle,
+    ///     vec![(WithSpan::test_new(ComparisonOp::LessThan), right)]
+    /// );
+    /// ```
+    ComparisonOp {
+        /// The comparison operator to apply.
+        op: WithSpan<ComparisonOp>,
+        /// The left-hand operand.
+        left: Box<ExprWithSpan>,
+        /// The right-hand operand.
+        right: Box<ExprWithSpan>,
+        /// Chained comparison operations (order matters).
+        rest_chained: Vec<(WithSpan<ComparisonOp>, ExprWithSpan)>,
+    },
     /// Binary operation combining two expressions with an operator.
     ///
     /// # Arguments
@@ -109,6 +145,45 @@ pub enum Expr {
 pub type ExprWithSpan = WithSpan<Expr>;
 
 impl Expr {
+    /// Creates a comparison operation expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `op` - The comparison operator
+    /// * `left` - The left-hand operand
+    /// * `right` - The right-hand operand
+    /// * `rest_chained` - Additional chained comparison operations (order matters)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::expr::{Expr, ComparisonOp, Literal};
+    /// use oneil_ir::span::WithSpan;
+    ///
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(1.0)));
+    /// let middle = WithSpan::test_new(Expr::literal(Literal::number(2.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::LessThan),
+    ///     left,
+    ///     middle,
+    ///     vec![(WithSpan::test_new(ComparisonOp::LessThan), right)]
+    /// );
+    /// ```
+    pub fn comparison_op(
+        op: WithSpan<ComparisonOp>,
+        left: ExprWithSpan,
+        right: ExprWithSpan,
+        rest_chained: Vec<(WithSpan<ComparisonOp>, ExprWithSpan)>,
+    ) -> Self {
+        Self::ComparisonOp {
+            op,
+            left: Box::new(left),
+            right: Box::new(right),
+            rest_chained,
+        }
+    }
+
     /// Creates a binary operation expression.
     ///
     /// # Arguments
@@ -274,24 +349,64 @@ pub enum BinaryOp {
     Mod,
     /// Exponentiation: `a ^ b`
     Pow,
-    /// Less than: `a < b`
-    LessThan,
-    /// Less than or equal: `a <= b`
-    LessThanEq,
-    /// Greater than: `a > b`
-    GreaterThan,
-    /// Greater than or equal: `a >= b`
-    GreaterThanEq,
-    /// Equality: `a == b`
-    Eq,
-    /// Inequality: `a != b`
-    NotEq,
     /// Logical AND: `a && b`
     And,
     /// Logical OR: `a || b`
     Or,
     /// Minimum/maximum: `a | b`
     MinMax,
+}
+
+/// Comparison operators for expressions.
+///
+/// These operators are used in comparison expressions to compare two operands.
+/// Comparison operations support chaining for expressions like `a < b < c`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ComparisonOp {
+    /// Less than comparison: `a < b`
+    LessThan,
+    /// Less than or equal comparison: `a <= b`
+    LessThanEq,
+    /// Greater than comparison: `a > b`
+    GreaterThan,
+    /// Greater than or equal comparison: `a >= b`
+    GreaterThanEq,
+    /// Equality comparison: `a == b`
+    Eq,
+    /// Inequality comparison: `a != b`
+    NotEq,
+}
+
+impl ComparisonOp {
+    /// Creates a less than operator.
+    pub fn less_than() -> Self {
+        Self::LessThan
+    }
+
+    /// Creates a less than or equal operator.
+    pub fn less_than_eq() -> Self {
+        Self::LessThanEq
+    }
+
+    /// Creates a greater than operator.
+    pub fn greater_than() -> Self {
+        Self::GreaterThan
+    }
+
+    /// Creates a greater than or equal operator.
+    pub fn greater_than_eq() -> Self {
+        Self::GreaterThanEq
+    }
+
+    /// Creates an equality operator.
+    pub fn eq() -> Self {
+        Self::Eq
+    }
+
+    /// Creates an inequality operator.
+    pub fn not_eq() -> Self {
+        Self::NotEq
+    }
 }
 
 /// Unary operators for single-operand operations.

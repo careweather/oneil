@@ -16,7 +16,9 @@ use nom::{
 
 use oneil_ast::{
     Span as AstSpan,
-    expression::{BinaryOp, BinaryOpNode, Expr, ExprNode, Literal, UnaryOp, Variable},
+    expression::{
+        BinaryOp, BinaryOpNode, ComparisonOp, Expr, ExprNode, Literal, UnaryOp, Variable,
+    },
     naming::Identifier,
     node::Node,
 };
@@ -255,20 +257,20 @@ fn not_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// Returns an expression node representing either a comparison expression or a single operand.
 fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
     let mut op = alt((
-        less_than_equals.map(|token| Node::new(token, BinaryOp::LessThanEq)),
-        greater_than_equals.map(|token| Node::new(token, BinaryOp::GreaterThanEq)),
-        less_than.map(|token| Node::new(token, BinaryOp::LessThan)),
-        greater_than.map(|token| Node::new(token, BinaryOp::GreaterThan)),
-        equals_equals.map(|token| Node::new(token, BinaryOp::Eq)),
-        bang_equals.map(|token| Node::new(token, BinaryOp::NotEq)),
+        less_than_equals.map(|token| Node::new(token, ComparisonOp::LessThanEq)),
+        greater_than_equals.map(|token| Node::new(token, ComparisonOp::GreaterThanEq)),
+        less_than.map(|token| Node::new(token, ComparisonOp::LessThan)),
+        greater_than.map(|token| Node::new(token, ComparisonOp::GreaterThan)),
+        equals_equals.map(|token| Node::new(token, ComparisonOp::Eq)),
+        bang_equals.map(|token| Node::new(token, ComparisonOp::NotEq)),
     ))
     .convert_errors();
 
     let (rest, first_operand) = minmax_expr.parse(input)?;
-    let (rest, second_operand) = opt(|input| {
+    let (rest, rest_operands) = many0(|input| {
         let (rest, operator) = op.parse(input)?;
         let (rest, operand) = minmax_expr
-            .or_fail_with(ParserError::expr_binary_op_missing_second_operand(
+            .or_fail_with(ParserError::expr_comparison_op_missing_second_operand(
                 &operator,
             ))
             .parse(rest)?;
@@ -276,12 +278,24 @@ fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
     })
     .parse(rest)?;
 
-    let expr = match second_operand {
-        Some((op, second_operand)) => {
+    let mut rest_operands = rest_operands.into_iter();
+
+    let maybe_second_operand = rest_operands.next();
+
+    let expr = match maybe_second_operand {
+        Some((second_op, second_operand)) => {
             let left = first_operand;
             let right = second_operand;
             let span = AstSpan::calc_span(&left, &right);
-            Node::new(span, Expr::binary_op(op, left, right))
+            Node::new(
+                span,
+                Expr::comparison_op(
+                    second_op.clone(),
+                    left,
+                    right.clone(),
+                    rest_operands.collect(),
+                ),
+            )
         }
         None => first_operand,
     };
@@ -987,11 +1001,11 @@ mod tests {
         let expected_3 = Node::new(AstSpan::new(2, 1, 0), Literal::number(3.0));
         let expected_3 = Node::new(AstSpan::new(2, 1, 0), Expr::literal(expected_3));
 
-        let op = Node::new(AstSpan::new(1, 1, 0), BinaryOp::LessThan);
+        let op = Node::new(AstSpan::new(1, 1, 0), ComparisonOp::LessThan);
 
         let expected_expr = Node::new(
             AstSpan::new(0, 3, 0),
-            Expr::binary_op(op, expected_2, expected_3),
+            Expr::comparison_op(op, expected_2, expected_3, vec![]),
         );
 
         assert_eq!(expr, expected_expr);
@@ -1052,6 +1066,131 @@ mod tests {
         );
 
         assert_eq!(expr, expected_expr);
+    }
+
+    #[test]
+    fn test_chained_comparison_expr() {
+        let input = Span::new_extra("1 < 2 < 3", Config::default());
+        let (_, expr) = parse(input).unwrap();
+
+        let expected_1 = Node::new(AstSpan::new(0, 1, 1), Literal::number(1.0));
+        let expected_1 = Node::new(AstSpan::new(0, 1, 1), Expr::literal(expected_1));
+
+        let expected_2 = Node::new(AstSpan::new(4, 1, 1), Literal::number(2.0));
+        let expected_2 = Node::new(AstSpan::new(4, 1, 1), Expr::literal(expected_2));
+
+        let expected_3 = Node::new(AstSpan::new(8, 1, 0), Literal::number(3.0));
+        let expected_3 = Node::new(AstSpan::new(8, 1, 0), Expr::literal(expected_3));
+
+        let op1 = Node::new(AstSpan::new(2, 1, 1), ComparisonOp::LessThan);
+        let op2 = Node::new(AstSpan::new(6, 1, 1), ComparisonOp::LessThan);
+
+        let expected_expr = Node::new(
+            AstSpan::new(0, 5, 1),
+            Expr::comparison_op(op1, expected_1, expected_2, vec![(op2, expected_3)]),
+        );
+
+        assert_eq!(expr, expected_expr);
+    }
+
+    #[test]
+    fn test_chained_comparison_expr_different_ops() {
+        let input = Span::new_extra("x <= y < z", Config::default());
+        let (_, expr) = parse(input).unwrap();
+
+        let expected_x = Node::new(AstSpan::new(0, 1, 1), Identifier::new("x".to_string()));
+        let expected_x = Node::new(AstSpan::new(0, 1, 1), Variable::identifier(expected_x));
+        let expected_x = Node::new(AstSpan::new(0, 1, 1), Expr::variable(expected_x));
+
+        let expected_y = Node::new(AstSpan::new(5, 1, 1), Identifier::new("y".to_string()));
+        let expected_y = Node::new(AstSpan::new(5, 1, 1), Variable::identifier(expected_y));
+        let expected_y = Node::new(AstSpan::new(5, 1, 1), Expr::variable(expected_y));
+
+        let expected_z = Node::new(AstSpan::new(9, 1, 0), Identifier::new("z".to_string()));
+        let expected_z = Node::new(AstSpan::new(9, 1, 0), Variable::identifier(expected_z));
+        let expected_z = Node::new(AstSpan::new(9, 1, 0), Expr::variable(expected_z));
+
+        let op1 = Node::new(AstSpan::new(2, 2, 1), ComparisonOp::LessThanEq);
+        let op2 = Node::new(AstSpan::new(7, 1, 1), ComparisonOp::LessThan);
+
+        let expected_expr = Node::new(
+            AstSpan::new(0, 6, 1),
+            Expr::comparison_op(op1, expected_x, expected_y, vec![(op2, expected_z)]),
+        );
+
+        assert_eq!(expr, expected_expr);
+    }
+
+    #[test]
+    fn test_chained_comparison_expr_three_ops() {
+        let input = Span::new_extra("a >= b == c", Config::default());
+        let (_, expr) = parse(input).unwrap();
+
+        let expected_a = Node::new(AstSpan::new(0, 1, 1), Identifier::new("a".to_string()));
+        let expected_a = Node::new(AstSpan::new(0, 1, 1), Variable::identifier(expected_a));
+        let expected_a = Node::new(AstSpan::new(0, 1, 1), Expr::variable(expected_a));
+
+        let expected_b = Node::new(AstSpan::new(5, 1, 1), Identifier::new("b".to_string()));
+        let expected_b = Node::new(AstSpan::new(5, 1, 1), Variable::identifier(expected_b));
+        let expected_b = Node::new(AstSpan::new(5, 1, 1), Expr::variable(expected_b));
+
+        let expected_c = Node::new(AstSpan::new(10, 1, 0), Identifier::new("c".to_string()));
+        let expected_c = Node::new(AstSpan::new(10, 1, 0), Variable::identifier(expected_c));
+        let expected_c = Node::new(AstSpan::new(10, 1, 0), Expr::variable(expected_c));
+
+        let op1 = Node::new(AstSpan::new(2, 2, 1), ComparisonOp::GreaterThanEq);
+        let op2 = Node::new(AstSpan::new(7, 2, 1), ComparisonOp::Eq);
+
+        let expected_expr = Node::new(
+            AstSpan::new(0, 6, 1),
+            Expr::comparison_op(op1, expected_a, expected_b, vec![(op2, expected_c)]),
+        );
+
+        assert_eq!(expr, expected_expr);
+    }
+
+    #[test]
+    fn test_chained_comparison_expr_with_expressions() {
+        let input = Span::new_extra("x + 1 < y * 2 <= z - 3", Config::default());
+        let (_, expr) = parse(input).unwrap();
+
+        // This is a complex expression, so we just verify it parses correctly
+        // and has the right structure for a chained comparison
+        assert!(matches!(expr.node_value(), Expr::ComparisonOp { .. }));
+    }
+
+    #[test]
+    fn test_single_comparison_expr() {
+        let input = Span::new_extra("x != y", Config::default());
+        let (_, expr) = parse(input).unwrap();
+
+        let expected_x = Node::new(AstSpan::new(0, 1, 1), Identifier::new("x".to_string()));
+        let expected_x = Node::new(AstSpan::new(0, 1, 1), Variable::identifier(expected_x));
+        let expected_x = Node::new(AstSpan::new(0, 1, 1), Expr::variable(expected_x));
+
+        let expected_y = Node::new(AstSpan::new(5, 1, 0), Identifier::new("y".to_string()));
+        let expected_y = Node::new(AstSpan::new(5, 1, 0), Variable::identifier(expected_y));
+        let expected_y = Node::new(AstSpan::new(5, 1, 0), Expr::variable(expected_y));
+
+        let op = Node::new(AstSpan::new(2, 2, 1), ComparisonOp::NotEq);
+
+        let expected_expr = Node::new(
+            AstSpan::new(0, 6, 0),
+            Expr::comparison_op(op, expected_x, expected_y, vec![]),
+        );
+
+        assert_eq!(expr, expected_expr);
+    }
+
+    #[test]
+    fn test_no_comparison_expr() {
+        let input = Span::new_extra("42", Config::default());
+        let (_, expr) = parse(input).unwrap();
+
+        let expected_42 = Node::new(AstSpan::new(0, 2, 0), Literal::number(42.0));
+        let expected_42 = Node::new(AstSpan::new(0, 2, 0), Expr::literal(expected_42));
+
+        assert_eq!(expr, expected_42);
     }
 
     #[test]
@@ -1300,12 +1439,12 @@ mod tests {
                         match error.reason {
                             ParserErrorReason::Incomplete {
                                 kind:
-                                    IncompleteKind::Expr(ExprKind::BinaryOpMissingSecondOperand {
+                                    IncompleteKind::Expr(ExprKind::ComparisonOpMissingSecondOperand {
                                         operator,
                                     }),
                                 cause,
                             } => {
-                                assert_eq!(operator, BinaryOp::LessThan);
+                                assert_eq!(operator, ComparisonOp::LessThan);
                                 assert_eq!(cause, expected_less_span);
                             }
                             _ => panic!("Unexpected reason {:?}", error.reason),

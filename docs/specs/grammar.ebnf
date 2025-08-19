@@ -55,7 +55,7 @@ TestDecl = [ Trace ], "test", ":", Expr, EndOfLine ;
    4. Multiplication, division, floor division, modulo (*, /, //, %) - left associative
    5. Addition, subtraction (+, -) - left associative
    6. Min/max (|) - non-associative
-   6. Comparisons (<, >, <=, >=, ==, !=) - non-associative
+   6. Comparisons (<, >, <=, >=, ==, !=) - non-associative, can be chained
    7. NOT - unary prefix
    8. AND - left associative
    9. OR - left associative
@@ -64,7 +64,7 @@ Expr = OrExpr ;
 OrExpr = [ OrExpr, "or", ], AndExpr ;
 AndExpr = [ AndExpr, "and", ], NotExpr ;
 NotExpr = [ "not", ], NotExpr | ComparisonExpr ;
-ComparisonExpr = AdditiveExpr, ComparisonOp, AdditiveExpr ;
+ComparisonExpr = AdditiveExpr, { ComparisonOp, AdditiveExpr } ;
 ComparisonOp = "<" | ">" | "<=" | ">=" | "==" | "!=" ;
 AdditiveExpr = [ AdditiveExpr, AdditiveOp, ], MultiplicativeExpr ;
 AdditiveOp = "+" | "-" | "--" ;
