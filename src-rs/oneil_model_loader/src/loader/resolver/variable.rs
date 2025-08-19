@@ -92,7 +92,7 @@ use crate::{
 ///    - Handle nested accessors through recursive calls
 pub fn resolve_variable(
     variable: &ast::expression::VariableNode,
-    local_variables: &HashSet<Identifier>,
+    builtin_variables: &HashSet<String>,
     defined_parameters: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
@@ -102,23 +102,24 @@ pub fn resolve_variable(
             let span = get_span_from_ast_span(variable.node_span());
             let var_identifier = Identifier::new(identifier.as_str());
             let var_identifier_span = get_span_from_ast_span(identifier.node_span());
-            if local_variables.contains(&var_identifier) {
-                let expr = Expr::local_variable(var_identifier);
-                Ok(WithSpan::new(expr, span))
-            } else {
-                match defined_parameters.get(&var_identifier) {
-                    InfoResult::Found(_parameter) => {
-                        let span = get_span_from_ast_span(variable.node_span());
-                        let expr = Expr::parameter_variable(var_identifier);
+
+            match defined_parameters.get(&var_identifier) {
+                InfoResult::Found(_parameter) => {
+                    let span = get_span_from_ast_span(variable.node_span());
+                    let expr = Expr::parameter_variable(var_identifier);
+                    Ok(WithSpan::new(expr, span))
+                }
+                InfoResult::HasError => {
+                    return Err(VariableResolutionError::parameter_has_error(
+                        var_identifier,
+                        var_identifier_span,
+                    ));
+                }
+                InfoResult::NotFound => {
+                    if builtin_variables.contains(var_identifier.as_str()) {
+                        let expr = Expr::builtin_variable(var_identifier);
                         Ok(WithSpan::new(expr, span))
-                    }
-                    InfoResult::HasError => {
-                        return Err(VariableResolutionError::parameter_has_error(
-                            var_identifier,
-                            var_identifier_span,
-                        ));
-                    }
-                    InfoResult::NotFound => {
+                    } else {
                         return Err(VariableResolutionError::undefined_parameter(
                             var_identifier,
                             var_identifier_span,
@@ -376,16 +377,16 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_local_variable() {
+    fn test_resolve_builtin_variable() {
         // create a local variable
-        let variable = helper::create_identifier_variable("local_var");
-        let mut local_vars = HashSet::new();
-        local_vars.insert(Identifier::new("local_var"));
+        let variable = helper::create_identifier_variable("pi");
+        let mut builtin_vars = HashSet::new();
+        builtin_vars.insert("pi".to_string());
 
         // resolve the variable
         let result = resolve_variable(
             &variable,
-            &local_vars,
+            &builtin_vars,
             &helper::create_test_parameter_info(),
             &helper::create_test_submodel_info(),
             &helper::create_test_model_info(),
@@ -397,10 +398,10 @@ mod tests {
 
         assert_eq!(result.span(), &get_span_from_ast_span(variable.node_span()));
         match result.value() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Local(ident)) => {
-                assert_eq!(ident, &Identifier::new("local_var"));
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Builtin(ident)) => {
+                assert_eq!(ident, &Identifier::new("pi"));
             }
-            error => panic!("Expected local variable expression, got {:?}", error),
+            error => panic!("Expected builtin variable expression, got {:?}", error),
         }
     }
 
@@ -854,11 +855,11 @@ mod tests {
     }
 
     #[test]
-    fn test_local_variable_takes_precedence_over_parameter() {
-        // create a variable that conflicts between local and parameter
+    fn test_parameter_takes_precedence_over_builtin() {
+        // create a variable that conflicts between builtin and parameter
         let variable = helper::create_identifier_variable("conflict");
-        let mut local_vars = HashSet::new();
-        local_vars.insert(Identifier::new("conflict"));
+        let mut builtin_vars = HashSet::new();
+        builtin_vars.insert("conflict".to_string());
 
         // create parameter info with conflicting parameter
         let mut param_map = HashMap::new();
@@ -883,21 +884,21 @@ mod tests {
         // resolve the variable
         let result = resolve_variable(
             &variable,
-            &local_vars,
+            &builtin_vars,
             &param_info,
             &helper::create_test_submodel_info(),
             &helper::create_test_model_info(),
         );
 
-        // check the result - local variable should take precedence
+        // check the result - parameter should take precedence
         assert!(result.is_ok());
         let result = result.expect("result should be ok");
         match result.value() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Local(ident)) => {
+            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
                 assert_eq!(ident, &Identifier::new("conflict"));
             }
             error => panic!(
-                "Expected local variable expression (should take precedence), got {:?}",
+                "Expected parameter variable expression (should take precedence), got {:?}",
                 error
             ),
         }

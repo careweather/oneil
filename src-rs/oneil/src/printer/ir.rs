@@ -398,10 +398,10 @@ fn print_variable(
     indent: usize,
 ) -> io::Result<()> {
     match var {
-        oneil_ir::expr::Variable::Local(id) => {
+        oneil_ir::expr::Variable::Builtin(id) => {
             writeln!(
                 writer,
-                "{}    ├── Local Variable: \"{}\"",
+                "{}    ├── Builtin Variable: \"{}\"",
                 "  ".repeat(indent),
                 id.as_str()
             )?;

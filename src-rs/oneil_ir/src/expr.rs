@@ -253,21 +253,21 @@ impl Expr {
         Self::FunctionCall { name, args }
     }
 
-    /// Creates a local variable reference.
+    /// Creates a built-in variable reference.
     ///
     /// # Arguments
     ///
-    /// * `ident` - The identifier of the local variable
+    /// * `ident` - The identifier of the built-in variable
     ///
     /// # Example
     ///
     /// ```rust
     /// use oneil_ir::{expr::Expr, reference::Identifier};
     ///
-    /// let expr = Expr::local_variable(Identifier::new("x"));
+    /// let expr = Expr::builtin_variable(Identifier::new("pi"));
     /// ```
-    pub fn local_variable(ident: Identifier) -> Self {
-        Self::Variable(Variable::Local(ident))
+    pub fn builtin_variable(ident: Identifier) -> Self {
+        Self::Variable(Variable::Builtin(ident))
     }
 
     /// Creates a parameter variable reference.
@@ -614,8 +614,8 @@ pub enum BuiltinFunction {
 /// - **External**: Parameters defined in other models
 #[derive(Debug, Clone, PartialEq)]
 pub enum Variable {
-    /// Local variable in the current scope.
-    Local(Identifier),
+    /// Built-in variable
+    Builtin(Identifier),
     /// Parameter defined in the current model.
     Parameter(Identifier),
     /// Parameter defined in another model.
@@ -628,21 +628,21 @@ pub enum Variable {
 }
 
 impl Variable {
-    /// Creates a local variable reference.
+    /// Creates a built-in variable reference.
     ///
     /// # Arguments
     ///
-    /// * `ident` - The identifier of the local variable
+    /// * `ident` - The identifier of the built-in variable
     ///
     /// # Example
     ///
     /// ```rust
     /// use oneil_ir::{expr::Variable, reference::Identifier};
     ///
-    /// let var = Variable::local(Identifier::new("x"));
+    /// let var = Variable::builtin(Identifier::new("x"));
     /// ```
-    pub fn local(ident: Identifier) -> Self {
-        Self::Local(ident)
+    pub fn builtin(ident: Identifier) -> Self {
+        Self::Builtin(ident)
     }
 
     /// Creates a parameter variable reference.

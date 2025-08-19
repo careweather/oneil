@@ -71,6 +71,7 @@ use crate::{
 /// Each test is processed independently, so errors in one test don't affect others.
 pub fn resolve_tests(
     tests: Vec<&ast::test::TestNode>,
+    builtin_variables: &HashSet<String>,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
@@ -83,11 +84,9 @@ pub fn resolve_tests(
 
         let trace_level = resolve_trace_level(test.trace_level());
 
-        let local_variables: HashSet<_> = HashSet::new();
-
         let test_expr = resolve_expr(
             &test.expr(),
-            &local_variables,
+            builtin_variables,
             defined_parameters_info,
             submodel_info,
             model_info,
@@ -114,6 +113,11 @@ mod tests {
 
     mod helper {
         use super::*;
+
+        /// Helper function to create empty builtin variables
+        pub fn create_empty_builtin_variables() -> HashSet<String> {
+            HashSet::new()
+        }
 
         /// Helper function to create test parameter information for testing
         pub fn create_empty_parameter_info() -> ParameterInfo<'static> {
@@ -193,6 +197,7 @@ mod tests {
         // resolve the tests
         let (resolved_tests, errors) = resolve_tests(
             tests_refs,
+            &helper::create_empty_builtin_variables(),
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
             &helper::create_empty_model_info(),
@@ -222,6 +227,7 @@ mod tests {
         // resolve the tests
         let (resolved_tests, errors) = resolve_tests(
             tests_refs,
+            &helper::create_empty_builtin_variables(),
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
             &helper::create_empty_model_info(),
@@ -254,6 +260,7 @@ mod tests {
         // resolve the tests
         let (resolved_tests, errors) = resolve_tests(
             tests_refs,
+            &helper::create_empty_builtin_variables(),
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
             &helper::create_empty_model_info(),
@@ -287,6 +294,7 @@ mod tests {
         // resolve the tests
         let (resolved_tests, errors) = resolve_tests(
             tests_refs,
+            &helper::create_empty_builtin_variables(),
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
             &helper::create_empty_model_info(),
@@ -339,6 +347,7 @@ mod tests {
         // resolve the tests
         let (resolved_tests, errors) = resolve_tests(
             tests_refs,
+            &helper::create_empty_builtin_variables(),
             &helper::create_empty_parameter_info(),
             &helper::create_empty_submodel_info(),
             &helper::create_empty_model_info(),

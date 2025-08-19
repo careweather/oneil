@@ -74,6 +74,7 @@ mod resolver;
 pub fn load_model<F>(
     model_path: ModelPath,
     mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
+    builtin_variables: &HashSet<String>,
     load_stack: &mut Stack<ModelPath>,
     file_loader: &F,
 ) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
@@ -117,6 +118,7 @@ where
     // load use models and resolve them
     let mut builder = load_use_models(
         model_path.clone(),
+        builtin_variables,
         load_stack,
         file_loader,
         &use_models,
@@ -139,7 +141,7 @@ where
 
     // resolve parameters
     let (parameters, parameter_resolution_errors) =
-        resolver::resolve_parameters(parameters, &submodel_info, &model_info);
+        resolver::resolve_parameters(parameters, builtin_variables, &submodel_info, &model_info);
 
     let parameters_with_errors: HashSet<&Identifier> = parameter_resolution_errors.keys().collect();
 
@@ -147,8 +149,13 @@ where
         InfoMap::new(parameters.iter().collect(), parameters_with_errors);
 
     // resolve tests
-    let (tests, test_resolution_errors) =
-        resolver::resolve_tests(tests, &parameter_info, &submodel_info, &model_info);
+    let (tests, test_resolution_errors) = resolver::resolve_tests(
+        tests,
+        builtin_variables,
+        &parameter_info,
+        &submodel_info,
+        &model_info,
+    );
 
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,
@@ -279,6 +286,7 @@ fn split_model_ast(
 /// `model_path.get_sibling_path(&use_model.model_name)`.
 fn load_use_models<F>(
     model_path: ModelPath,
+    builtin_variables: &HashSet<String>,
     load_stack: &mut Stack<ModelPath>,
     file_loader: &F,
     use_models: &[&ast::declaration::UseModelNode],
@@ -295,7 +303,13 @@ where
         let use_model_path = ModelPath::new(use_model_path);
 
         // load the use model (and its submodels)
-        load_model(use_model_path, builder, load_stack, file_loader)
+        load_model(
+            use_model_path,
+            builder,
+            builtin_variables,
+            load_stack,
+            file_loader,
+        )
     });
 
     load_stack.pop();
@@ -412,13 +426,20 @@ mod tests {
         let model_path = ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_variables = HashSet::new();
         let mut load_stack = Stack::new();
 
         let file_loader =
             TestFileParser::new(vec![(PathBuf::from("test.on"), create_test_model(&[]))]);
 
         // load the model
-        let result = load_model(model_path.clone(), builder, &mut load_stack, &file_loader);
+        let result = load_model(
+            model_path.clone(),
+            builder,
+            &builtin_variables,
+            &mut load_stack,
+            &file_loader,
+        );
 
         // check the errors
         let errors = result.get_model_errors();
@@ -436,12 +457,19 @@ mod tests {
         let model_path = ModelPath::new("nonexistent");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_variables = HashSet::new();
         let mut load_stack = Stack::new();
 
         let file_loader = TestFileParser::empty();
 
         // load the model
-        let result = load_model(model_path.clone(), builder, &mut load_stack, &file_loader);
+        let result = load_model(
+            model_path.clone(),
+            builder,
+            &builtin_variables,
+            &mut load_stack,
+            &file_loader,
+        );
 
         // check the errors
         let errors = result.get_model_errors();
@@ -461,6 +489,7 @@ mod tests {
         let model_path = ModelPath::new("main");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_variables = HashSet::new();
         let mut load_stack = Stack::new();
 
         // create a circular dependency: main.on -> sub.on -> main.on
@@ -472,7 +501,13 @@ mod tests {
         ]);
 
         // load the model
-        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
+        let result = load_model(
+            model_path,
+            builder,
+            &builtin_variables,
+            &mut load_stack,
+            &file_loader,
+        );
 
         // check the errors
         let errors = result.get_model_errors();
@@ -543,6 +578,7 @@ mod tests {
         let model_path = ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
         let mut builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_variables = HashSet::new();
         let mut load_stack = Stack::new();
 
         // mark the model as already visited
@@ -552,7 +588,13 @@ mod tests {
         let file_loader =
             TestFileParser::new(vec![(PathBuf::from("test.on"), create_empty_model_node())]);
 
-        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
+        let result = load_model(
+            model_path,
+            builder,
+            &builtin_variables,
+            &mut load_stack,
+            &file_loader,
+        );
 
         // check the errors
         let errors = result.get_model_errors();
@@ -568,6 +610,7 @@ mod tests {
         // create initial context
         let model_path = ModelPath::new("parent");
         let mut load_stack = Stack::new();
+        let builtin_variables = HashSet::new();
         let file_loader = TestFileParser::empty();
         let use_models = vec![];
         let builder = ModelCollectionBuilder::new(HashSet::new());
@@ -575,6 +618,7 @@ mod tests {
         // load the use models
         let result = load_use_models(
             model_path,
+            &builtin_variables,
             &mut load_stack,
             &file_loader,
             &use_models,
@@ -595,6 +639,7 @@ mod tests {
         // create initial context
         let model_path = ModelPath::new("parent");
         let mut load_stack = Stack::new();
+        let builder = ModelCollectionBuilder::new(HashSet::new());
         let file_loader = TestFileParser::new(vec![
             (PathBuf::from("child1.on"), create_empty_model_node()),
             (PathBuf::from("child2.on"), create_empty_model_node()),
@@ -615,11 +660,12 @@ mod tests {
             .collect::<Vec<_>>();
         let use_models_ref = use_models.iter().collect::<Vec<_>>();
 
-        let builder = ModelCollectionBuilder::new(HashSet::new());
+        let builtin_variables = HashSet::new();
 
         // load the use models
         let result = load_use_models(
             model_path,
+            &builtin_variables,
             &mut load_stack,
             &file_loader,
             &use_models_ref,
@@ -641,6 +687,7 @@ mod tests {
     fn test_load_use_models_with_parse_errors() {
         // create initial context
         let model_path = ModelPath::new("parent");
+        let builtin_variables = HashSet::new();
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::empty(); // No models available
 
@@ -659,6 +706,7 @@ mod tests {
         // load the use models
         let result = load_use_models(
             model_path,
+            &builtin_variables,
             &mut load_stack,
             &file_loader,
             &use_models_ref,
@@ -683,6 +731,7 @@ mod tests {
         let model_path = ModelPath::new("root");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_variables = HashSet::new();
         let mut load_stack = Stack::new();
 
         // create a dependency chain: root.on -> level1.on -> level2.on
@@ -697,7 +746,13 @@ mod tests {
         ]);
 
         // load the model
-        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
+        let result = load_model(
+            model_path,
+            builder,
+            &builtin_variables,
+            &mut load_stack,
+            &file_loader,
+        );
 
         // check the errors
         let errors = result.get_model_errors();
@@ -717,6 +772,7 @@ mod tests {
         let model_path = ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_variables = HashSet::new();
         let mut load_stack = Stack::new();
 
         // create a model with sections
@@ -750,7 +806,13 @@ mod tests {
         ]);
 
         // load the model
-        let result = load_model(model_path, builder, &mut load_stack, &file_loader);
+        let result = load_model(
+            model_path,
+            builder,
+            &builtin_variables,
+            &mut load_stack,
+            &file_loader,
+        );
 
         // check the errors
         let errors = result.get_model_errors();
