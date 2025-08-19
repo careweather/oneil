@@ -30,6 +30,7 @@ use oneil_ir::{
 };
 
 use crate::{
+    BuiltinRef,
     error::{self, ParameterResolutionError},
     loader::resolver::{
         ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
@@ -49,7 +50,7 @@ use crate::{
 /// # Arguments
 ///
 /// * `parameters` - Vector of AST parameters to resolve
-/// * `builtin_variables` - Set of builtin variables
+/// * `builtin_ref` - Set of builtin variables
 /// * `submodel_info` - Information about available submodels
 /// * `model_info` - Information about available models
 ///
@@ -68,7 +69,7 @@ use crate::{
 /// - Missing submodel references
 pub fn resolve_parameters(
     parameters: Vec<&ast::parameter::ParameterNode>,
-    builtin_variables: &HashSet<String>,
+    builtin_ref: &impl BuiltinRef,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
 ) -> (
@@ -119,7 +120,7 @@ pub fn resolve_parameters(
                 parameter_identifier_with_span,
                 &parameter_map,
                 &dependencies,
-                builtin_variables,
+                builtin_ref,
                 submodel_info,
                 model_info,
                 &mut parameter_stack,
@@ -312,7 +313,7 @@ fn get_expr_internal_dependencies(
 /// * `parameter_identifier` - Identifier of the parameter to resolve
 /// * `parameter_map` - Map of all available parameters
 /// * `dependencies` - Dependency graph for all parameters
-/// * `builtin_variables` - Set of builtin variables
+/// * `builtin_ref` - Set of builtin variables
 /// * `submodel_info` - Information about available submodels
 /// * `model_info` - Information about available models
 /// * `parameter_stack` - Stack for tracking resolution order (for circular dependency detection)
@@ -329,7 +330,7 @@ fn resolve_parameter(
     parameter_identifier: WithSpan<Identifier>,
     parameter_map: &HashMap<Identifier, (Span, &ast::parameter::ParameterNode)>,
     dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
-    builtin_variables: &HashSet<String>,
+    builtin_ref: &impl BuiltinRef,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
     parameter_stack: &mut Stack<Identifier>,
@@ -391,7 +392,7 @@ fn resolve_parameter(
                 dependency.clone(),
                 parameter_map,
                 dependencies,
-                builtin_variables,
+                builtin_ref,
                 submodel_info,
                 model_info,
                 parameter_stack,
@@ -418,7 +419,7 @@ fn resolve_parameter(
 
     let value = resolve_parameter_value(
         &parameter.value(),
-        builtin_variables,
+        builtin_ref,
         &defined_parameters_info,
         submodel_info,
         model_info,
@@ -426,7 +427,7 @@ fn resolve_parameter(
 
     let limits = resolve_limits(
         parameter.limits(),
-        builtin_variables,
+        builtin_ref,
         &defined_parameters_info,
         submodel_info,
         model_info,
@@ -486,7 +487,7 @@ fn resolve_parameter(
 /// A resolved parameter value or a list of resolution errors
 fn resolve_parameter_value(
     value: &ast::parameter::ParameterValue,
-    builtin_variables: &HashSet<String>,
+    builtin_ref: &impl BuiltinRef,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
@@ -495,7 +496,7 @@ fn resolve_parameter_value(
         ast::parameter::ParameterValue::Simple(expr, unit) => {
             let expr = resolve_expr(
                 expr,
-                &builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
@@ -511,7 +512,7 @@ fn resolve_parameter_value(
             let exprs = piecewise.iter().map(|part| {
                 let expr = resolve_expr(
                     &part.expr(),
-                    &builtin_variables,
+                    builtin_ref,
                     defined_parameters_info,
                     submodel_info,
                     model_info,
@@ -520,7 +521,7 @@ fn resolve_parameter_value(
 
                 let if_expr = resolve_expr(
                     &part.if_expr(),
-                    &builtin_variables,
+                    builtin_ref,
                     defined_parameters_info,
                     submodel_info,
                     model_info,
@@ -558,7 +559,7 @@ fn resolve_parameter_value(
 /// Resolved parameter limits or a list of resolution errors
 fn resolve_limits(
     limits: Option<&ast::parameter::LimitsNode>,
-    builtin_variables: &HashSet<String>,
+    builtin_ref: &impl BuiltinRef,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
@@ -567,7 +568,7 @@ fn resolve_limits(
         Some(ast::parameter::Limits::Continuous { min, max }) => {
             let min = resolve_expr(
                 min,
-                &builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
@@ -576,7 +577,7 @@ fn resolve_limits(
 
             let max = resolve_expr(
                 max,
-                &builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
@@ -591,7 +592,7 @@ fn resolve_limits(
             let values = values.into_iter().map(|value| {
                 resolve_expr(
                     value,
-                    &builtin_variables,
+                    builtin_ref,
                     defined_parameters_info,
                     submodel_info,
                     model_info,
@@ -619,6 +620,8 @@ mod tests {
     };
 
     mod helper {
+        use crate::test::TestBuiltinRef;
+
         use super::*;
 
         /// Helper function to create a test span
@@ -785,8 +788,8 @@ mod tests {
         }
 
         /// Helper function to create empty builtin variables
-        pub fn create_empty_builtin_variables() -> HashSet<String> {
-            HashSet::new()
+        pub fn create_empty_builtin_ref() -> TestBuiltinRef {
+            TestBuiltinRef::new()
         }
     }
 
@@ -796,14 +799,14 @@ mod tests {
         let parameters = vec![];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors
         assert!(errors.is_empty());
@@ -820,14 +823,14 @@ mod tests {
         let parameters = vec![&param_a, &param_b];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors
         assert!(errors.is_empty());
@@ -850,14 +853,14 @@ mod tests {
         let parameters = vec![&param_a, &param_b];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors
         assert!(errors.is_empty());
@@ -880,14 +883,14 @@ mod tests {
         let parameters = vec![&param_a, &param_b];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors
         assert!(!errors.is_empty());
@@ -1130,7 +1133,7 @@ mod tests {
         // resolve the parameter value
         let result = resolve_parameter_value(
             &value_node,
-            &helper::create_empty_builtin_variables(),
+            &helper::create_empty_builtin_ref(),
             &defined_parameters_info,
             &submodel_info,
             &model_info,
@@ -1151,7 +1154,7 @@ mod tests {
         // resolve the limits
         let result = resolve_limits(
             None,
-            &helper::create_empty_builtin_variables(),
+            &helper::create_empty_builtin_ref(),
             &defined_parameters_info,
             &submodel_info,
             &model_info,
@@ -1181,7 +1184,7 @@ mod tests {
         // resolve the limits
         let result = resolve_limits(
             Some(&limits_node),
-            &helper::create_empty_builtin_variables(),
+            &helper::create_empty_builtin_ref(),
             &defined_parameters_info,
             &submodel_info,
             &model_info,
@@ -1209,7 +1212,7 @@ mod tests {
         // resolve the limits
         let result = resolve_limits(
             Some(&limits_node),
-            &helper::create_empty_builtin_variables(),
+            &helper::create_empty_builtin_ref(),
             &defined_parameters_info,
             &submodel_info,
             &model_info,
@@ -1231,14 +1234,14 @@ mod tests {
         let parameters = vec![&param_a1, &param_a2];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
@@ -1278,14 +1281,14 @@ mod tests {
         let parameters = vec![&param_a1, &param_b1, &param_a2, &param_b2];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors - should have two duplicate parameter errors
         assert_eq!(errors.len(), 2);
@@ -1337,14 +1340,14 @@ mod tests {
         let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
@@ -1383,14 +1386,14 @@ mod tests {
         let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
 
         // create the builtin variables
-        let builtin_variables = HashSet::new();
+        let builtin_ref = helper::create_empty_builtin_ref();
 
         // create the submodel and model info
         let (submodel_info, model_info) = helper::create_mock_info();
 
         // resolve the parameters
         let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_variables, &submodel_info, &model_info);
+            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);

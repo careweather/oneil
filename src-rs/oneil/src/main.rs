@@ -3,19 +3,18 @@
 //! This module provides the main entry point for the Oneil CLI tool, which offers
 //! development utilities for parsing, analyzing, and debugging Oneil source files.
 
-use std::{
-    collections::HashSet,
-    io::{self, Write},
-};
+use std::io::{self, Write};
 
 use clap::Parser;
 use oneil_model_loader::FileLoader;
 
 use crate::{
+    builtins::Builtins,
     command::{CliCommand, Commands, DevCommands},
     file_parser::LoadingError,
 };
 
+mod builtins;
 mod command;
 mod convert_error;
 mod file_parser;
@@ -99,8 +98,7 @@ fn main() -> io::Result<()> {
                     &mut stderr_writer,
                 );
 
-                let builtin_variables =
-                    HashSet::from(["pi".to_string(), "e".to_string(), "inf".to_string()]);
+                let builtin_variables = Builtins::new();
 
                 let model_collection = oneil_model_loader::load_model(
                     file,

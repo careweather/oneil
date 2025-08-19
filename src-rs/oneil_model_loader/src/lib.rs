@@ -66,6 +66,7 @@ mod test;
 
 pub use crate::error::collection::ModelErrorMap;
 pub use crate::util::FileLoader;
+pub use crate::util::builtin_ref::BuiltinRef;
 
 /// Loads a single model and all its dependencies.
 ///
@@ -127,7 +128,7 @@ pub use crate::util::FileLoader;
 /// ```
 pub fn load_model<F>(
     model_path: impl AsRef<Path>,
-    builtin_variables: &HashSet<String>,
+    builtin_ref: &impl BuiltinRef,
     file_parser: &F,
 ) -> Result<
     ModelCollection,
@@ -139,7 +140,7 @@ pub fn load_model<F>(
 where
     F: FileLoader,
 {
-    load_model_list(&[model_path], builtin_variables, file_parser)
+    load_model_list(&[model_path], builtin_ref, file_parser)
 }
 
 /// Loads multiple models and all their dependencies.
@@ -201,7 +202,7 @@ where
 /// ```
 pub fn load_model_list<F>(
     model_paths: &[impl AsRef<Path>],
-    builtin_variables: &HashSet<String>,
+    builtin_ref: &impl BuiltinRef,
     file_parser: &F,
 ) -> Result<
     ModelCollection,
@@ -227,7 +228,7 @@ where
         loader::load_model(
             model_path,
             builder,
-            builtin_variables,
+            builtin_ref,
             &mut load_stack,
             file_parser,
         )

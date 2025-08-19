@@ -50,12 +50,11 @@
 //! All errors are collected and returned rather than causing the function to
 //! fail immediately.
 
-use std::collections::HashSet;
-
 use oneil_ast as ast;
 use oneil_ir::{expr::Expr, span::WithSpan};
 
 use crate::{
+    BuiltinRef,
     error::{self, VariableResolutionError},
     loader::resolver::{ModelInfo, ParameterInfo, SubmodelInfo, variable::resolve_variable},
     util::get_span_from_ast_span,
@@ -93,7 +92,7 @@ use crate::{
 /// immediately.
 pub fn resolve_expr(
     value: &ast::expression::ExprNode,
-    builtin_variables: &HashSet<String>,
+    builtin_ref: &impl BuiltinRef,
     defined_parameters_info: &ParameterInfo,
     submodel_info: &SubmodelInfo,
     model_info: &ModelInfo,
@@ -108,14 +107,14 @@ pub fn resolve_expr(
         } => {
             let left = resolve_expr(
                 left,
-                builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
             );
             let right = resolve_expr(
                 right,
-                builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
@@ -126,7 +125,7 @@ pub fn resolve_expr(
             let rest_chained = rest_chained.into_iter().map(|(op, expr)| {
                 let expr = resolve_expr(
                     expr,
-                    builtin_variables,
+                    builtin_ref,
                     defined_parameters_info,
                     submodel_info,
                     model_info,
@@ -146,14 +145,14 @@ pub fn resolve_expr(
         ast::Expr::BinaryOp { op, left, right } => {
             let left = resolve_expr(
                 left,
-                builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
             );
             let right = resolve_expr(
                 right,
-                builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
@@ -168,7 +167,7 @@ pub fn resolve_expr(
         ast::Expr::UnaryOp { op, expr } => {
             let expr = resolve_expr(
                 expr,
-                builtin_variables,
+                builtin_ref,
                 defined_parameters_info,
                 submodel_info,
                 model_info,
@@ -188,7 +187,7 @@ pub fn resolve_expr(
             let args = args.iter().map(|arg| {
                 resolve_expr(
                     arg,
-                    builtin_variables,
+                    builtin_ref,
                     defined_parameters_info,
                     submodel_info,
                     model_info,
@@ -202,7 +201,7 @@ pub fn resolve_expr(
         }
         ast::Expr::Variable(variable) => resolve_variable(
             variable,
-            builtin_variables,
+            builtin_ref,
             defined_parameters_info,
             submodel_info,
             model_info,
@@ -215,7 +214,7 @@ pub fn resolve_expr(
         }
         ast::Expr::Parenthesized { expr } => resolve_expr(
             expr,
-            builtin_variables,
+            builtin_ref,
             defined_parameters_info,
             submodel_info,
             model_info,
@@ -386,6 +385,8 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     mod helper {
+        use crate::test::TestBuiltinRef;
+
         use super::*;
 
         /// Helper function to create basic test data structures for tests that
@@ -518,17 +519,23 @@ mod tests {
         }
 
         pub fn create_empty_context() -> (
-            HashSet<String>,
+            TestBuiltinRef,
             ParameterInfo<'static>,
             SubmodelInfo<'static>,
             ModelInfo<'static>,
         ) {
-            let builtin_vars = HashSet::new();
+            let builtin_ref = TestBuiltinRef::new();
             let param_info = ParameterInfo::new(HashMap::new(), HashSet::new());
             let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
             let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
 
-            (builtin_vars, param_info, submodel_info, model_info)
+            (builtin_ref, param_info, submodel_info, model_info)
+        }
+
+        pub fn create_test_builtin_ref_with_builtin_variables(
+            variables: impl IntoIterator<Item = String>,
+        ) -> TestBuiltinRef {
+            TestBuiltinRef::new().with_builtin_variables(variables)
         }
 
         /// Helper function to create a parameter ID with span
@@ -570,12 +577,12 @@ mod tests {
             helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &literal,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -607,12 +614,12 @@ mod tests {
         );
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &literal,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -641,12 +648,12 @@ mod tests {
             helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &literal,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -685,12 +692,12 @@ mod tests {
         );
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -737,12 +744,12 @@ mod tests {
         let expr = helper::create_unary_op_expr_node(ast_op.clone(), ast_inner_expr.clone(), 0, 4);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -784,12 +791,12 @@ mod tests {
             helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg.clone()], 0, 8);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -833,12 +840,12 @@ mod tests {
             helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg.clone()], 0, 19);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -883,12 +890,12 @@ mod tests {
 
         // create the context
         let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
-        let builtin_vars = HashSet::from(["x".to_string()]);
+        let builtin_ref = helper::create_test_builtin_ref_with_builtin_variables(["x".to_string()]);
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -931,12 +938,12 @@ mod tests {
         );
         param_map.insert(param_id.value(), &parameter);
         let param_info = ParameterInfo::new(param_map, HashSet::new());
-        let (builtin_vars, _, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, _, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -969,12 +976,12 @@ mod tests {
         let expr = helper::create_variable_expr_node(ast_variable.clone(), 0, 9);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1037,12 +1044,12 @@ mod tests {
         );
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1348,12 +1355,12 @@ mod tests {
         );
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1414,12 +1421,12 @@ mod tests {
         let expr = helper::create_parenthesized_expr_node(inner_expr.clone(), 0, 8);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1490,12 +1497,12 @@ mod tests {
         );
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1586,12 +1593,12 @@ mod tests {
         let expr = helper::create_parenthesized_expr_node(first_parentheses.clone(), 0, 6);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1623,12 +1630,12 @@ mod tests {
         let expr = helper::create_parenthesized_expr_node(second_level, 0, 10);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1665,12 +1672,12 @@ mod tests {
         let expr = helper::create_parenthesized_expr_node(func_call.clone(), 0, 11);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1715,12 +1722,12 @@ mod tests {
         let expr = helper::create_parenthesized_expr_node(unary_expr.clone(), 0, 4);
 
         // create the context
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         // resolve the expression
         let result = resolve_expr(
             &expr,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1772,12 +1779,12 @@ mod tests {
 
         // create the context
         let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
-        let builtin_vars = HashSet::from(["x".to_string()]);
+        let builtin_ref = helper::create_test_builtin_ref_with_builtin_variables(["x".to_string()]);
 
         // resolve the expression
         let result = resolve_expr(
             &expr_node,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1852,12 +1859,12 @@ mod tests {
 
         // create the context
         let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
-        let builtin_vars = HashSet::from(["x".to_string()]);
+        let builtin_ref = helper::create_test_builtin_ref_with_builtin_variables(["x".to_string()]);
 
         // resolve the expression
         let result = resolve_expr(
             &expr_node,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1939,11 +1946,11 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(helper::test_span(0, 19), expr);
 
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         let result = resolve_expr(
             &expr_node,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -1985,11 +1992,11 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(helper::test_span(0, 19), expr);
 
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         let result = resolve_expr(
             &expr_node,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -2034,11 +2041,11 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(helper::test_span(0, 23), expr);
 
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         let result = resolve_expr(
             &expr_node,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
@@ -2085,11 +2092,11 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(helper::test_span(0, 51), expr);
 
-        let (builtin_vars, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
         let result = resolve_expr(
             &expr_node,
-            &builtin_vars,
+            &builtin_ref,
             &param_info,
             &submodel_info,
             &model_info,
