@@ -135,8 +135,12 @@ You can also run the following developer commands built into Oneil:
   ```
 
 In addition, you will want to install the
-[rust-analyzer](https://marketplace.cursorapi.com/items?itemName=rust-lang.rust-analyzer)
+[`rust-analyzer`](https://marketplace.cursorapi.com/items?itemName=rust-lang.rust-analyzer)
 VS Code extension in order to help you develop in Rust.
+
+If you are using `rust-analyzer` in VS Code, ensure that you are using the
+`clippy` linter by [updating your
+settings](https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-analyzer/41881)
 
 ### Model Syntax Updates for Rust Version
 

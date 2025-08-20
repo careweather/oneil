@@ -16,3 +16,6 @@ oneil_model_loader = { path = "../oneil_model_loader" }
 oneil_parser = { path = "../oneil_parser" }
 clap = { version = "4.5.1", features = ["derive"] }
 colored = "3.0.0"
+
+[lints]
+workspace = true

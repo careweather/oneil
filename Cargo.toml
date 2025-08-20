@@ -10,5 +10,38 @@ license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/careweather/oneil"
 
+# Lints originally derived from https://medium.com/@carlmkadie/92bb899d47ef
+# 
+# To use the lints in VSCode with rust-analyzer, follow this:
+# https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-analyzer/41881
+
 [workspace.lints.rust]
+# rustc (builtin) lints
+unused_lifetimes = "warn"
 missing_docs = "warn"
+single_use_lifetimes = "warn"
+rust_2018_idioms = { level = "warn", priority = -2 }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    "cfg(coverage)",
+    "cfg(never)",
+] }
+
+[workspace.lints.clippy]
+# individual Clippy lints
+uninlined_format_args = "warn"
+use_self = "warn"
+must_use_candidate = "warn"
+unwrap_used = "warn"
+panic_in_result_fn = "warn"
+
+# Clippy lint groups
+pedantic = { level = "warn", priority = -2 }
+perf = { level = "warn", priority = -6 }
+style = { level = "warn", priority = -4 }
+complexity = { level = "warn", priority = -5 }
+correctness = { level = "warn", priority = -3 }
+nursery = { level = "warn", priority = -7 }
+
+# cargo-specific groups
+cargo = { level = "warn", priority = -8 }
+cargo_common_metadata = { level = "warn", priority = -9 }

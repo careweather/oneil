@@ -12,3 +12,6 @@ oneil_ast = { path = "../oneil_ast" }
 oneil_error = { path = "../oneil_error" }
 nom = "8.0.0"
 nom_locate = "5.0.0"
+
+[lints]
+workspace = true
