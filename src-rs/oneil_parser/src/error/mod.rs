@@ -317,7 +317,7 @@ impl ParserError {
     }
 
     /// Creates a new ParserError for a section missing a label
-    pub(crate) fn section_missing_label(section_token: &Token) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn section_missing_label(section_token: &Token<'_>) -> impl Fn(TokenError) -> Self {
         move |error| {
             let section_span = AstSpan::from(section_token);
             Self::new_from_token_error(

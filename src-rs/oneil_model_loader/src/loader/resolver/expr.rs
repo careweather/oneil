@@ -93,9 +93,9 @@ use crate::{
 pub fn resolve_expr(
     value: &ast::expression::ExprNode,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
     let value_span = get_span_from_ast_span(value.node_span());
     match value.node_value() {

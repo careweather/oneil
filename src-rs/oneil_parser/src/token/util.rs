@@ -62,7 +62,7 @@ impl<'a> Token<'a> {
     }
 }
 
-impl<'a> SpanLike for Token<'a> {
+impl SpanLike for Token<'_> {
     /// Returns the starting offset of the token's lexeme.
     fn get_start(&self) -> usize {
         self.lexeme.location_offset()
@@ -92,7 +92,7 @@ impl<'a> SpanLike for Token<'a> {
 ///
 /// Returns `Ok((remaining_input, parsed_whitespace))` on success, where the
 /// remaining input excludes the consumed whitespace.
-pub fn inline_whitespace(input: Span) -> Result<Span, TokenError> {
+pub fn inline_whitespace(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     space0.parse(input)
 }
 

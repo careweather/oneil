@@ -173,7 +173,7 @@ pub enum IncompleteKind {
 
 impl TokenError {
     /// Creates a new TokenError
-    fn new(kind: TokenErrorKind, span: Span) -> Self {
+    fn new(kind: TokenErrorKind, span: Span<'_>) -> Self {
         Self {
             kind,
             offset: span.location_offset(),
@@ -225,7 +225,7 @@ impl TokenError {
     }
 
     /// Creates a new TokenError instance for an expected note from a span
-    pub fn expected_note_from_span(span: Span) -> Self {
+    pub fn expected_note_from_span(span: Span<'_>) -> Self {
         Self::new(TokenErrorKind::Expect(ExpectKind::Note), span)
     }
 
@@ -255,7 +255,7 @@ impl TokenError {
     }
 
     /// Creates a new TokenError instance for an unclosed note
-    pub fn unclosed_note(delimiter_span: Span) -> impl Fn(Self) -> Self {
+    pub fn unclosed_note(delimiter_span: Span<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let delimiter_start_offset = delimiter_span.location_offset();
             let delimiter_length = delimiter_span.len();
@@ -267,7 +267,7 @@ impl TokenError {
     }
 
     /// Creates a new TokenError instance for an unclosed string
-    pub fn unclosed_string(open_quote_span: Span) -> impl Fn(Self) -> Self {
+    pub fn unclosed_string(open_quote_span: Span<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let open_quote_offset = open_quote_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(IncompleteKind::UnclosedString {
@@ -277,7 +277,7 @@ impl TokenError {
     }
 
     /// Creates a new TokenError instance for an invalid decimal part in a number
-    pub fn invalid_decimal_part(decimal_point_span: Span) -> impl Fn(Self) -> Self {
+    pub fn invalid_decimal_part(decimal_point_span: Span<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let decimal_point_offset = decimal_point_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(
@@ -289,7 +289,7 @@ impl TokenError {
     }
 
     /// Creates a new TokenError instance for an invalid exponent part in a number
-    pub fn invalid_exponent_part(e_span: Span) -> impl Fn(Self) -> Self {
+    pub fn invalid_exponent_part(e_span: Span<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let e_offset = e_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(
@@ -315,15 +315,15 @@ impl TokenError {
     }
 }
 
-impl<'a> ParseError<Span<'a>> for TokenError {
-    fn from_error_kind(input: Span, kind: nom::error::ErrorKind) -> Self {
+impl ParseError<Span<'_>> for TokenError {
+    fn from_error_kind(input: Span<'_>, kind: nom::error::ErrorKind) -> Self {
         Self {
             kind: TokenErrorKind::NomError(kind),
             offset: input.location_offset(),
         }
     }
 
-    fn append(_input: Span, _kind: nom::error::ErrorKind, other: Self) -> Self {
+    fn append(_input: Span<'_>, _kind: nom::error::ErrorKind, other: Self) -> Self {
         other
     }
 }

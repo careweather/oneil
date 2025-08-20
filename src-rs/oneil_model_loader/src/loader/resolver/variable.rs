@@ -92,9 +92,9 @@ use crate::{
 pub fn resolve_variable(
     variable: &ast::expression::VariableNode,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters: &ParameterInfo,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    defined_parameters: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
 ) -> Result<ExprWithSpan, VariableResolutionError> {
     match variable.node_value() {
         ast::expression::Variable::Identifier(identifier) => {
@@ -177,9 +177,9 @@ fn resolve_variable_recursive(
     submodel_path: &ModelPath,
     variable: &ast::expression::Variable,
     parent_identifier_span: Span,
-    defined_parameters: &ParameterInfo,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    defined_parameters: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
 ) -> Result<(ModelPath, Identifier), VariableResolutionError> {
     let model = match model_info.get(submodel_path) {
         InfoResult::Found(model) => model,

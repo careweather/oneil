@@ -27,14 +27,14 @@ use crate::{
 /// Parses a unit expression
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span) -> Result<UnitExprNode, ParserError> {
+pub fn parse(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
     unit_expr(input)
 }
 
 /// Parses a unit expression
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<UnitExprNode, ParserError> {
+pub fn parse_complete(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
     all_consuming(unit_expr).parse(input)
 }
 
@@ -56,7 +56,7 @@ pub fn parse_complete(input: Span) -> Result<UnitExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns a unit expression node with proper operator precedence and associativity.
-fn unit_expr(input: Span) -> Result<UnitExprNode, ParserError> {
+fn unit_expr(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
     let (rest, first_term) = unit_term
         .convert_error_to(ParserError::expect_unit)
         .parse(input)?;
@@ -103,7 +103,7 @@ fn unit_expr(input: Span) -> Result<UnitExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns a unit expression node representing the parsed term.
-fn unit_term(input: Span) -> Result<UnitExprNode, ParserError> {
+fn unit_term(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
     let parse_unit = |input| {
         let (rest, id_token) = unit_identifier.convert_errors().parse(input)?;
         let id_value = Identifier::new(id_token.lexeme().to_string());

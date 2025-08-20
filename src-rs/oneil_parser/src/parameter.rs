@@ -55,14 +55,14 @@ use crate::util::{Result, Span};
 /// Parse a parameter declaration, e.g. `$ * x(0,100): y = 2*z : kg`.
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span) -> Result<ParameterNode, ParserError> {
+pub fn parse(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
     parameter_decl(input)
 }
 
 /// Parse a parameter declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<ParameterNode, ParserError> {
+pub fn parse_complete(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
     all_consuming(parameter_decl).parse(input)
 }
 
@@ -127,7 +127,7 @@ pub fn parse_complete(input: Span) -> Result<ParameterNode, ParserError> {
 /// // Piecewise parameter
 /// let param = parse_parameter("Force: f = { 2*x if x > 0\n{ 0 if x <= 0\n", None).unwrap();
 /// ```
-fn parameter_decl(input: Span) -> Result<ParameterNode, ParserError> {
+fn parameter_decl(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
     let (rest, performance_marker) = opt(performance_marker).parse(input)?;
 
     let (rest, trace_level) = opt(trace_level).parse(rest)?;
@@ -216,7 +216,7 @@ fn parameter_decl(input: Span) -> Result<ParameterNode, ParserError> {
 /// let param = parse_parameter("$ Speed: v = 10.0 :m/s", None).unwrap();
 /// assert!(param.performance_marker().is_some());
 /// ```
-fn performance_marker(input: Span) -> Result<PerformanceMarkerNode, ParserError> {
+fn performance_marker(input: Span<'_>) -> Result<'_, PerformanceMarkerNode, ParserError> {
     dollar
         .convert_errors()
         .map(|token| Node::new(token, PerformanceMarker::new()))
@@ -237,7 +237,7 @@ fn performance_marker(input: Span) -> Result<PerformanceMarkerNode, ParserError>
 ///
 /// Returns a trace level node if a valid trace indicator is found, or an error
 /// if the token is malformed.
-fn trace_level(input: Span) -> Result<TraceLevelNode, ParserError> {
+fn trace_level(input: Span<'_>) -> Result<'_, TraceLevelNode, ParserError> {
     let single_star = star.map(|token| Node::new(token, TraceLevel::Trace));
     let double_star = star_star.map(|token| Node::new(token, TraceLevel::Debug));
 
@@ -258,7 +258,7 @@ fn trace_level(input: Span) -> Result<TraceLevelNode, ParserError> {
 ///
 /// Returns a limits node if valid limits are found, or an error if the
 /// limits are malformed.
-fn limits(input: Span) -> Result<LimitsNode, ParserError> {
+fn limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
     alt((continuous_limits, discrete_limits)).parse(input)
 }
 
@@ -284,7 +284,7 @@ fn limits(input: Span) -> Result<LimitsNode, ParserError> {
 /// - **Missing comma**: When no comma separates the minimum and maximum values
 /// - **Missing maximum value**: When no expression follows the comma
 /// - **Missing closing parenthesis**: When the limits are not properly closed
-fn continuous_limits(input: Span) -> Result<LimitsNode, ParserError> {
+fn continuous_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
     let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
     let (rest, min) = parse_expr
@@ -330,7 +330,7 @@ fn continuous_limits(input: Span) -> Result<LimitsNode, ParserError> {
 /// - **Missing opening bracket**: When the input doesn't start with `[`
 /// - **Missing values**: When no expressions are found after the opening bracket
 /// - **Missing closing bracket**: When the limits are not properly closed
-fn discrete_limits(input: Span) -> Result<LimitsNode, ParserError> {
+fn discrete_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
     let (rest, bracket_left_token) = bracket_left.convert_errors().parse(input)?;
 
     let (rest, values) = separated_list1(comma.convert_errors(), parse_expr)
@@ -374,7 +374,7 @@ fn discrete_limits(input: Span) -> Result<LimitsNode, ParserError> {
 /// // Piecewise value
 /// let param = parse_parameter("Force: f = { 2*x if x > 0\n{ 0 if x <= 0", None).unwrap();
 /// ```
-fn parameter_value(input: Span) -> Result<ParameterValueNode, ParserError> {
+fn parameter_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> {
     simple_value.or(piecewise_value).parse(input)
 }
 
@@ -412,7 +412,7 @@ fn parameter_value(input: Span) -> Result<ParameterValueNode, ParserError> {
 /// // Simple value with compound unit
 /// let param = parse_parameter("Speed: v = 5.0 :m/s", None).unwrap();
 /// ```
-fn simple_value(input: Span) -> Result<ParameterValueNode, ParserError> {
+fn simple_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> {
     let (rest, expr) = parse_expr.parse(input)?;
 
     let (rest, unit) = opt(|input| {
@@ -472,7 +472,7 @@ fn simple_value(input: Span) -> Result<ParameterValueNode, ParserError> {
 /// // Multiple pieces
 /// let param = parse_parameter("Function: y = { x^2 if x > 0\n{ 0 if x == 0\n{ -x^2 if x < 0\n", None).unwrap();
 /// ```
-fn piecewise_value(input: Span) -> Result<ParameterValueNode, ParserError> {
+fn piecewise_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> {
     let (rest, first_part) = piecewise_part.parse(input)?;
 
     let (rest, unit) = opt(|input| {
@@ -540,7 +540,7 @@ fn piecewise_value(input: Span) -> Result<ParameterValueNode, ParserError> {
 /// // Complex piecewise part
 /// let param = parse_parameter("Result: r = { 2*x + 1 if x >= 0 and x < 10\n", None).unwrap();
 /// ```
-fn piecewise_part(input: Span) -> Result<PiecewisePartNode, ParserError> {
+fn piecewise_part(input: Span<'_>) -> Result<'_, PiecewisePartNode, ParserError> {
     let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
 
     let (rest, expr) = parse_expr

@@ -347,7 +347,7 @@ pub fn parse_unit(input: &str, config: Option<Config>) -> Result<UnitExprNode, e
 fn parse<T, E>(
     input: &str,
     config: Option<Config>,
-    parser: impl Fn(Span) -> InternalResult<T, E>,
+    parser: impl Fn(Span<'_>) -> InternalResult<'_, T, E>,
 ) -> Result<T, E> {
     let config = config.unwrap_or_default();
     let input = Span::new_extra(input, config);

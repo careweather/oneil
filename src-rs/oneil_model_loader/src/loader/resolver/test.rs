@@ -73,9 +73,9 @@ use crate::{
 pub fn resolve_tests(
     tests: Vec<&ast::test::TestNode>,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
 ) -> (
     HashMap<TestIndex, Test>,
     HashMap<TestIndex, Vec<TestResolutionError>>,

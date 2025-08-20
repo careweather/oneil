@@ -52,7 +52,7 @@ impl<'a> FileError<'a> {
     }
 }
 
-impl<'a> AsOneilError for FileError<'a> {
+impl AsOneilError for FileError<'_> {
     fn message(&self) -> String {
         format!("couldn't read `{}` - {}", self.path.display(), self.error)
     }

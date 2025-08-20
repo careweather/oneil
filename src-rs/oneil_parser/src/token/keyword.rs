@@ -43,7 +43,7 @@ pub const KEYWORDS: &[&str] = &[
 fn keyword(
     kw_str: &str,
     error_kind: error::ExpectKeyword,
-) -> impl Parser<Token, error::TokenError> {
+) -> impl Parser<'_, Token<'_>, error::TokenError> {
     token(
         move |input| {
             let next_char_is_not_ident_char =
@@ -62,62 +62,62 @@ fn keyword(
 }
 
 /// Parses the 'and' keyword token.
-pub fn and(input: Span) -> Result<Token, error::TokenError> {
+pub fn and(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("and", error::ExpectKeyword::And).parse(input)
 }
 
 /// Parses the 'as' keyword token.
-pub fn as_(input: Span) -> Result<Token, error::TokenError> {
+pub fn as_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("as", error::ExpectKeyword::As).parse(input)
 }
 
 /// Parses the 'false' keyword token.
-pub fn false_(input: Span) -> Result<Token, error::TokenError> {
+pub fn false_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("false", error::ExpectKeyword::False).parse(input)
 }
 
 /// Parses the 'from' keyword token.
-pub fn from(input: Span) -> Result<Token, error::TokenError> {
+pub fn from(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("from", error::ExpectKeyword::From).parse(input)
 }
 
 /// Parses the 'if' keyword token.
-pub fn if_(input: Span) -> Result<Token, error::TokenError> {
+pub fn if_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("if", error::ExpectKeyword::If).parse(input)
 }
 
 /// Parses the 'import' keyword token.
-pub fn import(input: Span) -> Result<Token, error::TokenError> {
+pub fn import(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("import", error::ExpectKeyword::Import).parse(input)
 }
 
 /// Parses the 'not' keyword token.
-pub fn not(input: Span) -> Result<Token, error::TokenError> {
+pub fn not(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("not", error::ExpectKeyword::Not).parse(input)
 }
 
 /// Parses the 'or' keyword token.
-pub fn or(input: Span) -> Result<Token, error::TokenError> {
+pub fn or(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("or", error::ExpectKeyword::Or).parse(input)
 }
 
 /// Parses the 'true' keyword token.
-pub fn true_(input: Span) -> Result<Token, error::TokenError> {
+pub fn true_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("true", error::ExpectKeyword::True).parse(input)
 }
 
 /// Parses the 'section' keyword token.
-pub fn section(input: Span) -> Result<Token, error::TokenError> {
+pub fn section(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("section", error::ExpectKeyword::Section).parse(input)
 }
 
 /// Parses the 'test' keyword token.
-pub fn test(input: Span) -> Result<Token, error::TokenError> {
+pub fn test(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("test", error::ExpectKeyword::Test).parse(input)
 }
 
 /// Parses the 'use' keyword token.
-pub fn use_(input: Span) -> Result<Token, error::TokenError> {
+pub fn use_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("use", error::ExpectKeyword::Use).parse(input)
 }
 

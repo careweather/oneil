@@ -70,8 +70,8 @@ use crate::{
 pub fn resolve_parameters(
     parameters: Vec<&ast::parameter::ParameterNode>,
     builtin_ref: &impl BuiltinRef,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
 ) -> (
     ParameterCollection,
     HashMap<Identifier, Vec<ParameterResolutionError>>,
@@ -331,8 +331,8 @@ fn resolve_parameter(
     parameter_map: &HashMap<Identifier, (Span, &ast::parameter::ParameterNode)>,
     dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
     builtin_ref: &impl BuiltinRef,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
     parameter_stack: &mut Stack<Identifier>,
     mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: HashSet<Identifier>,
@@ -488,9 +488,9 @@ fn resolve_parameter(
 fn resolve_parameter_value(
     value: &ast::parameter::ParameterValue,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
 ) -> Result<ParameterValue, Vec<ParameterResolutionError>> {
     match value {
         ast::parameter::ParameterValue::Simple(expr, unit) => {
@@ -560,9 +560,9 @@ fn resolve_parameter_value(
 fn resolve_limits(
     limits: Option<&ast::parameter::LimitsNode>,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo,
-    submodel_info: &SubmodelInfo,
-    model_info: &ModelInfo,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
 ) -> Result<oneil_ir::parameter::Limits, Vec<ParameterResolutionError>> {
     match limits.map(|l| l.node_value()) {
         Some(ast::parameter::Limits::Continuous { min, max }) => {

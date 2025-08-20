@@ -43,7 +43,7 @@ use crate::token::{
 /// # Returns
 ///
 /// Returns a token containing the parsed number literal.
-pub fn number(input: Span) -> Result<Token, TokenError> {
+pub fn number(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     // Optional sign (+ or -) at the beginning
     let opt_sign = opt(one_of("+-"));
 
@@ -111,7 +111,7 @@ pub fn number(input: Span) -> Result<Token, TokenError> {
 /// # Returns
 ///
 /// Returns a token containing the parsed string literal including the quotes.
-pub fn string(input: Span) -> Result<Token, TokenError> {
+pub fn string(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         |input| {
             let (rest, open_quote_span) = tag("\'").parse(input)?;
@@ -146,7 +146,7 @@ pub fn string(input: Span) -> Result<Token, TokenError> {
 /// # Returns
 ///
 /// Returns a token containing the parsed unit one literal.
-pub fn unit_one(input: Span) -> Result<Token, TokenError> {
+pub fn unit_one(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         |input| {
             let next_char_is_not_digit = satisfy(|c: char| !c.is_dec_digit()).map(|_| ());

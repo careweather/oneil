@@ -33,7 +33,7 @@ use crate::token::{
 ///
 /// Returns a span containing the parsed identifier, or an error if the input
 /// is not a valid identifier or is a reserved keyword.
-fn identifier_span(input: Span) -> Result<Span, TokenError> {
+fn identifier_span(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     verify(
         recognize(|input| {
             let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_').parse(input)?;
@@ -41,7 +41,7 @@ fn identifier_span(input: Span) -> Result<Span, TokenError> {
             Ok((rest, ()))
         }),
         // Ensure the identifier is not a reserved keyword
-        |identifier: &Span| !keyword::KEYWORDS.contains(&identifier.fragment()),
+        |identifier: &Span<'_>| !keyword::KEYWORDS.contains(&identifier.fragment()),
     )
     .parse(input)
 }
@@ -72,7 +72,7 @@ fn identifier_span(input: Span) -> Result<Span, TokenError> {
 ///
 /// Returns a token containing the parsed identifier, or an error if the input
 /// is not a valid identifier or is a reserved keyword.
-pub fn identifier(input: Span) -> Result<Token, TokenError> {
+pub fn identifier(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(identifier_span, TokenError::expected_identifier).parse(input)
 }
 
@@ -95,7 +95,7 @@ pub fn identifier(input: Span) -> Result<Token, TokenError> {
 ///
 /// Returns a token containing the parsed unit identifier, or an error if the input
 /// is not a valid unit identifier or is a reserved keyword.
-pub fn unit_identifier(input: Span) -> Result<Token, TokenError> {
+pub fn unit_identifier(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         alt((
             // either an identifier (optionally followed by $ or %)
@@ -155,7 +155,7 @@ pub fn unit_identifier(input: Span) -> Result<Token, TokenError> {
 ///
 /// Returns a token containing the parsed label, or an error if the input
 /// is not a valid label or is a reserved keyword.
-pub fn label(input: Span) -> Result<Token, TokenError> {
+pub fn label(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     verify(
         token(
             |input| {

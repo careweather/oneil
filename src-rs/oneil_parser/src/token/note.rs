@@ -41,7 +41,7 @@ pub enum NoteKind {
 /// # Returns
 ///
 /// Returns the span containing the end-of-line sequence.
-fn end_of_line_span(input: Span) -> Result<Span, TokenError> {
+fn end_of_line_span(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     recognize(end_of_line).parse(input)
 }
 
@@ -60,7 +60,7 @@ fn end_of_line_span(input: Span) -> Result<Span, TokenError> {
 /// # Returns
 ///
 /// Returns a token containing the single-line note with its trailing whitespace.
-fn single_line_note(input: Span) -> Result<Token, TokenError> {
+fn single_line_note(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     let (rest, matched) = recognize((char('~'), not_line_ending)).parse(input)?;
     let (rest, whitespace) = end_of_line_span(rest)?;
 
@@ -85,10 +85,10 @@ fn single_line_note(input: Span) -> Result<Token, TokenError> {
 /// # Returns
 ///
 /// Returns the span containing the delimiter with its surrounding whitespace.
-fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
+fn multi_line_note_delimiter(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     recognize((
         inline_whitespace,
-        verify(take_while(|c: char| c == '~'), |s: &Span| s.len() >= 3),
+        verify(take_while(|c: char| c == '~'), |s: &Span<'_>| s.len() >= 3),
         inline_whitespace,
     ))
     .parse(input)
@@ -107,7 +107,7 @@ fn multi_line_note_delimiter(input: Span) -> Result<Span, TokenError> {
 /// # Returns
 ///
 /// Returns the span containing all the note content.
-fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
+fn multi_line_note_content(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     recognize(many0(verify((not_line_ending, line_ending), |(s, _)| {
         multi_line_note_delimiter.parse(*s).is_err()
     })))
@@ -132,11 +132,11 @@ fn multi_line_note_content(input: Span) -> Result<Span, TokenError> {
 /// # Returns
 ///
 /// Returns a token containing the multi-line note with its trailing whitespace.
-fn multi_line_note(input: Span) -> Result<Token, TokenError> {
+fn multi_line_note(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     flat_map(
         consumed(|input| {
             let (rest, delimiter_span) = multi_line_note_delimiter.parse(input)?;
-            let (rest, _) = (|input| -> Result<_, TokenError> {
+            let (rest, _) = (|input| {
                 let (rest, _) = line_ending.parse(input)?;
                 let (rest, _) = multi_line_note_content.parse(rest)?;
                 let (rest, _) = multi_line_note_delimiter.parse(rest)?;
@@ -194,7 +194,7 @@ fn multi_line_note(input: Span) -> Result<Token, TokenError> {
 /// let input = "~~~\nThis is a\nmulti-line note\n~~~\n";
 /// let _ = parse_note(input, None).unwrap();
 /// ```
-pub fn note(input: Span) -> Result<(Token, NoteKind), TokenError> {
+pub fn note(input: Span<'_>) -> Result<'_, (Token<'_>, NoteKind), TokenError> {
     let single_line_note = single_line_note.map(|token| (token, NoteKind::SingleLine));
     let multi_line_note = multi_line_note.map(|token| (token, NoteKind::MultiLine));
     let note = single_line_note.or(multi_line_note);

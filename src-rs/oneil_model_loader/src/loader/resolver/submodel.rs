@@ -96,10 +96,10 @@ use crate::{
 /// - **Invalid paths**: If the model path cannot be resolved
 ///
 /// All errors are collected and returned rather than causing the function to fail.
-pub fn resolve_submodels<'a>(
-    use_models: Vec<&'a ast::declaration::UseModelNode>,
+pub fn resolve_submodels(
+    use_models: Vec<&ast::declaration::UseModelNode>,
     model_path: &ModelPath,
-    model_info: &ModelInfo,
+    model_info: &ModelInfo<'_>,
 ) -> (
     HashMap<Identifier, (ModelPath, Span)>,
     HashMap<Identifier, SubmodelResolutionError>,
@@ -203,7 +203,7 @@ fn resolve_model_path(
     model_path: ModelPath,
     parent_component_span: Span,
     subcomponents: &[ast::naming::IdentifierNode],
-    model_info: &ModelInfo,
+    model_info: &ModelInfo<'_>,
 ) -> Result<ModelPath, SubmodelResolutionError> {
     // if the model that we are trying to resolve has had an error, this
     // operation should fail

@@ -62,14 +62,14 @@ use crate::{
 /// Parse a test declaration, e.g. `* test: x > y`.
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span) -> Result<TestNode, ParserError> {
+pub fn parse(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
     test_decl(input)
 }
 
 /// Parse a test declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<TestNode, ParserError> {
+pub fn parse_complete(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
     all_consuming(test_decl).parse(input)
 }
 
@@ -118,7 +118,7 @@ pub fn parse_complete(input: Span) -> Result<TestNode, ParserError> {
 /// // Test with all components
 /// let test = parse_test("** test: a > b and b > c", None).unwrap();
 /// ```
-fn test_decl(input: Span) -> Result<TestNode, ParserError> {
+fn test_decl(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
     let (rest, trace_level) = opt(trace_level).parse(input)?;
 
     let (rest, test_keyword_token) = test_keyword
@@ -186,7 +186,7 @@ fn test_decl(input: Span) -> Result<TestNode, ParserError> {
 /// let test = parse_test("** test: x > 0", None).unwrap();
 /// assert!(test.trace_level().is_some());
 /// ```
-fn trace_level(input: Span) -> Result<TraceLevelNode, ParserError> {
+fn trace_level(input: Span<'_>) -> Result<'_, TraceLevelNode, ParserError> {
     let single_star = star.map(|token| Node::new(token, TraceLevel::Trace));
     let double_star = star_star.map(|token| Node::new(token, TraceLevel::Debug));
 

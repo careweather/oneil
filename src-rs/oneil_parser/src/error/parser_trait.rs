@@ -113,7 +113,7 @@ where
 ///
 /// This blanket implementation allows any parser to use the error handling
 /// methods provided by ErrorHandlingParser.
-impl<'a, I, O, E, P> ErrorHandlingParser<I, O, E> for P
+impl<I, O, E, P> ErrorHandlingParser<I, O, E> for P
 where
     P: Parser<I, Output = O, Error = E>,
     E: ParseError<I>,

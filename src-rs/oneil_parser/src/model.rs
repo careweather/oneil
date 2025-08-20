@@ -43,8 +43,8 @@ use crate::{
 ///
 /// This function **fails if the complete input is not consumed**.
 pub fn parse_complete(
-    input: Span,
-) -> Result<ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
+    input: Span<'_>,
+) -> Result<'_, ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
     let (rest, model) = model(input)?;
     let result = eof(rest);
 
@@ -90,7 +90,7 @@ pub fn parse_complete(
 /// 1. The section header error is recorded
 /// 2. Any declarations within the failed section are moved to the top-level
 /// 3. Parsing continues with the next section
-fn model(input: Span) -> Result<ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
+fn model(input: Span<'_>) -> Result<'_, ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
     let (rest, _) = opt(end_of_line).convert_errors().parse(input)?;
     let (rest, note) = opt(parse_note).convert_errors().parse(rest)?;
     let (rest, mut decls, decl_errors) = parse_decls(rest);
@@ -147,13 +147,13 @@ fn model(input: Span) -> Result<ModelNode, ErrorsWithPartialResult<Model, Parser
 /// In addition, because it returns partial results, the results may be used
 /// in order to determine other partial information, such as the associated
 /// units of the declarations that were successfully parsed.
-fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
-    fn parse_decls_recur<'a>(
-        input: Span<'a>,
+fn parse_decls(input: Span<'_>) -> (Span<'_>, Vec<DeclNode>, Vec<ParserError>) {
+    fn parse_decls_recur(
+        input: Span<'_>,
         mut acc_decls: Vec<DeclNode>,
         mut acc_errors: Vec<ParserError>,
         last_was_error: bool,
-    ) -> (Span<'a>, Vec<DeclNode>, Vec<ParserError>) {
+    ) -> (Span<'_>, Vec<DeclNode>, Vec<ParserError>) {
         let result = parse_decl(input);
 
         match result {
@@ -216,7 +216,9 @@ fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
 /// - Vector of successfully parsed section nodes
 /// - Vector of declarations that were parsed but couldn't be assigned to a section
 /// - Vector of parsing errors encountered
-fn parse_sections(input: Span) -> (Span, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
+fn parse_sections(
+    input: Span<'_>,
+) -> (Span<'_>, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
     fn parse_sections_recur<'a>(
         input: Span<'a>,
         mut acc_sections: Vec<SectionNode>,
@@ -274,9 +276,9 @@ fn parse_sections(input: Span) -> (Span, Vec<SectionNode>, Vec<DeclNode>, Vec<Pa
 ///
 
 fn parse_section(
-    input: Span,
+    input: Span<'_>,
 ) -> Option<(
-    Span,
+    Span<'_>,
     StdResult<SectionNode, Vec<DeclNode>>,
     Vec<ParserError>,
 )> {
@@ -344,7 +346,7 @@ fn parse_section(
 /// - **Missing label**: When the `section` keyword is followed by whitespace or newline
 /// - **Missing newline**: When the label is not followed by a proper line terminator
 /// - **Invalid label**: When the label contains invalid characters
-fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
+fn parse_section_header(input: Span<'_>) -> Result<'_, SectionHeaderNode, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
 
     let (rest, label) = label
@@ -378,7 +380,7 @@ fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
 /// # Returns
 ///
 /// Returns the remaining input after skipping to the next line.
-fn skip_to_next_line_with_content(input: Span) -> Span {
+fn skip_to_next_line_with_content(input: Span<'_>) -> Span<'_> {
     let (rest, _) = take_while::<_, _, nom::error::Error<_>>(|c| c != '\n')
         .parse(input)
         .expect("should never fail");

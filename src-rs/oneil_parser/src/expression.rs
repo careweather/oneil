@@ -87,14 +87,14 @@ fn left_associative_binary_op<'a>(
 /// Parses an expression
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span) -> Result<ExprNode, ParserError> {
+pub fn parse(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     expr(input)
 }
 
 /// Parses an expression
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<ExprNode, ParserError> {
+pub fn parse_complete(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     all_consuming(expr).parse(input)
 }
 
@@ -122,7 +122,7 @@ pub fn parse_complete(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node with proper operator precedence.
-fn expr(input: Span) -> Result<ExprNode, ParserError> {
+fn expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     or_expr
         .convert_error_to(ParserError::expect_expr)
         .parse(input)
@@ -148,7 +148,7 @@ fn expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the OR expression with proper associativity.
-fn or_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn or_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let or = or
         .map(|token| Node::new(token, BinaryOp::Or))
         .convert_errors();
@@ -175,7 +175,7 @@ fn or_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the AND expression with proper associativity.
-fn and_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn and_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let and = and
         .map(|token| Node::new(token, BinaryOp::And))
         .convert_errors();
@@ -203,7 +203,7 @@ fn and_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a NOT expression or a comparison expression.
-fn not_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn not_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         |input| {
             let (rest, not_op) = not
@@ -255,7 +255,7 @@ fn not_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a comparison expression or a single operand.
-fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn comparison_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let mut op = alt((
         less_than_equals.map(|token| Node::new(token, ComparisonOp::LessThanEq)),
         greater_than_equals.map(|token| Node::new(token, ComparisonOp::GreaterThanEq)),
@@ -326,7 +326,7 @@ fn comparison_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a min/max expression or a single operand.
-fn minmax_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn minmax_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, first_operand) = additive_expr.parse(input)?;
     let (rest, second_operand) = opt(|input| {
         let (rest, operator) = bar
@@ -384,7 +384,7 @@ fn minmax_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the additive expression with proper associativity.
-fn additive_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn additive_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
         plus.map(|token| Node::new(token, BinaryOp::Add)),
         minus.map(|token| Node::new(token, BinaryOp::Sub)),
@@ -424,7 +424,7 @@ fn additive_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the multiplicative expression with proper associativity.
-fn multiplicative_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn multiplicative_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
         star.map(|token| Node::new(token, BinaryOp::Mul)),
         slash.map(|token| Node::new(token, BinaryOp::Div)),
@@ -461,7 +461,7 @@ fn multiplicative_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either an exponential expression or a single operand.
-fn exponential_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn exponential_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let mut op = caret
         .map(|token| Node::new(token, BinaryOp::Pow))
         .convert_errors();
@@ -516,7 +516,7 @@ fn exponential_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a negation expression or a primary expression.
-fn neg_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn neg_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         |input| {
             let (rest, minus_op) = minus
@@ -566,7 +566,7 @@ fn neg_expr(input: Span) -> Result<ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the parsed primary expression.
-fn primary_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn primary_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         map(number.convert_errors(), |n| {
             let parse_result = n.lexeme().parse::<f64>();
@@ -629,7 +629,7 @@ fn primary_expr(input: Span) -> Result<ExprNode, ParserError> {
 ///
 /// Returns an expression node representing the function call, or an error if
 /// the function call is malformed (e.g., unclosed parentheses).
-fn function_call(input: Span) -> Result<ExprNode, ParserError> {
+fn function_call(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, name) = identifier.convert_errors().parse(input)?;
     let name_span = AstSpan::from(&name);
     let name = Node::new(name_span, Identifier::new(name.lexeme().to_string()));
@@ -673,7 +673,7 @@ fn function_call(input: Span) -> Result<ExprNode, ParserError> {
 ///
 /// Returns an expression node representing the variable, which can be either
 /// a simple identifier or a nested accessor structure.
-fn variable(input: Span) -> Result<ExprNode, ParserError> {
+fn variable(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, first_id) = identifier.convert_errors().parse(input)?;
     let first_id_span = AstSpan::from(&first_id);
     let first_id = Node::new(
@@ -741,7 +741,7 @@ fn variable(input: Span) -> Result<ExprNode, ParserError> {
 ///
 /// Returns an expression node representing the parenthesized expression, or an error if
 /// the parentheses are malformed (e.g., unclosed parentheses or missing expression).
-fn parenthesized_expr(input: Span) -> Result<ExprNode, ParserError> {
+fn parenthesized_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
 
     let (rest, expr) = expr

@@ -25,14 +25,14 @@ use crate::{
 /// Parses a declaration
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span) -> Result<DeclNode, ParserError> {
+pub fn parse(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     decl.parse(input)
 }
 
 /// Parses a declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<DeclNode, ParserError> {
+pub fn parse_complete(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     all_consuming(decl).parse(input)
 }
 
@@ -55,7 +55,7 @@ pub fn parse_complete(input: Span) -> Result<DeclNode, ParserError> {
 ///
 /// Returns a declaration node of the appropriate type, or an error if no
 /// declaration type matches.
-fn decl(input: Span) -> Result<DeclNode, ParserError> {
+fn decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     alt((import_decl, from_decl, use_decl, parameter_decl, test_decl))
         .convert_error_to(ParserError::expect_decl)
         .parse(input)
@@ -84,7 +84,7 @@ fn decl(input: Span) -> Result<DeclNode, ParserError> {
 ///
 /// Returns a declaration node containing the parsed import, or an error if
 /// the import declaration is malformed.
-fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
+fn import_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
     let (rest, import_path_token) = identifier
@@ -134,7 +134,7 @@ fn import_decl(input: Span) -> Result<DeclNode, ParserError> {
 ///
 /// Returns a declaration node containing the parsed from declaration, or an error if
 /// the declaration is malformed.
-fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
+fn from_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, from_token) = from.convert_errors().parse(input)?;
 
     let (rest, (from_path, mut subcomponents)) = model_path
@@ -206,7 +206,7 @@ fn from_decl(input: Span) -> Result<DeclNode, ParserError> {
 ///
 /// Returns a declaration node containing the parsed use declaration, or an error if
 /// the declaration is malformed.
-fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
+fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, use_token) = use_.convert_errors().parse(input)?;
 
     let (rest, (path, subcomponents)) = model_path
@@ -265,7 +265,7 @@ fn use_decl(input: Span) -> Result<DeclNode, ParserError> {
 ///
 /// Returns a tuple containing the main path identifier and a vector of
 /// subcomponent identifiers, or an error if the path is malformed.
-fn model_path(input: Span) -> Result<(IdentifierNode, Vec<IdentifierNode>), ParserError> {
+fn model_path(input: Span<'_>) -> Result<'_, (IdentifierNode, Vec<IdentifierNode>), ParserError> {
     let (rest, path) = identifier.convert_errors().parse(input)?;
     let path = Node::new(path, Identifier::new(path.lexeme().to_string()));
 
@@ -298,7 +298,7 @@ fn model_path(input: Span) -> Result<(IdentifierNode, Vec<IdentifierNode>), Pars
 /// # Returns
 ///
 /// Returns a declaration node containing the parsed parameter.
-fn parameter_decl(input: Span) -> Result<DeclNode, ParserError> {
+fn parameter_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, parameter) = parse_parameter.parse(input)?;
 
     let span = AstSpan::from(&parameter);
@@ -320,7 +320,7 @@ fn parameter_decl(input: Span) -> Result<DeclNode, ParserError> {
 /// # Returns
 ///
 /// Returns a declaration node containing the parsed test.
-fn test_decl(input: Span) -> Result<DeclNode, ParserError> {
+fn test_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, test) = parse_test.parse(input)?;
 
     let span = AstSpan::from(&test);

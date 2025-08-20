@@ -31,7 +31,7 @@ use crate::token::{
 /// # Returns
 ///
 /// Returns the span containing the line break sequence.
-fn linebreak(input: Span) -> Result<Span, TokenError> {
+fn linebreak(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     line_ending.parse(input)
 }
 
@@ -48,7 +48,7 @@ fn linebreak(input: Span) -> Result<Span, TokenError> {
 /// # Returns
 ///
 /// Returns an empty span when at end of file.
-fn end_of_file(input: Span) -> Result<Span, TokenError> {
+fn end_of_file(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     eof.parse(input)
 }
 
@@ -65,7 +65,7 @@ fn end_of_file(input: Span) -> Result<Span, TokenError> {
 /// # Returns
 ///
 /// Returns the span containing the comment including the `#` and newline.
-fn comment(input: Span) -> Result<Span, TokenError> {
+fn comment(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
     recognize((char('#'), not_line_ending, line_ending.or(eof))).parse(input)
 }
 
@@ -87,7 +87,7 @@ fn comment(input: Span) -> Result<Span, TokenError> {
 ///
 /// Returns a token containing the first line break/comment/EOF marker and any trailing
 /// whitespace including subsequent line breaks or comments.
-pub fn end_of_line(input: Span) -> Result<Token, TokenError> {
+pub fn end_of_line(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     let (rest, first_line_break) = linebreak
         .or(comment)
         .or(end_of_file)

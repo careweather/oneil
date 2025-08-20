@@ -15,7 +15,7 @@ use oneil_ast::note::{Note, NoteNode};
 /// or a multi-line note delimited by `~~~`.
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span) -> Result<NoteNode, ParserError> {
+pub fn parse(input: Span<'_>) -> Result<'_, NoteNode, ParserError> {
     note(input)
 }
 
@@ -23,7 +23,7 @@ pub fn parse(input: Span) -> Result<NoteNode, ParserError> {
 /// or a multi-line note delimited by `~~~`.
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span) -> Result<NoteNode, ParserError> {
+pub fn parse_complete(input: Span<'_>) -> Result<'_, NoteNode, ParserError> {
     all_consuming(note).parse(input)
 }
 
@@ -44,7 +44,7 @@ pub fn parse_complete(input: Span) -> Result<NoteNode, ParserError> {
 /// # Returns
 ///
 /// Returns a note node containing the parsed note with cleaned content.
-fn note(input: Span) -> Result<NoteNode, ParserError> {
+fn note(input: Span<'_>) -> Result<'_, NoteNode, ParserError> {
     let (rest, (token, kind)) = note_token
         .convert_error_to(ParserError::expect_note)
         .parse(input)?;
