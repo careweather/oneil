@@ -93,7 +93,7 @@ UnitIdentifier = Identifier, [ "$" ] | "$" | "%" ; (* A unit identifier may opti
 Label = LabelStartLetter, { LabelLetter }, { { " " | "\t" } LabelLetter { LabelLetter } } ;
 LabelStartLetter = Any character except ( "(" | ")" | "[" | "]" | ":" | "=" | " " | "\t" | "\n" | "*" | "$" );
 LabelLetter = Any character except ( "(" | ")" | "[" | "]" | ":" | "=" | " " | "\t" | "\n" );
-NumberLiteral = [ Sign ], NumberPart, [ ExponentPart ] ;
+NumberLiteral = [ Sign ], ( NumberPart, [ ExponentPart ] | "inf" ) ;
 NumberPart = DigitSequence, [ ".", DigitSequence ] | ".", DigitSequence ;
 DigitSequence = Digit, { Digit } ;
 ExponentPart = ( "e" | "E" ), [ Sign ], DigitSequence ;

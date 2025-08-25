@@ -45,20 +45,10 @@ use crate::token::{
 /// Returns a token containing the parsed number literal.
 pub fn number(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     // Optional sign (+ or -) at the beginning
-    let opt_sign = opt(one_of("+-"));
+    let opt_sign_1 = opt(one_of("+-"));
+    let opt_sign_2 = opt(one_of("+-"));
 
-    // Number part ()
-
-    // Optional exponent part (e.g., "e10", "E-3")
-    let opt_exponent = opt(|input| {
-        let (rest, e_span) = tag("e").or(tag("E")).parse(input)?;
-        let (rest, _) = opt(one_of("+-")).parse(rest)?;
-        let (rest, _) = digit1
-            .or_fail_with(TokenError::invalid_exponent_part(e_span))
-            .parse(rest)?;
-        Ok((rest, ()))
-    });
-
+    // Parse the number part: either digits followed by optional decimal, or just decimal
     let decimal_part = |input| {
         let (rest, decimal_point_span) = tag(".").parse(input)?;
         let (rest, _) = digit1
@@ -67,7 +57,6 @@ pub fn number(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
         Ok((rest, ()))
     };
 
-    // Parse the number part: either digits followed by optional decimal, or just decimal
     let number_part = |input| {
         // Try digits first (with optional decimal)
         let with_digits = |input| {
@@ -82,11 +71,35 @@ pub fn number(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
         alt((with_digits, decimal_only)).parse(input)
     };
 
-    token(
-        (opt_sign, number_part, opt_exponent),
-        TokenError::expected_number,
-    )
-    .parse(input)
+    // Optional exponent part (e.g., "e10", "E-3")
+    let opt_exponent = opt(|input| {
+        let (rest, e_span) = tag("e").or(tag("E")).parse(input)?;
+        let (rest, _) = opt(one_of("+-")).parse(rest)?;
+        let (rest, _) = digit1
+            .or_fail_with(TokenError::invalid_exponent_part(e_span))
+            .parse(rest)?;
+        Ok((rest, ()))
+    });
+
+    // Parse `inf` literal (not keyword)
+    let inf_literal = |input| {
+        let (rest, _) = tag("inf").parse(input)?;
+        let next_char_is_not_ident_char =
+            peek(satisfy(|c: char| !c.is_alphanumeric() && c != '_')).map(|_| ());
+        let reached_end_of_file = eof.map(|_| ());
+        let (rest, ()) = next_char_is_not_ident_char
+            .or(reached_end_of_file)
+            .parse(rest)?;
+        Ok((rest, ()))
+    };
+
+    // Parse a number literal
+    let number_literal = alt((
+        (opt_sign_1, number_part, opt_exponent).map(|_| ()),
+        (opt_sign_2, inf_literal).map(|_| ()),
+    ));
+
+    token(number_literal, TokenError::expected_number).parse(input)
 }
 
 /// Parses a string literal delimited by single quotes.
@@ -367,6 +380,110 @@ mod tests {
             assert_eq!(rest.fragment(), &"rest");
         }
 
+        #[test]
+        fn test_inf_literal() {
+            let input = Span::new_extra("inf rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf literal");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_positive_inf_literal() {
+            let input = Span::new_extra("+inf rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse +inf literal");
+            assert_eq!(matched.lexeme(), "+inf");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_negative_inf_literal() {
+            let input = Span::new_extra("-inf rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse -inf literal");
+            assert_eq!(matched.lexeme(), "-inf");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_inf_at_end_of_file() {
+            let input = Span::new_extra("inf", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf at end of file");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_positive_inf_at_end_of_file() {
+            let input = Span::new_extra("+inf", Config::default());
+            let (rest, matched) = number(input).expect("should parse +inf at end of file");
+            assert_eq!(matched.lexeme(), "+inf");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_negative_inf_at_end_of_file() {
+            let input = Span::new_extra("-inf", Config::default());
+            let (rest, matched) = number(input).expect("should parse -inf at end of file");
+            assert_eq!(matched.lexeme(), "-inf");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_inf_with_whitespace() {
+            let input = Span::new_extra("inf   rest", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf with trailing whitespace");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_inf_with_punctuation() {
+            let input = Span::new_extra("inf,", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf with comma");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &",");
+        }
+
+        #[test]
+        fn test_inf_with_parentheses() {
+            let input = Span::new_extra("inf(", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf with opening parenthesis");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"(");
+        }
+
+        #[test]
+        fn test_inf_with_symbols() {
+            let input = Span::new_extra("inf+", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf with plus symbol");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"+");
+        }
+
+        #[test]
+        fn test_inf_with_newline() {
+            let input = Span::new_extra("inf\n", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf with newline");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"\n");
+        }
+
+        #[test]
+        fn test_inf_with_tab() {
+            let input = Span::new_extra("inf\t", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf with tab");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_inf_with_carriage_return() {
+            let input = Span::new_extra("inf\r", Config::default());
+            let (rest, matched) = number(input).expect("should parse inf with carriage return");
+            assert_eq!(matched.lexeme(), "inf");
+            assert_eq!(rest.fragment(), &"\r");
+        }
+
         // Error cases
         #[test]
         fn test_empty_input() {
@@ -536,6 +653,98 @@ mod tests {
                 );
             } else {
                 panic!("expected TokenError Failure but got different error type: {res:?}");
+            }
+        }
+
+        // Error cases for inf literals
+        #[test]
+        fn test_inf_with_letters_after() {
+            let input = Span::new_extra("infinity", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_inf_with_numbers_after() {
+            let input = Span::new_extra("inf123", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_inf_with_underscore_after() {
+            let input = Span::new_extra("inf_", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_partial_inf_match() {
+            let input = Span::new_extra("in", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_case_sensitive_inf() {
+            let input = Span::new_extra("INF", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_mixed_case_inf() {
+            let input = Span::new_extra("Inf", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_inf_not_at_start() {
+            let input = Span::new_extra("foo inf bar", Config::default());
+            let res = number(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Number)
+                )),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
             }
         }
     }
