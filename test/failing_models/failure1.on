@@ -1,0 +1,19 @@
+# Failure Model 1: Syntax errors
+
+# Missing colon after label
+Invalid parameter invalid_param = 5
+
+# Invalid operator
+Invalid operator: invalid_op = 5 ** 3
+
+# Missing equals sign
+Missing equals: missing_equals 10
+
+# Unclosed parenthesis
+Unclosed paren: unclosed = (5 + 3
+
+# Invalid identifier with special characters
+Invalid@name: invalid_name = 42
+
+# Missing value
+Empty value: empty_value =

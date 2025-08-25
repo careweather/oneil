@@ -14,7 +14,7 @@
 //! - **Model Structure**: Defining how Oneil models are organized and composed
 //! - **Parameter Management**: Handling parameter definitions, dependencies, and values
 //! - **Expression System**: Providing a rich expression language for calculations
-//! - **Testing Framework**: Supporting model and submodel testing capabilities
+//! - **Testing Framework**: Supporting testing capabilities
 //! - **Unit System**: Managing physical units and dimensional analysis
 //! - **Reference System**: Handling identifiers, model paths, and Python imports
 //!
@@ -36,8 +36,7 @@
 //! - [`expr::Variable`] - Local, parameter, and external variable references
 //!
 //! ### Testing
-//! - [`test::ModelTest`] - Tests for entire models
-//! - [`test::SubmodelTest`] - Tests for individual submodels
+//! - [`test::Test`] - Tests for model parameters
 //!
 //! ### Units
 //! - [`unit::CompositeUnit`] - Complex units composed of multiple base units
@@ -54,11 +53,12 @@
 //! use std::collections::{HashMap, HashSet};
 //!
 //! // Create a simple parameter
-//! let param_expr = Expr::literal(Literal::number(42.0));
+//! use oneil_ir::span::WithSpan;
+//! let param_expr = WithSpan::test_new(Expr::literal(Literal::number(42.0)));
 //! let param_value = ParameterValue::simple(param_expr, None);
 //! let param = Parameter::new(
 //!     HashSet::new(),
-//!     Identifier::new("my_param"),
+//!     WithSpan::test_new(Identifier::new("my_param")),
 //!     param_value,
 //!     Limits::default(),
 //!     false,
@@ -69,11 +69,10 @@
 //! let mut params = HashMap::new();
 //! params.insert(Identifier::new("my_param"), param);
 //! let model = Model::new(
-//!     HashSet::new(), // no Python imports
+//!     HashMap::new(), // no Python imports
 //!     HashMap::new(),  // no submodels
 //!     ParameterCollection::new(params),
-//!     HashMap::new(),  // no model tests
-//!     Vec::new(),      // no submodel tests
+//!     HashMap::new(),  // no tests
 //! );
 //! ```
 //!
@@ -95,5 +94,6 @@ pub mod expr;
 pub mod model;
 pub mod parameter;
 pub mod reference;
+pub mod span;
 pub mod test;
 pub mod unit;

@@ -7,6 +7,8 @@
 //! The unit system supports both simple units and composite units that
 //! combine multiple base units with exponents.
 
+use crate::span::Span;
+
 /// A composite unit composed of multiple base units.
 ///
 /// `CompositeUnit` represents a complex unit that is built from multiple
@@ -29,12 +31,12 @@ impl CompositeUnit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::{CompositeUnit, Unit};
+    /// use oneil_ir::{unit::{CompositeUnit, Unit}, span::Span};
     ///
     /// let units = vec![
-    ///     Unit::new("m".to_string(), 2.0),  // meters squared
-    ///     Unit::new("kg".to_string(), 1.0), // kilograms
-    ///     Unit::new("s".to_string(), -2.0), // per second squared
+    ///     Unit::new("m".to_string(), Span::new(0, 1), 2.0, Span::new(0, 1)),  // meters squared
+    ///     Unit::new("kg".to_string(), Span::new(0, 2), 1.0, Span::new(0, 1)), // kilograms
+    ///     Unit::new("s".to_string(), Span::new(0, 1), -2.0, Span::new(0, 1)), // per second squared
     /// ];
     ///
     /// let composite = CompositeUnit::new(units);
@@ -56,11 +58,11 @@ impl CompositeUnit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::{CompositeUnit, Unit};
+    /// use oneil_ir::{unit::{CompositeUnit, Unit}, span::Span};
     ///
     /// let units = vec![
-    ///     Unit::new("m".to_string(), 1.0),
-    ///     Unit::new("s".to_string(), -1.0),
+    ///     Unit::new("m".to_string(), Span::new(0, 1), 1.0, Span::new(0, 1)),
+    ///     Unit::new("s".to_string(), Span::new(0, 1), -1.0, Span::new(0, 1)),
     /// ];
     ///
     /// let composite = CompositeUnit::new(units);
@@ -89,7 +91,9 @@ impl CompositeUnit {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unit {
     name: String,
+    name_span: Span,
     exponent: f64,
+    exponent_span: Span,
 }
 
 impl Unit {
@@ -103,15 +107,20 @@ impl Unit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::Unit;
+    /// use oneil_ir::{unit::Unit, span::Span};
     ///
-    /// let meter = Unit::new("m".to_string(), 1.0);
-    /// let square_meter = Unit::new("m".to_string(), 2.0);
-    /// let per_second = Unit::new("s".to_string(), -1.0);
-    /// let sqrt_meter = Unit::new("m".to_string(), 0.5);
+    /// let meter = Unit::new("m".to_string(), Span::new(0, 1), 1.0, Span::new(0, 1));
+    /// let square_meter = Unit::new("m".to_string(), Span::new(0, 1), 2.0, Span::new(0, 1));
+    /// let per_second = Unit::new("s".to_string(), Span::new(0, 1), -1.0, Span::new(0, 1));
+    /// let sqrt_meter = Unit::new("m".to_string(), Span::new(0, 1), 0.5, Span::new(0, 1));
     /// ```
-    pub fn new(name: String, exponent: f64) -> Self {
-        Self { name, exponent }
+    pub fn new(name: String, name_span: Span, exponent: f64, exponent_span: Span) -> Self {
+        Self {
+            name,
+            name_span,
+            exponent,
+            exponent_span,
+        }
     }
 
     /// Returns the name of this unit.
@@ -126,13 +135,37 @@ impl Unit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::Unit;
+    /// use oneil_ir::{unit::Unit, span::Span};
     ///
-    /// let unit = Unit::new("kg".to_string(), 1.0);
+    /// let unit = Unit::new("kg".to_string(), Span::new(0, 2), 1.0, Span::new(0, 1));
     /// assert_eq!(unit.name(), "kg");
     /// ```
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Returns the source location span for the unit name.
+    ///
+    /// This method provides access to the source location information
+    /// for the unit name, which is useful for error reporting and
+    /// debugging.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `Span` indicating where the unit name appears in the source.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{unit::Unit, span::Span};
+    ///
+    /// let name_span = Span::new(10, 2);
+    /// let unit = Unit::new("kg".to_string(), name_span, 1.0, Span::new(0, 1));
+    /// assert_eq!(unit.name_span().start(), 10);
+    /// assert_eq!(unit.name_span().length(), 2);
+    /// ```
+    pub fn name_span(&self) -> &Span {
+        &self.name_span
     }
 
     /// Returns the exponent of this unit.
@@ -151,11 +184,11 @@ impl Unit {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::unit::Unit;
+    /// use oneil_ir::{unit::Unit, span::Span};
     ///
-    /// let linear = Unit::new("m".to_string(), 1.0);
-    /// let squared = Unit::new("m".to_string(), 2.0);
-    /// let inverse = Unit::new("s".to_string(), -1.0);
+    /// let linear = Unit::new("m".to_string(), Span::new(0, 1), 1.0, Span::new(0, 1));
+    /// let squared = Unit::new("m".to_string(), Span::new(0, 1), 2.0, Span::new(0, 1));
+    /// let inverse = Unit::new("s".to_string(), Span::new(0, 1), -1.0, Span::new(0, 1));
     ///
     /// assert_eq!(linear.exponent(), 1.0);
     /// assert_eq!(squared.exponent(), 2.0);
@@ -163,5 +196,29 @@ impl Unit {
     /// ```
     pub fn exponent(&self) -> f64 {
         self.exponent
+    }
+
+    /// Returns the source location span for the unit exponent.
+    ///
+    /// This method provides access to the source location information
+    /// for the unit exponent, which is useful for error reporting and
+    /// debugging.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `Span` indicating where the unit exponent appears in the source.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{unit::Unit, span::Span};
+    ///
+    /// let exponent_span = Span::new(15, 3);
+    /// let unit = Unit::new("m".to_string(), Span::new(0, 1), 2.0, exponent_span);
+    /// assert_eq!(unit.exponent_span().start(), 15);
+    /// assert_eq!(unit.exponent_span().length(), 3);
+    /// ```
+    pub fn exponent_span(&self) -> &Span {
+        &self.exponent_span
     }
 }

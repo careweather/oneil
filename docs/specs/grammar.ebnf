@@ -29,11 +29,9 @@ Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | Parame
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-FromDecl = "from", ModelPath, "use", ModelName, [ ModelInputs ], "as", Identifier, EndOfLine ;
-UseDecl = "use", ModelPath, [ ModelInputs ], "as", Identifier, EndOfLine ;
+FromDecl = "from", ModelPath, "use", ModelName, "as", Identifier, EndOfLine ;
+UseDecl = "use", ModelPath, "as", Identifier, EndOfLine ;
 ModelPath = Identifier, { ".", Identifier } ;
-ModelInputs = "(", ModelInput, { ",", ModelInput }, ")" ;
-ModelInput = Identifier, "=", Expr ;
 ModelName = Identifier ;
 
 (* Parameters *)
@@ -47,8 +45,7 @@ DiscreteLimits = "[", Expr, { ",", Expr }, "]" ;
 Assignment = Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
 
 (* Tests *)
-TestDecl = [ Trace ], "test", [ TestInputs ], ":", Expr, EndOfLine ;
-TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
+TestDecl = [ Trace ], "test", ":", Expr, EndOfLine ;
 
 (* Expressions *)
 (* Expression Precedence (highest to lowest):
@@ -58,7 +55,7 @@ TestInputs = "{", Identifier, { ",", Identifier }, "}" ;
    4. Multiplication, division, floor division, modulo (*, /, //, %) - left associative
    5. Addition, subtraction (+, -) - left associative
    6. Min/max (|) - non-associative
-   6. Comparisons (<, >, <=, >=, ==, !=) - non-associative
+   6. Comparisons (<, >, <=, >=, ==, !=) - non-associative, can be chained
    7. NOT - unary prefix
    8. AND - left associative
    9. OR - left associative
@@ -67,7 +64,7 @@ Expr = OrExpr ;
 OrExpr = [ OrExpr, "or", ], AndExpr ;
 AndExpr = [ AndExpr, "and", ], NotExpr ;
 NotExpr = [ "not", ], NotExpr | ComparisonExpr ;
-ComparisonExpr = AdditiveExpr, ComparisonOp, AdditiveExpr ;
+ComparisonExpr = AdditiveExpr, { ComparisonOp, AdditiveExpr } ;
 ComparisonOp = "<" | ">" | "<=" | ">=" | "==" | "!=" ;
 AdditiveExpr = [ AdditiveExpr, AdditiveOp, ], MultiplicativeExpr ;
 AdditiveOp = "+" | "-" | "--" ;
@@ -85,17 +82,23 @@ FunctionCall = Identifier, "(", [ Expr, { ",", Expr } ], ")" ;
 
 (* Units *)
 UnitExpr = [ UnitExpr, ( "*" | "/" ) ], UnitTerm ;
-UnitTerm = Identifier, [ "^", Number ] | "(" UnitExpr, ")" ;
+UnitTerm = UnitIdentifier, [ "^", Number ] | UnitOne | ParenthesizedUnitExpr ;
+UnitOne = "1" ; (* represents a unitless 1, usually used for units like 1/s *)
+ParenthesizedUnitExpr = "(", UnitExpr, ")" ;
 
 (* Basic Elements *)
 Identifier = Letter, { Letter | Digit | "_" } ;
-Label = Identifier, { "-" | Identifier } ;
-NumberLiteral = [ Sign ], ( Integer | Float | Scientific ) ;
-Integer = Digit, { Digit } ;
-Float = Integer , ".", Digit, { Digit } ;
-Scientific = ( Integer | Float ), ( "e" | "E" ), [ Sign ], Integer ;
+UnitIdentifier = Identifier, [ "$" ] | "$" | "%" ; (* A unit identifier may optionally be terminated by a dollar sign or may be a percent sign *)
+(* note: labels are context sensitive since they can contain spaces and tabs *)
+Label = LabelStartLetter, { LabelLetter }, { { " " | "\t" } LabelLetter { LabelLetter } } ;
+LabelStartLetter = Any character except ( "(" | ")" | "[" | "]" | ":" | "=" | " " | "\t" | "\n" | "*" | "$" );
+LabelLetter = Any character except ( "(" | ")" | "[" | "]" | ":" | "=" | " " | "\t" | "\n" );
+NumberLiteral = [ Sign ], NumberPart, [ ExponentPart ] ;
+NumberPart = DigitSequence, [ ".", DigitSequence ] | ".", DigitSequence ;
+DigitSequence = Digit, { Digit } ;
+ExponentPart = ( "e" | "E" ), [ Sign ], DigitSequence ;
 Sign = "+" | "-" ;
 Letter = "A" | ... | "Z" | "a" | ... | "z" ;
 Digit = "0" | "1" | ... | "9" ;
-StringLiteral = "\"", { Any character except LineBreak or "\" }, "\"", ;
+StringLiteral = "'", { Any character except LineBreak or "'" }, "'", ;
 BooleanLiteral = "true" | "false" ;

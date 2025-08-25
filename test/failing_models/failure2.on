@@ -1,0 +1,24 @@
+# Failure Model 2: Structural errors
+
+# Invalid section syntax (missing section keyword)
+Invalid section "My Section"
+
+# Malformed use statement
+use
+
+# Invalid piecewise expression
+Invalid piecewise: invalid_piece = { 5 if x > 0
+                                   { 10 if x < 0
+                                   { 15
+
+# Invalid function call
+Invalid function: invalid_func = sqrt(5, 3, 4)
+
+# Invalid comparison with multiple operators
+Invalid comparison: invalid_comp = 5 > < 3
+
+# Invalid logical expression
+Invalid logic: invalid_logic = 5 and or 3
+
+# Invalid number format
+Invalid number: invalid_num = 5.5.5

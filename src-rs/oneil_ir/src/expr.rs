@@ -5,12 +5,16 @@
 //! system is designed to be extensible and type-safe, supporting both built-in
 //! functions and imported Python functions.
 
-use crate::reference::{Identifier, ModelPath};
+use crate::{
+    reference::{Identifier, ModelPath},
+    span::WithSpan,
+};
 
 /// Abstract syntax tree for mathematical and logical expressions.
 ///
 /// `Expr` represents the core expression language in Oneil, supporting:
 ///
+/// - **Comparison Operations**: Comparison operations with support for chaining
 /// - **Binary Operations**: Mathematical and logical operations on two operands
 /// - **Unary Operations**: Operations on a single operand (negation, logical NOT)
 /// - **Function Calls**: Built-in and imported function invocations
@@ -20,6 +24,41 @@ use crate::reference::{Identifier, ModelPath};
 /// All expressions are immutable and can be easily cloned for manipulation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
+    /// Comparison operation with left and right operands, supporting chaining.
+    ///
+    /// # Arguments
+    ///
+    /// * `op` - The comparison operator
+    /// * `left` - The left-hand operand
+    /// * `right` - The right-hand operand
+    /// * `rest_chained` - Additional chained comparison operations (order matters)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::expr::{Expr, ComparisonOp, Literal};
+    /// use oneil_ir::span::WithSpan;
+    ///
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(1.0)));
+    /// let middle = WithSpan::test_new(Expr::literal(Literal::number(2.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::LessThan),
+    ///     left,
+    ///     middle,
+    ///     vec![(WithSpan::test_new(ComparisonOp::LessThan), right)]
+    /// );
+    /// ```
+    ComparisonOp {
+        /// The comparison operator to apply.
+        op: WithSpan<ComparisonOp>,
+        /// The left-hand operand.
+        left: Box<ExprWithSpan>,
+        /// The right-hand operand.
+        right: Box<ExprWithSpan>,
+        /// Chained comparison operations (order matters).
+        rest_chained: Vec<(WithSpan<ComparisonOp>, ExprWithSpan)>,
+    },
     /// Binary operation combining two expressions with an operator.
     ///
     /// # Arguments
@@ -32,18 +71,19 @@ pub enum Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, BinaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let left = Expr::literal(Literal::number(5.0));
-    /// let right = Expr::literal(Literal::number(3.0));
-    /// let expr = Expr::binary_op(BinaryOp::Add, left, right);
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::binary_op(WithSpan::test_new(BinaryOp::Add), left, right);
     /// ```
     BinaryOp {
         /// The binary operator to apply.
-        op: BinaryOp,
+        op: WithSpan<BinaryOp>,
         /// The left-hand operand.
-        left: Box<Expr>,
+        left: Box<ExprWithSpan>,
         /// The right-hand operand.
-        right: Box<Expr>,
+        right: Box<ExprWithSpan>,
     },
     /// Unary operation applied to a single expression.
     ///
@@ -56,15 +96,16 @@ pub enum Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, UnaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let operand = Expr::literal(Literal::number(5.0));
-    /// let expr = Expr::unary_op(UnaryOp::Neg, operand);
+    /// let operand = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let expr = Expr::unary_op(WithSpan::test_new(UnaryOp::Neg), operand);
     /// ```
     UnaryOp {
         /// The unary operator to apply.
-        op: UnaryOp,
+        op: WithSpan<UnaryOp>,
         /// The operand expression.
-        expr: Box<Expr>,
+        expr: Box<ExprWithSpan>,
     },
     /// Function call with a name and argument list.
     ///
@@ -77,15 +118,17 @@ pub enum Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, FunctionName, Literal};
+    /// use oneil_ir::reference::Identifier;
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let args = vec![Expr::literal(Literal::number(3.14))];
-    /// let expr = Expr::function_call(FunctionName::sin(), args);
+    /// let args = vec![WithSpan::test_new(Expr::literal(Literal::number(3.14)))];
+    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::imported(Identifier::new("foo"))), args);
     /// ```
     FunctionCall {
         /// The name of the function to call.
-        name: FunctionName,
+        name: WithSpan<FunctionName>,
         /// The arguments to pass to the function.
-        args: Vec<Expr>,
+        args: Vec<ExprWithSpan>,
     },
     /// Variable reference (local, parameter, or external).
     Variable(Variable),
@@ -96,7 +139,52 @@ pub enum Expr {
     },
 }
 
+/// An expression with associated source location information.
+///
+/// This type alias provides a convenient way to work with expressions
+/// that include source location spans for error reporting and debugging.
+pub type ExprWithSpan = WithSpan<Expr>;
+
 impl Expr {
+    /// Creates a comparison operation expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `op` - The comparison operator
+    /// * `left` - The left-hand operand
+    /// * `right` - The right-hand operand
+    /// * `rest_chained` - Additional chained comparison operations (order matters)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::expr::{Expr, ComparisonOp, Literal};
+    /// use oneil_ir::span::WithSpan;
+    ///
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(1.0)));
+    /// let middle = WithSpan::test_new(Expr::literal(Literal::number(2.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::LessThan),
+    ///     left,
+    ///     middle,
+    ///     vec![(WithSpan::test_new(ComparisonOp::LessThan), right)]
+    /// );
+    /// ```
+    pub fn comparison_op(
+        op: WithSpan<ComparisonOp>,
+        left: ExprWithSpan,
+        right: ExprWithSpan,
+        rest_chained: Vec<(WithSpan<ComparisonOp>, ExprWithSpan)>,
+    ) -> Self {
+        Self::ComparisonOp {
+            op,
+            left: Box::new(left),
+            right: Box::new(right),
+            rest_chained,
+        }
+    }
+
     /// Creates a binary operation expression.
     ///
     /// # Arguments
@@ -109,12 +197,13 @@ impl Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, BinaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let left = Expr::literal(Literal::number(5.0));
-    /// let right = Expr::literal(Literal::number(3.0));
-    /// let expr = Expr::binary_op(BinaryOp::Add, left, right);
+    /// let left = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
+    /// let expr = Expr::binary_op(WithSpan::test_new(BinaryOp::Add), left, right);
     /// ```
-    pub fn binary_op(op: BinaryOp, left: Expr, right: Expr) -> Self {
+    pub fn binary_op(op: WithSpan<BinaryOp>, left: ExprWithSpan, right: ExprWithSpan) -> Self {
         Self::BinaryOp {
             op,
             left: Box::new(left),
@@ -133,11 +222,12 @@ impl Expr {
     ///
     /// ```rust
     /// use oneil_ir::expr::{Expr, UnaryOp, Literal};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let operand = Expr::literal(Literal::number(5.0));
-    /// let expr = Expr::unary_op(UnaryOp::Neg, operand);
+    /// let operand = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
+    /// let expr = Expr::unary_op(WithSpan::test_new(UnaryOp::Neg), operand);
     /// ```
-    pub fn unary_op(op: UnaryOp, expr: Expr) -> Self {
+    pub fn unary_op(op: WithSpan<UnaryOp>, expr: ExprWithSpan) -> Self {
         Self::UnaryOp {
             op,
             expr: Box::new(expr),
@@ -154,30 +244,31 @@ impl Expr {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::expr::{Expr, FunctionName, Literal};
+    /// use oneil_ir::{expr::{Expr, FunctionName, Literal}, reference::Identifier};
+    /// use oneil_ir::span::WithSpan;
     ///
-    /// let args = vec![Expr::literal(Literal::number(3.14))];
-    /// let expr = Expr::function_call(FunctionName::sin(), args);
+    /// let args = vec![WithSpan::test_new(Expr::literal(Literal::number(3.14)))];
+    /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::imported(Identifier::new("foo"))), args);
     /// ```
-    pub fn function_call(name: FunctionName, args: Vec<Expr>) -> Self {
+    pub fn function_call(name: WithSpan<FunctionName>, args: Vec<ExprWithSpan>) -> Self {
         Self::FunctionCall { name, args }
     }
 
-    /// Creates a local variable reference.
+    /// Creates a built-in variable reference.
     ///
     /// # Arguments
     ///
-    /// * `ident` - The identifier of the local variable
+    /// * `ident` - The identifier of the built-in variable
     ///
     /// # Example
     ///
     /// ```rust
     /// use oneil_ir::{expr::Expr, reference::Identifier};
     ///
-    /// let expr = Expr::local_variable(Identifier::new("x"));
+    /// let expr = Expr::builtin_variable(Identifier::new("pi"));
     /// ```
-    pub fn local_variable(ident: Identifier) -> Self {
-        Self::Variable(Variable::Local(ident))
+    pub fn builtin_variable(ident: Identifier) -> Self {
+        Self::Variable(Variable::Builtin(ident))
     }
 
     /// Creates a parameter variable reference.
@@ -259,24 +350,64 @@ pub enum BinaryOp {
     Mod,
     /// Exponentiation: `a ^ b`
     Pow,
-    /// Less than: `a < b`
-    LessThan,
-    /// Less than or equal: `a <= b`
-    LessThanEq,
-    /// Greater than: `a > b`
-    GreaterThan,
-    /// Greater than or equal: `a >= b`
-    GreaterThanEq,
-    /// Equality: `a == b`
-    Eq,
-    /// Inequality: `a != b`
-    NotEq,
     /// Logical AND: `a && b`
     And,
     /// Logical OR: `a || b`
     Or,
     /// Minimum/maximum: `a | b`
     MinMax,
+}
+
+/// Comparison operators for expressions.
+///
+/// These operators are used in comparison expressions to compare two operands.
+/// Comparison operations support chaining for expressions like `a < b < c`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ComparisonOp {
+    /// Less than comparison: `a < b`
+    LessThan,
+    /// Less than or equal comparison: `a <= b`
+    LessThanEq,
+    /// Greater than comparison: `a > b`
+    GreaterThan,
+    /// Greater than or equal comparison: `a >= b`
+    GreaterThanEq,
+    /// Equality comparison: `a == b`
+    Eq,
+    /// Inequality comparison: `a != b`
+    NotEq,
+}
+
+impl ComparisonOp {
+    /// Creates a less than operator.
+    pub fn less_than() -> Self {
+        Self::LessThan
+    }
+
+    /// Creates a less than or equal operator.
+    pub fn less_than_eq() -> Self {
+        Self::LessThanEq
+    }
+
+    /// Creates a greater than operator.
+    pub fn greater_than() -> Self {
+        Self::GreaterThan
+    }
+
+    /// Creates a greater than or equal operator.
+    pub fn greater_than_eq() -> Self {
+        Self::GreaterThanEq
+    }
+
+    /// Creates an equality operator.
+    pub fn eq() -> Self {
+        Self::Eq
+    }
+
+    /// Creates an inequality operator.
+    pub fn not_eq() -> Self {
+        Self::NotEq
+    }
 }
 
 /// Unary operators for single-operand operations.
@@ -297,115 +428,27 @@ pub enum UnaryOp {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionName {
     /// Built-in mathematical function.
-    Builtin(BuiltinFunction),
+    Builtin(Identifier),
     /// Function imported from a Python module.
-    Imported(String),
+    Imported(Identifier),
 }
 
 impl FunctionName {
-    /// Creates a reference to the `min` function.
-    pub fn min() -> Self {
-        Self::Builtin(BuiltinFunction::Min)
-    }
-
-    /// Creates a reference to the `max` function.
-    pub fn max() -> Self {
-        Self::Builtin(BuiltinFunction::Max)
-    }
-
-    /// Creates a reference to the `sin` function.
-    pub fn sin() -> Self {
-        Self::Builtin(BuiltinFunction::Sin)
-    }
-
-    /// Creates a reference to the `cos` function.
-    pub fn cos() -> Self {
-        Self::Builtin(BuiltinFunction::Cos)
-    }
-
-    /// Creates a reference to the `tan` function.
-    pub fn tan() -> Self {
-        Self::Builtin(BuiltinFunction::Tan)
-    }
-
-    /// Creates a reference to the `asin` function.
-    pub fn asin() -> Self {
-        Self::Builtin(BuiltinFunction::Asin)
-    }
-
-    /// Creates a reference to the `acos` function.
-    pub fn acos() -> Self {
-        Self::Builtin(BuiltinFunction::Acos)
-    }
-
-    /// Creates a reference to the `atan` function.
-    pub fn atan() -> Self {
-        Self::Builtin(BuiltinFunction::Atan)
-    }
-
-    /// Creates a reference to the `sqrt` function.
-    pub fn sqrt() -> Self {
-        Self::Builtin(BuiltinFunction::Sqrt)
-    }
-
-    /// Creates a reference to the `ln` function.
-    pub fn ln() -> Self {
-        Self::Builtin(BuiltinFunction::Ln)
-    }
-
-    /// Creates a reference to the `log` function.
-    pub fn log() -> Self {
-        Self::Builtin(BuiltinFunction::Log)
-    }
-
-    /// Creates a reference to the `log10` function.
-    pub fn log10() -> Self {
-        Self::Builtin(BuiltinFunction::Log10)
-    }
-
-    /// Creates a reference to the `floor` function.
-    pub fn floor() -> Self {
-        Self::Builtin(BuiltinFunction::Floor)
-    }
-
-    /// Creates a reference to the `ceiling` function.
-    pub fn ceiling() -> Self {
-        Self::Builtin(BuiltinFunction::Ceiling)
-    }
-
-    /// Creates a reference to the `extent` function.
-    pub fn extent() -> Self {
-        Self::Builtin(BuiltinFunction::Extent)
-    }
-
-    /// Creates a reference to the `range` function.
-    pub fn range() -> Self {
-        Self::Builtin(BuiltinFunction::Range)
-    }
-
-    /// Creates a reference to the `abs` function.
-    pub fn abs() -> Self {
-        Self::Builtin(BuiltinFunction::Abs)
-    }
-
-    /// Creates a reference to the `sign` function.
-    pub fn sign() -> Self {
-        Self::Builtin(BuiltinFunction::Sign)
-    }
-
-    /// Creates a reference to the `mid` function.
-    pub fn mid() -> Self {
-        Self::Builtin(BuiltinFunction::Mid)
-    }
-
-    /// Creates a reference to the `strip` function.
-    pub fn strip() -> Self {
-        Self::Builtin(BuiltinFunction::Strip)
-    }
-
-    /// Creates a reference to the `minmax` function.
-    pub fn minmax() -> Self {
-        Self::Builtin(BuiltinFunction::MinMax)
+    /// Creates a reference to a built-in function.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the built-in function
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::FunctionName, reference::Identifier};
+    ///
+    /// let func = FunctionName::builtin(Identifier::new("sin"));
+    /// ```
+    pub fn builtin(name: Identifier) -> Self {
+        Self::Builtin(name)
     }
 
     /// Creates a reference to an imported Python function.
@@ -417,63 +460,13 @@ impl FunctionName {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::expr::FunctionName;
+    /// use oneil_ir::{expr::FunctionName, reference::Identifier};
     ///
-    /// let func = FunctionName::imported("numpy.random.normal".to_string());
+    /// let func = FunctionName::imported(Identifier::new("numpy.random.normal"));
     /// ```
-    pub fn imported(name: String) -> Self {
+    pub fn imported(name: Identifier) -> Self {
         Self::Imported(name)
     }
-}
-
-/// Built-in mathematical functions available in Oneil.
-///
-/// These functions provide common mathematical operations and are
-/// always available without requiring imports.
-#[derive(Debug, Clone, PartialEq)]
-pub enum BuiltinFunction {
-    /// Minimum of two values: `min(a, b)`
-    Min,
-    /// Maximum of two values: `max(a, b)`
-    Max,
-    /// Sine function: `sin(x)`
-    Sin,
-    /// Cosine function: `cos(x)`
-    Cos,
-    /// Tangent function: `tan(x)`
-    Tan,
-    /// Arcsine function: `asin(x)`
-    Asin,
-    /// Arccosine function: `acos(x)`
-    Acos,
-    /// Arctangent function: `atan(x)`
-    Atan,
-    /// Square root: `sqrt(x)`
-    Sqrt,
-    /// Natural logarithm: `ln(x)`
-    Ln,
-    /// Logarithm (base e): `log(x)`
-    Log,
-    /// Base-10 logarithm: `log10(x)`
-    Log10,
-    /// Floor function: `floor(x)`
-    Floor,
-    /// Ceiling function: `ceiling(x)`
-    Ceiling,
-    /// Extent function: `extent(x)`
-    Extent,
-    /// Range function: `range(x)`
-    Range,
-    /// Absolute value: `abs(x)`
-    Abs,
-    /// Sign function: `sign(x)`
-    Sign,
-    /// Midpoint function: `mid(x)`
-    Mid,
-    /// Strip function: `strip(x)`
-    Strip,
-    /// Min/max function: `mnmx(x)`
-    MinMax,
 }
 
 /// Variable references in expressions.
@@ -484,8 +477,8 @@ pub enum BuiltinFunction {
 /// - **External**: Parameters defined in other models
 #[derive(Debug, Clone, PartialEq)]
 pub enum Variable {
-    /// Local variable in the current scope.
-    Local(Identifier),
+    /// Built-in variable
+    Builtin(Identifier),
     /// Parameter defined in the current model.
     Parameter(Identifier),
     /// Parameter defined in another model.
@@ -495,6 +488,60 @@ pub enum Variable {
         /// The identifier of the parameter in that model.
         ident: Identifier,
     },
+}
+
+impl Variable {
+    /// Creates a built-in variable reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `ident` - The identifier of the built-in variable
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::Variable, reference::Identifier};
+    ///
+    /// let var = Variable::builtin(Identifier::new("x"));
+    /// ```
+    pub fn builtin(ident: Identifier) -> Self {
+        Self::Builtin(ident)
+    }
+
+    /// Creates a parameter variable reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `ident` - The identifier of the parameter
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::Variable, reference::Identifier};
+    ///
+    /// let var = Variable::parameter(Identifier::new("radius"));
+    /// ```
+    pub fn parameter(ident: Identifier) -> Self {
+        Self::Parameter(ident)
+    }
+
+    /// Creates an external variable reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The model path where the variable is defined
+    /// * `ident` - The identifier of the variable in that model
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use oneil_ir::{expr::Variable, reference::{Identifier, ModelPath}};
+    ///
+    /// let var = Variable::external(ModelPath::new("submodel"), Identifier::new("area"));
+    /// ```
+    pub fn external(model: ModelPath, ident: Identifier) -> Self {
+        Self::External { model, ident }
+    }
 }
 
 /// Literal values that can appear in expressions.

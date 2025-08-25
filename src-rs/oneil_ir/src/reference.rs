@@ -6,6 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::span::WithSpan;
+
 /// An identifier for a variable, parameter, or other named entity in Oneil.
 ///
 /// `Identifier` represents a string-based name that uniquely identifies
@@ -31,8 +33,8 @@ impl Identifier {
     /// let id1 = Identifier::new("radius");
     /// let id2 = Identifier::new(String::from("area"));
     ///
-    /// assert_eq!(id1.value(), "radius");
-    /// assert_eq!(id2.value(), "area");
+    /// assert_eq!(id1.as_str(), "radius");
+    /// assert_eq!(id2.as_str(), "area");
     /// ```
     pub fn new(identifier: impl AsRef<str>) -> Self {
         Self(identifier.as_ref().to_string())
@@ -50,12 +52,18 @@ impl Identifier {
     /// use oneil_ir::reference::Identifier;
     ///
     /// let id = Identifier::new("my_parameter");
-    /// assert_eq!(id.value(), "my_parameter");
+    /// assert_eq!(id.as_str(), "my_parameter");
     /// ```
-    pub fn value(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         &self.0
     }
 }
+
+/// An identifier with associated source location information.
+///
+/// This type alias provides a convenient way to work with identifiers
+/// that include source location spans for error reporting and debugging.
+pub type IdentifierWithSpan = WithSpan<Identifier>;
 
 /// A path to an Oneil model file.
 ///
@@ -103,11 +111,11 @@ impl ModelPath {
         let mut path = path.as_ref().to_path_buf();
 
         match path.extension() {
-            Some(ext) => panic!(
+            Some(ext) if ext != "on" => panic!(
                 "Model paths must not have an extension other than .on: '{:?}'",
                 ext
             ),
-            None => {
+            _ => {
                 path.set_extension("on");
                 Self(path)
             }
@@ -145,7 +153,7 @@ impl ModelPath {
     /// let sibling2 = current.get_sibling_path("shapes/triangle");
     /// assert_eq!(sibling2.to_string_lossy(), "models/geometry/shapes/triangle");
     /// ```
-    pub fn get_sibling_path(&self, sibling_name: impl AsRef<Path>) -> PathBuf {
+    pub fn get_sibling_path(&self, sibling_name: impl AsRef<str>) -> PathBuf {
         let parent = self.0.parent();
         let sibling_name = sibling_name.as_ref();
 
@@ -205,11 +213,11 @@ impl PythonPath {
     /// ```
     pub fn new(mut path: PathBuf) -> Self {
         match path.extension() {
-            Some(ext) => panic!(
+            Some(ext) if ext != "py" => panic!(
                 "Python paths must not have an extension other than .py: '{:?}'",
                 ext
             ),
-            None => {
+            _ => {
                 path.set_extension("py");
                 Self(path)
             }

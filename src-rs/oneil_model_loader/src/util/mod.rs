@@ -22,9 +22,15 @@
 use std::path::Path;
 
 use oneil_ast as ast;
+use oneil_ir::span::Span;
 
 pub mod builder;
+pub mod builtin_ref;
 pub mod info;
+
+pub fn get_span_from_ast_span(ast_span: &ast::Span) -> Span {
+    Span::new(ast_span.start(), ast_span.length())
+}
 
 /// Trait for loading and parsing Oneil model files.
 ///
@@ -57,7 +63,7 @@ pub trait FileLoader {
     /// # Returns
     ///
     /// Returns `Ok(Model)` if parsing succeeds, or `Err(Self::ParseError)` if parsing fails.
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::Model, Self::ParseError>;
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::model::ModelNode, Self::ParseError>;
 
     /// Validates a Python import.
     ///

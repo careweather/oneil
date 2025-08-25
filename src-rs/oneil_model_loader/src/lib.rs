@@ -55,19 +55,18 @@ use std::{collections::HashSet, path::Path};
 
 use oneil_ir::{model::ModelCollection, reference::ModelPath};
 
-use crate::{
-    error::collection::ModelErrorMap,
-    util::{Stack, builder::ModelCollectionBuilder},
-};
+use crate::util::{Stack, builder::ModelCollectionBuilder};
 
-mod error;
+pub mod error;
 mod loader;
 mod util;
 
 #[cfg(test)]
 mod test;
 
+pub use crate::error::collection::ModelErrorMap;
 pub use crate::util::FileLoader;
+pub use crate::util::builtin_ref::BuiltinRef;
 
 /// Loads a single model and all its dependencies.
 ///
@@ -129,6 +128,7 @@ pub use crate::util::FileLoader;
 /// ```
 pub fn load_model<F>(
     model_path: impl AsRef<Path>,
+    builtin_ref: &impl BuiltinRef,
     file_parser: &F,
 ) -> Result<
     ModelCollection,
@@ -140,7 +140,7 @@ pub fn load_model<F>(
 where
     F: FileLoader,
 {
-    load_model_list(&[model_path], file_parser)
+    load_model_list(&[model_path], builtin_ref, file_parser)
 }
 
 /// Loads multiple models and all their dependencies.
@@ -202,6 +202,7 @@ where
 /// ```
 pub fn load_model_list<F>(
     model_paths: &[impl AsRef<Path>],
+    builtin_ref: &impl BuiltinRef,
     file_parser: &F,
 ) -> Result<
     ModelCollection,
@@ -224,7 +225,13 @@ where
         let model_path = ModelPath::new(model_path.as_ref().to_path_buf());
         let mut load_stack = Stack::new();
 
-        loader::load_model(model_path, builder, &mut load_stack, file_parser)
+        loader::load_model(
+            model_path,
+            builder,
+            builtin_ref,
+            &mut load_stack,
+            file_parser,
+        )
     });
 
     builder.try_into()

@@ -1,10 +1,19 @@
-use nom::{Parser as _, character::complete::space0, combinator::recognize};
+use nom::{Parser as NomParser, character::complete::space0, combinator::recognize};
+use oneil_ast::span::SpanLike;
 
 use crate::token::{
     Parser, Result, Span,
     error::{ErrorHandlingParser, TokenError},
 };
 
+/// A token representing a lexical element in Oneil source code.
+///
+/// A token consists of two parts:
+/// - **Lexeme**: The actual text content of the token (e.g., "if", "123", "+")
+/// - **Whitespace**: Any trailing whitespace that follows the lexeme
+///
+/// This structure allows the parser to maintain precise location information
+/// while handling whitespace appropriately during tokenization.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'a> {
     lexeme: Span<'a>,
@@ -12,51 +21,77 @@ pub struct Token<'a> {
 }
 
 impl<'a> Token<'a> {
+    /// Creates a new token with the specified lexeme and whitespace spans.
+    ///
+    /// # Arguments
+    ///
+    /// * `lexeme` - The span containing the token's text content
+    /// * `whitespace` - The span containing trailing whitespace
+    ///
+    /// # Returns
+    ///
+    /// A new `Token` instance.
     pub fn new(lexeme: Span<'a>, whitespace: Span<'a>) -> Self {
         Self { lexeme, whitespace }
     }
 
+    /// Returns the text content of the token.
+    ///
+    /// This is the actual lexical content that was matched by the parser,
+    /// such as keywords, identifiers, literals, or operators.
+    ///
+    /// # Returns
+    ///
+    /// A string slice containing the token's text content.
     pub fn lexeme(&self) -> &str {
         self.lexeme.fragment()
     }
 
-    pub fn lexeme_offset(&self) -> usize {
-        self.lexeme.location_offset()
-    }
-
-    pub fn lexeme_line(&self) -> u32 {
-        self.lexeme.location_line()
-    }
-
-    pub fn lexeme_column(&self) -> usize {
-        self.lexeme.get_column()
-    }
-
-    pub fn get_lexeme_end_offset(&self) -> usize {
-        let start = self.lexeme.location_offset();
-        let length = self.lexeme.fragment().len();
-        start + length
-    }
-
+    /// Returns the trailing whitespace that follows the token.
+    ///
+    /// This method is primarily used for testing and debugging purposes.
+    /// The whitespace information is preserved for precise error reporting
+    /// and location tracking.
+    ///
+    /// # Returns
+    ///
+    /// A string slice containing the trailing whitespace.
+    #[cfg(test)]
     pub fn whitespace(&self) -> &str {
         self.whitespace.fragment()
     }
+}
 
-    pub fn whitespace_offset(&self) -> usize {
-        self.whitespace.location_offset()
+impl<'a> SpanLike for Token<'a> {
+    /// Returns the starting offset of the token's lexeme.
+    fn get_start(&self) -> usize {
+        self.lexeme.location_offset()
     }
 
-    pub fn get_whitespace_end_offset(&self) -> usize {
-        let start = self.whitespace.location_offset();
-        let length = self.whitespace.fragment().len();
-        start + length
+    /// Returns the ending offset of the token's lexeme.
+    fn get_length(&self) -> usize {
+        self.lexeme.fragment().len()
+    }
+
+    /// Returns the ending offset including trailing whitespace.
+    fn get_whitespace_length(&self) -> usize {
+        self.whitespace.fragment().len()
     }
 }
 
-/// Parses inline whitespace (spaces and tabs) and returns unit `()`.
+/// Parses inline whitespace (spaces and tabs) and returns the parsed whitespace.
 ///
 /// This function consumes any amount of whitespace (including none) and always succeeds.
 /// It's useful for handling optional whitespace between tokens.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns `Ok((remaining_input, parsed_whitespace))` on success, where the
+/// remaining input excludes the consumed whitespace.
 pub fn inline_whitespace(input: Span) -> Result<Span, TokenError> {
     space0.parse(input)
 }
@@ -66,14 +101,27 @@ pub fn inline_whitespace(input: Span) -> Result<Span, TokenError> {
 /// This function takes a parser `f` and returns a new parser that:
 /// 1. Recognizes the content matched by `f`
 /// 2. Consumes any trailing whitespace after the match
-/// 3. Returns the matched content as a `Span`
+/// 3. Returns the matched content as a `Token` with lexeme and whitespace spans
 ///
 /// This is useful for tokenizing where whitespace between tokens should be handled automatically.
+///
+/// # Arguments
+///
+/// * `f` - The parser to wrap
+/// * `convert_error` - A function to convert parsing errors to `TokenError`
+///
+/// # Returns
+///
+/// A new parser that returns a `Token` containing both the matched content
+/// and any trailing whitespace.
 pub fn token<'a, O>(
     f: impl Parser<'a, O, TokenError>,
     convert_error: impl Fn(TokenError) -> TokenError,
 ) -> impl Parser<'a, Token<'a>, TokenError> {
-    (recognize(f).map_error(convert_error), inline_whitespace)
+    (
+        recognize(f).convert_error_to(convert_error),
+        inline_whitespace,
+    )
         .map(|(lexeme, whitespace)| Token::new(lexeme, whitespace))
 }
 

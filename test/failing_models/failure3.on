@@ -1,0 +1,25 @@
+# Failure Model 3: Semantic and reference errors
+
+# Undefined variable reference
+Undefined var: undefined_var = x + y
+
+# Invalid string literal (missing closing quote)
+Invalid string: invalid_str = 'Hello world
+
+# Invalid boolean literal
+Invalid boolean: invalid_bool = maybe
+
+# Invalid unit expression
+Invalid unit: invalid_unit = 5 meters^2
+
+# Invalid import statement
+import
+
+# Invalid test declaration
+test invalid_test: 5 + 3
+
+# Invalid parameter with invalid limits
+Invalid limits: invalid_limits = 5 (0, 10, 20)
+
+# Invalid trace parameter
+**Invalid trace: invalid_trace = 42

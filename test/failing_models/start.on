@@ -1,0 +1,21 @@
+# Top-level model for testing success and failure cases
+
+# Import success models
+use success1 as s1
+use success2 as s2  
+use success3 as s3
+
+# Import failure models (these should fail to parse)
+use failure1 as f1
+use failure2 as f2
+use failure3 as f3
+
+# Main calculations
+Main calculation: main = result.s1 + result.s2 + result.s3
+
+# Test section
+section Test Results
+
+test: main > 0
+test: invalid.f1 + invalid.f2 + invalid.f3 > 0
+test: invalid.s1 == 0

@@ -52,6 +52,10 @@ pub enum ExpectKind {
     String,
     /// Expected a symbol
     Symbol(ExpectSymbol),
+    /// Expected a unit identifier
+    UnitIdentifier,
+    /// Expected a unit one
+    UnitOne,
 }
 
 /// The different keywords that could have been expected.
@@ -92,8 +96,6 @@ pub enum ExpectSymbol {
     Bar,
     /// Expected '{' symbol
     BraceLeft,
-    /// Expected '}' symbol
-    BraceRight,
     /// Expected '[' symbol
     BracketLeft,
     /// Expected ']' symbol
@@ -149,8 +151,8 @@ pub enum IncompleteKind {
     UnclosedNote {
         /// The offset of the note delimiter start
         delimiter_start_offset: usize,
-        /// The offset of the note delimiter end
-        delimiter_end_offset: usize,
+        /// The length of the note delimiter
+        delimiter_length: usize,
     },
     /// Unclosed string
     UnclosedString {
@@ -180,8 +182,12 @@ impl TokenError {
 
     /// Updates the error kind
     ///
-    /// This should only be happening if the error is
-    /// a nom error, so it panics if it's not.
+    /// This should only be happening if the error is a nom error, so it panics
+    /// if it's not.
+    ///
+    /// This is because if it's any other token error, that likely means that
+    /// the `token` function was used multiple times, meaning that there might
+    /// be whitespace in the middle of the token
     fn update_kind(self, kind: TokenErrorKind) -> Self {
         let is_nom_error = matches!(self.kind, TokenErrorKind::NomError(_));
         assert!(
@@ -238,14 +244,24 @@ impl TokenError {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Symbol(symbol)))
     }
 
+    /// Creates a new TokenError instance for an expected unit identifier
+    pub fn expected_unit_identifier(error: Self) -> Self {
+        error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitIdentifier))
+    }
+
+    /// Creates a new TokenError instance for an expected unit one
+    pub fn expected_unit_one(error: Self) -> Self {
+        error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitOne))
+    }
+
     /// Creates a new TokenError instance for an unclosed note
     pub fn unclosed_note(delimiter_span: Span) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let delimiter_start_offset = delimiter_span.location_offset();
-            let delimiter_end_offset = delimiter_start_offset + delimiter_span.len();
+            let delimiter_length = delimiter_span.len();
             error.update_kind(TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote {
                 delimiter_start_offset,
-                delimiter_end_offset,
+                delimiter_length,
             }))
         }
     }

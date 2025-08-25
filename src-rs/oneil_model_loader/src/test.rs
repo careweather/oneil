@@ -15,9 +15,15 @@
 //! the behavior of the model loading system under various conditions, such as
 //! successful imports, failed imports, and different AST structures.
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
-use crate::FileLoader;
+use oneil_ast::model::ModelNode;
+use oneil_ir::reference::Identifier;
+
+use crate::{BuiltinRef, FileLoader};
 
 /// A test file loader that only implements Python import validation.
 ///
@@ -83,10 +89,7 @@ impl FileLoader for TestPythonValidator {
     /// # Panics
     ///
     /// Always panics with the message "TestPythonLoader does not support parsing ASTs".
-    fn parse_ast(
-        &self,
-        _path: impl AsRef<std::path::Path>,
-    ) -> Result<oneil_ast::Model, Self::ParseError> {
+    fn parse_ast(&self, _path: impl AsRef<std::path::Path>) -> Result<ModelNode, Self::ParseError> {
         panic!("TestPythonLoader does not support parsing ASTs");
     }
 
@@ -132,7 +135,7 @@ impl FileLoader for TestPythonValidator {
 /// It maintains a map of file paths to AST models and returns the appropriate
 /// model when a file is requested for parsing.
 pub struct TestFileParser {
-    models: HashMap<PathBuf, oneil_ast::Model>,
+    models: HashMap<PathBuf, ModelNode>,
 }
 
 impl TestFileParser {
@@ -146,7 +149,7 @@ impl TestFileParser {
     ///
     /// A new `TestFileParser` that will return the specified models when their
     /// corresponding paths are requested.
-    pub fn new(models: impl IntoIterator<Item = (PathBuf, oneil_ast::Model)>) -> Self {
+    pub fn new(models: impl IntoIterator<Item = (PathBuf, ModelNode)>) -> Self {
         Self {
             models: models.into_iter().collect(),
         }
@@ -184,10 +187,7 @@ impl FileLoader for TestFileParser {
     ///
     /// Returns `Ok(Model)` if the path exists in the predefined models,
     /// or `Err(())` if the path is not found.
-    fn parse_ast(
-        &self,
-        path: impl AsRef<std::path::Path>,
-    ) -> Result<oneil_ast::Model, Self::ParseError> {
+    fn parse_ast(&self, path: impl AsRef<std::path::Path>) -> Result<ModelNode, Self::ParseError> {
         let path = path.as_ref().to_path_buf();
         self.models.get(&path).cloned().ok_or(())
     }
@@ -210,5 +210,39 @@ impl FileLoader for TestFileParser {
         _path: impl AsRef<std::path::Path>,
     ) -> Result<(), Self::PythonError> {
         Ok(())
+    }
+}
+
+pub struct TestBuiltinRef {
+    builtin_variables: HashSet<String>,
+    builtin_functions: HashSet<String>,
+}
+
+impl TestBuiltinRef {
+    pub fn new() -> Self {
+        Self {
+            builtin_variables: HashSet::new(),
+            builtin_functions: HashSet::new(),
+        }
+    }
+
+    pub fn with_builtin_variables(mut self, variables: impl IntoIterator<Item = String>) -> Self {
+        self.builtin_variables.extend(variables);
+        self
+    }
+
+    pub fn with_builtin_functions(mut self, functions: impl IntoIterator<Item = String>) -> Self {
+        self.builtin_functions.extend(functions);
+        self
+    }
+}
+
+impl BuiltinRef for TestBuiltinRef {
+    fn has_builtin_value(&self, identifier: &Identifier) -> bool {
+        self.builtin_variables.contains(identifier.as_str())
+    }
+
+    fn has_builtin_function(&self, identifier: &Identifier) -> bool {
+        self.builtin_functions.contains(identifier.as_str())
     }
 }

@@ -60,9 +60,16 @@
 use std::collections::HashMap;
 
 use oneil_ast as ast;
-use oneil_ir::reference::{Identifier, ModelPath};
+use oneil_ir::{
+    reference::{Identifier, ModelPath},
+    span::Span,
+};
 
-use crate::{error::SubmodelResolutionError, loader::resolver::ModelInfo, util::info::InfoResult};
+use crate::{
+    error::SubmodelResolutionError,
+    loader::resolver::ModelInfo,
+    util::{get_span_from_ast_span, info::InfoResult},
+};
 
 /// Resolves submodels and their associated tests from use model declarations.
 ///
@@ -79,7 +86,6 @@ use crate::{error::SubmodelResolutionError, loader::resolver::ModelInfo, util::i
 ///
 /// A tuple containing:
 /// * `HashMap<Identifier, ModelPath>` - Successfully resolved submodels mapped to their paths
-/// * `Vec<(Identifier, Vec<ModelInput>)>` - Submodel test inputs for later resolution
 /// * `HashMap<Identifier, SubmodelResolutionError>` - Any resolution errors that occurred
 ///
 /// # Error Handling
@@ -90,53 +96,68 @@ use crate::{error::SubmodelResolutionError, loader::resolver::ModelInfo, util::i
 /// - **Invalid paths**: If the model path cannot be resolved
 ///
 /// All errors are collected and returned rather than causing the function to fail.
-pub fn resolve_submodels_and_tests(
-    use_models: Vec<ast::declaration::UseModel>,
+pub fn resolve_submodels<'a>(
+    use_models: Vec<&'a ast::declaration::UseModelNode>,
     model_path: &ModelPath,
     model_info: &ModelInfo,
 ) -> (
-    HashMap<Identifier, ModelPath>,
-    Vec<(Identifier, Vec<ast::declaration::ModelInput>)>,
+    HashMap<Identifier, (ModelPath, Span)>,
     HashMap<Identifier, SubmodelResolutionError>,
 ) {
     use_models.into_iter().fold(
-        (HashMap::new(), Vec::new(), HashMap::new()),
-        |(mut submodels, mut submodel_tests, mut resolution_errors), use_model| {
+        (HashMap::new(), HashMap::new()),
+        |(mut submodels, mut resolution_errors), use_model| {
             // get the use model path
-            let use_model_path = model_path.get_sibling_path(&use_model.model_name);
+            let use_model_path = model_path.get_sibling_path(&use_model.model_name().as_str());
             let use_model_path = ModelPath::new(use_model_path);
 
+            // get the submodel span
+            let submodel_name_span = get_span_from_ast_span(use_model.node_span());
+
             // get the submodel name
-            let submodel_name = use_model.as_name.as_ref().unwrap_or(
-                use_model
-                    .subcomponents
-                    .last()
-                    .unwrap_or(&use_model.model_name),
-            );
-            let submodel_name = Identifier::new(submodel_name);
+            let submodel_name = use_model
+                .alias()
+                .or(use_model.subcomponents().last())
+                .unwrap_or(use_model.model_name());
+            let submodel_name = Identifier::new(submodel_name.as_str());
+
+            // verify that the submodel name is not a duplicate
+            let maybe_original_submodel = submodels.get(&submodel_name);
+            if let Some((_path, original_submodel_span)) = maybe_original_submodel {
+                resolution_errors.insert(
+                    submodel_name.clone(),
+                    SubmodelResolutionError::duplicate_submodel(
+                        submodel_name,
+                        original_submodel_span.clone(),
+                        submodel_name_span,
+                    ),
+                );
+
+                return (submodels, resolution_errors);
+            }
 
             // resolve the use model path
-            let resolved_use_model_path =
-                resolve_model_path(use_model_path.clone(), &use_model.subcomponents, model_info);
+            let resolved_use_model_path = resolve_model_path(
+                use_model_path.clone(),
+                submodel_name_span,
+                use_model.subcomponents(),
+                model_info,
+            );
 
             // insert the use model path into the submodels map if it was resolved successfully
             // otherwise, add the error to the builder
             match resolved_use_model_path {
                 Ok(resolved_use_model_path) => {
-                    submodels.insert(submodel_name.clone(), resolved_use_model_path.clone());
-
-                    // store the inputs for the submodel tests
-                    // (the inputs are stored in their AST form for now and converted to
-                    // the model input type once all the submodels have been resolved)
-                    let inputs = use_model.inputs.unwrap_or_default();
-                    submodel_tests.push((submodel_name, inputs));
+                    // create a span for the submodel
+                    let span = get_span_from_ast_span(use_model.node_span());
+                    submodels.insert(submodel_name.clone(), (resolved_use_model_path, span));
                 }
                 Err(error) => {
                     resolution_errors.insert(submodel_name, error);
                 }
             }
 
-            (submodels, submodel_tests, resolution_errors)
+            (submodels, resolution_errors)
         },
     )
 }
@@ -180,14 +201,20 @@ pub fn resolve_submodels_and_tests(
 /// will panic, indicating a bug in the model loading process.
 fn resolve_model_path(
     model_path: ModelPath,
-    subcomponents: &[String],
+    parent_component_span: Span,
+    subcomponents: &[ast::naming::IdentifierNode],
     model_info: &ModelInfo,
 ) -> Result<ModelPath, SubmodelResolutionError> {
     // if the model that we are trying to resolve has had an error, this
     // operation should fail
     let model = match model_info.get(&model_path) {
         InfoResult::Found(model) => model,
-        InfoResult::HasError => return Err(SubmodelResolutionError::model_has_error(model_path)),
+        InfoResult::HasError => {
+            return Err(SubmodelResolutionError::model_has_error(
+                model_path,
+                parent_component_span,
+            ));
+        }
         InfoResult::NotFound => panic!("model should have been visited already"),
     };
 
@@ -196,54 +223,91 @@ fn resolve_model_path(
         return Ok(model_path);
     }
 
-    let submodel_name = Identifier::new(subcomponents[0].clone());
+    let submodel_name = Identifier::new(subcomponents[0].as_str());
+    let submodel_name_span = get_span_from_ast_span(subcomponents[0].node_span());
     let submodel_path = model
         .get_submodel(&submodel_name)
+        .map(|(path, _)| path)
         .ok_or(SubmodelResolutionError::undefined_submodel_in_submodel(
             model_path.clone(),
             submodel_name,
+            submodel_name_span,
         ))?
         .clone();
 
-    resolve_model_path(submodel_path, &subcomponents[1..], model_info)
+    resolve_model_path(
+        submodel_path,
+        submodel_name_span,
+        &subcomponents[1..],
+        model_info,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oneil_ast::declaration::{ModelInput, UseModel};
-    use oneil_ast::expression::{Expr, Literal};
     use oneil_ir::model::Model;
     use std::collections::HashSet;
 
-    /// Creates a test model with specified submodels
-    fn create_test_model(submodels: Vec<(&str, ModelPath)>) -> Model {
-        let mut submodel_map = HashMap::new();
-        for (name, path) in submodels {
-            submodel_map.insert(Identifier::new(name), path);
+    // TODO: write tests that test the span of the submodel path
+
+    mod helper {
+        use super::*;
+
+        /// Helper function to create a test AST span
+        pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
+            ast::Span::new(start, end - start, 0)
         }
 
-        Model::new(
-            HashSet::new(),                                                // python_imports
-            submodel_map,                                                  // submodels
-            oneil_ir::parameter::ParameterCollection::new(HashMap::new()), // parameters
-            HashMap::new(),                                                // model_tests
-            Vec::new(),                                                    // submodel_tests
-        )
+        /// Helper function to create a test IR span
+        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::Span {
+            oneil_ir::span::Span::new(start, end - start)
+        }
+
+        /// Helper function to create a use model node
+        pub fn create_use_model_node(
+            model_name: &str,
+            subcomponents: Vec<ast::naming::IdentifierNode>,
+            alias: Option<&str>,
+            start: usize,
+            end: usize,
+        ) -> ast::declaration::UseModelNode {
+            let identifier = ast::naming::Identifier::new(model_name.to_string());
+            let model_name_node =
+                ast::node::Node::new(test_ast_span(start, start + model_name.len()), identifier);
+
+            let alias_node = alias.map(|name| {
+                let identifier = ast::naming::Identifier::new(name.to_string());
+                ast::node::Node::new(test_ast_span(end - name.len(), end), identifier)
+            });
+
+            let use_model =
+                ast::declaration::UseModel::new(model_name_node, subcomponents, alias_node);
+            ast::node::Node::new(test_ast_span(start, end), use_model)
+        }
+
+        /// Helper function to create a test model with specified submodels
+        pub fn create_test_model(submodels: Vec<(&str, (ModelPath, Span))>) -> Model {
+            let mut submodel_map = HashMap::new();
+            for (name, path) in submodels {
+                let identifier = Identifier::new(name);
+                submodel_map.insert(identifier, path);
+            }
+
+            Model::new(
+                HashMap::new(),                                                // python_imports
+                submodel_map,                                                  // submodels
+                oneil_ir::parameter::ParameterCollection::new(HashMap::new()), // parameters
+                HashMap::new(),                                                // tests
+            )
+        }
     }
 
     #[test]
     fn test_resolve_simple_submodel() {
-        // build the use model list
-        let use_models = vec![
-            // use temperature as temp
-            UseModel {
-                model_name: "temperature".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: Some("temp".to_string()),
-            },
-        ];
+        // create the use model list
+        let use_model = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+        let use_models = vec![&use_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
@@ -251,110 +315,57 @@ mod tests {
         // create the model map
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
-        let temperature_submodel = create_test_model(vec![]);
+        let temperature_submodel = helper::create_test_model(vec![]);
         let model_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
         let model_info = ModelInfo::new(model_map, HashSet::new());
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert!(errors.is_empty());
 
-        // submodel tests
+        // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&temperature_id);
-        assert_eq!(submodel_path, Some(&temperature_path));
-
-        // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
-        assert_eq!(test_id, &temperature_id);
-        assert!(test_inputs.is_empty()); // no inputs
-    }
-
-    #[test]
-    fn test_resolve_submodel_with_inputs() {
-        // build the use model list
-        let use_models = vec![
-            // use sensor(location="north", height=100) as sensor
-            UseModel {
-                model_name: "sensor".to_string(),
-                subcomponents: vec![],
-                inputs: Some(vec![
-                    ModelInput {
-                        name: "location".to_string(),
-                        value: Expr::Literal(Literal::String("north".to_string())),
-                    },
-                    ModelInput {
-                        name: "height".to_string(),
-                        value: Expr::Literal(Literal::Number(100.0)),
-                    },
-                ]),
-                as_name: Some("sensor".to_string()),
-            },
-        ];
-
-        // create the current model path
-        let model_path = ModelPath::new("/parent_model");
-
-        // create the model map
-        let sensor_id = Identifier::new("sensor");
-        let sensor_path = ModelPath::new("/sensor");
-        let sensor_submodel = create_test_model(vec![]);
-        let model_map = HashMap::from([(&sensor_path, &sensor_submodel)]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
-
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
-
-        // error tests
-        assert!(errors.is_empty());
-
-        // submodel tests
-        assert_eq!(submodels.len(), 1);
-        let submodel_path = submodels.get(&sensor_id);
-        assert_eq!(submodel_path, Some(&sensor_path));
-
-        // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
-        assert_eq!(test_id, &sensor_id);
-        assert_eq!(test_inputs.len(), 2);
-
-        assert_eq!(test_inputs[0].name, "location");
-        assert_eq!(
-            test_inputs[0].value,
-            Expr::Literal(Literal::String("north".to_string()))
-        );
-
-        assert_eq!(test_inputs[1].name, "height");
-        assert_eq!(test_inputs[1].value, Expr::Literal(Literal::Number(100.0)));
+        let result = submodels.get(&temperature_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &temperature_path);
     }
 
     #[test]
     fn test_resolve_nested_submodel() {
-        let use_models = vec![UseModel {
-            // use weather.atmosphere.temperature as temp
-            model_name: "weather".to_string(),
-            subcomponents: vec!["atmosphere".to_string(), "temperature".to_string()],
-            inputs: None,
-            as_name: Some("temp".to_string()),
-        }];
+        // create the use model list with nested subcomponents
+        // use weather.atmosphere.temperature as temp
+        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
+        let atmosphere_node =
+            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
+        let temperature_identifier = ast::naming::Identifier::new("temperature".to_string());
+        let temperature_node =
+            ast::node::Node::new(helper::test_ast_span(0, 11), temperature_identifier);
+        let subcomponents = vec![atmosphere_node, temperature_node];
+
+        let use_model =
+            helper::create_use_model_node("weather", subcomponents, Some("temp"), 0, 35);
+        let use_models = vec![&use_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the model map with nested structure
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
-        let temperature_submodel = create_test_model(vec![]);
+        let temperature_submodel = helper::create_test_model(vec![]);
         let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model =
-            create_test_model(vec![("temperature", ModelPath::new("/temperature"))]);
+        let atmosphere_model = helper::create_test_model(vec![(
+            "temperature",
+            (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
+        )]);
         let weather_path = ModelPath::new("/weather");
-        let weather_model = create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let weather_model = helper::create_test_model(vec![(
+            "atmosphere",
+            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+        )]);
         let model_map = HashMap::from([
             (&weather_path, &weather_model),
             (&atmosphere_path, &atmosphere_model),
@@ -362,37 +373,26 @@ mod tests {
         ]);
         let model_info = ModelInfo::new(model_map, HashSet::new());
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert!(errors.is_empty());
 
-        // submodel tests
+        // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&temperature_id);
-        assert_eq!(submodel_path, Some(&temperature_path));
-
-        // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
-        assert_eq!(test_id, &temperature_id);
-        assert!(test_inputs.is_empty()); // no inputs
+        let result = submodels.get(&temperature_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &temperature_path);
     }
 
     #[test]
     fn test_resolve_submodel_without_alias() {
-        // build the use model list
-        let use_models = vec![
-            // use temperature
-            UseModel {
-                model_name: "temperature".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: None,
-            },
-        ];
+        // create the use model list without alias
+        // use temperature
+        let use_model = helper::create_use_model_node("temperature", vec![], None, 0, 12);
+        let use_models = vec![&use_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
@@ -400,41 +400,35 @@ mod tests {
         // create the model map
         let temperature_id = Identifier::new("temperature");
         let temperature_path = ModelPath::new("/temperature");
-        let temperature_submodel = create_test_model(vec![]);
+        let temperature_submodel = helper::create_test_model(vec![]);
         let model_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
         let model_info = ModelInfo::new(model_map, HashSet::new());
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert!(errors.is_empty());
 
-        // submodel tests
+        // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&temperature_id);
-        assert_eq!(submodel_path, Some(&temperature_path));
-
-        // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
-        assert_eq!(test_id, &temperature_id);
-        assert!(test_inputs.is_empty()); // no inputs
+        let result = submodels.get(&temperature_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &temperature_path);
     }
 
     #[test]
     fn test_resolve_submodel_with_subcomponent_alias() {
-        // build the use model list
-        let use_models = vec![
-            // use weather.atmosphere
-            UseModel {
-                model_name: "weather".to_string(),
-                subcomponents: vec!["atmosphere".to_string()],
-                inputs: None,
-                as_name: None, // Should use "atmosphere" as the alias
-            },
-        ];
+        // create the use model list with subcomponent as alias
+        // use weather.atmosphere
+        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
+        let atmosphere_node =
+            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
+        let subcomponents = vec![atmosphere_node];
+
+        let use_model = helper::create_use_model_node("weather", subcomponents, None, 0, 20);
+        let use_models = vec![&use_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
@@ -442,10 +436,12 @@ mod tests {
         // create the model map
         let atmosphere_id = Identifier::new("atmosphere");
         let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_submodel = create_test_model(vec![]);
+        let atmosphere_submodel = helper::create_test_model(vec![]);
         let weather_path = ModelPath::new("/weather");
-        let weather_submodel =
-            create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let weather_submodel = helper::create_test_model(vec![(
+            "atmosphere",
+            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+        )]);
 
         // create the model map
         let model_map = HashMap::from([
@@ -454,184 +450,182 @@ mod tests {
         ]);
         let model_info = ModelInfo::new(model_map, HashSet::new());
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert!(errors.is_empty());
 
-        // submodel tests
+        // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let submodel_path = submodels.get(&atmosphere_id);
-        assert_eq!(submodel_path, Some(&atmosphere_path));
-
-        // test inputs tests
-        let (test_id, test_inputs) = &tests[0];
-        assert_eq!(test_id, &atmosphere_id);
-        assert!(test_inputs.is_empty()); // no inputs
+        let result = submodels.get(&atmosphere_id);
+        let (submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(submodel_path, &atmosphere_path);
     }
 
     #[test]
     fn test_resolve_model_with_error() {
-        // build the use model list
-        let use_models = vec![
-            // use error_model as error
-            UseModel {
-                model_name: "error_model".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: Some("error".to_string()),
-            },
-        ];
+        // create the use model list with error model
+        // use error_model as error
+        let use_model = helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
+        let use_model_span = get_span_from_ast_span(&use_model.node_span());
+        let use_models = vec![&use_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the model map with error model
         let error_id = Identifier::new("error");
         let error_path = ModelPath::new("/error_model");
-        let error_submodel = create_test_model(vec![]);
+        let error_submodel = helper::create_test_model(vec![]);
         let model_map = HashMap::from([(&error_path, &error_submodel)]);
         let model_info = ModelInfo::new(model_map, HashSet::from([&error_path]));
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert_eq!(errors.len(), 1);
         let error = errors.get(&error_id).unwrap();
 
         match error {
-            SubmodelResolutionError::ModelHasError(path) => {
-                assert_eq!(path, &error_path);
+            SubmodelResolutionError::ModelHasError {
+                model_path,
+                reference_span,
+            } => {
+                assert_eq!(model_path, &error_path);
+                assert_eq!(reference_span, &use_model_span);
             }
             _ => panic!("Expected ModelHasError, got {:?}", error),
         }
 
-        // submodel tests
+        // check the submodels
         assert!(submodels.is_empty());
-
-        // test inputs tests
-        assert!(tests.is_empty());
     }
 
     #[test]
     fn test_resolve_undefined_submodel() {
-        // build the use model list
-        let use_models = vec![UseModel {
-            model_name: "weather".to_string(),
-            subcomponents: vec!["undefined_submodel".to_string()],
-            inputs: None,
-            as_name: Some("weather".to_string()),
-        }];
+        // create the use model list with undefined submodel
+        let undefined_identifier = ast::naming::Identifier::new("undefined_submodel".to_string());
+        let undefined_identifier_span = helper::test_ast_span(0, 16);
+        let undefined_node =
+            ast::node::Node::new(undefined_identifier_span.clone(), undefined_identifier);
+        let subcomponents = vec![undefined_node];
+
+        let use_model =
+            helper::create_use_model_node("weather", subcomponents, Some("weather"), 0, 30);
+        let use_models = vec![&use_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the model map without the undefined submodel
         let weather_id = Identifier::new("weather");
         let weather_path = ModelPath::new("/weather");
-        let weather_model = create_test_model(vec![]); // No submodels
+        let weather_model = helper::create_test_model(vec![]); // No submodels
         let model_map = HashMap::from([(&weather_path, &weather_model)]);
         let model_info = ModelInfo::new(model_map, HashSet::new());
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&weather_id).unwrap();
         match error {
-            SubmodelResolutionError::UndefinedSubmodel(parent_path, submodel_name) => {
-                assert_eq!(parent_path, &Some(weather_path));
-                assert_eq!(submodel_name, &Identifier::new("undefined_submodel"));
+            SubmodelResolutionError::UndefinedSubmodel {
+                parent_model_path,
+                submodel,
+                reference_span,
+            } => {
+                assert_eq!(parent_model_path, &weather_path);
+                assert_eq!(submodel.as_str(), "undefined_submodel");
+                assert_eq!(
+                    reference_span,
+                    &get_span_from_ast_span(&undefined_identifier_span)
+                );
             }
             _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
         }
 
-        // submodel tests
+        // check the submodels
         assert!(submodels.is_empty());
-
-        // test inputs tests
-        assert!(tests.is_empty());
     }
 
     #[test]
     fn test_resolve_undefined_submodel_in_submodel() {
-        // build the use model list
-        let use_models = vec![UseModel {
-            // use weather.atmosphere.undefined as undefined
-            model_name: "weather".to_string(),
-            subcomponents: vec!["atmosphere".to_string(), "undefined".to_string()],
-            inputs: None,
-            as_name: Some("undefined".to_string()),
-        }];
+        // create the use model list with nested undefined submodel
+        // use weather.atmosphere.undefined as undefined
+        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
+        let atmosphere_node =
+            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
+        let undefined_identifier = ast::naming::Identifier::new("undefined".to_string());
+        let undefined_identifier_span = helper::test_ast_span(0, 9);
+        let undefined_node =
+            ast::node::Node::new(undefined_identifier_span.clone(), undefined_identifier);
+        let subcomponents = vec![atmosphere_node, undefined_node];
+
+        let use_model =
+            helper::create_use_model_node("weather", subcomponents, Some("undefined"), 0, 35);
+        let use_models = vec![&use_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the model map with missing nested submodel
         let undefined_id = Identifier::new("undefined");
         let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model = create_test_model(vec![]); // No submodels
+        let atmosphere_model = helper::create_test_model(vec![]); // No submodels
         let weather_path = ModelPath::new("/weather");
-        let weather_model = create_test_model(vec![("atmosphere", ModelPath::new("/atmosphere"))]);
+        let weather_model = helper::create_test_model(vec![(
+            "atmosphere",
+            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
+        )]);
         let model_map = HashMap::from([
             (&weather_path, &weather_model),
             (&atmosphere_path, &atmosphere_model),
         ]);
         let model_info = ModelInfo::new(model_map, HashSet::new());
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&undefined_id).unwrap();
         match error {
-            SubmodelResolutionError::UndefinedSubmodel(parent_path, submodel_name) => {
-                assert_eq!(parent_path, &Some(atmosphere_path));
-                assert_eq!(submodel_name, &Identifier::new("undefined"));
+            SubmodelResolutionError::UndefinedSubmodel {
+                parent_model_path,
+                submodel,
+                reference_span,
+            } => {
+                assert_eq!(parent_model_path, &atmosphere_path);
+                assert_eq!(submodel.as_str(), "undefined");
+                assert_eq!(
+                    reference_span,
+                    &get_span_from_ast_span(&undefined_identifier_span)
+                );
             }
             _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
         }
 
-        // submodel tests
+        // check the submodels
         assert!(submodels.is_empty());
-
-        // test inputs tests
-        assert!(tests.is_empty());
     }
 
     #[test]
     fn test_resolve_multiple_submodels() {
-        // build the use model list
-        let use_models = vec![
-            // use temperature as temp
-            UseModel {
-                model_name: "temperature".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: Some("temp".to_string()),
-            },
-            // use pressure(altitude=1000) as press
-            UseModel {
-                model_name: "pressure".to_string(),
-                subcomponents: vec![],
-                inputs: Some(vec![ModelInput {
-                    name: "altitude".to_string(),
-                    value: Expr::Literal(Literal::Number(1000.0)),
-                }]),
-                as_name: Some("press".to_string()),
-            },
-        ];
+        // create the use model list with multiple submodels
+        // use temperature as temp
+        let temp_model = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+
+        // use pressure as press
+        let press_model = helper::create_use_model_node("pressure", vec![], Some("press"), 0, 25);
+
+        let use_models = vec![&temp_model, &press_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
@@ -639,78 +633,57 @@ mod tests {
         // create the model map
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = create_test_model(vec![]);
+        let temperature_model = helper::create_test_model(vec![]);
         let pressure_id = Identifier::new("press");
         let pressure_path = ModelPath::new("/pressure");
-        let pressure_model = create_test_model(vec![]);
+        let pressure_model = helper::create_test_model(vec![]);
         let model_map = HashMap::from([
             (&temperature_path, &temperature_model),
             (&pressure_path, &pressure_model),
         ]);
         let model_info = ModelInfo::new(model_map, HashSet::new());
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert!(errors.is_empty());
 
-        // submodel tests
+        // check the submodels
         assert_eq!(submodels.len(), 2);
 
-        let temp_submodel_path = submodels.get(&temperature_id);
-        assert_eq!(temp_submodel_path, Some(&temperature_path));
+        let result = submodels.get(&temperature_id);
+        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(temp_submodel_path, &temperature_path);
 
-        let press_submodel_path = submodels.get(&pressure_id);
-        assert_eq!(press_submodel_path, Some(&pressure_path));
-
-        // test inputs tests
-        assert_eq!(tests.len(), 2);
-
-        // Check temperature test (no inputs)
-        let (test_id, test_inputs) = &tests[0];
-        assert_eq!(test_id, &temperature_id);
-        assert!(test_inputs.is_empty());
-
-        // Check pressure test (with altitude input)
-        let (test_id, test_inputs) = &tests[1];
-        assert_eq!(test_id, &pressure_id);
-        assert_eq!(test_inputs.len(), 1);
-        assert_eq!(test_inputs[0].name, "altitude");
-        assert_eq!(test_inputs[0].value, Expr::Literal(Literal::Number(1000.0)));
+        let result = submodels.get(&pressure_id);
+        let (press_submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(press_submodel_path, &pressure_path);
     }
 
     #[test]
     fn test_resolve_mixed_success_and_error() {
-        // build the use model list
-        let use_models = vec![
-            // use temperature as temp
-            UseModel {
-                model_name: "temperature".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: Some("temp".to_string()),
-            },
-            // use error_model as error
-            UseModel {
-                model_name: "error_model".to_string(),
-                subcomponents: vec![],
-                inputs: None,
-                as_name: Some("error".to_string()),
-            },
-        ];
+        // create the use model list with mixed success and error cases
+        // use temperature as temp
+        let temp_model = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+
+        // use error_model as error
+        let error_model =
+            helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
+        let error_model_ident_span = get_span_from_ast_span(&error_model.node_span());
+
+        let use_models = vec![&temp_model, &error_model];
 
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the model map with one valid model and one error model
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = create_test_model(vec![]);
+        let temperature_model = helper::create_test_model(vec![]);
         let error_id = Identifier::new("error");
         let error_path = ModelPath::new("/error_model");
-        let error_model = create_test_model(vec![]);
+        let error_model = helper::create_test_model(vec![]);
 
         // create model info with one valid model and one error model
         let model_map = HashMap::from([
@@ -721,33 +694,29 @@ mod tests {
         model_with_errors.insert(&error_path);
         let model_info = ModelInfo::new(model_map, model_with_errors);
 
-        // resolve the submodels and tests
-        let (submodels, tests, errors) =
-            resolve_submodels_and_tests(use_models, &model_path, &model_info);
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
 
-        // error tests
+        // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&error_id).unwrap();
         match error {
-            SubmodelResolutionError::ModelHasError(path) => {
-                assert_eq!(path, &error_path);
+            SubmodelResolutionError::ModelHasError {
+                model_path,
+                reference_span,
+            } => {
+                assert_eq!(model_path, &error_path);
+                assert_eq!(reference_span, &error_model_ident_span);
             }
             _ => panic!("Expected ModelHasError, got {:?}", error),
         }
 
-        // submodel tests
+        // check the submodels
         assert_eq!(submodels.len(), 1);
 
-        let temp_submodel_path = submodels.get(&temperature_id);
-        assert_eq!(temp_submodel_path, Some(&temperature_path));
-
-        // test inputs tests
-        assert_eq!(tests.len(), 1);
-
-        // check temperature test (no inputs)
-        let (test_id, test_inputs) = &tests[0];
-        assert_eq!(test_id, &temperature_id);
-        assert!(test_inputs.is_empty());
+        let result = submodels.get(&temperature_id);
+        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
+        assert_eq!(temp_submodel_path, &temperature_path);
     }
 }

@@ -9,7 +9,12 @@ use std::{
     ops::Deref,
 };
 
-use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier, unit::CompositeUnit};
+use crate::{
+    debug_info::TraceLevel,
+    expr::ExprWithSpan,
+    reference::{Identifier, IdentifierWithSpan},
+    unit::CompositeUnit,
+};
 
 /// A collection of parameters that can be managed together.
 ///
@@ -17,6 +22,8 @@ use crate::{debug_info::TraceLevel, expr::Expr, reference::Identifier, unit::Com
 /// allowing easy lookup and iteration over all parameters in a model.
 /// It implements `Deref` to provide direct access to the underlying
 /// parameter mapping.
+///
+/// The `Span` is the span of the parameter's identifier.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParameterCollection {
     parameters: HashMap<Identifier, Parameter>,
@@ -36,10 +43,11 @@ impl ParameterCollection {
     /// use std::collections::HashMap;
     ///
     /// let mut params = HashMap::new();
+    /// use oneil_ir::span::WithSpan;
     /// let param = Parameter::new(
     ///     std::collections::HashSet::new(),
-    ///     Identifier::new("radius"),
-    ///     ParameterValue::simple(Expr::literal(Literal::number(5.0)), None),
+    ///     WithSpan::test_new(Identifier::new("radius")),
+    ///     ParameterValue::simple(WithSpan::test_new(Expr::literal(Literal::number(5.0))), None),
     ///     Limits::default(),
     ///     false,
     ///     TraceLevel::None,
@@ -77,7 +85,7 @@ impl Deref for ParameterCollection {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     dependencies: HashSet<Identifier>,
-    ident: Identifier,
+    ident: IdentifierWithSpan,
     value: ParameterValue,
     limits: Limits,
     is_performance: bool,
@@ -99,13 +107,13 @@ impl Parameter {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel, span::WithSpan};
     /// use std::collections::HashSet;
     ///
     /// let param = Parameter::new(
     ///     HashSet::new(),
-    ///     Identifier::new("area"),
-    ///     ParameterValue::simple(Expr::literal(Literal::number(25.0)), None),
+    ///     WithSpan::test_new(Identifier::new("area")),
+    ///     ParameterValue::simple(WithSpan::test_new(Expr::literal(Literal::number(25.0))), None),
     ///     Limits::default(),
     ///     false,
     ///     TraceLevel::None,
@@ -113,7 +121,7 @@ impl Parameter {
     /// ```
     pub fn new(
         dependencies: HashSet<Identifier>,
-        ident: Identifier,
+        ident: IdentifierWithSpan,
         value: ParameterValue,
         limits: Limits,
         is_performance: bool,
@@ -142,7 +150,7 @@ impl Parameter {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel};
+    /// use oneil_ir::{parameter::{Parameter, ParameterValue, Limits}, expr::{Expr, Literal}, reference::Identifier, debug_info::TraceLevel, span::WithSpan};
     /// use std::collections::HashSet;
     ///
     /// let mut deps = HashSet::new();
@@ -150,8 +158,8 @@ impl Parameter {
     ///
     /// let param = Parameter::new(
     ///     deps,
-    ///     Identifier::new("area"),
-    ///     ParameterValue::simple(Expr::literal(Literal::number(25.0)), None),
+    ///     WithSpan::test_new(Identifier::new("area")),
+    ///     ParameterValue::simple(WithSpan::test_new(Expr::literal(Literal::number(25.0))), None),
     ///     Limits::default(),
     ///     false,
     ///     TraceLevel::None,
@@ -162,6 +170,51 @@ impl Parameter {
     pub fn dependencies(&self) -> &HashSet<Identifier> {
         &self.dependencies
     }
+
+    /// Returns the identifier of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the parameter's identifier.
+    pub fn identifier(&self) -> &IdentifierWithSpan {
+        &self.ident
+    }
+
+    /// Returns the value of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the parameter's value.
+    pub fn value(&self) -> &ParameterValue {
+        &self.value
+    }
+
+    /// Returns the limits of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the parameter's limits.
+    pub fn limits(&self) -> &Limits {
+        &self.limits
+    }
+
+    /// Returns whether this parameter is a performance parameter.
+    ///
+    /// # Returns
+    ///
+    /// `true` if this parameter is a performance parameter, `false` otherwise.
+    pub fn is_performance(&self) -> bool {
+        self.is_performance
+    }
+
+    /// Returns the trace level of this parameter.
+    ///
+    /// # Returns
+    ///
+    /// The trace level for this parameter.
+    pub fn trace_level(&self) -> &TraceLevel {
+        &self.trace_level
+    }
 }
 
 /// The value of a parameter, which can be either a simple expression or a piecewise function.
@@ -171,7 +224,7 @@ impl Parameter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     /// A simple expression with an optional unit.
-    Simple(Expr, Option<CompositeUnit>),
+    Simple(ExprWithSpan, Option<CompositeUnit>),
     /// A piecewise function with multiple expressions and conditions.
     Piecewise(Vec<PiecewiseExpr>, Option<CompositeUnit>),
 }
@@ -187,12 +240,12 @@ impl ParameterValue {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::ParameterValue, expr::{Expr, Literal}, unit::CompositeUnit};
+    /// use oneil_ir::{parameter::ParameterValue, expr::{Expr, Literal}, unit::CompositeUnit, span::WithSpan};
     ///
-    /// let expr = Expr::literal(Literal::number(3.14159));
+    /// let expr = WithSpan::test_new(Expr::literal(Literal::number(3.14159)));
     /// let value = ParameterValue::simple(expr, None);
     /// ```
-    pub fn simple(expr: Expr, unit: Option<CompositeUnit>) -> Self {
+    pub fn simple(expr: ExprWithSpan, unit: Option<CompositeUnit>) -> Self {
         Self::Simple(expr, unit)
     }
 
@@ -206,14 +259,15 @@ impl ParameterValue {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::{ParameterValue, PiecewiseExpr}, expr::{Expr, Literal, BinaryOp}, reference::Identifier};
+    /// use oneil_ir::{parameter::{ParameterValue, PiecewiseExpr}, expr::{Expr, Literal, ComparisonOp}, reference::Identifier, span::WithSpan};
     ///
-    /// let condition = Expr::binary_op(
-    ///     BinaryOp::LessThan,
-    ///     Expr::parameter_variable(Identifier::new("x")),
-    ///     Expr::literal(Literal::number(0.0))
-    /// );
-    /// let expr = Expr::literal(Literal::number(-1.0));
+    /// let condition = WithSpan::test_new(Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::LessThan),
+    ///     WithSpan::test_new(Expr::parameter_variable(Identifier::new("x"))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0))),
+    ///     vec![]
+    /// ));
+    /// let expr = WithSpan::test_new(Expr::literal(Literal::number(-1.0)));
     /// let piecewise = PiecewiseExpr::new(expr, condition);
     ///
     /// let value = ParameterValue::piecewise(vec![piecewise], None);
@@ -229,8 +283,8 @@ impl ParameterValue {
 /// value should be used. The condition is evaluated as a boolean expression.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewiseExpr {
-    expr: Expr,
-    if_expr: Expr,
+    expr: ExprWithSpan,
+    if_expr: ExprWithSpan,
 }
 
 impl PiecewiseExpr {
@@ -244,19 +298,38 @@ impl PiecewiseExpr {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::PiecewiseExpr, expr::{Expr, Literal, BinaryOp}, reference::Identifier};
+    /// use oneil_ir::{parameter::PiecewiseExpr, expr::{Expr, Literal, ComparisonOp}, reference::Identifier, span::WithSpan};
     ///
-    /// let value = Expr::literal(Literal::number(1.0));
-    /// let condition = Expr::binary_op(
-    ///     BinaryOp::GreaterThan,
-    ///     Expr::parameter_variable(Identifier::new("x")),
-    ///     Expr::literal(Literal::number(0.0))
-    /// );
+    /// let value = WithSpan::test_new(Expr::literal(Literal::number(1.0)));
+    /// let condition = WithSpan::test_new(Expr::comparison_op(
+    ///     WithSpan::test_new(ComparisonOp::GreaterThan),
+    ///     WithSpan::test_new(Expr::parameter_variable(Identifier::new("x"))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(0.0))),
+    ///     vec![]
+    /// ));
     ///
     /// let piecewise = PiecewiseExpr::new(value, condition);
     /// ```
-    pub fn new(expr: Expr, if_expr: Expr) -> Self {
+    pub fn new(expr: ExprWithSpan, if_expr: ExprWithSpan) -> Self {
         Self { expr, if_expr }
+    }
+
+    /// Returns the expression value.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the expression that defines the value.
+    pub fn expr(&self) -> &ExprWithSpan {
+        &self.expr
+    }
+
+    /// Returns the condition expression.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the condition expression.
+    pub fn if_expr(&self) -> &ExprWithSpan {
+        &self.if_expr
     }
 }
 
@@ -271,14 +344,14 @@ pub enum Limits {
     /// Continuous range with minimum and maximum values.
     Continuous {
         /// The minimum allowed value expression.
-        min: Expr,
+        min: ExprWithSpan,
         /// The maximum allowed value expression.
-        max: Expr,
+        max: ExprWithSpan,
     },
     /// Discrete set of allowed values.
     Discrete {
         /// Vector of expressions representing allowed values.
-        values: Vec<Expr>,
+        values: Vec<ExprWithSpan>,
     },
 }
 
@@ -306,13 +379,13 @@ impl Limits {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}};
+    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}, span::WithSpan};
     ///
-    /// let min = Expr::literal(Literal::number(0.0));
-    /// let max = Expr::literal(Literal::number(100.0));
+    /// let min = WithSpan::test_new(Expr::literal(Literal::number(0.0)));
+    /// let max = WithSpan::test_new(Expr::literal(Literal::number(100.0)));
     /// let limits = Limits::continuous(min, max);
     /// ```
-    pub fn continuous(min: Expr, max: Expr) -> Self {
+    pub fn continuous(min: ExprWithSpan, max: ExprWithSpan) -> Self {
         Self::Continuous { min, max }
     }
 
@@ -325,16 +398,16 @@ impl Limits {
     /// # Example
     ///
     /// ```rust
-    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}};
+    /// use oneil_ir::{parameter::Limits, expr::{Expr, Literal}, span::WithSpan};
     ///
     /// let values = vec![
-    ///     Expr::literal(Literal::number(1.0)),
-    ///     Expr::literal(Literal::number(2.0)),
-    ///     Expr::literal(Literal::number(3.0)),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(1.0))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(2.0))),
+    ///     WithSpan::test_new(Expr::literal(Literal::number(3.0))),
     /// ];
     /// let limits = Limits::discrete(values);
     /// ```
-    pub fn discrete(values: Vec<Expr>) -> Self {
+    pub fn discrete(values: Vec<ExprWithSpan>) -> Self {
         Self::Discrete { values }
     }
 }

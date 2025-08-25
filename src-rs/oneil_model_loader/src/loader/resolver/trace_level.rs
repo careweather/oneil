@@ -14,12 +14,12 @@ use oneil_ast as ast;
 ///
 /// The corresponding model trace level
 pub fn resolve_trace_level(
-    trace_level: &ast::parameter::TraceLevel,
+    trace_level: Option<&ast::debug_info::TraceLevelNode>,
 ) -> oneil_ir::debug_info::TraceLevel {
-    match trace_level {
-        ast::parameter::TraceLevel::None => oneil_ir::debug_info::TraceLevel::None,
-        ast::parameter::TraceLevel::Trace => oneil_ir::debug_info::TraceLevel::Trace,
-        ast::parameter::TraceLevel::Debug => oneil_ir::debug_info::TraceLevel::Debug,
+    match trace_level.map(|l| l.node_value()) {
+        Some(ast::debug_info::TraceLevel::Trace) => oneil_ir::debug_info::TraceLevel::Trace,
+        Some(ast::debug_info::TraceLevel::Debug) => oneil_ir::debug_info::TraceLevel::Debug,
+        None => oneil_ir::debug_info::TraceLevel::None,
     }
 }
 
@@ -30,14 +30,13 @@ mod tests {
     #[test]
     fn test_resolve_none_trace_level() {
         {
-            let ast_level = ast::parameter::TraceLevel::None;
             let expected_model_level = oneil_ir::debug_info::TraceLevel::None;
 
-            let result = resolve_trace_level(&ast_level);
+            let result = resolve_trace_level(None);
             assert_eq!(
                 result, expected_model_level,
-                "Expected {:?} to resolve to {:?}, but got {:?}",
-                ast_level, expected_model_level, result
+                "Expected None to resolve to {:?}, but got {:?}",
+                expected_model_level, result
             );
         };
     }
@@ -45,14 +44,19 @@ mod tests {
     #[test]
     fn test_resolve_trace_trace_level() {
         {
-            let ast_level = ast::parameter::TraceLevel::Trace;
+            let ast_level = ast::debug_info::TraceLevel::Trace;
             let expected_model_level = oneil_ir::debug_info::TraceLevel::Trace;
 
-            let result = resolve_trace_level(&ast_level);
+            // Create a trace level node
+            let trace_level_node = ast::node::Node::new(ast::Span::new(0, 0, 0), ast_level);
+            let result = resolve_trace_level(Some(&trace_level_node));
             assert_eq!(
-                result, expected_model_level,
+                result,
+                expected_model_level,
                 "Expected {:?} to resolve to {:?}, but got {:?}",
-                ast_level, expected_model_level, result
+                ast::debug_info::TraceLevel::Trace,
+                expected_model_level,
+                result
             );
         };
     }
@@ -60,14 +64,19 @@ mod tests {
     #[test]
     fn test_resolve_debug_trace_level() {
         {
-            let ast_level = ast::parameter::TraceLevel::Debug;
+            let ast_level = ast::debug_info::TraceLevel::Debug;
             let expected_model_level = oneil_ir::debug_info::TraceLevel::Debug;
 
-            let result = resolve_trace_level(&ast_level);
+            // Create a trace level node
+            let trace_level_node = ast::node::Node::new(ast::Span::new(0, 0, 0), ast_level);
+            let result = resolve_trace_level(Some(&trace_level_node));
             assert_eq!(
-                result, expected_model_level,
+                result,
+                expected_model_level,
                 "Expected {:?} to resolve to {:?}, but got {:?}",
-                ast_level, expected_model_level, result
+                ast::debug_info::TraceLevel::Debug,
+                expected_model_level,
+                result
             );
         };
     }

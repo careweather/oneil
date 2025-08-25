@@ -1,6 +1,9 @@
-use super::expression::Expr;
-use super::parameter::Parameter;
-use super::test::Test;
+//! Declaration constructs for the AST
+//!
+//! This module contains structures for representing declarations in Oneil programs,
+//! including imports, model usage, parameters, and tests.
+
+use crate::{naming::IdentifierNode, node::Node, parameter::ParameterNode, test::TestNode};
 
 /// A declaration in an Oneil program
 ///
@@ -8,29 +11,101 @@ use super::test::Test;
 /// parameters, and tests.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
-    Import(Import),
+    /// Import declaration for including other modules
+    Import(ImportNode),
 
-    UseModel(UseModel),
+    /// Model usage declaration for referencing other models
+    UseModel(UseModelNode),
 
-    Parameter(Parameter),
-    Test(Test),
+    /// Parameter declaration for defining model parameters
+    Parameter(ParameterNode),
+    /// Test declaration for verifying model behavior
+    Test(TestNode),
 }
 
+/// A node containing a declaration
+pub type DeclNode = Node<Decl>;
+
+impl Decl {
+    /// Creates an import declaration
+    pub fn import(path: ImportNode) -> Self {
+        Self::Import(path)
+    }
+
+    /// Creates a model usage declaration
+    pub fn use_model(use_model: UseModelNode) -> Self {
+        Self::UseModel(use_model)
+    }
+
+    /// Creates a parameter declaration
+    pub fn parameter(parameter: ParameterNode) -> Self {
+        Self::Parameter(parameter)
+    }
+
+    /// Creates a test declaration
+    pub fn test(test: TestNode) -> Self {
+        Self::Test(test)
+    }
+}
+
+/// An import declaration that specifies a module to include
 #[derive(Debug, Clone, PartialEq)]
 pub struct Import {
-    pub path: String,
+    path: Node<String>,
 }
 
+/// A node containing an import declaration
+pub type ImportNode = Node<Import>;
+
+impl Import {
+    /// Creates a new import with the given path
+    pub fn new(path: Node<String>) -> Self {
+        Self { path }
+    }
+
+    /// Returns the import path as a string slice
+    pub fn path(&self) -> &Node<String> {
+        &self.path
+    }
+}
+
+/// A model usage declaration that references another model
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseModel {
-    pub model_name: String,
-    pub subcomponents: Vec<String>,
-    pub inputs: Option<Vec<ModelInput>>,
-    pub as_name: Option<String>,
+    model_name: IdentifierNode,
+    subcomponents: Vec<IdentifierNode>,
+    alias: Option<IdentifierNode>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelInput {
-    pub name: String,
-    pub value: Expr,
+/// A node containing a model usage declaration
+pub type UseModelNode = Node<UseModel>;
+
+impl UseModel {
+    /// Creates a new model usage declaration
+    pub fn new(
+        model_name: IdentifierNode,
+        subcomponents: Vec<IdentifierNode>,
+        alias: Option<IdentifierNode>,
+    ) -> Self {
+        Self {
+            model_name,
+            subcomponents,
+            alias,
+        }
+    }
+
+    /// Returns the name of the model being used
+    pub fn model_name(&self) -> &IdentifierNode {
+        &self.model_name
+    }
+
+    /// Returns the list of subcomponents being used
+    pub fn subcomponents(&self) -> &[IdentifierNode] {
+        &self.subcomponents
+    }
+
+    /// Returns the optional alias for the model usage
+    pub fn alias(&self) -> Option<&IdentifierNode> {
+        self.alias.as_ref()
+    }
 }
