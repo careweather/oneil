@@ -155,7 +155,7 @@ fn test_decl(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
 
     let test = Test::new(trace_level, expr, note);
 
-    Ok((rest, Node::new(span, test)))
+    Ok((rest, Node::new(&span, test)))
 }
 
 /// Parse a trace level indicator (`*` or `**`).
@@ -187,8 +187,8 @@ fn test_decl(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
 /// assert!(test.trace_level().is_some());
 /// ```
 fn trace_level(input: Span<'_>) -> Result<'_, TraceLevelNode, ParserError> {
-    let single_star = star.map(|token| Node::new(token, TraceLevel::Trace));
-    let double_star = star_star.map(|token| Node::new(token, TraceLevel::Debug));
+    let single_star = star.map(|token| Node::new(&token, TraceLevel::Trace));
+    let double_star = star_star.map(|token| Node::new(&token, TraceLevel::Debug));
 
     double_star.or(single_star).convert_errors().parse(input)
 }
@@ -210,15 +210,15 @@ mod tests {
         #[test]
         fn test_decl_basic() {
             let input = Span::new_extra("test: true\n", Config::default());
-            let (rest, test) = parse(input).unwrap();
+            let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 1);
 
-            let expected_test_expr = Node::new(AstSpan::new(6, 4, 0), Literal::boolean(true));
+            let expected_test_expr = Node::new(&AstSpan::new(6, 4, 0), Literal::boolean(true));
             let expected_test_expr =
-                Node::new(AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
+                Node::new(&AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
 
-            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.node_span(), expected_span);
             assert_eq!(test.trace_level(), None);
             assert_eq!(test.expr(), &expected_test_expr);
 
@@ -228,15 +228,15 @@ mod tests {
         #[test]
         fn test_decl_at_eof() {
             let input = Span::new_extra("test: true", Config::default());
-            let (rest, test) = parse(input).unwrap();
+            let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 0);
 
-            let expected_test_expr = Node::new(AstSpan::new(6, 4, 0), Literal::boolean(true));
+            let expected_test_expr = Node::new(&AstSpan::new(6, 4, 0), Literal::boolean(true));
             let expected_test_expr =
-                Node::new(AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
+                Node::new(&AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
 
-            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.node_span(), expected_span);
             assert_eq!(test.trace_level(), None);
             assert_eq!(test.expr(), &expected_test_expr);
 
@@ -246,13 +246,13 @@ mod tests {
         #[test]
         fn test_decl_with_trace() {
             let input = Span::new_extra("* test: true\n", Config::default());
-            let (rest, test) = parse(input).unwrap();
+            let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 12, 1);
 
-            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.node_span(), expected_span);
             assert_eq!(
-                test.trace_level().map(|t| t.node_value()),
+                test.trace_level().map(Node::node_value),
                 Some(&TraceLevel::Trace)
             );
 
@@ -262,13 +262,13 @@ mod tests {
         #[test]
         fn test_decl_with_debug() {
             let input = Span::new_extra("** test: true\n", Config::default());
-            let (rest, test) = parse(input).unwrap();
+            let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 13, 1);
 
-            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.node_span(), expected_span);
             assert_eq!(
-                test.trace_level().map(|t| t.node_value()),
+                test.trace_level().map(Node::node_value),
                 Some(&TraceLevel::Debug)
             );
 
@@ -278,11 +278,11 @@ mod tests {
         #[test]
         fn test_decl_with_note() {
             let input = Span::new_extra("test: true\n~ This is a note\n", Config::default());
-            let (rest, test) = parse(input).unwrap();
+            let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 18);
 
-            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.node_span(), expected_span);
 
             let note = test.note().expect("note should be present");
             assert_eq!(note.node_value(), &Note::new("This is a note".to_string()));
@@ -293,13 +293,13 @@ mod tests {
         #[test]
         fn test_decl_full() {
             let input = Span::new_extra("** test: x > y\n", Config::default());
-            let (rest, test) = parse(input).unwrap();
+            let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 14, 1);
 
-            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.node_span(), expected_span);
             assert_eq!(
-                test.trace_level().map(|t| t.node_value()),
+                test.trace_level().map(Node::node_value),
                 Some(&TraceLevel::Debug)
             );
 
@@ -313,15 +313,15 @@ mod tests {
         #[test]
         fn test_parse_complete_success() {
             let input = Span::new_extra("test: true\n", Config::default());
-            let (rest, test) = parse_complete(input).unwrap();
+            let (rest, test) = parse_complete(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 1);
 
-            let expected_test_expr = Node::new(AstSpan::new(6, 4, 0), Literal::boolean(true));
+            let expected_test_expr = Node::new(&AstSpan::new(6, 4, 0), Literal::boolean(true));
             let expected_test_expr =
-                Node::new(AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
+                Node::new(&AstSpan::new(6, 4, 0), Expr::literal(expected_test_expr));
 
-            assert_eq!(test.node_span(), &expected_span);
+            assert_eq!(test.node_span(), expected_span);
             assert_eq!(test.trace_level(), None);
             assert_eq!(test.expr(), &expected_test_expr);
             assert_eq!(rest.fragment(), &"");
@@ -351,7 +351,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Test)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -371,10 +371,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_test_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -394,10 +394,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_colon_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -417,10 +417,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_test_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -440,10 +440,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_colon_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -460,7 +460,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Test)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -477,7 +477,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Test)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -494,7 +494,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Test)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
     }

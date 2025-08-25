@@ -568,9 +568,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -583,9 +583,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -598,9 +598,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -613,9 +613,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -628,9 +628,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Equals))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -643,9 +643,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::GreaterThan))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -658,9 +658,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::LessThan))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -673,9 +673,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Minus))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -688,9 +688,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Star))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -703,9 +703,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Slash))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -718,9 +718,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::BangEquals))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
 
@@ -733,9 +733,9 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::BangEquals))
-                    ))
+                    ));
                 }
-                _ => panic!("expected TokenError::Expect(_), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
             }
         }
     }
@@ -746,7 +746,7 @@ mod tests {
         #[test]
         fn test_next_char_is_not_succeeds() {
             let input = Span::new_extra("abc", Config::default());
-            let (rest, _) = next_char_is_not('b')
+            let (rest, ()) = next_char_is_not('b')
                 .parse(input)
                 .expect("next char should not be 'b'");
             assert_eq!(rest.fragment(), &"abc");
@@ -755,7 +755,7 @@ mod tests {
         #[test]
         fn test_next_char_is_not_succeeds_with_eof() {
             let input = Span::new_extra("", Config::default());
-            let (rest, _) = next_char_is_not('b')
+            let (rest, ()) = next_char_is_not('b')
                 .parse(input)
                 .expect("next char should not be 'b' at EOF");
             assert_eq!(rest.fragment(), &"");
@@ -767,16 +767,16 @@ mod tests {
             let res = next_char_is_not('a').parse(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
         #[test]
         fn test_next_char_is_not_with_whitespace() {
             let input = Span::new_extra(" b", Config::default());
-            let (rest, _) = next_char_is_not('a')
+            let (rest, ()) = next_char_is_not('a')
                 .parse(input)
                 .expect("next char should not be 'a'");
             assert_eq!(rest.fragment(), &" b");
@@ -785,7 +785,7 @@ mod tests {
         #[test]
         fn test_next_char_is_not_with_special_characters() {
             let input = Span::new_extra("!bc", Config::default());
-            let (rest, _) = next_char_is_not('a')
+            let (rest, ()) = next_char_is_not('a')
                 .parse(input)
                 .expect("next char should not be 'a'");
             assert_eq!(rest.fragment(), &"!bc");
@@ -794,7 +794,7 @@ mod tests {
         #[test]
         fn test_next_char_is_not_with_numbers() {
             let input = Span::new_extra("123", Config::default());
-            let (rest, _) = next_char_is_not('a')
+            let (rest, ()) = next_char_is_not('a')
                 .parse(input)
                 .expect("next char should not be 'a'");
             assert_eq!(rest.fragment(), &"123");
@@ -803,7 +803,7 @@ mod tests {
         #[test]
         fn test_next_char_is_not_with_unicode() {
             let input = Span::new_extra("αβγ", Config::default());
-            let (rest, _) = next_char_is_not('a')
+            let (rest, ()) = next_char_is_not('a')
                 .parse(input)
                 .expect("next char should not be 'a'");
             assert_eq!(rest.fragment(), &"αβγ");
@@ -812,7 +812,7 @@ mod tests {
         #[test]
         fn test_next_char_is_not_with_emoji() {
             let input = Span::new_extra("🚀bc", Config::default());
-            let (rest, _) = next_char_is_not('a')
+            let (rest, ()) = next_char_is_not('a')
                 .parse(input)
                 .expect("next char should not be 'a'");
             assert_eq!(rest.fragment(), &"🚀bc");

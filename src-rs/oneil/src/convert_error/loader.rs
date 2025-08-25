@@ -14,7 +14,7 @@
 
 use std::{fs, path::Path};
 
-use oneil_error::OneilError;
+use oneil_error::{ErrorLocation, OneilError};
 use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
@@ -72,7 +72,7 @@ pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -
         // appearance within the file
         model_errors.sort_by_key(|error| {
             let location = error.location();
-            location.map(|location| location.offset())
+            location.map(ErrorLocation::offset)
         });
 
         errors.extend(model_errors);
@@ -201,14 +201,14 @@ fn convert_resolution_errors(
     let source = match &source {
         Ok(source) => Some(source.as_str()),
         Err(error) => {
-            let file_error = file::convert(path, &error);
+            let file_error = file::convert(path, error);
             errors.push(file_error);
             None
         }
     };
 
     // convert import errors
-    for (_python_path, import_error) in resolution_errors.get_import_errors() {
+    for import_error in resolution_errors.get_import_errors().values() {
         match import_error {
             ImportResolutionError::FailedValidation { .. } => {
                 // this error is intentionally ignored because it indicates that the
@@ -227,9 +227,7 @@ fn convert_resolution_errors(
     }
 
     // convert submodel resolution errors
-    for (_identifier, submodel_resolution_error) in
-        resolution_errors.get_submodel_resolution_errors()
-    {
+    for submodel_resolution_error in resolution_errors.get_submodel_resolution_errors().values() {
         match submodel_resolution_error {
             SubmodelResolutionError::ModelHasError { .. } => {
                 ignore_error();
@@ -248,8 +246,7 @@ fn convert_resolution_errors(
     }
 
     // convert parameter resolution errors
-    for (_identifier, parameter_resolution_errors) in
-        resolution_errors.get_parameter_resolution_errors()
+    for parameter_resolution_errors in resolution_errors.get_parameter_resolution_errors().values()
     {
         for parameter_resolution_error in parameter_resolution_errors {
             match parameter_resolution_error {
@@ -277,7 +274,7 @@ fn convert_resolution_errors(
     }
 
     // convert test resolution errors
-    for (_test_index, test_resolution_errors) in resolution_errors.get_test_resolution_errors() {
+    for test_resolution_errors in resolution_errors.get_test_resolution_errors().values() {
         for test_resolution_error in test_resolution_errors {
             match test_resolution_error {
                 TestResolutionError::DuplicateInput { .. } => {
@@ -371,4 +368,4 @@ fn convert_variable_resolution_error(
 ///
 /// This function does nothing and is used purely for documentation purposes
 /// to indicate where errors are intentionally ignored.
-pub fn ignore_error() {}
+pub const fn ignore_error() {}

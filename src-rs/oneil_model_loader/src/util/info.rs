@@ -44,8 +44,8 @@ where
     ///
     /// # Arguments
     ///
-    /// * `map` - HashMap of successfully resolved items
-    /// * `with_errors` - HashSet of items that have errors
+    /// * `map` - `HashMap` of successfully resolved items
+    /// * `with_errors` - `HashSet` of items that have errors
     ///
     /// # Returns
     ///

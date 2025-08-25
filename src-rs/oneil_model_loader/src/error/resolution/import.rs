@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{reference::PythonPath, span::Span};
 
@@ -5,7 +7,7 @@ use oneil_ir::{reference::PythonPath, span::Span};
 ///
 /// This error type is used when a Python import declaration cannot be validated,
 /// typically because the referenced Python file does not exist or cannot be imported.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ImportResolutionError {
     /// A duplicate import was detected.
     DuplicateImport {
@@ -37,7 +39,8 @@ impl ImportResolutionError {
     /// # Returns
     ///
     /// A new `ImportResolutionError::DuplicateImport` variant.
-    pub fn duplicate_import(
+    #[must_use]
+    pub const fn duplicate_import(
         original_span: Span,
         duplicate_span: Span,
         python_path: PythonPath,
@@ -59,13 +62,16 @@ impl ImportResolutionError {
     /// # Returns
     ///
     /// A new `ImportResolutionError::FailedValidation` variant.
-    pub fn failed_validation(ident_span: Span, python_path: PythonPath) -> Self {
+    #[must_use]
+    pub const fn failed_validation(ident_span: Span, python_path: PythonPath) -> Self {
         Self::FailedValidation {
             ident_span,
             python_path,
         }
     }
+}
 
+impl Display for ImportResolutionError {
     /// Converts the import resolution error to a string representation.
     ///
     /// This method delegates to the display module to format the error message
@@ -74,15 +80,15 @@ impl ImportResolutionError {
     /// # Returns
     ///
     /// A string representation of the import resolution error.
-    pub fn to_string(&self) -> String {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DuplicateImport { python_path, .. } => {
                 let path = python_path.as_ref().display();
-                format!("duplicate import of `{}`", path)
+                write!(f, "duplicate import of `{path}`")
             }
             Self::FailedValidation { python_path, .. } => {
                 let path = python_path.as_ref().display();
-                format!("unable to import python file `{}`", path)
+                write!(f, "unable to import python file `{path}`")
             }
         }
     }

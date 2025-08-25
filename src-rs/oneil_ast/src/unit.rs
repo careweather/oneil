@@ -38,6 +38,7 @@ pub type UnitExprNode = Node<UnitExpr>;
 
 impl UnitExpr {
     /// Creates a binary operation unit expression
+    #[must_use]
     pub fn binary_op(op: UnitOpNode, left: UnitExprNode, right: UnitExprNode) -> Self {
         let left = Box::new(left);
         let right = Box::new(right);
@@ -45,6 +46,7 @@ impl UnitExpr {
     }
 
     /// Creates a parenthesized unit expression
+    #[must_use]
     pub fn parenthesized(expr: UnitExprNode) -> Self {
         Self::Parenthesized {
             expr: Box::new(expr),
@@ -52,12 +54,14 @@ impl UnitExpr {
     }
 
     /// Creates a unitless 1, usually used for units like 1/s
-    pub fn unit_one() -> Self {
+    #[must_use]
+    pub const fn unit_one() -> Self {
         Self::UnitOne
     }
 
     /// Creates a unit expression with optional exponent
-    pub fn unit(identifier: IdentifierNode, exponent: Option<UnitExponentNode>) -> Self {
+    #[must_use]
+    pub const fn unit(identifier: IdentifierNode, exponent: Option<UnitExponentNode>) -> Self {
         Self::Unit {
             identifier,
             exponent,
@@ -66,7 +70,7 @@ impl UnitExpr {
 }
 
 /// Unit operators for unit expressions
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnitOp {
     /// Multiplication operator for units (*)
     Multiply,
@@ -79,12 +83,14 @@ pub type UnitOpNode = Node<UnitOp>;
 
 impl UnitOp {
     /// Creates a multiplication operator for units
-    pub fn multiply() -> Self {
+    #[must_use]
+    pub const fn multiply() -> Self {
         Self::Multiply
     }
 
     /// Creates a division operator for units
-    pub fn divide() -> Self {
+    #[must_use]
+    pub const fn divide() -> Self {
         Self::Divide
     }
 }
@@ -101,12 +107,14 @@ pub type UnitExponentNode = Node<UnitExponent>;
 
 impl UnitExponent {
     /// Creates a new unit exponent with the given value
-    pub fn new(value: f64) -> Self {
+    #[must_use]
+    pub const fn new(value: f64) -> Self {
         Self(value)
     }
 
     /// Returns the value of the unit exponent
-    pub fn value(&self) -> f64 {
+    #[must_use]
+    pub const fn value(&self) -> f64 {
         self.0
     }
 }

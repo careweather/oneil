@@ -64,15 +64,16 @@ where
     /// # Arguments
     ///
     /// * `use_colors` - Whether to enable colored output. When `true`, uses ANSI color codes
-    ///                  for enhanced readability. When `false`, outputs plain text.
+    ///   for enhanced readability. When `false`, outputs plain text.
     /// * `print_debug` - Whether to print in debug format. When `true`, displays raw
-    ///                   debug representations. When `false`, uses formatted tree structures.
+    ///   debug representations. When `false`, uses formatted tree structures.
     /// * `writer` - The writer to output formatted data to. Must implement `Write`.
+    /// * `error_writer` - The writer to output error messages to. Must implement `Write`.
     ///
     /// # Returns
     ///
     /// A new `Printer` instance configured with the specified options.
-    pub fn new(
+    pub const fn new(
         use_colors: bool,
         print_debug: bool,
         writer: &'a mut W1,
@@ -110,7 +111,7 @@ where
     /// Returns an error if writing to the underlying writer fails.
     pub fn print_ast(&mut self, ast: &AstModel) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "AST: {:?}", ast)?;
+            writeln!(self.writer, "AST: {ast:?}")?;
         } else {
             ast::print(ast, self.writer)?;
         }
@@ -136,7 +137,7 @@ where
     /// Returns an error if writing to the underlying writer fails.
     pub fn print_ir(&mut self, ir: &IrModelCollection) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.writer, "IR: {:?}", ir)?;
+            writeln!(self.writer, "IR: {ir:?}")?;
         } else {
             ir::print(ir, self.writer)?;
         }
@@ -162,9 +163,9 @@ where
     /// Returns an error if writing to the underlying writer fails.
     pub fn print_error(&mut self, error: &OneilError) -> io::Result<()> {
         if self.print_debug {
-            writeln!(self.error_writer, "Error: {:?}", error)?;
+            writeln!(self.error_writer, "Error: {error:?}")?;
         } else {
-            error::print(error, &self.color_choice, self.error_writer)?;
+            error::print(error, self.color_choice, self.error_writer)?;
         }
 
         Ok(())
@@ -204,7 +205,7 @@ where
     /// # Returns
     ///
     /// Returns a mutable reference to the writer of type `W1`
-    pub fn writer(&mut self) -> &mut W1 {
+    pub const fn writer(&mut self) -> &mut W1 {
         self.writer
     }
 

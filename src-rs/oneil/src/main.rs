@@ -107,7 +107,8 @@ fn main() -> io::Result<()> {
                 );
                 match model_collection {
                     Ok(model_collection) => printer.print_ir(&model_collection)?,
-                    Err((model_collection, error_map)) => {
+                    Err(error) => {
+                        let (model_collection, error_map) = *error;
                         let errors = convert_error::loader::convert_map(&error_map);
                         printer.print_errors(&errors)?;
 

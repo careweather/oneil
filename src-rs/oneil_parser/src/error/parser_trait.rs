@@ -109,10 +109,10 @@ where
     }
 }
 
-/// Implements the ErrorHandlingParser trait for any type that implements Parser.
+/// Implements the `ErrorHandlingParser` trait for any type that implements `Parser`.
 ///
 /// This blanket implementation allows any parser to use the error handling
-/// methods provided by ErrorHandlingParser.
+/// methods provided by `ErrorHandlingParser`.
 impl<I, O, E, P> ErrorHandlingParser<I, O, E> for P
 where
     P: Parser<I, Output = O, Error = E>,

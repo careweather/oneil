@@ -87,8 +87,6 @@
 //! - **Type Safety**: Strong typing prevents invalid operations
 //! - **Extensibility**: The expression system can be easily extended with new operators and functions
 
-#![warn(missing_docs)]
-
 pub mod debug_info;
 pub mod expr;
 pub mod model;

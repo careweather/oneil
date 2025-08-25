@@ -16,7 +16,7 @@
 /// // Create a new configuration (currently identical to default)
 /// let config = Config::new();
 /// ```
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Config {}
 
 impl Config {
@@ -38,7 +38,8 @@ impl Config {
     /// let config = Config::new();
     /// assert_eq!(config, Config::default());
     /// ```
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 }

@@ -38,20 +38,16 @@ fn resolve_unit_recursive(
         ast::UnitExpr::BinaryOp { op, left, right } => {
             let units = resolve_unit_recursive(left, is_inverse, units);
 
-            let units = match op.node_value() {
+            match op.node_value() {
                 ast::unit::UnitOp::Multiply => resolve_unit_recursive(right, is_inverse, units),
                 ast::unit::UnitOp::Divide => resolve_unit_recursive(right, !is_inverse, units),
-            };
-            units
+            }
         }
         ast::UnitExpr::Unit {
             identifier,
             exponent,
         } => {
-            let exponent_value = exponent
-                .as_ref()
-                .map(|e| e.node_value().value())
-                .unwrap_or(1.0);
+            let exponent_value = exponent.as_ref().map_or(1.0, |e| e.value());
             let exponent_value = if is_inverse {
                 -exponent_value
             } else {
@@ -59,10 +55,10 @@ fn resolve_unit_recursive(
             };
 
             let name_span = get_span_from_ast_span(identifier.node_span());
-            let exponent_span = match &exponent {
-                Some(exp) => get_span_from_ast_span(exp.node_span()),
-                None => oneil_ir::span::Span::new(identifier.node_span().end(), 0),
-            };
+            let exponent_span = exponent.as_ref().map_or_else(
+                || oneil_ir::span::Span::new(identifier.node_span().end(), 0),
+                |exp| get_span_from_ast_span(exp.node_span()),
+            );
             let unit = oneil_ir::unit::Unit::new(
                 identifier.as_str().to_string(),
                 name_span,
@@ -93,7 +89,7 @@ mod tests {
         /// Helper function to create an identifier node
         pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            ast::node::Node::new(test_span(start, start + name.len()), identifier)
+            ast::node::Node::new(&test_span(start, start + name.len()), identifier)
         }
 
         /// Helper function to create a unit exponent node
@@ -103,7 +99,7 @@ mod tests {
             end: usize,
         ) -> ast::unit::UnitExponentNode {
             let exponent = ast::unit::UnitExponent::new(value);
-            ast::node::Node::new(test_span(start, end), exponent)
+            ast::node::Node::new(&test_span(start, end), exponent)
         }
 
         /// Helper function to create a simple unit expression node
@@ -120,7 +116,7 @@ mod tests {
                 identifier: identifier_node,
                 exponent: exponent_node,
             };
-            ast::node::Node::new(test_span(start, end), unit_expr)
+            ast::node::Node::new(&test_span(start, end), unit_expr)
         }
 
         /// Helper function to create a binary operation node
@@ -131,13 +127,13 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::unit::UnitExprNode {
-            let op_node = ast::node::Node::new(test_span(start, end), op);
+            let op_node = ast::node::Node::new(&test_span(start, end), op);
             let unit_expr = UnitExpr::BinaryOp {
                 op: op_node,
                 left: Box::new(left),
                 right: Box::new(right),
             };
-            ast::node::Node::new(test_span(start, end), unit_expr)
+            ast::node::Node::new(&test_span(start, end), unit_expr)
         }
 
         /// Helper function to create a parenthesized expression node
@@ -149,20 +145,26 @@ mod tests {
             let unit_expr = UnitExpr::Parenthesized {
                 expr: Box::new(expr),
             };
-            ast::node::Node::new(test_span(start, end), unit_expr)
+            ast::node::Node::new(&test_span(start, end), unit_expr)
         }
 
-        /// Helper function to create a UnitOne node
+        /// Helper function to create a `UnitOne` node
         pub fn create_unit_one_node(start: usize, end: usize) -> ast::unit::UnitExprNode {
             let unit_expr = UnitExpr::UnitOne;
-            ast::node::Node::new(test_span(start, end), unit_expr)
+            ast::node::Node::new(&test_span(start, end), unit_expr)
+        }
+
+        /// Helper function to compare two `f64` values with a small epsilon
+        fn is_equal_f64(left: f64, right: f64) -> bool {
+            const EPSILON: f64 = 1e-6;
+            (left - right).abs() < EPSILON
         }
 
         /// Helper function to check if a unit with the given name and exponent exists
         pub fn assert_unit_exists(units: &[oneil_ir::unit::Unit], name: &str, exponent: f64) {
             let found = units
                 .iter()
-                .any(|u| u.name() == name && u.exponent() == exponent);
+                .any(|u| u.name() == name && is_equal_f64(u.exponent(), exponent));
             assert!(
                 found,
                 "Expected unit '{}' with exponent {} not found. Available units: {:?}",

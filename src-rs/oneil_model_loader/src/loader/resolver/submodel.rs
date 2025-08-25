@@ -108,7 +108,7 @@ pub fn resolve_submodels(
         (HashMap::new(), HashMap::new()),
         |(mut submodels, mut resolution_errors), use_model| {
             // get the use model path
-            let use_model_path = model_path.get_sibling_path(&use_model.model_name().as_str());
+            let use_model_path = model_path.get_sibling_path(use_model.model_name().as_str());
             let use_model_path = ModelPath::new(use_model_path);
 
             // get the submodel span
@@ -117,8 +117,8 @@ pub fn resolve_submodels(
             // get the submodel name
             let submodel_name = use_model
                 .alias()
-                .or(use_model.subcomponents().last())
-                .unwrap_or(use_model.model_name());
+                .or_else(|| use_model.subcomponents().last())
+                .unwrap_or_else(|| use_model.model_name());
             let submodel_name = Identifier::new(submodel_name.as_str());
 
             // verify that the submodel name is not a duplicate
@@ -128,7 +128,7 @@ pub fn resolve_submodels(
                     submodel_name.clone(),
                     SubmodelResolutionError::duplicate_submodel(
                         submodel_name,
-                        original_submodel_span.clone(),
+                        *original_submodel_span,
                         submodel_name_span,
                     ),
                 );
@@ -138,7 +138,7 @@ pub fn resolve_submodels(
 
             // resolve the use model path
             let resolved_use_model_path = resolve_model_path(
-                use_model_path.clone(),
+                use_model_path,
                 submodel_name_span,
                 use_model.subcomponents(),
                 model_info,
@@ -192,13 +192,17 @@ pub fn resolve_submodels(
 ///
 /// * **Model has error**: If the target model failed to load
 /// * **Undefined submodel**: If a subcomponent doesn't exist in the parent model
-/// * **Invalid model**: If the model doesn't exist in model_info
+/// * **Invalid model**: If the model doesn't exist in `model_info`
 ///
 /// # Safety
 ///
 /// This function assumes that models referenced in `model_info` have been
 /// properly loaded and validated. If this assumption is violated, the function
 /// will panic, indicating a bug in the model loading process.
+#[allow(
+    clippy::panic_in_result_fn,
+    reason = "panic enforces a function invariant"
+)]
 fn resolve_model_path(
     model_path: ModelPath,
     parent_component_span: Span,
@@ -228,11 +232,13 @@ fn resolve_model_path(
     let submodel_path = model
         .get_submodel(&submodel_name)
         .map(|(path, _)| path)
-        .ok_or(SubmodelResolutionError::undefined_submodel_in_submodel(
-            model_path.clone(),
-            submodel_name,
-            submodel_name_span,
-        ))?
+        .ok_or_else(|| {
+            SubmodelResolutionError::undefined_submodel_in_submodel(
+                model_path,
+                submodel_name,
+                submodel_name_span,
+            )
+        })?
         .clone();
 
     resolve_model_path(
@@ -274,16 +280,16 @@ mod tests {
         ) -> ast::declaration::UseModelNode {
             let identifier = ast::naming::Identifier::new(model_name.to_string());
             let model_name_node =
-                ast::node::Node::new(test_ast_span(start, start + model_name.len()), identifier);
+                ast::node::Node::new(&test_ast_span(start, start + model_name.len()), identifier);
 
             let alias_node = alias.map(|name| {
                 let identifier = ast::naming::Identifier::new(name.to_string());
-                ast::node::Node::new(test_ast_span(end - name.len(), end), identifier)
+                ast::node::Node::new(&test_ast_span(end - name.len(), end), identifier)
             });
 
             let use_model =
                 ast::declaration::UseModel::new(model_name_node, subcomponents, alias_node);
-            ast::node::Node::new(test_ast_span(start, end), use_model)
+            ast::node::Node::new(&test_ast_span(start, end), use_model)
         }
 
         /// Helper function to create a test model with specified submodels
@@ -339,10 +345,10 @@ mod tests {
         // use weather.atmosphere.temperature as temp
         let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
         let atmosphere_node =
-            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
+            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
         let temperature_identifier = ast::naming::Identifier::new("temperature".to_string());
         let temperature_node =
-            ast::node::Node::new(helper::test_ast_span(0, 11), temperature_identifier);
+            ast::node::Node::new(&helper::test_ast_span(0, 11), temperature_identifier);
         let subcomponents = vec![atmosphere_node, temperature_node];
 
         let use_model =
@@ -424,7 +430,7 @@ mod tests {
         // use weather.atmosphere
         let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
         let atmosphere_node =
-            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
+            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
         let subcomponents = vec![atmosphere_node];
 
         let use_model = helper::create_use_model_node("weather", subcomponents, None, 0, 20);
@@ -469,7 +475,7 @@ mod tests {
         // create the use model list with error model
         // use error_model as error
         let use_model = helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
-        let use_model_span = get_span_from_ast_span(&use_model.node_span());
+        let use_model_span = get_span_from_ast_span(use_model.node_span());
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -487,7 +493,7 @@ mod tests {
 
         // check the errors
         assert_eq!(errors.len(), 1);
-        let error = errors.get(&error_id).unwrap();
+        let error = errors.get(&error_id).expect("error should exist");
 
         match error {
             SubmodelResolutionError::ModelHasError {
@@ -497,7 +503,7 @@ mod tests {
                 assert_eq!(model_path, &error_path);
                 assert_eq!(reference_span, &use_model_span);
             }
-            _ => panic!("Expected ModelHasError, got {:?}", error),
+            _ => panic!("Expected ModelHasError, got {error:?}"),
         }
 
         // check the submodels
@@ -510,7 +516,7 @@ mod tests {
         let undefined_identifier = ast::naming::Identifier::new("undefined_submodel".to_string());
         let undefined_identifier_span = helper::test_ast_span(0, 16);
         let undefined_node =
-            ast::node::Node::new(undefined_identifier_span.clone(), undefined_identifier);
+            ast::node::Node::new(&undefined_identifier_span.clone(), undefined_identifier);
         let subcomponents = vec![undefined_node];
 
         let use_model =
@@ -533,7 +539,7 @@ mod tests {
         // check the errors
         assert_eq!(errors.len(), 1);
 
-        let error = errors.get(&weather_id).unwrap();
+        let error = errors.get(&weather_id).expect("error should exist");
         match error {
             SubmodelResolutionError::UndefinedSubmodel {
                 parent_model_path,
@@ -544,10 +550,10 @@ mod tests {
                 assert_eq!(submodel.as_str(), "undefined_submodel");
                 assert_eq!(
                     reference_span,
-                    &get_span_from_ast_span(&undefined_identifier_span)
+                    &get_span_from_ast_span(undefined_identifier_span)
                 );
             }
-            _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
+            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
         }
 
         // check the submodels
@@ -560,11 +566,11 @@ mod tests {
         // use weather.atmosphere.undefined as undefined
         let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
         let atmosphere_node =
-            ast::node::Node::new(helper::test_ast_span(0, 10), atmosphere_identifier);
+            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
         let undefined_identifier = ast::naming::Identifier::new("undefined".to_string());
         let undefined_identifier_span = helper::test_ast_span(0, 9);
         let undefined_node =
-            ast::node::Node::new(undefined_identifier_span.clone(), undefined_identifier);
+            ast::node::Node::new(&undefined_identifier_span.clone(), undefined_identifier);
         let subcomponents = vec![atmosphere_node, undefined_node];
 
         let use_model =
@@ -595,7 +601,7 @@ mod tests {
         // check the errors
         assert_eq!(errors.len(), 1);
 
-        let error = errors.get(&undefined_id).unwrap();
+        let error = errors.get(&undefined_id).expect("error should exist");
         match error {
             SubmodelResolutionError::UndefinedSubmodel {
                 parent_model_path,
@@ -606,10 +612,10 @@ mod tests {
                 assert_eq!(submodel.as_str(), "undefined");
                 assert_eq!(
                     reference_span,
-                    &get_span_from_ast_span(&undefined_identifier_span)
+                    &get_span_from_ast_span(undefined_identifier_span)
                 );
             }
-            _ => panic!("Expected UndefinedSubmodel, got {:?}", error),
+            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
         }
 
         // check the submodels
@@ -670,7 +676,7 @@ mod tests {
         // use error_model as error
         let error_model =
             helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
-        let error_model_ident_span = get_span_from_ast_span(&error_model.node_span());
+        let error_model_ident_span = get_span_from_ast_span(error_model.node_span());
 
         let use_models = vec![&temp_model, &error_model];
 
@@ -700,7 +706,7 @@ mod tests {
         // check the errors
         assert_eq!(errors.len(), 1);
 
-        let error = errors.get(&error_id).unwrap();
+        let error = errors.get(&error_id).expect("error should exist");
         match error {
             SubmodelResolutionError::ModelHasError {
                 model_path,
@@ -709,7 +715,7 @@ mod tests {
                 assert_eq!(model_path, &error_path);
                 assert_eq!(reference_span, &error_model_ident_span);
             }
-            _ => panic!("Expected ModelHasError, got {:?}", error),
+            _ => panic!("Expected ModelHasError, got {error:?}"),
         }
 
         // check the submodels

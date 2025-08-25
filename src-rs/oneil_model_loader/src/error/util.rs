@@ -29,14 +29,17 @@ use std::{collections::HashMap, hash::Hash};
 ///
 /// Returns `Ok((T, U))` if both operations succeed, or `Err(Vec<E>)` if either
 /// operation fails, containing all errors from the failed operations.
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "this is a utility function for merging errors"
+)]
 pub fn combine_errors<T, U, E>(
     result1: Result<T, Vec<E>>,
     result2: Result<U, Vec<E>>,
 ) -> Result<(T, U), Vec<E>> {
     match (result1, result2) {
         (Ok(result1), Ok(result2)) => Ok((result1, result2)),
-        (Err(errors), Ok(_)) => Err(errors),
-        (Ok(_), Err(errors)) => Err(errors),
+        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
         (Err(errors1), Err(errors2)) => Err(errors1.into_iter().chain(errors2).collect()),
     }
 }
@@ -56,9 +59,17 @@ pub fn combine_errors<T, U, E>(
 ///
 /// Returns `Ok(Vec<T>)` if all operations succeed, or `Err(Vec<E>)` if any
 /// operation fails, containing all errors from all failed operations.
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "this is a utility function for merging errors"
+)]
 pub fn combine_error_list<T, E>(
     results: impl IntoIterator<Item = Result<T, Vec<E>>>,
 ) -> Result<Vec<T>, Vec<E>> {
+    #[allow(
+        clippy::manual_try_fold,
+        reason = "we want to consume *all* errors, not just the first one"
+    )]
     results
         .into_iter()
         .fold(Ok(Vec::new()), |acc, result| match acc {
@@ -98,6 +109,7 @@ pub fn combine_error_list<T, E>(
 /// # Panics
 ///
 /// Panics if there are duplicate error keys in the results.
+#[must_use]
 pub fn split_ok_and_errors<T, I, E, O>(
     results: impl IntoIterator<Item = Result<T, (I, Vec<E>)>>,
 ) -> (O, HashMap<I, Vec<E>>)
@@ -139,9 +151,10 @@ where
 /// # Returns
 ///
 /// Returns a vector of converted errors.
+#[must_use]
 pub fn convert_errors<E1, E2>(errors: Vec<E1>) -> Vec<E2>
 where
     E1: Into<E2>,
 {
-    errors.into_iter().map(|error| error.into()).collect()
+    errors.into_iter().map(Into::into).collect()
 }

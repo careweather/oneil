@@ -22,7 +22,7 @@ use crate::token::{
 ///
 /// All valid numbers should be parsed correctly because they conform to the
 /// grammar noted here:
-/// https://doc.rust-lang.org/std/primitive.f64.html#impl-FromStr-for-f64
+/// <https://doc.rust-lang.org/std/primitive.f64.html#impl-FromStr-for-f64>
 ///
 /// Therefore, when this parser is used, we can use the following pattern to convert it to an f64:
 /// ```ignore
@@ -154,7 +154,7 @@ pub fn unit_one(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
 
             let (rest, _) = tag("1").parse(input)?;
             // Ensure the next character is not a digit
-            let (rest, _) = peek(next_char_is_not_digit.or(is_at_end_of_file)).parse(rest)?;
+            let (rest, ()) = peek(next_char_is_not_digit.or(is_at_end_of_file)).parse(rest)?;
             Ok((rest, ()))
         },
         TokenError::expected_unit_one,
@@ -377,7 +377,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Number)
                 )),
-                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
             }
         }
 
@@ -390,7 +390,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Number)
                 )),
-                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
             }
         }
 
@@ -403,7 +403,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Number)
                 )),
-                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
             }
         }
 
@@ -416,7 +416,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Number)
                 )),
-                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
             }
         }
 
@@ -429,10 +429,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::InvalidDecimalPart { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(InvalidDecimalPart), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(InvalidDecimalPart), got {res:?}"),
             }
         }
 
@@ -445,7 +442,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Number)
                 )),
-                _ => panic!("expected TokenError::Expect(Number), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Number), got {res:?}"),
             }
         }
 
@@ -458,10 +455,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::InvalidExponentPart { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(InvalidExponentPart), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(InvalidExponentPart), got {res:?}"),
             }
         }
 
@@ -474,10 +468,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::InvalidExponentPart { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(InvalidExponentPart), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(InvalidExponentPart), got {res:?}"),
             }
         }
 
@@ -490,10 +481,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::InvalidExponentPart { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(InvalidExponentPart), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(InvalidExponentPart), got {res:?}"),
             }
         }
 
@@ -509,10 +497,7 @@ mod tests {
                     "error should be for Number"
                 );
             } else {
-                panic!(
-                    "expected TokenError but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError but got different error type: {res:?}");
             }
         }
 
@@ -531,10 +516,7 @@ mod tests {
                     "error should be for InvalidDecimalPart"
                 );
             } else {
-                panic!(
-                    "expected TokenError Failure but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError Failure but got different error type: {res:?}");
             }
         }
 
@@ -553,10 +535,7 @@ mod tests {
                     "error should be for InvalidExponentPart"
                 );
             } else {
-                panic!(
-                    "expected TokenError Failure but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError Failure but got different error type: {res:?}");
             }
         }
     }
@@ -649,10 +628,10 @@ mod tests {
         #[test]
         fn test_very_long() {
             let long_content = "a".repeat(1000);
-            let input_str = format!("'{}' rest", long_content);
+            let input_str = format!("'{long_content}' rest");
             let input = Span::new_extra(&input_str, Config::default());
             let (rest, matched) = string(input).expect("should parse very long string");
-            let expected_lexeme = format!("'{}'", long_content);
+            let expected_lexeme = format!("'{long_content}'");
             assert_eq!(matched.lexeme(), expected_lexeme);
             assert_eq!(rest.fragment(), &"rest");
         }
@@ -684,7 +663,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::String)
                 )),
-                _ => panic!("expected TokenError::Expect(String), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(String), got {res:?}"),
             }
         }
 
@@ -697,7 +676,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::String)
                 )),
-                _ => panic!("expected TokenError::Expect(String), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(String), got {res:?}"),
             }
         }
 
@@ -710,10 +689,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(UnclosedString), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(UnclosedString), got {res:?}"),
             }
         }
 
@@ -726,10 +702,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(UnclosedString), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(UnclosedString), got {res:?}"),
             }
         }
 
@@ -752,10 +725,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::UnclosedString { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(UnclosedString), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(UnclosedString), got {res:?}"),
             }
         }
 
@@ -771,10 +741,7 @@ mod tests {
                     "error should be for String"
                 );
             } else {
-                panic!(
-                    "expected TokenError but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError but got different error type: {res:?}");
             }
         }
 
@@ -793,10 +760,7 @@ mod tests {
                     "error should be for UnclosedString"
                 );
             } else {
-                panic!(
-                    "expected TokenError Failure but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError Failure but got different error type: {res:?}");
             }
         }
 
@@ -815,10 +779,7 @@ mod tests {
                     "error should be for UnclosedString"
                 );
             } else {
-                panic!(
-                    "expected TokenError Failure but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError Failure but got different error type: {res:?}");
             }
         }
     }
@@ -860,7 +821,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitOne)
                 )),
-                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {res:?}"),
             }
         }
 
@@ -890,7 +851,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitOne)
                 )),
-                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {res:?}"),
             }
         }
 
@@ -903,7 +864,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitOne)
                 )),
-                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {res:?}"),
             }
         }
 
@@ -916,7 +877,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitOne)
                 )),
-                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {res:?}"),
             }
         }
 
@@ -929,7 +890,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitOne)
                 )),
-                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {res:?}"),
             }
         }
 
@@ -942,7 +903,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitOne)
                 )),
-                _ => panic!("expected TokenError::Expect(UnitOne), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(UnitOne), got {res:?}"),
             }
         }
 
@@ -961,10 +922,7 @@ mod tests {
                     "error should be for UnitOne"
                 );
             } else {
-                panic!(
-                    "expected TokenError but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError but got different error type: {res:?}");
             }
         }
     }

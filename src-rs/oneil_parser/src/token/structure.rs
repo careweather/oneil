@@ -135,9 +135,9 @@ mod tests {
             let res = linebreak(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
@@ -147,9 +147,9 @@ mod tests {
             let res = linebreak(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
@@ -159,9 +159,9 @@ mod tests {
             let res = linebreak(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
     }
@@ -249,9 +249,9 @@ mod tests {
             let res = comment(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
@@ -269,9 +269,9 @@ mod tests {
             let res = comment(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
@@ -281,9 +281,9 @@ mod tests {
             let res = comment(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
     }
@@ -305,9 +305,9 @@ mod tests {
             let res = end_of_file(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
@@ -317,9 +317,9 @@ mod tests {
             let res = end_of_file(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
@@ -329,9 +329,9 @@ mod tests {
             let res = end_of_file(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
 
@@ -341,9 +341,9 @@ mod tests {
             let res = end_of_file(input);
             match res {
                 Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)))
+                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
                 }
-                _ => panic!("expected TokenError::NomError(_), got {:?}", res),
+                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
             }
         }
     }
@@ -500,7 +500,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::EndOfLine)
                 )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
             }
         }
 
@@ -513,7 +513,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::EndOfLine)
                 )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
             }
         }
 
@@ -526,7 +526,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::EndOfLine)
                 )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
             }
         }
 
@@ -539,7 +539,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::EndOfLine)
                 )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
             }
         }
     }

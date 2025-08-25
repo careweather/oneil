@@ -12,7 +12,7 @@ pub type Span<'a> = LocatedSpan<&'a str, Config>;
 /// A result type for parser operations.
 ///
 /// This type alias provides a consistent result type for all parser functions,
-/// wrapping nom's IResult with our custom Span type.
+/// wrapping nom's `IResult` with our custom Span type.
 pub type Result<'a, O, E = Error<Span<'a>>> = IResult<Span<'a>, O, E>;
 
 /// A trait for parser implementations that work with our custom Span type.

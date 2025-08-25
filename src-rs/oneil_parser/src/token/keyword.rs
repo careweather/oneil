@@ -52,7 +52,7 @@ fn keyword(
             let reached_end_of_file = eof.map(|_| ());
 
             let (input, _) = tag(kw_str)(input)?;
-            let (input, _) = next_char_is_not_ident_char
+            let (input, ()) = next_char_is_not_ident_char
                 .or(reached_end_of_file)
                 .parse(input)?;
             Ok((input, ()))
@@ -269,7 +269,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::From))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(From)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(From)), got {res:?}"),
             }
         }
 
@@ -319,7 +319,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -332,7 +332,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -345,7 +345,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -358,7 +358,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -371,7 +371,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -384,7 +384,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -397,7 +397,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -410,7 +410,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -423,7 +423,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -436,7 +436,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -449,7 +449,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -462,7 +462,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -475,7 +475,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -488,7 +488,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
             }
         }
 
@@ -502,7 +502,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::As))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(As)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(As)), got {res:?}"),
             }
         }
 
@@ -515,7 +515,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::False))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(False)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(False)), got {res:?}"),
             }
         }
 
@@ -528,7 +528,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::From))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(From)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(From)), got {res:?}"),
             }
         }
 
@@ -541,7 +541,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::If))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(If)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(If)), got {res:?}"),
             }
         }
 
@@ -554,10 +554,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Import))
                 )),
-                _ => panic!(
-                    "expected TokenError::Expect(Keyword(Import)), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Expect(Keyword(Import)), got {res:?}"),
             }
         }
 
@@ -570,7 +567,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Not))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(Not)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(Not)), got {res:?}"),
             }
         }
 
@@ -583,7 +580,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Or))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(Or)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(Or)), got {res:?}"),
             }
         }
 
@@ -596,7 +593,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::True))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(True)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(True)), got {res:?}"),
             }
         }
 
@@ -609,10 +606,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Section))
                 )),
-                _ => panic!(
-                    "expected TokenError::Expect(Keyword(Section)), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Expect(Keyword(Section)), got {res:?}"),
             }
         }
 
@@ -625,7 +619,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Test))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(Test)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(Test)), got {res:?}"),
             }
         }
 
@@ -638,7 +632,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Use))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(Use)), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Keyword(Use)), got {res:?}"),
             }
         }
 
@@ -657,10 +651,7 @@ mod tests {
                     "error should be for And keyword"
                 );
             } else {
-                panic!(
-                    "expected TokenError but got different error type: {:?}",
-                    res
-                );
+                panic!("expected TokenError but got different error type: {res:?}");
             }
         }
     }
@@ -671,7 +662,7 @@ mod tests {
         #[test]
         fn test_keywords_constant_contains_no_duplicates() {
             let mut sorted = KEYWORDS.to_vec();
-            sorted.sort();
+            sorted.sort_unstable();
             let mut deduped = sorted.clone();
             deduped.dedup();
             assert_eq!(

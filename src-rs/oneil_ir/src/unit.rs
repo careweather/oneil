@@ -42,7 +42,8 @@ impl CompositeUnit {
     /// let composite = CompositeUnit::new(units);
     /// // Represents: m²·kg/s² (newtons)
     /// ```
-    pub fn new(units: Vec<Unit>) -> Self {
+    #[must_use]
+    pub const fn new(units: Vec<Unit>) -> Self {
         Self { units }
     }
 
@@ -74,6 +75,7 @@ impl CompositeUnit {
     /// assert_eq!(unit_refs[1].name(), "s");
     /// assert_eq!(unit_refs[1].exponent(), -1.0);
     /// ```
+    #[must_use]
     pub fn units(&self) -> &[Unit] {
         &self.units
     }
@@ -114,7 +116,8 @@ impl Unit {
     /// let per_second = Unit::new("s".to_string(), Span::new(0, 1), -1.0, Span::new(0, 1));
     /// let sqrt_meter = Unit::new("m".to_string(), Span::new(0, 1), 0.5, Span::new(0, 1));
     /// ```
-    pub fn new(name: String, name_span: Span, exponent: f64, exponent_span: Span) -> Self {
+    #[must_use]
+    pub const fn new(name: String, name_span: Span, exponent: f64, exponent_span: Span) -> Self {
         Self {
             name,
             name_span,
@@ -140,6 +143,7 @@ impl Unit {
     /// let unit = Unit::new("kg".to_string(), Span::new(0, 2), 1.0, Span::new(0, 1));
     /// assert_eq!(unit.name(), "kg");
     /// ```
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -164,8 +168,9 @@ impl Unit {
     /// assert_eq!(unit.name_span().start(), 10);
     /// assert_eq!(unit.name_span().length(), 2);
     /// ```
-    pub fn name_span(&self) -> &Span {
-        &self.name_span
+    #[must_use]
+    pub const fn name_span(&self) -> Span {
+        self.name_span
     }
 
     /// Returns the exponent of this unit.
@@ -194,7 +199,8 @@ impl Unit {
     /// assert_eq!(squared.exponent(), 2.0);
     /// assert_eq!(inverse.exponent(), -1.0);
     /// ```
-    pub fn exponent(&self) -> f64 {
+    #[must_use]
+    pub const fn exponent(&self) -> f64 {
         self.exponent
     }
 
@@ -218,7 +224,8 @@ impl Unit {
     /// assert_eq!(unit.exponent_span().start(), 15);
     /// assert_eq!(unit.exponent_span().length(), 3);
     /// ```
-    pub fn exponent_span(&self) -> &Span {
-        &self.exponent_span
+    #[must_use]
+    pub const fn exponent_span(&self) -> Span {
+        self.exponent_span
     }
 }

@@ -47,7 +47,7 @@ struct FileError<'a> {
 }
 
 impl<'a> FileError<'a> {
-    fn new(path: &'a Path, error: &'a IoError) -> Self {
+    const fn new(path: &'a Path, error: &'a IoError) -> Self {
         Self { path, error }
     }
 }

@@ -7,7 +7,7 @@
 ///
 /// Spans are used throughout the AST to provide precise location information
 /// for error reporting, debugging, and other source-aware operations.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     start: usize,
     length: usize,
@@ -16,7 +16,8 @@ pub struct Span {
 
 impl Span {
     /// Creates a new span with the given positions
-    pub fn new(start: usize, length: usize, whitespace_length: usize) -> Self {
+    #[must_use]
+    pub const fn new(start: usize, length: usize, whitespace_length: usize) -> Self {
         Self {
             start,
             length,
@@ -25,27 +26,32 @@ impl Span {
     }
 
     /// Returns the start position of the span
-    pub fn start(&self) -> usize {
+    #[must_use]
+    pub const fn start(&self) -> usize {
         self.start
     }
 
     /// Returns the length of the span
-    pub fn length(&self) -> usize {
+    #[must_use]
+    pub const fn length(&self) -> usize {
         self.length
     }
 
     /// Returns the length of the whitespace after the span
-    pub fn whitespace_length(&self) -> usize {
+    #[must_use]
+    pub const fn whitespace_length(&self) -> usize {
         self.whitespace_length
     }
 
     /// Returns the end position of the span
-    pub fn end(&self) -> usize {
+    #[must_use]
+    pub const fn end(&self) -> usize {
         self.start + self.length
     }
 
     /// Returns the position where whitespace ends after the span
-    pub fn whitespace_end(&self) -> usize {
+    #[must_use]
+    pub const fn whitespace_end(&self) -> usize {
         self.start + self.length + self.whitespace_length
     }
 
@@ -53,6 +59,7 @@ impl Span {
     ///
     /// The resulting span starts at the start of the first object and ends
     /// at the end of the second object, with whitespace end from the second object.
+    #[must_use]
     pub fn calc_span<T, U>(start_span: &T, end_span: &U) -> Self
     where
         T: SpanLike,

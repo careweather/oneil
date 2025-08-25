@@ -56,7 +56,8 @@ impl ParameterCollection {
     ///
     /// let collection = ParameterCollection::new(params);
     /// ```
-    pub fn new(parameters: HashMap<Identifier, Parameter>) -> Self {
+    #[must_use]
+    pub const fn new(parameters: HashMap<Identifier, Parameter>) -> Self {
         Self { parameters }
     }
 
@@ -119,7 +120,8 @@ impl Parameter {
     ///     TraceLevel::None,
     /// );
     /// ```
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         dependencies: HashSet<Identifier>,
         ident: IdentifierWithSpan,
         value: ParameterValue,
@@ -167,7 +169,8 @@ impl Parameter {
     ///
     /// assert!(param.dependencies().contains(&Identifier::new("radius")));
     /// ```
-    pub fn dependencies(&self) -> &HashSet<Identifier> {
+    #[must_use]
+    pub const fn dependencies(&self) -> &HashSet<Identifier> {
         &self.dependencies
     }
 
@@ -176,7 +179,8 @@ impl Parameter {
     /// # Returns
     ///
     /// A reference to the parameter's identifier.
-    pub fn identifier(&self) -> &IdentifierWithSpan {
+    #[must_use]
+    pub const fn identifier(&self) -> &IdentifierWithSpan {
         &self.ident
     }
 
@@ -185,7 +189,8 @@ impl Parameter {
     /// # Returns
     ///
     /// A reference to the parameter's value.
-    pub fn value(&self) -> &ParameterValue {
+    #[must_use]
+    pub const fn value(&self) -> &ParameterValue {
         &self.value
     }
 
@@ -194,7 +199,8 @@ impl Parameter {
     /// # Returns
     ///
     /// A reference to the parameter's limits.
-    pub fn limits(&self) -> &Limits {
+    #[must_use]
+    pub const fn limits(&self) -> &Limits {
         &self.limits
     }
 
@@ -203,7 +209,8 @@ impl Parameter {
     /// # Returns
     ///
     /// `true` if this parameter is a performance parameter, `false` otherwise.
-    pub fn is_performance(&self) -> bool {
+    #[must_use]
+    pub const fn is_performance(&self) -> bool {
         self.is_performance
     }
 
@@ -212,8 +219,9 @@ impl Parameter {
     /// # Returns
     ///
     /// The trace level for this parameter.
-    pub fn trace_level(&self) -> &TraceLevel {
-        &self.trace_level
+    #[must_use]
+    pub const fn trace_level(&self) -> TraceLevel {
+        self.trace_level
     }
 }
 
@@ -245,7 +253,8 @@ impl ParameterValue {
     /// let expr = WithSpan::test_new(Expr::literal(Literal::number(3.14159)));
     /// let value = ParameterValue::simple(expr, None);
     /// ```
-    pub fn simple(expr: ExprWithSpan, unit: Option<CompositeUnit>) -> Self {
+    #[must_use]
+    pub const fn simple(expr: ExprWithSpan, unit: Option<CompositeUnit>) -> Self {
         Self::Simple(expr, unit)
     }
 
@@ -272,7 +281,8 @@ impl ParameterValue {
     ///
     /// let value = ParameterValue::piecewise(vec![piecewise], None);
     /// ```
-    pub fn piecewise(exprs: Vec<PiecewiseExpr>, unit: Option<CompositeUnit>) -> Self {
+    #[must_use]
+    pub const fn piecewise(exprs: Vec<PiecewiseExpr>, unit: Option<CompositeUnit>) -> Self {
         Self::Piecewise(exprs, unit)
     }
 }
@@ -310,7 +320,8 @@ impl PiecewiseExpr {
     ///
     /// let piecewise = PiecewiseExpr::new(value, condition);
     /// ```
-    pub fn new(expr: ExprWithSpan, if_expr: ExprWithSpan) -> Self {
+    #[must_use]
+    pub const fn new(expr: ExprWithSpan, if_expr: ExprWithSpan) -> Self {
         Self { expr, if_expr }
     }
 
@@ -319,7 +330,8 @@ impl PiecewiseExpr {
     /// # Returns
     ///
     /// A reference to the expression that defines the value.
-    pub fn expr(&self) -> &ExprWithSpan {
+    #[must_use]
+    pub const fn expr(&self) -> &ExprWithSpan {
         &self.expr
     }
 
@@ -328,7 +340,8 @@ impl PiecewiseExpr {
     /// # Returns
     ///
     /// A reference to the condition expression.
-    pub fn if_expr(&self) -> &ExprWithSpan {
+    #[must_use]
+    pub const fn if_expr(&self) -> &ExprWithSpan {
         &self.if_expr
     }
 }
@@ -365,7 +378,8 @@ impl Limits {
     ///
     /// let limits = Limits::default();
     /// ```
-    pub fn default() -> Self {
+    #[must_use]
+    pub const fn default() -> Self {
         Self::Default
     }
 
@@ -385,7 +399,8 @@ impl Limits {
     /// let max = WithSpan::test_new(Expr::literal(Literal::number(100.0)));
     /// let limits = Limits::continuous(min, max);
     /// ```
-    pub fn continuous(min: ExprWithSpan, max: ExprWithSpan) -> Self {
+    #[must_use]
+    pub const fn continuous(min: ExprWithSpan, max: ExprWithSpan) -> Self {
         Self::Continuous { min, max }
     }
 
@@ -407,7 +422,8 @@ impl Limits {
     /// ];
     /// let limits = Limits::discrete(values);
     /// ```
-    pub fn discrete(values: Vec<ExprWithSpan>) -> Self {
+    #[must_use]
+    pub const fn discrete(values: Vec<ExprWithSpan>) -> Self {
         Self::Discrete { values }
     }
 }

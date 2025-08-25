@@ -14,7 +14,7 @@ use crate::token::{
 ///
 /// This structure allows the parser to maintain precise location information
 /// while handling whitespace appropriately during tokenization.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token<'a> {
     lexeme: Span<'a>,
     whitespace: Span<'a>,

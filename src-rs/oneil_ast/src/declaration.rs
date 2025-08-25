@@ -18,9 +18,11 @@ pub enum Decl {
     UseModel(UseModelNode),
 
     /// Parameter declaration for defining model parameters
-    Parameter(ParameterNode),
+    /// (boxed because of large size of `ParameterNode`)
+    Parameter(Box<ParameterNode>),
     /// Test declaration for verifying model behavior
-    Test(TestNode),
+    /// (boxed because of large size of `TestNode`)
+    Test(Box<TestNode>),
 }
 
 /// A node containing a declaration
@@ -28,28 +30,32 @@ pub type DeclNode = Node<Decl>;
 
 impl Decl {
     /// Creates an import declaration
-    pub fn import(path: ImportNode) -> Self {
+    #[must_use]
+    pub const fn import(path: ImportNode) -> Self {
         Self::Import(path)
     }
 
     /// Creates a model usage declaration
-    pub fn use_model(use_model: UseModelNode) -> Self {
+    #[must_use]
+    pub const fn use_model(use_model: UseModelNode) -> Self {
         Self::UseModel(use_model)
     }
 
     /// Creates a parameter declaration
+    #[must_use]
     pub fn parameter(parameter: ParameterNode) -> Self {
-        Self::Parameter(parameter)
+        Self::Parameter(Box::new(parameter))
     }
 
     /// Creates a test declaration
+    #[must_use]
     pub fn test(test: TestNode) -> Self {
-        Self::Test(test)
+        Self::Test(Box::new(test))
     }
 }
 
 /// An import declaration that specifies a module to include
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Import {
     path: Node<String>,
 }
@@ -59,18 +65,20 @@ pub type ImportNode = Node<Import>;
 
 impl Import {
     /// Creates a new import with the given path
-    pub fn new(path: Node<String>) -> Self {
+    #[must_use]
+    pub const fn new(path: Node<String>) -> Self {
         Self { path }
     }
 
     /// Returns the import path as a string slice
-    pub fn path(&self) -> &Node<String> {
+    #[must_use]
+    pub const fn path(&self) -> &Node<String> {
         &self.path
     }
 }
 
 /// A model usage declaration that references another model
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UseModel {
     model_name: IdentifierNode,
     subcomponents: Vec<IdentifierNode>,
@@ -82,7 +90,8 @@ pub type UseModelNode = Node<UseModel>;
 
 impl UseModel {
     /// Creates a new model usage declaration
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         model_name: IdentifierNode,
         subcomponents: Vec<IdentifierNode>,
         alias: Option<IdentifierNode>,
@@ -95,17 +104,20 @@ impl UseModel {
     }
 
     /// Returns the name of the model being used
-    pub fn model_name(&self) -> &IdentifierNode {
+    #[must_use]
+    pub const fn model_name(&self) -> &IdentifierNode {
         &self.model_name
     }
 
     /// Returns the list of subcomponents being used
+    #[must_use]
     pub fn subcomponents(&self) -> &[IdentifierNode] {
         &self.subcomponents
     }
 
     /// Returns the optional alias for the model usage
-    pub fn alias(&self) -> Option<&IdentifierNode> {
+    #[must_use]
+    pub const fn alias(&self) -> Option<&IdentifierNode> {
         self.alias.as_ref()
     }
 }

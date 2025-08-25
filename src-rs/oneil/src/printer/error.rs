@@ -56,11 +56,11 @@ use crate::printer::ColorChoice;
 /// Returns an error if writing to the writer fails.
 pub fn print(
     error: &OneilError,
-    color_choice: &ColorChoice,
+    color_choice: ColorChoice,
     writer: &mut impl Write,
 ) -> io::Result<()> {
     let error_string = error_to_string(error, color_choice);
-    writeln!(writer, "{}", error_string)?;
+    writeln!(writer, "{error_string}")?;
 
     Ok(())
 }
@@ -78,16 +78,18 @@ pub fn print(
 /// # Returns
 ///
 /// Returns a formatted string representation of the error.
-fn error_to_string(error: &OneilError, color_choice: &ColorChoice) -> String {
+fn error_to_string(error: &OneilError, color_choice: ColorChoice) -> String {
     let message_line = get_error_message_line(error.message(), color_choice);
     let location_line = get_location_line(error.path(), error.location(), color_choice);
     let empty_line = String::new();
-    let source_line = get_source_lines(error.location(), error.context(), color_choice);
+    let maybe_source_line = error
+        .location()
+        .map(|location| get_source_lines(location, error.context(), color_choice));
     let context_with_source_lines =
         get_context_with_source_lines(error.path(), error.context_with_source(), color_choice);
 
     let mut lines = vec![message_line, location_line];
-    lines.extend(source_line);
+    lines.extend(maybe_source_line);
     lines.push(empty_line);
     lines.extend(context_with_source_lines);
 
@@ -107,7 +109,7 @@ fn error_to_string(error: &OneilError, color_choice: &ColorChoice) -> String {
 /// # Returns
 ///
 /// Returns the formatted error message line as a string.
-fn get_error_message_line(message: &str, color_choice: &ColorChoice) -> String {
+fn get_error_message_line(message: &str, color_choice: ColorChoice) -> String {
     get_message_line("error", ColorChoice::bold_red, message, color_choice)
 }
 
@@ -124,7 +126,7 @@ fn get_error_message_line(message: &str, color_choice: &ColorChoice) -> String {
 /// # Returns
 ///
 /// Returns the formatted note message line as a string.
-fn get_note_message_line(message: &str, color_choice: &ColorChoice) -> String {
+fn get_note_message_line(message: &str, color_choice: ColorChoice) -> String {
     get_message_line("note", ColorChoice::bold_blue, message, color_choice)
 }
 
@@ -141,7 +143,7 @@ fn get_note_message_line(message: &str, color_choice: &ColorChoice) -> String {
 /// # Returns
 ///
 /// Returns the formatted help message line as a string.
-fn get_help_message_line(message: &str, color_choice: &ColorChoice) -> String {
+fn get_help_message_line(message: &str, color_choice: ColorChoice) -> String {
     get_message_line("help", ColorChoice::bold_blue, message, color_choice)
 }
 
@@ -174,15 +176,15 @@ fn get_help_message_line(message: &str, color_choice: &ColorChoice) -> String {
 /// ```
 fn get_message_line(
     kind: &str,
-    kind_color: impl FnOnce(&ColorChoice, &str) -> String,
+    kind_color: impl FnOnce(ColorChoice, &str) -> String,
     message: &str,
-    color_choice: &ColorChoice,
+    color_choice: ColorChoice,
 ) -> String {
     // <kind>: <message>
     let kind_str = kind_color(color_choice, kind);
-    let message_line = format!("{}: {}", kind_str, message);
-    let message_line = color_choice.bold(&message_line);
-    message_line
+    let message_line = format!("{kind_str}: {message}");
+
+    color_choice.bold(&message_line)
 }
 
 /// Formats the location information line
@@ -201,7 +203,7 @@ fn get_message_line(
 fn get_location_line(
     path: &Path,
     location: Option<&ErrorLocation>,
-    color_choice: &ColorChoice,
+    color_choice: ColorChoice,
 ) -> String {
     // location line (line and column are optional)
     //  --> <path>
@@ -209,22 +211,11 @@ fn get_location_line(
     //  --> <path> (line <line>, column <column>)
     let arrow = color_choice.bold_blue("-->");
     let path = path.display();
-    let location_line = match location {
-        // This format is technically less readable than " --> <path> (line <line>, column <column>)"
-        // but IDEs like VSCode and Cursor allow you to <ctrl> + click on the error to jump to the
-        // location in the file. In addition, the line and column will be displayed in the source
-        // code snippet.
-        Some(location) => format!(
-            " {} {}:{}:{}",
-            arrow,
-            path,
-            location.line(),
-            location.column()
-        ),
-        None => format!(" {} {}", arrow, path),
-    };
 
-    location_line
+    location.map_or_else(
+        || format!(" {arrow} {path}"),
+        |location| format!(" {arrow} {path}:{}:{}", location.line(), location.column()),
+    )
 }
 
 /// Formats the source code snippet with error highlighting
@@ -243,70 +234,61 @@ fn get_location_line(
 /// Returns `Some(String)` with the formatted source code snippet if location
 /// information is available, or `None` if no location information exists.
 fn get_source_lines(
-    location: Option<&ErrorLocation>,
+    location: &ErrorLocation,
     context: &[Context],
-    color_choice: &ColorChoice,
-) -> Option<String> {
+    color_choice: ColorChoice,
+) -> String {
     // source line (if available)
     //   |
     // 1 | use foo bar
     //   |         ^
     //   |
-    match location {
-        Some(location) => {
-            let line = location.line();
-            let column = location.column();
-            let length = location.length();
-            let line_source = location.line_source();
+    let line = location.line();
+    let column = location.column();
+    let length = location.length();
+    let line_source = location.line_source();
 
-            // The width of the left margin is based on the number of digits
-            // required for the line number (`line.ilog10() + 1` tells us
-            // how many digits are in the base 10 representation of the line
-            // number).
-            let margin_width = line.ilog10() + 1;
-            let margin = " ".repeat(margin_width as usize);
+    // The width of the left margin is based on the number of digits
+    // required for the line number (`line.ilog10() + 1` tells us
+    // how many digits are in the base 10 representation of the line
+    // number).
+    let margin_width = line.ilog10() + 1;
+    let margin = " ".repeat(margin_width as usize);
 
-            let bar = color_choice.bold_blue("|");
+    let bar = color_choice.bold_blue("|");
 
-            let line_label = color_choice.bold_blue(&line.to_string());
+    let line_label = color_choice.bold_blue(&line.to_string());
 
-            let pointer_indent_width = column - 1;
-            let pointer_indent = " ".repeat(pointer_indent_width);
+    let pointer_indent_width = column - 1;
+    let pointer_indent = " ".repeat(pointer_indent_width);
 
-            let pointer = color_choice.bold_red("^");
-            let pointer_rest = color_choice.bold_red(&"-".repeat(length - 1));
+    let pointer = color_choice.bold_red("^");
+    let pointer_rest = color_choice.bold_red(&"-".repeat(length - 1));
 
-            let blank_line = format!("{} {} ", margin, bar);
-            let source_line = format!("{} {} {}", line_label, bar, line_source);
-            let pointer_line = format!(
-                "{} {} {}{}{}",
-                margin, bar, pointer_indent, pointer, pointer_rest
-            );
+    let blank_line = format!("{margin} {bar} ");
+    let source_line = format!("{line_label} {bar} {line_source}");
+    let pointer_line = format!("{margin} {bar} {pointer_indent}{pointer}{pointer_rest}");
 
-            let context_lines = context.iter().map(|context| {
-                let equals = color_choice.bold_blue("=");
-                let context_message = match context {
-                    Context::Note(message) => get_note_message_line(message, color_choice),
-                    Context::Help(message) => get_help_message_line(message, color_choice),
-                };
-                let context_line = format!("{} {} {}", margin, equals, context_message);
-                context_line
-            });
+    let context_lines = context.iter().map(|context| {
+        let equals = color_choice.bold_blue("=");
+        let context_message = match context {
+            Context::Note(message) => get_note_message_line(message, color_choice),
+            Context::Help(message) => get_help_message_line(message, color_choice),
+        };
+        let context_line = format!("{margin} {equals} {context_message}");
+        context_line
+    });
 
-            let mut source_lines = vec![blank_line, source_line, pointer_line];
-            source_lines.extend(context_lines);
-            let source_lines = source_lines.join("\n");
+    let mut source_lines = vec![blank_line, source_line, pointer_line];
+    source_lines.extend(context_lines);
 
-            Some(source_lines)
-        }
-        None => None,
-    }
+    source_lines.join("\n")
 }
 
 fn get_context_with_source_lines(
     path: &Path,
     contexts: &[(Context, ErrorLocation)],
-    color_choice: &ColorChoice,
+    color_choice: ColorChoice,
 ) -> Vec<String> {
     contexts
         .iter()
@@ -316,10 +298,10 @@ fn get_context_with_source_lines(
                 Context::Help(message) => get_help_message_line(message, color_choice),
             };
             let location_line = get_location_line(path, Some(location), color_choice);
-            let source_lines = get_source_lines(Some(location), &[], color_choice);
+            let source_lines = get_source_lines(location, &[], color_choice);
             let empty_line = String::new();
             let mut lines = vec![context_message, location_line];
-            lines.extend(source_lines);
+            lines.push(source_lines);
             lines.push(empty_line);
             lines.join("\n")
         })

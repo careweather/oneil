@@ -50,7 +50,8 @@ impl Span {
     /// assert_eq!(span.start(), 5);
     /// assert_eq!(span.length(), 10);
     /// ```
-    pub fn new(start: usize, length: usize) -> Self {
+    #[must_use]
+    pub const fn new(start: usize, length: usize) -> Self {
         Self { start, length }
     }
 
@@ -59,7 +60,8 @@ impl Span {
     /// # Returns
     ///
     /// The 0-indexed starting position.
-    pub fn start(&self) -> usize {
+    #[must_use]
+    pub const fn start(&self) -> usize {
         self.start
     }
 
@@ -68,7 +70,8 @@ impl Span {
     /// # Returns
     ///
     /// The number of characters in the span.
-    pub fn length(&self) -> usize {
+    #[must_use]
+    pub const fn length(&self) -> usize {
         self.length
     }
 
@@ -86,7 +89,8 @@ impl Span {
     /// let span = Span::new(10, 5);
     /// assert_eq!(span.end(), 15);
     /// ```
-    pub fn end(&self) -> usize {
+    #[must_use]
+    pub const fn end(&self) -> usize {
         self.start + self.length
     }
 }
@@ -139,7 +143,8 @@ impl<T> WithSpan<T> {
     /// let wrapped = WithSpan::new(42, span);
     /// assert_eq!(*wrapped, 42);
     /// ```
-    pub fn new(value: T, span: Span) -> Self {
+    #[must_use]
+    pub const fn new(value: T, span: Span) -> Self {
         Self { value, span }
     }
 
@@ -164,7 +169,8 @@ impl<T> WithSpan<T> {
     /// let test_value = WithSpan::test_new("test");
     /// assert_eq!(*test_value, "test");
     /// ```
-    pub fn test_new(value: T) -> Self {
+    #[must_use]
+    pub const fn test_new(value: T) -> Self {
         Self::new(value, Span::new(0, 0))
     }
 
@@ -182,7 +188,8 @@ impl<T> WithSpan<T> {
     /// let wrapped = WithSpan::new("hello", Span::new(0, 5));
     /// assert_eq!(wrapped.value(), &"hello");
     /// ```
-    pub fn value(&self) -> &T {
+    #[must_use]
+    pub const fn value(&self) -> &T {
         &self.value
     }
 
@@ -201,8 +208,9 @@ impl<T> WithSpan<T> {
     /// let wrapped = WithSpan::new("test", span);
     /// assert_eq!(wrapped.span().start(), 10);
     /// ```
-    pub fn span(&self) -> &Span {
-        &self.span
+    #[must_use]
+    pub const fn span(&self) -> Span {
+        self.span
     }
 
     /// Consumes the `WithSpan<T>` and returns the wrapped value.
@@ -220,6 +228,7 @@ impl<T> WithSpan<T> {
     /// let value = wrapped.take_value();
     /// assert_eq!(value, 42);
     /// ```
+    #[must_use]
     pub fn take_value(self) -> T {
         self.value
     }

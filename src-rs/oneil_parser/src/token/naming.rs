@@ -41,7 +41,7 @@ fn identifier_span(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
             Ok((rest, ()))
         }),
         // Ensure the identifier is not a reserved keyword
-        |identifier: &Span<'_>| !keyword::KEYWORDS.contains(&identifier.fragment()),
+        |identifier: &Span<'_>| !keyword::KEYWORDS.contains(identifier.fragment()),
     )
     .parse(input)
 }
@@ -261,7 +261,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Identifier)
                 )),
-                _ => panic!("expected TokenError::Expect(Identifier), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Identifier), got {res:?}"),
             }
         }
 
@@ -274,7 +274,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Identifier)
                 )),
-                _ => panic!("expected TokenError::Expect(Identifier), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Identifier), got {res:?}"),
             }
         }
 
@@ -287,7 +287,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Identifier)
                 )),
-                _ => panic!("expected TokenError::Expect(Identifier), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Identifier), got {res:?}"),
             }
         }
 
@@ -331,8 +331,7 @@ mod tests {
                         ));
                     }
                     _ => panic!(
-                        "expected TokenError::Expect(Identifier) for keyword {:?}, got {:?}",
-                        keyword, res
+                        "expected TokenError::Expect(Identifier) for keyword {keyword:?}, got {res:?}"
                     ),
                 }
             }
@@ -443,7 +442,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Label)
                 )),
-                _ => panic!("expected TokenError::Expect(Label), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Label), got {res:?}"),
             }
         }
 
@@ -456,7 +455,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Label)
                 )),
-                _ => panic!("expected TokenError::Expect(Label), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Label), got {res:?}"),
             }
         }
 
@@ -491,8 +490,7 @@ mod tests {
                         ));
                     }
                     _ => panic!(
-                        "expected TokenError::NomError(Verify) for keyword {:?}, got {:?}",
-                        keyword, res
+                        "expected TokenError::NomError(Verify) for keyword {keyword:?}, got {res:?}"
                     ),
                 }
             }
@@ -524,7 +522,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Label)
                 )),
-                _ => panic!("expected TokenError::Expect(Label), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Label), got {res:?}"),
             }
         }
 
@@ -605,7 +603,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitIdentifier)
                 )),
-                _ => panic!("expected TokenError::Expect(UnitIdentifier), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(UnitIdentifier), got {res:?}"),
             }
         }
 
@@ -623,8 +621,7 @@ mod tests {
                         ));
                     }
                     _ => panic!(
-                        "expected TokenError::Expect(UnitIdentifier) for keyword {:?}, got {:?}",
-                        keyword, res
+                        "expected TokenError::Expect(UnitIdentifier) for keyword {keyword:?}, got {res:?}"
                     ),
                 }
             }

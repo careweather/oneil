@@ -1,3 +1,5 @@
+use std::fmt;
+
 use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{
     reference::{Identifier, ModelPath},
@@ -9,7 +11,7 @@ use oneil_ir::{
 /// This error type is used when a `use model` declaration cannot be resolved to
 /// its corresponding model. This can happen when the referenced model has errors
 /// or when the submodel identifier is not defined in the referenced model.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubmodelResolutionError {
     /// The referenced model has errors, preventing submodel resolution.
     ModelHasError {
@@ -49,7 +51,8 @@ impl SubmodelResolutionError {
     /// # Returns
     ///
     /// A new `SubmodelResolutionError::ModelHasError` variant.
-    pub fn model_has_error(model_path: ModelPath, reference_span: Span) -> Self {
+    #[must_use]
+    pub const fn model_has_error(model_path: ModelPath, reference_span: Span) -> Self {
         Self::ModelHasError {
             model_path,
             reference_span,
@@ -67,7 +70,8 @@ impl SubmodelResolutionError {
     /// # Returns
     ///
     /// A new `SubmodelResolutionError::UndefinedSubmodel` variant.
-    pub fn undefined_submodel_in_submodel(
+    #[must_use]
+    pub const fn undefined_submodel_in_submodel(
         parent_model_path: ModelPath,
         submodel: Identifier,
         reference_span: Span,
@@ -90,7 +94,8 @@ impl SubmodelResolutionError {
     /// # Returns
     ///
     /// A new `SubmodelResolutionError::DuplicateSubmodel` variant.
-    pub fn duplicate_submodel(
+    #[must_use]
+    pub const fn duplicate_submodel(
         submodel: Identifier,
         original_span: Span,
         duplicate_span: Span,
@@ -101,38 +106,33 @@ impl SubmodelResolutionError {
             duplicate_span,
         }
     }
+}
 
-    /// Converts the submodel resolution error to a string representation.
-    ///
-    /// This method delegates to the display module to format the error message
-    /// in a user-friendly way.
-    ///
-    /// # Returns
-    ///
-    /// A string representation of the submodel resolution error.
-    pub fn to_string(&self) -> String {
+impl fmt::Display for SubmodelResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SubmodelResolutionError::ModelHasError {
+            Self::ModelHasError {
                 model_path: path,
                 reference_span: _,
             } => {
                 let path = path.as_ref().display();
-                format!("submodel `{}` has errors", path)
+                write!(f, "submodel `{path}` has errors")
             }
-            SubmodelResolutionError::UndefinedSubmodel {
+            Self::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
                 reference_span: _,
             } => {
                 let path = parent_model_path.as_ref().display();
-                format!(
-                    "submodel `{}` is not defined in model `{}`",
-                    submodel.as_str(),
-                    path
+                let submodel_str = submodel.as_str();
+                write!(
+                    f,
+                    "submodel `{submodel_str}` is not defined in model `{path}`"
                 )
             }
-            SubmodelResolutionError::DuplicateSubmodel { submodel, .. } => {
-                format!("submodel `{}` is defined multiple times", submodel.as_str())
+            Self::DuplicateSubmodel { submodel, .. } => {
+                let submodel_str = submodel.as_str();
+                write!(f, "submodel `{submodel_str}` is defined multiple times")
             }
         }
     }
@@ -145,28 +145,21 @@ impl AsOneilError for SubmodelResolutionError {
 
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
-            SubmodelResolutionError::ModelHasError {
+            Self::ModelHasError {
                 model_path: _,
-                reference_span,
-            } => {
-                let start = reference_span.start();
-                let length = reference_span.length();
-                let location = ErrorLocation::from_source_and_span(source, start, length);
-                Some(location)
+                reference_span: location_span,
             }
-            SubmodelResolutionError::UndefinedSubmodel {
+            | Self::UndefinedSubmodel {
                 parent_model_path: _,
                 submodel: _,
-                reference_span,
-            } => {
-                let start = reference_span.start();
-                let length = reference_span.length();
-                let location = ErrorLocation::from_source_and_span(source, start, length);
-                Some(location)
+                reference_span: location_span,
             }
-            SubmodelResolutionError::DuplicateSubmodel { duplicate_span, .. } => {
-                let start = duplicate_span.start();
-                let length = duplicate_span.length();
+            | Self::DuplicateSubmodel {
+                duplicate_span: location_span,
+                ..
+            } => {
+                let start = location_span.start();
+                let length = location_span.length();
                 let location = ErrorLocation::from_source_and_span(source, start, length);
                 Some(location)
             }
@@ -175,7 +168,7 @@ impl AsOneilError for SubmodelResolutionError {
 
     fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
         match self {
-            SubmodelResolutionError::DuplicateSubmodel { duplicate_span, .. } => {
+            Self::DuplicateSubmodel { duplicate_span, .. } => {
                 let start = duplicate_span.start();
                 let length = duplicate_span.length();
                 let location = ErrorLocation::from_source_and_span(source, start, length);
@@ -184,8 +177,7 @@ impl AsOneilError for SubmodelResolutionError {
                     Some(location),
                 )]
             }
-            SubmodelResolutionError::ModelHasError { .. } => vec![],
-            SubmodelResolutionError::UndefinedSubmodel { .. } => vec![],
+            Self::ModelHasError { .. } | Self::UndefinedSubmodel { .. } => vec![],
         }
     }
 }

@@ -17,7 +17,7 @@ use oneil_parser as parser;
 /// Represents the result of parsing a Oneil source file, which may include
 /// partial AST results even when errors occur during parsing.
 type OneilParserError =
-    parser::error::ErrorsWithPartialResult<ast::Model, parser::error::ParserError>;
+    parser::error::ErrorsWithPartialResult<Box<ast::Model>, parser::error::ParserError>;
 
 /// Errors that can occur during file loading operations
 ///
@@ -40,14 +40,14 @@ pub enum LoadingError {
 impl From<std::io::Error> for LoadingError {
     /// Converts an I/O error into a `LoadingError::InvalidFile`
     fn from(error: std::io::Error) -> Self {
-        LoadingError::InvalidFile(error)
+        Self::InvalidFile(error)
     }
 }
 
 impl From<OneilParserError> for LoadingError {
     /// Converts a parser error into a `LoadingError::Parser`
     fn from(error: OneilParserError) -> Self {
-        LoadingError::Parser(error)
+        Self::Parser(error)
     }
 }
 

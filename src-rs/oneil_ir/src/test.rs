@@ -9,7 +9,7 @@ use crate::{debug_info::TraceLevel, expr::ExprWithSpan};
 ///
 /// `TestIndex` provides a unique identifier for tests within a model.
 /// It wraps a `usize` value and provides a type-safe way to reference tests.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TestIndex(usize);
 
 impl TestIndex {
@@ -26,7 +26,8 @@ impl TestIndex {
     ///
     /// let index = TestIndex::new(0);
     /// ```
-    pub fn new(index: usize) -> Self {
+    #[must_use]
+    pub const fn new(index: usize) -> Self {
         Self(index)
     }
 }
@@ -63,7 +64,8 @@ impl Test {
     /// let test_expr = WithSpan::test_new(Expr::literal(Literal::number(78.54))); // Expected area for radius = 5
     /// let test = Test::new(TraceLevel::None, test_expr);
     /// ```
-    pub fn new(trace_level: TraceLevel, test_expr: ExprWithSpan) -> Self {
+    #[must_use]
+    pub const fn new(trace_level: TraceLevel, test_expr: ExprWithSpan) -> Self {
         Self {
             trace_level,
             test_expr,
@@ -78,8 +80,9 @@ impl Test {
     /// # Returns
     ///
     /// A reference to the trace level for this test.
-    pub fn trace_level(&self) -> &TraceLevel {
-        &self.trace_level
+    #[must_use]
+    pub const fn trace_level(&self) -> TraceLevel {
+        self.trace_level
     }
 
     /// Returns the test expression that defines the expected behavior.
@@ -103,7 +106,8 @@ impl Test {
     ///
     /// assert_eq!(test.test_expr(), &expected_area);
     /// ```
-    pub fn test_expr(&self) -> &ExprWithSpan {
+    #[must_use]
+    pub const fn test_expr(&self) -> &ExprWithSpan {
         &self.test_expr
     }
 }

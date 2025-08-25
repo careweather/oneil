@@ -98,10 +98,10 @@ fn import_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let span =
         AstSpan::calc_span_with_whitespace(&import_token, &import_path_token, &end_of_line_token);
 
-    let import_path = Node::new(import_path_token, import_path_token.lexeme().to_string());
-    let import_node = Node::new(span, Import::new(import_path));
+    let import_path = Node::new(&import_path_token, import_path_token.lexeme().to_string());
+    let import_node = Node::new(&span, Import::new(import_path));
 
-    let decl_node = Node::new(span, Decl::Import(import_node));
+    let decl_node = Node::new(&span, Decl::Import(import_node));
 
     Ok((rest, decl_node))
 }
@@ -154,7 +154,7 @@ fn from_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, use_model) = identifier
         .or_fail_with(ParserError::from_missing_use_model(&use_token))
         .parse(rest)?;
-    let use_model = Node::new(use_model, Identifier::new(use_model.lexeme().to_string()));
+    let use_model = Node::new(&use_model, Identifier::new(use_model.lexeme().to_string()));
     let use_model_span = AstSpan::from(&use_model);
     subcomponents.push(use_model);
 
@@ -165,7 +165,7 @@ fn from_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, alias) = identifier
         .or_fail_with(ParserError::from_missing_alias(&as_token))
         .parse(rest)?;
-    let alias = Node::new(alias, Identifier::new(alias.lexeme().to_string()));
+    let alias = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
 
     let (rest, end_of_line_token) = end_of_line
         .or_fail_with(ParserError::from_missing_end_of_line(&alias))
@@ -173,9 +173,9 @@ fn from_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 
     let span = AstSpan::calc_span_with_whitespace(&from_token, &alias, &end_of_line_token);
 
-    let use_model_node = Node::new(span, UseModel::new(from_path, subcomponents, Some(alias)));
+    let use_model_node = Node::new(&span, UseModel::new(from_path, subcomponents, Some(alias)));
 
-    let decl_node = Node::new(span, Decl::UseModel(use_model_node));
+    let decl_node = Node::new(&span, Decl::UseModel(use_model_node));
 
     Ok((rest, decl_node))
 }
@@ -226,7 +226,7 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, alias) = identifier
         .or_fail_with(ParserError::use_missing_alias(&as_token))
         .parse(rest)?;
-    let alias = Node::new(alias, Identifier::new(alias.lexeme().to_string()));
+    let alias = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
 
     let (rest, end_of_line_token) = end_of_line
         .or_fail_with(ParserError::use_missing_end_of_line(&alias))
@@ -234,9 +234,9 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 
     let span = AstSpan::calc_span_with_whitespace(&use_token, &alias, &end_of_line_token);
 
-    let use_model_node = Node::new(span, UseModel::new(path, subcomponents, Some(alias)));
+    let use_model_node = Node::new(&span, UseModel::new(path, subcomponents, Some(alias)));
 
-    let decl_node = Node::new(span, Decl::UseModel(use_model_node));
+    let decl_node = Node::new(&span, Decl::UseModel(use_model_node));
 
     Ok((rest, decl_node))
 }
@@ -267,7 +267,7 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 /// subcomponent identifiers, or an error if the path is malformed.
 fn model_path(input: Span<'_>) -> Result<'_, (IdentifierNode, Vec<IdentifierNode>), ParserError> {
     let (rest, path) = identifier.convert_errors().parse(input)?;
-    let path = Node::new(path, Identifier::new(path.lexeme().to_string()));
+    let path = Node::new(&path, Identifier::new(path.lexeme().to_string()));
 
     let (rest, subcomponents) = many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
@@ -275,7 +275,7 @@ fn model_path(input: Span<'_>) -> Result<'_, (IdentifierNode, Vec<IdentifierNode
             .or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token))
             .parse(rest)?;
         let subcomponent_node = Node::new(
-            subcomponent,
+            &subcomponent,
             Identifier::new(subcomponent.lexeme().to_string()),
         );
         Ok((rest, subcomponent_node))
@@ -302,7 +302,7 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, parameter) = parse_parameter.parse(input)?;
 
     let span = AstSpan::from(&parameter);
-    let decl_node = Node::new(span, Decl::Parameter(parameter));
+    let decl_node = Node::new(&span, Decl::Parameter(Box::new(parameter)));
 
     Ok((rest, decl_node))
 }
@@ -324,7 +324,7 @@ fn test_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, test) = parse_test.parse(input)?;
 
     let span = AstSpan::from(&test);
-    let decl_node = Node::new(span, Decl::Test(test));
+    let decl_node = Node::new(&span, Decl::Test(Box::new(test)));
 
     Ok((rest, decl_node))
 }
@@ -340,13 +340,13 @@ mod tests {
         #[test]
         fn test_import_decl() {
             let input = Span::new_extra("import foo\n", Config::default());
-            let (rest, decl) = parse(input).unwrap();
+            let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::Import(import_node) => {
                     let import_path = import_node.path();
 
                     assert_eq!(import_path.node_value(), "foo");
-                    assert_eq!(import_path.node_span(), &AstSpan::new(7, 3, 0));
+                    assert_eq!(import_path.node_span(), AstSpan::new(7, 3, 0));
                 }
                 _ => panic!("Expected import declaration"),
             }
@@ -356,13 +356,14 @@ mod tests {
         #[test]
         fn test_use_decl() {
             let input = Span::new_extra("use foo.bar as baz\n", Config::default());
-            let (rest, decl) = parse(input).unwrap();
+            let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(use_model.alias().unwrap().as_str(), "baz");
+                    assert_eq!(alias.as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -372,13 +373,14 @@ mod tests {
         #[test]
         fn test_from_decl() {
             let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
-            let (rest, decl) = parse(input).unwrap();
+            let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(use_model.alias().unwrap().as_str(), "baz");
+                    assert_eq!(alias.as_str(), "baz");
                 }
                 _ => panic!("Expected from declaration"),
             }
@@ -388,12 +390,12 @@ mod tests {
         #[test]
         fn test_parse_complete_import_success() {
             let input = Span::new_extra("import foo\n", Config::default());
-            let (rest, decl) = parse_complete(input).unwrap();
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::Import(import_node) => {
                     let import_path = import_node.path();
                     assert_eq!(import_path.node_value(), "foo");
-                    assert_eq!(import_path.node_span(), &AstSpan::new(7, 3, 0));
+                    assert_eq!(import_path.node_span(), AstSpan::new(7, 3, 0));
                 }
                 _ => panic!("Expected import declaration"),
             }
@@ -403,13 +405,14 @@ mod tests {
         #[test]
         fn test_parse_complete_use_success() {
             let input = Span::new_extra("use foo.bar as baz\n", Config::default());
-            let (rest, decl) = parse_complete(input).unwrap();
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(use_model.alias().unwrap().as_str(), "baz");
+                    assert_eq!(alias.as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -419,13 +422,14 @@ mod tests {
         #[test]
         fn test_parse_complete_from_success() {
             let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
-            let (rest, decl) = parse_complete(input).unwrap();
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
                     assert_eq!(use_model.model_name().as_str(), "foo");
                     assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(use_model.alias().unwrap().as_str(), "baz");
+                    assert_eq!(alias.as_str(), "baz");
                 }
                 _ => panic!("Expected from declaration"),
             }
@@ -495,7 +499,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -519,7 +523,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -543,7 +547,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -623,7 +627,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -647,7 +651,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -672,7 +676,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -697,7 +701,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
         }
@@ -744,7 +748,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -768,7 +772,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -791,7 +795,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -814,7 +818,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -837,7 +841,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -861,7 +865,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -884,7 +888,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
         }
@@ -950,7 +954,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -973,7 +977,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -996,7 +1000,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
 
@@ -1019,7 +1023,7 @@ mod tests {
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {:?}", result),
+                    _ => panic!("Unexpected result {result:?}"),
                 }
             }
         }

@@ -69,17 +69,15 @@ use crate::{
 /// # Arguments
 ///
 /// * `value` - The AST expression to resolve
-/// * `local_variables` - Set of local variable identifiers available in the current scope
+/// * `builtin_ref` - Reference to built-in functions and variables
 /// * `defined_parameters_info` - Information about defined parameters and their status
 /// * `submodel_info` - Information about available submodels and their paths
 /// * `model_info` - Information about all available models and their loading status
 ///
 /// # Returns
 ///
-/// * `Ok(oneil_ir::expr::Expr)` - The resolved model expression
+/// * `Ok(oneil_ir::expr::ExprWithSpan)` - The resolved model expression
 /// * `Err(Vec<VariableResolutionError>)` - Any variable resolution errors that occurred
-///
-
 ///
 /// # Error Conditions
 ///
@@ -104,115 +102,54 @@ pub fn resolve_expr(
             left,
             right,
             rest_chained,
-        } => {
-            let left = resolve_expr(
-                left,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            );
-            let right = resolve_expr(
-                right,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            );
-            let op_with_span = resolve_comparison_op(op);
-
-            // Resolve the chained comparisons
-            let rest_chained = rest_chained.into_iter().map(|(op, expr)| {
-                let expr = resolve_expr(
-                    expr,
-                    builtin_ref,
-                    defined_parameters_info,
-                    submodel_info,
-                    model_info,
-                );
-                let op_with_span = resolve_comparison_op(op);
-                expr.map(|expr| (op_with_span, expr))
-            });
-
-            let left_right_result = error::combine_errors(left, right);
-            let rest_chained_result = error::combine_error_list(rest_chained);
-            let ((left, right), rest_chained) =
-                error::combine_errors(left_right_result, rest_chained_result)?;
-
-            let expr = Expr::comparison_op(op_with_span, left, right, rest_chained);
-            Ok(WithSpan::new(expr, value_span))
-        }
-        ast::Expr::BinaryOp { op, left, right } => {
-            let left = resolve_expr(
-                left,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            );
-            let right = resolve_expr(
-                right,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            );
-            let op_with_span = resolve_binary_op(op);
-
-            let (left, right) = error::combine_errors(left, right)?;
-
-            let expr = Expr::binary_op(op_with_span, left, right);
-            Ok(WithSpan::new(expr, value_span))
-        }
-        ast::Expr::UnaryOp { op, expr } => {
-            let expr = resolve_expr(
-                expr,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            );
-            let op_with_span = resolve_unary_op(op);
-
-            match expr {
-                Ok(expr) => Ok(WithSpan::new(
-                    Expr::unary_op(op_with_span, expr),
-                    value_span,
-                )),
-                Err(errors) => Err(errors),
-            }
-        }
-        ast::Expr::FunctionCall { name, args } => {
-            let name_with_span = resolve_function_name(name, builtin_ref);
-            let args = args.iter().map(|arg| {
-                resolve_expr(
-                    arg,
-                    builtin_ref,
-                    defined_parameters_info,
-                    submodel_info,
-                    model_info,
-                )
-            });
-
-            let args = error::combine_error_list(args)?;
-
-            let expr = Expr::function_call(name_with_span, args);
-            Ok(WithSpan::new(expr, value_span))
-        }
-        ast::Expr::Variable(variable) => resolve_variable(
+        } => resolve_comparison_expression(
+            op,
+            left,
+            right,
+            rest_chained,
+            value_span,
+            builtin_ref,
+            defined_parameters_info,
+            submodel_info,
+            model_info,
+        ),
+        ast::Expr::BinaryOp { op, left, right } => resolve_binary_expression(
+            op,
+            left,
+            right,
+            value_span,
+            builtin_ref,
+            defined_parameters_info,
+            submodel_info,
+            model_info,
+        ),
+        ast::Expr::UnaryOp { op, expr } => resolve_unary_expression(
+            op,
+            expr,
+            value_span,
+            builtin_ref,
+            defined_parameters_info,
+            submodel_info,
+            model_info,
+        ),
+        ast::Expr::FunctionCall { name, args } => resolve_function_call_expression(
+            name,
+            args,
+            value_span,
+            builtin_ref,
+            defined_parameters_info,
+            submodel_info,
+            model_info,
+        ),
+        ast::Expr::Variable(variable) => resolve_variable_expression(
             variable,
             builtin_ref,
             defined_parameters_info,
             submodel_info,
             model_info,
-        )
-        .map_err(|error| vec![error]),
-        ast::Expr::Literal(literal) => {
-            let literal = resolve_literal(literal);
-            let expr = Expr::literal(literal);
-            Ok(WithSpan::new(expr, value_span))
-        }
-        ast::Expr::Parenthesized { expr } => resolve_expr(
+        ),
+        ast::Expr::Literal(literal) => Ok(resolve_literal_expression(literal, value_span)),
+        ast::Expr::Parenthesized { expr } => resolve_parenthesized_expression(
             expr,
             builtin_ref,
             defined_parameters_info,
@@ -220,6 +157,281 @@ pub fn resolve_expr(
             model_info,
         ),
     }
+}
+
+/// Resolves a comparison expression with optional chained comparisons.
+///
+/// # Arguments
+///
+/// * `op` - The comparison operator
+/// * `left` - The left operand expression
+/// * `right` - The right operand expression
+/// * `rest_chained` - Additional chained comparison operations
+/// * `value_span` - The span of the entire expression
+/// * `builtin_ref` - Reference to built-in functions and variables
+/// * `defined_parameters_info` - Information about defined parameters
+/// * `submodel_info` - Information about available submodels
+/// * `model_info` - Information about all available models
+///
+/// # Returns
+///
+/// The resolved comparison expression or error collection
+fn resolve_comparison_expression(
+    op: &ast::expression::ComparisonOpNode,
+    left: &ast::expression::ExprNode,
+    right: &ast::expression::ExprNode,
+    rest_chained: &[(ast::expression::ComparisonOpNode, ast::expression::ExprNode)],
+    value_span: oneil_ir::span::Span,
+    builtin_ref: &impl BuiltinRef,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
+) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+    let left = resolve_expr(
+        left,
+        builtin_ref,
+        defined_parameters_info,
+        submodel_info,
+        model_info,
+    );
+    let right = resolve_expr(
+        right,
+        builtin_ref,
+        defined_parameters_info,
+        submodel_info,
+        model_info,
+    );
+    let op_with_span = resolve_comparison_op(op);
+
+    // Resolve the chained comparisons
+    let rest_chained = rest_chained.iter().map(|(op, expr)| {
+        let expr = resolve_expr(
+            expr,
+            builtin_ref,
+            defined_parameters_info,
+            submodel_info,
+            model_info,
+        );
+        let op_with_span = resolve_comparison_op(op);
+        expr.map(|expr| (op_with_span, expr))
+    });
+
+    let left_right_result = error::combine_errors(left, right);
+    let rest_chained_result = error::combine_error_list(rest_chained);
+    let ((left, right), rest_chained) =
+        error::combine_errors(left_right_result, rest_chained_result)?;
+
+    let expr = Expr::comparison_op(op_with_span, left, right, rest_chained);
+    Ok(WithSpan::new(expr, value_span))
+}
+
+/// Resolves a binary operation expression.
+///
+/// # Arguments
+///
+/// * `op` - The binary operator
+/// * `left` - The left operand expression
+/// * `right` - The right operand expression
+/// * `value_span` - The span of the entire expression
+/// * `builtin_ref` - Reference to built-in functions and variables
+/// * `defined_parameters_info` - Information about defined parameters
+/// * `submodel_info` - Information about available submodels
+/// * `model_info` - Information about all available models
+///
+/// # Returns
+///
+/// The resolved binary expression or error collection
+fn resolve_binary_expression(
+    op: &ast::expression::BinaryOpNode,
+    left: &ast::expression::ExprNode,
+    right: &ast::expression::ExprNode,
+    value_span: oneil_ir::span::Span,
+    builtin_ref: &impl BuiltinRef,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
+) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+    let left = resolve_expr(
+        left,
+        builtin_ref,
+        defined_parameters_info,
+        submodel_info,
+        model_info,
+    );
+    let right = resolve_expr(
+        right,
+        builtin_ref,
+        defined_parameters_info,
+        submodel_info,
+        model_info,
+    );
+    let op_with_span = resolve_binary_op(op);
+
+    let (left, right) = error::combine_errors(left, right)?;
+
+    let expr = Expr::binary_op(op_with_span, left, right);
+    Ok(WithSpan::new(expr, value_span))
+}
+
+/// Resolves a unary operation expression.
+///
+/// # Arguments
+///
+/// * `op` - The unary operator
+/// * `expr` - The operand expression
+/// * `value_span` - The span of the entire expression
+/// * `builtin_ref` - Reference to built-in functions and variables
+/// * `defined_parameters_info` - Information about defined parameters
+/// * `submodel_info` - Information about available submodels
+/// * `model_info` - Information about all available models
+///
+/// # Returns
+///
+/// The resolved unary expression or error collection
+fn resolve_unary_expression(
+    op: &ast::expression::UnaryOpNode,
+    expr: &ast::expression::ExprNode,
+    value_span: oneil_ir::span::Span,
+    builtin_ref: &impl BuiltinRef,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
+) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+    let expr = resolve_expr(
+        expr,
+        builtin_ref,
+        defined_parameters_info,
+        submodel_info,
+        model_info,
+    );
+    let op_with_span = resolve_unary_op(op);
+
+    match expr {
+        Ok(expr) => Ok(WithSpan::new(
+            Expr::unary_op(op_with_span, expr),
+            value_span,
+        )),
+        Err(errors) => Err(errors),
+    }
+}
+
+/// Resolves a function call expression.
+///
+/// # Arguments
+///
+/// * `name` - The function name identifier
+/// * `args` - The function arguments
+/// * `value_span` - The span of the entire expression
+/// * `builtin_ref` - Reference to built-in functions and variables
+/// * `defined_parameters_info` - Information about defined parameters
+/// * `submodel_info` - Information about available submodels
+/// * `model_info` - Information about all available models
+///
+/// # Returns
+///
+/// The resolved function call expression or error collection
+fn resolve_function_call_expression(
+    name: &ast::naming::IdentifierNode,
+    args: &[ast::expression::ExprNode],
+    value_span: oneil_ir::span::Span,
+    builtin_ref: &impl BuiltinRef,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
+) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+    let name_with_span = resolve_function_name(name, builtin_ref);
+    let args = args.iter().map(|arg| {
+        resolve_expr(
+            arg,
+            builtin_ref,
+            defined_parameters_info,
+            submodel_info,
+            model_info,
+        )
+    });
+
+    let args = error::combine_error_list(args)?;
+
+    let expr = Expr::function_call(name_with_span, args);
+    Ok(WithSpan::new(expr, value_span))
+}
+
+/// Resolves a variable expression.
+///
+/// # Arguments
+///
+/// * `variable` - The variable node to resolve
+/// * `builtin_ref` - Reference to built-in functions and variables
+/// * `defined_parameters_info` - Information about defined parameters
+/// * `submodel_info` - Information about available submodels
+/// * `model_info` - Information about all available models
+///
+/// # Returns
+///
+/// The resolved variable expression or error collection
+fn resolve_variable_expression(
+    variable: &ast::expression::VariableNode,
+    builtin_ref: &impl BuiltinRef,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
+) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+    resolve_variable(
+        variable,
+        builtin_ref,
+        defined_parameters_info,
+        submodel_info,
+        model_info,
+    )
+    .map_err(|error| vec![error])
+}
+
+/// Resolves a literal expression.
+///
+/// # Arguments
+///
+/// * `literal` - The literal node to resolve
+/// * `value_span` - The span of the entire expression
+///
+/// # Returns
+///
+/// The resolved literal expression
+fn resolve_literal_expression(
+    literal: &ast::expression::LiteralNode,
+    value_span: oneil_ir::span::Span,
+) -> oneil_ir::span::WithSpan<oneil_ir::expr::Expr> {
+    let literal = resolve_literal(literal);
+    let expr = Expr::literal(literal);
+    WithSpan::new(expr, value_span)
+}
+
+/// Resolves a parenthesized expression.
+///
+/// # Arguments
+///
+/// * `expr` - The expression inside parentheses
+/// * `builtin_ref` - Reference to built-in functions and variables
+/// * `defined_parameters_info` - Information about defined parameters
+/// * `submodel_info` - Information about available submodels
+/// * `model_info` - Information about all available models
+///
+/// # Returns
+///
+/// The resolved expression (parentheses are removed during resolution)
+fn resolve_parenthesized_expression(
+    expr: &ast::expression::ExprNode,
+    builtin_ref: &impl BuiltinRef,
+    defined_parameters_info: &ParameterInfo<'_>,
+    submodel_info: &SubmodelInfo<'_>,
+    model_info: &ModelInfo<'_>,
+) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+    resolve_expr(
+        expr,
+        builtin_ref,
+        defined_parameters_info,
+        submodel_info,
+        model_info,
+    )
 }
 
 /// Converts an AST comparison operation to a model comparison operation.
@@ -318,7 +530,7 @@ fn resolve_function_name(
     builtin_ref: &impl BuiltinRef,
 ) -> WithSpan<oneil_ir::expr::FunctionName> {
     let span = get_span_from_ast_span(name.node_span());
-    let name = Identifier::new(name.as_str().to_string());
+    let name = Identifier::new(name.as_str());
 
     let name = if builtin_ref.has_builtin_function(&name) {
         oneil_ir::expr::FunctionName::builtin(name)
@@ -379,9 +591,9 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ExprNode {
-            let literal_node = ast::node::Node::new(test_span(start, end), literal);
+            let literal_node = ast::node::Node::new(&test_span(start, end), literal);
             let expr = ast::expression::Expr::Literal(literal_node);
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a variable expression node
@@ -391,7 +603,7 @@ mod tests {
             end: usize,
         ) -> ast::expression::ExprNode {
             let expr = ast::expression::Expr::Variable(variable);
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a binary operation node
@@ -400,8 +612,7 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::BinaryOpNode {
-            let op_node = ast::node::Node::new(test_span(start, end), op);
-            op_node
+            ast::node::Node::new(&test_span(start, end), op)
         }
 
         /// Helper function to create a comparison operation node
@@ -410,8 +621,7 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ComparisonOpNode {
-            let op_node = ast::node::Node::new(test_span(start, end), op);
-            op_node
+            ast::node::Node::new(&test_span(start, end), op)
         }
 
         /// Helper function to create a binary operation expression node
@@ -427,7 +637,7 @@ mod tests {
                 op,
                 right: Box::new(right),
             };
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a unary operation node
@@ -436,8 +646,7 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::UnaryOpNode {
-            let op_node = ast::node::Node::new(test_span(start, end), op);
-            op_node
+            ast::node::Node::new(&test_span(start, end), op)
         }
 
         /// Helper function to create an identifier node
@@ -447,7 +656,7 @@ mod tests {
             end: usize,
         ) -> ast::naming::IdentifierNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            ast::node::Node::new(test_span(start, end), identifier)
+            ast::node::Node::new(&test_span(start, end), identifier)
         }
 
         /// Helper function to create a unary operation expression node
@@ -461,7 +670,7 @@ mod tests {
                 op,
                 expr: Box::new(expr),
             };
-            ast::node::Node::new(test_span(start, end), expr_node)
+            ast::node::Node::new(&test_span(start, end), expr_node)
         }
 
         /// Helper function to create a function call expression node
@@ -472,15 +681,15 @@ mod tests {
             end: usize,
         ) -> ast::expression::ExprNode {
             let expr = ast::expression::Expr::FunctionCall { name, args };
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a simple identifier variable
         pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            let identifier_node = ast::node::Node::new(test_span(0, name.len()), identifier);
+            let identifier_node = ast::node::Node::new(&test_span(0, name.len()), identifier);
             let variable = ast::expression::Variable::Identifier(identifier_node);
-            ast::node::Node::new(test_span(0, name.len()), variable)
+            ast::node::Node::new(&test_span(0, name.len()), variable)
         }
 
         /// Helper function to create a parenthesized expression node
@@ -492,7 +701,7 @@ mod tests {
             let parenthesized_expr = ast::expression::Expr::Parenthesized {
                 expr: Box::new(expr),
             };
-            ast::node::Node::new(test_span(start, end), parenthesized_expr)
+            ast::node::Node::new(&test_span(start, end), parenthesized_expr)
         }
 
         pub fn create_empty_context() -> (
@@ -531,7 +740,7 @@ mod tests {
             start: usize,
             end: usize,
         ) -> WithSpan<Identifier> {
-            WithSpan::new(Identifier::new(name.to_string()), Span::new(start, end))
+            WithSpan::new(Identifier::new(name), Span::new(start, end))
         }
 
         /// Helper function to create a parameter value with span
@@ -553,7 +762,7 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::LiteralNode {
-            ast::node::Node::new(test_span(start, end), literal)
+            ast::node::Node::new(&test_span(start, end), literal)
         }
     }
 
@@ -579,15 +788,15 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(literal.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
                         assert_eq!(value, &Literal::Number(42.0));
                     }
-                    _ => panic!("Expected literal expression, got {:?}", result),
+                    _ => panic!("Expected literal expression, got {result:?}"),
                 }
             }
-            _ => panic!("Expected literal expression, got {:?}", result),
+            _ => panic!("Expected literal expression, got {result:?}"),
         }
     }
 
@@ -616,15 +825,15 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(literal.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
                         assert_eq!(value, &Literal::String("hello".to_string()));
                     }
-                    _ => panic!("Expected literal expression, got {:?}", result),
+                    _ => panic!("Expected literal expression, got {result:?}"),
                 }
             }
-            _ => panic!("Expected literal expression, got {:?}", result),
+            _ => panic!("Expected literal expression, got {result:?}"),
         }
     }
 
@@ -650,15 +859,15 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(literal.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
                         assert_eq!(value, &Literal::Boolean(true));
                     }
-                    _ => panic!("Expected literal expression, got {:?}", result),
+                    _ => panic!("Expected literal expression, got {result:?}"),
                 }
             }
-            _ => panic!("Expected literal expression, got {:?}", result),
+            _ => panic!("Expected literal expression, got {result:?}"),
         }
     }
 
@@ -670,13 +879,7 @@ mod tests {
         let ast_op = helper::create_binary_op_node(ast::expression::BinaryOp::Add, 1, 2);
         let ast_right =
             helper::create_literal_expr_node(ast::expression::Literal::Number(2.0), 4, 5);
-        let expr = helper::create_binary_op_expr_node(
-            ast_left.clone(),
-            ast_op.clone(),
-            ast_right.clone(),
-            0,
-            5,
-        );
+        let expr = helper::create_binary_op_expr_node(ast_left, ast_op.clone(), ast_right, 0, 5);
 
         // create the context
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -694,31 +897,31 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::BinaryOp { op, left, right } => {
                         let expected_op_span = get_span_from_ast_span(ast_op.node_span());
-                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.span(), expected_op_span);
                         assert_eq!(op.value(), &BinaryOp::Add);
 
                         match left.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(1.0));
                             }
-                            _ => panic!("Expected literal expression on left, got {:?}", left),
+                            _ => panic!("Expected literal expression on left, got {left:?}"),
                         }
 
                         match right.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(2.0));
                             }
-                            _ => panic!("Expected literal expression on right, got {:?}", right),
+                            _ => panic!("Expected literal expression on right, got {right:?}"),
                         }
                     }
-                    _ => panic!("Expected binary operation, got {:?}", result),
+                    _ => panic!("Expected binary operation, got {result:?}"),
                 }
             }
-            _ => panic!("Expected binary operation, got {:?}", result),
+            _ => panic!("Expected binary operation, got {result:?}"),
         }
     }
 
@@ -728,7 +931,7 @@ mod tests {
         let ast_inner_expr =
             helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 1, 4);
         let ast_op = helper::create_unary_op_node(ast::expression::UnaryOp::Neg, 0, 1);
-        let expr = helper::create_unary_op_expr_node(ast_op.clone(), ast_inner_expr.clone(), 0, 4);
+        let expr = helper::create_unary_op_expr_node(ast_op.clone(), ast_inner_expr, 0, 4);
 
         // create the context
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -746,36 +949,34 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
 
                 match result.value() {
                     ir::expr::Expr::UnaryOp { op, expr } => {
                         let expected_op_span = get_span_from_ast_span(ast_op.node_span());
-                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.span(), expected_op_span);
                         assert_eq!(op.value(), &UnaryOp::Neg);
 
                         match expr.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(5.0));
                             }
-                            _ => panic!("Expected literal expression, got {:?}", expr),
+                            _ => panic!("Expected literal expression, got {expr:?}"),
                         }
                     }
-                    _ => panic!("Expected unary operation, got {:?}", result),
+                    _ => panic!("Expected unary operation, got {result:?}"),
                 }
             }
-            _ => panic!("Expected unary operation, got {:?}", result),
+            _ => panic!("Expected unary operation, got {result:?}"),
         }
     }
 
     #[test]
     fn test_resolve_function_call_builtin() {
         // create the expression
-        let ast_arg =
-            helper::create_literal_expr_node(ast::expression::Literal::Number(3.14), 4, 8);
+        let ast_arg = helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 4, 8);
         let ast_name = helper::create_identifier_node("foo", 0, 3);
-        let expr =
-            helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg.clone()], 0, 8);
+        let expr = helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg], 0, 8);
 
         // create the context
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -793,12 +994,12 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
 
                 match result.value() {
                     ir::expr::Expr::FunctionCall { name, args } => {
                         let expected_name_span = get_span_from_ast_span(ast_name.node_span());
-                        assert_eq!(name.span(), &expected_name_span);
+                        assert_eq!(name.span(), expected_name_span);
                         assert_eq!(
                             name.value(),
                             &FunctionName::imported(Identifier::new("foo"))
@@ -808,15 +1009,15 @@ mod tests {
 
                         match &args[0].value() {
                             ir::expr::Expr::Literal { value } => {
-                                assert_eq!(value, &Literal::Number(3.14));
+                                assert_eq!(value, &Literal::Number(1.0));
                             }
                             _ => panic!("Expected literal argument, got {:?}", args[0]),
                         }
                     }
-                    _ => panic!("Expected function call, got {:?}", result),
+                    _ => panic!("Expected function call, got {result:?}"),
                 }
             }
-            _ => panic!("Expected function call, got {:?}", result),
+            _ => panic!("Expected function call, got {result:?}"),
         }
     }
 
@@ -826,8 +1027,7 @@ mod tests {
         let ast_arg =
             helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 16, 19);
         let ast_name = helper::create_identifier_node("custom_function", 0, 15);
-        let expr =
-            helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg.clone()], 0, 19);
+        let expr = helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg], 0, 19);
 
         // create the context
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -845,12 +1045,12 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
 
                 match result.value() {
                     ir::expr::Expr::FunctionCall { name, args } => {
                         let expected_name_span = get_span_from_ast_span(ast_name.node_span());
-                        assert_eq!(name.span(), &expected_name_span);
+                        assert_eq!(name.span(), expected_name_span);
                         assert_eq!(
                             name.value(),
                             &FunctionName::imported(Identifier::new("custom_function"))
@@ -865,10 +1065,10 @@ mod tests {
                             _ => panic!("Expected literal argument, got {:?}", args[0]),
                         }
                     }
-                    _ => panic!("Expected function call, got {:?}", result),
+                    _ => panic!("Expected function call, got {result:?}"),
                 }
             }
-            _ => panic!("Expected function call, got {:?}", result),
+            _ => panic!("Expected function call, got {result:?}"),
         }
     }
 
@@ -876,7 +1076,7 @@ mod tests {
     fn test_resolve_variable_builtin() {
         // create the expression
         let ast_variable = helper::create_identifier_variable("x");
-        let expr = helper::create_variable_expr_node(ast_variable.clone(), 0, 1);
+        let expr = helper::create_variable_expr_node(ast_variable, 0, 1);
 
         // create the context
         let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -895,16 +1095,16 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
 
                 match result.value() {
                     ir::expr::Expr::Variable(variable) => {
                         assert_eq!(variable, &ir::expr::Variable::Builtin(Identifier::new("x")));
                     }
-                    _ => panic!("Expected variable expression, got {:?}", result),
+                    _ => panic!("Expected variable expression, got {result:?}"),
                 }
             }
-            _ => panic!("Expected local variable, got {:?}", result),
+            _ => panic!("Expected local variable, got {result:?}"),
         }
     }
 
@@ -912,7 +1112,7 @@ mod tests {
     fn test_resolve_variable_parameter() {
         // create the expression
         let ast_variable = helper::create_identifier_variable("param");
-        let expr = helper::create_variable_expr_node(ast_variable.clone(), 0, 5);
+        let expr = helper::create_variable_expr_node(ast_variable, 0, 5);
 
         // create the context
         let mut param_map = HashMap::new();
@@ -943,7 +1143,7 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
 
                 match result.value() {
                     ir::expr::Expr::Variable(variable) => {
@@ -952,10 +1152,10 @@ mod tests {
                             &ir::expr::Variable::Parameter(Identifier::new("param"))
                         );
                     }
-                    _ => panic!("Expected variable expression, got {:?}", result),
+                    _ => panic!("Expected variable expression, got {result:?}"),
                 }
             }
-            _ => panic!("Expected parameter variable, got {:?}", result),
+            _ => panic!("Expected parameter variable, got {result:?}"),
         }
     }
 
@@ -994,13 +1194,14 @@ mod tests {
                     _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
                 }
             }
-            _ => panic!("Expected error, got {:?}", result),
+            _ => panic!("Expected error, got {result:?}"),
         }
     }
 
     #[test]
+    #[allow(clippy::too_many_lines, reason = "this is a complex test")]
     fn test_resolve_complex_expression() {
-        // create the expression: (1 + 2) * sin(3.14)
+        // create the expression: (1 + 2) * foo(1)
         let ast_left_1 =
             helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 1, 2);
         let ast_right_1 =
@@ -1015,7 +1216,7 @@ mod tests {
         );
 
         let ast_func_arg =
-            helper::create_literal_expr_node(ast::expression::Literal::Number(3.14), 12, 16);
+            helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 12, 16);
         let ast_func_name = helper::create_identifier_node("foo", 8, 11);
         let func_call = helper::create_function_call_expr_node(
             ast_func_name.clone(),
@@ -1028,7 +1229,7 @@ mod tests {
         let expr = helper::create_binary_op_expr_node(
             inner_binary.clone(),
             ast_mul_op.clone(),
-            func_call.clone(),
+            func_call,
             0,
             17,
         );
@@ -1049,17 +1250,17 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
 
                 match result.value() {
                     ir::expr::Expr::BinaryOp { op, left, right } => {
                         let expected_op_span = get_span_from_ast_span(ast_mul_op.node_span());
-                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.span(), expected_op_span);
                         assert_eq!(op.value(), &BinaryOp::Mul);
 
                         // check left side (1 + 2)
                         let expected_left_span = get_span_from_ast_span(inner_binary.node_span());
-                        assert_eq!(left.span(), &expected_left_span);
+                        assert_eq!(left.span(), expected_left_span);
                         match left.value() {
                             ir::expr::Expr::BinaryOp {
                                 op: left_op,
@@ -1068,12 +1269,12 @@ mod tests {
                             } => {
                                 let expected_left_op_span =
                                     get_span_from_ast_span(ast_add_op.node_span());
-                                assert_eq!(left_op.span(), &expected_left_op_span);
+                                assert_eq!(left_op.span(), expected_left_op_span);
                                 assert_eq!(left_op.value(), &BinaryOp::Add);
 
                                 let expected_left_span =
                                     get_span_from_ast_span(ast_left_1.node_span());
-                                assert_eq!(left_left.span(), &expected_left_span);
+                                assert_eq!(left_left.span(), expected_left_span);
                                 match left_left.value() {
                                     ir::expr::Expr::Literal { value } => {
                                         assert_eq!(value, &Literal::Number(1.0));
@@ -1086,7 +1287,7 @@ mod tests {
 
                                 let expected_right_span =
                                     get_span_from_ast_span(ast_right_1.node_span());
-                                assert_eq!(left_right.span(), &expected_right_span);
+                                assert_eq!(left_right.span(), expected_right_span);
                                 match left_right.value() {
                                     ir::expr::Expr::Literal { value } => {
                                         assert_eq!(value, &Literal::Number(2.0));
@@ -1108,7 +1309,7 @@ mod tests {
                             ir::expr::Expr::FunctionCall { name, args } => {
                                 let expected_name_span =
                                     get_span_from_ast_span(ast_func_name.node_span());
-                                assert_eq!(name.span(), &expected_name_span);
+                                assert_eq!(name.span(), expected_name_span);
                                 assert_eq!(
                                     name.value(),
                                     &FunctionName::imported(Identifier::new("foo"))
@@ -1117,10 +1318,10 @@ mod tests {
                                 assert_eq!(args.len(), 1);
                                 let expected_arg_span =
                                     get_span_from_ast_span(ast_func_arg.node_span());
-                                assert_eq!(args[0].span(), &expected_arg_span);
+                                assert_eq!(args[0].span(), expected_arg_span);
                                 match args[0].value() {
                                     ir::expr::Expr::Literal { value } => {
-                                        assert_eq!(value, &Literal::Number(3.14));
+                                        assert_eq!(value, &Literal::Number(1.0));
                                     }
                                     _ => panic!(
                                         "Expected literal argument, got {:?}",
@@ -1137,7 +1338,7 @@ mod tests {
                     _ => panic!("Expected binary operation, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected successful result, got {:?}", result),
+            _ => panic!("Expected successful result, got {result:?}"),
         }
     }
 
@@ -1167,7 +1368,7 @@ mod tests {
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_op_node.node_span());
-            assert_eq!(result.span(), &expected_span);
+            assert_eq!(result.span(), expected_span);
             assert_eq!(result.value(), &expected_ir_op);
         }
     }
@@ -1207,7 +1408,7 @@ mod tests {
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_op_node.node_span());
-            assert_eq!(result.span(), &expected_span);
+            assert_eq!(result.span(), expected_span);
             assert_eq!(result.value(), &expected_ir_op);
         }
     }
@@ -1229,7 +1430,7 @@ mod tests {
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_op_node.node_span());
-            assert_eq!(result.span(), &expected_span);
+            assert_eq!(result.span(), expected_span);
             assert_eq!(result.value(), &expected_ir_op);
         }
     }
@@ -1259,7 +1460,7 @@ mod tests {
             // check the result
             let expected_span = get_span_from_ast_span(ast_func_name_node.node_span());
             let expected_func_builtin = FunctionName::builtin(Identifier::new(&func_name));
-            assert_eq!(result.span(), &expected_span);
+            assert_eq!(result.span(), expected_span);
             assert_eq!(result.value(), &expected_func_builtin);
         }
     }
@@ -1286,15 +1487,14 @@ mod tests {
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_func_name_node.node_span());
-            assert_eq!(result.span(), &expected_span);
+            assert_eq!(result.span(), expected_span);
             match result.value() {
                 FunctionName::Imported(name) => {
                     assert_eq!(name.as_str(), func_name);
                 }
-                _ => panic!(
-                    "Expected imported function for '{}', got {:?}",
-                    func_name, result
-                ),
+                FunctionName::Builtin(_) => {
+                    panic!("Expected imported function for '{func_name}', got {result:?}")
+                }
             }
         }
     }
@@ -1329,13 +1529,8 @@ mod tests {
         let ast_right_var = helper::create_identifier_variable("undefined2");
         let ast_right_expr = helper::create_variable_expr_node(ast_right_var.clone(), 15, 26);
         let ast_add_op = helper::create_binary_op_node(ast::expression::BinaryOp::Add, 11, 14);
-        let expr = helper::create_binary_op_expr_node(
-            ast_left_expr.clone(),
-            ast_add_op.clone(),
-            ast_right_expr.clone(),
-            0,
-            26,
-        );
+        let expr =
+            helper::create_binary_op_expr_node(ast_left_expr, ast_add_op, ast_right_expr, 0, 26);
 
         // create the context
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -1382,7 +1577,7 @@ mod tests {
                     undefined2_span
                 )));
             }
-            _ => panic!("Expected error, got {:?}", result),
+            _ => panic!("Expected error, got {result:?}"),
         }
     }
 
@@ -1419,15 +1614,15 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(inner_expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::BinaryOp { op, left, right } => {
                         let expected_op_span = get_span_from_ast_span(ast_add_op.node_span());
-                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.span(), expected_op_span);
                         assert_eq!(op.value(), &BinaryOp::Add);
 
                         let expected_left_span = get_span_from_ast_span(ast_left.node_span());
-                        assert_eq!(left.span(), &expected_left_span);
+                        assert_eq!(left.span(), expected_left_span);
                         match left.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(1.0));
@@ -1436,7 +1631,7 @@ mod tests {
                         }
 
                         let expected_right_span = get_span_from_ast_span(ast_right.node_span());
-                        assert_eq!(right.span(), &expected_right_span);
+                        assert_eq!(right.span(), expected_right_span);
                         match right.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(2.0));
@@ -1447,7 +1642,7 @@ mod tests {
                     _ => panic!("Expected binary operation, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected successful result, got {:?}", result),
+            _ => panic!("Expected successful result, got {result:?}"),
         }
     }
 
@@ -1472,7 +1667,7 @@ mod tests {
             helper::create_literal_expr_node(ast::expression::Literal::Number(3.0), 12, 13);
         let ast_mul_op = helper::create_binary_op_node(ast::expression::BinaryOp::Mul, 9, 10);
         let expr = helper::create_binary_op_expr_node(
-            inner_parenthesized.clone(),
+            inner_parenthesized,
             ast_mul_op.clone(),
             ast_outer_right.clone(),
             0,
@@ -1495,16 +1690,16 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::BinaryOp { op, left, right } => {
                         let expected_op_span = get_span_from_ast_span(ast_mul_op.node_span());
-                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.span(), expected_op_span);
                         assert_eq!(op.value(), &BinaryOp::Mul);
 
                         // check left side ((1 + 2))
                         let expected_left_span = get_span_from_ast_span(inner_binary.node_span());
-                        assert_eq!(left.span(), &expected_left_span);
+                        assert_eq!(left.span(), expected_left_span);
                         match left.value() {
                             ir::expr::Expr::BinaryOp {
                                 op: left_op,
@@ -1513,12 +1708,12 @@ mod tests {
                             } => {
                                 let expected_left_op_span =
                                     get_span_from_ast_span(ast_add_op.node_span());
-                                assert_eq!(left_op.span(), &expected_left_op_span);
+                                assert_eq!(left_op.span(), expected_left_op_span);
                                 assert_eq!(left_op.value(), &BinaryOp::Add);
 
                                 let expected_left_left_span =
                                     get_span_from_ast_span(ast_inner_left.node_span());
-                                assert_eq!(left_left.span(), &expected_left_left_span);
+                                assert_eq!(left_left.span(), expected_left_left_span);
                                 match left_left.value() {
                                     ir::expr::Expr::Literal { value } => {
                                         assert_eq!(value, &Literal::Number(1.0));
@@ -1531,7 +1726,7 @@ mod tests {
 
                                 let expected_left_right_span =
                                     get_span_from_ast_span(ast_inner_right.node_span());
-                                assert_eq!(left_right.span(), &expected_left_right_span);
+                                assert_eq!(left_right.span(), expected_left_right_span);
                                 match left_right.value() {
                                     ir::expr::Expr::Literal { value } => {
                                         assert_eq!(value, &Literal::Number(2.0));
@@ -1551,7 +1746,7 @@ mod tests {
                         // check right side (3)
                         let expected_right_span =
                             get_span_from_ast_span(ast_outer_right.node_span());
-                        assert_eq!(right.span(), &expected_right_span);
+                        assert_eq!(right.span(), expected_right_span);
                         match right.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(3.0));
@@ -1562,7 +1757,7 @@ mod tests {
                     _ => panic!("Expected binary operation, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected successful result, got {:?}", result),
+            _ => panic!("Expected successful result, got {result:?}"),
         }
     }
 
@@ -1573,7 +1768,7 @@ mod tests {
             helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 2, 4);
         let first_parentheses =
             helper::create_parenthesized_expr_node(ast_inner_literal.clone(), 1, 5);
-        let expr = helper::create_parenthesized_expr_node(first_parentheses.clone(), 0, 6);
+        let expr = helper::create_parenthesized_expr_node(first_parentheses, 0, 6);
 
         // create the context
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -1591,7 +1786,7 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(ast_inner_literal.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
                         assert_eq!(value, &Literal::Number(42.0));
@@ -1599,15 +1794,15 @@ mod tests {
                     _ => panic!("Expected literal expression, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected successful result, got {:?}", result),
+            _ => panic!("Expected successful result, got {result:?}"),
         }
     }
 
     #[test]
     fn test_resolve_single_literal_deep_nested_parentheses() {
-        // Test a single literal with deeply nested parentheses: (((3.14)))
+        // Test a single literal with deeply nested parentheses: (((1)))
         let inner_literal =
-            helper::create_literal_expr_node(ast::expression::Literal::Number(3.14), 3, 7);
+            helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 3, 7);
         let third_level = helper::create_parenthesized_expr_node(inner_literal.clone(), 2, 8);
         let second_level = helper::create_parenthesized_expr_node(third_level, 1, 9);
         let expr = helper::create_parenthesized_expr_node(second_level, 0, 10);
@@ -1628,15 +1823,15 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(inner_literal.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::Literal { value } => {
-                        assert_eq!(value, &Literal::Number(3.14));
+                        assert_eq!(value, &Literal::Number(1.0));
                     }
                     _ => panic!("Expected literal expression, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected literal expression, got {:?}", result),
+            _ => panic!("Expected literal expression, got {result:?}"),
         }
     }
 
@@ -1644,7 +1839,7 @@ mod tests {
     fn test_resolve_parenthesized_function_call() {
         // Test a parenthesized function call: (foo(3.14))
         let func_arg =
-            helper::create_literal_expr_node(ast::expression::Literal::Number(3.14), 5, 9);
+            helper::create_literal_expr_node(ast::expression::Literal::Number(1.0), 5, 9);
         let func_name = helper::create_identifier_node("foo", 1, 4);
         let func_call = helper::create_function_call_expr_node(
             func_name.clone(),
@@ -1670,11 +1865,11 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(func_call.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::FunctionCall { name, args } => {
                         let expected_name_span = get_span_from_ast_span(func_name.node_span());
-                        assert_eq!(name.span(), &expected_name_span);
+                        assert_eq!(name.span(), expected_name_span);
                         assert_eq!(
                             name.value(),
                             &FunctionName::imported(Identifier::new("foo"))
@@ -1682,10 +1877,10 @@ mod tests {
 
                         assert_eq!(args.len(), 1);
                         let expected_arg_span = get_span_from_ast_span(func_arg.node_span());
-                        assert_eq!(args[0].span(), &expected_arg_span);
+                        assert_eq!(args[0].span(), expected_arg_span);
                         match args[0].value() {
                             ir::expr::Expr::Literal { value } => {
-                                assert_eq!(value, &Literal::Number(3.14));
+                                assert_eq!(value, &Literal::Number(1.0));
                             }
                             _ => panic!("Expected literal argument, got {:?}", args[0].value()),
                         }
@@ -1693,7 +1888,7 @@ mod tests {
                     _ => panic!("Expected function call, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected function call, got {:?}", result),
+            _ => panic!("Expected function call, got {result:?}"),
         }
     }
 
@@ -1723,15 +1918,15 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(unary_expr.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::UnaryOp { op, expr } => {
                         let expected_op_span = get_span_from_ast_span(ast_op.node_span());
-                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.span(), expected_op_span);
                         assert_eq!(op.value(), &UnaryOp::Neg);
 
                         let expected_expr_span = get_span_from_ast_span(inner_expr.node_span());
-                        assert_eq!(expr.span(), &expected_expr_span);
+                        assert_eq!(expr.span(), expected_expr_span);
                         match expr.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(5.0));
@@ -1742,7 +1937,7 @@ mod tests {
                     _ => panic!("Expected unary operation, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected unary operation, got {:?}", result),
+            _ => panic!("Expected unary operation, got {result:?}"),
         }
     }
 
@@ -1761,7 +1956,7 @@ mod tests {
             right: Box::new(right_expr.clone()),
             rest_chained: vec![],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 5), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 5), expr);
 
         // create the context
         let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -1780,7 +1975,7 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr_node.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::ComparisonOp {
                         op: ir_op,
@@ -1789,11 +1984,11 @@ mod tests {
                         rest_chained,
                     } => {
                         let expected_op_span = get_span_from_ast_span(op.node_span());
-                        assert_eq!(ir_op.span(), &expected_op_span);
+                        assert_eq!(ir_op.span(), expected_op_span);
                         assert_eq!(ir_op.value(), &ir::expr::ComparisonOp::LessThan);
 
                         let expected_left_span = get_span_from_ast_span(left_expr.node_span());
-                        assert_eq!(left.span(), &expected_left_span);
+                        assert_eq!(left.span(), expected_left_span);
                         match left.value() {
                             ir::expr::Expr::Variable(variable) => {
                                 assert_eq!(
@@ -1805,7 +2000,7 @@ mod tests {
                         }
 
                         let expected_right_span = get_span_from_ast_span(right_expr.node_span());
-                        assert_eq!(right.span(), &expected_right_span);
+                        assert_eq!(right.span(), expected_right_span);
                         match right.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(5.0));
@@ -1818,7 +2013,7 @@ mod tests {
                     _ => panic!("Expected comparison operation, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected comparison operation, got {:?}", result),
+            _ => panic!("Expected comparison operation, got {result:?}"),
         }
     }
 
@@ -1837,11 +2032,11 @@ mod tests {
 
         let expr = ast::expression::Expr::ComparisonOp {
             op: op1.clone(),
-            left: Box::new(left_expr.clone()),
-            right: Box::new(middle_expr.clone()),
+            left: Box::new(left_expr),
+            right: Box::new(middle_expr),
             rest_chained: vec![(op2.clone(), right_expr.clone())],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 10), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 10), expr);
 
         // create the context
         let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
@@ -1860,7 +2055,7 @@ mod tests {
         match result {
             Ok(result) => {
                 let expected_span = get_span_from_ast_span(expr_node.node_span());
-                assert_eq!(result.span(), &expected_span);
+                assert_eq!(result.span(), expected_span);
                 match result.value() {
                     ir::expr::Expr::ComparisonOp {
                         op,
@@ -1869,7 +2064,7 @@ mod tests {
                         rest_chained,
                     } => {
                         let expected_op_span = get_span_from_ast_span(op1.node_span());
-                        assert_eq!(op.span(), &expected_op_span);
+                        assert_eq!(op.span(), expected_op_span);
                         assert_eq!(op.value(), &ir::expr::ComparisonOp::LessThan);
 
                         match left.value() {
@@ -1892,12 +2087,12 @@ mod tests {
                         assert_eq!(rest_chained.len(), 1);
                         let (chained_op, chained_expr) = &rest_chained[0];
                         let expected_chained_op_span = get_span_from_ast_span(op2.node_span());
-                        assert_eq!(chained_op.span(), &expected_chained_op_span);
+                        assert_eq!(chained_op.span(), expected_chained_op_span);
                         assert_eq!(chained_op.value(), &ir::expr::ComparisonOp::LessThan);
 
                         let expected_chained_expr_span =
                             get_span_from_ast_span(right_expr.node_span());
-                        assert_eq!(chained_expr.span(), &expected_chained_expr_span);
+                        assert_eq!(chained_expr.span(), expected_chained_expr_span);
                         match chained_expr.value() {
                             ir::expr::Expr::Literal { value } => {
                                 assert_eq!(value, &Literal::Number(10.0));
@@ -1911,7 +2106,7 @@ mod tests {
                     _ => panic!("Expected comparison operation, got {:?}", result.value()),
                 }
             }
-            _ => panic!("Expected comparison operation, got {:?}", result),
+            _ => panic!("Expected comparison operation, got {result:?}"),
         }
     }
 
@@ -1925,12 +2120,12 @@ mod tests {
         let op = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 16, 17);
 
         let expr = ast::expression::Expr::ComparisonOp {
-            op: op.clone(),
-            left: Box::new(left_expr.clone()),
-            right: Box::new(right_expr.clone()),
+            op,
+            left: Box::new(left_expr),
+            right: Box::new(right_expr),
             rest_chained: vec![],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 19), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 19), expr);
 
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
@@ -1956,7 +2151,7 @@ mod tests {
                     _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
                 }
             }
-            _ => panic!("Expected error, got {:?}", result),
+            _ => panic!("Expected error, got {result:?}"),
         }
     }
 
@@ -1971,12 +2166,12 @@ mod tests {
             helper::create_comparison_op_node(ast::expression::ComparisonOp::GreaterThan, 2, 3);
 
         let expr = ast::expression::Expr::ComparisonOp {
-            op: op.clone(),
-            left: Box::new(left_expr.clone()),
-            right: Box::new(right_expr.clone()),
+            op,
+            left: Box::new(left_expr),
+            right: Box::new(right_expr),
             rest_chained: vec![],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 19), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 19), expr);
 
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
@@ -2002,7 +2197,7 @@ mod tests {
                     _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
                 }
             }
-            _ => panic!("Expected error, got {:?}", result),
+            _ => panic!("Expected error, got {result:?}"),
         }
     }
 
@@ -2020,12 +2215,12 @@ mod tests {
         let op2 = helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 6, 7);
 
         let expr = ast::expression::Expr::ComparisonOp {
-            op: op1.clone(),
-            left: Box::new(left_expr.clone()),
-            right: Box::new(middle_expr.clone()),
-            rest_chained: vec![(op2.clone(), chained_expr.clone())],
+            op: op1,
+            left: Box::new(left_expr),
+            right: Box::new(middle_expr),
+            rest_chained: vec![(op2, chained_expr)],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 23), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 23), expr);
 
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
@@ -2051,7 +2246,7 @@ mod tests {
                     _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
                 }
             }
-            _ => panic!("Expected error, got {:?}", result),
+            _ => panic!("Expected error, got {result:?}"),
         }
     }
 
@@ -2071,12 +2266,12 @@ mod tests {
             helper::create_comparison_op_node(ast::expression::ComparisonOp::LessThan, 34, 35);
 
         let expr = ast::expression::Expr::ComparisonOp {
-            op: op1.clone(),
-            left: Box::new(left_expr.clone()),
-            right: Box::new(right_expr.clone()),
-            rest_chained: vec![(op2.clone(), chained_expr.clone())],
+            op: op1,
+            left: Box::new(left_expr),
+            right: Box::new(right_expr),
+            rest_chained: vec![(op2, chained_expr)],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 51), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 51), expr);
 
         let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
 
@@ -2112,7 +2307,7 @@ mod tests {
                 assert!(error_identifiers.contains(&Identifier::new("undefined_right")));
                 assert!(error_identifiers.contains(&Identifier::new("undefined_chained")));
             }
-            _ => panic!("Expected multiple errors, got {:?}", result),
+            _ => panic!("Expected multiple errors, got {result:?}"),
         }
     }
 }

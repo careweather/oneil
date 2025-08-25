@@ -19,6 +19,8 @@
 //! The module provides utilities for collecting and managing errors across multiple
 //! models and resolution phases, allowing for comprehensive error reporting.
 
+use std::fmt;
+
 use oneil_error::AsOneilError;
 use oneil_ir::reference::ModelPath;
 
@@ -37,7 +39,7 @@ pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_
 /// This enum encapsulates all possible error types that can occur during the model
 /// loading process. It distinguishes between parse errors (which occur during AST
 /// parsing) and resolution errors (which occur during dependency resolution).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoadError<Ps> {
     /// Error that occurred during AST parsing of a model file.
     ParseError(Ps),
@@ -68,7 +70,8 @@ impl<Ps> LoadError<Ps> {
     /// # Returns
     ///
     /// A `LoadError::ResolutionErrors` variant containing the resolution errors.
-    pub fn resolution_errors(resolution_errors: resolution::ResolutionErrors) -> Self {
+    #[must_use]
+    pub const fn resolution_errors(resolution_errors: resolution::ResolutionErrors) -> Self {
         Self::ResolutionErrors(resolution_errors)
     }
 }
@@ -78,7 +81,7 @@ impl<Ps> LoadError<Ps> {
 /// A circular dependency occurs when model A depends on model B, which depends on
 /// model C, which depends back on model A (or any other cycle). This error contains
 /// the complete cycle of model paths that form the circular dependency.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CircularDependencyError(Vec<ModelPath>);
 
 impl CircularDependencyError {
@@ -93,6 +96,7 @@ impl CircularDependencyError {
     /// # Returns
     ///
     /// A new `CircularDependencyError` containing the circular dependency path.
+    #[must_use]
     pub fn new(circular_dependency: Vec<ModelPath>) -> Self {
         Self(circular_dependency)
     }
@@ -102,48 +106,24 @@ impl CircularDependencyError {
     /// # Returns
     ///
     /// A vector of model paths that form the circular dependency.
+    #[must_use]
     pub fn circular_dependency(&self) -> &[ModelPath] {
         &self.0
     }
-    /// Converts the circular dependency error to a string representation.
-    ///
-    /// This method formats the circular dependency path into a user-friendly error message
-    /// by joining the model paths with arrows (`->`) to show the dependency chain.
-    ///
-    /// # Returns
-    ///
-    /// A string containing the formatted error message showing the circular dependency chain.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use oneil_model_loader::error::CircularDependencyError;
-    /// use oneil_ir::reference::ModelPath;
-    /// use std::path::PathBuf;
-    ///
-    /// let paths = vec![
-    ///     ModelPath::new(PathBuf::from("model_a.on")),
-    ///     ModelPath::new(PathBuf::from("model_b.on")),
-    ///     ModelPath::new(PathBuf::from("model_a.on"))
-    /// ];
-    /// let error = CircularDependencyError::new(paths);
-    /// assert_eq!(
-    ///     error.to_string(),
-    ///     "circular dependency found in models - model_a.on -> model_b.on -> model_a.on"
-    /// );
-    /// ```
-    pub fn to_string(&self) -> String {
+}
+
+impl fmt::Display for CircularDependencyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let circular_dependency_str = self
             .0
             .iter()
             .map(|path| path.as_ref().display().to_string())
             .collect::<Vec<_>>()
             .join(" -> ");
-        let message = format!(
-            "circular dependency found in models - {}",
-            circular_dependency_str
-        );
-        message
+        write!(
+            f,
+            "circular dependency found in models - {circular_dependency_str}"
+        )
     }
 }
 

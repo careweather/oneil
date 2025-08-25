@@ -86,13 +86,13 @@ pub fn resolve_tests(
         let trace_level = resolve_trace_level(test.trace_level());
 
         let test_expr = resolve_expr(
-            &test.expr(),
+            test.expr(),
             builtin_ref,
             defined_parameters_info,
             submodel_info,
             model_info,
         )
-        .map_err(|errors| (test_index.clone(), error::convert_errors(errors)))?;
+        .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
         Ok((test_index, Test::new(trace_level, test_expr)))
     });
@@ -144,7 +144,7 @@ mod tests {
         /// Helper function to create an identifier node
         pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            ast::node::Node::new(test_ast_span(start, start + name.len()), identifier)
+            ast::node::Node::new(&test_ast_span(start, start + name.len()), identifier)
         }
 
         /// Helper function to create a literal expression node
@@ -153,16 +153,16 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ExprNode {
-            let literal_node = ast::node::Node::new(test_ast_span(start, end), literal);
+            let literal_node = ast::node::Node::new(&test_ast_span(start, end), literal);
             let expr = ast::expression::Expr::Literal(literal_node);
-            ast::node::Node::new(test_ast_span(start, end), expr)
+            ast::node::Node::new(&test_ast_span(start, end), expr)
         }
 
         /// Helper function to create a simple identifier variable
         pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
             let identifier_node = create_identifier_node(name, 0);
             let variable = ast::expression::Variable::Identifier(identifier_node);
-            ast::node::Node::new(test_ast_span(0, name.len()), variable)
+            ast::node::Node::new(&test_ast_span(0, name.len()), variable)
         }
 
         /// Helper function to create a variable expression node
@@ -172,7 +172,7 @@ mod tests {
             end: usize,
         ) -> ast::expression::ExprNode {
             let expr = ast::expression::Expr::Variable(variable);
-            ast::node::Node::new(test_ast_span(start, end), expr)
+            ast::node::Node::new(&test_ast_span(start, end), expr)
         }
 
         /// Helper function to create a test node
@@ -183,17 +183,17 @@ mod tests {
             end: usize,
         ) -> ast::test::TestNode {
             let trace_level_node =
-                trace_level.map(|tl| ast::node::Node::new(test_ast_span(start, start + 1), tl));
+                trace_level.map(|tl| ast::node::Node::new(&test_ast_span(start, start + 1), tl));
 
             let test = ast::test::Test::new(trace_level_node, expr, None);
-            ast::node::Node::new(test_ast_span(start, end), test)
+            ast::node::Node::new(&test_ast_span(start, end), test)
         }
     }
 
     #[test]
     fn test_resolve_tests_empty() {
         // create the tests
-        let tests = vec![];
+        let tests = [];
         let tests_refs = tests.iter().collect();
 
         // resolve the tests
@@ -241,8 +241,10 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
 
-        let test_0 = resolved_tests.get(&TestIndex::new(0)).unwrap();
-        assert_eq!(test_0.trace_level(), &ModelTraceLevel::None);
+        let test_0 = resolved_tests
+            .get(&TestIndex::new(0))
+            .expect("test should exist");
+        assert_eq!(test_0.trace_level(), ModelTraceLevel::None);
     }
 
     #[test]
@@ -273,8 +275,10 @@ mod tests {
 
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
-        let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
-        assert_eq!(test.trace_level(), &ModelTraceLevel::Debug);
+        let test = resolved_tests
+            .get(&TestIndex::new(0))
+            .expect("test should exist");
+        assert_eq!(test.trace_level(), ModelTraceLevel::Debug);
     }
 
     #[test]
@@ -305,7 +309,9 @@ mod tests {
         // check the errors
         assert_eq!(errors.len(), 1);
 
-        let test_errors = errors.get(&TestIndex::new(0)).unwrap();
+        let test_errors = errors
+            .get(&TestIndex::new(0))
+            .expect("test errors should exist");
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
@@ -357,7 +363,9 @@ mod tests {
 
         // check the errors
         assert_eq!(errors.len(), 1);
-        let test_errors = errors.get(&TestIndex::new(1)).unwrap();
+        let test_errors = errors
+            .get(&TestIndex::new(1))
+            .expect("test errors should exist");
         assert!(test_errors.len() == 1);
         assert_eq!(
             test_errors[0],
@@ -369,7 +377,9 @@ mod tests {
 
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
-        let test = resolved_tests.get(&TestIndex::new(0)).unwrap();
-        assert_eq!(test.trace_level(), &ModelTraceLevel::None);
+        let test = resolved_tests
+            .get(&TestIndex::new(0))
+            .expect("test should exist");
+        assert_eq!(test.trace_level(), ModelTraceLevel::None);
     }
 }

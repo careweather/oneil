@@ -77,8 +77,6 @@
 //! let ast: ModelNode = parse_model("Parameter radius: r = 5.0 :cm", None).unwrap();
 //! // Use the AST for further processing...
 //! ```
-#![warn(missing_docs)]
-
 use oneil_ast::{
     Model, declaration::DeclNode, expression::ExprNode, model::ModelNode, note::NoteNode,
     parameter::ParameterNode, test::TestNode, unit::UnitExprNode,
@@ -117,6 +115,12 @@ pub use config::Config;
 /// Returns `Ok(ModelNode)` on successful parsing, or `Err(ErrorsWithPartialResult)`
 /// containing detailed error information and any partial parsing results.
 ///
+/// # Errors
+///
+/// Returns an error if the input cannot be parsed as a valid Oneil model.
+/// The error includes detailed information about what went wrong and may
+/// contain partial parsing results.
+///
 /// # Examples
 ///
 /// ```rust
@@ -134,7 +138,7 @@ pub use config::Config;
 pub fn parse_model(
     input: &str,
     config: Option<Config>,
-) -> Result<ModelNode, error::ErrorsWithPartialResult<Model, error::ParserError>> {
+) -> Result<ModelNode, error::ErrorsWithPartialResult<Box<Model>, error::ParserError>> {
     parse(input, config, model::parse_complete)
 }
 
@@ -152,6 +156,11 @@ pub fn parse_model(
 ///
 /// Returns `Ok(DeclNode)` on successful parsing, or `Err(ParserError)` with
 /// detailed error information.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be parsed as a valid declaration.
+/// The error includes detailed information about what went wrong.
 ///
 /// # Examples
 ///
@@ -185,6 +194,11 @@ pub fn parse_declaration(
 ///
 /// Returns `Ok(ExprNode)` on successful parsing, or `Err(ParserError)` with
 /// detailed error information.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be parsed as a valid expression.
+/// The error includes detailed information about what went wrong.
 ///
 /// # Examples
 ///
@@ -222,6 +236,11 @@ pub fn parse_expression(
 /// Returns `Ok(NoteNode)` on successful parsing, or `Err(ParserError)` with
 /// detailed error information.
 ///
+/// # Errors
+///
+/// Returns an error if the input cannot be parsed as a valid note.
+/// The error includes detailed information about what went wrong.
+///
 /// # Examples
 ///
 /// ```rust
@@ -248,6 +267,11 @@ pub fn parse_note(input: &str, config: Option<Config>) -> Result<NoteNode, error
 ///
 /// Returns `Ok(ParameterNode)` on successful parsing, or `Err(ParserError)` with
 /// detailed error information.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be parsed as a valid parameter.
+/// The error includes detailed information about what went wrong.
 ///
 /// # Examples
 ///
@@ -282,6 +306,11 @@ pub fn parse_parameter(
 /// Returns `Ok(TestNode)` on successful parsing, or `Err(ParserError)` with
 /// detailed error information.
 ///
+/// # Errors
+///
+/// Returns an error if the input cannot be parsed as a valid test.
+/// The error includes detailed information about what went wrong.
+///
 /// # Examples
 ///
 /// ```rust
@@ -309,6 +338,11 @@ pub fn parse_test(input: &str, config: Option<Config>) -> Result<TestNode, error
 ///
 /// Returns `Ok(UnitExprNode)` on successful parsing, or `Err(ParserError)` with
 /// detailed error information.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be parsed as a valid unit expression.
+/// The error includes detailed information about what went wrong.
 ///
 /// # Examples
 ///
@@ -358,7 +392,6 @@ fn parse<T, E>(
         Err(nom::Err::Incomplete(_needed)) => unreachable!(
             "This should never happen because we use `complete` combinators rather than `stream` combinators"
         ),
-        Err(nom::Err::Error(e)) => Err(e),
-        Err(nom::Err::Failure(e)) => Err(e),
+        Err(nom::Err::Error(e) | nom::Err::Failure(e)) => Err(e),
     }
 }

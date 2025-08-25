@@ -3,8 +3,6 @@
 //! This module contains the core data structures that represent Oneil programs
 //! in memory after parsing.
 
-#![warn(missing_docs)]
-
 pub mod debug_info;
 pub mod declaration;
 pub mod expression;

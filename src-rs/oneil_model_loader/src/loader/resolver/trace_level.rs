@@ -1,4 +1,4 @@
-use oneil_ast as ast;
+use oneil_ast::{self as ast, node::Node};
 
 /// Resolves an AST trace level into a model trace level.
 ///
@@ -16,7 +16,7 @@ use oneil_ast as ast;
 pub fn resolve_trace_level(
     trace_level: Option<&ast::debug_info::TraceLevelNode>,
 ) -> oneil_ir::debug_info::TraceLevel {
-    match trace_level.map(|l| l.node_value()) {
+    match trace_level.map(Node::node_value) {
         Some(ast::debug_info::TraceLevel::Trace) => oneil_ir::debug_info::TraceLevel::Trace,
         Some(ast::debug_info::TraceLevel::Debug) => oneil_ir::debug_info::TraceLevel::Debug,
         None => oneil_ir::debug_info::TraceLevel::None,
@@ -35,8 +35,7 @@ mod tests {
             let result = resolve_trace_level(None);
             assert_eq!(
                 result, expected_model_level,
-                "Expected None to resolve to {:?}, but got {:?}",
-                expected_model_level, result
+                "Expected None to resolve to {expected_model_level:?}, but got {result:?}"
             );
         };
     }
@@ -48,7 +47,7 @@ mod tests {
             let expected_model_level = oneil_ir::debug_info::TraceLevel::Trace;
 
             // Create a trace level node
-            let trace_level_node = ast::node::Node::new(ast::Span::new(0, 0, 0), ast_level);
+            let trace_level_node = ast::node::Node::new(&ast::Span::new(0, 0, 0), ast_level);
             let result = resolve_trace_level(Some(&trace_level_node));
             assert_eq!(
                 result,
@@ -68,7 +67,7 @@ mod tests {
             let expected_model_level = oneil_ir::debug_info::TraceLevel::Debug;
 
             // Create a trace level node
-            let trace_level_node = ast::node::Node::new(ast::Span::new(0, 0, 0), ast_level);
+            let trace_level_node = ast::node::Node::new(&ast::Span::new(0, 0, 0), ast_level);
             let result = resolve_trace_level(Some(&trace_level_node));
             assert_eq!(
                 result,

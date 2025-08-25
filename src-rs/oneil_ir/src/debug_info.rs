@@ -13,7 +13,7 @@
 /// Trace levels are used throughout the Oneil system to provide
 /// visibility into the evaluation process without overwhelming users
 /// with unnecessary information.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TraceLevel {
     /// No debug output is produced
     None,

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{reference::Identifier, span::Span};
 
@@ -8,7 +10,7 @@ use crate::error::VariableResolutionError;
 /// This error type is used when a parameter reference cannot be resolved to its
 /// actual parameter definition. This can happen due to circular dependencies or
 /// variable resolution errors within the parameter's value.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParameterResolutionError {
     /// A circular dependency was detected during parameter resolution.
     CircularDependency {
@@ -40,7 +42,11 @@ impl ParameterResolutionError {
     /// # Returns
     ///
     /// A new `ParameterResolutionError::CircularDependency` variant.
-    pub fn circular_dependency(circular_dependency: Vec<Identifier>, reference_span: Span) -> Self {
+    #[must_use]
+    pub const fn circular_dependency(
+        circular_dependency: Vec<Identifier>,
+        reference_span: Span,
+    ) -> Self {
         Self::CircularDependency {
             circular_dependency,
             reference_span,
@@ -56,7 +62,8 @@ impl ParameterResolutionError {
     /// # Returns
     ///
     /// A new `ParameterResolutionError::VariableResolution` variant.
-    pub fn variable_resolution(error: VariableResolutionError) -> Self {
+    #[must_use]
+    pub const fn variable_resolution(error: VariableResolutionError) -> Self {
         Self::VariableResolution(error)
     }
 
@@ -68,7 +75,8 @@ impl ParameterResolutionError {
     /// # Returns
     ///
     /// A new `ParameterResolutionError::DuplicateParameter` variant.
-    pub fn duplicate_parameter(
+    #[must_use]
+    pub const fn duplicate_parameter(
         identifier: Identifier,
         original_span: Span,
         duplicate_span: Span,
@@ -79,36 +87,28 @@ impl ParameterResolutionError {
             duplicate_span,
         }
     }
+}
 
-    /// Converts the parameter resolution error to a string representation.
-    ///
-    /// This method delegates to the display module to format the error message
-    /// in a user-friendly way.
-    ///
-    /// # Returns
-    ///
-    /// A string representation of the parameter resolution error.
-    pub fn to_string(&self) -> String {
+impl fmt::Display for ParameterResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParameterResolutionError::CircularDependency {
+            Self::CircularDependency {
                 circular_dependency,
                 reference_span: _,
             } => {
                 let dependency_chain = circular_dependency
                     .iter()
-                    .map(|id| format!("{}", id.as_str()))
+                    .map(Identifier::as_str)
                     .collect::<Vec<_>>()
                     .join(" -> ");
-                format!(
-                    "circular dependency detected in parameters - {}",
-                    dependency_chain
+                write!(
+                    f,
+                    "circular dependency detected in parameters - {dependency_chain}",
                 )
             }
-            ParameterResolutionError::VariableResolution(variable_error) => {
-                variable_error.to_string()
-            }
-            ParameterResolutionError::DuplicateParameter { identifier, .. } => {
-                format!("duplicate parameter `{}`", identifier.as_str())
+            Self::VariableResolution(variable_error) => variable_error.fmt(f),
+            Self::DuplicateParameter { identifier, .. } => {
+                write!(f, "duplicate parameter `{}`", identifier.as_str())
             }
         }
     }
@@ -127,7 +127,7 @@ impl AsOneilError for ParameterResolutionError {
 
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
-            ParameterResolutionError::CircularDependency {
+            Self::CircularDependency {
                 circular_dependency: _,
                 reference_span,
             } => {
@@ -136,8 +136,8 @@ impl AsOneilError for ParameterResolutionError {
                 let location = ErrorLocation::from_source_and_span(source, offset_start, length);
                 Some(location)
             }
-            ParameterResolutionError::VariableResolution(error) => error.error_location(source),
-            ParameterResolutionError::DuplicateParameter { duplicate_span, .. } => {
+            Self::VariableResolution(error) => error.error_location(source),
+            Self::DuplicateParameter { duplicate_span, .. } => {
                 let offset_start = duplicate_span.start();
                 let length = duplicate_span.length();
                 let location = ErrorLocation::from_source_and_span(source, offset_start, length);
@@ -151,7 +151,7 @@ impl AsOneilError for ParameterResolutionError {
         source: &str,
     ) -> Vec<(oneil_error::Context, Option<ErrorLocation>)> {
         match self {
-            ParameterResolutionError::DuplicateParameter { original_span, .. } => {
+            Self::DuplicateParameter { original_span, .. } => {
                 let original_location = ErrorLocation::from_source_and_span(
                     source,
                     original_span.start(),
@@ -160,10 +160,8 @@ impl AsOneilError for ParameterResolutionError {
                 let context = Context::Note("original parameter found here".to_string());
                 vec![(context, Some(original_location))]
             }
-            ParameterResolutionError::CircularDependency { .. } => vec![],
-            ParameterResolutionError::VariableResolution(error) => {
-                error.context_with_source(source)
-            }
+            Self::CircularDependency { .. } => vec![],
+            Self::VariableResolution(error) => error.context_with_source(source),
         }
     }
 }

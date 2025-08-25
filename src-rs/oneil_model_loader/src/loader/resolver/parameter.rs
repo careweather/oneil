@@ -22,7 +22,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use oneil_ast as ast;
+use oneil_ast::{self as ast, node::Node};
 use oneil_ir::{
     parameter::{Parameter, ParameterCollection, ParameterValue, PiecewiseExpr},
     reference::Identifier,
@@ -84,13 +84,13 @@ pub fn resolve_parameters(
 
             let maybe_original_parameter = parameter_map.get(&ident);
             if let Some((original_ident_span, _)) = maybe_original_parameter {
-                let original_ident_span: &Span = original_ident_span; // to help type inference
+                let original_ident_span: Span = *original_ident_span; // to help type inference
                 duplicate_errors.insert(
                     ident.clone(),
                     vec![ParameterResolutionError::duplicate_parameter(
                         ident,
-                        original_ident_span.clone(),
-                        ident_span.clone(),
+                        original_ident_span,
+                        ident_span,
                     )],
                 );
             } else {
@@ -114,7 +114,7 @@ pub fn resolve_parameters(
             let mut parameter_stack = Stack::new();
 
             let parameter_identifier_with_span =
-                WithSpan::new(parameter_identifier.clone(), parameter_span.clone());
+                WithSpan::new(parameter_identifier.clone(), *parameter_span);
 
             resolve_parameter(
                 parameter_identifier_with_span,
@@ -198,36 +198,31 @@ fn get_parameter_internal_dependencies(
 ) -> HashSet<WithSpan<Identifier>> {
     let dependencies = HashSet::new();
 
-    let limits = parameter.limits().map(|l| l.node_value());
+    let limits = parameter.limits().map(Node::node_value);
     let dependencies = match limits {
         Some(ast::parameter::Limits::Continuous { min, max }) => {
             let dependencies = get_expr_internal_dependencies(min, dependencies);
-            let dependencies = get_expr_internal_dependencies(max, dependencies);
-            dependencies
+            get_expr_internal_dependencies(max, dependencies)
         }
         Some(ast::parameter::Limits::Discrete { values }) => {
             values.iter().fold(dependencies, |dependencies, expr| {
-                let dependencies = get_expr_internal_dependencies(expr, dependencies);
-                dependencies
+                get_expr_internal_dependencies(expr, dependencies)
             })
         }
         None => dependencies,
     };
 
-    let dependencies = match &parameter.value().node_value() {
+    match &parameter.value().node_value() {
         ast::parameter::ParameterValue::Simple(expr, _) => {
             get_expr_internal_dependencies(expr, dependencies)
         }
         ast::parameter::ParameterValue::Piecewise(piecewise, _) => {
             piecewise.iter().fold(dependencies, |dependencies, part| {
-                let dependencies = get_expr_internal_dependencies(&part.if_expr(), dependencies);
-                let dependencies = get_expr_internal_dependencies(&part.expr(), dependencies);
-                dependencies
+                let dependencies = get_expr_internal_dependencies(part.if_expr(), dependencies);
+                get_expr_internal_dependencies(part.expr(), dependencies)
             })
         }
-    };
-
-    dependencies
+    }
 }
 
 /// Extracts internal dependencies from an expression.
@@ -249,17 +244,17 @@ fn get_expr_internal_dependencies(
 ) -> HashSet<WithSpan<Identifier>> {
     match expr {
         ast::Expr::BinaryOp { op: _, left, right } => {
-            let dependencies = get_expr_internal_dependencies(&left, dependencies);
-            let dependencies = get_expr_internal_dependencies(&right, dependencies);
-            dependencies
+            let dependencies = get_expr_internal_dependencies(left, dependencies);
+            get_expr_internal_dependencies(right, dependencies)
         }
 
-        ast::Expr::UnaryOp { op: _, expr } => get_expr_internal_dependencies(expr, dependencies),
+        ast::Expr::UnaryOp { op: _, expr } | ast::Expr::Parenthesized { expr } => {
+            get_expr_internal_dependencies(expr, dependencies)
+        }
 
         ast::Expr::FunctionCall { name: _, args } => {
             args.iter().fold(dependencies, |dependencies, arg| {
-                let dependencies = get_expr_internal_dependencies(arg, dependencies);
-                dependencies
+                get_expr_internal_dependencies(arg, dependencies)
             })
         }
 
@@ -282,15 +277,14 @@ fn get_expr_internal_dependencies(
             }
         },
         ast::Expr::Literal(_) => dependencies,
-        ast::Expr::Parenthesized { expr } => get_expr_internal_dependencies(expr, dependencies),
         ast::Expr::ComparisonOp {
             op: _,
             left,
             right,
             rest_chained,
         } => {
-            let dependencies = get_expr_internal_dependencies(&left, dependencies);
-            let dependencies = get_expr_internal_dependencies(&right, dependencies);
+            let dependencies = get_expr_internal_dependencies(left, dependencies);
+            let dependencies = get_expr_internal_dependencies(right, dependencies);
             // Handle chained comparisons
             rest_chained
                 .iter()
@@ -337,7 +331,7 @@ fn resolve_parameter(
     mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: HashSet<Identifier>,
 ) -> (ParameterCollectionBuilder, HashSet<Identifier>) {
-    let parameter_identifier_span = parameter_identifier.span().clone();
+    let parameter_identifier_span = parameter_identifier.span();
     let parameter_identifier = parameter_identifier.take_value();
 
     // check that the parameter exists
@@ -353,8 +347,7 @@ fn resolve_parameter(
 
     assert!(
         dependencies.contains_key(&parameter_identifier),
-        "parameter dependencies for '{:?}' not found",
-        parameter_identifier
+        "parameter dependencies for '{parameter_identifier:?}' not found",
     );
 
     // check for circular dependencies
@@ -363,7 +356,7 @@ fn resolve_parameter(
     {
         let reference_span = parameter_identifier_span;
         resolved_parameters.add_error_list(
-            parameter_identifier.clone(),
+            &parameter_identifier,
             vec![ParameterResolutionError::circular_dependency(
                 circular_dependency,
                 reference_span,
@@ -379,7 +372,9 @@ fn resolve_parameter(
     visited.insert(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    let parameter_dependencies = dependencies.get(&parameter_identifier).unwrap();
+    let parameter_dependencies = dependencies
+        .get(&parameter_identifier)
+        .expect("parameter dependencies should exist");
 
     // add the parameter to the stack
     parameter_stack.push(parameter_identifier.clone());
@@ -406,7 +401,9 @@ fn resolve_parameter(
     parameter_stack.pop();
 
     // resolve the parameter
-    let (_, parameter) = parameter_map.get(&parameter_identifier).unwrap();
+    let (_, parameter) = parameter_map
+        .get(&parameter_identifier)
+        .expect("parameter should exist");
 
     let ident = parameter_identifier.clone();
 
@@ -418,7 +415,7 @@ fn resolve_parameter(
     );
 
     let value = resolve_parameter_value(
-        &parameter.value(),
+        parameter.value(),
         builtin_ref,
         &defined_parameters_info,
         submodel_info,
@@ -461,7 +458,7 @@ fn resolve_parameter(
             resolved_parameters
         }
         Err(errors) => {
-            resolved_parameters.add_error_list(parameter_identifier.clone(), errors);
+            resolved_parameters.add_error_list(&parameter_identifier, errors);
 
             resolved_parameters
         }
@@ -511,7 +508,7 @@ fn resolve_parameter_value(
         ast::parameter::ParameterValue::Piecewise(piecewise, unit) => {
             let exprs = piecewise.iter().map(|part| {
                 let expr = resolve_expr(
-                    &part.expr(),
+                    part.expr(),
                     builtin_ref,
                     defined_parameters_info,
                     submodel_info,
@@ -520,7 +517,7 @@ fn resolve_parameter_value(
                 .map_err(error::convert_errors);
 
                 let if_expr = resolve_expr(
-                    &part.if_expr(),
+                    part.if_expr(),
                     builtin_ref,
                     defined_parameters_info,
                     submodel_info,
@@ -564,7 +561,7 @@ fn resolve_limits(
     submodel_info: &SubmodelInfo<'_>,
     model_info: &ModelInfo<'_>,
 ) -> Result<oneil_ir::parameter::Limits, Vec<ParameterResolutionError>> {
-    match limits.map(|l| l.node_value()) {
+    match limits.map(Node::node_value) {
         Some(ast::parameter::Limits::Continuous { min, max }) => {
             let min = resolve_expr(
                 min,
@@ -589,7 +586,7 @@ fn resolve_limits(
             Ok(oneil_ir::parameter::Limits::continuous(min, max))
         }
         Some(ast::parameter::Limits::Discrete { values }) => {
-            let values = values.into_iter().map(|value| {
+            let values = values.iter().map(|value| {
                 resolve_expr(
                     value,
                     builtin_ref,
@@ -635,9 +632,9 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ExprNode {
-            let literal_node = ast::node::Node::new(test_span(start, end), literal);
+            let literal_node = ast::node::Node::new(&test_span(start, end), literal);
             let expr = ast::expression::Expr::Literal(literal_node);
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a variable expression node
@@ -647,7 +644,7 @@ mod tests {
             end: usize,
         ) -> ast::expression::ExprNode {
             let expr = ast::expression::Expr::Variable(variable);
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a binary operation expression node
@@ -658,13 +655,13 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::ExprNode {
-            let op_node = ast::node::Node::new(test_span(start, end), op);
+            let op_node = ast::node::Node::new(&test_span(start, end), op);
             let expr = ast::expression::Expr::BinaryOp {
                 left: Box::new(left),
                 op: op_node,
                 right: Box::new(right),
             };
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a function call expression node
@@ -675,41 +672,41 @@ mod tests {
             end: usize,
         ) -> ast::expression::ExprNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            let name_node = ast::node::Node::new(test_span(start, start + name.len()), identifier);
+            let name_node = ast::node::Node::new(&test_span(start, start + name.len()), identifier);
             let expr = ast::expression::Expr::FunctionCall {
                 name: name_node,
                 args,
             };
-            ast::node::Node::new(test_span(start, end), expr)
+            ast::node::Node::new(&test_span(start, end), expr)
         }
 
         /// Helper function to create a simple identifier variable
         pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            let identifier_node = ast::node::Node::new(test_span(0, name.len()), identifier);
+            let identifier_node = ast::node::Node::new(&test_span(0, name.len()), identifier);
             let variable = ast::expression::Variable::Identifier(identifier_node);
-            ast::node::Node::new(test_span(0, name.len()), variable)
+            ast::node::Node::new(&test_span(0, name.len()), variable)
         }
 
         /// Helper function to create a simple parameter with a literal value
         pub fn create_simple_parameter(ident: &str, value: f64) -> ast::parameter::ParameterNode {
-            let label = ast::naming::Label::new(format!("Parameter {}", ident));
-            let label_node = ast::node::Node::new(test_span(0, 0), label);
+            let label = ast::naming::Label::new(format!("Parameter {ident}"));
+            let label_node = ast::node::Node::new(&test_span(0, 0), label);
             let identifier = ast::naming::Identifier::new(ident.to_string());
-            let ident_node = ast::node::Node::new(test_span(0, ident.len()), identifier);
+            let ident_node = ast::node::Node::new(&test_span(0, ident.len()), identifier);
 
             let literal = ast::expression::Literal::Number(value);
-            let literal_node = ast::node::Node::new(test_span(0, 1), literal);
+            let literal_node = ast::node::Node::new(&test_span(0, 1), literal);
             let expr = ast::expression::Expr::Literal(literal_node);
-            let expr_node = ast::node::Node::new(test_span(0, 1), expr);
+            let expr_node = ast::node::Node::new(&test_span(0, 1), expr);
             let value_node = ast::node::Node::new(
-                test_span(0, 1),
+                &test_span(0, 1),
                 ast::parameter::ParameterValue::Simple(expr_node, None),
             );
 
             let parameter =
                 ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
-            ast::node::Node::new(test_span(0, ident.len()), parameter)
+            ast::node::Node::new(&test_span(0, ident.len()), parameter)
         }
 
         /// Helper function to create a parameter with a specific span for testing duplicates
@@ -719,24 +716,24 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::parameter::ParameterNode {
-            let label = ast::naming::Label::new(format!("Parameter {}", ident));
-            let label_node = ast::node::Node::new(test_span(start, start), label);
+            let label = ast::naming::Label::new(format!("Parameter {ident}"));
+            let label_node = ast::node::Node::new(&test_span(start, start), label);
             let identifier = ast::naming::Identifier::new(ident.to_string());
             let ident_node =
-                ast::node::Node::new(test_span(start, start + ident.len()), identifier);
+                ast::node::Node::new(&test_span(start, start + ident.len()), identifier);
 
             let literal = ast::expression::Literal::Number(value);
-            let literal_node = ast::node::Node::new(test_span(start, start + 1), literal);
+            let literal_node = ast::node::Node::new(&test_span(start, start + 1), literal);
             let expr = ast::expression::Expr::Literal(literal_node);
-            let expr_node = ast::node::Node::new(test_span(start, start + 1), expr);
+            let expr_node = ast::node::Node::new(&test_span(start, start + 1), expr);
             let value_node = ast::node::Node::new(
-                test_span(start, start + 1),
+                &test_span(start, start + 1),
                 ast::parameter::ParameterValue::Simple(expr_node, None),
             );
 
             let parameter =
                 ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
-            ast::node::Node::new(test_span(start, end), parameter)
+            ast::node::Node::new(&test_span(start, end), parameter)
         }
 
         /// Helper function to create a dependent parameter that references another parameter
@@ -744,40 +741,40 @@ mod tests {
             ident: &str,
             dependency: &str,
         ) -> ast::parameter::ParameterNode {
-            let label = ast::naming::Label::new(format!("Parameter {}", ident));
-            let label_node = ast::node::Node::new(test_span(0, 0), label);
+            let label = ast::naming::Label::new(format!("Parameter {ident}"));
+            let label_node = ast::node::Node::new(&test_span(0, 0), label);
             let identifier = ast::naming::Identifier::new(ident.to_string());
-            let ident_node = ast::node::Node::new(test_span(0, ident.len()), identifier);
+            let ident_node = ast::node::Node::new(&test_span(0, ident.len()), identifier);
 
             let dep_identifier = ast::naming::Identifier::new(dependency.to_string());
             let dep_ident_node =
-                ast::node::Node::new(test_span(0, dependency.len()), dep_identifier);
+                ast::node::Node::new(&test_span(0, dependency.len()), dep_identifier);
             let dep_variable = ast::expression::Variable::Identifier(dep_ident_node);
-            let dep_var_node = ast::node::Node::new(test_span(0, dependency.len()), dep_variable);
+            let dep_var_node = ast::node::Node::new(&test_span(0, dependency.len()), dep_variable);
             let dep_expr = ast::expression::Expr::Variable(dep_var_node);
-            let dep_expr_node = ast::node::Node::new(test_span(0, dependency.len()), dep_expr);
+            let dep_expr_node = ast::node::Node::new(&test_span(0, dependency.len()), dep_expr);
 
             let literal = ast::expression::Literal::Number(1.0);
-            let literal_node = ast::node::Node::new(test_span(0, 1), literal);
+            let literal_node = ast::node::Node::new(&test_span(0, 1), literal);
             let literal_expr = ast::expression::Expr::Literal(literal_node);
-            let literal_expr_node = ast::node::Node::new(test_span(0, 1), literal_expr);
+            let literal_expr_node = ast::node::Node::new(&test_span(0, 1), literal_expr);
 
             let op = ast::expression::BinaryOp::Add;
-            let op_node = ast::node::Node::new(test_span(0, 1), op);
+            let op_node = ast::node::Node::new(&test_span(0, 1), op);
             let binary_expr = ast::expression::Expr::BinaryOp {
                 left: Box::new(dep_expr_node),
                 op: op_node,
                 right: Box::new(literal_expr_node),
             };
-            let binary_expr_node = ast::node::Node::new(test_span(0, 3), binary_expr);
+            let binary_expr_node = ast::node::Node::new(&test_span(0, 3), binary_expr);
             let value_node = ast::node::Node::new(
-                test_span(0, 3),
+                &test_span(0, 3),
                 ast::parameter::ParameterValue::Simple(binary_expr_node, None),
             );
 
             let parameter =
                 ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
-            ast::node::Node::new(test_span(0, ident.len()), parameter)
+            ast::node::Node::new(&test_span(0, ident.len()), parameter)
         }
 
         /// Helper function to create mock model and submodel info for testing
@@ -838,8 +835,12 @@ mod tests {
         // check the resolved parameters
         assert_eq!(resolved_params.len(), 2);
 
-        let param_a = resolved_params.get(&Identifier::new("a")).unwrap();
-        let param_b = resolved_params.get(&Identifier::new("b")).unwrap();
+        let param_a = resolved_params
+            .get(&Identifier::new("a"))
+            .expect("param a should exist");
+        let param_b = resolved_params
+            .get(&Identifier::new("b"))
+            .expect("param b should exist");
 
         assert!(param_a.dependencies().is_empty());
         assert!(param_b.dependencies().is_empty());
@@ -868,8 +869,12 @@ mod tests {
         // check the resolved parameters
         assert_eq!(resolved_params.len(), 2);
 
-        let param_a = resolved_params.get(&Identifier::new("a")).unwrap();
-        let param_b = resolved_params.get(&Identifier::new("b")).unwrap();
+        let param_a = resolved_params
+            .get(&Identifier::new("a"))
+            .expect("param a should exist");
+        let param_b = resolved_params
+            .get(&Identifier::new("b"))
+            .expect("param b should exist");
 
         assert!(param_a.dependencies().is_empty());
         assert!(param_b.dependencies().contains(&Identifier::new("a")));
@@ -898,8 +903,12 @@ mod tests {
         assert!(errors.contains_key(&Identifier::new("a")));
         assert!(errors.contains_key(&Identifier::new("b")));
 
-        let a_errors = errors.get(&Identifier::new("a")).unwrap();
-        let b_errors = errors.get(&Identifier::new("b")).unwrap();
+        let a_errors = errors
+            .get(&Identifier::new("a"))
+            .expect("a errors should exist");
+        let b_errors = errors
+            .get(&Identifier::new("b"))
+            .expect("b errors should exist");
 
         // check that both parameters have errors, one is a circular dependency
         // error and both have a "parameter had error" error
@@ -948,10 +957,7 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(|dep| dep.take_value())
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert!(dependencies.is_empty());
@@ -964,10 +970,7 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(|dep| dep.take_value())
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 1);
@@ -978,15 +981,15 @@ mod tests {
     fn test_get_parameter_internal_dependencies_with_limits() {
         // create a parameter with limits that reference other parameters
         let label = ast::naming::Label::new("Test Parameter".to_string());
-        let label_node = ast::node::Node::new(helper::test_span(0, 0), label);
+        let label_node = ast::node::Node::new(&helper::test_span(0, 0), label);
         let identifier = ast::naming::Identifier::new("test".to_string());
-        let ident_node = ast::node::Node::new(helper::test_span(0, 4), identifier);
+        let ident_node = ast::node::Node::new(&helper::test_span(0, 4), identifier);
 
         // create the value expression
         let value_expr =
             helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1);
         let value_node = ast::node::Node::new(
-            helper::test_span(0, 1),
+            &helper::test_span(0, 1),
             ast::parameter::ParameterValue::Simple(value_expr, None),
         );
 
@@ -999,7 +1002,7 @@ mod tests {
             min: min_expr,
             max: max_expr,
         };
-        let limits_node = ast::node::Node::new(helper::test_span(0, 7), limits);
+        let limits_node = ast::node::Node::new(&helper::test_span(0, 7), limits);
 
         let parameter = ast::Parameter::new(
             label_node,
@@ -1013,10 +1016,7 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(|dep| dep.take_value())
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
@@ -1031,7 +1031,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert!(result.is_empty());
@@ -1045,7 +1045,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 1);
@@ -1069,7 +1069,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -1089,7 +1089,7 @@ mod tests {
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -1101,21 +1101,21 @@ mod tests {
     fn test_get_expr_internal_dependencies_accessor() {
         // create an accessor variable
         let parent_identifier = ast::naming::Identifier::new("parent".to_string());
-        let parent_node = ast::node::Node::new(helper::test_span(0, 6), parent_identifier);
+        let parent_node = ast::node::Node::new(&helper::test_span(0, 6), parent_identifier);
         let component_identifier = ast::naming::Identifier::new("component".to_string());
-        let component_node = ast::node::Node::new(helper::test_span(0, 9), component_identifier);
+        let component_node = ast::node::Node::new(&helper::test_span(0, 9), component_identifier);
         let component_variable = ast::expression::Variable::Identifier(component_node);
-        let component_var_node = ast::node::Node::new(helper::test_span(0, 9), component_variable);
+        let component_var_node = ast::node::Node::new(&helper::test_span(0, 9), component_variable);
         let accessor_variable = ast::expression::Variable::Accessor {
             parent: parent_node,
             component: Box::new(component_var_node),
         };
-        let accessor_var_node = ast::node::Node::new(helper::test_span(0, 9), accessor_variable);
+        let accessor_var_node = ast::node::Node::new(&helper::test_span(0, 9), accessor_variable);
         let expr = helper::create_variable_expr_node(accessor_var_node, 0, 9);
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies - accessors don't count as internal dependencies
         assert!(result.is_empty());
@@ -1126,7 +1126,7 @@ mod tests {
         // create a simple parameter value
         let expr = helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
         let value = ast::parameter::ParameterValue::Simple(expr, None);
-        let value_node = ast::node::Node::new(helper::test_span(0, 4), value);
+        let value_node = ast::node::Node::new(&helper::test_span(0, 4), value);
         let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
@@ -1140,9 +1140,7 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_ok());
-        let resolved_value = result.unwrap();
-        assert!(matches!(resolved_value, ParameterValue::Simple(_, None)));
+        assert!(matches!(result, Ok(ParameterValue::Simple(_, None))));
     }
 
     #[test]
@@ -1161,9 +1159,7 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_ok());
-        let limits = result.unwrap();
-        assert!(matches!(limits, Limits::Default));
+        assert!(matches!(result, Ok(Limits::Default)));
     }
 
     #[test]
@@ -1177,7 +1173,7 @@ mod tests {
             min: min_expr,
             max: max_expr,
         };
-        let limits_node = ast::node::Node::new(helper::test_span(0, 3), limits);
+        let limits_node = ast::node::Node::new(&helper::test_span(0, 3), limits);
         let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
@@ -1191,9 +1187,7 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_ok());
-        let resolved_limits = result.unwrap();
-        assert!(matches!(resolved_limits, Limits::Continuous { .. }));
+        assert!(matches!(result, Ok(Limits::Continuous { .. })));
     }
 
     #[test]
@@ -1205,7 +1199,7 @@ mod tests {
         let limits = ast::parameter::Limits::Discrete {
             values: vec![value1, value2, value3],
         };
-        let limits_node = ast::node::Node::new(helper::test_span(0, 3), limits);
+        let limits_node = ast::node::Node::new(&helper::test_span(0, 3), limits);
         let (submodel_info, model_info) = helper::create_mock_info();
         let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
 
@@ -1219,9 +1213,7 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_ok());
-        let resolved_limits = result.unwrap();
-        assert!(matches!(resolved_limits, Limits::Discrete { .. }));
+        assert!(matches!(result, Ok(Limits::Discrete { .. })));
     }
 
     #[test]
@@ -1247,7 +1239,9 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(errors.contains_key(&Identifier::new("a")));
 
-        let a_errors = errors.get(&Identifier::new("a")).unwrap();
+        let a_errors = errors
+            .get(&Identifier::new("a"))
+            .expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
         // check that the error is a duplicate parameter error
@@ -1256,8 +1250,8 @@ mod tests {
             duplicate_error,
             &ParameterResolutionError::DuplicateParameter {
                 identifier: Identifier::new("a"),
-                original_span: param_a1_span.clone(),
-                duplicate_span: param_a2_span.clone()
+                original_span: param_a1_span,
+                duplicate_span: param_a2_span
             }
         );
 
@@ -1270,15 +1264,15 @@ mod tests {
     #[test]
     fn test_resolve_parameters_multiple_duplicate_parameters() {
         // create the parameters with multiple duplicates
-        let param_a1 = helper::create_simple_parameter_with_span("a", 10.0, 0, 10);
-        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
-        let param_b1 = helper::create_simple_parameter_with_span("b", 20.0, 15, 25);
-        let param_b1_span = get_span_from_ast_span(param_b1.ident().node_span());
-        let param_a2 = helper::create_simple_parameter_with_span("a", 30.0, 30, 40);
-        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
-        let param_b2 = helper::create_simple_parameter_with_span("b", 40.0, 45, 55);
-        let param_b2_span = get_span_from_ast_span(param_b2.ident().node_span());
-        let parameters = vec![&param_a1, &param_b1, &param_a2, &param_b2];
+        let param_foo1 = helper::create_simple_parameter_with_span("foo", 10.0, 0, 10);
+        let param_foo1_span = get_span_from_ast_span(param_foo1.ident().node_span());
+        let param_bar1 = helper::create_simple_parameter_with_span("bar", 20.0, 15, 25);
+        let param_bar1_span = get_span_from_ast_span(param_bar1.ident().node_span());
+        let param_foo2 = helper::create_simple_parameter_with_span("foo", 30.0, 30, 40);
+        let param_foo2_span = get_span_from_ast_span(param_foo2.ident().node_span());
+        let param_bar2 = helper::create_simple_parameter_with_span("bar", 40.0, 45, 55);
+        let param_bar2_span = get_span_from_ast_span(param_bar2.ident().node_span());
+        let parameters = vec![&param_foo1, &param_bar1, &param_foo2, &param_bar2];
 
         // create the builtin variables
         let builtin_ref = helper::create_empty_builtin_ref();
@@ -1292,40 +1286,44 @@ mod tests {
 
         // check the errors - should have two duplicate parameter errors
         assert_eq!(errors.len(), 2);
-        assert!(errors.contains_key(&Identifier::new("a")));
-        assert!(errors.contains_key(&Identifier::new("b")));
+        assert!(errors.contains_key(&Identifier::new("foo")));
+        assert!(errors.contains_key(&Identifier::new("bar")));
 
-        let a_errors = errors.get(&Identifier::new("a")).unwrap();
-        let b_errors = errors.get(&Identifier::new("b")).unwrap();
-        assert_eq!(a_errors.len(), 1);
-        assert_eq!(b_errors.len(), 1);
+        let foo_errors = errors
+            .get(&Identifier::new("foo"))
+            .expect("foo errors should exist");
+        let bar_errors = errors
+            .get(&Identifier::new("bar"))
+            .expect("bar errors should exist");
+        assert_eq!(foo_errors.len(), 1);
+        assert_eq!(bar_errors.len(), 1);
 
         // check that both errors are duplicate parameter errors
-        let a_duplicate_error = &a_errors[0];
+        let foo_duplicate_error = &foo_errors[0];
         assert_eq!(
-            a_duplicate_error,
+            foo_duplicate_error,
             &ParameterResolutionError::DuplicateParameter {
-                identifier: Identifier::new("a"),
-                original_span: param_a1_span.clone(),
-                duplicate_span: param_a2_span.clone()
+                identifier: Identifier::new("foo"),
+                original_span: param_foo1_span,
+                duplicate_span: param_foo2_span
             }
         );
 
-        let b_duplicate_error = &b_errors[0];
+        let bar_duplicate_error = &bar_errors[0];
         assert_eq!(
-            b_duplicate_error,
+            bar_duplicate_error,
             &ParameterResolutionError::DuplicateParameter {
-                identifier: Identifier::new("b"),
-                original_span: param_b1_span.clone(),
-                duplicate_span: param_b2_span.clone()
+                identifier: Identifier::new("bar"),
+                original_span: param_bar1_span,
+                duplicate_span: param_bar2_span
             }
         );
 
         // check the resolved parameters - should have two parameters, the
         //     parameters that are present are left unspecified
         assert_eq!(resolved_params.len(), 2);
-        assert!(resolved_params.contains_key(&Identifier::new("a")));
-        assert!(resolved_params.contains_key(&Identifier::new("b")));
+        assert!(resolved_params.contains_key(&Identifier::new("foo")));
+        assert!(resolved_params.contains_key(&Identifier::new("bar")));
     }
 
     #[test]
@@ -1353,7 +1351,9 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(errors.contains_key(&Identifier::new("a")));
 
-        let a_errors = errors.get(&Identifier::new("a")).unwrap();
+        let a_errors = errors
+            .get(&Identifier::new("a"))
+            .expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
         // check that the error is a duplicate parameter error
@@ -1362,8 +1362,8 @@ mod tests {
             duplicate_error,
             &ParameterResolutionError::DuplicateParameter {
                 identifier: Identifier::new("a"),
-                original_span: param_a1_span.clone(),
-                duplicate_span: param_a2_span.clone()
+                original_span: param_a1_span,
+                duplicate_span: param_a2_span
             }
         );
 
@@ -1399,7 +1399,9 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert!(errors.contains_key(&Identifier::new("a")));
 
-        let a_errors = errors.get(&Identifier::new("a")).unwrap();
+        let a_errors = errors
+            .get(&Identifier::new("a"))
+            .expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
         // check that the error is a duplicate parameter error
@@ -1408,8 +1410,8 @@ mod tests {
             duplicate_error,
             &ParameterResolutionError::DuplicateParameter {
                 identifier: Identifier::new("a"),
-                original_span: param_a1_span.clone(),
-                duplicate_span: param_a2_span.clone()
+                original_span: param_a1_span,
+                duplicate_span: param_a2_span
             }
         );
 
@@ -1429,7 +1431,7 @@ mod tests {
         let right_expr = helper::create_variable_expr_node(right_var, 4, 5);
 
         let op = ast::expression::ComparisonOp::LessThan;
-        let op_node = ast::node::Node::new(helper::test_span(2, 3), op);
+        let op_node = ast::node::Node::new(&helper::test_span(2, 3), op);
 
         let expr = ast::expression::Expr::ComparisonOp {
             op: op_node,
@@ -1437,11 +1439,11 @@ mod tests {
             right: Box::new(right_expr),
             rest_chained: vec![],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 5), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 5), expr);
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -1460,9 +1462,9 @@ mod tests {
         let right_expr = helper::create_variable_expr_node(right_var, 8, 9);
 
         let op1 = ast::expression::ComparisonOp::LessThan;
-        let op1_node = ast::node::Node::new(helper::test_span(2, 3), op1);
+        let op1_node = ast::node::Node::new(&helper::test_span(2, 3), op1);
         let op2 = ast::expression::ComparisonOp::LessThan;
-        let op2_node = ast::node::Node::new(helper::test_span(6, 7), op2);
+        let op2_node = ast::node::Node::new(&helper::test_span(6, 7), op2);
 
         let expr = ast::expression::Expr::ComparisonOp {
             op: op1_node,
@@ -1470,11 +1472,11 @@ mod tests {
             right: Box::new(middle_expr),
             rest_chained: vec![(op2_node, right_expr)],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 9), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 9), expr);
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 3);
@@ -1492,7 +1494,7 @@ mod tests {
             helper::create_literal_expr_node(ast::expression::Literal::Number(10.0), 4, 6);
 
         let op = ast::expression::ComparisonOp::GreaterThan;
-        let op_node = ast::node::Node::new(helper::test_span(2, 3), op);
+        let op_node = ast::node::Node::new(&helper::test_span(2, 3), op);
 
         let expr = ast::expression::Expr::ComparisonOp {
             op: op_node,
@@ -1500,11 +1502,11 @@ mod tests {
             right: Box::new(right_expr),
             rest_chained: vec![],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 6), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 6), expr);
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies - should only contain the variable
         assert_eq!(result.len(), 1);
@@ -1526,27 +1528,27 @@ mod tests {
 
         // Create (a + b)
         let add_op = ast::expression::BinaryOp::Add;
-        let add_op_node = ast::node::Node::new(helper::test_span(3, 4), add_op);
+        let add_op_node = ast::node::Node::new(&helper::test_span(3, 4), add_op);
         let left_binary = ast::expression::Expr::BinaryOp {
             left: Box::new(a_expr),
             op: add_op_node,
             right: Box::new(b_expr),
         };
-        let left_expr = ast::node::Node::new(helper::test_span(0, 7), left_binary);
+        let left_expr = ast::node::Node::new(&helper::test_span(0, 7), left_binary);
 
         // Create (c * d)
         let mul_op = ast::expression::BinaryOp::Mul;
-        let mul_op_node = ast::node::Node::new(helper::test_span(13, 14), mul_op);
+        let mul_op_node = ast::node::Node::new(&helper::test_span(13, 14), mul_op);
         let right_binary = ast::expression::Expr::BinaryOp {
             left: Box::new(c_expr),
             op: mul_op_node,
             right: Box::new(d_expr),
         };
-        let right_expr = ast::node::Node::new(helper::test_span(10, 17), right_binary);
+        let right_expr = ast::node::Node::new(&helper::test_span(10, 17), right_binary);
 
         // Create the comparison
         let comp_op = ast::expression::ComparisonOp::LessThan;
-        let comp_op_node = ast::node::Node::new(helper::test_span(8, 9), comp_op);
+        let comp_op_node = ast::node::Node::new(&helper::test_span(8, 9), comp_op);
 
         let expr = ast::expression::Expr::ComparisonOp {
             op: comp_op_node,
@@ -1554,11 +1556,11 @@ mod tests {
             right: Box::new(right_expr),
             rest_chained: vec![],
         };
-        let expr_node = ast::node::Node::new(helper::test_span(0, 17), expr);
+        let expr_node = ast::node::Node::new(&helper::test_span(0, 17), expr);
 
         // get the dependencies
         let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(|dep| dep.take_value()).collect();
+        let result: HashSet<_> = result.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(result.len(), 4);
@@ -1572,9 +1574,9 @@ mod tests {
     fn test_get_parameter_internal_dependencies_with_comparison_conditions() {
         // create a parameter with a piecewise value that uses comparison conditions
         let label = ast::naming::Label::new("Test Parameter".to_string());
-        let label_node = ast::node::Node::new(helper::test_span(0, 0), label);
+        let label_node = ast::node::Node::new(&helper::test_span(0, 0), label);
         let identifier = ast::naming::Identifier::new("test".to_string());
-        let ident_node = ast::node::Node::new(helper::test_span(0, 4), identifier);
+        let ident_node = ast::node::Node::new(&helper::test_span(0, 4), identifier);
 
         // create the value expression
         let value_expr =
@@ -1587,7 +1589,7 @@ mod tests {
         let threshold_expr = helper::create_variable_expr_node(threshold_var, 4, 13);
 
         let comp_op = ast::expression::ComparisonOp::LessThan;
-        let comp_op_node = ast::node::Node::new(helper::test_span(2, 3), comp_op);
+        let comp_op_node = ast::node::Node::new(&helper::test_span(2, 3), comp_op);
 
         let condition_expr = ast::expression::Expr::ComparisonOp {
             op: comp_op_node,
@@ -1595,14 +1597,14 @@ mod tests {
             right: Box::new(threshold_expr),
             rest_chained: vec![],
         };
-        let condition_expr_node = ast::node::Node::new(helper::test_span(0, 13), condition_expr);
+        let condition_expr_node = ast::node::Node::new(&helper::test_span(0, 13), condition_expr);
 
         // create the piecewise part
         let piecewise_part = ast::parameter::PiecewisePart::new(value_expr, condition_expr_node);
-        let piecewise_part_node = ast::node::Node::new(helper::test_span(0, 13), piecewise_part);
+        let piecewise_part_node = ast::node::Node::new(&helper::test_span(0, 13), piecewise_part);
 
         let value_node = ast::node::Node::new(
-            helper::test_span(0, 13),
+            &helper::test_span(0, 13),
             ast::parameter::ParameterValue::Piecewise(vec![piecewise_part_node], None),
         );
 
@@ -1611,10 +1613,7 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(|dep| dep.take_value())
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
@@ -1626,15 +1625,15 @@ mod tests {
     fn test_get_parameter_internal_dependencies_with_chained_comparison_limits() {
         // create a parameter with limits that use chained comparisons
         let label = ast::naming::Label::new("Test Parameter".to_string());
-        let label_node = ast::node::Node::new(helper::test_span(0, 0), label);
+        let label_node = ast::node::Node::new(&helper::test_span(0, 0), label);
         let identifier = ast::naming::Identifier::new("test".to_string());
-        let ident_node = ast::node::Node::new(helper::test_span(0, 4), identifier);
+        let ident_node = ast::node::Node::new(&helper::test_span(0, 4), identifier);
 
         // create the value expression
         let value_expr =
             helper::create_literal_expr_node(ast::expression::Literal::Number(5.0), 0, 1);
         let value_node = ast::node::Node::new(
-            helper::test_span(0, 1),
+            &helper::test_span(0, 1),
             ast::parameter::ParameterValue::Simple(value_expr, None),
         );
 
@@ -1647,9 +1646,9 @@ mod tests {
         let max_expr = helper::create_variable_expr_node(max_var, 8, 15);
 
         let op1 = ast::expression::ComparisonOp::LessThan;
-        let op1_node = ast::node::Node::new(helper::test_span(2, 3), op1);
+        let op1_node = ast::node::Node::new(&helper::test_span(2, 3), op1);
         let op2 = ast::expression::ComparisonOp::LessThan;
-        let op2_node = ast::node::Node::new(helper::test_span(6, 7), op2);
+        let op2_node = ast::node::Node::new(&helper::test_span(6, 7), op2);
 
         let limits_expr = ast::expression::Expr::ComparisonOp {
             op: op1_node,
@@ -1657,13 +1656,13 @@ mod tests {
             right: Box::new(x_expr),
             rest_chained: vec![(op2_node, max_expr)],
         };
-        let limits_expr_node = ast::node::Node::new(helper::test_span(0, 15), limits_expr);
+        let limits_expr_node = ast::node::Node::new(&helper::test_span(0, 15), limits_expr);
 
         let limits = ast::parameter::Limits::Continuous {
             min: limits_expr_node.clone(),
             max: limits_expr_node,
         };
-        let limits_node = ast::node::Node::new(helper::test_span(0, 15), limits);
+        let limits_node = ast::node::Node::new(&helper::test_span(0, 15), limits);
 
         let parameter = ast::Parameter::new(
             label_node,
@@ -1677,10 +1676,7 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(|dep| dep.take_value())
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_iter().map(WithSpan::take_value).collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 3);

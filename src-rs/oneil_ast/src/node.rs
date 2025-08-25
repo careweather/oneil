@@ -11,36 +11,33 @@ use crate::{Span, span::SpanLike};
 ///
 /// Every AST element is wrapped in a `Node<T>` to provide source location
 /// information for error reporting, debugging, and other source-aware operations.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Node<T>
-where
-    T: Debug + Clone + PartialEq,
-{
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Node<T> {
     span: Span,
     value: T,
 }
 
-impl<T> Node<T>
-where
-    T: Debug + Clone + PartialEq,
-{
+impl<T> Node<T> {
     /// Creates a new node with the given span and value
-    pub fn new(spanlike: impl SpanLike, value: T) -> Self {
-        let span = Span::from(&spanlike);
+    pub fn new(spanlike: &impl SpanLike, value: T) -> Self {
+        let span = Span::from(spanlike);
         Self { span, value }
     }
 
     /// Returns a reference to the node's span information
-    pub fn node_span(&self) -> &Span {
-        &self.span
+    #[must_use]
+    pub const fn node_span(&self) -> Span {
+        self.span
     }
 
     /// Returns a reference to the node's value
-    pub fn node_value(&self) -> &T {
+    #[must_use]
+    pub const fn node_value(&self) -> &T {
         &self.value
     }
 
     /// Consumes the node and returns its value
+    #[must_use]
     pub fn take_value(self) -> T {
         self.value
     }

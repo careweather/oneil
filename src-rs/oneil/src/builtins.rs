@@ -6,7 +6,7 @@ use oneil_model_loader::BuiltinRef;
 pub struct Builtins;
 
 impl Builtins {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 }

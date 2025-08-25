@@ -171,6 +171,7 @@ impl Expr {
     ///     vec![(WithSpan::test_new(ComparisonOp::LessThan), right)]
     /// );
     /// ```
+    #[must_use]
     pub fn comparison_op(
         op: WithSpan<ComparisonOp>,
         left: ExprWithSpan,
@@ -203,6 +204,7 @@ impl Expr {
     /// let right = WithSpan::test_new(Expr::literal(Literal::number(3.0)));
     /// let expr = Expr::binary_op(WithSpan::test_new(BinaryOp::Add), left, right);
     /// ```
+    #[must_use]
     pub fn binary_op(op: WithSpan<BinaryOp>, left: ExprWithSpan, right: ExprWithSpan) -> Self {
         Self::BinaryOp {
             op,
@@ -227,6 +229,7 @@ impl Expr {
     /// let operand = WithSpan::test_new(Expr::literal(Literal::number(5.0)));
     /// let expr = Expr::unary_op(WithSpan::test_new(UnaryOp::Neg), operand);
     /// ```
+    #[must_use]
     pub fn unary_op(op: WithSpan<UnaryOp>, expr: ExprWithSpan) -> Self {
         Self::UnaryOp {
             op,
@@ -250,7 +253,8 @@ impl Expr {
     /// let args = vec![WithSpan::test_new(Expr::literal(Literal::number(3.14)))];
     /// let expr = Expr::function_call(WithSpan::test_new(FunctionName::imported(Identifier::new("foo"))), args);
     /// ```
-    pub fn function_call(name: WithSpan<FunctionName>, args: Vec<ExprWithSpan>) -> Self {
+    #[must_use]
+    pub const fn function_call(name: WithSpan<FunctionName>, args: Vec<ExprWithSpan>) -> Self {
         Self::FunctionCall { name, args }
     }
 
@@ -267,7 +271,8 @@ impl Expr {
     ///
     /// let expr = Expr::builtin_variable(Identifier::new("pi"));
     /// ```
-    pub fn builtin_variable(ident: Identifier) -> Self {
+    #[must_use]
+    pub const fn builtin_variable(ident: Identifier) -> Self {
         Self::Variable(Variable::Builtin(ident))
     }
 
@@ -284,7 +289,8 @@ impl Expr {
     ///
     /// let expr = Expr::parameter_variable(Identifier::new("radius"));
     /// ```
-    pub fn parameter_variable(ident: Identifier) -> Self {
+    #[must_use]
+    pub const fn parameter_variable(ident: Identifier) -> Self {
         Self::Variable(Variable::Parameter(ident))
     }
 
@@ -305,7 +311,8 @@ impl Expr {
     ///     Identifier::new("pi")
     /// );
     /// ```
-    pub fn external_variable(model: ModelPath, ident: Identifier) -> Self {
+    #[must_use]
+    pub const fn external_variable(model: ModelPath, ident: Identifier) -> Self {
         Self::Variable(Variable::External { model, ident })
     }
 
@@ -322,7 +329,8 @@ impl Expr {
     ///
     /// let expr = Expr::literal(Literal::number(42.0));
     /// ```
-    pub fn literal(value: Literal) -> Self {
+    #[must_use]
+    pub const fn literal(value: Literal) -> Self {
         Self::Literal { value }
     }
 }
@@ -332,7 +340,7 @@ impl Expr {
 /// These operators are used in binary expressions to combine two operands.
 /// The operators include standard arithmetic operations, comparison operators,
 /// and logical operations.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
     /// Addition: `a + b`
     Add,
@@ -362,7 +370,7 @@ pub enum BinaryOp {
 ///
 /// These operators are used in comparison expressions to compare two operands.
 /// Comparison operations support chaining for expressions like `a < b < c`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComparisonOp {
     /// Less than comparison: `a < b`
     LessThan,
@@ -380,32 +388,38 @@ pub enum ComparisonOp {
 
 impl ComparisonOp {
     /// Creates a less than operator.
-    pub fn less_than() -> Self {
+    #[must_use]
+    pub const fn less_than() -> Self {
         Self::LessThan
     }
 
     /// Creates a less than or equal operator.
-    pub fn less_than_eq() -> Self {
+    #[must_use]
+    pub const fn less_than_eq() -> Self {
         Self::LessThanEq
     }
 
     /// Creates a greater than operator.
-    pub fn greater_than() -> Self {
+    #[must_use]
+    pub const fn greater_than() -> Self {
         Self::GreaterThan
     }
 
     /// Creates a greater than or equal operator.
-    pub fn greater_than_eq() -> Self {
+    #[must_use]
+    pub const fn greater_than_eq() -> Self {
         Self::GreaterThanEq
     }
 
     /// Creates an equality operator.
-    pub fn eq() -> Self {
+    #[must_use]
+    pub const fn eq() -> Self {
         Self::Eq
     }
 
     /// Creates an inequality operator.
-    pub fn not_eq() -> Self {
+    #[must_use]
+    pub const fn not_eq() -> Self {
         Self::NotEq
     }
 }
@@ -413,7 +427,7 @@ impl ComparisonOp {
 /// Unary operators for single-operand operations.
 ///
 /// These operators are used in unary expressions to modify a single operand.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     /// Negation: `-a`
     Neg,
@@ -425,7 +439,7 @@ pub enum UnaryOp {
 ///
 /// Functions in Oneil can be either built-in mathematical functions
 /// or imported from Python modules.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionName {
     /// Built-in mathematical function.
     Builtin(Identifier),
@@ -447,7 +461,8 @@ impl FunctionName {
     ///
     /// let func = FunctionName::builtin(Identifier::new("sin"));
     /// ```
-    pub fn builtin(name: Identifier) -> Self {
+    #[must_use]
+    pub const fn builtin(name: Identifier) -> Self {
         Self::Builtin(name)
     }
 
@@ -464,7 +479,8 @@ impl FunctionName {
     ///
     /// let func = FunctionName::imported(Identifier::new("numpy.random.normal"));
     /// ```
-    pub fn imported(name: Identifier) -> Self {
+    #[must_use]
+    pub const fn imported(name: Identifier) -> Self {
         Self::Imported(name)
     }
 }
@@ -475,7 +491,7 @@ impl FunctionName {
 /// - **Local**: Variables defined in the current scope
 /// - **Parameter**: Parameters defined in the current model
 /// - **External**: Parameters defined in other models
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Variable {
     /// Built-in variable
     Builtin(Identifier),
@@ -504,7 +520,8 @@ impl Variable {
     ///
     /// let var = Variable::builtin(Identifier::new("x"));
     /// ```
-    pub fn builtin(ident: Identifier) -> Self {
+    #[must_use]
+    pub const fn builtin(ident: Identifier) -> Self {
         Self::Builtin(ident)
     }
 
@@ -521,7 +538,8 @@ impl Variable {
     ///
     /// let var = Variable::parameter(Identifier::new("radius"));
     /// ```
-    pub fn parameter(ident: Identifier) -> Self {
+    #[must_use]
+    pub const fn parameter(ident: Identifier) -> Self {
         Self::Parameter(ident)
     }
 
@@ -539,7 +557,8 @@ impl Variable {
     ///
     /// let var = Variable::external(ModelPath::new("submodel"), Identifier::new("area"));
     /// ```
-    pub fn external(model: ModelPath, ident: Identifier) -> Self {
+    #[must_use]
+    pub const fn external(model: ModelPath, ident: Identifier) -> Self {
         Self::External { model, ident }
     }
 }
@@ -572,7 +591,8 @@ impl Literal {
     ///
     /// let lit = Literal::number(3.14159);
     /// ```
-    pub fn number(value: f64) -> Self {
+    #[must_use]
+    pub const fn number(value: f64) -> Self {
         Self::Number(value)
     }
 
@@ -589,7 +609,8 @@ impl Literal {
     ///
     /// let lit = Literal::string("hello".to_string());
     /// ```
-    pub fn string(value: String) -> Self {
+    #[must_use]
+    pub const fn string(value: String) -> Self {
         Self::String(value)
     }
 
@@ -606,7 +627,8 @@ impl Literal {
     ///
     /// let lit = Literal::boolean(true);
     /// ```
-    pub fn boolean(value: bool) -> Self {
+    #[must_use]
+    pub const fn boolean(value: bool) -> Self {
         Self::Boolean(value)
     }
 }

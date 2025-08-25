@@ -136,7 +136,7 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
         .convert_error_to(ParserError::expect_parameter)
         .parse(rest)?;
     let label_span = AstSpan::from(&label);
-    let label = Node::new(label_span, Label::new(label.lexeme().to_string()));
+    let label = Node::new(&label_span, Label::new(label.lexeme().to_string()));
 
     let (rest, limits) = opt(limits).parse(rest)?;
 
@@ -148,7 +148,7 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
         .or_fail_with(ParserError::parameter_missing_identifier(&colon_token))
         .parse(rest)?;
     let ident_span = AstSpan::from(&ident);
-    let ident_node = Node::new(ident_span, Identifier::new(ident.lexeme().to_string()));
+    let ident_node = Node::new(&ident_span, Identifier::new(ident.lexeme().to_string()));
 
     let (rest, equals_token) = equals
         .or_fail_with(ParserError::parameter_missing_equals_sign(&ident_node))
@@ -191,9 +191,9 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
         note,
     );
 
-    let node = Node::new(span, param);
+    let param_node = Node::new(&span, param);
 
-    Ok((rest, node))
+    Ok((rest, param_node))
 }
 
 /// Parse a performance indicator (`$`).
@@ -219,7 +219,7 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
 fn performance_marker(input: Span<'_>) -> Result<'_, PerformanceMarkerNode, ParserError> {
     dollar
         .convert_errors()
-        .map(|token| Node::new(token, PerformanceMarker::new()))
+        .map(|token| Node::new(&token, PerformanceMarker::new()))
         .parse(input)
 }
 
@@ -238,8 +238,8 @@ fn performance_marker(input: Span<'_>) -> Result<'_, PerformanceMarkerNode, Pars
 /// Returns a trace level node if a valid trace indicator is found, or an error
 /// if the token is malformed.
 fn trace_level(input: Span<'_>) -> Result<'_, TraceLevelNode, ParserError> {
-    let single_star = star.map(|token| Node::new(token, TraceLevel::Trace));
-    let double_star = star_star.map(|token| Node::new(token, TraceLevel::Debug));
+    let single_star = star.map(|token| Node::new(&token, TraceLevel::Trace));
+    let double_star = star_star.map(|token| Node::new(&token, TraceLevel::Debug));
 
     double_star.or(single_star).convert_errors().parse(input)
 }
@@ -305,7 +305,7 @@ fn continuous_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
 
     let span = AstSpan::calc_span(&paren_left_token, &paren_right_token);
 
-    let node = Node::new(span, Limits::continuous(min, max));
+    let node = Node::new(&span, Limits::continuous(min, max));
 
     Ok((rest, node))
 }
@@ -343,7 +343,7 @@ fn discrete_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
 
     let span = AstSpan::calc_span(&bracket_left_token, &bracket_right_token);
 
-    let node = Node::new(span, Limits::discrete(values));
+    let node = Node::new(&span, Limits::discrete(values));
 
     Ok((rest, node))
 }
@@ -431,7 +431,7 @@ fn simple_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> 
         None => AstSpan::from(&expr),
     };
 
-    let node = Node::new(span, ParameterValue::simple(expr, unit));
+    let node = Node::new(&span, ParameterValue::simple(expr, unit));
 
     Ok((rest, node))
 }
@@ -503,7 +503,7 @@ fn piecewise_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserErro
     parts.push(first_part);
     parts.extend(rest_parts);
 
-    let node = Node::new(span, ParameterValue::piecewise(parts, unit));
+    let node = Node::new(&span, ParameterValue::piecewise(parts, unit));
 
     Ok((rest, node))
 }
@@ -556,7 +556,7 @@ fn piecewise_part(input: Span<'_>) -> Result<'_, PiecewisePartNode, ParserError>
         .parse(rest)?;
 
     let node = Node::new(
-        AstSpan::calc_span(&brace_left_token, &if_expr),
+        &AstSpan::calc_span(&brace_left_token, &if_expr),
         PiecewisePart::new(expr, if_expr),
     );
 
@@ -581,23 +581,25 @@ mod tests {
         #[test]
         fn test_parse_simple_parameter() {
             let input = Span::new_extra("x: y = 42", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse simple parameter");
 
-            assert_eq!(param.label().node_value().as_str(), "x");
-            assert_eq!(param.ident().node_value().as_str(), "y");
+            assert_eq!(param.label().as_str(), "x");
+            assert_eq!(param.ident().as_str(), "y");
             assert!(param.performance_marker().is_none());
             assert!(param.trace_level().is_none());
 
             match param.value().node_value() {
                 ParameterValue::Simple(expr, unit) => {
-                    let expected_value = Node::new(AstSpan::new(7, 2, 0), Literal::number(42.0));
+                    let expected_value = Node::new(&AstSpan::new(7, 2, 0), Literal::number(42.0));
                     let expected_expr =
-                        Node::new(AstSpan::new(7, 2, 0), Expr::literal(expected_value));
+                        Node::new(&AstSpan::new(7, 2, 0), Expr::literal(expected_value));
 
                     assert_eq!(expr, &expected_expr);
                     assert!(unit.is_none());
                 }
-                _ => panic!("Expected simple parameter value"),
+                value @ ParameterValue::Piecewise(..) => {
+                    panic!("Expected simple parameter value, got {value:?}")
+                }
             }
         }
 
@@ -605,24 +607,24 @@ mod tests {
         fn test_parse_parameter_with_multiword_label() {
             let input = Span::new_extra("Value of x: x = 42", Config::default());
             let (_, param) = parse(input).expect("Parameter should parse");
-            assert_eq!(param.label().node_value().as_str(), "Value of x");
+            assert_eq!(param.label().as_str(), "Value of x");
         }
 
         #[test]
         fn test_parse_parameter_with_continuous_limits() {
             let input = Span::new_extra("x(0, 100): y = 42", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with continuous limits");
 
-            match param.limits().map(|limits| limits.node_value()) {
+            match param.limits().map(Node::node_value) {
                 Some(Limits::Continuous { min, max }) => {
                     let expected_min_literal =
-                        Node::new(AstSpan::new(2, 1, 0), Literal::number(0.0));
+                        Node::new(&AstSpan::new(2, 1, 0), Literal::number(0.0));
                     let expected_min =
-                        Node::new(AstSpan::new(2, 1, 0), Expr::literal(expected_min_literal));
+                        Node::new(&AstSpan::new(2, 1, 0), Expr::literal(expected_min_literal));
                     let expected_max_literal =
-                        Node::new(AstSpan::new(5, 3, 0), Literal::number(100.0));
+                        Node::new(&AstSpan::new(5, 3, 0), Literal::number(100.0));
                     let expected_max =
-                        Node::new(AstSpan::new(5, 3, 0), Expr::literal(expected_max_literal));
+                        Node::new(&AstSpan::new(5, 3, 0), Expr::literal(expected_max_literal));
 
                     assert_eq!(min, &expected_min);
                     assert_eq!(max, &expected_max);
@@ -634,21 +636,21 @@ mod tests {
         #[test]
         fn test_parse_parameter_with_discrete_limits() {
             let input = Span::new_extra("x[1, 2, 3]: y = 42", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with discrete limits");
 
-            match param.limits().map(|limits| limits.node_value()) {
+            match param.limits().map(oneil_ast::node::Node::node_value) {
                 Some(Limits::Discrete { values }) => {
-                    let expected_literals = vec![
-                        Node::new(AstSpan::new(2, 1, 0), Literal::number(1.0)),
-                        Node::new(AstSpan::new(5, 1, 0), Literal::number(2.0)),
-                        Node::new(AstSpan::new(8, 1, 0), Literal::number(3.0)),
+                    let expected_literals = [
+                        Node::new(&AstSpan::new(2, 1, 0), Literal::number(1.0)),
+                        Node::new(&AstSpan::new(5, 1, 0), Literal::number(2.0)),
+                        Node::new(&AstSpan::new(8, 1, 0), Literal::number(3.0)),
                     ];
 
                     let expected_exprs = expected_literals
                         .iter()
                         .map(|literal| {
                             let literal_span = AstSpan::from(literal);
-                            Node::new(literal_span, Expr::literal(literal.clone()))
+                            Node::new(&literal_span, Expr::literal(literal.clone()))
                         })
                         .collect::<Vec<_>>();
 
@@ -664,7 +666,7 @@ mod tests {
         #[test]
         fn test_parse_parameter_with_performance() {
             let input = Span::new_extra("$ x: y = 42", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with performance");
 
             assert!(param.performance_marker().is_some());
         }
@@ -672,12 +674,10 @@ mod tests {
         #[test]
         fn test_parse_parameter_with_trace() {
             let input = Span::new_extra("* x: y = 42", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with trace");
 
             assert_eq!(
-                param
-                    .trace_level()
-                    .map(|trace_level| trace_level.node_value()),
+                param.trace_level().map(Node::node_value),
                 Some(&TraceLevel::Trace)
             );
         }
@@ -685,12 +685,10 @@ mod tests {
         #[test]
         fn test_parse_parameter_with_debug() {
             let input = Span::new_extra("** x: y = 42", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with debug");
 
             assert_eq!(
-                param
-                    .trace_level()
-                    .map(|trace_level| trace_level.node_value()),
+                param.trace_level().map(Node::node_value),
                 Some(&TraceLevel::Debug)
             );
         }
@@ -698,35 +696,37 @@ mod tests {
         #[test]
         fn test_parse_parameter_with_simple_units() {
             let input = Span::new_extra("x: y = 42 : kg", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with simple units");
             match param.value().node_value() {
                 ParameterValue::Simple(expr, unit) => {
-                    let expected_value = Node::new(AstSpan::new(7, 2, 1), Literal::number(42.0));
+                    let expected_value = Node::new(&AstSpan::new(7, 2, 1), Literal::number(42.0));
                     let expected_expr =
-                        Node::new(AstSpan::new(7, 2, 1), Expr::literal(expected_value));
+                        Node::new(&AstSpan::new(7, 2, 1), Expr::literal(expected_value));
 
                     assert_eq!(expr, &expected_expr);
 
                     let expected_unit_identifier =
-                        Node::new(AstSpan::new(12, 2, 0), Identifier::new("kg".to_string()));
+                        Node::new(&AstSpan::new(12, 2, 0), Identifier::new("kg".to_string()));
                     let expected_unit = Node::new(
-                        AstSpan::new(12, 2, 0),
+                        &AstSpan::new(12, 2, 0),
                         UnitExpr::unit(expected_unit_identifier, None),
                     );
 
                     assert_eq!(unit, &Some(expected_unit));
                 }
-                _ => panic!("Expected simple parameter value"),
+                value @ ParameterValue::Piecewise(..) => {
+                    panic!("Expected simple parameter value, got {value:?}")
+                }
             }
         }
 
         #[test]
         fn test_parse_parameter_with_compound_units() {
             let input = Span::new_extra("x: y = 42 : m/s^2", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with compound units");
             match param.value().node_value() {
                 ParameterValue::Simple(_expr, unit) => {
-                    let unit = unit.clone().unwrap();
+                    let unit = unit.clone().expect("should have unit");
 
                     match unit.node_value() {
                         UnitExpr::BinaryOp { op, .. } => {
@@ -735,14 +735,16 @@ mod tests {
                         _ => panic!("Expected binary unit expression"),
                     }
                 }
-                _ => panic!("Expected simple parameter value"),
+                value @ ParameterValue::Piecewise(..) => {
+                    panic!("Expected simple parameter value, got {value:?}")
+                }
             }
         }
 
         #[test]
         fn test_parse_piecewise_parameter() {
             let input = Span::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse piecewise parameter");
             match param.node_value().value().node_value() {
                 ParameterValue::Piecewise(piecewise, unit) => {
                     assert_eq!(piecewise.len(), 2);
@@ -771,7 +773,9 @@ mod tests {
 
                     assert!(unit.is_none());
                 }
-                _ => panic!("Expected piecewise parameter value"),
+                value @ ParameterValue::Simple(..) => {
+                    panic!("Expected piecewise parameter value, got {value:?}")
+                }
             }
         }
 
@@ -781,12 +785,14 @@ mod tests {
                 "x: y = {2*z if z > 0 : m/s \n {0 if z <= 0 ",
                 Config::default(),
             );
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with all features");
             match param.node_value().value().node_value() {
                 ParameterValue::Piecewise(_, unit) => {
                     assert!(unit.is_some());
                 }
-                _ => panic!("Expected piecewise parameter value"),
+                value @ ParameterValue::Simple(..) => {
+                    panic!("Expected piecewise parameter value, got {value:?}")
+                }
             }
         }
 
@@ -796,55 +802,61 @@ mod tests {
                 "$ ** x(0, 100): y = {2*z if z > 0 : kg/m^2 \n {-z if z <= 0",
                 Config::default(),
             );
-            let (_, param) = parse(input).unwrap();
+            let (_, param) = parse(input).expect("should parse parameter with all features");
 
-            assert!(param.node_value().performance_marker().is_some());
+            assert!(param.performance_marker().is_some());
             assert_eq!(
-                param.node_value().trace_level().unwrap().node_value(),
-                &TraceLevel::Debug
+                param.trace_level().map(Node::node_value),
+                Some(&TraceLevel::Debug)
             );
-            assert_eq!(param.node_value().label().node_value().as_str(), "x");
-            assert_eq!(param.node_value().ident().node_value().as_str(), "y");
+            assert_eq!(param.label().as_str(), "x");
+            assert_eq!(param.ident().as_str(), "y");
 
-            match param.node_value().limits() {
+            match param.limits() {
                 Some(limits) => match limits.node_value() {
                     Limits::Continuous { min, max } => {
                         assert!(matches!(min.node_value(), Expr::Literal(_)));
                         assert!(matches!(max.node_value(), Expr::Literal(_)));
                     }
-                    _ => panic!("Expected continuous limits"),
+                    value @ Limits::Discrete { .. } => {
+                        panic!("Expected continuous limits, got {value:?}")
+                    }
                 },
                 None => panic!("Expected limits"),
             }
 
-            match param.node_value().value().node_value() {
+            match param.value().node_value() {
                 ParameterValue::Piecewise(piecewise, unit) => {
                     assert_eq!(piecewise.len(), 2);
 
                     // Check unit
                     assert!(matches!(
-                        unit.as_ref().map(|u| u.node_value()),
+                        unit.as_ref().map(Node::node_value),
                         Some(UnitExpr::BinaryOp { .. })
                     ));
                 }
-                _ => panic!("Expected piecewise parameter value"),
+                value @ ParameterValue::Simple(..) => {
+                    panic!("Expected piecewise parameter value, got {value:?}")
+                }
             }
         }
 
         #[test]
         fn test_parse_complete_success() {
             let input = Span::new_extra("x: y = 42\n", Config::default());
-            let (rest, param) = parse_complete(input).unwrap();
-            assert_eq!(param.node_value().label().node_value().as_str(), "x");
-            assert_eq!(param.node_value().ident().node_value().as_str(), "y");
-            assert!(param.node_value().performance_marker().is_none());
-            assert!(param.node_value().trace_level().is_none());
-            match param.node_value().value().node_value() {
+            let (rest, param) = parse_complete(input).expect("should parse complete parameter");
+            assert_eq!(param.label().as_str(), "x");
+            assert_eq!(param.ident().as_str(), "y");
+            assert!(param.performance_marker().is_none());
+            assert!(param.trace_level().is_none());
+            match param.value().node_value() {
                 ParameterValue::Simple(expr, unit) => {
                     assert!(matches!(expr.node_value(), Expr::Literal(_)));
                     assert!(unit.is_none());
                 }
-                _ => panic!("Expected simple parameter value"),
+                value @ ParameterValue::Piecewise(..) => {
+                    panic!("Expected simple parameter value, got {value:?}")
+                }
             }
             assert_eq!(rest.fragment(), &"");
         }
@@ -856,17 +868,19 @@ mod tests {
         #[test]
         fn test_parse_complete_success() {
             let input = Span::new_extra("x: y = 42\n", Config::default());
-            let (rest, param) = parse_complete(input).unwrap();
-            assert_eq!(param.node_value().label().node_value().as_str(), "x");
-            assert_eq!(param.node_value().ident().node_value().as_str(), "y");
-            assert!(param.node_value().performance_marker().is_none());
-            assert!(param.node_value().trace_level().is_none());
-            match param.node_value().value().node_value() {
+            let (rest, param) = parse_complete(input).expect("should parse complete parameter");
+            assert_eq!(param.label().as_str(), "x");
+            assert_eq!(param.ident().as_str(), "y");
+            assert!(param.performance_marker().is_none());
+            assert!(param.trace_level().is_none());
+            match param.value().node_value() {
                 ParameterValue::Simple(expr, unit) => {
                     assert!(matches!(expr.node_value(), Expr::Literal(_)));
                     assert!(unit.is_none());
                 }
-                _ => panic!("Expected simple parameter value"),
+                value @ ParameterValue::Piecewise(..) => {
+                    panic!("Expected simple parameter value, got {value:?}")
+                }
             }
             assert_eq!(rest.fragment(), &"");
         }
@@ -895,7 +909,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Parameter)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -915,10 +929,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_colon_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -938,10 +952,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_ident_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -961,10 +975,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_equals_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -984,10 +998,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_colon_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1007,10 +1021,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_paren_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1030,10 +1044,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_min_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1053,10 +1067,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_comma_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1076,10 +1090,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_paren_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1099,10 +1113,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_bracket_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1122,10 +1136,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_bracket_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1145,10 +1159,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_brace_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1168,10 +1182,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_expr_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1191,10 +1205,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_if_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1214,10 +1228,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_colon_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1237,10 +1251,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_equals_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1260,10 +1274,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_colon_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1280,7 +1294,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Parameter)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1297,7 +1311,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Parameter)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1314,7 +1328,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Parameter)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1331,7 +1345,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Parameter)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1348,7 +1362,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Parameter)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1365,7 +1379,7 @@ mod tests {
                         ParserErrorReason::Expect(ExpectKind::Parameter)
                     ));
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1385,10 +1399,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_paren_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1408,10 +1422,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_first_part_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1431,10 +1445,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_paren_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1454,10 +1468,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_bracket_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
 
@@ -1480,10 +1494,10 @@ mod tests {
                         } => {
                             assert_eq!(cause, expected_second_part_span);
                         }
-                        error => panic!("Unexpected error {:?}", error),
+                        error => panic!("Unexpected error {error:?}"),
                     }
                 }
-                _ => panic!("Unexpected result {:?}", result),
+                _ => panic!("Unexpected result {result:?}"),
             }
         }
     }

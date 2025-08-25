@@ -11,6 +11,9 @@ use crate::{
     util::{builder::ModelCollectionBuilder, get_span_from_ast_span},
 };
 
+type ValidatedImports = HashMap<PythonPath, Span>;
+type ImportErrors = HashMap<PythonPath, ImportResolutionError>;
+
 /// Validates a list of Python import declarations for a given model.
 ///
 /// This function processes import declarations from an Oneil model and validates
@@ -42,8 +45,8 @@ pub fn validate_imports<F>(
     imports: Vec<&oneil_ast::declaration::ImportNode>,
     file_loader: &F,
 ) -> (
-    HashMap<PythonPath, Span>,
-    HashMap<PythonPath, ImportResolutionError>,
+    ValidatedImports,
+    ImportErrors,
     ModelCollectionBuilder<F::ParseError, F::PythonError>,
 )
 where
@@ -62,7 +65,7 @@ where
                 import_resolution_errors.insert(
                     python_path.clone(),
                     ImportResolutionError::duplicate_import(
-                        original_import_span.clone(),
+                        *original_import_span,
                         python_path_span,
                         python_path,
                     ),
@@ -106,30 +109,30 @@ mod tests {
 
         use super::*;
 
-        pub(crate) fn get_model_path() -> ModelPath {
+        pub fn get_model_path() -> ModelPath {
             ModelPath::new(PathBuf::from("test_model"))
         }
 
-        pub(crate) fn get_empty_builder() -> ModelCollectionBuilder<(), ()> {
+        pub fn get_empty_builder() -> ModelCollectionBuilder<(), ()> {
             ModelCollectionBuilder::new(HashSet::new())
         }
 
-        pub(crate) fn build_import(path: &str) -> ImportNode {
+        pub fn build_import(path: &str) -> ImportNode {
             // for simplicity's sake, we'll use a span that's the length of the path
             let span = Span::new(0, path.len(), 0);
-            let import = Import::new(Node::new(span, path.to_string()));
-            Node::new(span, import)
+            let import = Import::new(Node::new(&span, path.to_string()));
+            Node::new(&span, import)
         }
 
-        pub(crate) fn build_import_with_span(
+        pub fn build_import_with_span(
             path: &str,
             start: usize,
             end: usize,
             line: usize,
         ) -> ImportNode {
             let span = Span::new(start, end, line);
-            let import = Import::new(Node::new(span, path.to_string()));
-            Node::new(span, import)
+            let import = Import::new(Node::new(&span, path.to_string()));
+            Node::new(&span, import)
         }
     }
 
@@ -162,7 +165,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![helper::build_import("my_python")];
+        let imports = [helper::build_import("my_python")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -173,7 +176,7 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors
@@ -188,7 +191,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![helper::build_import("nonexistent")];
+        let imports = [helper::build_import("nonexistent")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -202,7 +205,7 @@ mod tests {
         assert_eq!(errors.len(), 1);
 
         let error_path = PythonPath::new(PathBuf::from("nonexistent"));
-        let error_path_span = get_span_from_ast_span(&imports[0].node_span());
+        let error_path_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(
             errors.get(&error_path),
             Some(&ImportResolutionError::failed_validation(
@@ -220,7 +223,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![
+        let imports = [
             helper::build_import("my_python"),
             helper::build_import("nonexistent"),
         ];
@@ -234,14 +237,14 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error_path = PythonPath::new(PathBuf::from("nonexistent"));
-        let error_path_span = get_span_from_ast_span(&imports[1].node_span());
+        let error_path_span = get_span_from_ast_span(imports[1].node_span());
         assert_eq!(
             errors.get(&error_path),
             Some(&ImportResolutionError::failed_validation(
@@ -259,7 +262,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![
+        let imports = [
             helper::build_import("my_python1"),
             helper::build_import("my_python2"),
             helper::build_import("my_python3"),
@@ -273,15 +276,15 @@ mod tests {
         // check the imports
         assert_eq!(valid_imports.len(), 3);
         let valid_path1 = PythonPath::new(PathBuf::from("my_python1"));
-        let valid_path1_span = get_span_from_ast_span(&imports[0].node_span());
+        let valid_path1_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(valid_imports.get(&valid_path1), Some(&valid_path1_span));
 
         let valid_path2 = PythonPath::new(PathBuf::from("my_python2"));
-        let valid_path2_span = get_span_from_ast_span(&imports[1].node_span());
+        let valid_path2_span = get_span_from_ast_span(imports[1].node_span());
         assert_eq!(valid_imports.get(&valid_path2), Some(&valid_path2_span));
 
         let valid_path3 = PythonPath::new(PathBuf::from("my_python3"));
-        let valid_path3_span = get_span_from_ast_span(&imports[2].node_span());
+        let valid_path3_span = get_span_from_ast_span(imports[2].node_span());
         assert_eq!(valid_imports.get(&valid_path3), Some(&valid_path3_span));
 
         // check the errors
@@ -296,7 +299,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![
+        let imports = [
             helper::build_import("nonexistent1"),
             helper::build_import("nonexistent2"),
         ];
@@ -313,7 +316,7 @@ mod tests {
         assert_eq!(errors.len(), 2);
 
         let error_path1 = PythonPath::new(PathBuf::from("nonexistent1"));
-        let error_path1_span = get_span_from_ast_span(&imports[0].node_span());
+        let error_path1_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(
             errors.get(&error_path1),
             Some(&ImportResolutionError::failed_validation(
@@ -323,7 +326,7 @@ mod tests {
         );
 
         let error_path2 = PythonPath::new(PathBuf::from("nonexistent2"));
-        let error_path2_span = get_span_from_ast_span(&imports[1].node_span());
+        let error_path2_span = get_span_from_ast_span(imports[1].node_span());
         assert_eq!(
             errors.get(&error_path2),
             Some(&ImportResolutionError::failed_validation(
@@ -341,7 +344,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![helper::build_import("nonexistent")];
+        let imports = [helper::build_import("nonexistent")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -364,7 +367,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports
-        let imports = vec![helper::build_import("my_python")];
+        let imports = [helper::build_import("my_python")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -375,7 +378,7 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = PythonPath::new(PathBuf::from("subdir/my_python"));
-        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors
@@ -390,7 +393,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports with different spans to simulate different positions in the file
-        let imports = vec![
+        let imports = [
             helper::build_import_with_span("my_python", 0, 9, 1), // first import at line 1
             helper::build_import_with_span("my_python", 10, 19, 2), // duplicate import at line 2
         ];
@@ -404,14 +407,14 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors - should have one duplicate import error
         assert_eq!(errors.len(), 1);
 
         let error_path = PythonPath::new(PathBuf::from("my_python"));
-        let duplicate_span = get_span_from_ast_span(&imports[1].node_span());
+        let duplicate_span = get_span_from_ast_span(imports[1].node_span());
         let expected_error = ImportResolutionError::duplicate_import(
             valid_path_span,
             duplicate_span,
@@ -428,7 +431,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports with multiple duplicates
-        let imports = vec![
+        let imports = [
             helper::build_import_with_span("my_python", 0, 9, 1), // first import
             helper::build_import_with_span("other_python", 10, 22, 2), // different import
             helper::build_import_with_span("my_python", 23, 32, 3), // duplicate of first
@@ -444,17 +447,17 @@ mod tests {
         assert_eq!(valid_imports.len(), 2);
 
         let valid_path1 = PythonPath::new(PathBuf::from("my_python"));
-        let valid_path1_span = get_span_from_ast_span(&imports[0].node_span());
+        let valid_path1_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(valid_imports.get(&valid_path1), Some(&valid_path1_span));
 
         let valid_path2 = PythonPath::new(PathBuf::from("other_python"));
-        let valid_path2_span = get_span_from_ast_span(&imports[1].node_span());
+        let valid_path2_span = get_span_from_ast_span(imports[1].node_span());
         assert_eq!(valid_imports.get(&valid_path2), Some(&valid_path2_span));
 
         // check the errors - should have two duplicate import errors
         assert_eq!(errors.len(), 2);
 
-        let duplicate_span1 = get_span_from_ast_span(&imports[2].node_span());
+        let duplicate_span1 = get_span_from_ast_span(imports[2].node_span());
         let expected_error1 = ImportResolutionError::duplicate_import(
             valid_path1_span,
             duplicate_span1,
@@ -462,7 +465,7 @@ mod tests {
         );
         assert_eq!(errors.get(&valid_path1), Some(&expected_error1));
 
-        let duplicate_span2 = get_span_from_ast_span(&imports[3].node_span());
+        let duplicate_span2 = get_span_from_ast_span(imports[3].node_span());
         let expected_error2 = ImportResolutionError::duplicate_import(
             valid_path2_span,
             duplicate_span2,
@@ -479,7 +482,7 @@ mod tests {
         let builder = helper::get_empty_builder();
 
         // set up the imports with duplicates and invalid imports
-        let imports = vec![
+        let imports = [
             helper::build_import_with_span("my_python", 0, 9, 1), // valid import
             helper::build_import_with_span("nonexistent", 10, 21, 2), // invalid import
             helper::build_import_with_span("my_python", 22, 31, 3), // duplicate of first
@@ -495,14 +498,14 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(&imports[0].node_span());
+        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
         assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
 
         // check the errors - should have 3 errors: 1 duplicate + 2 invalid imports
         assert_eq!(errors.len(), 3);
 
         // Check duplicate import error
-        let duplicate_span = get_span_from_ast_span(&imports[2].node_span());
+        let duplicate_span = get_span_from_ast_span(imports[2].node_span());
         let expected_duplicate_error = ImportResolutionError::duplicate_import(
             valid_path_span,
             duplicate_span,
@@ -512,13 +515,13 @@ mod tests {
 
         // Check invalid import errors
         let invalid_path1 = PythonPath::new(PathBuf::from("nonexistent"));
-        let invalid_span1 = get_span_from_ast_span(&imports[1].node_span());
+        let invalid_span1 = get_span_from_ast_span(imports[1].node_span());
         let expected_invalid_error1 =
             ImportResolutionError::failed_validation(invalid_span1, invalid_path1.clone());
         assert_eq!(errors.get(&invalid_path1), Some(&expected_invalid_error1));
 
         let invalid_path2 = PythonPath::new(PathBuf::from("another_nonexistent"));
-        let invalid_span2 = get_span_from_ast_span(&imports[3].node_span());
+        let invalid_span2 = get_span_from_ast_span(imports[3].node_span());
         let expected_invalid_error2 =
             ImportResolutionError::failed_validation(invalid_span2, invalid_path2.clone());
         assert_eq!(errors.get(&invalid_path2), Some(&expected_invalid_error2));

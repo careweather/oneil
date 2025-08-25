@@ -1,3 +1,5 @@
+use std::fmt;
+
 use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{reference::Identifier, span::Span};
 
@@ -7,7 +9,7 @@ use crate::error::VariableResolutionError;
 ///
 /// This error type is used when a test cannot be resolved, typically due
 /// to variable resolution errors within the test's expressions.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestResolutionError {
     /// Error indicating that an input parameter has been declared multiple times.
     DuplicateInput {
@@ -34,7 +36,8 @@ impl TestResolutionError {
     /// # Returns
     ///
     /// A new `TestResolutionError` instance.
-    pub fn duplicate_input(
+    #[must_use]
+    pub const fn duplicate_input(
         identifier: Identifier,
         original_span: Span,
         duplicate_span: Span,
@@ -55,24 +58,20 @@ impl TestResolutionError {
     /// # Returns
     ///
     /// A new `TestResolutionError` instance.
-    pub fn variable_resolution(error: VariableResolutionError) -> Self {
+    #[must_use]
+    pub const fn variable_resolution(error: VariableResolutionError) -> Self {
         Self::VariableResolution(error)
     }
+}
 
-    /// Converts the test resolution error to a string representation.
-    ///
-    /// This method delegates to the display module to format the error message
-    /// in a user-friendly way.
-    ///
-    /// # Returns
-    ///
-    /// A string representation of the test resolution error.
-    pub fn to_string(&self) -> String {
+impl fmt::Display for TestResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DuplicateInput { identifier, .. } => {
-                format!("duplicate input `{}`", identifier.as_str())
+                let identifier_str = identifier.as_str();
+                write!(f, "duplicate input `{identifier_str}`")
             }
-            Self::VariableResolution(error) => error.to_string(),
+            Self::VariableResolution(error) => error.fmt(f),
         }
     }
 }

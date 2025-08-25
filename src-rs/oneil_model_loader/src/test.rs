@@ -30,6 +30,10 @@ use crate::{BuiltinRef, FileLoader};
 /// This type is used for testing Python import validation logic without needing
 /// to implement full AST parsing. It can be configured to validate all imports,
 /// reject all imports, or selectively validate specific imports.
+#[allow(
+    clippy::enum_variant_names,
+    reason = "'Validate' clarifies what 'All', 'None', and 'Some' refer to"
+)]
 pub enum TestPythonValidator {
     /// Validates all Python imports successfully.
     ValidateAll,
@@ -88,7 +92,8 @@ impl FileLoader for TestPythonValidator {
     ///
     /// # Panics
     ///
-    /// Always panics with the message "TestPythonLoader does not support parsing ASTs".
+    /// Always panics with the message "`TestPythonLoader` does not support parsing ASTs".
+    #[allow(clippy::panic_in_result_fn, reason = "this is a test implementation")]
     fn parse_ast(&self, _path: impl AsRef<std::path::Path>) -> Result<ModelNode, Self::ParseError> {
         panic!("TestPythonLoader does not support parsing ASTs");
     }

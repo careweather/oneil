@@ -43,12 +43,12 @@ pub use variable::VariableResolutionError;
 /// This struct aggregates errors from all resolution phases, including import validation,
 /// submodel resolution, parameter resolution, and test resolution. It provides methods
 /// for checking if any errors occurred and accessing the different error categories.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolutionErrors {
-    import_errors: HashMap<PythonPath, ImportResolutionError>,
-    submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
-    parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
-    test_resolution_errors: HashMap<TestIndex, Vec<TestResolutionError>>,
+    import: HashMap<PythonPath, ImportResolutionError>,
+    submodel_resolution: HashMap<Identifier, SubmodelResolutionError>,
+    parameter_resolution: HashMap<Identifier, Vec<ParameterResolutionError>>,
+    test_resolution: HashMap<TestIndex, Vec<TestResolutionError>>,
 }
 
 impl ResolutionErrors {
@@ -64,17 +64,18 @@ impl ResolutionErrors {
     /// # Returns
     ///
     /// A new `ResolutionErrors` instance containing all the specified errors.
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         import_errors: HashMap<PythonPath, ImportResolutionError>,
         submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
         parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
         test_resolution_errors: HashMap<TestIndex, Vec<TestResolutionError>>,
     ) -> Self {
         Self {
-            import_errors,
-            submodel_resolution_errors,
-            parameter_resolution_errors,
-            test_resolution_errors,
+            import: import_errors,
+            submodel_resolution: submodel_resolution_errors,
+            parameter_resolution: parameter_resolution_errors,
+            test_resolution: test_resolution_errors,
         }
     }
 
@@ -83,11 +84,12 @@ impl ResolutionErrors {
     /// # Returns
     ///
     /// Returns `true` if there are no errors in any category, `false` otherwise.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.import_errors.is_empty()
-            && self.submodel_resolution_errors.is_empty()
-            && self.parameter_resolution_errors.is_empty()
-            && self.test_resolution_errors.is_empty()
+        self.import.is_empty()
+            && self.submodel_resolution.is_empty()
+            && self.parameter_resolution.is_empty()
+            && self.test_resolution.is_empty()
     }
 
     /// Returns a reference to the map of import resolution errors.
@@ -98,9 +100,10 @@ impl ResolutionErrors {
     ///
     /// # Returns
     ///
-    /// A reference to the HashMap containing Python paths and their associated import resolution errors.
-    pub fn get_import_errors(&self) -> &HashMap<PythonPath, ImportResolutionError> {
-        &self.import_errors
+    /// A reference to the `HashMap` containing Python paths and their associated import resolution errors.
+    #[must_use]
+    pub const fn get_import_errors(&self) -> &HashMap<PythonPath, ImportResolutionError> {
+        &self.import
     }
 
     /// Returns a reference to the map of submodel resolution errors.
@@ -112,9 +115,12 @@ impl ResolutionErrors {
     ///
     /// # Returns
     ///
-    /// A reference to the HashMap containing submodel identifiers and their associated resolution errors.
-    pub fn get_submodel_resolution_errors(&self) -> &HashMap<Identifier, SubmodelResolutionError> {
-        &self.submodel_resolution_errors
+    /// A reference to the `HashMap` containing submodel identifiers and their associated resolution errors.
+    #[must_use]
+    pub const fn get_submodel_resolution_errors(
+        &self,
+    ) -> &HashMap<Identifier, SubmodelResolutionError> {
+        &self.submodel_resolution
     }
 
     /// Returns a reference to the map of parameter resolution errors.
@@ -126,11 +132,12 @@ impl ResolutionErrors {
     ///
     /// # Returns
     ///
-    /// A reference to the HashMap containing parameter identifiers and their associated resolution errors.
-    pub fn get_parameter_resolution_errors(
+    /// A reference to the `HashMap` containing parameter identifiers and their associated resolution errors.
+    #[must_use]
+    pub const fn get_parameter_resolution_errors(
         &self,
     ) -> &HashMap<Identifier, Vec<ParameterResolutionError>> {
-        &self.parameter_resolution_errors
+        &self.parameter_resolution
     }
 
     /// Returns a reference to the map of test resolution errors.
@@ -142,8 +149,11 @@ impl ResolutionErrors {
     ///
     /// # Returns
     ///
-    /// A reference to the HashMap containing test indices and their associated resolution errors.
-    pub fn get_test_resolution_errors(&self) -> &HashMap<TestIndex, Vec<TestResolutionError>> {
-        &self.test_resolution_errors
+    /// A reference to the `HashMap` containing test indices and their associated resolution errors.
+    #[must_use]
+    pub const fn get_test_resolution_errors(
+        &self,
+    ) -> &HashMap<TestIndex, Vec<TestResolutionError>> {
+        &self.test_resolution
     }
 }

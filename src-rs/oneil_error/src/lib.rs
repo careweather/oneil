@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! # Oneil Error
 //!
 //! A unified error handling system for the Oneil programming language.
@@ -70,7 +68,7 @@ pub use traits::AsOneilError;
 /// This struct represents errors in a format suitable for display to users.
 /// It includes the file path where the error occurred, a human-readable message,
 /// and optional source location information for precise error reporting.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OneilError {
     /// The path to the file where the error occurred
     path: PathBuf,
@@ -269,7 +267,8 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the `PathBuf` containing the file path.
-    pub fn path(&self) -> &PathBuf {
+    #[must_use]
+    pub const fn path(&self) -> &PathBuf {
         &self.path
     }
 
@@ -278,6 +277,7 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the error message string.
+    #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -287,7 +287,8 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns an optional reference to the `ErrorLocation` if available.
-    pub fn location(&self) -> Option<&ErrorLocation> {
+    #[must_use]
+    pub const fn location(&self) -> Option<&ErrorLocation> {
         self.location.as_ref()
     }
 
@@ -296,6 +297,7 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the context information.
+    #[must_use]
     pub fn context(&self) -> &[Context] {
         &self.context
     }
@@ -305,6 +307,7 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the context information with source location.
+    #[must_use]
     pub fn context_with_source(&self) -> &[(Context, ErrorLocation)] {
         &self.context_with_source
     }

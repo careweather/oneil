@@ -3,7 +3,7 @@
 /// This struct provides detailed information about where an error occurred
 /// in the source code, including line and column numbers, character offset,
 /// and the source line content. Line and column numbers are 1-indexed.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorLocation {
     /// Character offset from the beginning of the source file
     offset: usize,
@@ -93,7 +93,11 @@ impl ErrorLocation {
         let line = source[..offset].chars().filter(|c| *c == '\n').count() + 1;
 
         // The line is 1-indexed, so we need to subtract 1 to get the correct line
-        let line_source = source.lines().nth(line - 1).unwrap().to_string();
+        let line_source = source
+            .lines()
+            .nth(line - 1)
+            .expect("line must exist since it was derived from the string")
+            .to_string();
 
         // Replace tabs with 4 spaces
         let line_source = line_source.replace('\t', "    ");
@@ -122,6 +126,7 @@ impl ErrorLocation {
     ///
     /// Panics if:
     /// - `offset` is greater than the source length
+    #[must_use]
     pub fn from_source_and_offset(source: &str, offset: usize) -> Self {
         Self::new(source, offset, None)
     }
@@ -145,6 +150,7 @@ impl ErrorLocation {
     /// - `length` is 0
     /// - `offset + length` exceeds the source length
     /// - the span delineated by `offset` and `length` contains newlines
+    #[must_use]
     pub fn from_source_and_span(source: &str, offset: usize, length: usize) -> Self {
         Self::new(source, offset, Some(length))
     }
@@ -154,7 +160,8 @@ impl ErrorLocation {
     /// # Returns
     ///
     /// Returns the character offset as a `usize`.
-    pub fn offset(&self) -> usize {
+    #[must_use]
+    pub const fn offset(&self) -> usize {
         self.offset
     }
 
@@ -163,7 +170,8 @@ impl ErrorLocation {
     /// # Returns
     ///
     /// Returns the line number as a `usize`.
-    pub fn line(&self) -> usize {
+    #[must_use]
+    pub const fn line(&self) -> usize {
         self.line
     }
 
@@ -172,7 +180,8 @@ impl ErrorLocation {
     /// # Returns
     ///
     /// Returns the column number as a `usize`.
-    pub fn column(&self) -> usize {
+    #[must_use]
+    pub const fn column(&self) -> usize {
         self.column
     }
 
@@ -183,6 +192,7 @@ impl ErrorLocation {
     /// # Returns
     ///
     /// Returns the span length as a `usize`.
+    #[must_use]
     pub fn length(&self) -> usize {
         // if no length is provided, assume a single character
         self.length.unwrap_or(1)
@@ -193,6 +203,7 @@ impl ErrorLocation {
     /// # Returns
     ///
     /// Returns a reference to the source line string.
+    #[must_use]
     pub fn line_source(&self) -> &str {
         &self.line_source
     }

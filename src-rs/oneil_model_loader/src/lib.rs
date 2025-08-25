@@ -49,8 +49,6 @@
 //! let result = load_model("path/to/model.on", &file_loader);
 //! ```
 
-#![warn(missing_docs)]
-
 use std::{collections::HashSet, path::Path};
 
 use oneil_ir::{model::ModelCollection, reference::ModelPath};
@@ -67,6 +65,9 @@ mod test;
 pub use crate::error::collection::ModelErrorMap;
 pub use crate::util::FileLoader;
 pub use crate::util::builtin_ref::BuiltinRef;
+
+type LoadModelOk = Box<ModelCollection>;
+type LoadModelErr<Ps, Py> = Box<(ModelCollection, ModelErrorMap<Ps, Py>)>;
 
 /// Loads a single model and all its dependencies.
 ///
@@ -130,13 +131,7 @@ pub fn load_model<F>(
     model_path: impl AsRef<Path>,
     builtin_ref: &impl BuiltinRef,
     file_parser: &F,
-) -> Result<
-    ModelCollection,
-    (
-        ModelCollection,
-        ModelErrorMap<F::ParseError, F::PythonError>,
-    ),
->
+) -> Result<LoadModelOk, LoadModelErr<F::ParseError, F::PythonError>>
 where
     F: FileLoader,
 {
@@ -165,6 +160,16 @@ where
 /// has already been loaded as a dependency of an earlier model, it won't be loaded again.
 /// This ensures that all dependencies are properly resolved and that circular dependencies
 /// are detected.
+///
+/// # Errors
+///
+/// The function can fail with various errors during model loading:
+///
+/// * **Parse Errors**: If a model file cannot be parsed successfully
+/// * **Python Import Errors**: If a Python import validation fails
+/// * **Dependency Resolution Errors**: If model dependencies cannot be resolved
+/// * **Circular Dependencies**: If circular dependencies are detected between models
+/// * **Invalid Model Structure**: If a model's structure is invalid
 ///
 /// # Example
 ///
@@ -204,25 +209,20 @@ pub fn load_model_list<F>(
     model_paths: &[impl AsRef<Path>],
     builtin_ref: &impl BuiltinRef,
     file_parser: &F,
-) -> Result<
-    ModelCollection,
-    (
-        ModelCollection,
-        ModelErrorMap<F::ParseError, F::PythonError>,
-    ),
->
+) -> Result<LoadModelOk, LoadModelErr<F::ParseError, F::PythonError>>
 where
     F: FileLoader,
 {
     let initial_model_paths: HashSet<_> = model_paths
         .iter()
-        .map(|p| ModelPath::new(p.as_ref().to_path_buf()))
+        .map(AsRef::as_ref)
+        .map(ModelPath::new)
         .collect();
 
     let builder = ModelCollectionBuilder::new(initial_model_paths);
 
     let builder = model_paths.iter().fold(builder, |builder, model_path| {
-        let model_path = ModelPath::new(model_path.as_ref().to_path_buf());
+        let model_path = ModelPath::new(model_path.as_ref());
         let mut load_stack = Stack::new();
 
         loader::load_model(
@@ -234,5 +234,5 @@ where
         )
     });
 
-    builder.try_into()
+    builder.try_into().map(Box::new).map_err(Box::new)
 }

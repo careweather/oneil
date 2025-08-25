@@ -9,6 +9,8 @@ authors = ["Brendon Bown <brendon.bown@gmail.com>"]
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/careweather/oneil"
+keywords = ["programming-language", "oneil", "engineering", "specification", "units"]
+categories = ["compilers", "science", "simulation"]
 
 # Lints originally derived from https://medium.com/@carlmkadie/92bb899d47ef
 # 
@@ -36,12 +38,14 @@ panic_in_result_fn = "warn"
 
 # Clippy lint groups
 pedantic = { level = "warn", priority = -2 }
-perf = { level = "warn", priority = -6 }
+correctness = { level = "warn", priority = -3 }
 style = { level = "warn", priority = -4 }
 complexity = { level = "warn", priority = -5 }
-correctness = { level = "warn", priority = -3 }
-nursery = { level = "warn", priority = -7 }
+perf = { level = "warn", priority = -6 }
 
 # cargo-specific groups
-cargo = { level = "warn", priority = -8 }
-cargo_common_metadata = { level = "warn", priority = -9 }
+cargo = { level = "warn", priority = -7 }
+cargo_common_metadata = { level = "warn", priority = -8 }
+
+# allowed
+too_many_arguments = "allow"

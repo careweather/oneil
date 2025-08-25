@@ -31,7 +31,8 @@ pub type ParameterNode = Node<Parameter>;
 
 impl Parameter {
     /// Creates a new parameter with the given components
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         label: LabelNode,
         ident: IdentifierNode,
         value: ParameterValueNode,
@@ -52,37 +53,44 @@ impl Parameter {
     }
 
     /// Returns the label of this parameter
-    pub fn label(&self) -> &LabelNode {
+    #[must_use]
+    pub const fn label(&self) -> &LabelNode {
         &self.label
     }
 
     /// Returns the identifier of this parameter
-    pub fn ident(&self) -> &IdentifierNode {
+    #[must_use]
+    pub const fn ident(&self) -> &IdentifierNode {
         &self.ident
     }
 
     /// Returns the value of this parameter
-    pub fn value(&self) -> &ParameterValueNode {
+    #[must_use]
+    pub const fn value(&self) -> &ParameterValueNode {
         &self.value
     }
 
     /// Returns the optional limits for this parameter
-    pub fn limits(&self) -> Option<&LimitsNode> {
+    #[must_use]
+    pub const fn limits(&self) -> Option<&LimitsNode> {
         self.limits.as_ref()
     }
 
     /// Returns the optional performance marker for this parameter
-    pub fn performance_marker(&self) -> Option<&PerformanceMarkerNode> {
+    #[must_use]
+    pub const fn performance_marker(&self) -> Option<&PerformanceMarkerNode> {
         self.performance_marker.as_ref()
     }
 
     /// Returns the optional trace level for this parameter
-    pub fn trace_level(&self) -> Option<&TraceLevelNode> {
+    #[must_use]
+    pub const fn trace_level(&self) -> Option<&TraceLevelNode> {
         self.trace_level.as_ref()
     }
 
     /// Returns the optional note attached to this parameter
-    pub fn note(&self) -> Option<&NoteNode> {
+    #[must_use]
+    pub const fn note(&self) -> Option<&NoteNode> {
         self.note.as_ref()
     }
 }
@@ -104,12 +112,14 @@ pub type ParameterValueNode = Node<ParameterValue>;
 
 impl ParameterValue {
     /// Creates a simple parameter value with an expression and optional unit
-    pub fn simple(expr: ExprNode, unit: Option<UnitExprNode>) -> Self {
+    #[must_use]
+    pub const fn simple(expr: ExprNode, unit: Option<UnitExprNode>) -> Self {
         Self::Simple(expr, unit)
     }
 
     /// Creates a piecewise parameter value with parts and optional unit
-    pub fn piecewise(parts: Vec<PiecewisePartNode>, unit: Option<UnitExprNode>) -> Self {
+    #[must_use]
+    pub const fn piecewise(parts: Vec<PiecewisePartNode>, unit: Option<UnitExprNode>) -> Self {
         Self::Piecewise(parts, unit)
     }
 }
@@ -139,18 +149,20 @@ pub type LimitsNode = Node<Limits>;
 
 impl Limits {
     /// Creates continuous limits with minimum and maximum values
-    pub fn continuous(min: ExprNode, max: ExprNode) -> Self {
+    #[must_use]
+    pub const fn continuous(min: ExprNode, max: ExprNode) -> Self {
         Self::Continuous { min, max }
     }
 
     /// Creates discrete limits with a list of allowed values
-    pub fn discrete(values: Vec<ExprNode>) -> Self {
+    #[must_use]
+    pub const fn discrete(values: Vec<ExprNode>) -> Self {
         Self::Discrete { values }
     }
 }
 
 /// A performance marker for optimization purposes
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PerformanceMarker;
 
 /// A node containing a performance marker
@@ -158,8 +170,15 @@ pub type PerformanceMarkerNode = Node<PerformanceMarker>;
 
 impl PerformanceMarker {
     /// Creates a new performance marker
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
+    }
+}
+
+impl Default for PerformanceMarker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -175,17 +194,20 @@ pub type PiecewisePartNode = Node<PiecewisePart>;
 
 impl PiecewisePart {
     /// Creates a new piecewise part with expression and condition
-    pub fn new(expr: ExprNode, if_expr: ExprNode) -> Self {
+    #[must_use]
+    pub const fn new(expr: ExprNode, if_expr: ExprNode) -> Self {
         Self { expr, if_expr }
     }
 
     /// Returns the expression value for this piecewise part
-    pub fn expr(&self) -> &ExprNode {
+    #[must_use]
+    pub const fn expr(&self) -> &ExprNode {
         &self.expr
     }
 
     /// Returns the condition expression for this piecewise part
-    pub fn if_expr(&self) -> &ExprNode {
+    #[must_use]
+    pub const fn if_expr(&self) -> &ExprNode {
         &self.if_expr
     }
 }

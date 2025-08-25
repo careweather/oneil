@@ -34,10 +34,10 @@ impl ColorChoice {
     ///
     /// Returns the formatted text as a `String`. When colors are enabled,
     /// the text will be bold. When disabled, the text will be unchanged.
-    pub fn bold(&self, text: &str) -> String {
+    pub fn bold(self, text: &str) -> String {
         match self {
-            ColorChoice::EnableColors => text.bold().to_string(),
-            ColorChoice::DisableColors => text.to_string(),
+            Self::EnableColors => text.bold().to_string(),
+            Self::DisableColors => text.to_string(),
         }
     }
 
@@ -54,10 +54,10 @@ impl ColorChoice {
     ///
     /// Returns the formatted text as a `String`. When colors are enabled,
     /// the text will be bold and red. When disabled, the text will be unchanged.
-    pub fn bold_red(&self, text: &str) -> String {
+    pub fn bold_red(self, text: &str) -> String {
         match self {
-            ColorChoice::EnableColors => text.bold().red().to_string(),
-            ColorChoice::DisableColors => text.to_string(),
+            Self::EnableColors => text.bold().red().to_string(),
+            Self::DisableColors => text.to_string(),
         }
     }
 
@@ -75,10 +75,10 @@ impl ColorChoice {
     ///
     /// Returns the formatted text as a `String`. When colors are enabled,
     /// the text will be bold and blue. When disabled, the text will be unchanged.
-    pub fn bold_blue(&self, text: &str) -> String {
+    pub fn bold_blue(self, text: &str) -> String {
         match self {
-            ColorChoice::EnableColors => text.bold().blue().to_string(),
-            ColorChoice::DisableColors => text.to_string(),
+            Self::EnableColors => text.bold().blue().to_string(),
+            Self::DisableColors => text.to_string(),
         }
     }
 }

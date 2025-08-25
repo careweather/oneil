@@ -19,7 +19,7 @@ use crate::token::{
 };
 
 /// The kind of note that was parsed
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteKind {
     /// A single-line note, which starts with `~` and ends with a newline
     SingleLine,
@@ -136,7 +136,7 @@ fn multi_line_note(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
     flat_map(
         consumed(|input| {
             let (rest, delimiter_span) = multi_line_note_delimiter.parse(input)?;
-            let (rest, _) = (|input| {
+            let (rest, ()) = (|input| {
                 let (rest, _) = line_ending.parse(input)?;
                 let (rest, _) = multi_line_note_content.parse(rest)?;
                 let (rest, _) = multi_line_note_delimiter.parse(rest)?;
@@ -299,7 +299,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Note)
                 )),
-                _ => panic!("expected TokenError::Expect(Note), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Note), got {res:?}"),
             }
         }
 
@@ -312,7 +312,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Note)
                 )),
-                _ => panic!("expected TokenError::Expect(Note), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Note), got {res:?}"),
             }
         }
 
@@ -345,10 +345,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(UnclosedNote), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(UnclosedNote), got {res:?}"),
             }
         }
 
@@ -535,7 +532,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Note)
                 )),
-                _ => panic!("expected TokenError::Expect(Note), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Note), got {res:?}"),
             }
         }
 
@@ -548,7 +545,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::Note)
                 )),
-                _ => panic!("expected TokenError::Expect(Note), got {:?}", res),
+                _ => panic!("expected TokenError::Expect(Note), got {res:?}"),
             }
         }
 
@@ -571,10 +568,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(UnclosedNote), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(UnclosedNote), got {res:?}"),
             }
         }
 
@@ -587,10 +581,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(UnclosedNote), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(UnclosedNote), got {res:?}"),
             }
         }
 
@@ -623,10 +614,7 @@ mod tests {
                     token_error.kind,
                     TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote { .. })
                 )),
-                _ => panic!(
-                    "expected TokenError::Incomplete(UnclosedNote), got {:?}",
-                    res
-                ),
+                _ => panic!("expected TokenError::Incomplete(UnclosedNote), got {res:?}"),
             }
         }
     }

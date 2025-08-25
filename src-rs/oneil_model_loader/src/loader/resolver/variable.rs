@@ -108,21 +108,19 @@ pub fn resolve_variable(
                     let expr = Expr::parameter_variable(var_identifier);
                     Ok(WithSpan::new(expr, span))
                 }
-                InfoResult::HasError => {
-                    return Err(VariableResolutionError::parameter_has_error(
-                        var_identifier,
-                        var_identifier_span,
-                    ));
-                }
+                InfoResult::HasError => Err(VariableResolutionError::parameter_has_error(
+                    var_identifier,
+                    var_identifier_span,
+                )),
                 InfoResult::NotFound => {
                     if builtin_ref.has_builtin_value(&var_identifier) {
                         let expr = Expr::builtin_variable(var_identifier);
                         Ok(WithSpan::new(expr, span))
                     } else {
-                        return Err(VariableResolutionError::undefined_parameter(
+                        Err(VariableResolutionError::undefined_parameter(
                             var_identifier,
                             var_identifier_span,
-                        ));
+                        ))
                     }
                 }
             }
@@ -150,8 +148,6 @@ pub fn resolve_variable(
                 submodel_path,
                 component,
                 parent_identifier_span,
-                defined_parameters,
-                submodel_info,
                 model_info,
             )?;
 
@@ -173,12 +169,14 @@ pub fn resolve_variable(
 /// This function assumes that the submodel path has been validated and the model
 /// exists in the modelinfo. If this assumption is violated, the function will panic.
 /// This is by design as it indicates a bug in the model loading process.
+#[allow(
+    clippy::panic_in_result_fn,
+    reason = "panic enforces a function invariant"
+)]
 fn resolve_variable_recursive(
     submodel_path: &ModelPath,
     variable: &ast::expression::Variable,
     parent_identifier_span: Span,
-    defined_parameters: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
     model_info: &ModelInfo<'_>,
 ) -> Result<(ModelPath, Identifier), VariableResolutionError> {
     let model = match model_info.get(submodel_path) {
@@ -200,11 +198,11 @@ fn resolve_variable_recursive(
             if model.get_parameter(&var_identifier).is_some() {
                 Ok((submodel_path.clone(), var_identifier))
             } else {
-                return Err(VariableResolutionError::undefined_parameter_in_submodel(
+                Err(VariableResolutionError::undefined_parameter_in_submodel(
                     submodel_path.clone(),
                     var_identifier,
                     var_identifier_span,
-                ));
+                ))
             }
         }
 
@@ -212,26 +210,16 @@ fn resolve_variable_recursive(
         ast::expression::Variable::Accessor { parent, component } => {
             let parent_identifier = Identifier::new(parent.as_str());
             let parent_identifier_span = get_span_from_ast_span(parent.node_span());
-            let submodel_path = match model.get_submodel(&parent_identifier) {
-                Some((submodel_path, _)) => submodel_path,
-                None => {
-                    let source = VariableResolutionError::undefined_submodel_in_submodel(
-                        submodel_path.clone(),
-                        parent_identifier,
-                        parent_identifier_span,
-                    );
-                    return Err(source);
-                }
+            let Some((submodel_path, _)) = model.get_submodel(&parent_identifier) else {
+                let source = VariableResolutionError::undefined_submodel_in_submodel(
+                    submodel_path.clone(),
+                    parent_identifier,
+                    parent_identifier_span,
+                );
+                return Err(source);
             };
 
-            resolve_variable_recursive(
-                submodel_path,
-                component,
-                parent_identifier_span,
-                defined_parameters,
-                submodel_info,
-                model_info,
-            )
+            resolve_variable_recursive(submodel_path, component, parent_identifier_span, model_info)
         }
     }
 }
@@ -267,7 +255,7 @@ mod tests {
         /// Helper function to create an identifier node
         pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
             let identifier = ast::naming::Identifier::new(name.to_string());
-            ast::node::Node::new(test_ast_span(start, start + name.len()), identifier)
+            ast::node::Node::new(&test_ast_span(start, start + name.len()), identifier)
         }
 
         /// Helper function to create a variable node
@@ -276,7 +264,7 @@ mod tests {
             start: usize,
             end: usize,
         ) -> ast::expression::VariableNode {
-            ast::node::Node::new(test_ast_span(start, end), variable)
+            ast::node::Node::new(&test_ast_span(start, end), variable)
         }
 
         /// Helper function to create a simple identifier variable
@@ -382,7 +370,9 @@ mod tests {
         ) -> oneil_ir::span::Span {
             let parent_span = match accessor.node_value() {
                 ast::expression::Variable::Accessor { parent, .. } => parent.node_span(),
-                _ => panic!("accessor should be an accessor variable"),
+                ast::expression::Variable::Identifier(_) => {
+                    panic!("accessor should be an accessor variable")
+                }
             };
             get_span_from_ast_span(parent_span)
         }
@@ -407,12 +397,12 @@ mod tests {
         assert!(result.is_ok());
         let result = result.expect("result should be ok");
 
-        assert_eq!(result.span(), &get_span_from_ast_span(variable.node_span()));
+        assert_eq!(result.span(), get_span_from_ast_span(variable.node_span()));
         match result.value() {
             oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Builtin(ident)) => {
                 assert_eq!(ident, &Identifier::new("pi"));
             }
-            error => panic!("Expected builtin variable expression, got {:?}", error),
+            error => panic!("Expected builtin variable expression, got {error:?}"),
         }
     }
 
@@ -456,12 +446,12 @@ mod tests {
         assert!(result.is_ok());
         let result = result.expect("result should be ok");
 
-        assert_eq!(result.span(), &get_span_from_ast_span(variable.node_span()));
+        assert_eq!(result.span(), get_span_from_ast_span(variable.node_span()));
         match result.value() {
             oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
                 assert_eq!(ident, &Identifier::new("temperature"));
             }
-            error => panic!("Expected parameter variable expression, got {:?}", error),
+            error => panic!("Expected parameter variable expression, got {error:?}"),
         }
     }
 
@@ -481,20 +471,19 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            VariableResolutionError::UndefinedParameter {
+        match result {
+            Err(VariableResolutionError::UndefinedParameter {
                 model_path,
                 parameter,
                 reference_span,
-            } => {
+            }) => {
                 assert_eq!(model_path, None);
 
                 let span = get_span_from_ast_span(variable.node_span());
                 assert_eq!(reference_span, span);
                 assert_eq!(parameter, Identifier::new("undefined_param"));
             }
-            error => panic!("Expected undefined parameter error, got {:?}", error),
+            result => panic!("Expected undefined parameter error, got {result:?}"),
         }
     }
 
@@ -521,16 +510,15 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            VariableResolutionError::ParameterHasError {
+        match result {
+            Err(VariableResolutionError::ParameterHasError {
                 identifier,
                 reference_span,
-            } => {
+            }) => {
                 assert_eq!(identifier, Identifier::new("error_param"));
                 assert_eq!(reference_span, variable_span);
             }
-            error => panic!("Expected parameter has error, got {:?}", error),
+            result => panic!("Expected parameter has error, got {result:?}"),
         }
     }
 
@@ -553,19 +541,18 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            VariableResolutionError::UndefinedSubmodel {
+        match result {
+            Err(VariableResolutionError::UndefinedSubmodel {
                 model_path,
                 submodel,
                 reference_span,
-            } => {
+            }) => {
                 assert_eq!(model_path, None);
 
                 assert_eq!(reference_span, undefined_submodel_span);
                 assert_eq!(submodel, Identifier::new("undefined_submodel"));
             }
-            error => panic!("Expected undefined submodel error, got {:?}", error),
+            result => panic!("Expected undefined submodel error, got {result:?}"),
         }
     }
 
@@ -595,16 +582,15 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            VariableResolutionError::SubmodelResolutionFailed {
+        match result {
+            Err(VariableResolutionError::SubmodelResolutionFailed {
                 identifier,
                 reference_span,
-            } => {
+            }) => {
                 assert_eq!(identifier, Identifier::new("error_submodel"));
                 assert_eq!(reference_span, error_submodel_span);
             }
-            error => panic!("Expected submodel has error, got {:?}", error),
+            result => panic!("Expected submodel has error, got {result:?}"),
         }
     }
 
@@ -642,14 +628,18 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_ok());
-        let result = result.expect("result should be ok");
-        match result.value() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::External { model, ident }) => {
-                assert_eq!(model, &ModelPath::new("test_submodel"));
-                assert_eq!(ident, &Identifier::new("parameter"));
-            }
-            error => panic!("Expected external variable expression, got {:?}", error),
+        match result {
+            Ok(result) => match result.value() {
+                oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::External {
+                    model,
+                    ident,
+                }) => {
+                    assert_eq!(model, &ModelPath::new("test_submodel"));
+                    assert_eq!(ident, &Identifier::new("parameter"));
+                }
+                result => panic!("Expected external variable expression, got {result:?}"),
+            },
+            Err(error) => panic!("Expected external variable expression, got {error:?}"),
         }
     }
 
@@ -694,14 +684,18 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_ok());
-        let result = result.expect("result should be ok");
-        match result.value() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::External { model, ident }) => {
-                assert_eq!(model, &ModelPath::new("test_submodel2"));
-                assert_eq!(ident, &Identifier::new("parameter"));
-            }
-            error => panic!("Expected external variable expression, got {:?}", error),
+        match result {
+            Ok(result) => match result.value() {
+                oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::External {
+                    model,
+                    ident,
+                }) => {
+                    assert_eq!(model, &ModelPath::new("test_submodel2"));
+                    assert_eq!(ident, &Identifier::new("parameter"));
+                }
+                result => panic!("Expected external variable expression, got {result:?}"),
+            },
+            Err(error) => panic!("Expected external variable expression, got {error:?}"),
         }
     }
 
@@ -745,22 +739,18 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            VariableResolutionError::UndefinedParameter {
+        match result {
+            Err(VariableResolutionError::UndefinedParameter {
                 model_path,
                 parameter,
                 reference_span,
-            } => {
+            }) => {
                 assert_eq!(model_path, Some(submodel_path));
 
                 assert_eq!(reference_span, inner_var_span);
                 assert_eq!(parameter, Identifier::new("undefined_param"));
             }
-            error => panic!(
-                "Expected undefined parameter in submodel error, got {:?}",
-                error
-            ),
+            result => panic!("Expected undefined parameter in submodel error, got {result:?}"),
         }
     }
 
@@ -806,22 +796,18 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            VariableResolutionError::UndefinedSubmodel {
+        match result {
+            Err(VariableResolutionError::UndefinedSubmodel {
                 model_path,
                 submodel,
                 reference_span,
-            } => {
+            }) => {
                 assert_eq!(model_path, Some(submodel_path));
 
                 assert_eq!(reference_span, undefined_submodel_span);
                 assert_eq!(submodel, Identifier::new("undefined_submodel"));
             }
-            error => panic!(
-                "Expected undefined submodel in submodel error, got {:?}",
-                error
-            ),
+            result => panic!("Expected undefined submodel in submodel error, got {result:?}"),
         }
     }
 
@@ -859,16 +845,15 @@ mod tests {
         );
 
         // check the result
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            VariableResolutionError::ModelHasError {
+        match result {
+            Err(VariableResolutionError::ModelHasError {
                 path,
                 reference_span,
-            } => {
+            }) => {
                 assert_eq!(path, submodel_path);
                 assert_eq!(reference_span, variable_span);
             }
-            error => panic!("Expected model has error, got {:?}", error),
+            result => panic!("Expected model has error, got {result:?}"),
         }
     }
 
@@ -908,15 +893,17 @@ mod tests {
         );
 
         // check the result - parameter should take precedence
-        assert!(result.is_ok());
-        let result = result.expect("result should be ok");
-        match result.value() {
-            oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
-                assert_eq!(ident, &Identifier::new("conflict"));
-            }
-            error => panic!(
-                "Expected parameter variable expression (should take precedence), got {:?}",
-                error
+        match result {
+            Ok(result) => match result.value() {
+                oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
+                    assert_eq!(ident, &Identifier::new("conflict"));
+                }
+                result => panic!(
+                    "Expected parameter variable expression (should take precedence), got {result:?}"
+                ),
+            },
+            Err(error) => panic!(
+                "Expected parameter variable expression (should take precedence), got {error:?}"
             ),
         }
     }
@@ -963,7 +950,7 @@ mod tests {
             oneil_ir::expr::Expr::Variable(oneil_ir::expr::Variable::Parameter(ident)) => {
                 assert_eq!(ident, &Identifier::new("parameter"));
             }
-            error => panic!("Expected parameter variable expression, got {:?}", error),
+            error => panic!("Expected parameter variable expression, got {error:?}"),
         }
     }
 }

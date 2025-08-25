@@ -36,6 +36,7 @@ impl Identifier {
     /// assert_eq!(id1.as_str(), "radius");
     /// assert_eq!(id2.as_str(), "area");
     /// ```
+    #[must_use]
     pub fn new(identifier: impl AsRef<str>) -> Self {
         Self(identifier.as_ref().to_string())
     }
@@ -54,6 +55,7 @@ impl Identifier {
     /// let id = Identifier::new("my_parameter");
     /// assert_eq!(id.as_str(), "my_parameter");
     /// ```
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -107,14 +109,17 @@ impl ModelPath {
     /// // ModelPath::new("file.on"); // This would panic
     /// // ModelPath::new("file.txt"); // This would panic
     /// ```
+    #[must_use]
     pub fn new(path: impl AsRef<Path>) -> Self {
         let mut path = path.as_ref().to_path_buf();
 
         match path.extension() {
-            Some(ext) if ext != "on" => panic!(
-                "Model paths must not have an extension other than .on: '{:?}'",
-                ext
-            ),
+            Some(ext) if ext != "on" => {
+                panic!(
+                    "Model paths must not have an extension other than .on: '{}'",
+                    ext.display()
+                )
+            }
             _ => {
                 path.set_extension("on");
                 Self(path)
@@ -157,12 +162,10 @@ impl ModelPath {
         let parent = self.0.parent();
         let sibling_name = sibling_name.as_ref();
 
-        let sibling_path = match parent {
-            Some(parent) => parent.join(sibling_name),
-            None => PathBuf::from(sibling_name),
-        };
-
-        sibling_path
+        parent.map_or_else(
+            || PathBuf::from(sibling_name),
+            |parent| parent.join(sibling_name),
+        )
     }
 }
 
@@ -211,11 +214,12 @@ impl PythonPath {
     /// // Path with other extension panics
     /// // PythonPath::new(PathBuf::from("file.txt")); // This would panic
     /// ```
+    #[must_use]
     pub fn new(mut path: PathBuf) -> Self {
         match path.extension() {
             Some(ext) if ext != "py" => panic!(
-                "Python paths must not have an extension other than .py: '{:?}'",
-                ext
+                "Python paths must not have an extension other than .py: '{}'",
+                ext.display()
             ),
             _ => {
                 path.set_extension("py");

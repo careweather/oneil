@@ -7,11 +7,11 @@
 //!
 //! # Error Categories
 //!
-//! - **Expect**: Expected a specific language construct but found something else
-//! - **Incomplete**: Found an incomplete input with specific details about what's missing
-//! - **UnexpectedToken**: Found a token that wasn't expected in the current context
-//! - **TokenError**: Low-level tokenization errors
-//! - **NomError**: Internal nom parsing library errors
+//! - **`Expect`**: Expected a specific language construct but found something else
+//! - **`Incomplete`**: Found an incomplete input with specific details about what's missing
+//! - **`UnexpectedToken`**: Found a token that wasn't expected in the current context
+//! - **`TokenError`**: Low-level tokenization errors
+//! - **`NomError`**: Internal nom parsing library errors
 use oneil_ast::{
     Span as AstSpan,
     expression::{BinaryOp, ComparisonOp, UnaryOp},
@@ -25,7 +25,7 @@ use crate::token::error::TokenErrorKind;
 /// This enum represents all possible high-level parsing errors in the Oneil
 /// language. Each variant describes a specific type of error, such as an
 /// invalid declaration or an unexpected token.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParserErrorReason {
     /// Expected an AST node but found something else
     Expect(ExpectKind),
@@ -369,7 +369,7 @@ impl ParserErrorReason {
 }
 
 /// The different kinds of AST nodes that can be expected
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectKind {
     /// Expected a declaration
     Decl,
@@ -386,7 +386,7 @@ pub enum ExpectKind {
 }
 
 /// The different kinds of incomplete input that can be found
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IncompleteKind {
     /// Found an incomplete declaration
     Decl(DeclKind),
@@ -407,7 +407,7 @@ pub enum IncompleteKind {
 }
 
 /// The different kind of incomplete declaration errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeclKind {
     /// Found an incomplete `import` declaration
     Import(
@@ -429,7 +429,7 @@ pub enum DeclKind {
 }
 
 /// The different kind of `import` errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImportKind {
     /// Found an incomplete path
     MissingPath,
@@ -438,7 +438,7 @@ pub enum ImportKind {
 }
 
 /// The different kind of `from` errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FromKind {
     /// Found an incomplete path
     MissingPath,
@@ -455,7 +455,7 @@ pub enum FromKind {
 }
 
 /// The different kind of `use` errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UseKind {
     /// Found an incomplete path
     MissingPath,
@@ -468,7 +468,7 @@ pub enum UseKind {
 }
 
 /// The different kind of incomplete expression errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExprKind {
     /// Found a comparison operation missing a second operand
     ComparisonOpMissingSecondOperand {
@@ -492,7 +492,7 @@ pub enum ExprKind {
 }
 
 /// The different kind of incomplete section errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionKind {
     /// Found an incomplete section label
     MissingLabel,
@@ -501,7 +501,7 @@ pub enum SectionKind {
 }
 
 /// The different kind of incomplete parameter errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParameterKind {
     /// Found a missing identifier
     MissingIdentifier,
@@ -530,7 +530,7 @@ pub enum ParameterKind {
 }
 
 /// The different kind of incomplete test errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestKind {
     /// Found a missing colon in a test declaration
     MissingColon,
@@ -541,7 +541,7 @@ pub enum TestKind {
 }
 
 /// The different kind of incomplete unit errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnitKind {
     /// Found a missing second term in a unit expression
     MissingSecondTerm {

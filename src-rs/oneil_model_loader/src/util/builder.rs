@@ -63,7 +63,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// A new `ModelCollectionBuilder` with the specified initial models.
     pub fn new(initial_models: HashSet<ModelPath>) -> Self {
         Self {
-            initial_models: initial_models,
+            initial_models,
             models: HashMap::new(),
             visited_models: HashSet::new(),
             errors: ModelErrorMap::new(),
@@ -260,7 +260,7 @@ impl ParameterCollectionBuilder {
     ///
     /// * `identifier` - The identifier of the parameter that has errors
     /// * `errors` - An iterator of parameter resolution errors
-    pub fn add_error_list<I>(&mut self, identifier: Identifier, errors: I)
+    pub fn add_error_list<I>(&mut self, identifier: &Identifier, errors: I)
     where
         I: IntoIterator<Item = ParameterResolutionError>,
     {

@@ -28,7 +28,7 @@ pub mod builder;
 pub mod builtin_ref;
 pub mod info;
 
-pub fn get_span_from_ast_span(ast_span: &ast::Span) -> Span {
+pub fn get_span_from_ast_span(ast_span: ast::Span) -> Span {
     Span::new(ast_span.start(), ast_span.length())
 }
 
@@ -63,6 +63,11 @@ pub trait FileLoader {
     /// # Returns
     ///
     /// Returns `Ok(Model)` if parsing succeeds, or `Err(Self::ParseError)` if parsing fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(Self::ParseError)` if the file cannot be read, parsed, or if any other
+    /// parsing-related error occurs.
     fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::model::ModelNode, Self::ParseError>;
 
     /// Validates a Python import.
@@ -78,6 +83,11 @@ pub trait FileLoader {
     /// # Returns
     ///
     /// Returns `Ok(())` if the import is valid, or `Err(Self::PythonError)` if validation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(Self::PythonError)` if the Python file cannot be found, is invalid,
+    /// or cannot be imported successfully.
     fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError>;
 }
 

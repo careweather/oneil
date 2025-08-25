@@ -35,7 +35,7 @@ use crate::error::ParserError;
 /// successfully parse some content before encountering an error. The partial
 /// result can be used for debugging, error reporting, or in some cases,
 /// partial evaluation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorsWithPartialResult<T, E> {
     /// The partial result of the parsing operation
     ///
@@ -99,12 +99,21 @@ impl<T> CanBeEmpty for Option<T> {
     }
 }
 
+/// Implementation for `Box<T>` - returns an empty box
+///
+/// An empty box represents no successfully parsed value.
+impl<T: CanBeEmpty> CanBeEmpty for Box<T> {
+    fn empty() -> Self {
+        Self::new(T::empty())
+    }
+}
+
 /// Implementation for `Model` - returns an empty model
 ///
 /// An empty model represents no successfully parsed model.
 impl CanBeEmpty for oneil_ast::model::Model {
     fn empty() -> Self {
-        oneil_ast::model::Model::new(None, vec![], vec![])
+        Self::new(None, vec![], vec![])
     }
 }
 
@@ -113,7 +122,7 @@ impl<T, E> ErrorsWithPartialResult<T, E> {
     /// and errors
     pub fn new(partial_result: T, errors: Vec<E>) -> Self {
         Self {
-            partial_result: partial_result,
+            partial_result,
             errors,
         }
     }

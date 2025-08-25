@@ -59,7 +59,8 @@ impl Model {
     ///     HashMap::new(),  // no tests
     /// );
     /// ```
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         python_imports: HashMap<PythonPath, Span>,
         submodels: HashMap<Identifier, (ModelPath, Span)>,
         parameters: ParameterCollection,
@@ -77,7 +78,8 @@ impl Model {
     ///
     /// Python imports allow models to use external Python functionality
     /// for complex calculations or data processing.
-    pub fn get_python_imports(&self) -> &HashMap<PythonPath, Span> {
+    #[must_use]
+    pub const fn get_python_imports(&self) -> &HashMap<PythonPath, Span> {
         &self.python_imports
     }
 
@@ -108,6 +110,7 @@ impl Model {
     /// assert!(model.get_submodel(&Identifier::new("sub")).is_some());
     /// assert!(model.get_submodel(&Identifier::new("nonexistent")).is_none());
     /// ```
+    #[must_use]
     pub fn get_submodel(&self, identifier: &Identifier) -> Option<&(ModelPath, Span)> {
         self.submodels.get(identifier)
     }
@@ -117,7 +120,8 @@ impl Model {
     /// # Returns
     ///
     /// A reference to the mapping of submodel identifiers to their corresponding model paths.
-    pub fn get_submodels(&self) -> &HashMap<Identifier, (ModelPath, Span)> {
+    #[must_use]
+    pub const fn get_submodels(&self) -> &HashMap<Identifier, (ModelPath, Span)> {
         &self.submodels
     }
 
@@ -128,6 +132,7 @@ impl Model {
     /// # Arguments
     ///
     /// * `identifier` - The identifier of the parameter to look up
+    #[must_use]
     pub fn get_parameter(&self, identifier: &Identifier) -> Option<&Parameter> {
         self.parameters.get(identifier)
     }
@@ -137,7 +142,8 @@ impl Model {
     /// # Returns
     ///
     /// A reference to the parameter collection.
-    pub fn get_parameters(&self) -> &ParameterCollection {
+    #[must_use]
+    pub const fn get_parameters(&self) -> &ParameterCollection {
         &self.parameters
     }
 
@@ -145,7 +151,8 @@ impl Model {
     ///
     /// Tests validate the behavior of the entire model and are
     /// indexed by test indices for easy lookup.
-    pub fn get_tests(&self) -> &HashMap<TestIndex, Test> {
+    #[must_use]
+    pub const fn get_tests(&self) -> &HashMap<TestIndex, Test> {
         &self.tests
     }
 
@@ -169,6 +176,7 @@ impl Model {
     ///
     /// assert!(empty_model.is_empty());
     /// ```
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.python_imports.is_empty()
             && self.submodels.is_empty()
@@ -216,7 +224,11 @@ impl ModelCollection {
     ///
     /// let collection = ModelCollection::new(initial_models, models);
     /// ```
-    pub fn new(initial_models: HashSet<ModelPath>, models: HashMap<ModelPath, Model>) -> Self {
+    #[must_use]
+    pub const fn new(
+        initial_models: HashSet<ModelPath>,
+        models: HashMap<ModelPath, Model>,
+    ) -> Self {
         Self {
             initial_models,
             models,
@@ -257,10 +269,11 @@ impl ModelCollection {
     /// let imports = collection.get_python_imports();
     /// assert_eq!(imports.len(), 1);
     /// ```
+    #[must_use]
     pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
         self.models
             .values()
-            .flat_map(|model| model.python_imports.iter().map(|(path, _)| path))
+            .flat_map(|model| model.python_imports.keys())
             .collect()
     }
 
@@ -271,7 +284,8 @@ impl ModelCollection {
     /// # Returns
     ///
     /// A reference to the mapping of model paths to their corresponding models.
-    pub fn get_models(&self) -> &HashMap<ModelPath, Model> {
+    #[must_use]
+    pub const fn get_models(&self) -> &HashMap<ModelPath, Model> {
         &self.models
     }
 
@@ -283,7 +297,8 @@ impl ModelCollection {
     /// # Returns
     ///
     /// A reference to the set of initial model paths.
-    pub fn get_initial_models(&self) -> &HashSet<ModelPath> {
+    #[must_use]
+    pub const fn get_initial_models(&self) -> &HashSet<ModelPath> {
         &self.initial_models
     }
 }
