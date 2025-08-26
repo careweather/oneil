@@ -76,11 +76,6 @@ pub fn false_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("false", error::ExpectKeyword::False).parse(input)
 }
 
-/// Parses the 'from' keyword token.
-pub fn from(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
-    keyword("from", error::ExpectKeyword::From).parse(input)
-}
-
 /// Parses the 'if' keyword token.
 pub fn if_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("if", error::ExpectKeyword::If).parse(input)
@@ -154,14 +149,6 @@ mod tests {
             let (rest, matched) = false_(input).expect("should parse 'false' keyword");
             assert_eq!(matched.lexeme(), "false");
             assert_eq!(rest.fragment(), &"true");
-        }
-
-        #[test]
-        fn test_from() {
-            let input = Span::new_extra("from bar", Config::default());
-            let (rest, matched) = from(input).expect("should parse 'from' keyword");
-            assert_eq!(matched.lexeme(), "from");
-            assert_eq!(rest.fragment(), &"bar");
         }
 
         #[test]
@@ -262,14 +249,14 @@ mod tests {
 
         #[test]
         fn test_with_underscore() {
-            let input = Span::new_extra("from_", Config::default());
-            let res = from(input);
+            let input = Span::new_extra("import_", Config::default());
+            let res = import(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
                     token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::From))
+                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Import))
                 )),
-                _ => panic!("expected TokenError::Expect(Keyword(From)), got {res:?}"),
+                _ => panic!("expected TokenError::Expect(Keyword(Import)), got {res:?}"),
             }
         }
 
@@ -516,19 +503,6 @@ mod tests {
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::False))
                 )),
                 _ => panic!("expected TokenError::Expect(Keyword(False)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_from_error() {
-            let input = Span::new_extra("wrong", Config::default());
-            let res = from(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::From))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(From)), got {res:?}"),
             }
         }
 

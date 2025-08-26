@@ -150,59 +150,6 @@ impl ParserError {
         }
     }
 
-    /// Creates a new `ParserError` for a missing path in a from declaration
-    pub(crate) fn from_missing_path(from_span: &impl SpanLike) -> impl Fn(Self) -> Self {
-        move |error| {
-            let from_span = AstSpan::from(from_span);
-            error.convert_reason(ParserErrorReason::from_missing_path(from_span))
-        }
-    }
-
-    /// Creates a new `ParserError` for a missing use keyword in a from declaration
-    pub(crate) fn from_missing_use(from_path: &impl SpanLike) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let from_path_span = AstSpan::from(from_path);
-            Self::new_from_token_error(error, ParserErrorReason::from_missing_use(from_path_span))
-        }
-    }
-
-    /// Creates a new `ParserError` for a missing use model in a from declaration
-    pub(crate) fn from_missing_use_model(use_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let use_span = AstSpan::from(use_token);
-            Self::new_from_token_error(error, ParserErrorReason::from_missing_use_model(use_span))
-        }
-    }
-
-    /// Creates a new `ParserError` for a missing as keyword in a from declaration
-    pub(crate) fn from_missing_as(use_model: &impl SpanLike) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let use_model_span = AstSpan::from(use_model);
-            Self::new_from_token_error(error, ParserErrorReason::from_missing_as(use_model_span))
-        }
-    }
-
-    /// Creates a new `ParserError` for a missing alias in a from declaration
-    pub(crate) fn from_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let as_span = AstSpan::from(as_token);
-            Self::new_from_token_error(error, ParserErrorReason::from_missing_alias(as_span))
-        }
-    }
-
-    /// Creates a new `ParserError` for a missing end of line in a from declaration
-    pub(crate) fn from_missing_end_of_line(
-        alias_span: &impl SpanLike,
-    ) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let alias_span = AstSpan::from(alias_span);
-            Self::new_from_token_error(
-                error,
-                ParserErrorReason::from_missing_end_of_line(alias_span),
-            )
-        }
-    }
-
     /// Creates a new `ParserError` for a missing path in a use declaration
     pub(crate) fn use_missing_path(use_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {

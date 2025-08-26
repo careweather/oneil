@@ -83,48 +83,6 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn from_missing_path(from_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: from_span,
-            kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingPath)),
-        }
-    }
-
-    pub(crate) fn from_missing_use(from_path_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: from_path_span,
-            kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingUse)),
-        }
-    }
-
-    pub(crate) fn from_missing_use_model(use_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: use_span,
-            kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingUseModel)),
-        }
-    }
-
-    pub(crate) fn from_missing_as(use_model_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: use_model_span,
-            kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAs)),
-        }
-    }
-
-    pub(crate) fn from_missing_alias(as_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: as_span,
-            kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAlias)),
-        }
-    }
-
-    pub(crate) fn from_missing_end_of_line(alias_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: alias_span,
-            kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingEndOfLine)),
-        }
-    }
-
     pub(crate) fn use_missing_path(use_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: use_span,
@@ -414,11 +372,6 @@ pub enum DeclKind {
         /// The kind of import error
         ImportKind,
     ),
-    /// Found an incomplete `from` declaration
-    From(
-        /// The kind of from error
-        FromKind,
-    ),
     /// Found an incomplete `use` declaration
     Use(
         /// The kind of use error
@@ -433,23 +386,6 @@ pub enum DeclKind {
 pub enum ImportKind {
     /// Found an incomplete path
     MissingPath,
-    /// Missing end of line
-    MissingEndOfLine,
-}
-
-/// The different kind of `from` errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FromKind {
-    /// Found an incomplete path
-    MissingPath,
-    /// Missing the `use` keyword
-    MissingUse,
-    /// Missing the model to use
-    MissingUseModel,
-    /// Missing the `as` keyword
-    MissingAs,
-    /// Missing the model alias
-    MissingAlias,
     /// Missing end of line
     MissingEndOfLine,
 }

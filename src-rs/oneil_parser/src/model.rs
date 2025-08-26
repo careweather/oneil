@@ -762,32 +762,6 @@ mod tests {
             }
 
             #[test]
-            fn test_from_missing_use() {
-                let input = Span::new_extra("from foo\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 8);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(5, 3, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing 'use' in from declaration"),
-                }
-            }
-
-            #[test]
             fn test_parameter_missing_equals() {
                 let input = Span::new_extra("X: x\n", Config::default());
                 let result = parse_complete(input);
@@ -895,7 +869,7 @@ mod tests {
 
             #[test]
             fn test_multiple_declaration_errors() {
-                let input = Span::new_extra("import\nuse foo\nfrom bar\nX: x\n", Config::default());
+                let input = Span::new_extra("import\nuse foo\nX: x\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -903,7 +877,7 @@ mod tests {
                         let errors = e.errors;
 
                         assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 4);
+                        assert_eq!(errors.len(), 3);
 
                         // All errors should be declaration-related
                         for error in &errors {

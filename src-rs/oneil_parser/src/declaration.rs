@@ -14,7 +14,7 @@ use crate::{
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
-        keyword::{as_, from, import, use_},
+        keyword::{as_, import, use_},
         naming::identifier,
         structure::end_of_line,
         symbol::dot,
@@ -56,7 +56,7 @@ pub fn parse_complete(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 /// Returns a declaration node of the appropriate type, or an error if no
 /// declaration type matches.
 fn decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
-    alt((import_decl, from_decl, use_decl, parameter_decl, test_decl))
+    alt((import_decl, use_decl, parameter_decl, test_decl))
         .convert_error_to(ParserError::expect_decl)
         .parse(input)
 }
@@ -102,80 +102,6 @@ fn import_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let import_node = Node::new(&span, Import::new(import_path));
 
     let decl_node = Node::new(&span, Decl::Import(import_node));
-
-    Ok((rest, decl_node))
-}
-
-/// Parses a from declaration
-///
-/// A from declaration has the format: `from path use model [inputs] as alias` followed by a newline.
-/// This declaration imports a specific model from a module and gives it a local alias.
-///
-/// Examples:
-/// - `from foo.bar use model as baz`
-/// - `from utils.math use model(x=1, y=2) as calculator`
-/// - `from my_module.submodule use model as local_name`
-///
-/// The parser requires:
-/// - The `from` keyword
-/// - A model path (e.g., "foo.bar")
-/// - The `use` keyword
-/// - The `model` keyword
-/// - Optional model inputs in parentheses
-/// - The `as` keyword
-/// - A valid identifier as the alias
-/// - A newline to terminate the declaration
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a declaration node containing the parsed from declaration, or an error if
-/// the declaration is malformed.
-fn from_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
-    let (rest, from_token) = from.convert_errors().parse(input)?;
-
-    let (rest, (from_path, mut subcomponents)) = model_path
-        .or_fail_with(ParserError::from_missing_path(&from_token))
-        .parse(rest)?;
-
-    // for error reporting
-    let from_path_span = match subcomponents.last() {
-        Some(last) => AstSpan::calc_span(&from_path, last),
-        None => AstSpan::from(&from_path),
-    };
-
-    let (rest, use_token) = use_
-        .or_fail_with(ParserError::from_missing_use(&from_path_span))
-        .parse(rest)?;
-
-    let (rest, use_model) = identifier
-        .or_fail_with(ParserError::from_missing_use_model(&use_token))
-        .parse(rest)?;
-    let use_model = Node::new(&use_model, Identifier::new(use_model.lexeme().to_string()));
-    let use_model_span = AstSpan::from(&use_model);
-    subcomponents.push(use_model);
-
-    let (rest, as_token) = as_
-        .or_fail_with(ParserError::from_missing_as(&use_model_span))
-        .parse(rest)?;
-
-    let (rest, alias) = identifier
-        .or_fail_with(ParserError::from_missing_alias(&as_token))
-        .parse(rest)?;
-    let alias = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
-
-    let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::from_missing_end_of_line(&alias))
-        .parse(rest)?;
-
-    let span = AstSpan::calc_span_with_whitespace(&from_token, &alias, &end_of_line_token);
-
-    let use_model_node = Node::new(&span, UseModel::new(from_path, subcomponents, Some(alias)));
-
-    let decl_node = Node::new(&span, Decl::UseModel(use_model_node));
 
     Ok((rest, decl_node))
 }
@@ -371,23 +297,6 @@ mod tests {
         }
 
         #[test]
-        fn test_from_decl() {
-            let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
-            let (rest, decl) = parse(input).expect("parsing should succeed");
-            match decl.node_value() {
-                Decl::UseModel(use_model_node) => {
-                    let use_model = use_model_node.node_value();
-                    let alias = use_model.alias().expect("alias should be present");
-                    assert_eq!(use_model.model_name().as_str(), "foo");
-                    assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(alias.as_str(), "baz");
-                }
-                _ => panic!("Expected from declaration"),
-            }
-            assert_eq!(rest.fragment(), &"");
-        }
-
-        #[test]
         fn test_parse_complete_import_success() {
             let input = Span::new_extra("import foo\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
@@ -415,23 +324,6 @@ mod tests {
                     assert_eq!(alias.as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
-            }
-            assert_eq!(rest.fragment(), &"");
-        }
-
-        #[test]
-        fn test_parse_complete_from_success() {
-            let input = Span::new_extra("from foo.bar use model as baz\n", Config::default());
-            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
-            match decl.node_value() {
-                Decl::UseModel(use_model_node) => {
-                    let use_model = use_model_node.node_value();
-                    let alias = use_model.alias().expect("alias should be present");
-                    assert_eq!(use_model.model_name().as_str(), "foo");
-                    assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(alias.as_str(), "baz");
-                }
-                _ => panic!("Expected from declaration"),
             }
             assert_eq!(rest.fragment(), &"");
         }
@@ -694,193 +586,6 @@ mod tests {
                         match error.reason {
                             ParserErrorReason::Incomplete {
                                 kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAlias)),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_as_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-        }
-
-        mod from_error_tests {
-            use crate::error::reason::{
-                DeclKind, ExpectKind, FromKind, IncompleteKind, ParserErrorReason,
-            };
-
-            use super::*;
-
-            #[test]
-            fn test_missing_from_keyword() {
-                let input = Span::new_extra("foo.bar use model as baz\n", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Decl)
-                        ));
-                    }
-                    _ => panic!("Expected error for missing from keyword"),
-                }
-            }
-
-            #[test]
-            fn test_missing_use_keyword() {
-                let input = Span::new_extra("from foo.bar model as baz\n", Config::default());
-                let result = parse(input);
-                let expected_foo_bar_span = AstSpan::new(5, 7, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 13);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingUse)),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_foo_bar_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_missing_model_keyword() {
-                let input = Span::new_extra("from foo.bar use as baz\n", Config::default());
-                let result = parse(input);
-                let expected_use_span = AstSpan::new(13, 3, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 17);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind:
-                                    IncompleteKind::Decl(DeclKind::From(FromKind::MissingUseModel)),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_use_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_missing_as_keyword() {
-                let input = Span::new_extra("from foo.bar use model baz\n", Config::default());
-                let result = parse(input);
-                let expected_model_span = AstSpan::new(17, 5, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 23);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAs)),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_model_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_missing_alias() {
-                let input = Span::new_extra("from foo.bar use model as\n", Config::default());
-                let result = parse(input);
-                let expected_as_span = AstSpan::new(23, 2, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 25);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAlias)),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_as_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_invalid_path_identifier() {
-                let input = Span::new_extra("from 123.bar use model as baz\n", Config::default());
-                let result = parse(input);
-                let expected_from_span = AstSpan::new(0, 4, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 5);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingPath)),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_from_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_invalid_model_identifier() {
-                let input = Span::new_extra("from foo.bar use 123 as baz\n", Config::default());
-                let result = parse(input);
-                let expected_use_span = AstSpan::new(13, 3, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 17);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind:
-                                    IncompleteKind::Decl(DeclKind::From(FromKind::MissingUseModel)),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_use_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_invalid_alias_identifier() {
-                let input = Span::new_extra("from foo.bar use model as 123\n", Config::default());
-                let result = parse(input);
-                let expected_as_span = AstSpan::new(23, 2, 1);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 26);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::From(FromKind::MissingAlias)),
                                 cause,
                             } => {
                                 assert_eq!(cause, expected_as_span);

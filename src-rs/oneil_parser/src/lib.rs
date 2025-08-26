@@ -170,8 +170,8 @@ pub fn parse_model(
 /// // Parse an import declaration
 /// let import = parse_declaration("import math", None).unwrap();
 ///
-/// // Parse a from declaration
-/// let from = parse_declaration("from constants use physics as c_p", None).unwrap();
+/// // Parse a use declaration
+/// let use_ = parse_declaration("use constants as c_p", None).unwrap();
 /// ```
 pub fn parse_declaration(
     input: &str,

@@ -1,6 +1,6 @@
 use crate::{
     error::reason::{
-        DeclKind, ExpectKind, ExprKind, FromKind, ImportKind, IncompleteKind, ParameterKind,
+        DeclKind, ExpectKind, ExprKind, ImportKind, IncompleteKind, ParameterKind,
         ParserErrorReason, SectionKind, TestKind, UnitKind, UseKind,
     },
     token::error::{IncompleteKind as TokenIncompleteKind, TokenErrorKind},
@@ -43,7 +43,6 @@ impl fmt::Display for DeclKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Import(import_kind) => import_kind.fmt(f),
-            Self::From(from_kind) => from_kind.fmt(f),
             Self::Use(use_kind) => use_kind.fmt(f),
             Self::ModelPathMissingSubcomponent => write!(f, "expected submodel name after `.`"),
         }
@@ -54,19 +53,6 @@ impl fmt::Display for ImportKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingPath => write!(f, "expected path after `import`"),
-            Self::MissingEndOfLine => write!(f, "unexpected character"),
-        }
-    }
-}
-
-impl fmt::Display for FromKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MissingPath => write!(f, "expected model path after `from`"),
-            Self::MissingUse => write!(f, "expected `use` after model path"),
-            Self::MissingUseModel => write!(f, "expected model after `use`"),
-            Self::MissingAs => write!(f, "expected `as` after model"),
-            Self::MissingAlias => write!(f, "expected model alias after `as`"),
             Self::MissingEndOfLine => write!(f, "unexpected character"),
         }
     }
