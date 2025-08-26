@@ -158,14 +158,6 @@ impl ParserError {
         }
     }
 
-    /// Creates a new `ParserError` for a missing as keyword in a use declaration
-    pub(crate) fn use_missing_as(use_path: &impl SpanLike) -> impl Fn(TokenError) -> Self {
-        move |error| {
-            let use_path_span = AstSpan::from(use_path);
-            Self::new_from_token_error(error, ParserErrorReason::use_missing_as(use_path_span))
-        }
-    }
-
     /// Creates a new `ParserError` for a missing alias in a use declaration
     pub(crate) fn use_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {

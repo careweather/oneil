@@ -1,6 +1,11 @@
 //! Parser for declarations in an Oneil program.
 
-use nom::{Parser as _, branch::alt, combinator::all_consuming, multi::many0};
+use nom::{
+    Parser as _,
+    branch::alt,
+    combinator::{all_consuming, opt},
+    multi::many0,
+};
 
 use oneil_ast::{
     Span as AstSpan,
@@ -147,24 +152,32 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
         (None, None) => AstSpan::from(&model_name),
     };
 
-    let (rest, as_token) = as_
-        .or_fail_with(ParserError::use_missing_as(&use_path_span))
-        .parse(rest)?;
+    let (rest, alias) = opt(|input| {
+        let (rest, as_token) = as_.convert_errors().parse(input)?;
 
-    let (rest, alias) = identifier
-        .or_fail_with(ParserError::use_missing_alias(&as_token))
-        .parse(rest)?;
-    let alias = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
+        let (rest, alias) = identifier
+            .or_fail_with(ParserError::use_missing_alias(&as_token))
+            .parse(rest)?;
+        let alias = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
+
+        Ok((rest, alias))
+    })
+    .parse(rest)?;
+
+    let final_span = match &alias {
+        Some(alias) => AstSpan::from(alias),
+        None => use_path_span,
+    };
 
     let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::use_missing_end_of_line(&alias))
+        .or_fail_with(ParserError::use_missing_end_of_line(&final_span))
         .parse(rest)?;
 
-    let span = AstSpan::calc_span_with_whitespace(&use_token, &alias, &end_of_line_token);
+    let span = AstSpan::calc_span_with_whitespace(&use_token, &final_span, &end_of_line_token);
 
     let use_model_node = Node::new(
         &span,
-        UseModel::new(model_name, subcomponents, directory_path, Some(alias)),
+        UseModel::new(model_name, subcomponents, directory_path, alias),
     );
 
     let decl_node = Node::new(&span, Decl::UseModel(use_model_node));
@@ -212,15 +225,12 @@ fn model_path(
 
     let (rest, path) = identifier.convert_errors().parse(rest)?;
     let path = Node::new(&path, Identifier::new(path.lexeme().to_string()));
-    eprintln!("identifier: {path:?}");
 
     let (rest, subcomponents) = many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
-        eprintln!("dot_token: {dot_token:?}");
         let (rest, subcomponent) = identifier
             .or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token))
             .parse(rest)?;
-        eprintln!("subcomponent: {subcomponent:?}");
         let subcomponent_node = Node::new(
             &subcomponent,
             Identifier::new(subcomponent.lexeme().to_string()),
@@ -361,6 +371,38 @@ mod tests {
         }
 
         #[test]
+        fn test_use_decl_without_alias() {
+            let input = Span::new_extra("use foo.bar\n", Config::default());
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    assert_eq!(use_model.model_name().as_str(), "foo");
+                    assert_eq!(use_model.subcomponents()[0].as_str(), "bar");
+                    assert!(use_model.alias().is_none());
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_decl_simple_without_alias() {
+            let input = Span::new_extra("use foo\n", Config::default());
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    assert_eq!(use_model.model_name().as_str(), "foo");
+                    assert_eq!(use_model.subcomponents().len(), 0);
+                    assert!(use_model.alias().is_none());
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
         fn test_parse_complete_import_success() {
             let input = Span::new_extra("import foo\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
@@ -403,6 +445,26 @@ mod tests {
                     assert_eq!(use_model.model_name().as_str(), "math");
                     assert_eq!(use_model.subcomponents().len(), 0);
                     assert_eq!(alias.as_str(), "calculator");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 1);
+                    assert_eq!(use_model.directory_path()[0].node_value().as_str(), "utils");
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_single_directory_without_alias() {
+            let input = Span::new_extra("use utils/math\n", Config::default());
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    assert_eq!(use_model.model_name().as_str(), "math");
+                    assert_eq!(use_model.subcomponents().len(), 0);
+                    assert!(use_model.alias().is_none());
 
                     // Check directory path
                     assert_eq!(use_model.directory_path().len(), 1);
@@ -794,23 +856,23 @@ mod tests {
             fn test_missing_as_keyword() {
                 let input = Span::new_extra("use foo.bar baz\n", Config::default());
                 let result = parse(input);
-                let expected_foo_bar_span = AstSpan::new(4, 7, 1);
-
+                // This should fail because 'baz' is not a valid continuation after a use declaration
+                // The parser correctly parses "use foo.bar" but then expects a newline
                 match result {
                     Err(nom::Err::Failure(error)) => {
                         assert_eq!(error.error_offset, 12);
-
                         match error.reason {
                             ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAs)),
+                                kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingEndOfLine)),
                                 cause,
                             } => {
-                                assert_eq!(cause, expected_foo_bar_span);
+                                // The cause should be the span of "foo.bar"
+                                assert_eq!(cause, AstSpan::new(4, 7, 1));
                             }
                             _ => panic!("Unexpected reason {:?}", error.reason),
                         }
                     }
-                    _ => panic!("Unexpected result {result:?}"),
+                    _ => panic!("Expected error for invalid continuation after use declaration"),
                 }
             }
 

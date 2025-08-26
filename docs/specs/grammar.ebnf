@@ -29,7 +29,7 @@ Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | Parame
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-UseDecl = "use", FullModelPath, "as", Identifier, EndOfLine ;
+UseDecl = "use", FullModelPath, [ "as", Identifier, ] EndOfLine ;
 FullModelPath = [ DirectoryPath ], Identifier, [ SubmodelComponents ] ;
 DirectoryPath = DirectoryName, "/", { DirectoryName, "/" } ;
 DirectoryName = Identifier | ".." | "." ;

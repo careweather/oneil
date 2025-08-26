@@ -435,6 +435,25 @@ mod tests {
     }
 
     #[test]
+    fn test_use_without_as() {
+        let input = Span::new_extra("use foo\n", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse model with use declaration");
+        assert!(model.note().is_none());
+        assert_eq!(model.decls().len(), 1);
+        match &model.decls()[0].node_value() {
+            Decl::UseModel(use_model_node) => {
+                let use_model = use_model_node.node_value();
+                assert_eq!(use_model.model_name().as_str(), "foo");
+                assert_eq!(use_model.subcomponents().len(), 0);
+                assert!(use_model.alias().is_none());
+            }
+            _ => panic!("Expected use declaration"),
+        }
+        assert!(model.sections().is_empty());
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
     fn test_model_with_section() {
         let input = Span::new_extra("section foo\nimport bar\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with section");
@@ -736,32 +755,6 @@ mod tests {
             }
 
             #[test]
-            fn test_use_missing_as() {
-                let input = Span::new_extra("use foo\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 7);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(4, 3, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing 'as' in use declaration"),
-                }
-            }
-
-            #[test]
             fn test_parameter_missing_equals() {
                 let input = Span::new_extra("X: x\n", Config::default());
                 let result = parse_complete(input);
@@ -869,7 +862,7 @@ mod tests {
 
             #[test]
             fn test_multiple_declaration_errors() {
-                let input = Span::new_extra("import\nuse foo\nX: x\n", Config::default());
+                let input = Span::new_extra("import\nuse\nX: x\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -896,8 +889,7 @@ mod tests {
 
             #[test]
             fn test_section_with_multiple_errors() {
-                let input =
-                    Span::new_extra("section foo\nimport\nuse bar\nX: x\n", Config::default());
+                let input = Span::new_extra("section foo\nimport\nuse\nX: x\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -936,7 +928,7 @@ mod tests {
             #[test]
             fn test_mixed_valid_and_invalid_declarations() {
                 let input = Span::new_extra(
-                    "import valid\nimport\nuse foo as bar\nuse invalid\n",
+                    "import valid\nimport\nuse foo as bar\nuse invalid.\n",
                     Config::default(),
                 );
                 let result = parse_complete(input);

@@ -90,13 +90,6 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn use_missing_as(use_path_span: AstSpan) -> Self {
-        Self::Incomplete {
-            cause: use_path_span,
-            kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAs)),
-        }
-    }
-
     pub(crate) fn use_missing_alias(as_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: as_span,
@@ -395,8 +388,6 @@ pub enum ImportKind {
 pub enum UseKind {
     /// Found an incomplete path
     MissingPath,
-    /// Missing the `as` keyword
-    MissingAs,
     /// Missing the model alias
     MissingAlias,
     /// Missing end of line

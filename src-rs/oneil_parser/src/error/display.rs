@@ -62,7 +62,6 @@ impl fmt::Display for UseKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingPath => write!(f, "expected model path after `use`"),
-            Self::MissingAs => write!(f, "expected `as` after model path"),
             Self::MissingAlias => write!(f, "expected model alias after `as`"),
             Self::MissingEndOfLine => write!(f, "unexpected character"),
         }
