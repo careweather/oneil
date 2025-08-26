@@ -104,7 +104,16 @@ pub fn dollar(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
 
 /// Parses the '.' symbol token.
 pub fn dot(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
-    token(char('.'), TokenError::expected_symbol(ExpectSymbol::Dot)).parse(input)
+    token(
+        char('.').and(next_char_is_not('.')),
+        TokenError::expected_symbol(ExpectSymbol::Dot),
+    )
+    .parse(input)
+}
+
+/// Parses the '..' symbol token.
+pub fn dot_dot(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
+    token(tag(".."), TokenError::expected_symbol(ExpectSymbol::DotDot)).parse(input)
 }
 
 /// Parses the '=' symbol token.
@@ -324,6 +333,14 @@ mod tests {
             let input = Span::new_extra(". rest", Config::default());
             let (rest, matched) = dot(input).expect("should parse '.' symbol");
             assert_eq!(matched.lexeme(), ".");
+            assert_eq!(rest.fragment(), &"rest");
+        }
+
+        #[test]
+        fn test_dot_dot() {
+            let input = Span::new_extra(".. rest", Config::default());
+            let (rest, matched) = dot_dot(input).expect("should parse '..' symbol");
+            assert_eq!(matched.lexeme(), "..");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -613,6 +630,21 @@ mod tests {
                     assert!(matches!(
                         token_error.kind,
                         TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
+                    ));
+                }
+                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_dot_not_dot_dot() {
+            let input = Span::new_extra(".. rest", Config::default());
+            let res = dot(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => {
+                    assert!(matches!(
+                        token_error.kind,
+                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Dot))
                     ));
                 }
                 _ => panic!("expected TokenError::Expect(_), got {res:?}"),

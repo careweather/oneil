@@ -19,9 +19,10 @@ pub fn from_source(
         string_literal_uses_double_quotes(remaining_source),
         unclosed(reason, source),
         invalid_number_literal(reason, source),
+        dot_instead_of_dot_dot(remaining_source),
     ]
     .into_iter()
-    .flatten() // get rid of any None values
+    .flatten()
     .collect()
 }
 
@@ -194,6 +195,16 @@ fn invalid_number_literal(
             _ => vec![],
         },
         _ => vec![],
+    }
+}
+
+fn dot_instead_of_dot_dot(remaining_source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
+    let starts_with_dot_dot = remaining_source.starts_with("..");
+    if starts_with_dot_dot {
+        let message = "did you mean `.` instead of `..`?";
+        vec![(Context::Help(message.to_string()), None)]
+    } else {
+        vec![]
     }
 }
 

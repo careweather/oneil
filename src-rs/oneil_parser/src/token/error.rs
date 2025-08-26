@@ -110,6 +110,8 @@ pub enum ExpectSymbol {
     Dollar,
     /// Expected '.' symbol
     Dot,
+    /// Expected '..' symbol
+    DotDot,
     /// Expected '=' symbol
     Equals,
     /// Expected '==' symbol

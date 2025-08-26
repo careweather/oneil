@@ -29,9 +29,11 @@ Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | Parame
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-UseDecl = "use", ModelPath, "as", Identifier, EndOfLine ;
-ModelPath = Identifier, { ".", Identifier } ;
-ModelName = Identifier ;
+UseDecl = "use", FullModelPath, "as", Identifier, EndOfLine ;
+FullModelPath = [ DirectoryPath ], Identifier, [ SubmodelComponents ] ;
+DirectoryPath = DirectoryName, "/", { DirectoryName, "/" } ;
+DirectoryName = Identifier | ".." | "." ;
+SubmodelComponents = ".", Identifier, { ".", Identifier }  ;
 
 (* Parameters *)
 ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine, [ Note ] ;

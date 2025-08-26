@@ -3,7 +3,12 @@
 //! This module contains structures for representing declarations in Oneil programs,
 //! including imports, model usage, parameters, and tests.
 
-use crate::{naming::IdentifierNode, node::Node, parameter::ParameterNode, test::TestNode};
+use crate::{
+    naming::{DirectoryNode, IdentifierNode},
+    node::Node,
+    parameter::ParameterNode,
+    test::TestNode,
+};
 
 /// A declaration in an Oneil program
 ///
@@ -82,6 +87,7 @@ impl Import {
 pub struct UseModel {
     model_name: IdentifierNode,
     subcomponents: Vec<IdentifierNode>,
+    directory_path: Vec<DirectoryNode>,
     alias: Option<IdentifierNode>,
 }
 
@@ -94,11 +100,13 @@ impl UseModel {
     pub const fn new(
         model_name: IdentifierNode,
         subcomponents: Vec<IdentifierNode>,
+        directory_path: Vec<DirectoryNode>,
         alias: Option<IdentifierNode>,
     ) -> Self {
         Self {
             model_name,
             subcomponents,
+            directory_path,
             alias,
         }
     }
@@ -119,5 +127,11 @@ impl UseModel {
     #[must_use]
     pub const fn alias(&self) -> Option<&IdentifierNode> {
         self.alias.as_ref()
+    }
+
+    /// Returns the directory path for the model usage
+    #[must_use]
+    pub fn directory_path(&self) -> &[DirectoryNode] {
+        &self.directory_path
     }
 }

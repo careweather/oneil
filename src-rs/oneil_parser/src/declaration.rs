@@ -5,7 +5,7 @@ use nom::{Parser as _, branch::alt, combinator::all_consuming, multi::many0};
 use oneil_ast::{
     Span as AstSpan,
     declaration::{Decl, DeclNode, Import, UseModel},
-    naming::{Identifier, IdentifierNode},
+    naming::{Directory, DirectoryNode, Identifier, IdentifierNode},
     node::Node,
 };
 
@@ -17,7 +17,7 @@ use crate::{
         keyword::{as_, import, use_},
         naming::identifier,
         structure::end_of_line,
-        symbol::dot,
+        symbol::{dot, dot_dot, slash},
     },
     util::{Result, Span},
 };
@@ -135,14 +135,16 @@ fn import_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, use_token) = use_.convert_errors().parse(input)?;
 
-    let (rest, (path, subcomponents)) = model_path
+    let (rest, (directory_path, model_name, subcomponents)) = model_path
         .or_fail_with(ParserError::use_missing_path(&use_token))
         .parse(rest)?;
 
     // for error reporting
-    let use_path_span = match subcomponents.last() {
-        Some(last) => AstSpan::calc_span(&path, last),
-        None => AstSpan::from(&path),
+    let use_path_span = match (directory_path.first(), subcomponents.last()) {
+        (Some(first), Some(last)) => AstSpan::calc_span(&first, &last),
+        (Some(first), None) => AstSpan::calc_span(&first, &model_name),
+        (None, Some(last)) => AstSpan::calc_span(&model_name, &last),
+        (None, None) => AstSpan::from(&model_name),
     };
 
     let (rest, as_token) = as_
@@ -160,28 +162,31 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 
     let span = AstSpan::calc_span_with_whitespace(&use_token, &alias, &end_of_line_token);
 
-    let use_model_node = Node::new(&span, UseModel::new(path, subcomponents, Some(alias)));
+    let use_model_node = Node::new(
+        &span,
+        UseModel::new(model_name, subcomponents, directory_path, Some(alias)),
+    );
 
     let decl_node = Node::new(&span, Decl::UseModel(use_model_node));
 
     Ok((rest, decl_node))
 }
 
-/// Parses a model path (e.g., "foo.bar.baz")
+/// Parses a model path (e.g., "foo/bar.baz")
 ///
-/// A model path consists of a sequence of identifiers separated by dots.
-/// The first identifier is the main module name, and subsequent identifiers
-/// are subcomponents or nested modules.
+/// A model path consists of an optional directory path followed by a model name and optional subcomponents.
+/// The directory path is a sequence of directory names separated by forward slashes.
+/// The model name is a single identifier.
+/// The subcomponents are a sequence of identifiers separated by dots.
 ///
 /// Examples:
-/// - `foo` (single component)
-/// - `foo.bar` (two components)
-/// - `foo.bar.baz` (three components)
-/// - `utils.math.functions` (multiple components)
-///
-/// The parser returns:
-/// - The first identifier as the main path
-/// - A vector of subsequent identifiers as subcomponents
+/// - `foo` (just model name)
+/// - `foo.bar` (model name with subcomponent)
+/// - `foo.bar.baz` (model name with multiple subcomponents)
+/// - `path/to/foo` (directory path with model name)
+/// - `path/to/foo.bar` (directory path, model name, and subcomponent)
+/// - `../foo` (parent directory with model name)
+/// - `./foo` (current directory with model name)
 ///
 /// # Arguments
 ///
@@ -189,17 +194,33 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 ///
 /// # Returns
 ///
-/// Returns a tuple containing the main path identifier and a vector of
-/// subcomponent identifiers, or an error if the path is malformed.
-fn model_path(input: Span<'_>) -> Result<'_, (IdentifierNode, Vec<IdentifierNode>), ParserError> {
-    let (rest, path) = identifier.convert_errors().parse(input)?;
+/// Returns a tuple containing:
+/// - A vector of directory nodes representing the directory path (empty if no path)
+/// - A node containing the model name identifier
+/// - A vector of identifier nodes for any subcomponents (empty if none)
+///
+/// Returns an error if the path is malformed.
+fn model_path(
+    input: Span<'_>,
+) -> Result<'_, (Vec<DirectoryNode>, IdentifierNode, Vec<IdentifierNode>), ParserError> {
+    let (rest, directory_path) = many0(|input| {
+        let (rest, directory_name) = directory_name(input)?;
+        let (rest, _slash_token) = slash.convert_errors().parse(rest)?;
+        Ok((rest, directory_name))
+    })
+    .parse(input)?;
+
+    let (rest, path) = identifier.convert_errors().parse(rest)?;
     let path = Node::new(&path, Identifier::new(path.lexeme().to_string()));
+    eprintln!("identifier: {path:?}");
 
     let (rest, subcomponents) = many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
+        eprintln!("dot_token: {dot_token:?}");
         let (rest, subcomponent) = identifier
             .or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token))
             .parse(rest)?;
+        eprintln!("subcomponent: {subcomponent:?}");
         let subcomponent_node = Node::new(
             &subcomponent,
             Identifier::new(subcomponent.lexeme().to_string()),
@@ -208,7 +229,50 @@ fn model_path(input: Span<'_>) -> Result<'_, (IdentifierNode, Vec<IdentifierNode
     })
     .parse(rest)?;
 
-    Ok((rest, (path, subcomponents)))
+    Ok((rest, (directory_path, path, subcomponents)))
+}
+
+/// Parses a directory name in a model path
+///
+/// A directory name can be one of:
+/// - An identifier (e.g. "foo")
+/// - A current directory marker (".")
+/// - A parent directory marker ("..")
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a directory node containing the parsed directory name.
+/// The directory node will contain one of:
+/// - `Directory::Name(String)` for an identifier
+/// - `Directory::Current` for "."
+/// - `Directory::Parent` for ".."
+fn directory_name(input: Span<'_>) -> Result<'_, DirectoryNode, ParserError> {
+    let directory_name = |input| {
+        let (rest, directory_name_token) = identifier.convert_errors().parse(input)?;
+        let directory_name = Node::new(
+            &directory_name_token,
+            Directory::name(directory_name_token.lexeme().to_string()),
+        );
+        Ok((rest, directory_name))
+    };
+
+    let current_directory = |input| {
+        let (rest, dot_token) = dot.convert_errors().parse(input)?;
+        let current_directory = Node::new(&dot_token, Directory::current());
+        Ok((rest, current_directory))
+    };
+
+    let parent_directory = |input| {
+        let (rest, dot_dot_token) = dot_dot.convert_errors().parse(input)?;
+        let parent_directory = Node::new(&dot_dot_token, Directory::parent());
+        Ok((rest, parent_directory))
+    };
+
+    alt((directory_name, current_directory, parent_directory)).parse(input)
 }
 
 /// Parses a parameter declaration by delegating to the parameter parser.
@@ -326,6 +390,233 @@ mod tests {
                 _ => panic!("Expected use declaration"),
             }
             assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_single_directory() {
+            let input = Span::new_extra("use utils/math as calculator\n", Config::default());
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
+                    assert_eq!(use_model.model_name().as_str(), "math");
+                    assert_eq!(use_model.subcomponents().len(), 0);
+                    assert_eq!(alias.as_str(), "calculator");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 1);
+                    assert_eq!(use_model.directory_path()[0].node_value().as_str(), "utils");
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_multiple_directories() {
+            let input = Span::new_extra(
+                "use models/physics/mechanics as dynamics\n",
+                Config::default(),
+            );
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
+                    assert_eq!(use_model.model_name().as_str(), "mechanics");
+                    assert_eq!(use_model.subcomponents().len(), 0);
+                    assert_eq!(alias.as_str(), "dynamics");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 2);
+                    assert_eq!(
+                        use_model.directory_path()[0].node_value().as_str(),
+                        "models"
+                    );
+                    assert_eq!(
+                        use_model.directory_path()[1].node_value().as_str(),
+                        "physics"
+                    );
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_directory_and_subcomponents() {
+            let input = Span::new_extra("use utils/math.trigonometry as trig\n", Config::default());
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
+                    assert_eq!(use_model.model_name().as_str(), "math");
+                    assert_eq!(use_model.subcomponents().len(), 1);
+                    assert_eq!(use_model.subcomponents()[0].as_str(), "trigonometry");
+                    assert_eq!(alias.as_str(), "trig");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 1);
+                    assert_eq!(use_model.directory_path()[0].node_value().as_str(), "utils");
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_current_directory() {
+            let input = Span::new_extra("use ./local_model as local\n", Config::default());
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
+                    assert_eq!(use_model.model_name().as_str(), "local_model");
+                    assert_eq!(use_model.subcomponents().len(), 0);
+                    assert_eq!(alias.as_str(), "local");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 1);
+                    assert_eq!(use_model.directory_path()[0].node_value().as_str(), ".");
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_parent_directory() {
+            let input = Span::new_extra("use ../parent_model as parent\n", Config::default());
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
+                    assert_eq!(use_model.model_name().as_str(), "parent_model");
+                    assert_eq!(use_model.subcomponents().len(), 0);
+                    assert_eq!(alias.as_str(), "parent");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 1);
+                    assert_eq!(use_model.directory_path()[0].node_value().as_str(), "..");
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_mixed_directory_types() {
+            let input = Span::new_extra(
+                "use ../shared/./utils/math as shared_math\n",
+                Config::default(),
+            );
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
+                    assert_eq!(use_model.model_name().as_str(), "math");
+                    assert_eq!(use_model.subcomponents().len(), 0);
+                    assert_eq!(alias.as_str(), "shared_math");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 4);
+                    assert_eq!(use_model.directory_path()[0].node_value().as_str(), "..");
+                    assert_eq!(
+                        use_model.directory_path()[1].node_value().as_str(),
+                        "shared"
+                    );
+                    assert_eq!(use_model.directory_path()[2].node_value().as_str(), ".");
+                    assert_eq!(use_model.directory_path()[3].node_value().as_str(), "utils");
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_use_with_complex_path_and_subcomponents() {
+            let input = Span::new_extra(
+                "use models/physics/mechanics.rotational.dynamics as rotation\n",
+                Config::default(),
+            );
+            let (rest, decl) = parse_complete(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model = use_model_node.node_value();
+                    let alias = use_model.alias().expect("alias should be present");
+                    assert_eq!(use_model.model_name().as_str(), "mechanics");
+                    assert_eq!(use_model.subcomponents().len(), 2);
+                    assert_eq!(use_model.subcomponents()[0].as_str(), "rotational");
+                    assert_eq!(use_model.subcomponents()[1].as_str(), "dynamics");
+                    assert_eq!(alias.as_str(), "rotation");
+
+                    // Check directory path
+                    assert_eq!(use_model.directory_path().len(), 2);
+                    assert_eq!(
+                        use_model.directory_path()[0].node_value().as_str(),
+                        "models"
+                    );
+                    assert_eq!(
+                        use_model.directory_path()[1].node_value().as_str(),
+                        "physics"
+                    );
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_directory_name_parsing() {
+            // Test parent directory
+            let input = Span::new_extra("..", Config::default());
+            let (rest, dir) = directory_name(input).expect("should parse parent directory");
+            assert_eq!(dir.node_value().as_str(), "..");
+            assert_eq!(rest.fragment(), &"");
+
+            // Test current directory
+            let input = Span::new_extra(".", Config::default());
+            let (rest, dir) = directory_name(input).expect("should parse current directory");
+            assert_eq!(dir.node_value().as_str(), ".");
+            assert_eq!(rest.fragment(), &"");
+
+            // Test regular directory name
+            let input = Span::new_extra("foo", Config::default());
+            let (rest, dir) = directory_name(input).expect("should parse regular directory name");
+            assert_eq!(dir.node_value().as_str(), "foo");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn test_mixed_directory_path_parsing() {
+            let input = Span::new_extra("../shared/./utils/math", Config::default());
+            let (_rest, (directory_path, model_name, subcomponents)) =
+                model_path(input).expect("should parse mixed directory path");
+
+            println!("Directory path length: {}", directory_path.len());
+            for (i, dir) in directory_path.iter().enumerate() {
+                println!("Directory {}: {}", i, dir.node_value().as_str());
+            }
+            println!("Model name: {}", model_name.node_value().as_str());
+            println!(
+                "Subcomponents: {:?}",
+                subcomponents
+                    .iter()
+                    .map(|s| s.node_value().as_str())
+                    .collect::<Vec<_>>()
+            );
+
+            assert_eq!(directory_path.len(), 4);
+            assert_eq!(directory_path[0].node_value().as_str(), "..");
+            assert_eq!(directory_path[1].node_value().as_str(), "shared");
+            assert_eq!(directory_path[2].node_value().as_str(), ".");
+            assert_eq!(directory_path[3].node_value().as_str(), "utils");
+            assert_eq!(model_name.node_value().as_str(), "math");
         }
     }
 
@@ -666,29 +957,6 @@ mod tests {
             #[test]
             fn test_invalid_subcomponent_after_dot() {
                 let input = Span::new_extra("foo.123", Config::default());
-                let result = model_path(input);
-                let expected_dot_span = AstSpan::new(3, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 4);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::ModelPathMissingSubcomponent),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_dot_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_consecutive_dots() {
-                let input = Span::new_extra("foo..bar", Config::default());
                 let result = model_path(input);
                 let expected_dot_span = AstSpan::new(3, 1, 0);
 

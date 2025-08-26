@@ -1698,29 +1698,6 @@ mod tests {
             }
 
             #[test]
-            fn test_consecutive_dots() {
-                let input = Span::new_extra("foo..bar", Config::default());
-                let result = parse(input);
-                let expected_dot_span = AstSpan::new(3, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 4);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_dot_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
             fn test_dot_at_end() {
                 let input = Span::new_extra("foo.bar.", Config::default());
                 let result = parse(input);

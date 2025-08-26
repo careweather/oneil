@@ -52,3 +52,50 @@ impl Label {
         &self.0
     }
 }
+
+/// A directory name in the Oneil language
+///
+/// Directories are used to organize models and other resources into logical groups.
+/// This represents a single directory name, not a full path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Directory {
+    /// A single directory name
+    Name(String),
+    /// The parent directory
+    Parent,
+    /// The current directory
+    Current,
+}
+
+/// A node containing a directory
+pub type DirectoryNode = Node<Directory>;
+
+impl Directory {
+    /// Creates a new directory with the given string value
+    #[must_use]
+    pub const fn name(value: String) -> Self {
+        Self::Name(value)
+    }
+
+    /// Creates a new parent directory
+    #[must_use]
+    pub const fn parent() -> Self {
+        Self::Parent
+    }
+
+    /// Creates a new current directory
+    #[must_use]
+    pub const fn current() -> Self {
+        Self::Current
+    }
+
+    /// Returns the directory as a string slice
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Name(name) => name,
+            Self::Parent => "..",
+            Self::Current => ".",
+        }
+    }
+}

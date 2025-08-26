@@ -108,7 +108,15 @@ pub fn resolve_submodels(
         (HashMap::new(), HashMap::new()),
         |(mut submodels, mut resolution_errors), use_model| {
             // get the use model path
-            let use_model_path = model_path.get_sibling_path(use_model.model_name().as_str());
+            let mut relative_path = use_model
+                .directory_path()
+                .iter()
+                .map(|dir| dir.as_str())
+                .collect::<Vec<_>>();
+            relative_path.push(use_model.model_name().as_str());
+            let relative_path = relative_path.join("/");
+
+            let use_model_path = model_path.get_sibling_path(relative_path);
             let use_model_path = ModelPath::new(use_model_path);
 
             // get the submodel span
@@ -287,8 +295,55 @@ mod tests {
                 ast::node::Node::new(&test_ast_span(end - name.len(), end), identifier)
             });
 
-            let use_model =
-                ast::declaration::UseModel::new(model_name_node, subcomponents, alias_node);
+            // Create an empty directory path for tests
+            let directory_path = vec![];
+
+            let use_model = ast::declaration::UseModel::new(
+                model_name_node,
+                subcomponents,
+                directory_path,
+                alias_node,
+            );
+            ast::node::Node::new(&test_ast_span(start, end), use_model)
+        }
+
+        /// Helper function to create a use model node with a specific directory path
+        pub fn create_use_model_node_with_directory_path(
+            model_name: &str,
+            subcomponents: Vec<ast::naming::IdentifierNode>,
+            alias: Option<&str>,
+            directory_path: &[&str],
+            start: usize,
+            end: usize,
+        ) -> ast::declaration::UseModelNode {
+            let identifier = ast::naming::Identifier::new(model_name.to_string());
+            let model_name_node =
+                ast::node::Node::new(&test_ast_span(start, start + model_name.len()), identifier);
+
+            let alias_node = alias.map(|name| {
+                let identifier = ast::naming::Identifier::new(name.to_string());
+                ast::node::Node::new(&test_ast_span(end - name.len(), end), identifier)
+            });
+
+            // Convert string directory paths to DirectoryNode objects
+            let directory_nodes: Vec<ast::naming::DirectoryNode> = directory_path
+                .iter()
+                .map(|dir_str| {
+                    let directory = match *dir_str {
+                        ".." => ast::naming::Directory::parent(),
+                        "." => ast::naming::Directory::current(),
+                        _ => ast::naming::Directory::name((*dir_str).to_string()),
+                    };
+                    ast::node::Node::new(&test_ast_span(start, start + dir_str.len()), directory)
+                })
+                .collect();
+
+            let use_model = ast::declaration::UseModel::new(
+                model_name_node,
+                subcomponents,
+                directory_nodes,
+                alias_node,
+            );
             ast::node::Node::new(&test_ast_span(start, end), use_model)
         }
 
@@ -724,5 +779,47 @@ mod tests {
         let result = submodels.get(&temperature_id);
         let (temp_submodel_path, _span) = result.expect("submodel path should be present");
         assert_eq!(temp_submodel_path, &temperature_path);
+    }
+
+    #[test]
+    fn test_resolve_submodel_with_directory_path_error() {
+        // create the use model list with directory path that doesn't exist
+        // use nonexistent/utils/math as math
+        let use_model = helper::create_use_model_node_with_directory_path(
+            "math",
+            vec![],
+            Some("math"),
+            &["nonexistent", "utils"],
+            0,
+            30,
+        );
+        let use_models = vec![&use_model];
+
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
+
+        // create the model map with the target model marked as having an error
+        let math_id = Identifier::new("math");
+        let math_path = ModelPath::new("/nonexistent/utils/math");
+        let math_submodel = helper::create_test_model(vec![]);
+        let model_map = HashMap::from([(&math_path, &math_submodel)]);
+        let model_info = ModelInfo::new(model_map, HashSet::from([&math_path]));
+
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+
+        // check the errors - should have a model loading error
+        assert_eq!(errors.len(), 1);
+
+        let error = errors.get(&math_id).expect("error should exist");
+        match error {
+            SubmodelResolutionError::ModelHasError { .. } => {
+                // This is expected when the model has an error
+            }
+            _ => panic!("Expected ModelHasError, got {error:?}"),
+        }
+
+        // check the submodels
+        assert!(submodels.is_empty());
     }
 }
