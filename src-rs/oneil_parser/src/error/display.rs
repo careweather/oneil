@@ -44,7 +44,7 @@ impl fmt::Display for DeclKind {
         match self {
             Self::Import(import_kind) => import_kind.fmt(f),
             Self::Use(use_kind) => use_kind.fmt(f),
-            Self::ModelPathMissingSubcomponent => write!(f, "expected submodel name after `.`"),
+            Self::ModelMissingSubcomponent => write!(f, "expected submodel name after `.`"),
             Self::AsMissingAlias => write!(f, "expected model alias after `as`"),
         }
     }
@@ -62,7 +62,7 @@ impl fmt::Display for ImportKind {
 impl fmt::Display for UseKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingPath => write!(f, "expected model path after `use`"),
+            Self::MissingModelInfo => write!(f, "expected model after `use`"),
             Self::MissingEndOfLine => write!(f, "unexpected character"),
         }
     }

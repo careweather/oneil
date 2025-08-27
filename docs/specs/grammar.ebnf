@@ -30,16 +30,15 @@ Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | Parame
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-UseDecl = "use", FullModelPath, [ AsAlias ] [ WithSubmodels ] EndOfLine ;
-FullModelPath = [ DirectoryPath ], Identifier, [ SubmodelComponents ] ;
+UseDecl = "use", [ DirectoryPath ], ModelInfo, [ "with", SubmodelList ], EndOfLine ;
 DirectoryPath = DirectoryName, "/", { DirectoryName, "/" } ;
 DirectoryName = Identifier | ".." | "." ;
+ModelInfo = Identifier, [ SubmodelComponents ], [ AsAlias ] ;
 SubmodelComponents = ".", Identifier, { ".", Identifier }  ;
 AsAlias = "as", Identifier ;
-WithSubmodels = "with", SubmodelList ;
 (* Note the optional trailing comma - this makes git diffs easier to read *)
-SubmodelList = Submodel | "[", OptEndOfLine, Submodel, { ",", OptEndOfLine, Submodel }, [ "," ], OptEndOfLine, "]" ;
-Submodel = Identifier, [ SubmodelComponents ], [ AsAlias ] ;
+SubmodelList = ModelInfo | "[", [ SubmodelListInner ], OptEndOfLine, "]" ;
+SubmodelListInner = OptEndOfLine, ModelInfo, { ",", OptEndOfLine, ModelInfo }, [ "," ] ;
 
 (* Parameters *)
 ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine, [ Note ] ;

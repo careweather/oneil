@@ -81,7 +81,7 @@ fn print_decl(
                 "{}{} UseModel: \"{}\"{}",
                 "  ".repeat(indent),
                 prefix,
-                use_model.model_name().node_value().as_str(),
+                use_model.top_component().node_value().as_str(),
                 alias
             )?;
 

@@ -151,10 +151,10 @@ impl ParserError {
     }
 
     /// Creates a new `ParserError` for a missing path in a use declaration
-    pub(crate) fn use_missing_path(use_token: &impl SpanLike) -> impl Fn(Self) -> Self {
+    pub(crate) fn use_missing_model_info(use_token: &impl SpanLike) -> impl Fn(Self) -> Self {
         move |error| {
             let use_span = AstSpan::from(use_token);
-            error.convert_reason(ParserErrorReason::use_missing_path(use_span))
+            error.convert_reason(ParserErrorReason::use_missing_model_info(use_span))
         }
     }
 

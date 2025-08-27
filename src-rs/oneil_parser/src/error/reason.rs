@@ -83,10 +83,10 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn use_missing_path(use_span: AstSpan) -> Self {
+    pub(crate) fn use_missing_model_info(use_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: use_span,
-            kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingPath)),
+            kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingModelInfo)),
         }
     }
 
@@ -107,7 +107,7 @@ impl ParserErrorReason {
     pub(crate) fn model_path_missing_subcomponent(dot_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: dot_span,
-            kind: IncompleteKind::Decl(DeclKind::ModelPathMissingSubcomponent),
+            kind: IncompleteKind::Decl(DeclKind::ModelMissingSubcomponent),
         }
     }
 
@@ -371,7 +371,7 @@ pub enum DeclKind {
         UseKind,
     ),
     /// Found an incomplete model path
-    ModelPathMissingSubcomponent,
+    ModelMissingSubcomponent,
     /// Found an incomplete alias after `as`
     AsMissingAlias,
 }
@@ -388,8 +388,8 @@ pub enum ImportKind {
 /// The different kind of `use` errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UseKind {
-    /// Found an incomplete path
-    MissingPath,
+    /// Missing the model info
+    MissingModelInfo,
     /// Missing end of line
     MissingEndOfLine,
 }
