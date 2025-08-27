@@ -90,10 +90,10 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn use_missing_alias(as_span: AstSpan) -> Self {
+    pub(crate) fn as_missing_alias(as_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: as_span,
-            kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAlias)),
+            kind: IncompleteKind::Decl(DeclKind::AsMissingAlias),
         }
     }
 
@@ -372,6 +372,8 @@ pub enum DeclKind {
     ),
     /// Found an incomplete model path
     ModelPathMissingSubcomponent,
+    /// Found an incomplete alias after `as`
+    AsMissingAlias,
 }
 
 /// The different kind of `import` errors
@@ -388,8 +390,6 @@ pub enum ImportKind {
 pub enum UseKind {
     /// Found an incomplete path
     MissingPath,
-    /// Missing the model alias
-    MissingAlias,
     /// Missing end of line
     MissingEndOfLine,
 }

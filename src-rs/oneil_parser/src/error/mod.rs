@@ -159,10 +159,10 @@ impl ParserError {
     }
 
     /// Creates a new `ParserError` for a missing alias in a use declaration
-    pub(crate) fn use_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
+    pub(crate) fn as_missing_alias(as_token: &impl SpanLike) -> impl Fn(TokenError) -> Self {
         move |error| {
             let as_span = AstSpan::from(as_token);
-            Self::new_from_token_error(error, ParserErrorReason::use_missing_alias(as_span))
+            Self::new_from_token_error(error, ParserErrorReason::as_missing_alias(as_span))
         }
     }
 

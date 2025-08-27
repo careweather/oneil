@@ -152,17 +152,7 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
         (None, None) => AstSpan::from(&model_name),
     };
 
-    let (rest, alias) = opt(|input| {
-        let (rest, as_token) = as_.convert_errors().parse(input)?;
-
-        let (rest, alias) = identifier
-            .or_fail_with(ParserError::use_missing_alias(&as_token))
-            .parse(rest)?;
-        let alias = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
-
-        Ok((rest, alias))
-    })
-    .parse(rest)?;
+    let (rest, alias) = opt(as_alias).parse(rest)?;
 
     let final_span = match &alias {
         Some(alias) => AstSpan::from(alias),
@@ -216,30 +206,48 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 fn model_path(
     input: Span<'_>,
 ) -> Result<'_, (Vec<DirectoryNode>, IdentifierNode, Vec<IdentifierNode>), ParserError> {
-    let (rest, directory_path) = many0(|input| {
+    let (rest, directory_path) = directory_path(input)?;
+
+    let (rest, model_name_token) = identifier.convert_errors().parse(rest)?;
+    let model_name = Node::new(
+        &model_name_token,
+        Identifier::new(model_name_token.lexeme().to_string()),
+    );
+
+    let (rest, subcomponents) = submodel_components(rest)?;
+
+    Ok((rest, (directory_path, model_name, subcomponents)))
+}
+
+/// Parses a directory path in a model path
+///
+/// A directory path is a sequence of directory names separated by forward slashes.
+/// The directory path is optional - if no directory path is present, an empty vector is returned.
+///
+/// Examples:
+/// - `path/to/` (two directory names)
+/// - `../foo/` (parent directory followed by identifier)
+/// - `./bar/` (current directory followed by identifier)
+/// - ` ` (empty path)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a vector of directory nodes representing the directory path.
+/// Each directory node contains one of:
+/// - `Directory::Name(String)` for an identifier
+/// - `Directory::Current` for "."
+/// - `Directory::Parent` for ".."
+fn directory_path(input: Span<'_>) -> Result<'_, Vec<DirectoryNode>, ParserError> {
+    many0(|input| {
         let (rest, directory_name) = directory_name(input)?;
         let (rest, _slash_token) = slash.convert_errors().parse(rest)?;
         Ok((rest, directory_name))
     })
-    .parse(input)?;
-
-    let (rest, path) = identifier.convert_errors().parse(rest)?;
-    let path = Node::new(&path, Identifier::new(path.lexeme().to_string()));
-
-    let (rest, subcomponents) = many0(|input| {
-        let (rest, dot_token) = dot.convert_errors().parse(input)?;
-        let (rest, subcomponent) = identifier
-            .or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token))
-            .parse(rest)?;
-        let subcomponent_node = Node::new(
-            &subcomponent,
-            Identifier::new(subcomponent.lexeme().to_string()),
-        );
-        Ok((rest, subcomponent_node))
-    })
-    .parse(rest)?;
-
-    Ok((rest, (directory_path, path, subcomponents)))
+    .parse(input)
 }
 
 /// Parses a directory name in a model path
@@ -283,6 +291,71 @@ fn directory_name(input: Span<'_>) -> Result<'_, DirectoryNode, ParserError> {
     };
 
     alt((directory_name, current_directory, parent_directory)).parse(input)
+}
+
+/// Parses submodel components in a model path
+///
+/// Submodel components are a sequence of identifiers separated by dots.
+/// Each identifier represents a subcomponent of the model.
+///
+/// Examples:
+/// - `.foo` (single subcomponent)
+/// - `.foo.bar` (multiple subcomponents)
+/// - ` ` (no subcomponents)
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns a vector of identifier nodes representing the subcomponents.
+/// Returns an error if a dot is not followed by a valid identifier.
+fn submodel_components(input: Span<'_>) -> Result<'_, Vec<IdentifierNode>, ParserError> {
+    many0(|input| {
+        let (rest, dot_token) = dot.convert_errors().parse(input)?;
+        let (rest, subcomponent) = identifier
+            .or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token))
+            .parse(rest)?;
+        let subcomponent_node = Node::new(
+            &subcomponent,
+            Identifier::new(subcomponent.lexeme().to_string()),
+        );
+        Ok((rest, subcomponent_node))
+    })
+    .parse(input)
+}
+
+/// Parses an alias identifier after an `as` keyword.
+///
+/// This function parses the alias identifier that follows an `as` keyword in a use declaration.
+/// It expects a valid identifier token after the `as` keyword.
+///
+/// # Arguments
+///
+/// * `input` - The input span to parse
+///
+/// # Returns
+///
+/// Returns an identifier node containing the parsed alias.
+/// Returns an error if no valid identifier follows the `as` keyword.
+///
+/// # Examples
+///
+/// ```text
+/// as foo  -> IdentifierNode("foo")
+/// as      -> Error(MissingAlias)
+/// as 123  -> Error(UnexpectedToken)
+/// ```
+fn as_alias(input: Span<'_>) -> Result<'_, IdentifierNode, ParserError> {
+    let (rest, as_token) = as_.convert_errors().parse(input)?;
+
+    let (rest, alias) = identifier
+        .or_fail_with(ParserError::as_missing_alias(&as_token))
+        .parse(rest)?;
+    let alias_node = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
+
+    Ok((rest, alias_node))
 }
 
 /// Parses a parameter declaration by delegating to the parameter parser.
@@ -888,7 +961,7 @@ mod tests {
 
                         match error.reason {
                             ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAlias)),
+                                kind: IncompleteKind::Decl(DeclKind::AsMissingAlias),
                                 cause,
                             } => {
                                 assert_eq!(cause, expected_as_span);
@@ -938,7 +1011,7 @@ mod tests {
 
                         match error.reason {
                             ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingAlias)),
+                                kind: IncompleteKind::Decl(DeclKind::AsMissingAlias),
                                 cause,
                             } => {
                                 assert_eq!(cause, expected_as_span);
