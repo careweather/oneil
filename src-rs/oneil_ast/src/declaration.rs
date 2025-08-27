@@ -89,6 +89,7 @@ pub struct UseModel {
     subcomponents: Vec<IdentifierNode>,
     directory_path: Vec<DirectoryNode>,
     alias: Option<IdentifierNode>,
+    submodels: Vec<SubmodelNode>,
 }
 
 /// A node containing a model usage declaration
@@ -102,12 +103,14 @@ impl UseModel {
         subcomponents: Vec<IdentifierNode>,
         directory_path: Vec<DirectoryNode>,
         alias: Option<IdentifierNode>,
+        submodels: Vec<SubmodelNode>,
     ) -> Self {
         Self {
             model_name,
             subcomponents,
             directory_path,
             alias,
+            submodels,
         }
     }
 
@@ -123,15 +126,66 @@ impl UseModel {
         &self.subcomponents
     }
 
+    /// Returns the directory path for the model usage
+    #[must_use]
+    pub fn directory_path(&self) -> &[DirectoryNode] {
+        &self.directory_path
+    }
+
     /// Returns the optional alias for the model usage
     #[must_use]
     pub const fn alias(&self) -> Option<&IdentifierNode> {
         self.alias.as_ref()
     }
 
-    /// Returns the directory path for the model usage
+    /// Returns the list of submodels being used
     #[must_use]
-    pub fn directory_path(&self) -> &[DirectoryNode] {
-        &self.directory_path
+    pub fn submodels(&self) -> &[SubmodelNode] {
+        &self.submodels
+    }
+}
+
+/// A submodel in a model usage declaration
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Submodel {
+    name: IdentifierNode,
+    subcomponents: Vec<IdentifierNode>,
+    alias: Option<IdentifierNode>,
+}
+
+/// A node containing a submodel
+pub type SubmodelNode = Node<Submodel>;
+
+impl Submodel {
+    /// Creates a new submodel
+    #[must_use]
+    pub const fn new(
+        name: IdentifierNode,
+        subcomponents: Vec<IdentifierNode>,
+        alias: Option<IdentifierNode>,
+    ) -> Self {
+        Self {
+            name,
+            subcomponents,
+            alias,
+        }
+    }
+
+    /// Returns the name of the submodel
+    #[must_use]
+    pub const fn name(&self) -> &IdentifierNode {
+        &self.name
+    }
+
+    /// Returns the list of subcomponents of the submodel
+    #[must_use]
+    pub fn subcomponents(&self) -> &[IdentifierNode] {
+        &self.subcomponents
+    }
+
+    /// Returns the optional alias of the submodel
+    #[must_use]
+    pub const fn alias(&self) -> Option<&IdentifierNode> {
+        self.alias.as_ref()
     }
 }

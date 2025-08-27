@@ -85,6 +85,8 @@ pub enum ExpectKeyword {
     Section,
     /// Expected 'use' keyword
     Use,
+    /// Expected 'with' keyword
+    With,
 }
 
 /// The different symbols that could have been expected.

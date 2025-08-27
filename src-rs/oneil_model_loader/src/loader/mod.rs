@@ -362,7 +362,8 @@ mod tests {
                 .map(|name| {
                     let use_model_name = ast::Identifier::new((*name).to_string());
                     let use_model_name_node = ast::Node::new(&span_from_str(name), use_model_name);
-                    let use_model = ast::UseModel::new(use_model_name_node, vec![], vec![], None);
+                    let use_model =
+                        ast::UseModel::new(use_model_name_node, vec![], vec![], None, vec![]);
                     let use_model_node = ast::Node::new(&unimportant_span(), use_model);
 
                     ast::Node::new(&unimportant_span(), ast::Decl::use_model(use_model_node))
@@ -656,8 +657,8 @@ mod tests {
             ast::Node::new(&helper::span_from_str("child2"), child2_identifier);
 
         let use_models = vec![
-            ast::UseModel::new(child1_identifier_node, vec![], vec![], None),
-            ast::UseModel::new(child2_identifier_node, vec![], vec![], None),
+            ast::UseModel::new(child1_identifier_node, vec![], vec![], None, vec![]),
+            ast::UseModel::new(child2_identifier_node, vec![], vec![], None, vec![]),
         ];
         let use_models = use_models
             .into_iter()
@@ -705,6 +706,7 @@ mod tests {
             vec![],
             vec![],
             None,
+            vec![],
         )];
         let use_models = use_models
             .into_iter()
@@ -799,7 +801,7 @@ mod tests {
         let use_model_name = ast::Identifier::new("submodel".to_string());
         let use_model_name_node =
             ast::Node::new(&helper::span_from_str("submodel"), use_model_name);
-        let use_model = ast::UseModel::new(use_model_name_node, vec![], vec![], None);
+        let use_model = ast::UseModel::new(use_model_name_node, vec![], vec![], None, vec![]);
         let use_model_node = ast::Node::new(&helper::unimportant_span(), use_model);
         let use_model_decl = ast::Node::new(
             &helper::unimportant_span(),

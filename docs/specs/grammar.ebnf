@@ -12,6 +12,7 @@
 LineBreak = "\n" | "\r\n" ;  (* Each line break is a separate token *)
 Comment = "#", { Any character except LineBreak }, LineBreak ;
 EndOfLine = { LineBreak | Comment | ? end of file ? } ;
+OptEndOfLine = [ EndOfLine ] ;
 
 (* Top Level Structure *)
 Model = [ EndOfLine ], [ Note ], { Declaration } { Section } ;
@@ -29,11 +30,16 @@ Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | UseDecl | Parame
 
 (* Imports *)
 ImportDecl = "import", Identifier, EndOfLine ;
-UseDecl = "use", FullModelPath, [ "as", Identifier, ] EndOfLine ;
+UseDecl = "use", FullModelPath, [ AsAlias ] [ WithSubmodels ] EndOfLine ;
 FullModelPath = [ DirectoryPath ], Identifier, [ SubmodelComponents ] ;
 DirectoryPath = DirectoryName, "/", { DirectoryName, "/" } ;
 DirectoryName = Identifier | ".." | "." ;
 SubmodelComponents = ".", Identifier, { ".", Identifier }  ;
+AsAlias = "as", Identifier ;
+WithSubmodels = "with", SubmodelList ;
+(* Note the optional trailing comma - this makes git diffs easier to read *)
+SubmodelList = Submodel | "[", OptEndOfLine, Submodel, { ",", OptEndOfLine, Submodel }, [ "," ], OptEndOfLine, "]" ;
+Submodel = Identifier, [ SubmodelComponents ], [ AsAlias ] ;
 
 (* Parameters *)
 ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine, [ Note ] ;

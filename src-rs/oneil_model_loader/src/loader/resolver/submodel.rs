@@ -303,6 +303,7 @@ mod tests {
                 subcomponents,
                 directory_path,
                 alias_node,
+                vec![], // submodels
             );
             ast::node::Node::new(&test_ast_span(start, end), use_model)
         }
@@ -343,6 +344,7 @@ mod tests {
                 subcomponents,
                 directory_nodes,
                 alias_node,
+                vec![], // submodels
             );
             ast::node::Node::new(&test_ast_span(start, end), use_model)
         }

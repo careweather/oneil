@@ -20,6 +20,7 @@ use crate::token::{
 /// Keywords that are valid in the Oneil language.
 pub const KEYWORDS: &[&str] = &[
     "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
+    "with",
 ];
 
 /// Creates a keyword parser for the specified keyword string.
@@ -114,6 +115,11 @@ pub fn test(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
 /// Parses the 'use' keyword token.
 pub fn use_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("use", error::ExpectKeyword::Use).parse(input)
+}
+
+/// Parses the 'with' keyword token.
+pub fn with(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
+    keyword("with", error::ExpectKeyword::With).parse(input)
 }
 
 #[cfg(test)]
@@ -212,6 +218,14 @@ mod tests {
             let input = Span::new_extra("use foo", Config::default());
             let (rest, matched) = use_(input).expect("should parse 'use' keyword");
             assert_eq!(matched.lexeme(), "use");
+            assert_eq!(rest.fragment(), &"foo");
+        }
+
+        #[test]
+        fn test_with() {
+            let input = Span::new_extra("with foo", Config::default());
+            let (rest, matched) = with(input).expect("should parse 'with' keyword");
+            assert_eq!(matched.lexeme(), "with");
             assert_eq!(rest.fragment(), &"foo");
         }
 
@@ -607,6 +621,19 @@ mod tests {
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Use))
                 )),
                 _ => panic!("expected TokenError::Expect(Keyword(Use)), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_with_error() {
+            let input = Span::new_extra("wrong", Config::default());
+            let res = with(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::With))
+                )),
+                _ => panic!("expected TokenError::Expect(Keyword(With)), got {res:?}"),
             }
         }
 
