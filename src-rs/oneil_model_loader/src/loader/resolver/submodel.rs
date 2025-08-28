@@ -106,30 +106,12 @@ pub fn resolve_submodels(
 ) -> (SubmodelMap, ResolutionErrorMap) {
     use_models.into_iter().fold(
         (HashMap::new(), HashMap::new()),
-        |(submodels, mut resolution_errors), use_model| {
+        |(submodels, resolution_errors), use_model| {
             let submodel_path = get_use_model_path(model_path, use_model);
-            let (submodel_name, submodel_name_span) = get_submodel_name_and_span(
-                use_model.model_info().alias(),
-                use_model.model_info().subcomponents(),
-                use_model.model_info().top_component(),
-            );
+            let (submodel_name, submodel_name_span) =
+                get_submodel_name_and_span(use_model.model_info());
 
-            // verify that the submodel name is not a duplicate
-            let maybe_original_submodel = submodels.get(&submodel_name);
-            if let Some((_path, original_submodel_span)) = maybe_original_submodel {
-                resolution_errors.insert(
-                    submodel_name.clone(),
-                    SubmodelResolutionError::duplicate_submodel(
-                        submodel_name,
-                        *original_submodel_span,
-                        submodel_name_span,
-                    ),
-                );
-
-                return (submodels, resolution_errors);
-            }
-
-            let (submodels, resolution_errors, _result) = resolve_single_submodel(
+            let (submodels, resolution_errors, result) = resolve_single_submodel(
                 submodel_path,
                 submodel_name_span,
                 use_model.model_info().subcomponents(),
@@ -140,7 +122,39 @@ pub fn resolve_submodels(
                 resolution_errors,
             );
 
-            (submodels, resolution_errors)
+            // if the use model was resolved successfully and has submodels,
+            // resolve each submodel
+            let (Ok(resolved_model_path), Some(submodel_list)) = (result, use_model.submodels())
+            else {
+                // otherwise, return early
+                return (submodels, resolution_errors);
+            };
+
+            submodel_list.iter().fold(
+                (submodels, resolution_errors),
+                |(submodels, resolution_errors), submodel| {
+                    let resolved_model_name_span = submodel_name_span;
+
+                    let mut submodel_subcomponents = submodel.subcomponents().to_vec();
+                    submodel_subcomponents.insert(0, submodel.top_component().clone());
+
+                    let (resolved_submodel_name, resolved_submodel_name_span) =
+                        get_submodel_name_and_span(submodel);
+
+                    let (submodels, resolution_errors, _result) = resolve_single_submodel(
+                        resolved_model_path.clone(),
+                        resolved_model_name_span,
+                        &submodel_subcomponents,
+                        resolved_submodel_name,
+                        resolved_submodel_name_span,
+                        model_info,
+                        submodels,
+                        resolution_errors,
+                    );
+
+                    (submodels, resolution_errors)
+                },
+            )
         },
     )
 }
@@ -155,12 +169,11 @@ fn get_use_model_path(
     ModelPath::new(use_model_path)
 }
 
-fn get_submodel_name_and_span(
-    alias: Option<&ast::node::Node<ast::naming::Identifier>>,
-    subcomponents: &[ast::naming::IdentifierNode],
-    model_name: &ast::naming::IdentifierNode,
-) -> (Identifier, Span) {
-    let submodel_name = alias.or_else(|| subcomponents.last()).unwrap_or(model_name);
+fn get_submodel_name_and_span(model_info: &ast::declaration::ModelInfo) -> (Identifier, Span) {
+    let submodel_name = model_info
+        .alias()
+        .or_else(|| model_info.subcomponents().last())
+        .unwrap_or(model_info.top_component());
     let ident = Identifier::new(submodel_name.as_str());
     let span = get_span_from_ast_span(submodel_name.node_span());
     (ident, span)
@@ -175,7 +188,22 @@ fn resolve_single_submodel(
     model_info: &crate::util::info::InfoMap<&ModelPath, &oneil_ir::model::Model>,
     mut submodels: SubmodelMap,
     mut resolution_errors: ResolutionErrorMap,
-) -> (SubmodelMap, ResolutionErrorMap, Result<(), ()>) {
+) -> (SubmodelMap, ResolutionErrorMap, Result<ModelPath, ()>) {
+    // verify that the submodel name is not a duplicate
+    let maybe_original_submodel = submodels.get(&resolved_model_name);
+    if let Some((_path, original_submodel_span)) = maybe_original_submodel {
+        resolution_errors.insert(
+            resolved_model_name.clone(),
+            SubmodelResolutionError::duplicate_submodel(
+                resolved_model_name,
+                *original_submodel_span,
+                resolved_model_reference_span,
+            ),
+        );
+
+        return (submodels, resolution_errors, Err(()));
+    }
+
     // resolve the use model path
     let resolved_use_model_path = resolve_model_path(
         top_model_path,
@@ -188,12 +216,15 @@ fn resolve_single_submodel(
     // otherwise, add the error to the builder
     let result = match resolved_use_model_path {
         Ok(resolved_use_model_path) => {
-            // create a span for the submodel
             submodels.insert(
                 resolved_model_name,
-                (resolved_use_model_path, resolved_model_reference_span),
+                (
+                    resolved_use_model_path.clone(),
+                    resolved_model_reference_span,
+                ),
             );
-            Ok(())
+
+            Ok(resolved_use_model_path)
         }
         Err(error) => {
             resolution_errors.insert(resolved_model_name, error);
@@ -637,7 +668,8 @@ mod tests {
         // create the use model list with error model
         // use error_model as error
         let use_model = helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
-        let use_model_span = get_span_from_ast_span(use_model.node_span());
+        let use_model_alias = use_model.model_info().alias().expect("alias should exist");
+        let use_model_name_span = get_span_from_ast_span(use_model_alias.node_span());
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -663,7 +695,7 @@ mod tests {
                 reference_span,
             } => {
                 assert_eq!(model_path, &error_path);
-                assert_eq!(reference_span, &use_model_span);
+                assert_eq!(reference_span, &use_model_name_span);
             }
             _ => panic!("Expected ModelHasError, got {error:?}"),
         }
@@ -838,7 +870,11 @@ mod tests {
         // use error_model as error
         let error_model =
             helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
-        let error_model_ident_span = get_span_from_ast_span(error_model.node_span());
+        let error_model_alias = error_model
+            .model_info()
+            .alias()
+            .expect("alias should exist");
+        let error_model_name_span = get_span_from_ast_span(error_model_alias.node_span());
 
         let use_models = vec![&temp_model, &error_model];
 
@@ -875,7 +911,7 @@ mod tests {
                 reference_span,
             } => {
                 assert_eq!(model_path, &error_path);
-                assert_eq!(reference_span, &error_model_ident_span);
+                assert_eq!(reference_span, &error_model_name_span);
             }
             _ => panic!("Expected ModelHasError, got {error:?}"),
         }
@@ -975,7 +1011,11 @@ mod tests {
         let temp_model1 = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
         // use pressure as temp (duplicate alias)
         let temp_model2 = helper::create_use_model_node("pressure", vec![], Some("temp"), 0, 25);
-        let temp_model2_span = get_span_from_ast_span(temp_model2.node_span());
+        let temp_model2_alias = temp_model2
+            .model_info()
+            .alias()
+            .expect("alias should exist");
+        let temp_model2_name_span = get_span_from_ast_span(temp_model2_alias.node_span());
 
         let use_models = vec![&temp_model1, &temp_model2];
 
@@ -1008,7 +1048,7 @@ mod tests {
                 duplicate_span,
             } => {
                 assert_eq!(submodel.as_str(), "temp");
-                assert_eq!(duplicate_span, &temp_model2_span);
+                assert_eq!(duplicate_span, &temp_model2_name_span);
             }
             _ => panic!("Expected DuplicateSubmodel, got {error:?}"),
         }
@@ -1338,11 +1378,18 @@ mod tests {
         assert!(errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_eq!(submodels.len(), 2);
 
-        let result = submodels.get(&temp_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &temperature_path);
+        let (temp_submodel_path, _span) = submodels
+            .get(&temp_id)
+            .expect("submodel path should be present");
+        assert_eq!(temp_submodel_path, &temperature_path);
+
+        let weather_id = Identifier::new("weather");
+        let (weather_submodel_path, _span) = submodels
+            .get(&weather_id)
+            .expect("submodel path should be present");
+        assert_eq!(weather_submodel_path, &weather_path);
     }
 
     #[test]
@@ -1399,15 +1446,23 @@ mod tests {
         assert!(errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 2);
+        assert_eq!(submodels.len(), 3);
 
-        let result = submodels.get(&temp_id);
-        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
+        let (temp_submodel_path, _span) = submodels
+            .get(&temp_id)
+            .expect("submodel path should be present");
         assert_eq!(temp_submodel_path, &temperature_path);
 
-        let result = submodels.get(&press_id);
-        let (press_submodel_path, _span) = result.expect("submodel path should be present");
+        let (press_submodel_path, _span) = submodels
+            .get(&press_id)
+            .expect("submodel path should be present");
         assert_eq!(press_submodel_path, &pressure_path);
+
+        let weather_id = Identifier::new("weather");
+        let (weather_submodel_path, _span) = submodels
+            .get(&weather_id)
+            .expect("submodel path should be present");
+        assert_eq!(weather_submodel_path, &weather_path);
     }
 
     #[test]
@@ -1461,11 +1516,18 @@ mod tests {
         assert!(errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_eq!(submodels.len(), 2);
 
-        let result = submodels.get(&temp_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &temperature_path);
+        let (temp_submodel_path, _span) = submodels
+            .get(&temp_id)
+            .expect("submodel path should be present");
+        assert_eq!(temp_submodel_path, &temperature_path);
+
+        let weather_id = Identifier::new("weather");
+        let (weather_submodel_path, _span) = submodels
+            .get(&weather_id)
+            .expect("submodel path should be present");
+        assert_eq!(weather_submodel_path, &weather_path);
     }
 
     #[test]
@@ -1515,7 +1577,13 @@ mod tests {
         }
 
         // check the submodels
-        assert!(submodels.is_empty());
+        assert_eq!(submodels.len(), 1);
+
+        let weather_id = Identifier::new("weather");
+        let (submodel_path, _span) = submodels
+            .get(&weather_id)
+            .expect("submodel path should be present");
+        assert_eq!(submodel_path, &weather_path);
     }
 
     #[test]
@@ -1576,11 +1644,18 @@ mod tests {
         }
 
         // check the submodels - should only contain the successful one
-        assert_eq!(submodels.len(), 1);
+        assert_eq!(submodels.len(), 2);
 
-        let result = submodels.get(&temp_id);
-        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
+        let (temp_submodel_path, _span) = submodels
+            .get(&temp_id)
+            .expect("submodel path should be present");
         assert_eq!(temp_submodel_path, &temperature_path);
+
+        let weather_id = Identifier::new("weather");
+        let (weather_submodel_path, _span) = submodels
+            .get(&weather_id)
+            .expect("submodel path should be present");
+        assert_eq!(weather_submodel_path, &weather_path);
     }
 
     #[test]

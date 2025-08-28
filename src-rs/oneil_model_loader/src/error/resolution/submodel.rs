@@ -168,12 +168,12 @@ impl AsOneilError for SubmodelResolutionError {
 
     fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
         match self {
-            Self::DuplicateSubmodel { duplicate_span, .. } => {
-                let start = duplicate_span.start();
-                let length = duplicate_span.length();
+            Self::DuplicateSubmodel { original_span, .. } => {
+                let start = original_span.start();
+                let length = original_span.length();
                 let location = ErrorLocation::from_source_and_span(source, start, length);
                 vec![(
-                    Context::Note("submodel is defined multiple times".to_string()),
+                    Context::Note("submodel is originally defined here".to_string()),
                     Some(location),
                 )]
             }
