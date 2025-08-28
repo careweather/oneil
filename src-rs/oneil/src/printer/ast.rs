@@ -73,6 +73,7 @@ fn print_decl(
         }
         Decl::UseModel(use_model) => {
             let alias = use_model
+                .model_info()
                 .alias()
                 .map(|a| format!(" as {}", a.node_value().as_str()))
                 .unwrap_or_default();
@@ -81,13 +82,14 @@ fn print_decl(
                 "{}{} UseModel: \"{}\"{}",
                 "  ".repeat(indent),
                 prefix,
-                use_model.top_component().node_value().as_str(),
+                use_model.model_info().top_component().node_value().as_str(),
                 alias
             )?;
 
             // Print subcomponents if any
-            if !use_model.subcomponents().is_empty() {
+            if !use_model.model_info().subcomponents().is_empty() {
                 let subcomps: Vec<String> = use_model
+                    .model_info()
                     .subcomponents()
                     .iter()
                     .map(|id| id.node_value().as_str().to_string())

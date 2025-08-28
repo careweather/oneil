@@ -283,7 +283,8 @@ where
 
     let builder = use_models.iter().fold(builder, |builder, use_model| {
         // get the use model path
-        let use_model_path = model_path.get_sibling_path(use_model.model_name().as_str());
+        let use_model_relative_path = use_model.get_model_relative_path();
+        let use_model_path = model_path.get_sibling_path(&use_model_relative_path);
         let use_model_path = ModelPath::new(use_model_path);
 
         // load the use model (and its submodels)
@@ -316,7 +317,7 @@ mod tests {
     mod ast {
         pub use oneil_ast::{
             Span,
-            declaration::{Decl, UseModel},
+            declaration::{Decl, ModelInfo, UseModel},
             model::{Model, ModelNode, Section, SectionHeader},
             naming::{Identifier, Label},
             node::Node,
@@ -325,16 +326,11 @@ mod tests {
 
     mod helper {
         use super::ast;
-        use oneil_ir::span::Span;
 
-        use crate::{test::TestBuiltinRef, util::get_span_from_ast_span};
+        use crate::test::TestBuiltinRef;
 
         pub fn unimportant_span() -> ast::Span {
             ast::Span::new(0, 0, 0)
-        }
-
-        pub fn unimportant_ir_span() -> Span {
-            get_span_from_ast_span(unimportant_span())
         }
 
         pub fn span_from_str(s: &str) -> ast::Span {
@@ -362,8 +358,9 @@ mod tests {
                 .map(|name| {
                     let use_model_name = ast::Identifier::new((*name).to_string());
                     let use_model_name_node = ast::Node::new(&span_from_str(name), use_model_name);
-                    let use_model =
-                        ast::UseModel::new(use_model_name_node, vec![], vec![], None, vec![]);
+                    let use_model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
+                    let use_model_info_node = ast::Node::new(&unimportant_span(), use_model_info);
+                    let use_model = ast::UseModel::new(vec![], use_model_info_node, None);
                     let use_model_node = ast::Node::new(&unimportant_span(), use_model);
 
                     ast::Node::new(&unimportant_span(), ast::Decl::use_model(use_model_node))
@@ -393,8 +390,11 @@ mod tests {
 
         assert_eq!(imports.len(), 0);
         assert_eq!(use_models.len(), 1);
-        assert_eq!(use_models[0].model_name().as_str(), "submodel");
-        assert!(use_models[0].subcomponents().is_empty());
+        assert_eq!(
+            use_models[0].model_info().top_component().as_str(),
+            "submodel"
+        );
+        assert!(use_models[0].model_info().subcomponents().is_empty());
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
     }
@@ -406,8 +406,14 @@ mod tests {
 
         assert!(imports.is_empty());
         assert_eq!(use_models.len(), 2);
-        assert_eq!(use_models[0].model_name().as_str(), "submodel1");
-        assert_eq!(use_models[1].model_name().as_str(), "submodel2");
+        assert_eq!(
+            use_models[0].model_info().top_component().as_str(),
+            "submodel1"
+        );
+        assert_eq!(
+            use_models[1].model_info().top_component().as_str(),
+            "submodel2"
+        );
 
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
@@ -517,7 +523,7 @@ mod tests {
                     Identifier::new("sub"),
                     SubmodelResolutionError::model_has_error(
                         ModelPath::new("sub"),
-                        helper::unimportant_ir_span()
+                        oneil_ir::span::Span::new(0, 3)
                     )
                 )]),
                 HashMap::new(),
@@ -534,7 +540,7 @@ mod tests {
                     Identifier::new("main"),
                     SubmodelResolutionError::model_has_error(
                         ModelPath::new("main"),
-                        helper::unimportant_ir_span()
+                        oneil_ir::span::Span::new(0, 4)
                     )
                 )]),
                 HashMap::new(),
@@ -657,8 +663,16 @@ mod tests {
             ast::Node::new(&helper::span_from_str("child2"), child2_identifier);
 
         let use_models = vec![
-            ast::UseModel::new(child1_identifier_node, vec![], vec![], None, vec![]),
-            ast::UseModel::new(child2_identifier_node, vec![], vec![], None, vec![]),
+            {
+                let model_info = ast::ModelInfo::new(child1_identifier_node, vec![], None);
+                let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
+                ast::UseModel::new(vec![], model_info_node, None)
+            },
+            {
+                let model_info = ast::ModelInfo::new(child2_identifier_node, vec![], None);
+                let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
+                ast::UseModel::new(vec![], model_info_node, None)
+            },
         ];
         let use_models = use_models
             .into_iter()
@@ -701,13 +715,11 @@ mod tests {
         let use_model_name_node =
             ast::Node::new(&helper::span_from_str("nonexistent"), use_model_name);
 
-        let use_models = vec![ast::UseModel::new(
-            use_model_name_node,
-            vec![],
-            vec![],
-            None,
-            vec![],
-        )];
+        let use_models = vec![{
+            let model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
+            let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
+            ast::UseModel::new(vec![], model_info_node, None)
+        }];
         let use_models = use_models
             .into_iter()
             .map(|use_model| ast::Node::new(&helper::unimportant_span(), use_model))
@@ -801,7 +813,9 @@ mod tests {
         let use_model_name = ast::Identifier::new("submodel".to_string());
         let use_model_name_node =
             ast::Node::new(&helper::span_from_str("submodel"), use_model_name);
-        let use_model = ast::UseModel::new(use_model_name_node, vec![], vec![], None, vec![]);
+        let model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
+        let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
+        let use_model = ast::UseModel::new(vec![], model_info_node, None);
         let use_model_node = ast::Node::new(&helper::unimportant_span(), use_model);
         let use_model_decl = ast::Node::new(
             &helper::unimportant_span(),
