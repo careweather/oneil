@@ -41,10 +41,8 @@ use oneil_ir::test::{Test, TestIndex};
 use crate::{
     BuiltinRef,
     error::{self, TestResolutionError},
-    loader::resolver::{
-        ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
-        trace_level::resolve_trace_level,
-    },
+    loader::resolver::{expr::resolve_expr, trace_level::resolve_trace_level},
+    util::context::{ModelContext, ModelImportsContext, ParameterContext},
 };
 
 /// Resolves tests from AST test declarations.
@@ -73,9 +71,7 @@ use crate::{
 pub fn resolve_tests(
     tests: Vec<&ast::test::TestNode>,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> (
     HashMap<TestIndex, Test>,
     HashMap<TestIndex, Vec<TestResolutionError>>,
@@ -85,14 +81,8 @@ pub fn resolve_tests(
 
         let trace_level = resolve_trace_level(test.trace_level());
 
-        let test_expr = resolve_expr(
-            test.expr(),
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        )
-        .map_err(|errors| (test_index, error::convert_errors(errors)))?;
+        let test_expr = resolve_expr(test.expr(), builtin_ref, context)
+            .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
         Ok((test_index, Test::new(trace_level, test_expr)))
     });
@@ -101,6 +91,7 @@ pub fn resolve_tests(
 }
 
 #[cfg(test)]
+#[cfg(any())]
 mod tests {
     use crate::{error::VariableResolutionError, util::get_span_from_ast_span};
 

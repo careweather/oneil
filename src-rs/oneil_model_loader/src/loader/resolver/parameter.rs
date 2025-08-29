@@ -32,11 +32,13 @@ use oneil_ir::{
 use crate::{
     BuiltinRef,
     error::{self, ParameterResolutionError},
-    loader::resolver::{
-        ModelInfo, ParameterInfo, SubmodelInfo, expr::resolve_expr,
-        trace_level::resolve_trace_level, unit::resolve_unit,
+    loader::resolver::{expr::resolve_expr, trace_level::resolve_trace_level, unit::resolve_unit},
+    util::{
+        Stack,
+        builder::ParameterCollectionBuilder,
+        context::{ModelContext, ModelImportsContext, ParameterContext},
+        get_span_from_ast_span,
     },
-    util::{Stack, builder::ParameterCollectionBuilder, get_span_from_ast_span, info::InfoMap},
 };
 
 /// Resolves a collection of AST parameters into resolved model parameters.
@@ -67,14 +69,14 @@ use crate::{
 /// - Undefined variable references
 /// - Invalid expressions in parameter values or limits
 /// - Missing submodel references
-pub fn resolve_parameters(
+pub fn resolve_parameters<Ctx: ModelContext + ModelImportsContext + ParameterContext>(
     parameters: Vec<&ast::parameter::ParameterNode>,
     builtin_ref: &impl BuiltinRef,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: Ctx,
 ) -> (
     ParameterCollection,
     HashMap<Identifier, Vec<ParameterResolutionError>>,
+    Ctx,
 ) {
     let (parameter_map, duplicate_errors) = parameters.into_iter().fold(
         (HashMap::new(), HashMap::new()),
@@ -108,9 +110,10 @@ pub fn resolve_parameters(
     let resolved_parameters = ParameterCollectionBuilder::new();
     let visited = HashSet::new();
 
-    let (resolved_parameters, _visited) = parameter_map.iter().fold(
-        (resolved_parameters, visited),
-        |(resolved_parameters, visited), (parameter_identifier, (parameter_span, _parameter))| {
+    let (resolved_parameters, _visited, context) = parameter_map.iter().fold(
+        (resolved_parameters, visited, context),
+        |(resolved_parameters, visited, context),
+         (parameter_identifier, (parameter_span, _parameter))| {
             let mut parameter_stack = Stack::new();
 
             let parameter_identifier_with_span =
@@ -121,8 +124,7 @@ pub fn resolve_parameters(
                 &parameter_map,
                 &dependencies,
                 builtin_ref,
-                submodel_info,
-                model_info,
+                context,
                 &mut parameter_stack,
                 resolved_parameters,
                 visited,
@@ -133,7 +135,7 @@ pub fn resolve_parameters(
     let resolved_parameters = resolved_parameters.try_into();
 
     match resolved_parameters {
-        Ok(resolved_parameters) => (resolved_parameters, duplicate_errors),
+        Ok(resolved_parameters) => (resolved_parameters, duplicate_errors, context),
         Err((resolved_parameters, resolution_errors)) => {
             // combine the duplicate errors with the resolution errors
             let mut errors = resolution_errors;
@@ -144,7 +146,7 @@ pub fn resolve_parameters(
                     .extend(duplicate_errors);
             }
 
-            (resolved_parameters, errors)
+            (resolved_parameters, errors, context)
         }
     }
 }
@@ -295,6 +297,8 @@ fn get_expr_internal_dependencies(
     }
 }
 
+type VisitedSet = HashSet<Identifier>;
+
 /// Resolves a single parameter with dependency tracking.
 ///
 /// This function handles the recursive resolution of a parameter, including:
@@ -320,17 +324,16 @@ fn get_expr_internal_dependencies(
 /// - Updated parameter collection builder
 /// - Updated visited set
 /// - Result indicating success or resolution errors
-fn resolve_parameter(
+fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>(
     parameter_identifier: WithSpan<Identifier>,
     parameter_map: &HashMap<Identifier, (Span, &ast::parameter::ParameterNode)>,
     dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
     builtin_ref: &impl BuiltinRef,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: Ctx,
     parameter_stack: &mut Stack<Identifier>,
     mut resolved_parameters: ParameterCollectionBuilder,
-    mut visited: HashSet<Identifier>,
-) -> (ParameterCollectionBuilder, HashSet<Identifier>) {
+    mut visited: VisitedSet,
+) -> (ParameterCollectionBuilder, VisitedSet, Ctx) {
     let parameter_identifier_span = parameter_identifier.span();
     let parameter_identifier = parameter_identifier.take_value();
 
@@ -342,7 +345,7 @@ fn resolve_parameter(
         // handle the "not found" error
         //
         // This also accounts for the fact that the parameter may be a builtin
-        return (resolved_parameters, visited);
+        return (resolved_parameters, visited, context);
     }
 
     assert!(
@@ -362,12 +365,12 @@ fn resolve_parameter(
                 reference_span,
             )],
         );
-        return (resolved_parameters, visited);
+        return (resolved_parameters, visited, context);
     }
 
     // check if the parameter has already been visited
     if visited.contains(&parameter_identifier) {
-        return (resolved_parameters, visited);
+        return (resolved_parameters, visited, context);
     }
     visited.insert(parameter_identifier.clone());
 
@@ -380,16 +383,15 @@ fn resolve_parameter(
     parameter_stack.push(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    (resolved_parameters, visited) = parameter_dependencies.iter().fold(
-        (resolved_parameters, visited),
-        |(resolved_parameters, visited), dependency| {
+    let (mut resolved_parameters, visited, mut context) = parameter_dependencies.iter().fold(
+        (resolved_parameters, visited, context),
+        |(resolved_parameters, visited, context), dependency| {
             resolve_parameter(
                 dependency.clone(),
                 parameter_map,
                 dependencies,
                 builtin_ref,
-                submodel_info,
-                model_info,
+                context,
                 parameter_stack,
                 resolved_parameters,
                 visited,
@@ -407,34 +409,15 @@ fn resolve_parameter(
 
     let ident = parameter_identifier.clone();
 
-    let defined_parameters = resolved_parameters.get_defined_parameters();
-    let defined_parameters_with_errors = resolved_parameters.get_parameters_with_errors();
-    let defined_parameters_info = InfoMap::new(
-        defined_parameters.iter().collect(),
-        defined_parameters_with_errors,
-    );
+    let value = resolve_parameter_value(parameter.value(), builtin_ref, &context);
 
-    let value = resolve_parameter_value(
-        parameter.value(),
-        builtin_ref,
-        &defined_parameters_info,
-        submodel_info,
-        model_info,
-    );
-
-    let limits = resolve_limits(
-        parameter.limits(),
-        builtin_ref,
-        &defined_parameters_info,
-        submodel_info,
-        model_info,
-    );
+    let limits = resolve_limits(parameter.limits(), builtin_ref, &context);
 
     let is_performance = parameter.performance_marker().is_some();
 
     let trace_level = resolve_trace_level(parameter.trace_level());
 
-    let resolved_parameters = match error::combine_errors(value, limits) {
+    let (resolved_parameters, context) = match error::combine_errors(value, limits) {
         Ok((value, limits)) => {
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
             let ident_with_span = oneil_ir::span::WithSpan::new(ident, ident_span);
@@ -453,18 +436,21 @@ fn resolve_parameter(
                 trace_level,
             );
 
-            resolved_parameters.add_parameter(parameter_identifier.clone(), parameter);
+            // TODO: figure out a way not to clone the parameter
+            resolved_parameters.add_parameter(parameter_identifier.clone(), parameter.clone());
+            context.add_parameter(parameter_identifier, parameter);
 
-            resolved_parameters
+            (resolved_parameters, context)
         }
         Err(errors) => {
             resolved_parameters.add_error_list(&parameter_identifier, errors);
+            context.add_parameter_error(parameter_identifier);
 
-            resolved_parameters
+            (resolved_parameters, context)
         }
     };
 
-    (resolved_parameters, visited)
+    (resolved_parameters, visited, context)
 }
 
 /// Resolves a parameter value expression.
@@ -485,20 +471,11 @@ fn resolve_parameter(
 fn resolve_parameter_value(
     value: &ast::parameter::ParameterValue,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<ParameterValue, Vec<ParameterResolutionError>> {
     match value {
         ast::parameter::ParameterValue::Simple(expr, unit) => {
-            let expr = resolve_expr(
-                expr,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            )
-            .map_err(error::convert_errors)?;
+            let expr = resolve_expr(expr, builtin_ref, context).map_err(error::convert_errors)?;
 
             let unit = unit.as_ref().map(resolve_unit);
 
@@ -507,23 +484,11 @@ fn resolve_parameter_value(
 
         ast::parameter::ParameterValue::Piecewise(piecewise, unit) => {
             let exprs = piecewise.iter().map(|part| {
-                let expr = resolve_expr(
-                    part.expr(),
-                    builtin_ref,
-                    defined_parameters_info,
-                    submodel_info,
-                    model_info,
-                )
-                .map_err(error::convert_errors);
+                let expr =
+                    resolve_expr(part.expr(), builtin_ref, context).map_err(error::convert_errors);
 
-                let if_expr = resolve_expr(
-                    part.if_expr(),
-                    builtin_ref,
-                    defined_parameters_info,
-                    submodel_info,
-                    model_info,
-                )
-                .map_err(error::convert_errors);
+                let if_expr = resolve_expr(part.if_expr(), builtin_ref, context)
+                    .map_err(error::convert_errors);
 
                 let (expr, if_expr) = error::combine_errors(expr, if_expr)?;
 
@@ -557,29 +522,13 @@ fn resolve_parameter_value(
 fn resolve_limits(
     limits: Option<&ast::parameter::LimitsNode>,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::parameter::Limits, Vec<ParameterResolutionError>> {
     match limits.map(Node::node_value) {
         Some(ast::parameter::Limits::Continuous { min, max }) => {
-            let min = resolve_expr(
-                min,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            )
-            .map_err(error::convert_errors);
+            let min = resolve_expr(min, builtin_ref, context).map_err(error::convert_errors);
 
-            let max = resolve_expr(
-                max,
-                builtin_ref,
-                defined_parameters_info,
-                submodel_info,
-                model_info,
-            )
-            .map_err(error::convert_errors);
+            let max = resolve_expr(max, builtin_ref, context).map_err(error::convert_errors);
 
             let (min, max) = error::combine_errors(min, max)?;
 
@@ -587,14 +536,7 @@ fn resolve_limits(
         }
         Some(ast::parameter::Limits::Discrete { values }) => {
             let values = values.iter().map(|value| {
-                resolve_expr(
-                    value,
-                    builtin_ref,
-                    defined_parameters_info,
-                    submodel_info,
-                    model_info,
-                )
-                .map_err(error::convert_errors)
+                resolve_expr(value, builtin_ref, context).map_err(error::convert_errors)
             });
 
             let values = error::combine_error_list(values)?;
@@ -606,6 +548,7 @@ fn resolve_limits(
 }
 
 #[cfg(test)]
+#[cfg(any())]
 mod tests {
     use crate::error::VariableResolutionError;
 

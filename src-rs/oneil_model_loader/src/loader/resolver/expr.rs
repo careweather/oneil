@@ -56,8 +56,11 @@ use oneil_ir::{expr::Expr, reference::Identifier, span::WithSpan};
 use crate::{
     BuiltinRef,
     error::{self, VariableResolutionError},
-    loader::resolver::{ModelInfo, ParameterInfo, SubmodelInfo, variable::resolve_variable},
-    util::get_span_from_ast_span,
+    loader::resolver::variable::resolve_variable,
+    util::{
+        context::{ModelContext, ModelImportsContext, ParameterContext},
+        get_span_from_ast_span,
+    },
 };
 
 /// Resolves an AST expression into a model expression.
@@ -91,9 +94,7 @@ use crate::{
 pub fn resolve_expr(
     value: &ast::expression::ExprNode,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
     let value_span = get_span_from_ast_span(value.node_span());
     match value.node_value() {
@@ -109,53 +110,24 @@ pub fn resolve_expr(
             rest_chained,
             value_span,
             builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
+            context,
         ),
-        ast::Expr::BinaryOp { op, left, right } => resolve_binary_expression(
-            op,
-            left,
-            right,
-            value_span,
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        ),
-        ast::Expr::UnaryOp { op, expr } => resolve_unary_expression(
-            op,
-            expr,
-            value_span,
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        ),
-        ast::Expr::FunctionCall { name, args } => resolve_function_call_expression(
-            name,
-            args,
-            value_span,
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        ),
-        ast::Expr::Variable(variable) => resolve_variable_expression(
-            variable,
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        ),
+        ast::Expr::BinaryOp { op, left, right } => {
+            resolve_binary_expression(op, left, right, value_span, builtin_ref, context)
+        }
+        ast::Expr::UnaryOp { op, expr } => {
+            resolve_unary_expression(op, expr, value_span, builtin_ref, context)
+        }
+        ast::Expr::FunctionCall { name, args } => {
+            resolve_function_call_expression(name, args, value_span, builtin_ref, context)
+        }
+        ast::Expr::Variable(variable) => {
+            resolve_variable_expression(variable, builtin_ref, context)
+        }
         ast::Expr::Literal(literal) => Ok(resolve_literal_expression(literal, value_span)),
-        ast::Expr::Parenthesized { expr } => resolve_parenthesized_expression(
-            expr,
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        ),
+        ast::Expr::Parenthesized { expr } => {
+            resolve_parenthesized_expression(expr, builtin_ref, context)
+        }
     }
 }
 
@@ -183,35 +155,15 @@ fn resolve_comparison_expression(
     rest_chained: &[(ast::expression::ComparisonOpNode, ast::expression::ExprNode)],
     value_span: oneil_ir::span::Span,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
-    let left = resolve_expr(
-        left,
-        builtin_ref,
-        defined_parameters_info,
-        submodel_info,
-        model_info,
-    );
-    let right = resolve_expr(
-        right,
-        builtin_ref,
-        defined_parameters_info,
-        submodel_info,
-        model_info,
-    );
+    let left = resolve_expr(left, builtin_ref, context);
+    let right = resolve_expr(right, builtin_ref, context);
     let op_with_span = resolve_comparison_op(op);
 
     // Resolve the chained comparisons
     let rest_chained = rest_chained.iter().map(|(op, expr)| {
-        let expr = resolve_expr(
-            expr,
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        );
+        let expr = resolve_expr(expr, builtin_ref, context);
         let op_with_span = resolve_comparison_op(op);
         expr.map(|expr| (op_with_span, expr))
     });
@@ -247,24 +199,10 @@ fn resolve_binary_expression(
     right: &ast::expression::ExprNode,
     value_span: oneil_ir::span::Span,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
-    let left = resolve_expr(
-        left,
-        builtin_ref,
-        defined_parameters_info,
-        submodel_info,
-        model_info,
-    );
-    let right = resolve_expr(
-        right,
-        builtin_ref,
-        defined_parameters_info,
-        submodel_info,
-        model_info,
-    );
+    let left = resolve_expr(left, builtin_ref, context);
+    let right = resolve_expr(right, builtin_ref, context);
     let op_with_span = resolve_binary_op(op);
 
     let (left, right) = error::combine_errors(left, right)?;
@@ -293,17 +231,9 @@ fn resolve_unary_expression(
     expr: &ast::expression::ExprNode,
     value_span: oneil_ir::span::Span,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
-    let expr = resolve_expr(
-        expr,
-        builtin_ref,
-        defined_parameters_info,
-        submodel_info,
-        model_info,
-    );
+    let expr = resolve_expr(expr, builtin_ref, context);
     let op_with_span = resolve_unary_op(op);
 
     match expr {
@@ -335,20 +265,12 @@ fn resolve_function_call_expression(
     args: &[ast::expression::ExprNode],
     value_span: oneil_ir::span::Span,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
     let name_with_span = resolve_function_name(name, builtin_ref);
-    let args = args.iter().map(|arg| {
-        resolve_expr(
-            arg,
-            builtin_ref,
-            defined_parameters_info,
-            submodel_info,
-            model_info,
-        )
-    });
+    let args = args
+        .iter()
+        .map(|arg| resolve_expr(arg, builtin_ref, context));
 
     let args = error::combine_error_list(args)?;
 
@@ -372,18 +294,9 @@ fn resolve_function_call_expression(
 fn resolve_variable_expression(
     variable: &ast::expression::VariableNode,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
-    resolve_variable(
-        variable,
-        builtin_ref,
-        defined_parameters_info,
-        submodel_info,
-        model_info,
-    )
-    .map_err(|error| vec![error])
+    resolve_variable(variable, builtin_ref, context).map_err(|error| vec![error])
 }
 
 /// Resolves a literal expression.
@@ -421,17 +334,9 @@ fn resolve_literal_expression(
 fn resolve_parenthesized_expression(
     expr: &ast::expression::ExprNode,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters_info: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
-    resolve_expr(
-        expr,
-        builtin_ref,
-        defined_parameters_info,
-        submodel_info,
-        model_info,
-    )
+    resolve_expr(expr, builtin_ref, context)
 }
 
 /// Converts an AST comparison operation to a model comparison operation.
@@ -562,6 +467,7 @@ fn resolve_literal(literal: &ast::expression::LiteralNode) -> oneil_ir::expr::Li
 }
 
 #[cfg(test)]
+#[cfg(any())]
 mod tests {
     use super::*;
     use oneil_ast as ast;

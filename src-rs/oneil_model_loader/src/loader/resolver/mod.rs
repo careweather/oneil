@@ -32,15 +32,6 @@
 //! and items that have errors, allowing the resolution functions to make informed decisions
 //! about error handling.
 
-use oneil_ir::{
-    model::Model,
-    parameter::Parameter,
-    reference::{Identifier, ModelPath},
-    span::Span,
-};
-
-use crate::util::info::InfoMap;
-
 mod expr;
 mod parameter;
 mod submodel;
@@ -54,21 +45,3 @@ pub use submodel::resolve_submodels;
 pub use test::resolve_tests;
 
 // TODO: in all resolver tests, seperate out tests that test spans and tests that test values
-
-/// Type alias for parameter information maps used during resolution.
-///
-/// This type represents a map from parameter identifiers to their resolved parameter
-/// definitions, along with information about which parameters have errors.
-pub type ParameterInfo<'a> = InfoMap<&'a Identifier, &'a Parameter>;
-
-/// Type alias for submodel information maps used during resolution.
-///
-/// This type represents a map from submodel identifiers to their resolved model paths,
-/// along with information about which submodels have errors.
-pub type SubmodelInfo<'a> = InfoMap<&'a Identifier, &'a (ModelPath, Span)>;
-
-/// Type alias for model information maps used during resolution.
-///
-/// This type represents a map from model paths to their loaded models,
-/// along with information about which models have errors.
-pub type ModelInfo<'a> = InfoMap<&'a ModelPath, &'a Model>;

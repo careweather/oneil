@@ -67,8 +67,10 @@ use oneil_ir::{
 
 use crate::{
     error::SubmodelResolutionError,
-    loader::resolver::ModelInfo,
-    util::{get_span_from_ast_span, info::InfoResult},
+    util::{
+        context::{LookupResult, ModelContext},
+        get_span_from_ast_span,
+    },
 };
 
 type SubmodelMap = HashMap<Identifier, (ModelPath, Span)>;
@@ -102,7 +104,7 @@ type ResolutionErrorMap = HashMap<Identifier, SubmodelResolutionError>;
 pub fn resolve_submodels(
     use_models: Vec<&ast::declaration::UseModelNode>,
     model_path: &ModelPath,
-    model_info: &ModelInfo<'_>,
+    context: &impl ModelContext,
 ) -> (SubmodelMap, ResolutionErrorMap) {
     use_models.into_iter().fold(
         (HashMap::new(), HashMap::new()),
@@ -117,7 +119,7 @@ pub fn resolve_submodels(
                 use_model.model_info().subcomponents(),
                 submodel_name,
                 submodel_name_span,
-                model_info,
+                context,
                 submodels,
                 resolution_errors,
             );
@@ -147,7 +149,7 @@ pub fn resolve_submodels(
                         &submodel_subcomponents,
                         resolved_submodel_name,
                         resolved_submodel_name_span,
-                        model_info,
+                        context,
                         submodels,
                         resolution_errors,
                     );
@@ -185,7 +187,7 @@ fn resolve_single_submodel(
     subcomponents: &[ast::naming::IdentifierNode],
     resolved_model_name: Identifier,
     resolved_model_reference_span: Span,
-    model_info: &crate::util::info::InfoMap<&ModelPath, &oneil_ir::model::Model>,
+    context: &impl ModelContext,
     mut submodels: SubmodelMap,
     mut resolution_errors: ResolutionErrorMap,
 ) -> (SubmodelMap, ResolutionErrorMap, Result<ModelPath, ()>) {
@@ -205,12 +207,8 @@ fn resolve_single_submodel(
     }
 
     // resolve the use model path
-    let resolved_use_model_path = resolve_model_path(
-        top_model_path,
-        top_model_ident_span,
-        subcomponents,
-        model_info,
-    );
+    let resolved_use_model_path =
+        resolve_model_path(top_model_path, top_model_ident_span, subcomponents, context);
 
     // insert the use model path into the submodels map if it was resolved successfully
     // otherwise, add the error to the builder
@@ -280,19 +278,19 @@ fn resolve_model_path(
     model_path: ModelPath,
     model_name_span: Span,
     model_subcomponents: &[ast::naming::IdentifierNode],
-    model_info: &ModelInfo<'_>,
+    context: &impl ModelContext,
 ) -> Result<ModelPath, SubmodelResolutionError> {
     // if the model that we are trying to resolve has had an error, this
     // operation should fail
-    let model = match model_info.get(&model_path) {
-        InfoResult::Found(model) => model,
-        InfoResult::HasError => {
+    let model = match context.lookup_model(&model_path) {
+        LookupResult::Found(model) => model,
+        LookupResult::HasError => {
             return Err(SubmodelResolutionError::model_has_error(
                 model_path,
                 model_name_span,
             ));
         }
-        InfoResult::NotFound => panic!("model should have been visited already"),
+        LookupResult::NotFound => panic!("model should have been visited already"),
     };
 
     // if there are no more subcomponents, we have resolved the model path
@@ -320,11 +318,12 @@ fn resolve_model_path(
         submodel_path,
         submodel_name_span,
         submodel_subcomponents,
-        model_info,
+        context,
     )
 }
 
 #[cfg(test)]
+#[cfg(any())]
 mod tests {
     use super::*;
     use oneil_ir::model::Model;

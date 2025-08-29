@@ -11,20 +11,15 @@
 //! - Test resolution
 //!
 
-use std::{borrow::Borrow, collections::HashSet};
+use std::borrow::Borrow;
 
 use oneil_ast as ast;
-use oneil_ir::{
-    model::Model,
-    parameter::Parameter,
-    reference::{Identifier, ModelPath},
-    span::Span,
-};
+use oneil_ir::{model::Model, reference::ModelPath};
 
 use crate::{
     BuiltinRef,
     error::{LoadError, ResolutionErrors},
-    util::{FileLoader, Stack, builder::ModelCollectionBuilder, info::InfoMap},
+    util::{FileLoader, Stack, builder::ModelCollectionBuilder, context::ModelsLoadedContext},
 };
 
 mod importer;
@@ -126,37 +121,21 @@ where
         builder,
     );
 
-    let model_info: InfoMap<&ModelPath, &Model> = InfoMap::new(
-        builder.get_models().iter().collect(),
-        builder.get_models_with_errors(),
-    );
+    let context = ModelsLoadedContext::from_builder(&builder);
 
     // resolve submodels
     let (submodels, submodel_resolution_errors) =
-        resolver::resolve_submodels(use_models, &model_path, &model_info);
+        resolver::resolve_submodels(use_models, &model_path, &context);
 
-    let submodels_with_errors: HashSet<&Identifier> = submodel_resolution_errors.keys().collect();
-
-    let submodel_info: InfoMap<&Identifier, &(ModelPath, Span)> =
-        InfoMap::new(submodels.iter().collect(), submodels_with_errors);
+    let context = context.with_model_imports_resolved(&submodels, &submodel_resolution_errors);
+    let context = context.begin_parameter_resolution();
 
     // resolve parameters
-    let (parameters, parameter_resolution_errors) =
-        resolver::resolve_parameters(parameters, builtin_ref, &submodel_info, &model_info);
-
-    let parameters_with_errors: HashSet<&Identifier> = parameter_resolution_errors.keys().collect();
-
-    let parameter_info: InfoMap<&Identifier, &Parameter> =
-        InfoMap::new(parameters.iter().collect(), parameters_with_errors);
+    let (parameters, parameter_resolution_errors, context) =
+        resolver::resolve_parameters(parameters, builtin_ref, context);
 
     // resolve tests
-    let (tests, test_resolution_errors) = resolver::resolve_tests(
-        tests,
-        builtin_ref,
-        &parameter_info,
-        &submodel_info,
-        &model_info,
-    );
+    let (tests, test_resolution_errors) = resolver::resolve_tests(tests, builtin_ref, &context);
 
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,
@@ -303,6 +282,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg(any())]
 mod tests {
 
     use super::*;

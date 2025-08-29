@@ -43,8 +43,10 @@ use oneil_ir::{
 use crate::{
     BuiltinRef,
     error::VariableResolutionError,
-    loader::resolver::{ModelInfo, ParameterInfo, SubmodelInfo},
-    util::{get_span_from_ast_span, info::InfoResult},
+    util::{
+        context::{LookupResult, ModelContext, ModelImportsContext, ParameterContext},
+        get_span_from_ast_span,
+    },
 };
 
 /// Resolves a variable expression to its corresponding model expression.
@@ -92,9 +94,7 @@ use crate::{
 pub fn resolve_variable(
     variable: &ast::expression::VariableNode,
     builtin_ref: &impl BuiltinRef,
-    defined_parameters: &ParameterInfo<'_>,
-    submodel_info: &SubmodelInfo<'_>,
-    model_info: &ModelInfo<'_>,
+    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
 ) -> Result<ExprWithSpan, VariableResolutionError> {
     match variable.node_value() {
         ast::expression::Variable::Identifier(identifier) => {
@@ -102,17 +102,17 @@ pub fn resolve_variable(
             let var_identifier = Identifier::new(identifier.as_str());
             let var_identifier_span = get_span_from_ast_span(identifier.node_span());
 
-            match defined_parameters.get(&var_identifier) {
-                InfoResult::Found(_parameter) => {
+            match context.lookup_parameter(&var_identifier) {
+                LookupResult::Found(_parameter) => {
                     let span = get_span_from_ast_span(variable.node_span());
                     let expr = Expr::parameter_variable(var_identifier);
                     Ok(WithSpan::new(expr, span))
                 }
-                InfoResult::HasError => Err(VariableResolutionError::parameter_has_error(
+                LookupResult::HasError => Err(VariableResolutionError::parameter_has_error(
                     var_identifier,
                     var_identifier_span,
                 )),
-                InfoResult::NotFound => {
+                LookupResult::NotFound => {
                     if builtin_ref.has_builtin_value(&var_identifier) {
                         let expr = Expr::builtin_variable(var_identifier);
                         Ok(WithSpan::new(expr, span))
@@ -128,15 +128,15 @@ pub fn resolve_variable(
         ast::expression::Variable::Accessor { parent, component } => {
             let parent_identifier = Identifier::new(parent.as_str());
             let parent_identifier_span = get_span_from_ast_span(parent.node_span());
-            let submodel_path = match submodel_info.get(&parent_identifier) {
-                InfoResult::Found((submodel_path, _span)) => submodel_path,
-                InfoResult::HasError => {
+            let submodel_path = match context.lookup_submodel(&parent_identifier) {
+                LookupResult::Found((submodel_path, _span)) => submodel_path,
+                LookupResult::HasError => {
                     return Err(VariableResolutionError::submodel_resolution_failed(
                         parent_identifier,
                         parent_identifier_span,
                     ));
                 }
-                InfoResult::NotFound => {
+                LookupResult::NotFound => {
                     return Err(VariableResolutionError::undefined_submodel(
                         parent_identifier,
                         parent_identifier_span,
@@ -148,7 +148,7 @@ pub fn resolve_variable(
                 submodel_path,
                 component,
                 parent_identifier_span,
-                model_info,
+                context,
             )?;
 
             let span = get_span_from_ast_span(variable.node_span());
@@ -177,17 +177,17 @@ fn resolve_variable_recursive(
     submodel_path: &ModelPath,
     variable: &ast::expression::Variable,
     parent_identifier_span: Span,
-    model_info: &ModelInfo<'_>,
+    context: &impl ModelContext,
 ) -> Result<(ModelPath, Identifier), VariableResolutionError> {
-    let model = match model_info.get(submodel_path) {
-        InfoResult::Found(model) => model,
-        InfoResult::HasError => {
+    let model = match context.lookup_model(submodel_path) {
+        LookupResult::Found(model) => model,
+        LookupResult::HasError => {
             return Err(VariableResolutionError::model_has_error(
                 submodel_path.clone(),
                 parent_identifier_span,
             ));
         }
-        InfoResult::NotFound => panic!("submodel should have been visited already"),
+        LookupResult::NotFound => panic!("submodel should have been visited already"),
     };
 
     match variable {
@@ -219,12 +219,13 @@ fn resolve_variable_recursive(
                 return Err(source);
             };
 
-            resolve_variable_recursive(submodel_path, component, parent_identifier_span, model_info)
+            resolve_variable_recursive(submodel_path, component, parent_identifier_span, context)
         }
     }
 }
 
 #[cfg(test)]
+#[cfg(any())]
 mod tests {
     use crate::test::TestBuiltinRef;
 

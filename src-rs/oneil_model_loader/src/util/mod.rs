@@ -26,7 +26,7 @@ use oneil_ir::span::Span;
 
 pub mod builder;
 pub mod builtin_ref;
-pub mod info;
+pub mod context;
 
 pub fn get_span_from_ast_span(ast_span: ast::Span) -> Span {
     Span::new(ast_span.start(), ast_span.length())
