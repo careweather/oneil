@@ -467,9 +467,10 @@ fn resolve_literal(literal: &ast::expression::LiteralNode) -> oneil_ir::expr::Li
 }
 
 #[cfg(test)]
-#[cfg(any())]
 mod tests {
     use super::*;
+    use crate::test::{TestBuiltinRef, TestContext};
+
     use oneil_ast as ast;
     use oneil_ir as ir;
     use oneil_ir::span::Span;
@@ -477,10 +478,9 @@ mod tests {
         expr::{BinaryOp, FunctionName, Literal, UnaryOp},
         reference::Identifier,
     };
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
 
     mod helper {
-        use crate::test::TestBuiltinRef;
 
         use super::*;
 
@@ -610,36 +610,6 @@ mod tests {
             ast::node::Node::new(&test_span(start, end), parenthesized_expr)
         }
 
-        pub fn create_empty_context() -> (
-            TestBuiltinRef,
-            ParameterInfo<'static>,
-            SubmodelInfo<'static>,
-            ModelInfo<'static>,
-        ) {
-            let builtin_ref = TestBuiltinRef::new();
-            let param_info = ParameterInfo::new(HashMap::new(), HashSet::new());
-            let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
-            let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
-
-            (builtin_ref, param_info, submodel_info, model_info)
-        }
-
-        pub fn create_empty_test_builtin_ref() -> TestBuiltinRef {
-            TestBuiltinRef::new()
-        }
-
-        pub fn create_test_builtin_ref_with_builtin_variables(
-            variables: impl IntoIterator<Item = String>,
-        ) -> TestBuiltinRef {
-            TestBuiltinRef::new().with_builtin_variables(variables)
-        }
-
-        pub fn create_test_builtin_ref_with_builtin_functions(
-            functions: impl IntoIterator<Item = String>,
-        ) -> TestBuiltinRef {
-            TestBuiltinRef::new().with_builtin_functions(functions)
-        }
-
         /// Helper function to create a parameter ID with span
         pub fn create_ir_id_with_span(
             name: &str,
@@ -678,17 +648,12 @@ mod tests {
         let literal =
             helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &literal,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&literal, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -716,16 +681,11 @@ mod tests {
         );
 
         // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &literal,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&literal, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -749,17 +709,12 @@ mod tests {
         let literal =
             helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &literal,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&literal, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -787,17 +742,12 @@ mod tests {
             helper::create_literal_expr_node(ast::expression::Literal::Number(2.0), 4, 5);
         let expr = helper::create_binary_op_expr_node(ast_left, ast_op.clone(), ast_right, 0, 5);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -839,17 +789,12 @@ mod tests {
         let ast_op = helper::create_unary_op_node(ast::expression::UnaryOp::Neg, 0, 1);
         let expr = helper::create_unary_op_expr_node(ast_op.clone(), ast_inner_expr, 0, 4);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -884,17 +829,12 @@ mod tests {
         let ast_name = helper::create_identifier_node("foo", 0, 3);
         let expr = helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg], 0, 8);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -935,17 +875,12 @@ mod tests {
         let ast_name = helper::create_identifier_node("custom_function", 0, 15);
         let expr = helper::create_function_call_expr_node(ast_name.clone(), vec![ast_arg], 0, 19);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -984,18 +919,12 @@ mod tests {
         let ast_variable = helper::create_identifier_variable("x");
         let expr = helper::create_variable_expr_node(ast_variable, 0, 1);
 
-        // create the context
-        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
-        let builtin_ref = helper::create_test_builtin_ref_with_builtin_variables(["x".to_string()]);
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1020,8 +949,9 @@ mod tests {
         let ast_variable = helper::create_identifier_variable("param");
         let expr = helper::create_variable_expr_node(ast_variable, 0, 5);
 
-        // create the context
-        let mut param_map = HashMap::new();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
+
         let param_id = helper::create_ir_id_with_span("param", 0, 5);
         let param_value = helper::create_ir_expr_literal(42.0, 0, 5);
         let parameter = oneil_ir::parameter::Parameter::new(
@@ -1032,18 +962,12 @@ mod tests {
             false,
             oneil_ir::debug_info::TraceLevel::None,
         );
-        param_map.insert(param_id.value(), &parameter);
-        let param_info = ParameterInfo::new(param_map, HashSet::new());
-        let (builtin_ref, _, submodel_info, model_info) = helper::create_empty_context();
+
+        let context =
+            TestContext::new().with_parameter_context([(param_id.take_value(), parameter)]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1071,17 +995,12 @@ mod tests {
         let ast_variable = helper::create_identifier_variable("undefined");
         let expr = helper::create_variable_expr_node(ast_variable.clone(), 0, 9);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1140,17 +1059,12 @@ mod tests {
             17,
         );
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1344,28 +1258,21 @@ mod tests {
     #[test]
     fn test_resolve_function_name_builtin() {
         // create the builtin functions
-        let builtin_functions = vec![
-            "min".to_string(),
-            "max".to_string(),
-            "sin".to_string(),
-            "cos".to_string(),
-            "tan".to_string(),
-        ];
+        let builtin_functions = ["min", "max", "sin", "cos", "tan"];
 
-        let builtin_ref =
-            helper::create_test_builtin_ref_with_builtin_functions(builtin_functions.clone());
+        let builtin_ref = TestBuiltinRef::new().with_builtin_functions(builtin_functions);
 
         // resolve the function names
         for func_name in builtin_functions {
             // create the function name node
-            let ast_func_name_node = helper::create_identifier_node(&func_name, 0, 1);
+            let ast_func_name_node = helper::create_identifier_node(func_name, 0, 1);
 
             // resolve the function name
             let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
             let expected_span = get_span_from_ast_span(ast_func_name_node.node_span());
-            let expected_func_builtin = FunctionName::builtin(Identifier::new(&func_name));
+            let expected_func_builtin = FunctionName::builtin(Identifier::new(func_name));
             assert_eq!(result.span(), expected_span);
             assert_eq!(result.value(), &expected_func_builtin);
         }
@@ -1381,7 +1288,7 @@ mod tests {
             "user_defined_function",
         ];
 
-        let builtin_ref = helper::create_empty_test_builtin_ref();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the function names
         for func_name in imported_functions {
@@ -1438,17 +1345,12 @@ mod tests {
         let expr =
             helper::create_binary_op_expr_node(ast_left_expr, ast_add_op, ast_right_expr, 0, 26);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1504,17 +1406,12 @@ mod tests {
         );
         let expr = helper::create_parenthesized_expr_node(inner_expr.clone(), 0, 8);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1581,16 +1478,11 @@ mod tests {
         );
 
         // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1676,17 +1568,12 @@ mod tests {
             helper::create_parenthesized_expr_node(ast_inner_literal.clone(), 1, 5);
         let expr = helper::create_parenthesized_expr_node(first_parentheses, 0, 6);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1713,17 +1600,12 @@ mod tests {
         let second_level = helper::create_parenthesized_expr_node(third_level, 1, 9);
         let expr = helper::create_parenthesized_expr_node(second_level, 0, 10);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1755,17 +1637,12 @@ mod tests {
         );
         let expr = helper::create_parenthesized_expr_node(func_call.clone(), 0, 11);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1808,17 +1685,12 @@ mod tests {
             helper::create_unary_op_expr_node(ast_op.clone(), inner_expr.clone(), 0, 3);
         let expr = helper::create_parenthesized_expr_node(unary_expr.clone(), 0, 4);
 
-        // create the context
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1865,17 +1737,11 @@ mod tests {
         let expr_node = ast::node::Node::new(&helper::test_span(0, 5), expr);
 
         // create the context
-        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
-        let builtin_ref = helper::create_test_builtin_ref_with_builtin_variables(["x".to_string()]);
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr_node,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr_node, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -1944,18 +1810,12 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(&helper::test_span(0, 10), expr);
 
-        // create the context
-        let (_, param_info, submodel_info, model_info) = helper::create_empty_context();
-        let builtin_ref = helper::create_test_builtin_ref_with_builtin_variables(["x".to_string()]);
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &expr_node,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr_node, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -2033,15 +1893,10 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(&helper::test_span(0, 19), expr);
 
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
-        let result = resolve_expr(
-            &expr_node,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr_node, &builtin_ref, &context);
 
         match result {
             Err(errors) => {
@@ -2079,15 +1934,10 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(&helper::test_span(0, 19), expr);
 
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
-        let result = resolve_expr(
-            &expr_node,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr_node, &builtin_ref, &context);
 
         match result {
             Err(errors) => {
@@ -2128,15 +1978,10 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(&helper::test_span(0, 23), expr);
 
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
-        let result = resolve_expr(
-            &expr_node,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr_node, &builtin_ref, &context);
 
         match result {
             Err(errors) => {
@@ -2179,15 +2024,10 @@ mod tests {
         };
         let expr_node = ast::node::Node::new(&helper::test_span(0, 51), expr);
 
-        let (builtin_ref, param_info, submodel_info, model_info) = helper::create_empty_context();
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
-        let result = resolve_expr(
-            &expr_node,
-            &builtin_ref,
-            &param_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_expr(&expr_node, &builtin_ref, &context);
 
         match result {
             Err(errors) => {

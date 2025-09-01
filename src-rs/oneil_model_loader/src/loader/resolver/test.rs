@@ -91,41 +91,22 @@ pub fn resolve_tests(
 }
 
 #[cfg(test)]
-#[cfg(any())]
 mod tests {
-    use crate::{error::VariableResolutionError, util::get_span_from_ast_span};
+    use crate::{
+        error::VariableResolutionError,
+        test::{TestBuiltinRef, TestContext},
+        util::get_span_from_ast_span,
+    };
 
     use super::*;
 
     use oneil_ir::{debug_info::TraceLevel as ModelTraceLevel, reference::Identifier};
-    use std::collections::HashSet;
 
     // TODO: write tests that test the span of the test inputs
 
     mod helper {
-        use crate::test::TestBuiltinRef;
 
         use super::*;
-
-        /// Helper function to create empty builtin variables
-        pub fn create_empty_builtin_ref() -> TestBuiltinRef {
-            TestBuiltinRef::new()
-        }
-
-        /// Helper function to create test parameter information for testing
-        pub fn create_empty_parameter_info() -> ParameterInfo<'static> {
-            ParameterInfo::new(HashMap::new(), HashSet::new())
-        }
-
-        /// Helper function to create test submodel information for testing
-        pub fn create_empty_submodel_info() -> SubmodelInfo<'static> {
-            SubmodelInfo::new(HashMap::new(), HashSet::new())
-        }
-
-        /// Helper function to create test model information for testing
-        pub fn create_empty_model_info() -> ModelInfo<'static> {
-            ModelInfo::new(HashMap::new(), HashSet::new())
-        }
 
         /// Helper function to create a test span
         pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
@@ -187,14 +168,12 @@ mod tests {
         let tests = [];
         let tests_refs = tests.iter().collect();
 
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
+
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &helper::create_empty_builtin_ref(),
-            &helper::create_empty_parameter_info(),
-            &helper::create_empty_submodel_info(),
-            &helper::create_empty_model_info(),
-        );
+        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -217,14 +196,12 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
+
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &helper::create_empty_builtin_ref(),
-            &helper::create_empty_parameter_info(),
-            &helper::create_empty_submodel_info(),
-            &helper::create_empty_model_info(),
-        );
+        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -252,14 +229,12 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
+
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &helper::create_empty_builtin_ref(),
-            &helper::create_empty_parameter_info(),
-            &helper::create_empty_submodel_info(),
-            &helper::create_empty_model_info(),
-        );
+        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -288,14 +263,12 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
+
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &helper::create_empty_builtin_ref(),
-            &helper::create_empty_parameter_info(),
-            &helper::create_empty_submodel_info(),
-            &helper::create_empty_model_info(),
-        );
+        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -343,14 +316,12 @@ mod tests {
         ];
         let tests_refs = tests.iter().collect();
 
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
+
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &helper::create_empty_builtin_ref(),
-            &helper::create_empty_parameter_info(),
-            &helper::create_empty_submodel_info(),
-            &helper::create_empty_model_info(),
-        );
+        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);

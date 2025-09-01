@@ -225,9 +225,8 @@ fn resolve_variable_recursive(
 }
 
 #[cfg(test)]
-#[cfg(any())]
 mod tests {
-    use crate::test::TestBuiltinRef;
+    use crate::test::{TestBuiltinRef, TestContext};
 
     use super::*;
     use oneil_ast as ast;
@@ -287,33 +286,6 @@ mod tests {
                 component: Box::new(component),
             };
             create_variable_node(variable, 0, parent.len() + 1 + component_end)
-        }
-
-        /// Helper function to create a basic model info for testing
-        pub fn create_test_model_info<'a>() -> ModelInfo<'a> {
-            ModelInfo::new(HashMap::new(), HashSet::new())
-        }
-
-        /// Helper function to create a basic parameter info for testing
-        pub fn create_test_parameter_info<'a>() -> ParameterInfo<'a> {
-            ParameterInfo::new(HashMap::new(), HashSet::new())
-        }
-
-        /// Helper function to create a basic submodel info for testing
-        pub fn create_test_submodel_info<'a>() -> SubmodelInfo<'a> {
-            SubmodelInfo::new(HashMap::new(), HashSet::new())
-        }
-
-        /// Helper function to create a basic builtin ref for testing
-        pub fn create_test_builtin_ref() -> TestBuiltinRef {
-            TestBuiltinRef::new()
-        }
-
-        /// Helper function to create a basic builtin ref with a parameter
-        pub fn create_test_builtin_ref_with_parameters(
-            parameters: impl IntoIterator<Item = String>,
-        ) -> TestBuiltinRef {
-            TestBuiltinRef::new().with_builtin_variables(parameters)
         }
 
         /// Helper function to create a model with a parameter
@@ -383,16 +355,13 @@ mod tests {
     fn test_resolve_builtin_variable() {
         // create a local variable
         let variable = helper::create_identifier_variable("pi");
-        let builtin_ref = helper::create_test_builtin_ref_with_parameters(["pi".to_string()]);
+
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["pi"]);
+        let context = TestContext::new();
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &helper::create_test_submodel_info(),
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         assert!(result.is_ok());
@@ -411,11 +380,11 @@ mod tests {
     fn test_resolve_parameter_variable() {
         // create a parameter variable
         let variable = helper::create_identifier_variable("temperature");
-        let builtin_ref =
-            helper::create_test_builtin_ref_with_parameters(["temperature".to_string()]);
 
-        // create parameter info with temperature parameter
-        let mut param_map = HashMap::new();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["temperature"]);
+
+        let temp_param_id = Identifier::new("temperature");
         let temp_param = Parameter::new(
             HashSet::new(),
             WithSpan::new(Identifier::new("temperature"), helper::test_ir_span(0, 10)),
@@ -430,18 +399,11 @@ mod tests {
             false,
             oneil_ir::debug_info::TraceLevel::None,
         );
-        let temp_param_id = Identifier::new("temperature");
-        param_map.insert(&temp_param_id, &temp_param);
-        let param_info = ParameterInfo::new(param_map, HashSet::new());
+
+        let context = TestContext::new().with_parameter_context([(temp_param_id, temp_param)]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &param_info,
-            &helper::create_test_submodel_info(),
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         assert!(result.is_ok());
@@ -460,16 +422,13 @@ mod tests {
     fn test_resolve_undefined_parameter() {
         // create a variable for undefined parameter
         let variable = helper::create_identifier_variable("undefined_param");
-        let builtin_ref = helper::create_test_builtin_ref();
+
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
+        let context = TestContext::new();
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &helper::create_test_submodel_info(),
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -493,22 +452,15 @@ mod tests {
         // create a variable for parameter with error
         let variable = helper::create_identifier_variable("error_param");
         let variable_span = get_span_from_ast_span(variable.node_span());
-        let builtin_ref = helper::create_test_builtin_ref();
 
-        // create parameter info with error parameter
-        let mut param_with_errors = HashSet::new();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
+
         let error_param_id = Identifier::new("error_param");
-        param_with_errors.insert(&error_param_id);
-        let param_info = ParameterInfo::new(HashMap::new(), param_with_errors);
+        let context = TestContext::new().with_parameter_errors([error_param_id]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &param_info,
-            &helper::create_test_submodel_info(),
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -530,16 +482,12 @@ mod tests {
         let variable = helper::create_accessor_variable("undefined_submodel", inner_var);
         let undefined_submodel_span = helper::get_accessor_parent_identifier_span(&variable);
 
-        let builtin_ref = helper::create_test_builtin_ref();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
+        let context = TestContext::new();
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &helper::create_test_submodel_info(),
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -564,23 +512,14 @@ mod tests {
         let variable = helper::create_accessor_variable("error_submodel", inner_var);
         let error_submodel_span = helper::get_accessor_parent_identifier_span(&variable);
 
-        // create builtin ref
-        let builtin_ref = helper::create_test_builtin_ref();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
 
-        // create submodel info with error submodel
-        let mut submodel_with_errors = HashSet::new();
         let error_submodel_id = Identifier::new("error_submodel");
-        submodel_with_errors.insert(&error_submodel_id);
-        let submodel_info = SubmodelInfo::new(HashMap::new(), submodel_with_errors);
+        let context = TestContext::new().with_submodel_errors([error_submodel_id]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &submodel_info,
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -601,32 +540,21 @@ mod tests {
         let inner_var = helper::create_identifier_variable("parameter");
         let variable = helper::create_accessor_variable("submodel", inner_var);
 
-        // create builtin ref
-        let builtin_ref = helper::create_test_builtin_ref();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
 
-        // create submodel info with the submodel
-        let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
         let submodel_path_span = helper::test_ir_span(0, 10);
-        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path_with_span);
-        let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
-        // create model info with the submodel model
-        let mut model_map = HashMap::new();
         let submodel_model = helper::create_model_with_parameter("parameter");
-        model_map.insert(&submodel_path, &submodel_model);
-        let modelinfo = ModelInfo::new(model_map, HashSet::new());
+
+        let context = TestContext::new()
+            .with_submodel_context([(submodel_id, (submodel_path.clone(), submodel_path_span))])
+            .with_model_context([(submodel_path, submodel_model)]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &submodel_info,
-            &modelinfo,
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -651,38 +579,30 @@ mod tests {
         let submodel2_var = helper::create_accessor_variable("submodel2", parameter_var);
         let variable = helper::create_accessor_variable("submodel1", submodel2_var);
 
-        // create builtin ref
-        let builtin_ref = helper::create_test_builtin_ref();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
 
-        // create submodel info
-        let mut submodel_map = HashMap::new();
         let submodel1_path = ModelPath::new("test_submodel1");
         let submodel1_path_span = helper::test_ir_span(0, 10);
-        let submodel1_path_with_span = (submodel1_path.clone(), submodel1_path_span);
         let submodel1_id = Identifier::new("submodel1");
-        submodel_map.insert(&submodel1_id, &submodel1_path_with_span);
-        let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
-        // create model info with nested models
-        let mut model_map = HashMap::new();
         let submodel2_path = ModelPath::new("test_submodel2");
         let submodel2_path_span = helper::test_ir_span(0, 10);
-        let submodel2_path_with_span = (submodel2_path.clone(), submodel2_path_span);
         let submodel2_model = helper::create_model_with_parameter("parameter");
-        let submodel1_model =
-            helper::create_modelwith_submodel("submodel2", submodel2_path_with_span);
-        model_map.insert(&submodel1_path, &submodel1_model);
-        model_map.insert(&submodel2_path, &submodel2_model);
-        let modelinfo = ModelInfo::new(model_map, HashSet::new());
+        let submodel1_model = helper::create_modelwith_submodel(
+            "submodel2",
+            (submodel2_path.clone(), submodel2_path_span),
+        );
+
+        let context = TestContext::new()
+            .with_submodel_context([(submodel1_id, (submodel1_path.clone(), submodel1_path_span))])
+            .with_model_context([
+                (submodel1_path, submodel1_model),
+                (submodel2_path, submodel2_model),
+            ]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &submodel_info,
-            &modelinfo,
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -707,37 +627,26 @@ mod tests {
         let inner_var_span = get_span_from_ast_span(inner_var.node_span());
         let variable = helper::create_accessor_variable("submodel", inner_var);
 
-        // create builtin ref
-        let builtin_ref = helper::create_test_builtin_ref();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
 
-        // create submodel info
-        let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
         let submodel_path_span = helper::test_ir_span(0, 10);
-        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path_with_span);
-        let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
-        // create model info with empty submodel model
-        let mut modelmap = HashMap::new();
         let submodel_model = Model::new(
             HashMap::new(),
             HashMap::new(),
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
             HashMap::new(),
         );
-        modelmap.insert(&submodel_path, &submodel_model);
-        let modelinfo = ModelInfo::new(modelmap, HashSet::new());
+
+        let context = TestContext::new()
+            .with_submodel_context([(submodel_id, (submodel_path.clone(), submodel_path_span))])
+            .with_model_context([(submodel_path.clone(), submodel_model)]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &submodel_info,
-            &modelinfo,
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -764,37 +673,27 @@ mod tests {
             helper::get_accessor_parent_identifier_span(&undefined_submodel);
         let variable = helper::create_accessor_variable("submodel", undefined_submodel);
 
-        // create builtin ref
-        let builtin_ref = helper::create_test_builtin_ref();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
 
         // create submodel info
-        let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
         let submodel_path_span = helper::test_ir_span(0, 10);
-        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path_with_span);
-        let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
-        // create model info with empty submodel model
-        let mut model_map = HashMap::new();
         let submodel_model = Model::new(
             HashMap::new(),
             HashMap::new(),
             oneil_ir::parameter::ParameterCollection::new(HashMap::new()),
             HashMap::new(),
         );
-        model_map.insert(&submodel_path, &submodel_model);
-        let modelinfo = ModelInfo::new(model_map, HashSet::new());
+
+        let context = TestContext::new()
+            .with_submodel_context([(submodel_id, (submodel_path.clone(), submodel_path_span))])
+            .with_model_context([(submodel_path.clone(), submodel_model)]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &submodel_info,
-            &modelinfo,
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -819,31 +718,20 @@ mod tests {
         let variable = helper::create_accessor_variable("submodel", inner_var);
         let variable_span = helper::get_accessor_parent_identifier_span(&variable);
 
-        // create builtin ref
-        let builtin_ref = helper::create_test_builtin_ref();
+        // create context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
 
         // create submodel info
-        let mut submodel_map = HashMap::new();
         let submodel_path = ModelPath::new("test_submodel");
         let submodel_path_span = helper::test_ir_span(0, 10);
-        let submodel_path_with_span = (submodel_path.clone(), submodel_path_span);
         let submodel_id = Identifier::new("submodel");
-        submodel_map.insert(&submodel_id, &submodel_path_with_span);
-        let submodel_info = SubmodelInfo::new(submodel_map, HashSet::new());
 
-        // create model info with error
-        let mut modelwith_errors = HashSet::new();
-        modelwith_errors.insert(&submodel_path);
-        let modelinfo = ModelInfo::new(HashMap::new(), modelwith_errors);
+        let context = TestContext::new()
+            .with_submodel_context([(submodel_id, (submodel_path.clone(), submodel_path_span))])
+            .with_model_errors([submodel_path.clone()]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &helper::create_test_parameter_info(),
-            &submodel_info,
-            &modelinfo,
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         match result {
@@ -862,10 +750,9 @@ mod tests {
     fn test_parameter_takes_precedence_over_builtin() {
         // create a variable that conflicts between builtin and parameter
         let variable = helper::create_identifier_variable("conflict");
-        let builtin_ref = helper::create_test_builtin_ref_with_parameters(["conflict".to_string()]);
+        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["conflict"]);
 
-        // create parameter info with conflicting parameter
-        let mut param_map = HashMap::new();
+        let conflict_id = Identifier::new("conflict");
         let param = Parameter::new(
             HashSet::new(),
             WithSpan::new(Identifier::new("conflict"), helper::test_ir_span(0, 10)),
@@ -880,18 +767,11 @@ mod tests {
             false,
             oneil_ir::debug_info::TraceLevel::None,
         );
-        let conflict_id = Identifier::new("conflict");
-        param_map.insert(&conflict_id, &param);
-        let param_info = ParameterInfo::new(param_map, HashSet::new());
+
+        let context = TestContext::new().with_parameter_context([(conflict_id, param)]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &param_info,
-            &helper::create_test_submodel_info(),
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result - parameter should take precedence
         match result {
@@ -913,10 +793,12 @@ mod tests {
     fn test_empty_local_variables() {
         // create a parameter variable with empty local variables
         let variable = helper::create_identifier_variable("parameter");
-        let builtin_ref = helper::create_test_builtin_ref();
 
-        // create parameter info with parameter
-        let mut param_map = HashMap::new();
+        // create the context and builtin ref
+        let builtin_ref = TestBuiltinRef::new();
+
+        // create parameter
+        let parameter_id = Identifier::new("parameter");
         let param = Parameter::new(
             HashSet::new(),
             WithSpan::new(Identifier::new("parameter"), helper::test_ir_span(0, 10)),
@@ -931,18 +813,11 @@ mod tests {
             false,
             oneil_ir::debug_info::TraceLevel::None,
         );
-        let parameter_id = Identifier::new("parameter");
-        param_map.insert(&parameter_id, &param);
-        let param_info = ParameterInfo::new(param_map, HashSet::new());
+
+        let context = TestContext::new().with_parameter_context([(parameter_id, param)]);
 
         // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &param_info,
-            &helper::create_test_submodel_info(),
-            &helper::create_test_model_info(),
-        );
+        let result = resolve_variable(&variable, &builtin_ref, &context);
 
         // check the result
         assert!(result.is_ok());

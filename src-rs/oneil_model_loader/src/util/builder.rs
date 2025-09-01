@@ -268,24 +268,6 @@ impl ParameterCollectionBuilder {
             self.add_error(identifier.clone(), error);
         }
     }
-
-    /// Returns a reference to the map of defined parameters.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the map of parameter identifiers to parameters.
-    pub fn get_defined_parameters(&self) -> &HashMap<Identifier, Parameter> {
-        &self.parameters
-    }
-
-    /// Returns a set of parameter identifiers that have errors.
-    ///
-    /// # Returns
-    ///
-    /// A set of parameter identifiers that have resolution errors.
-    pub fn get_parameters_with_errors(&self) -> HashSet<&Identifier> {
-        self.errors.get_parameters_with_errors()
-    }
 }
 
 impl TryInto<ParameterCollection> for ParameterCollectionBuilder {

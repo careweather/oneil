@@ -548,9 +548,11 @@ fn resolve_limits(
 }
 
 #[cfg(test)]
-#[cfg(any())]
 mod tests {
-    use crate::error::VariableResolutionError;
+    use crate::{
+        error::VariableResolutionError,
+        test::{TestBuiltinRef, TestContext},
+    };
 
     use super::*;
     use oneil_ast as ast;
@@ -560,8 +562,6 @@ mod tests {
     };
 
     mod helper {
-        use crate::test::TestBuiltinRef;
-
         use super::*;
 
         /// Helper function to create a test span
@@ -719,18 +719,6 @@ mod tests {
                 ast::Parameter::new(label_node, ident_node, value_node, None, None, None, None);
             ast::node::Node::new(&test_span(0, ident.len()), parameter)
         }
-
-        /// Helper function to create mock model and submodel info for testing
-        pub fn create_mock_info<'a>() -> (SubmodelInfo<'a>, ModelInfo<'a>) {
-            let submodel_info = SubmodelInfo::new(HashMap::new(), HashSet::new());
-            let model_info = ModelInfo::new(HashMap::new(), HashSet::new());
-            (submodel_info, model_info)
-        }
-
-        /// Helper function to create empty builtin variables
-        pub fn create_empty_builtin_ref() -> TestBuiltinRef {
-            TestBuiltinRef::new()
-        }
     }
 
     #[test]
@@ -738,15 +726,13 @@ mod tests {
         // create the parameters
         let parameters = vec![];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -762,15 +748,13 @@ mod tests {
         let param_b = helper::create_simple_parameter("b", 20.0);
         let parameters = vec![&param_a, &param_b];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -796,15 +780,13 @@ mod tests {
         let param_b = helper::create_dependent_parameter("b", "a");
         let parameters = vec![&param_a, &param_b];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -830,15 +812,13 @@ mod tests {
         let param_b = helper::create_dependent_parameter("b", "a");
         let parameters = vec![&param_a, &param_b];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors
         assert!(!errors.is_empty());
@@ -1070,17 +1050,11 @@ mod tests {
         let expr = helper::create_literal_expr_node(ast::expression::Literal::Number(42.0), 0, 4);
         let value = ast::parameter::ParameterValue::Simple(expr, None);
         let value_node = ast::node::Node::new(&helper::test_span(0, 4), value);
-        let (submodel_info, model_info) = helper::create_mock_info();
-        let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameter value
-        let result = resolve_parameter_value(
-            &value_node,
-            &helper::create_empty_builtin_ref(),
-            &defined_parameters_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_parameter_value(&value_node, &builtin_ref, &context);
 
         // check the result
         assert!(matches!(result, Ok(ParameterValue::Simple(_, None))));
@@ -1088,18 +1062,12 @@ mod tests {
 
     #[test]
     fn test_resolve_limits_none() {
-        // create the context
-        let (submodel_info, model_info) = helper::create_mock_info();
-        let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the limits
-        let result = resolve_limits(
-            None,
-            &helper::create_empty_builtin_ref(),
-            &defined_parameters_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_limits(None, &builtin_ref, &context);
 
         // check the result
         assert!(matches!(result, Ok(Limits::Default)));
@@ -1117,17 +1085,11 @@ mod tests {
             max: max_expr,
         };
         let limits_node = ast::node::Node::new(&helper::test_span(0, 3), limits);
-        let (submodel_info, model_info) = helper::create_mock_info();
-        let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the limits
-        let result = resolve_limits(
-            Some(&limits_node),
-            &helper::create_empty_builtin_ref(),
-            &defined_parameters_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_limits(Some(&limits_node), &builtin_ref, &context);
 
         // check the result
         assert!(matches!(result, Ok(Limits::Continuous { .. })));
@@ -1143,17 +1105,11 @@ mod tests {
             values: vec![value1, value2, value3],
         };
         let limits_node = ast::node::Node::new(&helper::test_span(0, 3), limits);
-        let (submodel_info, model_info) = helper::create_mock_info();
-        let defined_parameters_info = ParameterInfo::new(HashMap::new(), HashSet::new());
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the limits
-        let result = resolve_limits(
-            Some(&limits_node),
-            &helper::create_empty_builtin_ref(),
-            &defined_parameters_info,
-            &submodel_info,
-            &model_info,
-        );
+        let result = resolve_limits(Some(&limits_node), &builtin_ref, &context);
 
         // check the result
         assert!(matches!(result, Ok(Limits::Discrete { .. })));
@@ -1168,15 +1124,13 @@ mod tests {
         let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
         let parameters = vec![&param_a1, &param_a2];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
@@ -1217,15 +1171,13 @@ mod tests {
         let param_bar2_span = get_span_from_ast_span(param_bar2.ident().node_span());
         let parameters = vec![&param_foo1, &param_bar1, &param_foo2, &param_bar2];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors - should have two duplicate parameter errors
         assert_eq!(errors.len(), 2);
@@ -1280,15 +1232,13 @@ mod tests {
         let param_c = helper::create_simple_parameter("c", 40.0);
         let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
@@ -1328,15 +1278,13 @@ mod tests {
         let param_c = helper::create_dependent_parameter("c", "b");
         let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
 
-        // create the builtin variables
-        let builtin_ref = helper::create_empty_builtin_ref();
-
-        // create the submodel and model info
-        let (submodel_info, model_info) = helper::create_mock_info();
+        // create the context and builtin ref
+        let context = TestContext::new();
+        let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &submodel_info, &model_info);
+        let (resolved_params, errors, _context) =
+            resolve_parameters(parameters, &builtin_ref, context);
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);

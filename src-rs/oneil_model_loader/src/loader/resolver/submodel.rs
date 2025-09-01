@@ -323,11 +323,11 @@ fn resolve_model_path(
 }
 
 #[cfg(test)]
-#[cfg(any())]
 mod tests {
+    use crate::test::TestContext;
+
     use super::*;
     use oneil_ir::model::Model;
-    use std::collections::HashSet;
 
     // TODO: write tests that test the span of the submodel path
 
@@ -510,15 +510,16 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
         let temperature_submodel = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
+
+        let context = TestContext::new()
+            .with_model_context([(temperature_path.clone(), temperature_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -550,7 +551,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with nested structure
+        // create the context
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
         let temperature_submodel = helper::create_test_model(vec![]);
@@ -564,15 +565,14 @@ mod tests {
             "atmosphere",
             (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&atmosphere_path, &atmosphere_model),
-            (&temperature_path, &temperature_submodel),
+        let context = TestContext::new().with_model_context([
+            (weather_path, weather_model),
+            (atmosphere_path, atmosphere_model),
+            (temperature_path.clone(), temperature_submodel),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -595,15 +595,15 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let temperature_id = Identifier::new("temperature");
         let temperature_path = ModelPath::new("/temperature");
         let temperature_submodel = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([(&temperature_path, &temperature_submodel)]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
+        let context = TestContext::new()
+            .with_model_context([(temperature_path.clone(), temperature_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -631,7 +631,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let atmosphere_id = Identifier::new("atmosphere");
         let atmosphere_path = ModelPath::new("/atmosphere");
         let atmosphere_submodel = helper::create_test_model(vec![]);
@@ -641,15 +641,13 @@ mod tests {
             (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
 
-        // create the model map
-        let model_map = HashMap::from([
-            (&weather_path, &weather_submodel),
-            (&atmosphere_path, &atmosphere_submodel),
+        let context = TestContext::new().with_model_context([
+            (weather_path, weather_submodel),
+            (atmosphere_path.clone(), atmosphere_submodel),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -674,15 +672,14 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with error model
+        // create the context
         let error_id = Identifier::new("error");
         let error_path = ModelPath::new("/error_model");
         let error_submodel = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([(&error_path, &error_submodel)]);
-        let model_info = ModelInfo::new(model_map, HashSet::from([&error_path]));
+        let context = TestContext::new().with_model_context([(error_path.clone(), error_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -719,15 +716,15 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map without the undefined submodel
+        // create the context
         let weather_id = Identifier::new("weather");
         let weather_path = ModelPath::new("/weather");
         let weather_model = helper::create_test_model(vec![]); // No submodels
-        let model_map = HashMap::from([(&weather_path, &weather_model)]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
+        let context =
+            TestContext::new().with_model_context([(weather_path.clone(), weather_model)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -773,7 +770,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with missing nested submodel
+        // create the context
         let undefined_id = Identifier::new("undefined");
         let atmosphere_path = ModelPath::new("/atmosphere");
         let atmosphere_model = helper::create_test_model(vec![]); // No submodels
@@ -782,14 +779,13 @@ mod tests {
             "atmosphere",
             (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&atmosphere_path, &atmosphere_model),
+        let context = TestContext::new().with_model_context([
+            (weather_path, weather_model),
+            (atmosphere_path.clone(), atmosphere_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -829,21 +825,20 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
         let temperature_model = helper::create_test_model(vec![]);
         let pressure_id = Identifier::new("press");
         let pressure_path = ModelPath::new("/pressure");
         let pressure_model = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([
-            (&temperature_path, &temperature_model),
-            (&pressure_path, &pressure_model),
+        let context = TestContext::new().with_model_context([
+            (temperature_path.clone(), temperature_model),
+            (pressure_path.clone(), pressure_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -880,7 +875,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with one valid model and one error model
+        // create the context
         let temperature_id = Identifier::new("temp");
         let temperature_path = ModelPath::new("/temperature");
         let temperature_model = helper::create_test_model(vec![]);
@@ -888,17 +883,15 @@ mod tests {
         let error_path = ModelPath::new("/error_model");
         let error_model = helper::create_test_model(vec![]);
 
-        // create model info with one valid model and one error model
-        let model_map = HashMap::from([
-            (&temperature_path, &temperature_model),
-            (&error_path, &error_model),
-        ]);
-        let mut model_with_errors = HashSet::new();
-        model_with_errors.insert(&error_path);
-        let model_info = ModelInfo::new(model_map, model_with_errors);
+        let context = TestContext::new()
+            .with_model_context([
+                (temperature_path.clone(), temperature_model),
+                (error_path.clone(), error_model),
+            ])
+            .with_model_errors([error_path.clone()]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -940,15 +933,14 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with the target model marked as having an error
+        // create the context
         let math_id = Identifier::new("math");
         let math_path = ModelPath::new("/nonexistent/utils/math");
         let math_submodel = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([(&math_path, &math_submodel)]);
-        let model_info = ModelInfo::new(model_map, HashSet::from([&math_path]));
+        let context = TestContext::new().with_model_context([(math_path, math_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors - should have a model loading error
         assert_eq!(errors.len(), 1);
@@ -982,15 +974,14 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with the target model
+        // create the context
         let math_id = Identifier::new("math");
         let math_path = ModelPath::new("/utils/math");
         let math_submodel = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([(&math_path, &math_submodel)]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
+        let context = TestContext::new().with_model_context([(math_path.clone(), math_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1021,19 +1012,18 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let temperature_path = ModelPath::new("/temperature");
         let temperature_model = helper::create_test_model(vec![]);
         let pressure_path = ModelPath::new("/pressure");
         let pressure_model = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([
-            (&temperature_path, &temperature_model),
-            (&pressure_path, &pressure_model),
+        let context = TestContext::new().with_model_context([
+            (temperature_path.clone(), temperature_model),
+            (pressure_path, pressure_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -1077,15 +1067,15 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with the target model marked as having an error
+        // create the context
         let sub_id = Identifier::new("sub");
         let nonexistent_path = ModelPath::new("/nonexistent_model");
         let nonexistent_model = helper::create_test_model(vec![]);
-        let model_map = HashMap::from([(&nonexistent_path, &nonexistent_model)]);
-        let model_info = ModelInfo::new(model_map, HashSet::from([&nonexistent_path]));
+        let context =
+            TestContext::new().with_model_context([(nonexistent_path, nonexistent_model)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors - should have a model loading error
         assert_eq!(errors.len(), 1);
@@ -1131,7 +1121,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with complex nested structure
+        // create the context
         let temp_id = Identifier::new("temp");
         let loc_id = Identifier::new("loc");
         let press_id = Identifier::new("press");
@@ -1162,18 +1152,17 @@ mod tests {
             (ModelPath::new("/location"), helper::test_ir_span(0, 8)),
         )]);
 
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&atmosphere_path, &atmosphere_model),
-            (&temperature_path, &temperature_submodel),
-            (&sensor_path, &sensor_model),
-            (&location_path, &location_submodel),
-            (&pressure_path, &pressure_submodel),
+        let context = TestContext::new().with_model_context([
+            (weather_path, weather_model),
+            (atmosphere_path, atmosphere_model),
+            (temperature_path.clone(), temperature_submodel),
+            (sensor_path, sensor_model),
+            (location_path.clone(), location_submodel),
+            (pressure_path.clone(), pressure_submodel),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1214,7 +1203,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map where the nested submodel doesn't exist
+        // create the context
         let temp_id = Identifier::new("temp");
         let atmosphere_path = ModelPath::new("/atmosphere");
         let atmosphere_model = helper::create_test_model(vec![]); // No temperature submodel
@@ -1224,14 +1213,13 @@ mod tests {
             (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
 
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&atmosphere_path, &atmosphere_model),
+        let context = TestContext::new().with_model_context([
+            (weather_path, weather_model),
+            (atmosphere_path.clone(), atmosphere_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -1281,7 +1269,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with mixed success and failure scenarios
+        // create the context
         let temp_id = Identifier::new("temp");
         let undefined_id = Identifier::new("undefined");
 
@@ -1297,15 +1285,14 @@ mod tests {
             (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
         )]);
 
-        let model_map = HashMap::from([
-            (&temperature_path, &temperature_model),
-            (&weather_path, &weather_model),
-            (&atmosphere_path, &atmosphere_model),
+        let context = TestContext::new().with_model_context([
+            (temperature_path.clone(), temperature_model),
+            (weather_path, weather_model),
+            (atmosphere_path.clone(), atmosphere_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -1354,7 +1341,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let temp_id = Identifier::new("temp");
         let weather_path = ModelPath::new("/weather");
         let temperature_path = ModelPath::new("/temperature");
@@ -1364,14 +1351,13 @@ mod tests {
             (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
         )]);
 
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&temperature_path, &temperature_model),
+        let context = TestContext::new().with_model_context([
+            (weather_path.clone(), weather_model),
+            (temperature_path.clone(), temperature_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1412,7 +1398,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let temp_id = Identifier::new("temp");
         let press_id = Identifier::new("press");
         let weather_path = ModelPath::new("/weather");
@@ -1431,15 +1417,14 @@ mod tests {
             ),
         ]);
 
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&temperature_path, &temperature_model),
-            (&pressure_path, &pressure_model),
+        let context = TestContext::new().with_model_context([
+            (weather_path.clone(), weather_model),
+            (temperature_path.clone(), temperature_model),
+            (pressure_path.clone(), pressure_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1486,7 +1471,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let temp_id = Identifier::new("temp");
         let weather_path = ModelPath::new("/weather");
         let atmosphere_path = ModelPath::new("/atmosphere");
@@ -1501,15 +1486,14 @@ mod tests {
             (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 10)),
         )]);
 
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&atmosphere_path, &atmosphere_model),
-            (&temperature_path, &temperature_model),
+        let context = TestContext::new().with_model_context([
+            (weather_path.clone(), weather_model),
+            (atmosphere_path, atmosphere_model),
+            (temperature_path.clone(), temperature_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1548,16 +1532,16 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map where the submodel doesn't exist
+        // create the context
         let undefined_id = Identifier::new("undefined");
         let weather_path = ModelPath::new("/weather");
         let weather_model = helper::create_test_model(vec![]); // No undefined submodel
 
-        let model_map = HashMap::from([(&weather_path, &weather_model)]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
+        let context =
+            TestContext::new().with_model_context([(weather_path.clone(), weather_model)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -1606,7 +1590,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map with mixed success and failure scenarios
+        // create the context
         let temp_id = Identifier::new("temp");
         let undefined_id = Identifier::new("undefined");
         let weather_path = ModelPath::new("/weather");
@@ -1617,14 +1601,13 @@ mod tests {
             (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
         )]); // No undefined submodel
 
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&temperature_path, &temperature_model),
+        let context = TestContext::new().with_model_context([
+            (weather_path.clone(), weather_model),
+            (temperature_path.clone(), temperature_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -1678,7 +1661,7 @@ mod tests {
         // create the current model path
         let model_path = ModelPath::new("/parent_model");
 
-        // create the model map
+        // create the context
         let weather_model_id = Identifier::new("weather_model");
         let temp_id = Identifier::new("temp");
         let press_id = Identifier::new("press");
@@ -1698,15 +1681,14 @@ mod tests {
             ),
         ]);
 
-        let model_map = HashMap::from([
-            (&weather_path, &weather_model),
-            (&temperature_path, &temperature_model),
-            (&pressure_path, &pressure_model),
+        let context = TestContext::new().with_model_context([
+            (weather_path.clone(), weather_model),
+            (temperature_path.clone(), temperature_model),
+            (pressure_path.clone(), pressure_model),
         ]);
-        let model_info = ModelInfo::new(model_map, HashSet::new());
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &model_info);
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());

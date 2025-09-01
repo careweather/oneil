@@ -17,12 +17,20 @@ impl TestBuiltinRef {
         }
     }
 
-    pub fn with_builtin_variables(mut self, variables: impl IntoIterator<Item = String>) -> Self {
+    pub fn with_builtin_variables(
+        mut self,
+        variables: impl IntoIterator<Item = &'static str>,
+    ) -> Self {
+        let variables = variables.into_iter().map(ToString::to_string);
         self.builtin_variables.extend(variables);
         self
     }
 
-    pub fn with_builtin_functions(mut self, functions: impl IntoIterator<Item = String>) -> Self {
+    pub fn with_builtin_functions(
+        mut self,
+        functions: impl IntoIterator<Item = &'static str>,
+    ) -> Self {
+        let functions = functions.into_iter().map(ToString::to_string);
         self.builtin_functions.extend(functions);
         self
     }

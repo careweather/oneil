@@ -282,8 +282,9 @@ where
 }
 
 #[cfg(test)]
-#[cfg(any())]
 mod tests {
+
+    use oneil_ir::reference::Identifier;
 
     use super::*;
     use crate::{
