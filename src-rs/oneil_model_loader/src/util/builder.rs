@@ -21,14 +21,10 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ir::{
     model::{Model, ModelCollection},
-    parameter::{Parameter, ParameterCollection},
-    reference::{Identifier, ModelPath, PythonPath},
+    reference::{ModelPath, PythonPath},
 };
 
-use crate::error::{
-    CircularDependencyError, LoadError, ParameterResolutionError,
-    collection::{ModelErrorMap, ParameterErrorMap},
-};
+use crate::error::{CircularDependencyError, LoadError, collection::ModelErrorMap};
 
 /// A builder for constructing model collections while collecting loading errors.
 ///
@@ -203,105 +199,6 @@ impl<Ps, Py> TryInto<ModelCollection> for ModelCollectionBuilder<Ps, Py> {
             Ok(model_collection)
         } else {
             Err((model_collection, self.errors))
-        }
-    }
-}
-
-/// A builder for constructing parameter collections while collecting resolution errors.
-///
-/// This builder facilitates the incremental construction of parameter collections
-/// while collecting parameter resolution errors. It provides methods for adding
-/// parameters and errors, and can convert to a final `ParameterCollection` or return
-/// a partial collection with errors.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParameterCollectionBuilder {
-    parameters: HashMap<Identifier, Parameter>,
-    errors: ParameterErrorMap,
-}
-
-impl ParameterCollectionBuilder {
-    /// Creates a new parameter collection builder.
-    ///
-    /// # Returns
-    ///
-    /// A new `ParameterCollectionBuilder` with no parameters or errors.
-    pub fn new() -> Self {
-        Self {
-            parameters: HashMap::new(),
-            errors: ParameterErrorMap::new(),
-        }
-    }
-
-    /// Adds a parameter to the collection.
-    ///
-    /// # Arguments
-    ///
-    /// * `identifier` - The identifier of the parameter
-    /// * `parameter` - The parameter to add
-    pub fn add_parameter(&mut self, identifier: Identifier, parameter: Parameter) {
-        self.parameters.insert(identifier, parameter);
-    }
-
-    /// Adds a parameter resolution error for the specified parameter.
-    ///
-    /// # Arguments
-    ///
-    /// * `identifier` - The identifier of the parameter that has an error
-    /// * `error` - The parameter resolution error that occurred
-    pub fn add_error(&mut self, identifier: Identifier, error: ParameterResolutionError) {
-        self.errors.add_error(identifier, error);
-    }
-
-    /// Adds multiple parameter resolution errors for the specified parameter.
-    ///
-    /// This is a convenience method for adding multiple errors for the same parameter.
-    ///
-    /// # Arguments
-    ///
-    /// * `identifier` - The identifier of the parameter that has errors
-    /// * `errors` - An iterator of parameter resolution errors
-    pub fn add_error_list<I>(&mut self, identifier: &Identifier, errors: I)
-    where
-        I: IntoIterator<Item = ParameterResolutionError>,
-    {
-        for error in errors {
-            self.add_error(identifier.clone(), error);
-        }
-    }
-}
-
-impl TryInto<ParameterCollection> for ParameterCollectionBuilder {
-    type Error = (
-        ParameterCollection,
-        HashMap<Identifier, Vec<ParameterResolutionError>>,
-    );
-
-    /// Attempts to convert the builder into a parameter collection.
-    ///
-    /// If there are no errors, returns `Ok(ParameterCollection)`. If there are errors,
-    /// returns `Err((ParameterCollection, HashMap))` where the collection contains
-    /// all successfully resolved parameters and the hash map contains all collected errors.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(collection)` if no errors occurred, or `Err((partial_collection, errors))`
-    /// if there were errors during resolution.
-    fn try_into(
-        self,
-    ) -> Result<
-        ParameterCollection,
-        (
-            ParameterCollection,
-            HashMap<Identifier, Vec<ParameterResolutionError>>,
-        ),
-    > {
-        if self.errors.is_empty() {
-            Ok(ParameterCollection::new(self.parameters))
-        } else {
-            Err((
-                ParameterCollection::new(self.parameters),
-                self.errors.into(),
-            ))
         }
     }
 }

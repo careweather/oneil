@@ -131,11 +131,16 @@ where
     let context = context.begin_parameter_resolution();
 
     // resolve parameters
-    let (parameters, parameter_resolution_errors, context) =
-        resolver::resolve_parameters(parameters, builtin_ref, context);
+    let context = resolver::resolve_parameters(parameters, builtin_ref, context);
 
     // resolve tests
     let (tests, test_resolution_errors) = resolver::resolve_tests(tests, builtin_ref, &context);
+
+    // get the parameters and parameter resolution errors
+    //
+    // this needs to be done after test resolution because we need the parameter
+    // context for resolving tests
+    let (parameters, parameter_resolution_errors) = context.into_parameters_and_errors();
 
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,

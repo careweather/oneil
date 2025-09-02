@@ -7,7 +7,10 @@ use oneil_ir::{
     span::Span,
 };
 
-use crate::util::context::{LookupResult, ModelContext, ModelImportsContext, ParameterContext};
+use crate::{
+    error::ParameterResolutionError,
+    util::context::{LookupResult, ModelContext, ModelImportsContext, ParameterContext},
+};
 
 #[derive(Debug, Clone)]
 pub struct TestContext {
@@ -16,7 +19,7 @@ pub struct TestContext {
     submodel_context: HashMap<Identifier, (ModelPath, Span)>,
     submodel_errors: HashSet<Identifier>,
     parameter_context: HashMap<Identifier, Parameter>,
-    parameter_errors: HashSet<Identifier>,
+    parameter_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
 }
 
 impl TestContext {
@@ -27,7 +30,7 @@ impl TestContext {
             submodel_context: HashMap::new(),
             submodel_errors: HashSet::new(),
             parameter_context: HashMap::new(),
-            parameter_errors: HashSet::new(),
+            parameter_errors: HashMap::new(),
         }
     }
 
@@ -72,8 +75,22 @@ impl TestContext {
         mut self,
         parameter_errors: impl IntoIterator<Item = Identifier>,
     ) -> Self {
-        self.parameter_errors.extend(parameter_errors);
+        self.parameter_errors.extend(
+            parameter_errors
+                .into_iter()
+                // initialize the errors to an empty vector since just the
+                // presence of the key is enough to indicate an error
+                .map(|identifier| (identifier, Vec::new())),
+        );
         self
+    }
+
+    pub fn parameters(&self) -> &HashMap<Identifier, Parameter> {
+        &self.parameter_context
+    }
+
+    pub fn parameter_errors(&self) -> &HashMap<Identifier, Vec<ParameterResolutionError>> {
+        &self.parameter_errors
     }
 }
 
@@ -110,7 +127,7 @@ impl ModelImportsContext for TestContext {
 impl ParameterContext for TestContext {
     #[allow(clippy::redundant_closure, reason = "explicit map function is clearer")]
     fn lookup_parameter(&self, parameter_path: &Identifier) -> LookupResult<&Parameter> {
-        let has_error = self.parameter_errors.contains(parameter_path);
+        let has_error = self.parameter_errors.contains_key(parameter_path);
 
         if has_error {
             return LookupResult::HasError;
@@ -127,7 +144,10 @@ impl ParameterContext for TestContext {
         self.parameter_context.insert(parameter_name, parameter);
     }
 
-    fn add_parameter_error(&mut self, parameter_name: Identifier) {
-        self.parameter_errors.insert(parameter_name);
+    fn add_parameter_error(&mut self, parameter_name: Identifier, error: ParameterResolutionError) {
+        self.parameter_errors
+            .entry(parameter_name)
+            .or_default()
+            .push(error);
     }
 }

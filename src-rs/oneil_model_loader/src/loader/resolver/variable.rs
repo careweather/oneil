@@ -102,9 +102,6 @@ pub fn resolve_variable(
             let var_identifier = Identifier::new(identifier.as_str());
             let var_identifier_span = get_span_from_ast_span(identifier.node_span());
 
-            eprintln!("identifier: {var_identifier:?}");
-            eprintln!("context: {context:#?}");
-
             match context.lookup_parameter(&var_identifier) {
                 LookupResult::Found(_parameter) => {
                     let span = get_span_from_ast_span(variable.node_span());

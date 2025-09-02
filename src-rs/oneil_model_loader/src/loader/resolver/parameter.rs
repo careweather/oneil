@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ast::{self as ast, node::Node};
 use oneil_ir::{
-    parameter::{Parameter, ParameterCollection, ParameterValue, PiecewiseExpr},
+    parameter::{Parameter, ParameterValue, PiecewiseExpr},
     reference::Identifier,
     span::{Span, WithSpan},
 };
@@ -35,7 +35,6 @@ use crate::{
     loader::resolver::{expr::resolve_expr, trace_level::resolve_trace_level, unit::resolve_unit},
     util::{
         Stack,
-        builder::ParameterCollectionBuilder,
         context::{ModelContext, ModelImportsContext, ParameterContext},
         get_span_from_ast_span,
     },
@@ -73,33 +72,29 @@ pub fn resolve_parameters<Ctx: ModelContext + ModelImportsContext + ParameterCon
     parameters: Vec<&ast::parameter::ParameterNode>,
     builtin_ref: &impl BuiltinRef,
     context: Ctx,
-) -> (
-    ParameterCollection,
-    HashMap<Identifier, Vec<ParameterResolutionError>>,
-    Ctx,
-) {
-    let (parameter_map, duplicate_errors) = parameters.into_iter().fold(
-        (HashMap::new(), HashMap::new()),
-        |(mut parameter_map, mut duplicate_errors), parameter| {
+) -> Ctx {
+    let (parameter_map, context) = parameters.into_iter().fold(
+        (HashMap::new(), context),
+        |(mut parameter_map, mut context), parameter| {
             let ident = Identifier::new(parameter.ident().as_str());
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
 
             let maybe_original_parameter = parameter_map.get(&ident);
             if let Some((original_ident_span, _)) = maybe_original_parameter {
                 let original_ident_span: Span = *original_ident_span; // to help type inference
-                duplicate_errors.insert(
+                context.add_parameter_error(
                     ident.clone(),
-                    vec![ParameterResolutionError::duplicate_parameter(
+                    ParameterResolutionError::duplicate_parameter(
                         ident,
                         original_ident_span,
                         ident_span,
-                    )],
+                    ),
                 );
             } else {
                 parameter_map.insert(ident, (ident_span, parameter));
             }
 
-            (parameter_map, duplicate_errors)
+            (parameter_map, context)
         },
     );
 
@@ -107,13 +102,11 @@ pub fn resolve_parameters<Ctx: ModelContext + ModelImportsContext + ParameterCon
     // that is defined within the current model
     let dependencies = get_all_parameter_internal_dependencies(&parameter_map);
 
-    let resolved_parameters = ParameterCollectionBuilder::new();
     let visited = HashSet::new();
 
-    let (resolved_parameters, _visited, context) = parameter_map.iter().fold(
-        (resolved_parameters, visited, context),
-        |(resolved_parameters, visited, context),
-         (parameter_identifier, (parameter_span, _parameter))| {
+    let (context, _visited) = parameter_map.iter().fold(
+        (context, visited),
+        |(context, visited), (parameter_identifier, (parameter_span, _parameter))| {
             let mut parameter_stack = Stack::new();
 
             let parameter_identifier_with_span =
@@ -123,32 +116,15 @@ pub fn resolve_parameters<Ctx: ModelContext + ModelImportsContext + ParameterCon
                 parameter_identifier_with_span,
                 &parameter_map,
                 &dependencies,
+                &mut parameter_stack,
                 builtin_ref,
                 context,
-                &mut parameter_stack,
-                resolved_parameters,
                 visited,
             )
         },
     );
 
-    let resolved_parameters = resolved_parameters.try_into();
-
-    match resolved_parameters {
-        Ok(resolved_parameters) => (resolved_parameters, duplicate_errors, context),
-        Err((resolved_parameters, resolution_errors)) => {
-            // combine the duplicate errors with the resolution errors
-            let mut errors = resolution_errors;
-            for (identifier, duplicate_errors) in duplicate_errors {
-                errors
-                    .entry(identifier)
-                    .or_insert(vec![])
-                    .extend(duplicate_errors);
-            }
-
-            (resolved_parameters, errors, context)
-        }
-    }
+    context
 }
 
 /// Analyzes all parameters to extract their internal dependencies.
@@ -328,12 +304,11 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
     parameter_identifier: WithSpan<Identifier>,
     parameter_map: &HashMap<Identifier, (Span, &ast::parameter::ParameterNode)>,
     dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
+    parameter_stack: &mut Stack<Identifier>,
     builtin_ref: &impl BuiltinRef,
     mut context: Ctx,
-    parameter_stack: &mut Stack<Identifier>,
-    mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: VisitedSet,
-) -> (ParameterCollectionBuilder, VisitedSet, Ctx) {
+) -> (Ctx, VisitedSet) {
     let parameter_identifier_span = parameter_identifier.span();
     let parameter_identifier = parameter_identifier.take_value();
 
@@ -345,7 +320,7 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
         // handle the "not found" error
         //
         // This also accounts for the fact that the parameter may be a builtin
-        return (resolved_parameters, visited, context);
+        return (context, visited);
     }
 
     assert!(
@@ -358,20 +333,16 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
         parameter_stack.find_circular_dependency(&parameter_identifier)
     {
         let reference_span = parameter_identifier_span;
-        resolved_parameters.add_error_list(
-            &parameter_identifier,
-            vec![ParameterResolutionError::circular_dependency(
-                circular_dependency,
-                reference_span,
-            )],
+        context.add_parameter_error(
+            parameter_identifier,
+            ParameterResolutionError::circular_dependency(circular_dependency, reference_span),
         );
-        context.add_parameter_error(parameter_identifier);
-        return (resolved_parameters, visited, context);
+        return (context, visited);
     }
 
     // check if the parameter has already been visited
     if visited.contains(&parameter_identifier) {
-        return (resolved_parameters, visited, context);
+        return (context, visited);
     }
     visited.insert(parameter_identifier.clone());
 
@@ -384,21 +355,20 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
     parameter_stack.push(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    let (mut resolved_parameters, visited, mut context) = parameter_dependencies.iter().fold(
-        (resolved_parameters, visited, context),
-        |(resolved_parameters, visited, context), dependency| {
-            resolve_parameter(
-                dependency.clone(),
-                parameter_map,
-                dependencies,
-                builtin_ref,
-                context,
-                parameter_stack,
-                resolved_parameters,
-                visited,
-            )
-        },
-    );
+    let (mut context, visited) =
+        parameter_dependencies
+            .iter()
+            .fold((context, visited), |(context, visited), dependency| {
+                resolve_parameter(
+                    dependency.clone(),
+                    parameter_map,
+                    dependencies,
+                    parameter_stack,
+                    builtin_ref,
+                    context,
+                    visited,
+                )
+            });
 
     // remove the parameter from the stack
     parameter_stack.pop();
@@ -418,7 +388,7 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
 
     let trace_level = resolve_trace_level(parameter.trace_level());
 
-    let (resolved_parameters, context) = match error::combine_errors(value, limits) {
+    let context = match error::combine_errors(value, limits) {
         Ok((value, limits)) => {
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
             let ident_with_span = oneil_ir::span::WithSpan::new(ident, ident_span);
@@ -437,21 +407,20 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
                 trace_level,
             );
 
-            // TODO: figure out a way not to clone the parameter
-            resolved_parameters.add_parameter(parameter_identifier.clone(), parameter.clone());
             context.add_parameter(parameter_identifier, parameter);
 
-            (resolved_parameters, context)
+            context
         }
         Err(errors) => {
-            resolved_parameters.add_error_list(&parameter_identifier, errors);
-            context.add_parameter_error(parameter_identifier);
+            for error in errors {
+                context.add_parameter_error(parameter_identifier.clone(), error);
+            }
 
-            (resolved_parameters, context)
+            context
         }
     };
 
-    (resolved_parameters, visited, context)
+    (context, visited)
 }
 
 /// Resolves a parameter value expression.
@@ -732,8 +701,10 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
+
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
 
         // check the errors
         assert!(errors.is_empty());
@@ -754,8 +725,10 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
+
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
 
         // check the errors
         assert!(errors.is_empty());
@@ -786,8 +759,10 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
+
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
 
         // check the errors
         assert!(errors.is_empty());
@@ -818,8 +793,10 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
+
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
 
         // check the errors
         assert!(!errors.is_empty());
@@ -847,9 +824,6 @@ mod tests {
             .iter()
             .any(|e| matches!(e, ParameterResolutionError::CircularDependency { .. }));
         assert!(a_has_circular_dependency || b_has_circular_dependency);
-
-        eprintln!("a_errors: {a_errors:?}");
-        eprintln!("b_errors: {b_errors:?}");
 
         assert!(a_errors.iter().any(|e| matches!(
             e,
@@ -1133,8 +1107,10 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
+
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
@@ -1180,8 +1156,10 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
+
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
 
         // check the errors - should have two duplicate parameter errors
         assert_eq!(errors.len(), 2);
@@ -1241,8 +1219,10 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
+
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
@@ -1287,19 +1267,21 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the parameters
-        let (resolved_params, errors, _context) =
-            resolve_parameters(parameters, &builtin_ref, context);
+        let context = resolve_parameters(parameters, &builtin_ref, context);
 
-        // check the errors - should have one duplicate parameter error
-        assert_eq!(errors.len(), 1);
+        let resolved_params = context.parameters();
+        let errors = context.parameter_errors();
+
+        // check the errors
+        assert_eq!(errors.len(), 3);
+
+        // check the a error for "duplicate parameter"
         assert!(errors.contains_key(&Identifier::new("a")));
-
         let a_errors = errors
             .get(&Identifier::new("a"))
             .expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
-        // check that the error is a duplicate parameter error
         let duplicate_error = &a_errors[0];
         assert_eq!(
             duplicate_error,
@@ -1310,11 +1292,37 @@ mod tests {
             }
         );
 
-        // check the resolved parameters
-        assert_eq!(resolved_params.len(), 3);
+        // check the b error for "parameter has error"
+        assert!(errors.contains_key(&Identifier::new("b")));
+        let b_errors = errors
+            .get(&Identifier::new("b"))
+            .expect("b errors should exist");
+        assert_eq!(b_errors.len(), 1);
+
+        let parameter_has_error = &b_errors[0];
+        assert!(matches!(
+            parameter_has_error,
+            ParameterResolutionError::VariableResolution(VariableResolutionError::ParameterHasError { identifier, .. })
+            if identifier == &Identifier::new("a"),
+        ));
+
+        // check the c error for "parameter has error"
+        assert!(errors.contains_key(&Identifier::new("c")));
+        let c_errors = errors
+            .get(&Identifier::new("c"))
+            .expect("c errors should exist");
+        assert_eq!(c_errors.len(), 1);
+
+        let parameter_has_error = &c_errors[0];
+        assert!(matches!(
+            parameter_has_error,
+            ParameterResolutionError::VariableResolution(VariableResolutionError::ParameterHasError { identifier, .. })
+            if identifier == &Identifier::new("b"),
+        ));
+
+        // check the resolved parameters - only the first "a" parameter is resolved
+        assert_eq!(resolved_params.len(), 1);
         assert!(resolved_params.contains_key(&Identifier::new("a")));
-        assert!(resolved_params.contains_key(&Identifier::new("b")));
-        assert!(resolved_params.contains_key(&Identifier::new("c")));
     }
 
     #[test]
