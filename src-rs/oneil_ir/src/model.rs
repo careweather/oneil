@@ -155,34 +155,6 @@ impl Model {
     pub const fn get_tests(&self) -> &HashMap<TestIndex, Test> {
         &self.tests
     }
-
-    /// Checks if this model is empty (contains no components).
-    ///
-    /// A model is considered empty if it has no Python imports, submodels,
-    /// parameters, or tests.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use oneil_ir::{model::Model, parameter::ParameterCollection};
-    /// use std::collections::{HashMap, HashSet};
-    ///
-    /// let empty_model = Model::new(
-    ///     HashMap::new(),
-    ///     HashMap::new(),
-    ///     ParameterCollection::new(HashMap::new()),
-    ///     HashMap::new(),
-    /// );
-    ///
-    /// assert!(empty_model.is_empty());
-    /// ```
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.python_imports.is_empty()
-            && self.submodels.is_empty()
-            && self.parameters.is_empty()
-            && self.tests.is_empty()
-    }
 }
 
 /// A collection of models that can be managed together.
