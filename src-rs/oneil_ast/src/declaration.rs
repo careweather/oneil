@@ -3,6 +3,7 @@
 //! This module contains structures for representing declarations in Oneil programs,
 //! including imports, model usage, parameters, and tests.
 
+// TODO: rename `Import` to `ImportPython` and `UseModel` to `ImportModel`
 use std::ops::Deref;
 
 use crate::{
@@ -90,6 +91,7 @@ pub struct UseModel {
     directory_path: Vec<DirectoryNode>,
     model: ModelInfoNode,
     submodel_list: Option<SubmodelListNode>,
+    model_kind: ModelKind,
 }
 
 /// A node containing a model usage declaration
@@ -102,11 +104,13 @@ impl UseModel {
         directory_path: Vec<DirectoryNode>,
         model: ModelInfoNode,
         submodel_list: Option<SubmodelListNode>,
+        model_kind: ModelKind,
     ) -> Self {
         Self {
             directory_path,
             model,
             submodel_list,
+            model_kind,
         }
     }
 
@@ -126,6 +130,12 @@ impl UseModel {
     #[must_use]
     pub fn submodels(&self) -> Option<&SubmodelListNode> {
         self.submodel_list.as_ref()
+    }
+
+    /// Returns the kind of model being used
+    #[must_use]
+    pub const fn model_kind(&self) -> ModelKind {
+        self.model_kind
     }
 
     /// Returns the relative path of the model
@@ -214,5 +224,28 @@ impl Deref for SubmodelList {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+/// The kind of model being used
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelKind {
+    /// The model is being used for reference
+    Reference,
+    /// The model is being used as a submodel
+    Submodel,
+}
+
+impl ModelKind {
+    /// Returns the reference model kind
+    #[must_use]
+    pub const fn reference() -> Self {
+        Self::Reference
+    }
+
+    /// Returns the submodel model kind
+    #[must_use]
+    pub const fn submodel() -> Self {
+        Self::Submodel
     }
 }

@@ -289,6 +289,7 @@ where
 #[cfg(test)]
 mod tests {
 
+    use oneil_ast::declaration::ModelKind;
     use oneil_ir::reference::Identifier;
 
     use super::*;
@@ -303,7 +304,7 @@ mod tests {
     mod ast {
         pub use oneil_ast::{
             Span,
-            declaration::{Decl, ModelInfo, UseModel},
+            declaration::{Decl, ModelInfo, ModelKind, UseModel},
             model::{Model, ModelNode, Section, SectionHeader},
             naming::{Identifier, Label},
             node::Node,
@@ -346,7 +347,12 @@ mod tests {
                     let use_model_name_node = ast::Node::new(&span_from_str(name), use_model_name);
                     let use_model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
                     let use_model_info_node = ast::Node::new(&unimportant_span(), use_model_info);
-                    let use_model = ast::UseModel::new(vec![], use_model_info_node, None);
+                    let use_model = ast::UseModel::new(
+                        vec![],
+                        use_model_info_node,
+                        None,
+                        ast::ModelKind::Submodel,
+                    );
                     let use_model_node = ast::Node::new(&unimportant_span(), use_model);
 
                     ast::Node::new(&unimportant_span(), ast::Decl::use_model(use_model_node))
@@ -652,12 +658,12 @@ mod tests {
             {
                 let model_info = ast::ModelInfo::new(child1_identifier_node, vec![], None);
                 let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-                ast::UseModel::new(vec![], model_info_node, None)
+                ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel)
             },
             {
                 let model_info = ast::ModelInfo::new(child2_identifier_node, vec![], None);
                 let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-                ast::UseModel::new(vec![], model_info_node, None)
+                ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel)
             },
         ];
         let use_models = use_models
@@ -704,7 +710,7 @@ mod tests {
         let use_models = vec![{
             let model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
             let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-            ast::UseModel::new(vec![], model_info_node, None)
+            ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel)
         }];
         let use_models = use_models
             .into_iter()
@@ -801,7 +807,7 @@ mod tests {
             ast::Node::new(&helper::span_from_str("submodel"), use_model_name);
         let model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
         let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-        let use_model = ast::UseModel::new(vec![], model_info_node, None);
+        let use_model = ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel);
         let use_model_node = ast::Node::new(&helper::unimportant_span(), use_model);
         let use_model_decl = ast::Node::new(
             &helper::unimportant_span(),

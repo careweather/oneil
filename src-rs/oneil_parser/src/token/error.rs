@@ -77,12 +77,14 @@ pub enum ExpectKeyword {
     Not,
     /// Expected 'or' keyword
     Or,
+    /// Expected 'ref' keyword
+    Ref,
+    /// Expected 'section' keyword
+    Section,
     /// Expected 'test' keyword
     Test,
     /// Expected 'true' keyword
     True,
-    /// Expected 'section' keyword
-    Section,
     /// Expected 'use' keyword
     Use,
     /// Expected 'with' keyword

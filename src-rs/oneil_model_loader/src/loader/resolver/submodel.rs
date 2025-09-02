@@ -327,6 +327,7 @@ mod tests {
     use crate::test::TestContext;
 
     use super::*;
+    use oneil_ast::declaration::ModelKind;
     use oneil_ir::model::Model;
 
     // TODO: write tests that test the span of the submodel path
@@ -349,6 +350,7 @@ mod tests {
             model_name: &str,
             subcomponents: Vec<ast::naming::IdentifierNode>,
             alias: Option<&str>,
+            model_kind: ast::declaration::ModelKind,
             start: usize,
             end: usize,
         ) -> ast::declaration::UseModelNode {
@@ -373,6 +375,7 @@ mod tests {
                 directory_path,
                 model_info_node,
                 None, // No submodel list
+                model_kind,
             );
             ast::node::Node::new(&test_ast_span(start, end), use_model)
         }
@@ -382,6 +385,7 @@ mod tests {
             model_name: &str,
             subcomponents: Vec<ast::naming::IdentifierNode>,
             alias: Option<&str>,
+            model_kind: ast::declaration::ModelKind,
             directory_path: &[&str],
             start: usize,
             end: usize,
@@ -417,6 +421,7 @@ mod tests {
                 directory_nodes,
                 model_info_node,
                 None, // No submodel list
+                model_kind,
             );
             ast::node::Node::new(&test_ast_span(start, end), use_model)
         }
@@ -451,6 +456,7 @@ mod tests {
             subcomponents: Vec<ast::naming::IdentifierNode>,
             alias: Option<&str>,
             submodels: Vec<ast::declaration::ModelInfoNode>,
+            model_kind: ast::declaration::ModelKind,
             start: usize,
             end: usize,
         ) -> ast::declaration::UseModelNode {
@@ -480,6 +486,7 @@ mod tests {
                 directory_path,
                 model_info_node,
                 Some(submodel_list_node),
+                model_kind,
             );
             ast::node::Node::new(&test_ast_span(start, end), use_model)
         }
@@ -504,7 +511,14 @@ mod tests {
     #[test]
     fn test_resolve_simple_submodel() {
         // create the use model list
-        let use_model = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+        let use_model = helper::create_use_model_node(
+            "temperature",
+            vec![],
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            20,
+        );
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -544,8 +558,14 @@ mod tests {
             ast::node::Node::new(&helper::test_ast_span(0, 11), temperature_identifier);
         let subcomponents = vec![atmosphere_node, temperature_node];
 
-        let use_model =
-            helper::create_use_model_node("weather", subcomponents, Some("temp"), 0, 35);
+        let use_model = helper::create_use_model_node(
+            "weather",
+            subcomponents,
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            35,
+        );
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -589,7 +609,8 @@ mod tests {
     fn test_resolve_submodel_without_alias() {
         // create the use model list without alias
         // use temperature
-        let use_model = helper::create_use_model_node("temperature", vec![], None, 0, 12);
+        let use_model =
+            helper::create_use_model_node("temperature", vec![], None, ModelKind::Submodel, 0, 12);
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -625,7 +646,14 @@ mod tests {
             ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
         let subcomponents = vec![atmosphere_node];
 
-        let use_model = helper::create_use_model_node("weather", subcomponents, None, 0, 20);
+        let use_model = helper::create_use_model_node(
+            "weather",
+            subcomponents,
+            None,
+            ModelKind::Submodel,
+            0,
+            20,
+        );
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -664,7 +692,14 @@ mod tests {
     fn test_resolve_model_with_error() {
         // create the use model list with error model
         // use error_model as error
-        let use_model = helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
+        let use_model = helper::create_use_model_node(
+            "error_model",
+            vec![],
+            Some("error"),
+            ModelKind::Submodel,
+            0,
+            25,
+        );
         let use_model_alias = use_model.model_info().alias().expect("alias should exist");
         let use_model_name_span = get_span_from_ast_span(use_model_alias.node_span());
         let use_models = vec![&use_model];
@@ -711,8 +746,14 @@ mod tests {
             ast::node::Node::new(&undefined_identifier_span.clone(), undefined_identifier);
         let subcomponents = vec![undefined_node];
 
-        let use_model =
-            helper::create_use_model_node("weather", subcomponents, Some("weather"), 0, 30);
+        let use_model = helper::create_use_model_node(
+            "weather",
+            subcomponents,
+            Some("weather"),
+            ModelKind::Submodel,
+            0,
+            30,
+        );
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -765,8 +806,14 @@ mod tests {
             ast::node::Node::new(&undefined_identifier_span.clone(), undefined_identifier);
         let subcomponents = vec![atmosphere_node, undefined_node];
 
-        let use_model =
-            helper::create_use_model_node("weather", subcomponents, Some("undefined"), 0, 35);
+        let use_model = helper::create_use_model_node(
+            "weather",
+            subcomponents,
+            Some("undefined"),
+            ModelKind::Submodel,
+            0,
+            35,
+        );
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -817,10 +864,24 @@ mod tests {
     fn test_resolve_multiple_submodels() {
         // create the use model list with multiple submodels
         // use temperature as temp
-        let temp_model = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+        let temp_model = helper::create_use_model_node(
+            "temperature",
+            vec![],
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            20,
+        );
 
         // use pressure as press
-        let press_model = helper::create_use_model_node("pressure", vec![], Some("press"), 0, 25);
+        let press_model = helper::create_use_model_node(
+            "pressure",
+            vec![],
+            Some("press"),
+            ModelKind::Submodel,
+            0,
+            25,
+        );
 
         let use_models = vec![&temp_model, &press_model];
 
@@ -861,11 +922,24 @@ mod tests {
     fn test_resolve_mixed_success_and_error() {
         // create the use model list with mixed success and error cases
         // use temperature as temp
-        let temp_model = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+        let temp_model = helper::create_use_model_node(
+            "temperature",
+            vec![],
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            20,
+        );
 
         // use error_model as error
-        let error_model =
-            helper::create_use_model_node("error_model", vec![], Some("error"), 0, 25);
+        let error_model = helper::create_use_model_node(
+            "error_model",
+            vec![],
+            Some("error"),
+            ModelKind::Submodel,
+            0,
+            25,
+        );
         let error_model_alias = error_model
             .model_info()
             .alias()
@@ -926,6 +1000,7 @@ mod tests {
             "math",
             vec![],
             Some("math"),
+            ModelKind::Submodel,
             &["utils"],
             0,
             20,
@@ -963,6 +1038,7 @@ mod tests {
             "math",
             vec![],
             Some("math"),
+            ModelKind::Submodel,
             &["nonexistent"],
             0,
             20,
@@ -999,9 +1075,23 @@ mod tests {
     fn test_resolve_duplicate_submodel_names() {
         // create the use model list with duplicate submodel names
         // use temperature as temp
-        let temp_model1 = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+        let temp_model1 = helper::create_use_model_node(
+            "temperature",
+            vec![],
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            20,
+        );
         // use pressure as temp (duplicate alias)
-        let temp_model2 = helper::create_use_model_node("pressure", vec![], Some("temp"), 0, 25);
+        let temp_model2 = helper::create_use_model_node(
+            "pressure",
+            vec![],
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            25,
+        );
         let temp_model2_alias = temp_model2
             .model_info()
             .alias()
@@ -1062,18 +1152,37 @@ mod tests {
         let temperature_node =
             ast::node::Node::new(&helper::test_ast_span(0, 11), temperature_identifier);
         let temp_subcomponents = vec![atmosphere_node, temperature_node];
-        let temp_model =
-            helper::create_use_model_node("weather", temp_subcomponents, Some("temp"), 0, 35);
+        let temp_model = helper::create_use_model_node(
+            "weather",
+            temp_subcomponents,
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            35,
+        );
 
         // use sensor.location as loc
         let location_identifier = ast::naming::Identifier::new("location".to_string());
         let location_node = ast::node::Node::new(&helper::test_ast_span(0, 8), location_identifier);
         let loc_subcomponents = vec![location_node];
-        let loc_model =
-            helper::create_use_model_node("sensor", loc_subcomponents, Some("loc"), 0, 25);
+        let loc_model = helper::create_use_model_node(
+            "sensor",
+            loc_subcomponents,
+            Some("loc"),
+            ModelKind::Submodel,
+            0,
+            25,
+        );
 
         // use pressure as press
-        let press_model = helper::create_use_model_node("pressure", vec![], Some("press"), 0, 20);
+        let press_model = helper::create_use_model_node(
+            "pressure",
+            vec![],
+            Some("press"),
+            ModelKind::Submodel,
+            0,
+            20,
+        );
 
         let use_models = vec![&temp_model, &loc_model, &press_model];
 
@@ -1155,8 +1264,14 @@ mod tests {
             ast::node::Node::new(&temperature_span.clone(), temperature_identifier);
         let subcomponents = vec![atmosphere_node, temperature_node];
 
-        let use_model =
-            helper::create_use_model_node("weather", subcomponents, Some("temp"), 0, 35);
+        let use_model = helper::create_use_model_node(
+            "weather",
+            subcomponents,
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            35,
+        );
         let use_models = vec![&use_model];
 
         // create the current model path
@@ -1205,7 +1320,14 @@ mod tests {
     fn test_resolve_use_declaration_with_successful_and_failing_submodels() {
         // create the use model list with both successful and failing submodels
         // use temperature as temp (successful)
-        let temp_model = helper::create_use_model_node("temperature", vec![], Some("temp"), 0, 20);
+        let temp_model = helper::create_use_model_node(
+            "temperature",
+            vec![],
+            Some("temp"),
+            ModelKind::Submodel,
+            0,
+            20,
+        );
 
         // use weather.atmosphere.undefined as undefined (failing)
         let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
@@ -1219,6 +1341,7 @@ mod tests {
             "weather",
             undefined_subcomponents,
             Some("undefined"),
+            ModelKind::Submodel,
             0,
             35,
         );
@@ -1292,6 +1415,7 @@ mod tests {
             vec![],
             None,
             vec![temperature_submodel],
+            ModelKind::Submodel,
             0,
             25,
         );
@@ -1349,6 +1473,7 @@ mod tests {
             vec![],
             None,
             vec![temperature_submodel, pressure_submodel],
+            ModelKind::Submodel,
             0,
             45,
         );
@@ -1422,6 +1547,7 @@ mod tests {
             vec![],
             None,
             vec![temperature_submodel],
+            ModelKind::Submodel,
             0,
             30,
         );
@@ -1483,6 +1609,7 @@ mod tests {
             vec![],
             None,
             vec![undefined_submodel],
+            ModelKind::Submodel,
             0,
             30,
         );
@@ -1541,6 +1668,7 @@ mod tests {
             vec![],
             None,
             vec![temperature_submodel, undefined_submodel],
+            ModelKind::Submodel,
             0,
             50,
         );
@@ -1612,6 +1740,7 @@ mod tests {
             vec![],
             Some("weather_model"),
             vec![temperature_submodel, pressure_submodel],
+            ModelKind::Submodel,
             0,
             55,
         );

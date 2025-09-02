@@ -10,7 +10,8 @@ use nom::{
 use oneil_ast::{
     Span as AstSpan,
     declaration::{
-        Decl, DeclNode, Import, ModelInfo, ModelInfoNode, SubmodelList, SubmodelListNode, UseModel,
+        Decl, DeclNode, Import, ModelInfo, ModelInfoNode, ModelKind, SubmodelList,
+        SubmodelListNode, UseModel,
     },
     naming::{Directory, DirectoryNode, Identifier, IdentifierNode},
     node::Node,
@@ -21,7 +22,7 @@ use crate::{
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
-        keyword::{as_, import, use_, with},
+        keyword::{as_, import, ref_, use_, with},
         naming::identifier,
         structure::end_of_line,
         symbol::{bracket_left, bracket_right, comma, dot, dot_dot, slash},
@@ -140,12 +141,23 @@ fn import_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 /// Returns a declaration node containing the parsed use declaration, or an error if
 /// the declaration is malformed.
 fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
-    let (rest, use_token) = use_.convert_errors().parse(input)?;
+    let ref_keyword = |input| {
+        let (rest, ref_token) = ref_.convert_errors().parse(input)?;
+        Ok((rest, (ModelKind::Reference, ref_token)))
+    };
+
+    let use_keyword = |input| {
+        let (rest, use_token) = use_.convert_errors().parse(input)?;
+        Ok((rest, (ModelKind::Submodel, use_token)))
+    };
+
+    // either parse the ref keyword or the use keyword
+    let (rest, (is_ref_only, keyword_token)) = alt((ref_keyword, use_keyword)).parse(input)?;
 
     let (rest, directory_path) = opt_directory_path.parse(rest)?;
 
     let (rest, model_info) = model_info
-        .or_fail_with(ParserError::use_missing_model_info(&use_token))
+        .or_fail_with(ParserError::use_missing_model_info(&keyword_token))
         .parse(rest)?;
 
     let (rest, submodel_list) = opt(|input| {
@@ -163,11 +175,11 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
         .or_fail_with(ParserError::use_missing_end_of_line(&final_span))
         .parse(rest)?;
 
-    let span = AstSpan::calc_span_with_whitespace(&use_token, &final_span, &end_of_line_token);
+    let span = AstSpan::calc_span_with_whitespace(&keyword_token, &final_span, &end_of_line_token);
 
     let use_model_node = Node::new(
         &span,
-        UseModel::new(directory_path, model_info, submodel_list),
+        UseModel::new(directory_path, model_info, submodel_list, is_ref_only),
     );
 
     let decl_node = Node::new(&span, Decl::UseModel(use_model_node));
@@ -464,6 +476,23 @@ mod tests {
         }
 
         #[test]
+        fn test_ref_decl() {
+            let input = Span::new_extra("ref foo\n", Config::default());
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+            match decl.node_value() {
+                Decl::UseModel(use_model_node) => {
+                    let use_model_info = use_model_node.model_info();
+                    assert_eq!(use_model_info.top_component().as_str(), "foo");
+                    assert_eq!(use_model_info.subcomponents().len(), 0);
+                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_node.model_kind(), ModelKind::Reference);
+                }
+                _ => panic!("Expected use declaration"),
+            }
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
         fn test_use_decl() {
             let input = Span::new_extra("use foo.bar as baz\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
@@ -474,6 +503,7 @@ mod tests {
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents()[0].as_str(), "bar");
                     assert_eq!(alias.as_str(), "baz");
+                    assert_eq!(use_model_node.model_kind(), ModelKind::Submodel);
                 }
                 _ => panic!("Expected use declaration"),
             }

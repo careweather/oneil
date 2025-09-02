@@ -19,8 +19,8 @@ use crate::token::{
 
 /// Keywords that are valid in the Oneil language.
 pub const KEYWORDS: &[&str] = &[
-    "and", "as", "false", "from", "if", "import", "not", "or", "true", "section", "test", "use",
-    "with",
+    "and", "as", "false", "from", "if", "import", "not", "or", "ref", "section", "test", "true",
+    "use", "with",
 ];
 
 /// Creates a keyword parser for the specified keyword string.
@@ -97,9 +97,9 @@ pub fn or(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("or", error::ExpectKeyword::Or).parse(input)
 }
 
-/// Parses the 'true' keyword token.
-pub fn true_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
-    keyword("true", error::ExpectKeyword::True).parse(input)
+/// Parses the 'ref' keyword token.
+pub fn ref_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
+    keyword("ref", error::ExpectKeyword::Ref).parse(input)
 }
 
 /// Parses the 'section' keyword token.
@@ -110,6 +110,11 @@ pub fn section(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
 /// Parses the 'test' keyword token.
 pub fn test(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
     keyword("test", error::ExpectKeyword::Test).parse(input)
+}
+
+/// Parses the 'true' keyword token.
+pub fn true_(input: Span<'_>) -> Result<'_, Token<'_>, error::TokenError> {
+    keyword("true", error::ExpectKeyword::True).parse(input)
 }
 
 /// Parses the 'use' keyword token.
@@ -190,11 +195,11 @@ mod tests {
         }
 
         #[test]
-        fn test_true() {
-            let input = Span::new_extra("true false", Config::default());
-            let (rest, matched) = true_(input).expect("should parse 'true' keyword");
-            assert_eq!(matched.lexeme(), "true");
-            assert_eq!(rest.fragment(), &"false");
+        fn test_ref() {
+            let input = Span::new_extra("ref foo", Config::default());
+            let (rest, matched) = ref_(input).expect("should parse 'ref' keyword");
+            assert_eq!(matched.lexeme(), "ref");
+            assert_eq!(rest.fragment(), &"foo");
         }
 
         #[test]
@@ -211,6 +216,14 @@ mod tests {
             let (rest, matched) = test(input).expect("should parse 'test' keyword");
             assert_eq!(matched.lexeme(), "test");
             assert_eq!(rest.fragment(), &"use");
+        }
+
+        #[test]
+        fn test_true() {
+            let input = Span::new_extra("true false", Config::default());
+            let (rest, matched) = true_(input).expect("should parse 'true' keyword");
+            assert_eq!(matched.lexeme(), "true");
+            assert_eq!(rest.fragment(), &"false");
         }
 
         #[test]
@@ -573,19 +586,6 @@ mod tests {
         }
 
         #[test]
-        fn test_true_error() {
-            let input = Span::new_extra("wrong", Config::default());
-            let res = true_(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::True))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(True)), got {res:?}"),
-            }
-        }
-
-        #[test]
         fn test_section_error() {
             let input = Span::new_extra("wrong", Config::default());
             let res = section(input);
@@ -599,6 +599,19 @@ mod tests {
         }
 
         #[test]
+        fn test_ref_error() {
+            let input = Span::new_extra("wrong", Config::default());
+            let res = ref_(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Ref))
+                )),
+                _ => panic!("expected TokenError::Expect(Keyword(Ref)), got {res:?}"),
+            }
+        }
+
+        #[test]
         fn test_test_error() {
             let input = Span::new_extra("wrong", Config::default());
             let res = test(input);
@@ -608,6 +621,19 @@ mod tests {
                     TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Test))
                 )),
                 _ => panic!("expected TokenError::Expect(Keyword(Test)), got {res:?}"),
+            }
+        }
+
+        #[test]
+        fn test_true_error() {
+            let input = Span::new_extra("wrong", Config::default());
+            let res = true_(input);
+            match res {
+                Err(nom::Err::Error(token_error)) => assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::True))
+                )),
+                _ => panic!("expected TokenError::Expect(Keyword(True)), got {res:?}"),
             }
         }
 
