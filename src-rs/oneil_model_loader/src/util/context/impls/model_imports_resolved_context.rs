@@ -13,6 +13,7 @@ use crate::{
     },
 };
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModelImportsResolvedContext<'builder, 'model_imports> {
     models_loaded_context: ModelsLoadedContext<'builder>,
     submodels: &'model_imports HashMap<Identifier, (ModelPath, Span)>,

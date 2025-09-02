@@ -15,7 +15,7 @@ pub trait ModelImportsContext {
     fn lookup_submodel(&self, submodel_name: &Identifier) -> LookupResult<&(ModelPath, Span)>;
 }
 
-pub trait ParameterContext {
+pub trait ParameterContext: std::fmt::Debug {
     fn lookup_parameter(&self, parameter_name: &Identifier) -> LookupResult<&Parameter>;
     fn add_parameter(&mut self, parameter_name: Identifier, parameter: Parameter);
     fn add_parameter_error(&mut self, parameter_name: Identifier);

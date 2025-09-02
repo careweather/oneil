@@ -7,6 +7,7 @@ use crate::util::context::{
     lookup,
 };
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParametersResolvingContext<'builder, 'model_imports> {
     model_imports_resolved_context: ModelImportsResolvedContext<'builder, 'model_imports>,
     parameters: HashMap<Identifier, Parameter>,

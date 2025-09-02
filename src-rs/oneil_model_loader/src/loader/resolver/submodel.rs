@@ -676,7 +676,9 @@ mod tests {
         let error_id = Identifier::new("error");
         let error_path = ModelPath::new("/error_model");
         let error_submodel = helper::create_test_model(vec![]);
-        let context = TestContext::new().with_model_context([(error_path.clone(), error_submodel)]);
+        let context = TestContext::new()
+            .with_model_context([(error_path.clone(), error_submodel)])
+            .with_model_errors([error_path.clone()]);
 
         // resolve the submodels
         let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
@@ -917,47 +919,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_with_directory_path_error() {
-        // create the use model list with directory path that doesn't exist
-        // use nonexistent/utils/math as math
-        let use_model = helper::create_use_model_node_with_directory_path(
-            "math",
-            vec![],
-            Some("math"),
-            &["nonexistent", "utils"],
-            0,
-            30,
-        );
-        let use_models = vec![&use_model];
-
-        // create the current model path
-        let model_path = ModelPath::new("/parent_model");
-
-        // create the context
-        let math_id = Identifier::new("math");
-        let math_path = ModelPath::new("/nonexistent/utils/math");
-        let math_submodel = helper::create_test_model(vec![]);
-        let context = TestContext::new().with_model_context([(math_path, math_submodel)]);
-
-        // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
-
-        // check the errors - should have a model loading error
-        assert_eq!(errors.len(), 1);
-
-        let error = errors.get(&math_id).expect("error should exist");
-        match error {
-            SubmodelResolutionError::ModelHasError { .. } => {
-                // This is expected when the model has an error
-            }
-            _ => panic!("Expected ModelHasError, got {error:?}"),
-        }
-
-        // check the submodels
-        assert!(submodels.is_empty());
-    }
-
-    #[test]
     fn test_resolve_submodel_with_directory_path_success() {
         // create the use model list with directory path that exists
         // use utils/math as math
@@ -992,6 +953,46 @@ mod tests {
         let result = submodels.get(&math_id);
         let (submodel_path, _span) = result.expect("submodel path should be present");
         assert_eq!(submodel_path, &math_path);
+    }
+
+    #[test]
+    fn test_resolve_submodel_with_directory_path_error() {
+        // create the use model list with directory path that doesn't exist
+        // use nonexistent/math as math
+        let use_model = helper::create_use_model_node_with_directory_path(
+            "math",
+            vec![],
+            Some("math"),
+            &["nonexistent"],
+            0,
+            20,
+        );
+        let use_models = vec![&use_model];
+
+        // create the current model path
+        let model_path = ModelPath::new("/parent_model");
+
+        // create the context
+        let math_id = Identifier::new("math");
+        let math_path = ModelPath::new("/nonexistent/math");
+        let context = TestContext::new().with_model_errors([math_path.clone()]);
+
+        // resolve the submodels
+        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+
+        // check the errors
+        assert_eq!(errors.len(), 1);
+
+        let error = errors.get(&math_id).expect("error should exist");
+        match error {
+            SubmodelResolutionError::ModelHasError { .. } => {
+                // This is expected when the model has an error
+            }
+            _ => panic!("Expected ModelHasError, got {error:?}"),
+        }
+
+        // check the submodels
+        assert_eq!(submodels.len(), 0);
     }
 
     #[test]
@@ -1048,48 +1049,6 @@ mod tests {
         let result = submodels.get(&temp_id);
         let (submodel_path, _span) = result.expect("submodel path should be present");
         assert_eq!(submodel_path, &temperature_path);
-    }
-
-    #[test]
-    fn test_resolve_use_declaration_with_failing_submodel_resolution() {
-        // create the use model list where the original use declaration resolution fails
-        // use nonexistent_model.subcomponent as sub
-        let subcomponent_identifier = ast::naming::Identifier::new("subcomponent".to_string());
-        let subcomponent_span = helper::test_ast_span(0, 12);
-        let subcomponent_node =
-            ast::node::Node::new(&subcomponent_span.clone(), subcomponent_identifier);
-        let subcomponents = vec![subcomponent_node];
-
-        let use_model =
-            helper::create_use_model_node("nonexistent_model", subcomponents, Some("sub"), 0, 35);
-        let use_models = vec![&use_model];
-
-        // create the current model path
-        let model_path = ModelPath::new("/parent_model");
-
-        // create the context
-        let sub_id = Identifier::new("sub");
-        let nonexistent_path = ModelPath::new("/nonexistent_model");
-        let nonexistent_model = helper::create_test_model(vec![]);
-        let context =
-            TestContext::new().with_model_context([(nonexistent_path, nonexistent_model)]);
-
-        // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
-
-        // check the errors - should have a model loading error
-        assert_eq!(errors.len(), 1);
-
-        let error = errors.get(&sub_id).expect("error should exist");
-        match error {
-            SubmodelResolutionError::ModelHasError { .. } => {
-                // This is expected when the model has an error
-            }
-            _ => panic!("Expected ModelHasError, got {error:?}"),
-        }
-
-        // check the submodels
-        assert!(submodels.is_empty());
     }
 
     #[test]

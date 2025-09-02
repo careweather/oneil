@@ -14,6 +14,7 @@ use crate::{
     },
 };
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModelsLoadedContext<'builder> {
     models: &'builder HashMap<ModelPath, Model>,
     submodels: HashSet<&'builder ModelPath>,

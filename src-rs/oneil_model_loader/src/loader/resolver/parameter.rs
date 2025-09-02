@@ -329,7 +329,7 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
     parameter_map: &HashMap<Identifier, (Span, &ast::parameter::ParameterNode)>,
     dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
     builtin_ref: &impl BuiltinRef,
-    context: Ctx,
+    mut context: Ctx,
     parameter_stack: &mut Stack<Identifier>,
     mut resolved_parameters: ParameterCollectionBuilder,
     mut visited: VisitedSet,
@@ -365,6 +365,7 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
                 reference_span,
             )],
         );
+        context.add_parameter_error(parameter_identifier);
         return (resolved_parameters, visited, context);
     }
 
@@ -846,6 +847,9 @@ mod tests {
             .iter()
             .any(|e| matches!(e, ParameterResolutionError::CircularDependency { .. }));
         assert!(a_has_circular_dependency || b_has_circular_dependency);
+
+        eprintln!("a_errors: {a_errors:?}");
+        eprintln!("b_errors: {b_errors:?}");
 
         assert!(a_errors.iter().any(|e| matches!(
             e,

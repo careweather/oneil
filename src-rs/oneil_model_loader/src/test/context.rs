@@ -9,6 +9,7 @@ use oneil_ir::{
 
 use crate::util::context::{LookupResult, ModelContext, ModelImportsContext, ParameterContext};
 
+#[derive(Debug, Clone)]
 pub struct TestContext {
     model_context: HashMap<ModelPath, Model>,
     model_errors: HashSet<ModelPath>,
@@ -79,6 +80,12 @@ impl TestContext {
 impl ModelContext for TestContext {
     #[allow(clippy::redundant_closure, reason = "explicit map is clearer")]
     fn lookup_model(&self, model_path: &ModelPath) -> LookupResult<&Model> {
+        let has_error = self.model_errors.contains(model_path);
+
+        if has_error {
+            return LookupResult::HasError;
+        }
+
         self.model_context
             .get(model_path)
             .map_or(LookupResult::NotFound, |model| LookupResult::Found(model))
@@ -88,6 +95,12 @@ impl ModelContext for TestContext {
 impl ModelImportsContext for TestContext {
     #[allow(clippy::redundant_closure, reason = "explicit map function is clearer")]
     fn lookup_submodel(&self, submodel_name: &Identifier) -> LookupResult<&(ModelPath, Span)> {
+        let has_error = self.submodel_errors.contains(submodel_name);
+
+        if has_error {
+            return LookupResult::HasError;
+        }
+
         self.submodel_context
             .get(submodel_name)
             .map_or(LookupResult::NotFound, |model| LookupResult::Found(model))
@@ -97,6 +110,12 @@ impl ModelImportsContext for TestContext {
 impl ParameterContext for TestContext {
     #[allow(clippy::redundant_closure, reason = "explicit map function is clearer")]
     fn lookup_parameter(&self, parameter_path: &Identifier) -> LookupResult<&Parameter> {
+        let has_error = self.parameter_errors.contains(parameter_path);
+
+        if has_error {
+            return LookupResult::HasError;
+        }
+
         self.parameter_context
             .get(parameter_path)
             .map_or(LookupResult::NotFound, |parameter| {
