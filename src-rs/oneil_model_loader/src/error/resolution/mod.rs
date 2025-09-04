@@ -127,6 +127,9 @@ impl ResolutionErrors {
         &self.submodel_resolution
     }
 
+    /// Returns a reference to the map of reference resolution errors.
+    ///
+    /// Only one error can occur for a single reference.
     #[must_use]
     pub const fn get_reference_resolution_errors(
         &self,
@@ -136,14 +139,8 @@ impl ResolutionErrors {
 
     /// Returns a reference to the map of parameter resolution errors.
     ///
-    /// This method provides access to any errors that occurred during parameter resolution.
-    /// The errors are mapped from the parameter identifier to a vector of `ParameterResolutionError`s.
-    /// Multiple errors can occur for a single parameter, for example when a parameter references
-    /// multiple undefined variables or has circular dependencies.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the `HashMap` containing parameter identifiers and their associated resolution errors.
+    /// Multiple errors can occur for a single parameter, for example when a parameter
+    /// has circular dependencies or references multiple undefined variables.
     #[must_use]
     pub const fn get_parameter_resolution_errors(
         &self,

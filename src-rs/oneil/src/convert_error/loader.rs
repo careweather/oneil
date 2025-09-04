@@ -189,6 +189,10 @@ fn convert_model_errors(
 /// This function attempts to read the source file to provide location information.
 /// If the file cannot be read, it adds a file reading error and processes the
 /// resolution errors without location information.
+#[allow(
+    clippy::too_many_lines,
+    reason = "this is a repetitive and easy-to-read function"
+)]
 fn convert_resolution_errors(
     model_path: &ModelPath,
     resolution_errors: &ResolutionErrors,
@@ -238,6 +242,26 @@ fn convert_resolution_errors(
             | ModelImportResolutionError::DuplicateReference { .. } => {
                 let error = OneilError::from_error_with_optional_source(
                     submodel_resolution_error,
+                    path.to_path_buf(),
+                    source,
+                );
+                errors.push(error);
+            }
+        }
+    }
+
+    // convert reference resolution errors
+    for reference_resolution_error in resolution_errors.get_reference_resolution_errors().values() {
+        match reference_resolution_error {
+            ModelImportResolutionError::ModelHasError { .. } => {
+                ignore_error();
+            }
+
+            ModelImportResolutionError::UndefinedSubmodel { .. }
+            | ModelImportResolutionError::DuplicateSubmodel { .. }
+            | ModelImportResolutionError::DuplicateReference { .. } => {
+                let error = OneilError::from_error_with_optional_source(
+                    reference_resolution_error,
                     path.to_path_buf(),
                     source,
                 );
