@@ -2,7 +2,7 @@ use std::fmt;
 
 use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{
-    model_import::SubmodelName,
+    model_import::ReferenceName,
     reference::{Identifier, ModelPath},
     span::Span,
 };
@@ -29,10 +29,10 @@ pub enum VariableResolutionError {
         reference_span: Span,
     },
     /// The resolution of a submodel that is referenced by a variable has failed.
-    SubmodelResolutionFailed {
-        /// The identifier of the submodel that has errors
-        identifier: SubmodelName,
-        /// The span of where the submodel is referenced
+    ReferenceResolutionFailed {
+        /// The identifier of the reference that has errors
+        identifier: ReferenceName,
+        /// The span of where the reference is referenced
         reference_span: Span,
     },
     /// The parameter is not defined in the current context.
@@ -44,13 +44,11 @@ pub enum VariableResolutionError {
         /// The span of where the parameter is referenced
         reference_span: Span,
     },
-    /// The submodel is not defined in the current context.
-    UndefinedSubmodel {
-        /// The path of the model that contains the submodel (if None, the submodel is not defined in the current model)
-        model_path: Option<ModelPath>,
-        /// The identifier of the submodel that is undefined
-        submodel: SubmodelName,
-        /// The span of where the submodel is referenced
+    /// The reference is not defined in the current model.
+    UndefinedReference {
+        /// The identifier of the reference that is undefined
+        reference: ReferenceName,
+        /// The span of where the reference is referenced
         reference_span: Span,
     },
 }
@@ -104,11 +102,11 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::SubmodelResolutionFailed` variant.
     #[must_use]
-    pub const fn submodel_resolution_failed(
-        identifier: SubmodelName,
+    pub const fn reference_resolution_failed(
+        identifier: ReferenceName,
         reference_span: Span,
     ) -> Self {
-        Self::SubmodelResolutionFailed {
+        Self::ReferenceResolutionFailed {
             identifier,
             reference_span,
         }
@@ -167,33 +165,9 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::UndefinedSubmodel` variant.
     #[must_use]
-    pub const fn undefined_submodel(submodel: SubmodelName, reference_span: Span) -> Self {
-        Self::UndefinedSubmodel {
-            model_path: None,
-            submodel,
-            reference_span,
-        }
-    }
-
-    /// Creates a new error indicating that the submodel is undefined in a specific parent model.
-    ///
-    /// # Arguments
-    ///
-    /// * `parent_model_path` - The path of the parent model where the submodel should be defined
-    /// * `identifier` - The identifier of the undefined submodel
-    ///
-    /// # Returns
-    ///
-    /// A new `VariableResolutionError::UndefinedSubmodel` variant.
-    #[must_use]
-    pub const fn undefined_submodel_in_submodel(
-        parent_model_path: ModelPath,
-        submodel: SubmodelName,
-        reference_span: Span,
-    ) -> Self {
-        Self::UndefinedSubmodel {
-            model_path: Some(parent_model_path),
-            submodel,
+    pub const fn undefined_reference(reference: ReferenceName, reference_span: Span) -> Self {
+        Self::UndefinedReference {
+            reference,
             reference_span,
         }
     }
@@ -216,7 +190,7 @@ impl fmt::Display for VariableResolutionError {
                 let identifier = identifier.as_str();
                 write!(f, "parameter `{identifier}` has errors")
             }
-            Self::SubmodelResolutionFailed {
+            Self::ReferenceResolutionFailed {
                 identifier,
                 reference_span: _,
             } => {
@@ -244,26 +218,16 @@ impl fmt::Display for VariableResolutionError {
                     ),
                 }
             }
-            Self::UndefinedSubmodel {
-                model_path,
-                submodel,
+            Self::UndefinedReference {
+                reference,
                 reference_span: _,
             } => {
                 // TODO: add context "did you mean `{}`?" using hamming distance to suggest similar submodel names
-                let identifier_str = submodel.as_str();
-                match model_path {
-                    Some(path) => {
-                        let path = path.as_ref().display();
-                        write!(
-                            f,
-                            "submodel `{identifier_str}` is not defined in model `{path}`"
-                        )
-                    }
-                    None => write!(
-                        f,
-                        "submodel `{identifier_str}` is not defined in the current model"
-                    ),
-                }
+                let identifier_str = reference.as_str();
+                write!(
+                    f,
+                    "reference `{identifier_str}` is not defined in the current model"
+                )
             }
         }
     }
@@ -297,7 +261,7 @@ impl AsOneilError for VariableResolutionError {
                 identifier: _,
                 reference_span,
             }
-            | Self::SubmodelResolutionFailed {
+            | Self::ReferenceResolutionFailed {
                 identifier: _,
                 reference_span,
             }
@@ -306,9 +270,8 @@ impl AsOneilError for VariableResolutionError {
                 parameter: _,
                 reference_span,
             }
-            | Self::UndefinedSubmodel {
-                model_path: _,
-                submodel: _,
+            | Self::UndefinedReference {
+                reference: _,
                 reference_span,
             } => {
                 let start_offset = reference_span.start();

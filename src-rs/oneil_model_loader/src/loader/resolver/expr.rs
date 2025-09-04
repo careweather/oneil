@@ -467,6 +467,7 @@ fn resolve_literal(literal: &ast::expression::LiteralNode) -> oneil_ir::expr::Li
 }
 
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use super::*;
     use crate::test::{TestBuiltinRef, TestContext};

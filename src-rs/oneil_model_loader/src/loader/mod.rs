@@ -11,8 +11,6 @@
 //! - Test resolution
 //!
 
-use std::borrow::Borrow;
-
 use oneil_ast as ast;
 use oneil_ir::{model::Model, reference::ModelPath};
 
@@ -212,8 +210,8 @@ fn split_model_ast(
         match decl.node_value() {
             ast::declaration::Decl::Import(import) => imports.push(import),
             ast::declaration::Decl::UseModel(use_model) => use_models.push(use_model),
-            ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter.borrow()),
-            ast::declaration::Decl::Test(test) => tests.push(test.borrow()),
+            ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter),
+            ast::declaration::Decl::Test(test) => tests.push(test),
         }
     }
 
@@ -222,8 +220,8 @@ fn split_model_ast(
             match decl.node_value() {
                 ast::declaration::Decl::Import(import) => imports.push(import),
                 ast::declaration::Decl::UseModel(use_model) => use_models.push(use_model),
-                ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter.borrow()),
-                ast::declaration::Decl::Test(test) => tests.push(test.borrow()),
+                ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter),
+                ast::declaration::Decl::Test(test) => tests.push(test),
             }
         }
     }

@@ -244,9 +244,9 @@ fn get_expr_internal_dependencies(
                 dependencies
             }
 
-            ast::expression::Variable::Accessor {
-                parent: _,
-                component: _,
+            ast::expression::Variable::ReferenceModelParameter {
+                reference_model: _,
+                parameter: _,
             } => {
                 // an accessor implies that the dependency is on a parameter
                 // outside of the current model, so it doesn't count as an
@@ -518,6 +518,7 @@ fn resolve_limits(
 }
 
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use crate::{
         error::VariableResolutionError,

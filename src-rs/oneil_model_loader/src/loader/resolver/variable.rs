@@ -33,10 +33,10 @@
 //! - Model loading errors
 //!
 
-use oneil_ast as ast;
+use oneil_ast::{self as ast};
 use oneil_ir::{
     expr::{Expr, ExprWithSpan},
-    model_import::SubmodelName,
+    model_import::ReferenceName,
     reference::{Identifier, ModelPath},
     span::{Span, WithSpan},
 };
@@ -92,6 +92,10 @@ use crate::{
 ///    - Resolve the parent submodel path
 ///    - Recursively resolve the component within that submodel
 ///    - Handle nested accessors through recursive calls
+#[allow(
+    clippy::panic_in_result_fn,
+    reason = "panic enforces a function invariant"
+)]
 pub fn resolve_variable(
     variable: &ast::expression::VariableNode,
     builtin_ref: &impl BuiltinRef,
@@ -126,107 +130,60 @@ pub fn resolve_variable(
                 }
             }
         }
-        ast::expression::Variable::Accessor { parent, component } => {
-            let parent_identifier = SubmodelName::new(parent.as_str().to_string());
-            let parent_identifier_span = get_span_from_ast_span(parent.node_span());
-            let submodel_path = match context.lookup_submodel(&parent_identifier) {
-                LookupResult::Found(submodel_import) => submodel_import.path(),
+        ast::expression::Variable::ReferenceModelParameter {
+            reference_model,
+            parameter,
+        } => {
+            let reference_name = ReferenceName::new(reference_model.as_str().to_string());
+            let reference_name_span = get_span_from_ast_span(reference_model.node_span());
+            let reference_path =
+                resolve_reference_path(reference_name, reference_name_span, context)?;
+
+            // lookup the reference model
+            let model = match context.lookup_model(reference_path) {
+                LookupResult::Found(model) => model,
                 LookupResult::HasError => {
-                    return Err(VariableResolutionError::submodel_resolution_failed(
-                        parent_identifier,
-                        parent_identifier_span,
+                    return Err(VariableResolutionError::model_has_error(
+                        reference_path.clone(),
+                        reference_name_span,
                     ));
                 }
-                LookupResult::NotFound => {
-                    return Err(VariableResolutionError::undefined_submodel(
-                        parent_identifier,
-                        parent_identifier_span,
-                    ));
-                }
+                LookupResult::NotFound => panic!("reference should have been visited already"),
             };
 
-            let (model_path, ident) = resolve_variable_recursive(
-                submodel_path,
-                component,
-                parent_identifier_span,
-                context,
-            )?;
+            // ensure that the parameter is defined in the reference model
+            let var_identifier = Identifier::new(parameter.as_str());
+            let var_identifier_span = get_span_from_ast_span(parameter.node_span());
+            if model.get_parameter(&var_identifier).is_none() {
+                return Err(VariableResolutionError::undefined_parameter_in_submodel(
+                    reference_path.clone(),
+                    var_identifier,
+                    var_identifier_span,
+                ));
+            }
 
             let span = get_span_from_ast_span(variable.node_span());
-            let expr = Expr::external_variable(model_path, ident);
+            let expr = Expr::external_variable(reference_path.clone(), var_identifier);
             Ok(WithSpan::new(expr, span))
         }
     }
 }
 
-/// Recursively resolves a variable within a specific submodel context.
-///
-/// This internal function handles the recursive resolution of variables within
-/// submodel contexts. It's called by `resolve_variable` when dealing with
-/// accessor variables (e.g., `submodel.parameter`).
-///
-/// # Safety
-///
-/// This function assumes that the submodel path has been validated and the model
-/// exists in the modelinfo. If this assumption is violated, the function will panic.
-/// This is by design as it indicates a bug in the model loading process.
-#[allow(
-    clippy::panic_in_result_fn,
-    reason = "panic enforces a function invariant"
-)]
-fn resolve_variable_recursive(
-    submodel_path: &ModelPath,
-    variable: &ast::expression::Variable,
-    parent_identifier_span: Span,
-    context: &impl ModelContext,
-) -> Result<(ModelPath, Identifier), VariableResolutionError> {
-    let model = match context.lookup_model(submodel_path) {
-        LookupResult::Found(model) => model,
-        LookupResult::HasError => {
-            return Err(VariableResolutionError::model_has_error(
-                submodel_path.clone(),
-                parent_identifier_span,
-            ));
-        }
-        LookupResult::NotFound => panic!("submodel should have been visited already"),
-    };
-
-    match variable {
-        // if the variable is an identifier, this means that the variable refers to a parameter
-        ast::expression::Variable::Identifier(identifier) => {
-            let var_identifier = Identifier::new(identifier.as_str());
-            let var_identifier_span = get_span_from_ast_span(identifier.node_span());
-            if model.get_parameter(&var_identifier).is_some() {
-                Ok((submodel_path.clone(), var_identifier))
-            } else {
-                Err(VariableResolutionError::undefined_parameter_in_submodel(
-                    submodel_path.clone(),
-                    var_identifier,
-                    var_identifier_span,
-                ))
-            }
-        }
-
-        // if the variable is an accessor, this means that the variable refers to a submodel
-        ast::expression::Variable::Accessor { parent, component } => {
-            let parent_identifier = SubmodelName::new(parent.as_str().to_string());
-            let parent_identifier_span = get_span_from_ast_span(parent.node_span());
-            let Some(submodel_import) = model.get_submodel(&parent_identifier) else {
-                let source = VariableResolutionError::undefined_submodel_in_submodel(
-                    submodel_path.clone(),
-                    parent_identifier,
-                    parent_identifier_span,
-                );
-                return Err(source);
-            };
-
-            resolve_variable_recursive(
-                submodel_import.path(),
-                component,
-                parent_identifier_span,
-                context,
-            )
-        }
+fn resolve_reference_path(
+    reference_name: ReferenceName,
+    reference_name_span: Span,
+    context: &impl ModelImportsContext,
+) -> Result<&ModelPath, VariableResolutionError> {
+    match context.lookup_reference(&reference_name) {
+        LookupResult::Found(reference_import) => Ok(reference_import.path()),
+        LookupResult::HasError => Err(VariableResolutionError::reference_resolution_failed(
+            reference_name,
+            reference_name_span,
+        )),
+        LookupResult::NotFound => Err(VariableResolutionError::undefined_reference(
+            reference_name,
+            reference_name_span,
+        )),
     }
 }
 
@@ -530,7 +487,7 @@ mod tests {
 
         // check the result
         match result {
-            Err(VariableResolutionError::SubmodelResolutionFailed {
+            Err(VariableResolutionError::ReferenceResolutionFailed {
                 identifier,
                 reference_span,
             }) => {

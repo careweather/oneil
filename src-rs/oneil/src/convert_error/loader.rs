@@ -333,7 +333,7 @@ fn convert_variable_resolution_error(
 ) -> Option<OneilError> {
     match variable_resolution_error {
         VariableResolutionError::UndefinedParameter { .. }
-        | VariableResolutionError::UndefinedSubmodel { .. } => {
+        | VariableResolutionError::UndefinedReference { .. } => {
             let error = OneilError::from_error_with_optional_source(
                 variable_resolution_error,
                 path.to_path_buf(),
@@ -351,7 +351,7 @@ fn convert_variable_resolution_error(
             // parameter has errors, which will be reported separately.
             None
         }
-        VariableResolutionError::SubmodelResolutionFailed { .. } => {
+        VariableResolutionError::ReferenceResolutionFailed { .. } => {
             // This error is intentionally ignored because it indicates that the
             // submodel resolution failed, which will be reported separately.
             None

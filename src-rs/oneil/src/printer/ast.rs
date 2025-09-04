@@ -302,14 +302,17 @@ fn print_variable(var: &VariableNode, writer: &mut impl Write, indent: usize) ->
                 id.node_value().as_str()
             )?;
         }
-        Variable::Accessor { parent, component } => {
+        Variable::ReferenceModelParameter {
+            reference_model,
+            parameter,
+        } => {
             writeln!(
                 writer,
-                "{}Accessor: \"{}\"",
+                "{}ReferenceModelParameter: \"{}.{}\"",
                 "  ".repeat(indent),
-                parent.node_value().as_str()
+                reference_model.as_str(),
+                parameter.as_str()
             )?;
-            print_variable(component, writer, indent + 2)?;
         }
     }
     Ok(())

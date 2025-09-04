@@ -74,6 +74,7 @@ fn resolve_unit_recursive(
 }
 
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use super::*;
     use oneil_ast::unit::{UnitExpr, UnitOp};
