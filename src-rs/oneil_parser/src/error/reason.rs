@@ -145,10 +145,10 @@ impl ParserErrorReason {
         }
     }
 
-    pub(crate) fn expr_variable_missing_parent_model(dot_span: AstSpan) -> Self {
+    pub(crate) fn expr_variable_missing_reference_model(dot_span: AstSpan) -> Self {
         Self::Incomplete {
             cause: dot_span,
-            kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
+            kind: IncompleteKind::Expr(ExprKind::VariableMissingReferenceModel),
         }
     }
 
@@ -414,8 +414,8 @@ pub enum ExprKind {
         /// The operator value
         operator: UnaryOp,
     },
-    /// Found a missing parent model in a variable accessor
-    VariableMissingParentModel,
+    /// Found a missing reference model in a variable accessor
+    VariableMissingReferenceModel,
 }
 
 /// The different kind of incomplete section errors

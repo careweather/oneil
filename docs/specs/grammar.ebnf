@@ -78,7 +78,7 @@ MultiplicativeExpr = [ MultiplicativeExpr, MultiplicativeOp, ], ExponentialExpr 
 MultiplicativeOp = "*" | "/" | "//" | "%" ;
 ExponentialExpr = NegExpr, [ "^", , ExponentialExpr ] ;  (* right associative *)
 NegExpr = ( "-", NegExpr ) | PrimaryExpr ;
-PrimaryExpr = NumberLiteral | StringLiteral | BooleanLiteral | Identifier { ".", Identifier } | FunctionCall | ( "(", Expr, ")" ) ;
+PrimaryExpr = NumberLiteral | StringLiteral | BooleanLiteral | Identifier [ ".", Identifier ] | FunctionCall | ( "(", Expr, ")" ) ;
 
 PiecewiseExpr = PiecewisePart, [ ":", UnitExpr ], { EndOfLine, PiecewisePart } ;
 PiecewisePart = "{", Expr, "if", Expr ;

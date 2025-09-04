@@ -106,7 +106,9 @@ impl fmt::Display for ExprKind {
                 };
                 write!(f, "expected operand after `{operator_str}`")
             }
-            Self::VariableMissingParentModel => write!(f, "expected parent model name after `.`"),
+            Self::VariableMissingReferenceModel => {
+                write!(f, "expected parent model name after `.`")
+            }
         }
     }
 }

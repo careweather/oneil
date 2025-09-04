@@ -670,37 +670,41 @@ fn function_call(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// Returns an expression node representing the variable, which can be either
 /// a simple identifier or a nested accessor structure.
 fn variable(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
-    let (rest, first_id) = identifier.convert_errors().parse(input)?;
-    let first_id_span = AstSpan::from(&first_id);
-    let first_id = Node::new(
-        &first_id_span,
-        Identifier::new(first_id.lexeme().to_string()),
+    let (rest, parameter_id) = identifier.convert_errors().parse(input)?;
+    let parameter_id_span = AstSpan::from(&parameter_id);
+    let parameter_id = Node::new(
+        &parameter_id_span,
+        Identifier::new(parameter_id.lexeme().to_string()),
     );
 
-    let (rest, rest_ids) = many0(|input| {
+    let (rest, reference_model_id) = opt(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
-        let (rest, id) = identifier
-            .or_fail_with(ParserError::expr_variable_missing_parent(&dot_token))
+        let (rest, reference_model_id) = identifier
+            .or_fail_with(ParserError::expr_variable_missing_reference_model(
+                &dot_token,
+            ))
             .parse(rest)?;
-        let id_span = AstSpan::from(&id);
-        let id = Node::new(&id_span, Identifier::new(id.lexeme().to_string()));
+        let id_span = AstSpan::from(&reference_model_id);
+        let id = Node::new(
+            &id_span,
+            Identifier::new(reference_model_id.lexeme().to_string()),
+        );
 
         Ok((rest, id))
     })
     .parse(rest)?;
 
-    let first_id = Node::new(&first_id_span, Variable::identifier(first_id));
+    let variable_node = match reference_model_id {
+        Some(reference_model_id) => {
+            let variable_span =
+                AstSpan::calc_span(&parameter_id_span, &reference_model_id.node_span());
+            let variable = Variable::reference_model_accessor(parameter_id, reference_model_id);
+            Node::new(&variable_span, variable)
+        }
+        None => Node::new(&parameter_id_span, Variable::identifier(parameter_id)),
+    };
 
-    let variable = rest_ids.into_iter().fold(first_id, |acc, id| {
-        let start = &acc;
-        let end = &id;
-        let span = AstSpan::calc_span(start, end);
-
-        Node::new(&span, Variable::reference_model_accessor(id, acc))
-    });
-
-    let span = AstSpan::from(&variable);
-    let expr = Node::new(&span, Expr::variable(variable));
+    let expr = Node::new(&variable_node.node_span(), Expr::variable(variable_node));
 
     Ok((rest, expr))
 }
@@ -837,24 +841,18 @@ mod tests {
 
     #[test]
     fn test_primary_expr_multiword_identifier() {
-        let input = Span::new_extra("foo.bar.baz", Config::default());
+        let input = Span::new_extra("foo.bar", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_id = Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
         let expected_id2 = Node::new(&AstSpan::new(4, 3, 0), Identifier::new("bar".to_string()));
-        let expected_id3 = Node::new(&AstSpan::new(8, 3, 0), Identifier::new("baz".to_string()));
 
-        let variable = Node::new(&AstSpan::new(0, 3, 0), Variable::identifier(expected_id));
         let variable = Node::new(
             &AstSpan::new(0, 7, 0),
-            Variable::reference_model_accessor(expected_id2, variable),
-        );
-        let variable = Node::new(
-            &AstSpan::new(0, 11, 0),
-            Variable::reference_model_accessor(expected_id3, variable),
+            Variable::reference_model_accessor(expected_id, expected_id2),
         );
 
-        let expected_expr = Node::new(&AstSpan::new(0, 11, 0), Expr::variable(variable));
+        let expected_expr = Node::new(&AstSpan::new(0, 7, 0), Expr::variable(variable));
         assert_eq!(expr, expected_expr);
     }
 
@@ -1685,30 +1683,7 @@ mod tests {
                         assert_eq!(error.error_offset, 4);
                         match error.reason {
                             ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
-                                cause,
-                            } => {
-                                assert_eq!(cause, expected_dot_span);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Unexpected result {result:?}"),
-                }
-            }
-
-            #[test]
-            fn test_dot_at_end() {
-                let input = Span::new_extra("foo.bar.", Config::default());
-                let result = parse(input);
-                let expected_dot_span = AstSpan::new(7, 1, 0);
-
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 8);
-                        match error.reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Expr(ExprKind::VariableMissingParentModel),
+                                kind: IncompleteKind::Expr(ExprKind::VariableMissingReferenceModel),
                                 cause,
                             } => {
                                 assert_eq!(cause, expected_dot_span);

@@ -245,14 +245,14 @@ impl ParserError {
     }
 
     /// Creates a new `ParserError` for a missing parent in a variable accessor
-    pub(crate) fn expr_variable_missing_parent(
+    pub(crate) fn expr_variable_missing_reference_model(
         dot_span: &impl SpanLike,
     ) -> impl Fn(TokenError) -> Self {
         move |error| {
             let dot_span = AstSpan::from(dot_span);
             Self::new_from_token_error(
                 error,
-                ParserErrorReason::expr_variable_missing_parent_model(dot_span),
+                ParserErrorReason::expr_variable_missing_reference_model(dot_span),
             )
         }
     }

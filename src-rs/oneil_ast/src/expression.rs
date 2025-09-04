@@ -300,14 +300,16 @@ impl UnaryOp {
 /// Variable references in expressions
 #[derive(Debug, Clone, PartialEq)]
 pub enum Variable {
-    /// Simple identifier reference
+    /// A simple variable
+    ///
+    /// This could reference a parameter in the current model or a built-in variable
     Identifier(IdentifierNode),
-    /// Accessor pattern for nested references (e.g., parent.component)
-    Accessor {
-        /// The parent identifier
-        parent: IdentifierNode,
-        /// The component being accessed
-        component: Box<VariableNode>,
+    /// A parameter in a reference model
+    ReferenceModelParameter {
+        /// The reference model
+        reference_model: IdentifierNode,
+        /// The parameter being accessed
+        parameter: IdentifierNode,
     },
 }
 
@@ -323,10 +325,13 @@ impl Variable {
 
     /// Creates an accessor variable reference
     #[must_use]
-    pub fn accessor(parent: IdentifierNode, component: VariableNode) -> Self {
-        Self::Accessor {
-            parent,
-            component: Box::new(component),
+    pub fn reference_model_accessor(
+        reference_model: IdentifierNode,
+        parameter: IdentifierNode,
+    ) -> Self {
+        Self::ReferenceModelParameter {
+            reference_model,
+            parameter,
         }
     }
 }
