@@ -2,6 +2,7 @@ use std::fmt;
 
 use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{
+    model_import::SubmodelName,
     reference::{Identifier, ModelPath},
     span::Span,
 };
@@ -30,7 +31,7 @@ pub enum VariableResolutionError {
     /// The resolution of a submodel that is referenced by a variable has failed.
     SubmodelResolutionFailed {
         /// The identifier of the submodel that has errors
-        identifier: Identifier,
+        identifier: SubmodelName,
         /// The span of where the submodel is referenced
         reference_span: Span,
     },
@@ -48,7 +49,7 @@ pub enum VariableResolutionError {
         /// The path of the model that contains the submodel (if None, the submodel is not defined in the current model)
         model_path: Option<ModelPath>,
         /// The identifier of the submodel that is undefined
-        submodel: Identifier,
+        submodel: SubmodelName,
         /// The span of where the submodel is referenced
         reference_span: Span,
     },
@@ -103,7 +104,10 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::SubmodelResolutionFailed` variant.
     #[must_use]
-    pub const fn submodel_resolution_failed(identifier: Identifier, reference_span: Span) -> Self {
+    pub const fn submodel_resolution_failed(
+        identifier: SubmodelName,
+        reference_span: Span,
+    ) -> Self {
         Self::SubmodelResolutionFailed {
             identifier,
             reference_span,
@@ -163,7 +167,7 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::UndefinedSubmodel` variant.
     #[must_use]
-    pub const fn undefined_submodel(submodel: Identifier, reference_span: Span) -> Self {
+    pub const fn undefined_submodel(submodel: SubmodelName, reference_span: Span) -> Self {
         Self::UndefinedSubmodel {
             model_path: None,
             submodel,
@@ -184,7 +188,7 @@ impl VariableResolutionError {
     #[must_use]
     pub const fn undefined_submodel_in_submodel(
         parent_model_path: ModelPath,
-        submodel: Identifier,
+        submodel: SubmodelName,
         reference_span: Span,
     ) -> Self {
         Self::UndefinedSubmodel {

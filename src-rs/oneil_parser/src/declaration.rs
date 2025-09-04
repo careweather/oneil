@@ -484,7 +484,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
                     assert_eq!(use_model_node.model_kind(), ModelKind::Reference);
                 }
                 _ => panic!("Expected use declaration"),
@@ -499,10 +499,9 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(alias.as_str(), "baz");
+                    assert_eq!(use_model_info.get_alias().as_str(), "baz");
                     assert_eq!(use_model_node.model_kind(), ModelKind::Submodel);
                 }
                 _ => panic!("Expected use declaration"),
@@ -520,7 +519,7 @@ mod tests {
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 1);
                     assert_eq!(use_model_info.subcomponents()[0].as_str(), "bar");
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "bar");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -536,7 +535,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -565,10 +564,9 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents()[0].as_str(), "bar");
-                    assert_eq!(alias.as_str(), "baz");
+                    assert_eq!(use_model_info.get_alias().as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -582,10 +580,9 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "math");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert_eq!(alias.as_str(), "calculator");
+                    assert_eq!(use_model_info.get_alias().as_str(), "calculator");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 1);
@@ -608,7 +605,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "math");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "math");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 1);
@@ -632,10 +629,9 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "mechanics");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert_eq!(alias.as_str(), "dynamics");
+                    assert_eq!(use_model_info.get_alias().as_str(), "dynamics");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 2);
@@ -660,11 +656,10 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "math");
                     assert_eq!(use_model_info.subcomponents().len(), 1);
                     assert_eq!(use_model_info.subcomponents()[0].as_str(), "trigonometry");
-                    assert_eq!(alias.as_str(), "trig");
+                    assert_eq!(use_model_info.get_alias().as_str(), "trig");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 1);
@@ -685,10 +680,9 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "local_model");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert_eq!(alias.as_str(), "local");
+                    assert_eq!(use_model_info.get_alias().as_str(), "local");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 1);
@@ -709,10 +703,9 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "parent_model");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert_eq!(alias.as_str(), "parent");
+                    assert_eq!(use_model_info.get_alias().as_str(), "parent");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 1);
@@ -736,10 +729,9 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "math");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert_eq!(alias.as_str(), "shared_math");
+                    assert_eq!(use_model_info.get_alias().as_str(), "shared_math");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 4);
@@ -775,12 +767,11 @@ mod tests {
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
                     let use_model_info = use_model_node.model_info();
-                    let alias = use_model_info.alias().expect("alias should be present");
                     assert_eq!(use_model_info.top_component().as_str(), "mechanics");
                     assert_eq!(use_model_info.subcomponents().len(), 2);
                     assert_eq!(use_model_info.subcomponents()[0].as_str(), "rotational");
                     assert_eq!(use_model_info.subcomponents()[1].as_str(), "dynamics");
-                    assert_eq!(alias.as_str(), "rotation");
+                    assert_eq!(use_model_info.get_alias().as_str(), "rotation");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 2);
@@ -847,7 +838,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -856,7 +847,7 @@ mod tests {
                     let submodel = &submodels[0];
                     assert_eq!(submodel.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel.node_value().subcomponents().len(), 0);
-                    assert!(submodel.node_value().alias().is_none());
+                    assert_eq!(submodel.node_value().get_alias().as_str(), "bar");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -872,7 +863,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -881,11 +872,7 @@ mod tests {
                     let submodel = &submodels[0];
                     assert_eq!(submodel.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel.node_value().subcomponents().len(), 0);
-                    let submodel_alias = submodel
-                        .node_value()
-                        .alias()
-                        .expect("submodel should have alias");
-                    assert_eq!(submodel_alias.as_str(), "baz");
+                    assert_eq!(submodel.node_value().get_alias().as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -901,7 +888,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -911,7 +898,7 @@ mod tests {
                     assert_eq!(submodel.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel.node_value().subcomponents().len(), 1);
                     assert_eq!(submodel.node_value().subcomponents()[0].as_str(), "qux");
-                    assert!(submodel.node_value().alias().is_none());
+                    assert_eq!(submodel.node_value().get_alias().as_str(), "qux");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -927,7 +914,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -936,12 +923,12 @@ mod tests {
                     let submodel1 = &submodels[0];
                     assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-                    assert!(submodel1.node_value().alias().is_none());
+                    assert_eq!(submodel1.node_value().get_alias().as_str(), "bar");
 
                     let submodel2 = &submodels[1];
                     assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
                     assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-                    assert!(submodel2.node_value().alias().is_none());
+                    assert_eq!(submodel2.node_value().get_alias().as_str(), "qux");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -960,7 +947,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -969,20 +956,12 @@ mod tests {
                     let submodel1 = &submodels[0];
                     assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-                    let alias1 = submodel1
-                        .node_value()
-                        .alias()
-                        .expect("submodel should have alias");
-                    assert_eq!(alias1.as_str(), "baz");
+                    assert_eq!(submodel1.node_value().get_alias().as_str(), "baz");
 
                     let submodel2 = &submodels[1];
                     assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
                     assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-                    let alias2 = submodel2
-                        .node_value()
-                        .alias()
-                        .expect("submodel should have alias");
-                    assert_eq!(alias2.as_str(), "quux");
+                    assert_eq!(submodel2.node_value().get_alias().as_str(), "quux");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -999,7 +978,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -1009,14 +988,14 @@ mod tests {
                     assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel1.node_value().subcomponents().len(), 1);
                     assert_eq!(submodel1.node_value().subcomponents()[0].as_str(), "qux");
-                    assert!(submodel1.node_value().alias().is_none());
+                    assert_eq!(submodel1.node_value().get_alias().as_str(), "qux");
 
                     let submodel2 = &submodels[1];
                     assert_eq!(submodel2.node_value().top_component().as_str(), "baz");
                     assert_eq!(submodel2.node_value().subcomponents().len(), 2);
                     assert_eq!(submodel2.node_value().subcomponents()[0].as_str(), "quux");
                     assert_eq!(submodel2.node_value().subcomponents()[1].as_str(), "quuz");
-                    assert!(submodel2.node_value().alias().is_none());
+                    assert_eq!(submodel2.node_value().get_alias().as_str(), "quuz");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -1032,7 +1011,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -1041,12 +1020,12 @@ mod tests {
                     let submodel1 = &submodels[0];
                     assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-                    assert!(submodel1.node_value().alias().is_none());
+                    assert_eq!(submodel1.node_value().get_alias().as_str(), "bar");
 
                     let submodel2 = &submodels[1];
                     assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
                     assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-                    assert!(submodel2.node_value().alias().is_none());
+                    assert_eq!(submodel2.node_value().get_alias().as_str(), "qux");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -1062,7 +1041,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels - should be empty
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -1082,8 +1061,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    let alias = use_model_info.alias().expect("model should have alias");
-                    assert_eq!(alias.as_str(), "bar");
+                    assert_eq!(use_model_info.get_alias().as_str(), "bar");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -1092,12 +1070,12 @@ mod tests {
                     let submodel1 = &submodels[0];
                     assert_eq!(submodel1.node_value().top_component().as_str(), "qux");
                     assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-                    assert!(submodel1.node_value().alias().is_none());
+                    assert_eq!(submodel1.node_value().get_alias().as_str(), "qux");
 
                     let submodel2 = &submodels[1];
                     assert_eq!(submodel2.node_value().top_component().as_str(), "baz");
                     assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-                    assert!(submodel2.node_value().alias().is_none());
+                    assert_eq!(submodel2.node_value().get_alias().as_str(), "baz");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -1117,8 +1095,7 @@ mod tests {
                     assert_eq!(use_model_info.top_component().as_str(), "math");
                     assert_eq!(use_model_info.subcomponents().len(), 1);
                     assert_eq!(use_model_info.subcomponents()[0].as_str(), "trigonometry");
-                    let alias = use_model_info.alias().expect("model should have alias");
-                    assert_eq!(alias.as_str(), "trig");
+                    assert_eq!(use_model_info.get_alias().as_str(), "trig");
 
                     // Check directory path
                     assert_eq!(use_model_node.directory_path().len(), 1);
@@ -1134,16 +1111,12 @@ mod tests {
                     let submodel1 = &submodels[0];
                     assert_eq!(submodel1.node_value().top_component().as_str(), "sin");
                     assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-                    assert!(submodel1.node_value().alias().is_none());
+                    assert_eq!(submodel1.node_value().get_alias().as_str(), "sin");
 
                     let submodel2 = &submodels[1];
                     assert_eq!(submodel2.node_value().top_component().as_str(), "cos");
                     assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-                    let submodel_alias = submodel2
-                        .node_value()
-                        .alias()
-                        .expect("submodel should have alias");
-                    assert_eq!(submodel_alias.as_str(), "cosine");
+                    assert_eq!(submodel2.node_value().get_alias().as_str(), "cosine");
                 }
                 _ => panic!("Expected use declaration"),
             }
@@ -1159,7 +1132,7 @@ mod tests {
                     let use_model_info = use_model_node.model_info();
                     assert_eq!(use_model_info.top_component().as_str(), "foo");
                     assert_eq!(use_model_info.subcomponents().len(), 0);
-                    assert!(use_model_info.alias().is_none());
+                    assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
                     // Check submodels
                     let submodels = use_model_node.submodels().expect("should have submodels");
@@ -1168,12 +1141,12 @@ mod tests {
                     let submodel1 = &submodels[0];
                     assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
                     assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-                    assert!(submodel1.node_value().alias().is_none());
+                    assert_eq!(submodel1.node_value().get_alias().as_str(), "bar");
 
                     let submodel2 = &submodels[1];
                     assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
                     assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-                    assert!(submodel2.node_value().alias().is_none());
+                    assert_eq!(submodel2.node_value().get_alias().as_str(), "qux");
                 }
                 _ => panic!("Expected use declaration"),
             }

@@ -2,7 +2,8 @@ use std::fmt;
 
 use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{
-    reference::{Identifier, ModelPath},
+    model_import::{ReferenceName, SubmodelName},
+    reference::ModelPath,
     span::Span,
 };
 
@@ -12,7 +13,7 @@ use oneil_ir::{
 /// its corresponding model. This can happen when the referenced model has errors
 /// or when the submodel identifier is not defined in the referenced model.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SubmodelResolutionError {
+pub enum ModelImportResolutionError {
     /// The referenced model has errors, preventing submodel resolution.
     ModelHasError {
         /// The path of the model that has errors
@@ -25,22 +26,31 @@ pub enum SubmodelResolutionError {
         /// The path of the model that contains the submodel
         parent_model_path: ModelPath,
         /// The identifier of the submodel that is undefined
-        submodel: Identifier,
+        submodel: SubmodelName,
         /// The span of where the submodel is referenced
         reference_span: Span,
     },
     /// The submodel name is a duplicate.
     DuplicateSubmodel {
         /// The identifier of the duplicate submodel
-        submodel: Identifier,
+        submodel: SubmodelName,
         /// The span of where the original submodel is referenced
         original_span: Span,
         /// The span of where the duplicate submodel is referenced
         duplicate_span: Span,
     },
+    /// The reference name is a duplicate.
+    DuplicateReference {
+        /// The identifier of the duplicate reference
+        reference: ReferenceName,
+        /// The span of where the original reference is referenced
+        original_span: Span,
+        /// The span of where the duplicate reference is referenced
+        duplicate_span: Span,
+    },
 }
 
-impl SubmodelResolutionError {
+impl ModelImportResolutionError {
     /// Creates a new error indicating that the referenced model has errors.
     ///
     /// # Arguments
@@ -73,7 +83,7 @@ impl SubmodelResolutionError {
     #[must_use]
     pub const fn undefined_submodel_in_submodel(
         parent_model_path: ModelPath,
-        submodel: Identifier,
+        submodel: SubmodelName,
         reference_span: Span,
     ) -> Self {
         Self::UndefinedSubmodel {
@@ -96,7 +106,7 @@ impl SubmodelResolutionError {
     /// A new `SubmodelResolutionError::DuplicateSubmodel` variant.
     #[must_use]
     pub const fn duplicate_submodel(
-        submodel: Identifier,
+        submodel: SubmodelName,
         original_span: Span,
         duplicate_span: Span,
     ) -> Self {
@@ -106,9 +116,33 @@ impl SubmodelResolutionError {
             duplicate_span,
         }
     }
+
+    /// Creates a new error indicating that the reference name is a duplicate.
+    ///
+    /// # Arguments
+    ///
+    /// * `reference` - The identifier of the duplicate reference
+    /// * `original_span` - The span of where the original reference is referenced
+    /// * `duplicate_span` - The span of where the duplicate reference is referenced
+    ///
+    /// # Returns
+    ///
+    /// A new `SubmodelResolutionError::DuplicateReference` variant.
+    #[must_use]
+    pub const fn duplicate_reference(
+        reference: ReferenceName,
+        original_span: Span,
+        duplicate_span: Span,
+    ) -> Self {
+        Self::DuplicateReference {
+            reference,
+            original_span,
+            duplicate_span,
+        }
+    }
 }
 
-impl fmt::Display for SubmodelResolutionError {
+impl fmt::Display for ModelImportResolutionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ModelHasError {
@@ -134,11 +168,15 @@ impl fmt::Display for SubmodelResolutionError {
                 let submodel_str = submodel.as_str();
                 write!(f, "submodel `{submodel_str}` is defined multiple times")
             }
+            Self::DuplicateReference { reference, .. } => {
+                let reference_str = reference.as_str();
+                write!(f, "reference `{reference_str}` is defined multiple times")
+            }
         }
     }
 }
 
-impl AsOneilError for SubmodelResolutionError {
+impl AsOneilError for ModelImportResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }
@@ -155,6 +193,10 @@ impl AsOneilError for SubmodelResolutionError {
                 reference_span: location_span,
             }
             | Self::DuplicateSubmodel {
+                duplicate_span: location_span,
+                ..
+            }
+            | Self::DuplicateReference {
                 duplicate_span: location_span,
                 ..
             } => {
@@ -174,6 +216,15 @@ impl AsOneilError for SubmodelResolutionError {
                 let location = ErrorLocation::from_source_and_span(source, start, length);
                 vec![(
                     Context::Note("submodel is originally defined here".to_string()),
+                    Some(location),
+                )]
+            }
+            Self::DuplicateReference { original_span, .. } => {
+                let start = original_span.start();
+                let length = original_span.length();
+                let location = ErrorLocation::from_source_and_span(source, start, length);
+                vec![(
+                    Context::Note("reference is originally defined here".to_string()),
                     Some(location),
                 )]
             }

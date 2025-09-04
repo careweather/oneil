@@ -2,12 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ir::{
     model::Model,
-    reference::{Identifier, ModelPath},
-    span::Span,
+    model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
+    reference::ModelPath,
 };
 
 use crate::{
-    error::SubmodelResolutionError,
+    error::ModelImportResolutionError,
     util::{
         builder::ModelCollectionBuilder,
         context::{LookupResult, ModelContext, ModelImportsResolvedContext, lookup},
@@ -30,10 +30,24 @@ impl<'builder> ModelsLoadedContext<'builder> {
 
     pub fn with_model_imports_resolved<'model_imports>(
         self,
-        submodels: &'model_imports HashMap<Identifier, (ModelPath, Span)>,
-        submodel_resolution_errors: &'model_imports HashMap<Identifier, SubmodelResolutionError>,
+        submodels: &'model_imports HashMap<SubmodelName, SubmodelImport>,
+        submodel_resolution_errors: &'model_imports HashMap<
+            SubmodelName,
+            ModelImportResolutionError,
+        >,
+        references: &'model_imports HashMap<ReferenceName, ReferenceImport>,
+        reference_resolution_errors: &'model_imports HashMap<
+            ReferenceName,
+            ModelImportResolutionError,
+        >,
     ) -> ModelImportsResolvedContext<'builder, 'model_imports> {
-        ModelImportsResolvedContext::new(self, submodels, submodel_resolution_errors)
+        ModelImportsResolvedContext::new(
+            self,
+            submodels,
+            submodel_resolution_errors,
+            references,
+            reference_resolution_errors,
+        )
     }
 }
 

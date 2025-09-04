@@ -2,9 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ir::{
     model::Model,
+    model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
     parameter::Parameter,
     reference::{Identifier, ModelPath},
-    span::Span,
 };
 
 use crate::{
@@ -16,8 +16,10 @@ use crate::{
 pub struct TestContext {
     model_context: HashMap<ModelPath, Model>,
     model_errors: HashSet<ModelPath>,
-    submodel_context: HashMap<Identifier, (ModelPath, Span)>,
-    submodel_errors: HashSet<Identifier>,
+    submodel_context: HashMap<SubmodelName, SubmodelImport>,
+    submodel_errors: HashSet<SubmodelName>,
+    reference_context: HashMap<ReferenceName, ReferenceImport>,
+    reference_errors: HashSet<ReferenceName>,
     parameter_context: HashMap<Identifier, Parameter>,
     parameter_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
 }
@@ -29,6 +31,8 @@ impl TestContext {
             model_errors: HashSet::new(),
             submodel_context: HashMap::new(),
             submodel_errors: HashSet::new(),
+            reference_context: HashMap::new(),
+            reference_errors: HashSet::new(),
             parameter_context: HashMap::new(),
             parameter_errors: HashMap::new(),
         }
@@ -49,7 +53,7 @@ impl TestContext {
 
     pub fn with_submodel_context(
         mut self,
-        submodel_context: impl IntoIterator<Item = (Identifier, (ModelPath, Span))>,
+        submodel_context: impl IntoIterator<Item = (SubmodelName, SubmodelImport)>,
     ) -> Self {
         self.submodel_context.extend(submodel_context);
         self
@@ -57,7 +61,7 @@ impl TestContext {
 
     pub fn with_submodel_errors(
         mut self,
-        submodel_errors: impl IntoIterator<Item = Identifier>,
+        submodel_errors: impl IntoIterator<Item = SubmodelName>,
     ) -> Self {
         self.submodel_errors.extend(submodel_errors);
         self
@@ -111,7 +115,7 @@ impl ModelContext for TestContext {
 
 impl ModelImportsContext for TestContext {
     #[allow(clippy::redundant_closure, reason = "explicit map function is clearer")]
-    fn lookup_submodel(&self, submodel_name: &Identifier) -> LookupResult<&(ModelPath, Span)> {
+    fn lookup_submodel(&self, submodel_name: &SubmodelName) -> LookupResult<&SubmodelImport> {
         let has_error = self.submodel_errors.contains(submodel_name);
 
         if has_error {
@@ -121,6 +125,21 @@ impl ModelImportsContext for TestContext {
         self.submodel_context
             .get(submodel_name)
             .map_or(LookupResult::NotFound, |model| LookupResult::Found(model))
+    }
+
+    #[allow(clippy::redundant_closure, reason = "explicit map function is clearer")]
+    fn lookup_reference(&self, reference_name: &ReferenceName) -> LookupResult<&ReferenceImport> {
+        let has_error = self.reference_errors.contains(reference_name);
+
+        if has_error {
+            return LookupResult::HasError;
+        }
+
+        self.reference_context
+            .get(reference_name)
+            .map_or(LookupResult::NotFound, |reference| {
+                LookupResult::Found(reference)
+            })
     }
 }
 

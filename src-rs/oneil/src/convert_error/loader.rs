@@ -19,8 +19,8 @@ use oneil_ir::reference::{ModelPath, PythonPath};
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, ImportResolutionError, LoadError, ParameterResolutionError,
-        ResolutionErrors, SubmodelResolutionError, TestResolutionError, VariableResolutionError,
+        CircularDependencyError, ImportResolutionError, LoadError, ModelImportResolutionError,
+        ParameterResolutionError, ResolutionErrors, TestResolutionError, VariableResolutionError,
     },
 };
 
@@ -229,12 +229,13 @@ fn convert_resolution_errors(
     // convert submodel resolution errors
     for submodel_resolution_error in resolution_errors.get_submodel_resolution_errors().values() {
         match submodel_resolution_error {
-            SubmodelResolutionError::ModelHasError { .. } => {
+            ModelImportResolutionError::ModelHasError { .. } => {
                 ignore_error();
             }
 
-            SubmodelResolutionError::UndefinedSubmodel { .. }
-            | SubmodelResolutionError::DuplicateSubmodel { .. } => {
+            ModelImportResolutionError::UndefinedSubmodel { .. }
+            | ModelImportResolutionError::DuplicateSubmodel { .. }
+            | ModelImportResolutionError::DuplicateReference { .. } => {
                 let error = OneilError::from_error_with_optional_source(
                     submodel_resolution_error,
                     path.to_path_buf(),

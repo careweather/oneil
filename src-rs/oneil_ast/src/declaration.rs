@@ -177,7 +177,7 @@ impl ModelInfo {
         }
     }
 
-    /// Returns the top component of the model info
+    /// Returns the top component of the model
     #[must_use]
     pub const fn top_component(&self) -> &IdentifierNode {
         &self.top_component
@@ -189,10 +189,54 @@ impl ModelInfo {
         self.subcomponents.as_slice()
     }
 
-    /// Returns the optional alias of the submodel
+    /// Returns the calculated name of the model
+    ///
+    /// This is the name of the last subcomponent, or the name of the top
+    /// component if there are no subcomponents.
+    ///
+    /// ## Examples
+    ///
+    /// ```oneil
+    /// # name: `baz`
+    /// use foo/bar.baz as qux
+    ///
+    /// # name: `foo`
+    /// ref foo as bar         
+    ///
+    /// # name: `bar`
+    /// use foo/bar
+    ///
+    /// # name: `foo`
+    /// ref foo
+    /// ```
     #[must_use]
-    pub const fn alias(&self) -> Option<&IdentifierNode> {
-        self.alias.as_ref()
+    pub fn get_model_name(&self) -> &IdentifierNode {
+        self.subcomponents.last().unwrap_or(&self.top_component)
+    }
+
+    /// Returns the calculated alias of the model
+    ///
+    /// This is the given alias if one is provided. Otherwise, it is the model
+    /// name
+    ///
+    /// ## Examples
+    ///
+    /// ```oneil
+    /// # alias: `qux`
+    /// use foo/bar.baz as qux
+    ///
+    /// # alias: `bar`
+    /// ref foo as bar         
+    ///
+    /// # alias: `bar`
+    /// use foo/bar
+    ///
+    /// # alias: `foo`
+    /// ref foo
+    /// ```
+    #[must_use]
+    pub fn get_alias(&self) -> &IdentifierNode {
+        self.alias.as_ref().unwrap_or_else(|| self.get_model_name())
     }
 }
 

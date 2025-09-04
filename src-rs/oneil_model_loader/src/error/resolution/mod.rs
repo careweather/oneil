@@ -28,13 +28,14 @@ mod variable;
 use std::collections::HashMap;
 
 use oneil_ir::{
+    model_import::{ReferenceName, SubmodelName},
     reference::{Identifier, PythonPath},
     test::TestIndex,
 };
 
 pub use import::ImportResolutionError;
 pub use parameter::ParameterResolutionError;
-pub use submodel::SubmodelResolutionError;
+pub use submodel::ModelImportResolutionError;
 pub use test::TestResolutionError;
 pub use variable::VariableResolutionError;
 
@@ -46,7 +47,8 @@ pub use variable::VariableResolutionError;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolutionErrors {
     import: HashMap<PythonPath, ImportResolutionError>,
-    submodel_resolution: HashMap<Identifier, SubmodelResolutionError>,
+    submodel_resolution: HashMap<SubmodelName, ModelImportResolutionError>,
+    reference_resolution: HashMap<ReferenceName, ModelImportResolutionError>,
     parameter_resolution: HashMap<Identifier, Vec<ParameterResolutionError>>,
     test_resolution: HashMap<TestIndex, Vec<TestResolutionError>>,
 }
@@ -67,13 +69,15 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn new(
         import_errors: HashMap<PythonPath, ImportResolutionError>,
-        submodel_resolution_errors: HashMap<Identifier, SubmodelResolutionError>,
+        submodel_resolution_errors: HashMap<SubmodelName, ModelImportResolutionError>,
+        reference_resolution_errors: HashMap<ReferenceName, ModelImportResolutionError>,
         parameter_resolution_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
         test_resolution_errors: HashMap<TestIndex, Vec<TestResolutionError>>,
     ) -> Self {
         Self {
             import: import_errors,
             submodel_resolution: submodel_resolution_errors,
+            reference_resolution: reference_resolution_errors,
             parameter_resolution: parameter_resolution_errors,
             test_resolution: test_resolution_errors,
         }
@@ -119,8 +123,15 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn get_submodel_resolution_errors(
         &self,
-    ) -> &HashMap<Identifier, SubmodelResolutionError> {
+    ) -> &HashMap<SubmodelName, ModelImportResolutionError> {
         &self.submodel_resolution
+    }
+
+    #[must_use]
+    pub const fn get_reference_resolution_errors(
+        &self,
+    ) -> &HashMap<ReferenceName, ModelImportResolutionError> {
+        &self.reference_resolution
     }
 
     /// Returns a reference to the map of parameter resolution errors.

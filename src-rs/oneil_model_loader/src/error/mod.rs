@@ -29,7 +29,7 @@ pub mod resolution;
 pub mod util;
 
 pub use resolution::{
-    ImportResolutionError, ParameterResolutionError, ResolutionErrors, SubmodelResolutionError,
+    ImportResolutionError, ModelImportResolutionError, ParameterResolutionError, ResolutionErrors,
     TestResolutionError, VariableResolutionError,
 };
 pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_errors};
@@ -44,7 +44,7 @@ pub enum LoadError<Ps> {
     /// Error that occurred during AST parsing of a model file.
     ParseError(Ps),
     /// Errors that occurred during dependency resolution.
-    ResolutionErrors(resolution::ResolutionErrors),
+    ResolutionErrors(Box<resolution::ResolutionErrors>),
 }
 
 impl<Ps> LoadError<Ps> {
@@ -71,8 +71,8 @@ impl<Ps> LoadError<Ps> {
     ///
     /// A `LoadError::ResolutionErrors` variant containing the resolution errors.
     #[must_use]
-    pub const fn resolution_errors(resolution_errors: resolution::ResolutionErrors) -> Self {
-        Self::ResolutionErrors(resolution_errors)
+    pub fn resolution_errors(resolution_errors: resolution::ResolutionErrors) -> Self {
+        Self::ResolutionErrors(Box::new(resolution_errors))
     }
 }
 

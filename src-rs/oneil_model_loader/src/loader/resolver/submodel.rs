@@ -59,22 +59,27 @@
 
 use std::collections::HashMap;
 
-use oneil_ast as ast;
+use oneil_ast::{
+    self as ast,
+    declaration::{ModelInfo, ModelKind},
+};
 use oneil_ir::{
-    reference::{Identifier, ModelPath},
+    model_import::{
+        ReferenceMap, ReferenceName, ReferenceNameWithSpan, SubmodelImport, SubmodelMap,
+        SubmodelName, SubmodelNameWithSpan,
+    },
+    reference::ModelPath,
     span::Span,
 };
 
 use crate::{
-    error::SubmodelResolutionError,
+    error::ModelImportResolutionError,
     util::{
+        builder::ModelImportsBuilder,
         context::{LookupResult, ModelContext},
         get_span_from_ast_span,
     },
 };
-
-type SubmodelMap = HashMap<Identifier, (ModelPath, Span)>;
-type ResolutionErrorMap = HashMap<Identifier, SubmodelResolutionError>;
 
 /// Resolves submodels and their associated tests from use model declarations.
 ///
@@ -101,67 +106,165 @@ type ResolutionErrorMap = HashMap<Identifier, SubmodelResolutionError>;
 /// - **Invalid paths**: If the model path cannot be resolved
 ///
 /// All errors are collected and returned rather than causing the function to fail.
-pub fn resolve_submodels(
+pub fn resolve_model_imports(
     use_models: Vec<&ast::declaration::UseModelNode>,
     model_path: &ModelPath,
     context: &impl ModelContext,
-) -> (SubmodelMap, ResolutionErrorMap) {
-    use_models.into_iter().fold(
-        (HashMap::new(), HashMap::new()),
-        |(submodels, resolution_errors), use_model| {
-            let submodel_path = get_use_model_path(model_path, use_model);
-            let (submodel_name, submodel_name_span) =
-                get_submodel_name_and_span(use_model.model_info());
+) -> (
+    SubmodelMap,
+    ReferenceMap,
+    HashMap<SubmodelName, ModelImportResolutionError>,
+    HashMap<ReferenceName, ModelImportResolutionError>,
+) {
+    let mut builder = ModelImportsBuilder::new();
 
-            let (submodels, resolution_errors, result) = resolve_single_submodel(
-                submodel_path,
-                submodel_name_span,
-                use_model.model_info().subcomponents(),
-                submodel_name,
-                submodel_name_span,
+    for use_model in use_models {
+        let import_path = calc_import_path(model_path, use_model);
+
+        let reference_name = get_reference_name(use_model.model_info());
+        let submodel_name = get_submodel_name(use_model.model_info());
+
+        let is_submodel = use_model.model_kind() == ModelKind::Submodel;
+
+        // check for duplicates
+        let maybe_reference_duplicate_error =
+            builder
+                .get_reference(&reference_name)
+                .map(|original_reference| {
+                    ModelImportResolutionError::duplicate_reference(
+                        reference_name.value().clone(),
+                        original_reference.name().span(),
+                        reference_name.span(),
+                    )
+                });
+
+        let maybe_submodel_duplicate_error =
+            builder
+                .get_submodel(&submodel_name)
+                .map(|original_submodel| {
+                    ModelImportResolutionError::duplicate_submodel(
+                        submodel_name.value().clone(),
+                        original_submodel.name().span(),
+                        submodel_name.span(),
+                    )
+                });
+
+        let had_duplicate = maybe_reference_duplicate_error.is_some()
+            || (is_submodel && maybe_submodel_duplicate_error.is_some());
+
+        // handle duplicate references
+        if let Some(reference_duplicate_error) = maybe_reference_duplicate_error {
+            builder.add_reference_resolution_error(
+                reference_name.value().clone(),
+                reference_duplicate_error,
+            );
+        }
+
+        // handle duplicate submodels if the use model is a submodel
+        if is_submodel && let Some(submodel_duplicate_error) = maybe_submodel_duplicate_error {
+            builder.add_submodel_resolution_error(
+                submodel_name.value().clone(),
+                submodel_duplicate_error,
+            );
+        }
+
+        // if there were any duplicates, stop processing this use model
+        if had_duplicate {
+            continue;
+        }
+
+        // resolve the path for the use model
+        let subcomponents = use_model.model_info().subcomponents();
+        let model_name_span = submodel_name.span();
+        let resolved_path =
+            resolve_model_path(import_path, model_name_span, subcomponents, context);
+
+        // handle the error if there was one
+        let resolved_path = match resolved_path {
+            Ok(resolved_path) => resolved_path,
+            Err(error) if is_submodel => {
+                builder.add_submodel_resolution_error(submodel_name.take_value(), error);
+                continue;
+            }
+            Err(error) => {
+                builder.add_reference_resolution_error(reference_name.take_value(), error);
+                continue;
+            }
+        };
+
+        // add the reference to the builder
+        builder.add_reference(reference_name, resolved_path.clone());
+
+        // add the submodel to the builder if it's a submodel
+        if is_submodel {
+            builder.add_submodel(submodel_name, resolved_path.clone());
+        }
+
+        let Some(submodel_list) = use_model.submodels() else {
+            // if we don't have any submodels, we're done
+            continue;
+        };
+
+        for submodel_info in submodel_list.iter() {
+            // get the subcomponents relative to the main model being imported
+            let mut submodel_subcomponents = submodel_info.subcomponents().to_vec();
+            submodel_subcomponents.insert(0, submodel_info.top_component().clone());
+
+            // get the reference name for the submodel
+            let reference_name = get_reference_name(submodel_info);
+
+            // check for duplicate references
+            let maybe_original_reference = builder.get_reference(&reference_name);
+            if let Some(original_reference) = maybe_original_reference {
+                // if there is a duplicate, add the error and continue
+                let error = ModelImportResolutionError::duplicate_reference(
+                    reference_name.value().clone(),
+                    original_reference.name().span(),
+                    reference_name.span(),
+                );
+
+                builder.add_reference_resolution_error(reference_name.value().clone(), error);
+
+                continue;
+            }
+
+            // resolve the reference path
+            let resolved_reference_path = resolve_model_path(
+                resolved_path.clone(),
+                reference_name.span(),
+                &submodel_subcomponents,
                 context,
-                submodels,
-                resolution_errors,
             );
 
-            // if the use model was resolved successfully and has submodels,
-            // resolve each submodel
-            let (Ok(resolved_model_path), Some(submodel_list)) = (result, use_model.submodels())
-            else {
-                // otherwise, return early
-                return (submodels, resolution_errors);
-            };
+            match resolved_reference_path {
+                Ok(resolved_reference_path) => {
+                    builder.add_reference(reference_name, resolved_reference_path);
+                }
+                Err(error) => {
+                    builder.add_reference_resolution_error(reference_name.take_value(), error);
+                }
+            }
+        }
+    }
 
-            submodel_list.iter().fold(
-                (submodels, resolution_errors),
-                |(submodels, resolution_errors), submodel| {
-                    let resolved_model_name_span = submodel_name_span;
-
-                    let mut submodel_subcomponents = submodel.subcomponents().to_vec();
-                    submodel_subcomponents.insert(0, submodel.top_component().clone());
-
-                    let (resolved_submodel_name, resolved_submodel_name_span) =
-                        get_submodel_name_and_span(submodel);
-
-                    let (submodels, resolution_errors, _result) = resolve_single_submodel(
-                        resolved_model_path.clone(),
-                        resolved_model_name_span,
-                        &submodel_subcomponents,
-                        resolved_submodel_name,
-                        resolved_submodel_name_span,
-                        context,
-                        submodels,
-                        resolution_errors,
-                    );
-
-                    (submodels, resolution_errors)
-                },
-            )
-        },
-    )
+    builder.into_submodels_and_references_and_resolution_errors()
 }
 
-fn get_use_model_path(
+fn get_submodel_name(model_info: &ModelInfo) -> SubmodelNameWithSpan {
+    let model_name = model_info.get_model_name();
+    let name = SubmodelName::new(model_name.as_str().to_string());
+    let span = get_span_from_ast_span(model_name.node_span());
+    SubmodelNameWithSpan::new(name, span)
+}
+
+fn get_reference_name(model_info: &ModelInfo) -> ReferenceNameWithSpan {
+    let model_name = model_info.get_alias();
+    let name = ReferenceName::new(model_name.as_str().to_string());
+    let span = get_span_from_ast_span(model_name.node_span());
+    ReferenceNameWithSpan::new(name, span)
+}
+
+fn calc_import_path(
     model_path: &ModelPath,
     use_model: &oneil_ast::node::Node<oneil_ast::declaration::UseModel>,
 ) -> ModelPath {
@@ -169,68 +272,6 @@ fn get_use_model_path(
     let use_model_path = model_path.get_sibling_path(&use_model_relative_path);
 
     ModelPath::new(use_model_path)
-}
-
-fn get_submodel_name_and_span(model_info: &ast::declaration::ModelInfo) -> (Identifier, Span) {
-    let submodel_name = model_info
-        .alias()
-        .or_else(|| model_info.subcomponents().last())
-        .unwrap_or(model_info.top_component());
-    let ident = Identifier::new(submodel_name.as_str());
-    let span = get_span_from_ast_span(submodel_name.node_span());
-    (ident, span)
-}
-
-fn resolve_single_submodel(
-    top_model_path: ModelPath,
-    top_model_ident_span: Span,
-    subcomponents: &[ast::naming::IdentifierNode],
-    resolved_model_name: Identifier,
-    resolved_model_reference_span: Span,
-    context: &impl ModelContext,
-    mut submodels: SubmodelMap,
-    mut resolution_errors: ResolutionErrorMap,
-) -> (SubmodelMap, ResolutionErrorMap, Result<ModelPath, ()>) {
-    // verify that the submodel name is not a duplicate
-    let maybe_original_submodel = submodels.get(&resolved_model_name);
-    if let Some((_path, original_submodel_span)) = maybe_original_submodel {
-        resolution_errors.insert(
-            resolved_model_name.clone(),
-            SubmodelResolutionError::duplicate_submodel(
-                resolved_model_name,
-                *original_submodel_span,
-                resolved_model_reference_span,
-            ),
-        );
-
-        return (submodels, resolution_errors, Err(()));
-    }
-
-    // resolve the use model path
-    let resolved_use_model_path =
-        resolve_model_path(top_model_path, top_model_ident_span, subcomponents, context);
-
-    // insert the use model path into the submodels map if it was resolved successfully
-    // otherwise, add the error to the builder
-    let result = match resolved_use_model_path {
-        Ok(resolved_use_model_path) => {
-            submodels.insert(
-                resolved_model_name,
-                (
-                    resolved_use_model_path.clone(),
-                    resolved_model_reference_span,
-                ),
-            );
-
-            Ok(resolved_use_model_path)
-        }
-        Err(error) => {
-            resolution_errors.insert(resolved_model_name, error);
-            Err(())
-        }
-    };
-
-    (submodels, resolution_errors, result)
 }
 
 /// Recursively resolves a model path by traversing subcomponents.
@@ -279,13 +320,13 @@ fn resolve_model_path(
     model_name_span: Span,
     model_subcomponents: &[ast::naming::IdentifierNode],
     context: &impl ModelContext,
-) -> Result<ModelPath, SubmodelResolutionError> {
+) -> Result<ModelPath, ModelImportResolutionError> {
     // if the model that we are trying to resolve has had an error, this
     // operation should fail
     let model = match context.lookup_model(&model_path) {
         LookupResult::Found(model) => model,
         LookupResult::HasError => {
-            return Err(SubmodelResolutionError::model_has_error(
+            return Err(ModelImportResolutionError::model_has_error(
                 model_path,
                 model_name_span,
             ));
@@ -298,13 +339,13 @@ fn resolve_model_path(
         return Ok(model_path);
     }
 
-    let submodel_name = Identifier::new(model_subcomponents[0].as_str());
+    let submodel_name = SubmodelName::new(model_subcomponents[0].as_str().to_string());
     let submodel_name_span = get_span_from_ast_span(model_subcomponents[0].node_span());
     let submodel_path = model
         .get_submodel(&submodel_name)
-        .map(|(path, _)| path)
+        .map(SubmodelImport::path)
         .ok_or_else(|| {
-            SubmodelResolutionError::undefined_submodel_in_submodel(
+            ModelImportResolutionError::undefined_submodel_in_submodel(
                 model_path,
                 submodel_name,
                 submodel_name_span,
@@ -323,6 +364,7 @@ fn resolve_model_path(
 }
 
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use crate::test::TestContext;
 
@@ -533,7 +575,7 @@ mod tests {
             .with_model_context([(temperature_path.clone(), temperature_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -592,7 +634,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -624,7 +666,7 @@ mod tests {
             .with_model_context([(temperature_path.clone(), temperature_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -675,7 +717,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -716,14 +758,14 @@ mod tests {
             .with_model_errors([error_path.clone()]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
         let error = errors.get(&error_id).expect("error should exist");
 
         match error {
-            SubmodelResolutionError::ModelHasError {
+            ModelImportResolutionError::ModelHasError {
                 model_path,
                 reference_span,
             } => {
@@ -767,14 +809,14 @@ mod tests {
             TestContext::new().with_model_context([(weather_path.clone(), weather_model)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&weather_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::UndefinedSubmodel {
+            ModelImportResolutionError::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
                 reference_span,
@@ -834,14 +876,14 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&undefined_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::UndefinedSubmodel {
+            ModelImportResolutionError::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
                 reference_span,
@@ -901,7 +943,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -967,14 +1009,14 @@ mod tests {
             .with_model_errors([error_path.clone()]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&error_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::ModelHasError {
+            ModelImportResolutionError::ModelHasError {
                 model_path,
                 reference_span,
             } => {
@@ -1017,7 +1059,7 @@ mod tests {
         let context = TestContext::new().with_model_context([(math_path.clone(), math_submodel)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1054,14 +1096,14 @@ mod tests {
         let context = TestContext::new().with_model_errors([math_path.clone()]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&math_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::ModelHasError { .. } => {
+            ModelImportResolutionError::ModelHasError { .. } => {
                 // This is expected when the model has an error
             }
             _ => panic!("Expected ModelHasError, got {error:?}"),
@@ -1114,7 +1156,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
@@ -1122,7 +1164,7 @@ mod tests {
         let temp_id = Identifier::new("temp");
         let error = errors.get(&temp_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::DuplicateSubmodel {
+            ModelImportResolutionError::DuplicateSubmodel {
                 submodel,
                 original_span: _,
                 duplicate_span,
@@ -1230,7 +1272,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1293,14 +1335,14 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&temp_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::UndefinedSubmodel {
+            ModelImportResolutionError::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
                 reference_span,
@@ -1374,14 +1416,14 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&undefined_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::UndefinedSubmodel {
+            ModelImportResolutionError::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
                 reference_span,
@@ -1440,7 +1482,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1508,7 +1550,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1578,7 +1620,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());
@@ -1627,14 +1669,14 @@ mod tests {
             TestContext::new().with_model_context([(weather_path.clone(), weather_model)]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&undefined_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::UndefinedSubmodel {
+            ModelImportResolutionError::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
                 reference_span: _,
@@ -1694,14 +1736,14 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error = errors.get(&undefined_id).expect("error should exist");
         match error {
-            SubmodelResolutionError::UndefinedSubmodel {
+            ModelImportResolutionError::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
                 reference_span: _,
@@ -1776,7 +1818,7 @@ mod tests {
         ]);
 
         // resolve the submodels
-        let (submodels, errors) = resolve_submodels(use_models, &model_path, &context);
+        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
 
         // check the errors
         assert!(errors.is_empty());

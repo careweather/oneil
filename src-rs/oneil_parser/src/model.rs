@@ -445,7 +445,7 @@ mod tests {
                 let use_model_info = use_model_node.model_info();
                 assert_eq!(use_model_info.top_component().as_str(), "foo");
                 assert_eq!(use_model_info.subcomponents().len(), 0);
-                assert!(use_model_info.alias().is_none());
+                assert_eq!(use_model_info.get_alias().as_str(), "foo");
             }
             _ => panic!("Expected use declaration"),
         }
@@ -950,8 +950,7 @@ mod tests {
                         }
                         match &model.decls()[1].node_value() {
                             Decl::UseModel(use_node) => {
-                                let alias =
-                                    use_node.model_info().alias().expect("should have alias");
+                                let alias = use_node.model_info().get_alias();
                                 assert_eq!(alias.as_str(), "bar");
                             }
                             _ => panic!("Expected use model declaration"),

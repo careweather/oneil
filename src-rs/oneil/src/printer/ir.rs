@@ -16,6 +16,7 @@ use std::io::{self, Write};
 use oneil_ir::{
     expr::{Expr, Literal},
     model::ModelCollection,
+    model_import::{ReferenceMap, SubmodelMap},
     parameter::{Limits, Parameter, ParameterValue},
     reference::Identifier,
     test::Test,
@@ -109,6 +110,12 @@ fn print_model(
         sections.push(("Parameters", parameters.len()));
     }
 
+    // Collect references
+    let references = model.get_references();
+    if !references.is_empty() {
+        sections.push(("References", references.len()));
+    }
+
     // Collect tests
     let tests = model.get_tests();
     if !tests.is_empty() {
@@ -131,6 +138,7 @@ fn print_model(
         match *section_name {
             "Submodels" => print_submodels(submodels, writer, indent + 2)?,
             "Parameters" => print_parameters(parameters, writer, indent + 2)?,
+            "References" => print_references(references, writer, indent + 2)?,
             "Tests" => print_tests(tests, writer, indent + 2)?,
             _ => {}
         }
@@ -141,14 +149,11 @@ fn print_model(
 
 /// Prints submodels
 fn print_submodels(
-    submodels: &std::collections::HashMap<
-        Identifier,
-        (oneil_ir::reference::ModelPath, oneil_ir::span::Span),
-    >,
+    submodels: &SubmodelMap,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    for (i, (identifier, (model_path, _span))) in submodels.iter().enumerate() {
+    for (i, (identifier, submodel)) in submodels.iter().enumerate() {
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         writeln!(
@@ -157,7 +162,28 @@ fn print_submodels(
             "  ".repeat(indent),
             prefix,
             identifier.as_str(),
-            model_path.as_ref().display()
+            submodel.path().as_ref().display()
+        )?;
+    }
+    Ok(())
+}
+
+/// Prints submodels
+fn print_references(
+    references: &ReferenceMap,
+    writer: &mut impl Write,
+    indent: usize,
+) -> io::Result<()> {
+    for (i, (identifier, reference)) in references.iter().enumerate() {
+        let is_last = i == references.len() - 1;
+        let prefix = if is_last { "└──" } else { "├──" };
+        writeln!(
+            writer,
+            "{}    {}Reference: \"{}\" -> \"{}\"",
+            "  ".repeat(indent),
+            prefix,
+            identifier.as_str(),
+            reference.path().as_ref().display()
         )?;
     }
     Ok(())

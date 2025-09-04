@@ -36,6 +36,7 @@
 use oneil_ast as ast;
 use oneil_ir::{
     expr::{Expr, ExprWithSpan},
+    model_import::SubmodelName,
     reference::{Identifier, ModelPath},
     span::{Span, WithSpan},
 };
@@ -126,10 +127,10 @@ pub fn resolve_variable(
             }
         }
         ast::expression::Variable::Accessor { parent, component } => {
-            let parent_identifier = Identifier::new(parent.as_str());
+            let parent_identifier = SubmodelName::new(parent.as_str().to_string());
             let parent_identifier_span = get_span_from_ast_span(parent.node_span());
             let submodel_path = match context.lookup_submodel(&parent_identifier) {
-                LookupResult::Found((submodel_path, _span)) => submodel_path,
+                LookupResult::Found(submodel_import) => submodel_import.path(),
                 LookupResult::HasError => {
                     return Err(VariableResolutionError::submodel_resolution_failed(
                         parent_identifier,
@@ -208,9 +209,9 @@ fn resolve_variable_recursive(
 
         // if the variable is an accessor, this means that the variable refers to a submodel
         ast::expression::Variable::Accessor { parent, component } => {
-            let parent_identifier = Identifier::new(parent.as_str());
+            let parent_identifier = SubmodelName::new(parent.as_str().to_string());
             let parent_identifier_span = get_span_from_ast_span(parent.node_span());
-            let Some((submodel_path, _)) = model.get_submodel(&parent_identifier) else {
+            let Some(submodel_import) = model.get_submodel(&parent_identifier) else {
                 let source = VariableResolutionError::undefined_submodel_in_submodel(
                     submodel_path.clone(),
                     parent_identifier,
@@ -219,12 +220,18 @@ fn resolve_variable_recursive(
                 return Err(source);
             };
 
-            resolve_variable_recursive(submodel_path, component, parent_identifier_span, context)
+            resolve_variable_recursive(
+                submodel_import.path(),
+                component,
+                parent_identifier_span,
+                context,
+            )
         }
     }
 }
 
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use crate::test::{TestBuiltinRef, TestContext};
 

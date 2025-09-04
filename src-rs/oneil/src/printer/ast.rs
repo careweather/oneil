@@ -72,17 +72,15 @@ fn print_decl(
             )?;
         }
         Decl::UseModel(use_model) => {
-            let alias = use_model
-                .model_info()
-                .alias()
-                .map(|a| format!(" as {}", a.node_value().as_str()))
-                .unwrap_or_default();
+            let alias = use_model.model_info().get_alias();
+
+            let alias = format!(" as {}", alias.as_str());
             writeln!(
                 writer,
                 "{}{} UseModel: \"{}\"{}",
                 "  ".repeat(indent),
                 prefix,
-                use_model.model_info().top_component().node_value().as_str(),
+                use_model.model_info().top_component().as_str(),
                 alias
             )?;
 
@@ -92,7 +90,7 @@ fn print_decl(
                     .model_info()
                     .subcomponents()
                     .iter()
-                    .map(|id| id.node_value().as_str().to_string())
+                    .map(|id| id.as_str().to_string())
                     .collect();
                 writeln!(
                     writer,

@@ -1,5 +1,6 @@
 use oneil_ir::{
     model::Model,
+    model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
     parameter::Parameter,
     reference::{Identifier, ModelPath},
     span::Span,
@@ -12,7 +13,8 @@ pub trait ModelContext {
 }
 
 pub trait ModelImportsContext {
-    fn lookup_submodel(&self, submodel_name: &Identifier) -> LookupResult<&(ModelPath, Span)>;
+    fn lookup_submodel(&self, submodel_name: &SubmodelName) -> LookupResult<&SubmodelImport>;
+    fn lookup_reference(&self, reference_name: &ReferenceName) -> LookupResult<&ReferenceImport>;
 }
 
 pub trait ParameterContext {

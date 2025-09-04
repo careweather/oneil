@@ -8,6 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    model_import::{ReferenceMap, SubmodelImport, SubmodelMap, SubmodelName},
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
     span::Span,
@@ -31,7 +32,8 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
     python_imports: HashMap<PythonPath, Span>,
-    submodels: HashMap<Identifier, (ModelPath, Span)>,
+    submodels: SubmodelMap,
+    references: ReferenceMap,
     parameters: ParameterCollection,
     tests: HashMap<TestIndex, Test>,
 }
@@ -45,30 +47,18 @@ impl Model {
     /// * `submodels` - Mapping of submodel identifiers to their model paths and identifier spans
     /// * `parameters` - Collection of parameters defined in this model
     /// * `tests` - Tests for the entire model
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use oneil_ir::{model::Model, parameter::ParameterCollection, span::WithSpan, reference::{Identifier, ModelPath, PythonPath}};
-    /// use std::collections::{HashMap, HashSet};
-    ///
-    /// let model = Model::new(
-    ///     HashMap::new(), // no Python imports
-    ///     HashMap::new(),  // no submodels
-    ///     ParameterCollection::new(HashMap::new()),
-    ///     HashMap::new(),  // no tests
-    /// );
-    /// ```
     #[must_use]
     pub const fn new(
         python_imports: HashMap<PythonPath, Span>,
-        submodels: HashMap<Identifier, (ModelPath, Span)>,
+        submodels: SubmodelMap,
+        references: ReferenceMap,
         parameters: ParameterCollection,
         tests: HashMap<TestIndex, Test>,
     ) -> Self {
         Self {
             python_imports,
             submodels,
+            references,
             parameters,
             tests,
         }
@@ -90,28 +80,8 @@ impl Model {
     /// # Arguments
     ///
     /// * `identifier` - The identifier of the submodel to look up
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use oneil_ir::{model::Model, parameter::ParameterCollection, span::WithSpan, reference::{Identifier, ModelPath, PythonPath}};
-    /// use std::collections::{HashMap, HashSet};
-    ///
-    /// let mut submodels = HashMap::new();
-    /// submodels.insert(Identifier::new("sub"), (ModelPath::new("submodel"), oneil_ir::span::Span::new(0, 0)));
-    ///
-    /// let model = Model::new(
-    ///     HashMap::new(),
-    ///     submodels,
-    ///     ParameterCollection::new(HashMap::new()),
-    ///     HashMap::new(),
-    /// );
-    ///
-    /// assert!(model.get_submodel(&Identifier::new("sub")).is_some());
-    /// assert!(model.get_submodel(&Identifier::new("nonexistent")).is_none());
-    /// ```
     #[must_use]
-    pub fn get_submodel(&self, identifier: &Identifier) -> Option<&(ModelPath, Span)> {
+    pub fn get_submodel(&self, identifier: &SubmodelName) -> Option<&SubmodelImport> {
         self.submodels.get(identifier)
     }
 
@@ -121,7 +91,7 @@ impl Model {
     ///
     /// A reference to the mapping of submodel identifiers to their corresponding model paths.
     #[must_use]
-    pub const fn get_submodels(&self) -> &HashMap<Identifier, (ModelPath, Span)> {
+    pub const fn get_submodels(&self) -> &SubmodelMap {
         &self.submodels
     }
 
@@ -145,6 +115,16 @@ impl Model {
     #[must_use]
     pub const fn get_parameters(&self) -> &ParameterCollection {
         &self.parameters
+    }
+
+    /// Returns a reference to all references in this model.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the reference collection.
+    #[must_use]
+    pub const fn get_references(&self) -> &ReferenceMap {
+        &self.references
     }
 
     /// Returns a reference to all tests in this model.
@@ -176,26 +156,6 @@ impl ModelCollection {
     ///
     /// * `initial_models` - Set of model paths that serve as entry points
     /// * `models` - Mapping of model paths to their corresponding models
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use oneil_ir::{model::{ModelCollection, Model}, reference::ModelPath, parameter::ParameterCollection};
-    /// use std::collections::{HashMap, HashSet};
-    ///
-    /// let mut initial_models = HashSet::new();
-    /// initial_models.insert(ModelPath::new("main"));
-    ///
-    /// let mut models = HashMap::new();
-    /// models.insert(ModelPath::new("main"), Model::new(
-    ///     HashMap::new(),
-    ///     HashMap::new(),
-    ///     ParameterCollection::new(HashMap::new()),
-    ///     HashMap::new(),
-    /// ));
-    ///
-    /// let collection = ModelCollection::new(initial_models, models);
-    /// ```
     #[must_use]
     pub const fn new(
         initial_models: HashSet<ModelPath>,
@@ -215,32 +175,6 @@ impl ModelCollection {
     /// # Returns
     ///
     /// A set of references to all Python paths imported across all models.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use oneil_ir::{model::{ModelCollection, Model}, reference::{ModelPath, PythonPath}, parameter::ParameterCollection, span::WithSpan};
-    /// use std::collections::{HashMap, HashSet};
-    /// use std::path::PathBuf;
-    ///
-    /// let mut initial_models = HashSet::new();
-    /// initial_models.insert(ModelPath::new("main"));
-    ///
-    /// let mut python_imports = HashMap::new();
-    /// python_imports.insert(PythonPath::new(PathBuf::from("math")), oneil_ir::span::Span::new(0, 0));
-    ///
-    /// let mut models = HashMap::new();
-    /// models.insert(ModelPath::new("main"), Model::new(
-    ///     python_imports,
-    ///     HashMap::new(),
-    ///     ParameterCollection::new(HashMap::new()),
-    ///     HashMap::new(),
-    /// ));
-    ///
-    /// let collection = ModelCollection::new(initial_models, models);
-    /// let imports = collection.get_python_imports();
-    /// assert_eq!(imports.len(), 1);
-    /// ```
     #[must_use]
     pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
         self.models

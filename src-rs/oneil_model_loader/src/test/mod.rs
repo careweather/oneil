@@ -18,6 +18,7 @@
 mod builtin_ref;
 mod context;
 mod file_loader;
+mod helper;
 
 pub use builtin_ref::TestBuiltinRef;
 pub use context::TestContext;

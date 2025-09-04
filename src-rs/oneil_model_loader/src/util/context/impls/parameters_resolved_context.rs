@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
 use oneil_ir::{
+    model::Model,
+    model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
     parameter::{Parameter, ParameterCollection},
-    reference::Identifier,
+    reference::{Identifier, ModelPath},
 };
 
 use crate::{
@@ -47,21 +49,20 @@ impl<'builder, 'model_imports> ParametersResolvingContext<'builder, 'model_impor
 }
 
 impl ModelContext for ParametersResolvingContext<'_, '_> {
-    fn lookup_model(
-        &self,
-        model_path: &oneil_ir::reference::ModelPath,
-    ) -> LookupResult<&oneil_ir::model::Model> {
+    fn lookup_model(&self, model_path: &ModelPath) -> LookupResult<&Model> {
         self.model_imports_resolved_context.lookup_model(model_path)
     }
 }
 
 impl ModelImportsContext for ParametersResolvingContext<'_, '_> {
-    fn lookup_submodel(
-        &self,
-        submodel_name: &oneil_ir::reference::Identifier,
-    ) -> LookupResult<&(oneil_ir::reference::ModelPath, oneil_ir::span::Span)> {
+    fn lookup_submodel(&self, submodel_name: &SubmodelName) -> LookupResult<&SubmodelImport> {
         self.model_imports_resolved_context
             .lookup_submodel(submodel_name)
+    }
+
+    fn lookup_reference(&self, reference_name: &ReferenceName) -> LookupResult<&ReferenceImport> {
+        self.model_imports_resolved_context
+            .lookup_reference(reference_name)
     }
 }
 

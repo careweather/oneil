@@ -124,10 +124,16 @@ where
     let context = ModelsLoadedContext::from_builder(&builder);
 
     // resolve submodels
-    let (submodels, submodel_resolution_errors) =
-        resolver::resolve_submodels(use_models, &model_path, &context);
+    let (submodels, references, submodel_resolution_errors, reference_resolution_errors) =
+        resolver::resolve_model_imports(use_models, &model_path, &context);
 
-    let context = context.with_model_imports_resolved(&submodels, &submodel_resolution_errors);
+    // TODO: add references to the context as well
+    let context = context.with_model_imports_resolved(
+        &submodels,
+        &submodel_resolution_errors,
+        &references,
+        &reference_resolution_errors,
+    );
     let context = context.begin_parameter_resolution();
 
     // resolve parameters
@@ -145,6 +151,7 @@ where
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,
         submodel_resolution_errors,
+        reference_resolution_errors,
         parameter_resolution_errors,
         test_resolution_errors,
     );
@@ -155,7 +162,7 @@ where
     }
 
     // build model
-    let model = Model::new(python_imports, submodels, parameters, tests);
+    let model = Model::new(python_imports, submodels, references, parameters, tests);
 
     // add model to builder
     builder.add_model(model_path, model);
@@ -288,13 +295,12 @@ where
 
 #[cfg(test)]
 mod tests {
-
     use oneil_ast::declaration::ModelKind;
-    use oneil_ir::reference::Identifier;
+    use oneil_ir::model_import::SubmodelName;
 
     use super::*;
     use crate::{
-        error::{CircularDependencyError, SubmodelResolutionError},
+        error::{CircularDependencyError, ModelImportResolutionError},
         test::TestFileParser,
     };
     use std::collections::{HashMap, HashSet};
@@ -512,12 +518,13 @@ mod tests {
             Some(&LoadError::resolution_errors(ResolutionErrors::new(
                 HashMap::new(),
                 HashMap::from([(
-                    Identifier::new("sub"),
-                    SubmodelResolutionError::model_has_error(
+                    SubmodelName::new("sub".to_string()),
+                    ModelImportResolutionError::model_has_error(
                         ModelPath::new("sub"),
                         oneil_ir::span::Span::new(0, 3)
                     )
                 )]),
+                HashMap::new(),
                 HashMap::new(),
                 HashMap::new(),
             )))
@@ -529,12 +536,13 @@ mod tests {
             Some(&LoadError::resolution_errors(ResolutionErrors::new(
                 HashMap::new(),
                 HashMap::from([(
-                    Identifier::new("main"),
-                    SubmodelResolutionError::model_has_error(
+                    SubmodelName::new("main".to_string()),
+                    ModelImportResolutionError::model_has_error(
                         ModelPath::new("main"),
                         oneil_ir::span::Span::new(0, 4)
                     )
                 )]),
+                HashMap::new(),
                 HashMap::new(),
                 HashMap::new(),
             )))

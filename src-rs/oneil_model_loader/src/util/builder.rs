@@ -21,10 +21,16 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ir::{
     model::{Model, ModelCollection},
+    model_import::{
+        ReferenceImport, ReferenceMap, ReferenceName, ReferenceNameWithSpan, SubmodelImport,
+        SubmodelMap, SubmodelName, SubmodelNameWithSpan,
+    },
     reference::{ModelPath, PythonPath},
 };
 
-use crate::error::{CircularDependencyError, LoadError, collection::ModelErrorMap};
+use crate::error::{
+    CircularDependencyError, LoadError, ModelImportResolutionError, collection::ModelErrorMap,
+};
 
 /// A builder for constructing model collections while collecting loading errors.
 ///
@@ -200,5 +206,84 @@ impl<Ps, Py> TryInto<ModelCollection> for ModelCollectionBuilder<Ps, Py> {
         } else {
             Err((model_collection, self.errors))
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModelImportsBuilder {
+    submodels: HashMap<SubmodelName, SubmodelImport>,
+    submodel_resolution_errors: HashMap<SubmodelName, ModelImportResolutionError>,
+    references: HashMap<ReferenceName, ReferenceImport>,
+    reference_resolution_errors: HashMap<ReferenceName, ModelImportResolutionError>,
+}
+
+impl ModelImportsBuilder {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            submodels: HashMap::new(),
+            submodel_resolution_errors: HashMap::new(),
+            references: HashMap::new(),
+            reference_resolution_errors: HashMap::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn get_submodel(&self, submodel_name: &SubmodelName) -> Option<&SubmodelImport> {
+        self.submodels.get(submodel_name)
+    }
+
+    #[must_use]
+    pub fn get_reference(&self, reference_name: &ReferenceName) -> Option<&ReferenceImport> {
+        self.references.get(reference_name)
+    }
+
+    pub fn add_submodel(&mut self, submodel_name: SubmodelNameWithSpan, submodel_path: ModelPath) {
+        let submodel_ident = submodel_name.value().clone();
+        let submodel_import = SubmodelImport::new(submodel_name, submodel_path);
+        self.submodels.insert(submodel_ident, submodel_import);
+    }
+
+    pub fn add_reference(
+        &mut self,
+        reference_name: ReferenceNameWithSpan,
+        reference_path: ModelPath,
+    ) {
+        let reference_ident = reference_name.value().clone();
+        let reference_import = ReferenceImport::new(reference_name, reference_path);
+        self.references.insert(reference_ident, reference_import);
+    }
+
+    pub fn add_submodel_resolution_error(
+        &mut self,
+        submodel_name: SubmodelName,
+        error: ModelImportResolutionError,
+    ) {
+        self.submodel_resolution_errors.insert(submodel_name, error);
+    }
+
+    pub fn add_reference_resolution_error(
+        &mut self,
+        reference_name: ReferenceName,
+        error: ModelImportResolutionError,
+    ) {
+        self.reference_resolution_errors
+            .insert(reference_name, error);
+    }
+
+    pub fn into_submodels_and_references_and_resolution_errors(
+        self,
+    ) -> (
+        SubmodelMap,
+        ReferenceMap,
+        HashMap<SubmodelName, ModelImportResolutionError>,
+        HashMap<ReferenceName, ModelImportResolutionError>,
+    ) {
+        (
+            SubmodelMap::new(self.submodels),
+            ReferenceMap::new(self.references),
+            self.submodel_resolution_errors,
+            self.reference_resolution_errors,
+        )
     }
 }
