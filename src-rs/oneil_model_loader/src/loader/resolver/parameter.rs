@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ast::{self as ast, node::Node};
 use oneil_ir::{
-    parameter::{Parameter, ParameterValue, PiecewiseExpr},
+    parameter::{Parameter, ParameterCollection, ParameterValue, PiecewiseExpr},
     reference::Identifier,
     span::{Span, WithSpan},
 };
@@ -35,10 +35,13 @@ use crate::{
     loader::resolver::{expr::resolve_expr, trace_level::resolve_trace_level, unit::resolve_unit},
     util::{
         Stack,
-        context::{ModelContext, ModelImportsContext, ParameterContext},
+        builder::ParameterBuilder,
+        context::{ParameterContext, ReferenceContext},
         get_span_from_ast_span,
     },
 };
+
+pub type ParameterErrorMap = HashMap<Identifier, Vec<ParameterResolutionError>>;
 
 /// Resolves a collection of AST parameters into resolved model parameters.
 ///
@@ -68,63 +71,66 @@ use crate::{
 /// - Undefined variable references
 /// - Invalid expressions in parameter values or limits
 /// - Missing submodel references
-pub fn resolve_parameters<Ctx: ModelContext + ModelImportsContext + ParameterContext>(
+pub fn resolve_parameters(
     parameters: Vec<&ast::parameter::ParameterNode>,
     builtin_ref: &impl BuiltinRef,
-    context: Ctx,
-) -> Ctx {
-    let (parameter_map, context) = parameters.into_iter().fold(
-        (HashMap::new(), context),
-        |(mut parameter_map, mut context), parameter| {
-            let ident = Identifier::new(parameter.ident().as_str());
-            let ident_span = get_span_from_ast_span(parameter.ident().node_span());
+    context: &ReferenceContext<'_, '_>,
+) -> (ParameterCollection, ParameterErrorMap) {
+    let mut parameter_builder = ParameterBuilder::new();
 
-            let maybe_original_parameter = parameter_map.get(&ident);
-            if let Some((original_ident_span, _)) = maybe_original_parameter {
-                let original_ident_span: Span = *original_ident_span; // to help type inference
-                context.add_parameter_error(
-                    ident.clone(),
-                    ParameterResolutionError::duplicate_parameter(
-                        ident,
-                        original_ident_span,
-                        ident_span,
-                    ),
-                );
-            } else {
-                parameter_map.insert(ident, (ident_span, parameter));
-            }
+    let mut parameter_map = HashMap::new();
 
-            (parameter_map, context)
-        },
-    );
+    for parameter in parameters {
+        let ident = Identifier::new(parameter.ident().as_str());
+        let ident_span = get_span_from_ast_span(parameter.ident().node_span());
+
+        let maybe_original_parameter = parameter_map.get(&ident);
+        if let Some((original_ident_span, _)) = maybe_original_parameter {
+            parameter_builder.add_parameter_error(
+                ident.clone(),
+                ParameterResolutionError::duplicate_parameter(
+                    ident,
+                    *original_ident_span,
+                    ident_span,
+                ),
+            );
+        } else {
+            parameter_map.insert(ident, (ident_span, parameter));
+        }
+    }
+
+    // split the parameter map into two maps, one for the spans and one for the
+    // AST nodes
+    let (parameter_span_map, parameter_ast_map): (
+        HashMap<_, Span>,
+        HashMap<_, &ast::parameter::ParameterNode>,
+    ) = parameter_map
+        .into_iter()
+        .map(|(ident, (span, ast))| ((ident.clone(), span), (ident, ast)))
+        .unzip();
 
     // note that an 'internal dependency' is a dependency on a parameter
     // that is defined within the current model
-    let dependencies = get_all_parameter_internal_dependencies(&parameter_map);
+    let dependencies = get_all_parameter_internal_dependencies(&parameter_ast_map);
 
-    let visited = HashSet::new();
+    for (parameter_identifier, parameter_span) in parameter_span_map {
+        let mut parameter_stack = Stack::new();
 
-    let (context, _visited) = parameter_map.iter().fold(
-        (context, visited),
-        |(context, visited), (parameter_identifier, (parameter_span, _parameter))| {
-            let mut parameter_stack = Stack::new();
+        let parameter_identifier_with_span =
+            WithSpan::new(parameter_identifier.clone(), parameter_span);
 
-            let parameter_identifier_with_span =
-                WithSpan::new(parameter_identifier.clone(), *parameter_span);
+        parameter_builder = resolve_parameter(
+            parameter_identifier_with_span,
+            &parameter_ast_map,
+            &dependencies,
+            &mut parameter_stack,
+            builtin_ref,
+            context,
+            parameter_builder,
+        );
+    }
 
-            resolve_parameter(
-                parameter_identifier_with_span,
-                &parameter_map,
-                &dependencies,
-                &mut parameter_stack,
-                builtin_ref,
-                context,
-                visited,
-            )
-        },
-    );
-
-    context
+    parameter_builder.into_parameter_collection_and_errors()
 }
 
 /// Analyzes all parameters to extract their internal dependencies.
@@ -140,14 +146,14 @@ pub fn resolve_parameters<Ctx: ModelContext + ModelImportsContext + ParameterCon
 ///
 /// A map from parameter identifier to its set of internal dependencies
 fn get_all_parameter_internal_dependencies<'a>(
-    parameter_map: &'a HashMap<Identifier, (Span, &'a ast::parameter::ParameterNode)>,
+    parameter_map: &'a HashMap<Identifier, &'a ast::parameter::ParameterNode>,
 ) -> HashMap<&'a Identifier, HashSet<WithSpan<Identifier>>> {
     let dependencies = HashMap::new();
 
     parameter_map
         .keys()
         .fold(dependencies, |mut dependencies, identifier| {
-            let (_, parameter) = parameter_map
+            let parameter = parameter_map
                 .get(identifier)
                 .expect("parameter should exist");
 
@@ -273,8 +279,6 @@ fn get_expr_internal_dependencies(
     }
 }
 
-type VisitedSet = HashSet<Identifier>;
-
 /// Resolves a single parameter with dependency tracking.
 ///
 /// This function handles the recursive resolution of a parameter, including:
@@ -300,27 +304,27 @@ type VisitedSet = HashSet<Identifier>;
 /// - Updated parameter collection builder
 /// - Updated visited set
 /// - Result indicating success or resolution errors
-fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>(
+fn resolve_parameter(
     parameter_identifier: WithSpan<Identifier>,
-    parameter_map: &HashMap<Identifier, (Span, &ast::parameter::ParameterNode)>,
+    parameter_ast_map: &HashMap<Identifier, &ast::parameter::ParameterNode>,
     dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
     parameter_stack: &mut Stack<Identifier>,
     builtin_ref: &impl BuiltinRef,
-    mut context: Ctx,
-    mut visited: VisitedSet,
-) -> (Ctx, VisitedSet) {
+    context: &ReferenceContext<'_, '_>,
+    mut parameter_builder: ParameterBuilder,
+) -> ParameterBuilder {
     let parameter_identifier_span = parameter_identifier.span();
     let parameter_identifier = parameter_identifier.take_value();
 
     // check that the parameter exists
-    if !parameter_map.contains_key(&parameter_identifier) {
+    if !parameter_ast_map.contains_key(&parameter_identifier) {
         // This is technically a resolution error. However, this error will
         // be caught later when the variable is resolved. In order to avoid
         // duplicate errors, we return Ok(()) and let the variable resolution
         // handle the "not found" error
         //
         // This also accounts for the fact that the parameter may be a builtin
-        return (context, visited);
+        return parameter_builder;
     }
 
     assert!(
@@ -333,18 +337,18 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
         parameter_stack.find_circular_dependency(&parameter_identifier)
     {
         let reference_span = parameter_identifier_span;
-        context.add_parameter_error(
+        parameter_builder.add_parameter_error(
             parameter_identifier,
             ParameterResolutionError::circular_dependency(circular_dependency, reference_span),
         );
-        return (context, visited);
+        return parameter_builder;
     }
 
     // check if the parameter has already been visited
-    if visited.contains(&parameter_identifier) {
-        return (context, visited);
+    if parameter_builder.has_visited(&parameter_identifier) {
+        return parameter_builder;
     }
-    visited.insert(parameter_identifier.clone());
+    parameter_builder.mark_as_visited(parameter_identifier.clone());
 
     // resolve the parameter dependencies
     let parameter_dependencies = dependencies
@@ -355,41 +359,45 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
     parameter_stack.push(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    let (mut context, visited) =
-        parameter_dependencies
-            .iter()
-            .fold((context, visited), |(context, visited), dependency| {
-                resolve_parameter(
-                    dependency.clone(),
-                    parameter_map,
-                    dependencies,
-                    parameter_stack,
-                    builtin_ref,
-                    context,
-                    visited,
-                )
-            });
+    for dependency in parameter_dependencies {
+        parameter_builder = resolve_parameter(
+            dependency.clone(),
+            parameter_ast_map,
+            dependencies,
+            parameter_stack,
+            builtin_ref,
+            context,
+            parameter_builder,
+        );
+    }
 
     // remove the parameter from the stack
     parameter_stack.pop();
 
     // resolve the parameter
-    let (_, parameter) = parameter_map
+    let parameter = parameter_ast_map
         .get(&parameter_identifier)
         .expect("parameter should exist");
 
+    let parameter_context = ParameterContext::new(
+        parameter_builder.get_parameters(),
+        parameter_builder.get_parameter_errors(),
+    );
+
     let ident = parameter_identifier.clone();
 
-    let value = resolve_parameter_value(parameter.value(), builtin_ref, &context);
+    let value =
+        resolve_parameter_value(parameter.value(), builtin_ref, context, &parameter_context);
 
-    let limits = resolve_limits(parameter.limits(), builtin_ref, &context);
+    let limits = resolve_limits(parameter.limits(), builtin_ref, context, &parameter_context);
 
     let is_performance = parameter.performance_marker().is_some();
 
     let trace_level = resolve_trace_level(parameter.trace_level());
 
-    let context = match error::combine_errors(value, limits) {
+    match error::combine_errors(value, limits) {
         Ok((value, limits)) => {
+            // build the parameter
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
             let ident_with_span = oneil_ir::span::WithSpan::new(ident, ident_span);
 
@@ -407,20 +415,18 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
                 trace_level,
             );
 
-            context.add_parameter(parameter_identifier, parameter);
-
-            context
+            // add the parameter to the parameter builder
+            parameter_builder.add_parameter(parameter_identifier, parameter);
         }
         Err(errors) => {
+            // add the errors to the parameter builder
             for error in errors {
-                context.add_parameter_error(parameter_identifier.clone(), error);
+                parameter_builder.add_parameter_error(parameter_identifier.clone(), error);
             }
-
-            context
         }
-    };
+    }
 
-    (context, visited)
+    parameter_builder
 }
 
 /// Resolves a parameter value expression.
@@ -441,11 +447,13 @@ fn resolve_parameter<Ctx: ModelContext + ModelImportsContext + ParameterContext>
 fn resolve_parameter_value(
     value: &ast::parameter::ParameterValue,
     builtin_ref: &impl BuiltinRef,
-    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
+    reference_context: &ReferenceContext<'_, '_>,
+    parameter_context: &ParameterContext<'_>,
 ) -> Result<ParameterValue, Vec<ParameterResolutionError>> {
     match value {
         ast::parameter::ParameterValue::Simple(expr, unit) => {
-            let expr = resolve_expr(expr, builtin_ref, context).map_err(error::convert_errors)?;
+            let expr = resolve_expr(expr, builtin_ref, reference_context, parameter_context)
+                .map_err(error::convert_errors)?;
 
             let unit = unit.as_ref().map(resolve_unit);
 
@@ -454,11 +462,21 @@ fn resolve_parameter_value(
 
         ast::parameter::ParameterValue::Piecewise(piecewise, unit) => {
             let exprs = piecewise.iter().map(|part| {
-                let expr =
-                    resolve_expr(part.expr(), builtin_ref, context).map_err(error::convert_errors);
+                let expr = resolve_expr(
+                    part.expr(),
+                    builtin_ref,
+                    reference_context,
+                    parameter_context,
+                )
+                .map_err(error::convert_errors);
 
-                let if_expr = resolve_expr(part.if_expr(), builtin_ref, context)
-                    .map_err(error::convert_errors);
+                let if_expr = resolve_expr(
+                    part.if_expr(),
+                    builtin_ref,
+                    reference_context,
+                    parameter_context,
+                )
+                .map_err(error::convert_errors);
 
                 let (expr, if_expr) = error::combine_errors(expr, if_expr)?;
 
@@ -492,13 +510,16 @@ fn resolve_parameter_value(
 fn resolve_limits(
     limits: Option<&ast::parameter::LimitsNode>,
     builtin_ref: &impl BuiltinRef,
-    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
+    reference_context: &ReferenceContext<'_, '_>,
+    parameter_context: &ParameterContext<'_>,
 ) -> Result<oneil_ir::parameter::Limits, Vec<ParameterResolutionError>> {
     match limits.map(Node::node_value) {
         Some(ast::parameter::Limits::Continuous { min, max }) => {
-            let min = resolve_expr(min, builtin_ref, context).map_err(error::convert_errors);
+            let min = resolve_expr(min, builtin_ref, reference_context, parameter_context)
+                .map_err(error::convert_errors);
 
-            let max = resolve_expr(max, builtin_ref, context).map_err(error::convert_errors);
+            let max = resolve_expr(max, builtin_ref, reference_context, parameter_context)
+                .map_err(error::convert_errors);
 
             let (min, max) = error::combine_errors(min, max)?;
 
@@ -506,7 +527,8 @@ fn resolve_limits(
         }
         Some(ast::parameter::Limits::Discrete { values }) => {
             let values = values.iter().map(|value| {
-                resolve_expr(value, builtin_ref, context).map_err(error::convert_errors)
+                resolve_expr(value, builtin_ref, reference_context, parameter_context)
+                    .map_err(error::convert_errors)
             });
 
             let values = error::combine_error_list(values)?;

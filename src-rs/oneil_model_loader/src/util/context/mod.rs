@@ -1,7 +1,8 @@
-mod impls;
 mod lookup;
-mod traits;
+mod model_context;
+mod parameter_context;
+mod reference_context;
 
-pub use impls::{ModelImportsResolvedContext, ModelsLoadedContext};
-pub use lookup::LookupResult;
-pub use traits::{ModelContext, ModelImportsContext, ParameterContext};
+pub use model_context::{ModelContext, ModelContextResult};
+pub use parameter_context::{ParameterContext, ParameterContextResult};
+pub use reference_context::{ReferenceContext, ReferenceContextResult};

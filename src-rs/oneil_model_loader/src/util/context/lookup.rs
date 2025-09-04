@@ -5,6 +5,7 @@ pub enum LookupResult<T> {
     NotFound,
 }
 
+#[must_use]
 pub fn lookup_with<K, V>(
     key: &K,
     lookup_value: impl Fn(&K) -> Option<V>,

@@ -17,7 +17,11 @@ use oneil_ir::{model::Model, reference::ModelPath};
 use crate::{
     BuiltinRef,
     error::{LoadError, ResolutionErrors},
-    util::{FileLoader, Stack, builder::ModelCollectionBuilder, context::ModelsLoadedContext},
+    util::{
+        FileLoader, Stack,
+        builder::ModelCollectionBuilder,
+        context::{ModelContext, ParameterContext, ReferenceContext},
+    },
 };
 
 mod importer;
@@ -119,27 +123,31 @@ where
         builder,
     );
 
-    let context = ModelsLoadedContext::from_builder(&builder);
+    let models = builder.get_models();
+    let models_with_errors = builder.get_models_with_errors();
+
+    let model_context = ModelContext::new(models, &models_with_errors);
 
     // resolve submodels
     let (submodels, references, submodel_resolution_errors, reference_resolution_errors) =
-        resolver::resolve_model_imports(use_models, &model_path, &context);
+        resolver::resolve_model_imports(use_models, &model_path, &model_context);
 
-    // TODO: add references to the context as well
-    let context = context.with_model_imports_resolved(&references, &reference_resolution_errors);
-    let context = context.begin_parameter_resolution();
+    let reference_context = ReferenceContext::new(
+        models,
+        &models_with_errors,
+        &references,
+        &reference_resolution_errors,
+    );
 
     // resolve parameters
-    let context = resolver::resolve_parameters(parameters, builtin_ref, context);
+    let (parameters, parameter_resolution_errors) =
+        resolver::resolve_parameters(parameters, builtin_ref, &reference_context);
+
+    let parameter_context = ParameterContext::new(&parameters, &parameter_resolution_errors);
 
     // resolve tests
-    let (tests, test_resolution_errors) = resolver::resolve_tests(tests, builtin_ref, &context);
-
-    // get the parameters and parameter resolution errors
-    //
-    // this needs to be done after test resolution because we need the parameter
-    // context for resolving tests
-    let (parameters, parameter_resolution_errors) = context.into_parameters_and_errors();
+    let (tests, test_resolution_errors) =
+        resolver::resolve_tests(tests, builtin_ref, &reference_context, &parameter_context);
 
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,

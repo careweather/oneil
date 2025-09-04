@@ -25,11 +25,13 @@ use oneil_ir::{
         ReferenceImport, ReferenceMap, ReferenceName, ReferenceNameWithSpan, SubmodelImport,
         SubmodelMap, SubmodelName, SubmodelNameWithSpan,
     },
-    reference::{ModelPath, PythonPath},
+    parameter::{Parameter, ParameterCollection},
+    reference::{Identifier, ModelPath, PythonPath},
 };
 
 use crate::error::{
-    CircularDependencyError, LoadError, ModelImportResolutionError, collection::ModelErrorMap,
+    CircularDependencyError, LoadError, ModelImportResolutionError, ParameterResolutionError,
+    collection::ModelErrorMap,
 };
 
 /// A builder for constructing model collections while collecting loading errors.
@@ -284,6 +286,61 @@ impl ModelImportsBuilder {
             ReferenceMap::new(self.references),
             self.submodel_resolution_errors,
             self.reference_resolution_errors,
+        )
+    }
+}
+
+pub struct ParameterBuilder {
+    parameters: HashMap<Identifier, Parameter>,
+    parameter_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
+    visited: HashSet<Identifier>,
+}
+
+impl ParameterBuilder {
+    pub fn new() -> Self {
+        Self {
+            parameters: HashMap::new(),
+            parameter_errors: HashMap::new(),
+            visited: HashSet::new(),
+        }
+    }
+
+    pub fn add_parameter(&mut self, identifier: Identifier, parameter: Parameter) {
+        self.parameters.insert(identifier, parameter);
+    }
+
+    pub fn get_parameters(&self) -> &HashMap<Identifier, Parameter> {
+        &self.parameters
+    }
+
+    pub fn add_parameter_error(&mut self, identifier: Identifier, error: ParameterResolutionError) {
+        self.parameter_errors
+            .entry(identifier)
+            .or_default()
+            .push(error);
+    }
+
+    pub fn get_parameter_errors(&self) -> &HashMap<Identifier, Vec<ParameterResolutionError>> {
+        &self.parameter_errors
+    }
+
+    pub fn mark_as_visited(&mut self, identifier: Identifier) {
+        self.visited.insert(identifier);
+    }
+
+    pub fn has_visited(&self, identifier: &Identifier) -> bool {
+        self.visited.contains(identifier)
+    }
+
+    pub fn into_parameter_collection_and_errors(
+        self,
+    ) -> (
+        ParameterCollection,
+        HashMap<Identifier, Vec<ParameterResolutionError>>,
+    ) {
+        (
+            ParameterCollection::new(self.parameters),
+            self.parameter_errors,
         )
     }
 }

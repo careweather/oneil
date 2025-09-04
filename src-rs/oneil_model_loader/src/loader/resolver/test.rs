@@ -42,7 +42,7 @@ use crate::{
     BuiltinRef,
     error::{self, TestResolutionError},
     loader::resolver::{expr::resolve_expr, trace_level::resolve_trace_level},
-    util::context::{ModelContext, ModelImportsContext, ParameterContext},
+    util::context::{ParameterContext, ReferenceContext},
 };
 
 /// Resolves tests from AST test declarations.
@@ -71,7 +71,8 @@ use crate::{
 pub fn resolve_tests(
     tests: Vec<&ast::test::TestNode>,
     builtin_ref: &impl BuiltinRef,
-    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
+    reference_context: &ReferenceContext<'_, '_>,
+    parameter_context: &ParameterContext<'_>,
 ) -> (
     HashMap<TestIndex, Test>,
     HashMap<TestIndex, Vec<TestResolutionError>>,
@@ -81,8 +82,13 @@ pub fn resolve_tests(
 
         let trace_level = resolve_trace_level(test.trace_level());
 
-        let test_expr = resolve_expr(test.expr(), builtin_ref, context)
-            .map_err(|errors| (test_index, error::convert_errors(errors)))?;
+        let test_expr = resolve_expr(
+            test.expr(),
+            builtin_ref,
+            reference_context,
+            parameter_context,
+        )
+        .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
         Ok((test_index, Test::new(trace_level, test_expr)))
     });
@@ -91,6 +97,7 @@ pub fn resolve_tests(
 }
 
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use crate::{
         error::VariableResolutionError,

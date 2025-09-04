@@ -76,7 +76,7 @@ use crate::{
     error::ModelImportResolutionError,
     util::{
         builder::ModelImportsBuilder,
-        context::{LookupResult, ModelContext},
+        context::{ModelContext, ModelContextResult},
         get_span_from_ast_span,
     },
 };
@@ -109,7 +109,7 @@ use crate::{
 pub fn resolve_model_imports(
     use_models: Vec<&ast::declaration::UseModelNode>,
     model_path: &ModelPath,
-    context: &impl ModelContext,
+    context: &ModelContext<'_>,
 ) -> (
     SubmodelMap,
     ReferenceMap,
@@ -319,19 +319,19 @@ fn resolve_model_path(
     model_path: ModelPath,
     model_name_span: Span,
     model_subcomponents: &[ast::naming::IdentifierNode],
-    context: &impl ModelContext,
+    context: &ModelContext<'_>,
 ) -> Result<ModelPath, ModelImportResolutionError> {
     // if the model that we are trying to resolve has had an error, this
     // operation should fail
     let model = match context.lookup_model(&model_path) {
-        LookupResult::Found(model) => model,
-        LookupResult::HasError => {
+        ModelContextResult::Found(model) => model,
+        ModelContextResult::HasError => {
             return Err(ModelImportResolutionError::model_has_error(
                 model_path,
                 model_name_span,
             ));
         }
-        LookupResult::NotFound => panic!("model should have been visited already"),
+        ModelContextResult::NotFound => panic!("model should have been visited already"),
     };
 
     // if there are no more subcomponents, we have resolved the model path

@@ -37,15 +37,17 @@ use oneil_ast::{self as ast};
 use oneil_ir::{
     expr::{Expr, ExprWithSpan},
     model_import::ReferenceName,
-    reference::{Identifier, ModelPath},
-    span::{Span, WithSpan},
+    reference::Identifier,
+    span::WithSpan,
 };
 
 use crate::{
     BuiltinRef,
     error::VariableResolutionError,
     util::{
-        context::{LookupResult, ModelContext, ModelImportsContext, ParameterContext},
+        context::{
+            ParameterContext, ParameterContextResult, ReferenceContext, ReferenceContextResult,
+        },
         get_span_from_ast_span,
     },
 };
@@ -99,7 +101,8 @@ use crate::{
 pub fn resolve_variable(
     variable: &ast::expression::VariableNode,
     builtin_ref: &impl BuiltinRef,
-    context: &(impl ModelContext + ModelImportsContext + ParameterContext),
+    reference_context: &ReferenceContext<'_, '_>,
+    parameter_context: &ParameterContext<'_>,
 ) -> Result<ExprWithSpan, VariableResolutionError> {
     match variable.node_value() {
         ast::expression::Variable::Identifier(identifier) => {
@@ -107,17 +110,19 @@ pub fn resolve_variable(
             let var_identifier = Identifier::new(identifier.as_str());
             let var_identifier_span = get_span_from_ast_span(identifier.node_span());
 
-            match context.lookup_parameter(&var_identifier) {
-                LookupResult::Found(_parameter) => {
+            match parameter_context.lookup_parameter(&var_identifier) {
+                ParameterContextResult::Found(_parameter) => {
                     let span = get_span_from_ast_span(variable.node_span());
                     let expr = Expr::parameter_variable(var_identifier);
                     Ok(WithSpan::new(expr, span))
                 }
-                LookupResult::HasError => Err(VariableResolutionError::parameter_has_error(
-                    var_identifier,
-                    var_identifier_span,
-                )),
-                LookupResult::NotFound => {
+                ParameterContextResult::HasError => {
+                    Err(VariableResolutionError::parameter_has_error(
+                        var_identifier,
+                        var_identifier_span,
+                    ))
+                }
+                ParameterContextResult::NotFound => {
                     if builtin_ref.has_builtin_value(&var_identifier) {
                         let expr = Expr::builtin_variable(var_identifier);
                         Ok(WithSpan::new(expr, span))
@@ -136,19 +141,31 @@ pub fn resolve_variable(
         } => {
             let reference_name = ReferenceName::new(reference_model.as_str().to_string());
             let reference_name_span = get_span_from_ast_span(reference_model.node_span());
-            let reference_path =
-                resolve_reference_path(reference_name, reference_name_span, context)?;
 
-            // lookup the reference model
-            let model = match context.lookup_model(reference_path) {
-                LookupResult::Found(model) => model,
-                LookupResult::HasError => {
+            let (model, reference_path) = match reference_context.lookup_reference(&reference_name)
+            {
+                ReferenceContextResult::ReferenceHasResolutionError => {
+                    return Err(VariableResolutionError::reference_resolution_failed(
+                        reference_name,
+                        reference_name_span,
+                    ));
+                }
+                ReferenceContextResult::ReferenceNotFound => {
+                    return Err(VariableResolutionError::undefined_reference(
+                        reference_name,
+                        reference_name_span,
+                    ));
+                }
+                ReferenceContextResult::ModelHasResolutionError(reference_path) => {
                     return Err(VariableResolutionError::model_has_error(
                         reference_path.clone(),
                         reference_name_span,
                     ));
                 }
-                LookupResult::NotFound => panic!("reference should have been visited already"),
+                ReferenceContextResult::ModelNotFound(_reference_path) => {
+                    panic!("reference should have been visited already")
+                }
+                ReferenceContextResult::Found(model, reference_path) => (model, reference_path),
             };
 
             // ensure that the parameter is defined in the reference model
@@ -166,24 +183,6 @@ pub fn resolve_variable(
             let expr = Expr::external_variable(reference_path.clone(), var_identifier);
             Ok(WithSpan::new(expr, span))
         }
-    }
-}
-
-fn resolve_reference_path(
-    reference_name: ReferenceName,
-    reference_name_span: Span,
-    context: &impl ModelImportsContext,
-) -> Result<&ModelPath, VariableResolutionError> {
-    match context.lookup_reference(&reference_name) {
-        LookupResult::Found(reference_import) => Ok(reference_import.path()),
-        LookupResult::HasError => Err(VariableResolutionError::reference_resolution_failed(
-            reference_name,
-            reference_name_span,
-        )),
-        LookupResult::NotFound => Err(VariableResolutionError::undefined_reference(
-            reference_name,
-            reference_name_span,
-        )),
     }
 }
 
