@@ -1,4 +1,4 @@
-use oneil_ir::reference::Identifier;
+use oneil_ir as ir;
 use oneil_model_loader::BuiltinRef;
 
 // TODO: later, this will hold the actual values/functions that are built into the language
@@ -12,11 +12,11 @@ impl Builtins {
 }
 
 impl BuiltinRef for Builtins {
-    fn has_builtin_value(&self, identifier: &Identifier) -> bool {
+    fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool {
         matches!(identifier.as_str(), "pi" | "e" | "inf")
     }
 
-    fn has_builtin_function(&self, identifier: &Identifier) -> bool {
+    fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
         matches!(
             identifier.as_str(),
             "min"

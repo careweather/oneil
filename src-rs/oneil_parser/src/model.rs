@@ -20,11 +20,8 @@ use nom::{
     combinator::{eof, opt, value},
 };
 use oneil_ast::{
-    AstSpan,
-    declaration::DeclNode,
-    model::{Model, ModelNode, Section, SectionHeader, SectionHeaderNode, SectionNode},
-    naming::Label,
-    node::Node,
+    AstSpan, DeclNode, Label, Model, ModelNode, Node, Section, SectionHeader, SectionHeaderNode,
+    SectionNode,
 };
 
 use crate::{
@@ -408,7 +405,7 @@ fn skip_to_next_line_with_content(input: InputSpan<'_>) -> InputSpan<'_> {
 mod tests {
     use super::*;
     use crate::Config;
-    use oneil_ast::declaration::Decl;
+    use oneil_ast::Decl;
 
     #[test]
     fn test_empty_model() {

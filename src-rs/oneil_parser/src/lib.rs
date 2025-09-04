@@ -78,8 +78,7 @@
 //! // Use the AST for further processing...
 //! ```
 use oneil_ast::{
-    Model, declaration::DeclNode, expression::ExprNode, model::ModelNode, note::NoteNode,
-    parameter::ParameterNode, test::TestNode, unit::UnitExprNode,
+    DeclNode, ExprNode, Model, ModelNode, NoteNode, ParameterNode, TestNode, UnitExprNode,
 };
 
 mod config;
@@ -87,7 +86,7 @@ pub mod error;
 mod token;
 
 mod util;
-use util::{Result as InternalResult, InputSpan};
+use util::{InputSpan, Result as InternalResult};
 
 mod declaration;
 mod expression;

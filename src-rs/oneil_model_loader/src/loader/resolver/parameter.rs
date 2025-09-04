@@ -22,12 +22,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use oneil_ast::{self as ast, node::Node};
-use oneil_ir::{
-    parameter::{Parameter, ParameterCollection, ParameterValue, PiecewiseExpr},
-    reference::Identifier,
-    span::{IrSpan, WithSpan},
-};
+use oneil_ast as ast;
+use oneil_ir::{self as ir, IrSpan};
 
 use crate::{
     BuiltinRef,
@@ -41,7 +37,7 @@ use crate::{
     },
 };
 
-pub type ParameterErrorMap = HashMap<Identifier, Vec<ParameterResolutionError>>;
+pub type ParameterErrorMap = HashMap<ir::Identifier, Vec<ParameterResolutionError>>;
 
 /// Resolves a collection of AST parameters into resolved model parameters.
 ///
@@ -72,16 +68,16 @@ pub type ParameterErrorMap = HashMap<Identifier, Vec<ParameterResolutionError>>;
 /// - Invalid expressions in parameter values or limits
 /// - Missing submodel references
 pub fn resolve_parameters(
-    parameters: Vec<&ast::parameter::ParameterNode>,
+    parameters: Vec<&ast::ParameterNode>,
     builtin_ref: &impl BuiltinRef,
     context: &ReferenceContext<'_, '_>,
-) -> (ParameterCollection, ParameterErrorMap) {
+) -> (ir::ParameterCollection, ParameterErrorMap) {
     let mut parameter_builder = ParameterBuilder::new();
 
     let mut parameter_map = HashMap::new();
 
     for parameter in parameters {
-        let ident = Identifier::new(parameter.ident().as_str());
+        let ident = ir::Identifier::new(parameter.ident().as_str());
         let ident_span = get_span_from_ast_span(parameter.ident().node_span());
 
         let maybe_original_parameter = parameter_map.get(&ident);
@@ -103,7 +99,7 @@ pub fn resolve_parameters(
     // AST nodes
     let (parameter_span_map, parameter_ast_map): (
         HashMap<_, IrSpan>,
-        HashMap<_, &ast::parameter::ParameterNode>,
+        HashMap<_, &ast::ParameterNode>,
     ) = parameter_map
         .into_iter()
         .map(|(ident, (span, ast))| ((ident.clone(), span), (ident, ast)))
@@ -117,7 +113,7 @@ pub fn resolve_parameters(
         let mut parameter_stack = Stack::new();
 
         let parameter_identifier_with_span =
-            WithSpan::new(parameter_identifier.clone(), parameter_span);
+            ir::WithSpan::new(parameter_identifier.clone(), parameter_span);
 
         parameter_builder = resolve_parameter(
             parameter_identifier_with_span,
@@ -146,8 +142,8 @@ pub fn resolve_parameters(
 ///
 /// A map from parameter identifier to its set of internal dependencies
 fn get_all_parameter_internal_dependencies<'a>(
-    parameter_map: &'a HashMap<Identifier, &'a ast::parameter::ParameterNode>,
-) -> HashMap<&'a Identifier, HashSet<WithSpan<Identifier>>> {
+    parameter_map: &'a HashMap<ir::Identifier, &'a ast::ParameterNode>,
+) -> HashMap<&'a ir::Identifier, HashSet<ir::WithSpan<ir::Identifier>>> {
     let dependencies = HashMap::new();
 
     parameter_map
@@ -179,16 +175,16 @@ fn get_all_parameter_internal_dependencies<'a>(
 /// A set of parameter identifiers that this parameter depends on
 fn get_parameter_internal_dependencies(
     parameter: &ast::Parameter,
-) -> HashSet<WithSpan<Identifier>> {
+) -> HashSet<ir::WithSpan<ir::Identifier>> {
     let dependencies = HashSet::new();
 
-    let limits = parameter.limits().map(Node::node_value);
+    let limits = parameter.limits().map(ast::Node::node_value);
     let dependencies = match limits {
-        Some(ast::parameter::Limits::Continuous { min, max }) => {
+        Some(ast::Limits::Continuous { min, max }) => {
             let dependencies = get_expr_internal_dependencies(min, dependencies);
             get_expr_internal_dependencies(max, dependencies)
         }
-        Some(ast::parameter::Limits::Discrete { values }) => {
+        Some(ast::Limits::Discrete { values }) => {
             values.iter().fold(dependencies, |dependencies, expr| {
                 get_expr_internal_dependencies(expr, dependencies)
             })
@@ -197,10 +193,8 @@ fn get_parameter_internal_dependencies(
     };
 
     match &parameter.value().node_value() {
-        ast::parameter::ParameterValue::Simple(expr, _) => {
-            get_expr_internal_dependencies(expr, dependencies)
-        }
-        ast::parameter::ParameterValue::Piecewise(piecewise, _) => {
+        ast::ParameterValue::Simple(expr, _) => get_expr_internal_dependencies(expr, dependencies),
+        ast::ParameterValue::Piecewise(piecewise, _) => {
             piecewise.iter().fold(dependencies, |dependencies, part| {
                 let dependencies = get_expr_internal_dependencies(part.if_expr(), dependencies);
                 get_expr_internal_dependencies(part.expr(), dependencies)
@@ -224,8 +218,8 @@ fn get_parameter_internal_dependencies(
 /// Updated set of dependencies including any found in this expression
 fn get_expr_internal_dependencies(
     expr: &ast::Expr,
-    mut dependencies: HashSet<WithSpan<Identifier>>,
-) -> HashSet<WithSpan<Identifier>> {
+    mut dependencies: HashSet<ir::WithSpan<ir::Identifier>>,
+) -> HashSet<ir::WithSpan<ir::Identifier>> {
     match expr {
         ast::Expr::BinaryOp { op: _, left, right } => {
             let dependencies = get_expr_internal_dependencies(left, dependencies);
@@ -243,14 +237,14 @@ fn get_expr_internal_dependencies(
         }
 
         ast::Expr::Variable(variable) => match variable.node_value() {
-            ast::expression::Variable::Identifier(identifier) => {
+            ast::Variable::Identifier(identifier) => {
                 let identifier_span = get_span_from_ast_span(identifier.node_span());
-                let identifier = Identifier::new(identifier.as_str());
-                dependencies.insert(WithSpan::new(identifier, identifier_span));
+                let identifier = ir::Identifier::new(identifier.as_str());
+                dependencies.insert(ir::WithSpan::new(identifier, identifier_span));
                 dependencies
             }
 
-            ast::expression::Variable::ReferenceModelParameter {
+            ast::Variable::ReferenceModelParameter {
                 reference_model: _,
                 parameter: _,
             } => {
@@ -305,10 +299,10 @@ fn get_expr_internal_dependencies(
 /// - Updated visited set
 /// - Result indicating success or resolution errors
 fn resolve_parameter(
-    parameter_identifier: WithSpan<Identifier>,
-    parameter_ast_map: &HashMap<Identifier, &ast::parameter::ParameterNode>,
-    dependencies: &HashMap<&Identifier, HashSet<WithSpan<Identifier>>>,
-    parameter_stack: &mut Stack<Identifier>,
+    parameter_identifier: ir::WithSpan<ir::Identifier>,
+    parameter_ast_map: &HashMap<ir::Identifier, &ast::ParameterNode>,
+    dependencies: &HashMap<&ir::Identifier, HashSet<ir::WithSpan<ir::Identifier>>>,
+    parameter_stack: &mut Stack<ir::Identifier>,
     builtin_ref: &impl BuiltinRef,
     context: &ReferenceContext<'_, '_>,
     mut parameter_builder: ParameterBuilder,
@@ -399,14 +393,14 @@ fn resolve_parameter(
         Ok((value, limits)) => {
             // build the parameter
             let ident_span = get_span_from_ast_span(parameter.ident().node_span());
-            let ident_with_span = oneil_ir::span::WithSpan::new(ident, ident_span);
+            let ident_with_span = ir::WithSpan::new(ident, ident_span);
 
             let parameter_dependencies = parameter_dependencies
                 .iter()
                 .map(|dependency| dependency.value().clone())
                 .collect();
 
-            let parameter = Parameter::new(
+            let parameter = ir::Parameter::new(
                 parameter_dependencies,
                 ident_with_span,
                 value,
@@ -445,22 +439,22 @@ fn resolve_parameter(
 ///
 /// A resolved parameter value or a list of resolution errors
 fn resolve_parameter_value(
-    value: &ast::parameter::ParameterValue,
+    value: &ast::ParameterValue,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<ParameterValue, Vec<ParameterResolutionError>> {
+) -> Result<ir::ParameterValue, Vec<ParameterResolutionError>> {
     match value {
-        ast::parameter::ParameterValue::Simple(expr, unit) => {
+        ast::ParameterValue::Simple(expr, unit) => {
             let expr = resolve_expr(expr, builtin_ref, reference_context, parameter_context)
                 .map_err(error::convert_errors)?;
 
             let unit = unit.as_ref().map(resolve_unit);
 
-            Ok(ParameterValue::simple(expr, unit))
+            Ok(ir::ParameterValue::simple(expr, unit))
         }
 
-        ast::parameter::ParameterValue::Piecewise(piecewise, unit) => {
+        ast::ParameterValue::Piecewise(piecewise, unit) => {
             let exprs = piecewise.iter().map(|part| {
                 let expr = resolve_expr(
                     part.expr(),
@@ -480,14 +474,14 @@ fn resolve_parameter_value(
 
                 let (expr, if_expr) = error::combine_errors(expr, if_expr)?;
 
-                Ok(PiecewiseExpr::new(expr, if_expr))
+                Ok(ir::PiecewiseExpr::new(expr, if_expr))
             });
 
             let unit = unit.as_ref().map(resolve_unit);
 
             let exprs = error::combine_error_list(exprs)?;
 
-            Ok(ParameterValue::piecewise(exprs, unit))
+            Ok(ir::ParameterValue::piecewise(exprs, unit))
         }
     }
 }
@@ -508,13 +502,13 @@ fn resolve_parameter_value(
 ///
 /// Resolved parameter limits or a list of resolution errors
 fn resolve_limits(
-    limits: Option<&ast::parameter::LimitsNode>,
+    limits: Option<&ast::LimitsNode>,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::parameter::Limits, Vec<ParameterResolutionError>> {
-    match limits.map(Node::node_value) {
-        Some(ast::parameter::Limits::Continuous { min, max }) => {
+) -> Result<ir::Limits, Vec<ParameterResolutionError>> {
+    match limits.map(ast::Node::node_value) {
+        Some(ast::Limits::Continuous { min, max }) => {
             let min = resolve_expr(min, builtin_ref, reference_context, parameter_context)
                 .map_err(error::convert_errors);
 
@@ -523,9 +517,9 @@ fn resolve_limits(
 
             let (min, max) = error::combine_errors(min, max)?;
 
-            Ok(oneil_ir::parameter::Limits::continuous(min, max))
+            Ok(ir::Limits::continuous(min, max))
         }
-        Some(ast::parameter::Limits::Discrete { values }) => {
+        Some(ast::Limits::Discrete { values }) => {
             let values = values.iter().map(|value| {
                 resolve_expr(value, builtin_ref, reference_context, parameter_context)
                     .map_err(error::convert_errors)
@@ -533,9 +527,9 @@ fn resolve_limits(
 
             let values = error::combine_error_list(values)?;
 
-            Ok(oneil_ir::parameter::Limits::discrete(values))
+            Ok(ir::Limits::discrete(values))
         }
-        None => Ok(oneil_ir::parameter::Limits::default()),
+        None => Ok(ir::Limits::default()),
     }
 }
 

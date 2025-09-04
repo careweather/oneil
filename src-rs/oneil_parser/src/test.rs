@@ -40,12 +40,7 @@ use nom::{
     Parser,
     combinator::{all_consuming, opt},
 };
-use oneil_ast::{
-    AstSpan as AstSpan,
-    debug_info::{TraceLevel, TraceLevelNode},
-    node::Node,
-    test::{Test, TestNode},
-};
+use oneil_ast::{AstSpan, Node, Test, TestNode, TraceLevel, TraceLevelNode};
 
 use crate::{
     error::{ErrorHandlingParser, ParserError},
@@ -56,7 +51,7 @@ use crate::{
         structure::end_of_line,
         symbol::{colon, star, star_star},
     },
-    util::{Result, InputSpan},
+    util::{InputSpan, Result},
 };
 
 /// Parse a test declaration, e.g. `* test: x > y`.
@@ -200,7 +195,7 @@ mod tests {
         Config,
         error::reason::{ExpectKind, IncompleteKind, ParserErrorReason, TestKind},
     };
-    use oneil_ast::expression::{Expr, Literal};
+    use oneil_ast::{Expr, Literal};
 
     mod success_tests {
         use oneil_ast::Note;

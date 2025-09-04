@@ -15,7 +15,7 @@
 use std::{fs, path::Path};
 
 use oneil_error::{ErrorLocation, OneilError};
-use oneil_ir::reference::{ModelPath, PythonPath};
+use oneil_ir as ir;
 use oneil_model_loader::{
     ModelErrorMap,
     error::{
@@ -99,7 +99,7 @@ pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -
 ///
 /// Panics if the Python path and error path do not match, which should never happen
 /// in normal operation.
-fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> OneilError {
+fn convert_import_error(python_path: &ir::PythonPath, error: &DoesNotExistError) -> OneilError {
     assert_eq!(
         python_path.as_ref(),
         error.path(),
@@ -124,7 +124,7 @@ fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> 
 ///
 /// Returns a new `Error` instance with a message showing the circular dependency chain.
 fn convert_circular_dependency_error(
-    model_path: &ModelPath,
+    model_path: &ir::ModelPath,
     error: &CircularDependencyError,
 ) -> OneilError {
     let path = model_path.as_ref();
@@ -147,7 +147,7 @@ fn convert_circular_dependency_error(
 ///
 /// Returns a vector of `Error` instances for all errors found in the model.
 fn convert_model_errors(
-    model_path: &ModelPath,
+    model_path: &ir::ModelPath,
     errors: &LoadError<LoadingError>,
 ) -> Vec<OneilError> {
     let path = model_path.as_ref();
@@ -194,7 +194,7 @@ fn convert_model_errors(
     reason = "this is a repetitive and easy-to-read function"
 )]
 fn convert_resolution_errors(
-    model_path: &ModelPath,
+    model_path: &ir::ModelPath,
     resolution_errors: &ResolutionErrors,
 ) -> Vec<OneilError> {
     let mut errors = Vec::new();

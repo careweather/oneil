@@ -8,13 +8,8 @@ use nom::{
 };
 
 use oneil_ast::{
-    AstSpan as AstSpan,
-    declaration::{
-        Decl, DeclNode, Import, ModelInfo, ModelInfoNode, ModelKind, SubmodelList,
-        SubmodelListNode, UseModel,
-    },
-    naming::{Directory, DirectoryNode, Identifier, IdentifierNode},
-    node::Node,
+    AstSpan, Decl, DeclNode, Directory, DirectoryNode, Identifier, IdentifierNode, Import,
+    ModelInfo, ModelInfoNode, ModelKind, Node, SubmodelList, SubmodelListNode, UseModel,
 };
 
 use crate::{
@@ -27,7 +22,7 @@ use crate::{
         structure::end_of_line,
         symbol::{bracket_left, bracket_right, comma, dot, dot_dot, slash},
     },
-    util::{Result, InputSpan},
+    util::{InputSpan, Result},
 };
 
 /// Parses a declaration
@@ -651,7 +646,8 @@ mod tests {
 
         #[test]
         fn test_use_with_directory_and_subcomponents() {
-            let input = InputSpan::new_extra("use utils/math.trigonometry as trig\n", Config::default());
+            let input =
+                InputSpan::new_extra("use utils/math.trigonometry as trig\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -1743,7 +1739,8 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_subcomponents() {
-                let input = InputSpan::new_extra("use foo with [bar.qux, baz.quux\n", Config::default());
+                let input =
+                    InputSpan::new_extra("use foo with [bar.qux, baz.quux\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1766,8 +1763,10 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_aliases() {
-                let input =
-                    InputSpan::new_extra("use foo with [bar as baz, qux as quux\n", Config::default());
+                let input = InputSpan::new_extra(
+                    "use foo with [bar as baz, qux as quux\n",
+                    Config::default(),
+                );
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1790,7 +1789,8 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_model_alias() {
-                let input = InputSpan::new_extra("use foo as bar with [qux, baz\n", Config::default());
+                let input =
+                    InputSpan::new_extra("use foo as bar with [qux, baz\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(20, 1, 0);
 

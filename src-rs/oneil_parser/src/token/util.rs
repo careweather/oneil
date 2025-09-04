@@ -1,8 +1,8 @@
 use nom::{Parser as NomParser, character::complete::space0, combinator::recognize};
-use oneil_ast::span::SpanLike;
+use oneil_ast::SpanLike;
 
 use crate::token::{
-    Parser, Result, InputSpan,
+    InputSpan, Parser, Result,
     error::{ErrorHandlingParser, TokenError},
 };
 

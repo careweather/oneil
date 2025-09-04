@@ -1,6 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
-use oneil_ast::model::ModelNode;
+use oneil_ast as ast;
 
 use crate::FileLoader;
 
@@ -73,7 +76,7 @@ impl FileLoader for TestPythonValidator {
     ///
     /// Always panics with the message "`TestPythonLoader` does not support parsing ASTs".
     #[allow(clippy::panic_in_result_fn, reason = "this is a test implementation")]
-    fn parse_ast(&self, _path: impl AsRef<std::path::Path>) -> Result<ModelNode, Self::ParseError> {
+    fn parse_ast(&self, _path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
         panic!("TestPythonLoader does not support parsing ASTs");
     }
 
@@ -93,10 +96,7 @@ impl FileLoader for TestPythonValidator {
     /// # Returns
     ///
     /// Returns `Ok(())` if the import should be accepted, or `Err(())` if it should be rejected.
-    fn validate_python_import(
-        &self,
-        path: impl AsRef<std::path::Path>,
-    ) -> Result<(), Self::PythonError> {
+    fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError> {
         let path = path.as_ref().to_path_buf();
 
         match self {
@@ -119,7 +119,7 @@ impl FileLoader for TestPythonValidator {
 /// It maintains a map of file paths to AST models and returns the appropriate
 /// model when a file is requested for parsing.
 pub struct TestFileParser {
-    models: HashMap<PathBuf, ModelNode>,
+    models: HashMap<PathBuf, ast::ModelNode>,
 }
 
 impl TestFileParser {
@@ -133,7 +133,7 @@ impl TestFileParser {
     ///
     /// A new `TestFileParser` that will return the specified models when their
     /// corresponding paths are requested.
-    pub fn new(models: impl IntoIterator<Item = (PathBuf, ModelNode)>) -> Self {
+    pub fn new(models: impl IntoIterator<Item = (PathBuf, ast::ModelNode)>) -> Self {
         Self {
             models: models.into_iter().collect(),
         }
@@ -171,7 +171,7 @@ impl FileLoader for TestFileParser {
     ///
     /// Returns `Ok(Model)` if the path exists in the predefined models,
     /// or `Err(())` if the path is not found.
-    fn parse_ast(&self, path: impl AsRef<std::path::Path>) -> Result<ModelNode, Self::ParseError> {
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
         let path = path.as_ref().to_path_buf();
         self.models.get(&path).cloned().ok_or(())
     }

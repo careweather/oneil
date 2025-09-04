@@ -109,7 +109,7 @@ impl ModelFileLoader for FileLoader {
     ///
     /// - `LoadingError::InvalidFile` if the file cannot be read from disk
     /// - `LoadingError::Parser` if the file contains syntax errors
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::model::ModelNode, Self::ParseError> {
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
         let file_content = std::fs::read_to_string(path)?;
         let ast = parser::parse_model(&file_content, None)?;
         Ok(ast)

@@ -22,7 +22,7 @@
 use std::fmt;
 
 use oneil_error::AsOneilError;
-use oneil_ir::reference::ModelPath;
+use oneil_ir as ir;
 
 pub mod collection;
 pub mod resolution;
@@ -82,7 +82,7 @@ impl<Ps> LoadError<Ps> {
 /// model C, which depends back on model A (or any other cycle). This error contains
 /// the complete cycle of model paths that form the circular dependency.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CircularDependencyError(Vec<ModelPath>);
+pub struct CircularDependencyError(Vec<ir::ModelPath>);
 
 impl CircularDependencyError {
     /// Creates a new circular dependency error.
@@ -97,7 +97,7 @@ impl CircularDependencyError {
     ///
     /// A new `CircularDependencyError` containing the circular dependency path.
     #[must_use]
-    pub fn new(circular_dependency: Vec<ModelPath>) -> Self {
+    pub fn new(circular_dependency: Vec<ir::ModelPath>) -> Self {
         Self(circular_dependency)
     }
 
@@ -107,7 +107,7 @@ impl CircularDependencyError {
     ///
     /// A vector of model paths that form the circular dependency.
     #[must_use]
-    pub fn circular_dependency(&self) -> &[ModelPath] {
+    pub fn circular_dependency(&self) -> &[ir::ModelPath] {
         &self.0
     }
 }

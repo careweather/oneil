@@ -1,5 +1,7 @@
 use crate::util::get_span_from_ast_span;
+
 use oneil_ast as ast;
+use oneil_ir::{self as ir, IrSpan};
 
 /// Resolves an AST unit expression into a composite unit representation.
 ///
@@ -24,23 +26,23 @@ use oneil_ast as ast;
 /// # Returns
 ///
 /// A `CompositeUnit` containing the flattened representation of the unit expression
-pub fn resolve_unit(unit: &ast::unit::UnitExprNode) -> oneil_ir::unit::CompositeUnit {
+pub fn resolve_unit(unit: &ast::UnitExprNode) -> ir::CompositeUnit {
     let units = resolve_unit_recursive(unit, false, Vec::new());
-    oneil_ir::unit::CompositeUnit::new(units)
+    ir::CompositeUnit::new(units)
 }
 
 fn resolve_unit_recursive(
-    unit: &ast::unit::UnitExprNode,
+    unit: &ast::UnitExprNode,
     is_inverse: bool,
-    mut units: Vec<oneil_ir::unit::Unit>,
-) -> Vec<oneil_ir::unit::Unit> {
+    mut units: Vec<ir::Unit>,
+) -> Vec<ir::Unit> {
     match unit.node_value() {
         ast::UnitExpr::BinaryOp { op, left, right } => {
             let units = resolve_unit_recursive(left, is_inverse, units);
 
             match op.node_value() {
-                ast::unit::UnitOp::Multiply => resolve_unit_recursive(right, is_inverse, units),
-                ast::unit::UnitOp::Divide => resolve_unit_recursive(right, !is_inverse, units),
+                ast::UnitOp::Multiply => resolve_unit_recursive(right, is_inverse, units),
+                ast::UnitOp::Divide => resolve_unit_recursive(right, !is_inverse, units),
             }
         }
         ast::UnitExpr::Unit {
@@ -56,10 +58,10 @@ fn resolve_unit_recursive(
 
             let name_span = get_span_from_ast_span(identifier.node_span());
             let exponent_span = exponent.as_ref().map_or_else(
-                || oneil_ir::span::IrSpan::new(identifier.node_span().end(), 0),
+                || IrSpan::new(identifier.node_span().end(), 0),
                 |exp| get_span_from_ast_span(exp.node_span()),
             );
-            let unit = oneil_ir::unit::Unit::new(
+            let unit = ir::Unit::new(
                 identifier.as_str().to_string(),
                 name_span,
                 exponent_value,

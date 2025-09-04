@@ -19,15 +19,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use oneil_ir::{
-    model::{Model, ModelCollection},
-    model_import::{
-        ReferenceImport, ReferenceMap, ReferenceName, ReferenceNameWithSpan, SubmodelImport,
-        SubmodelMap, SubmodelName, SubmodelNameWithSpan,
-    },
-    parameter::{Parameter, ParameterCollection},
-    reference::{Identifier, ModelPath, PythonPath},
-};
+use oneil_ir as ir;
 
 use crate::error::{
     CircularDependencyError, LoadError, ModelImportResolutionError, ParameterResolutionError,
@@ -49,9 +41,9 @@ use crate::error::{
 ///
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelCollectionBuilder<Ps, Py> {
-    initial_models: HashSet<ModelPath>,
-    models: HashMap<ModelPath, Model>,
-    visited_models: HashSet<ModelPath>,
+    initial_models: HashSet<ir::ModelPath>,
+    models: HashMap<ir::ModelPath, ir::Model>,
+    visited_models: HashSet<ir::ModelPath>,
     errors: ModelErrorMap<Ps, Py>,
 }
 
@@ -65,7 +57,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// # Returns
     ///
     /// A new `ModelCollectionBuilder` with the specified initial models.
-    pub fn new(initial_models: HashSet<ModelPath>) -> Self {
+    pub fn new(initial_models: HashSet<ir::ModelPath>) -> Self {
         Self {
             initial_models,
             models: HashMap::new(),
@@ -86,7 +78,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// # Returns
     ///
     /// Returns `true` if the model has been visited, `false` otherwise.
-    pub fn model_has_been_visited(&self, model_path: &ModelPath) -> bool {
+    pub fn model_has_been_visited(&self, model_path: &ir::ModelPath) -> bool {
         self.visited_models.contains(model_path)
     }
 
@@ -98,7 +90,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// # Arguments
     ///
     /// * `model_path` - The path of the model to mark as visited
-    pub fn mark_model_as_visited(&mut self, model_path: &ModelPath) {
+    pub fn mark_model_as_visited(&mut self, model_path: &ir::ModelPath) {
         self.visited_models.insert(model_path.clone());
     }
 
@@ -107,7 +99,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// # Returns
     ///
     /// A reference to the map of model paths to loaded models.
-    pub fn get_models(&self) -> &HashMap<ModelPath, Model> {
+    pub fn get_models(&self) -> &HashMap<ir::ModelPath, ir::Model> {
         &self.models
     }
 
@@ -119,7 +111,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// # Returns
     ///
     /// A set of model paths that have any type of error.
-    pub fn get_models_with_errors(&self) -> HashSet<&ModelPath> {
+    pub fn get_models_with_errors(&self) -> HashSet<&ir::ModelPath> {
         self.errors.get_models_with_errors()
     }
 
@@ -129,7 +121,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     ///
     /// * `model_path` - The path of the model that has an error
     /// * `error` - The loading error that occurred
-    pub fn add_model_error(&mut self, model_path: ModelPath, error: LoadError<Ps>) {
+    pub fn add_model_error(&mut self, model_path: ir::ModelPath, error: LoadError<Ps>) {
         self.errors.add_model_error(model_path, error);
     }
 
@@ -141,8 +133,8 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// * `circular_dependency` - The circular dependency path
     pub fn add_circular_dependency_error(
         &mut self,
-        model_path: ModelPath,
-        circular_dependency: Vec<ModelPath>,
+        model_path: ir::ModelPath,
+        circular_dependency: Vec<ir::ModelPath>,
     ) {
         self.errors.add_circular_dependency_error(
             model_path,
@@ -156,7 +148,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     ///
     /// * `python_path` - The Python path that failed to import
     /// * `error` - The import error that occurred
-    pub fn add_import_error(&mut self, python_path: PythonPath, error: Py) {
+    pub fn add_import_error(&mut self, python_path: ir::PythonPath, error: Py) {
         self.errors.add_import_error(python_path, error);
     }
 
@@ -166,30 +158,30 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     ///
     /// * `model_path` - The path of the model
     /// * `model` - The loaded model
-    pub fn add_model(&mut self, model_path: ModelPath, model: Model) {
+    pub fn add_model(&mut self, model_path: ir::ModelPath, model: ir::Model) {
         self.models.insert(model_path, model);
     }
 
     #[cfg(test)]
-    pub fn get_imports_with_errors(&self) -> HashSet<&PythonPath> {
+    pub fn get_imports_with_errors(&self) -> HashSet<&ir::PythonPath> {
         self.errors.get_imports_with_errors()
     }
 
     #[cfg(test)]
-    pub fn get_model_errors(&self) -> &HashMap<ModelPath, LoadError<Ps>> {
+    pub fn get_model_errors(&self) -> &HashMap<ir::ModelPath, LoadError<Ps>> {
         self.errors.get_model_errors()
     }
 
     #[cfg(test)]
     pub fn get_circular_dependency_errors(
         &self,
-    ) -> &HashMap<ModelPath, Vec<CircularDependencyError>> {
+    ) -> &HashMap<ir::ModelPath, Vec<CircularDependencyError>> {
         self.errors.get_circular_dependency_errors()
     }
 }
 
-impl<Ps, Py> TryInto<ModelCollection> for ModelCollectionBuilder<Ps, Py> {
-    type Error = (ModelCollection, ModelErrorMap<Ps, Py>);
+impl<Ps, Py> TryInto<ir::ModelCollection> for ModelCollectionBuilder<Ps, Py> {
+    type Error = (ir::ModelCollection, ModelErrorMap<Ps, Py>);
 
     /// Attempts to convert the builder into a model collection.
     ///
@@ -201,8 +193,8 @@ impl<Ps, Py> TryInto<ModelCollection> for ModelCollectionBuilder<Ps, Py> {
     ///
     /// Returns `Ok(collection)` if no errors occurred, or `Err((partial_collection, errors))`
     /// if there were errors during loading.
-    fn try_into(self) -> Result<ModelCollection, (ModelCollection, ModelErrorMap<Ps, Py>)> {
-        let model_collection = ModelCollection::new(self.initial_models, self.models);
+    fn try_into(self) -> Result<ir::ModelCollection, (ir::ModelCollection, ModelErrorMap<Ps, Py>)> {
+        let model_collection = ir::ModelCollection::new(self.initial_models, self.models);
         if self.errors.is_empty() {
             Ok(model_collection)
         } else {
@@ -213,10 +205,10 @@ impl<Ps, Py> TryInto<ModelCollection> for ModelCollectionBuilder<Ps, Py> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelImportsBuilder {
-    submodels: HashMap<SubmodelName, SubmodelImport>,
-    submodel_resolution_errors: HashMap<SubmodelName, ModelImportResolutionError>,
-    references: HashMap<ReferenceName, ReferenceImport>,
-    reference_resolution_errors: HashMap<ReferenceName, ModelImportResolutionError>,
+    submodels: HashMap<ir::SubmodelName, ir::SubmodelImport>,
+    submodel_resolution_errors: HashMap<ir::SubmodelName, ModelImportResolutionError>,
+    references: HashMap<ir::ReferenceName, ir::ReferenceImport>,
+    reference_resolution_errors: HashMap<ir::ReferenceName, ModelImportResolutionError>,
 }
 
 impl ModelImportsBuilder {
@@ -231,34 +223,41 @@ impl ModelImportsBuilder {
     }
 
     #[must_use]
-    pub fn get_submodel(&self, submodel_name: &SubmodelName) -> Option<&SubmodelImport> {
+    pub fn get_submodel(&self, submodel_name: &ir::SubmodelName) -> Option<&ir::SubmodelImport> {
         self.submodels.get(submodel_name)
     }
 
     #[must_use]
-    pub fn get_reference(&self, reference_name: &ReferenceName) -> Option<&ReferenceImport> {
+    pub fn get_reference(
+        &self,
+        reference_name: &ir::ReferenceName,
+    ) -> Option<&ir::ReferenceImport> {
         self.references.get(reference_name)
     }
 
-    pub fn add_submodel(&mut self, submodel_name: SubmodelNameWithSpan, submodel_path: ModelPath) {
+    pub fn add_submodel(
+        &mut self,
+        submodel_name: ir::SubmodelNameWithSpan,
+        submodel_path: ir::ModelPath,
+    ) {
         let submodel_ident = submodel_name.value().clone();
-        let submodel_import = SubmodelImport::new(submodel_name, submodel_path);
+        let submodel_import = ir::SubmodelImport::new(submodel_name, submodel_path);
         self.submodels.insert(submodel_ident, submodel_import);
     }
 
     pub fn add_reference(
         &mut self,
-        reference_name: ReferenceNameWithSpan,
-        reference_path: ModelPath,
+        reference_name: ir::ReferenceNameWithSpan,
+        reference_path: ir::ModelPath,
     ) {
         let reference_ident = reference_name.value().clone();
-        let reference_import = ReferenceImport::new(reference_name, reference_path);
+        let reference_import = ir::ReferenceImport::new(reference_name, reference_path);
         self.references.insert(reference_ident, reference_import);
     }
 
     pub fn add_submodel_resolution_error(
         &mut self,
-        submodel_name: SubmodelName,
+        submodel_name: ir::SubmodelName,
         error: ModelImportResolutionError,
     ) {
         self.submodel_resolution_errors.insert(submodel_name, error);
@@ -266,7 +265,7 @@ impl ModelImportsBuilder {
 
     pub fn add_reference_resolution_error(
         &mut self,
-        reference_name: ReferenceName,
+        reference_name: ir::ReferenceName,
         error: ModelImportResolutionError,
     ) {
         self.reference_resolution_errors
@@ -276,14 +275,14 @@ impl ModelImportsBuilder {
     pub fn into_submodels_and_references_and_resolution_errors(
         self,
     ) -> (
-        SubmodelMap,
-        ReferenceMap,
-        HashMap<SubmodelName, ModelImportResolutionError>,
-        HashMap<ReferenceName, ModelImportResolutionError>,
+        ir::SubmodelMap,
+        ir::ReferenceMap,
+        HashMap<ir::SubmodelName, ModelImportResolutionError>,
+        HashMap<ir::ReferenceName, ModelImportResolutionError>,
     ) {
         (
-            SubmodelMap::new(self.submodels),
-            ReferenceMap::new(self.references),
+            ir::SubmodelMap::new(self.submodels),
+            ir::ReferenceMap::new(self.references),
             self.submodel_resolution_errors,
             self.reference_resolution_errors,
         )
@@ -291,9 +290,9 @@ impl ModelImportsBuilder {
 }
 
 pub struct ParameterBuilder {
-    parameters: HashMap<Identifier, Parameter>,
-    parameter_errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
-    visited: HashSet<Identifier>,
+    parameters: HashMap<ir::Identifier, ir::Parameter>,
+    parameter_errors: HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+    visited: HashSet<ir::Identifier>,
 }
 
 impl ParameterBuilder {
@@ -305,41 +304,45 @@ impl ParameterBuilder {
         }
     }
 
-    pub fn add_parameter(&mut self, identifier: Identifier, parameter: Parameter) {
+    pub fn add_parameter(&mut self, identifier: ir::Identifier, parameter: ir::Parameter) {
         self.parameters.insert(identifier, parameter);
     }
 
-    pub fn get_parameters(&self) -> &HashMap<Identifier, Parameter> {
+    pub fn get_parameters(&self) -> &HashMap<ir::Identifier, ir::Parameter> {
         &self.parameters
     }
 
-    pub fn add_parameter_error(&mut self, identifier: Identifier, error: ParameterResolutionError) {
+    pub fn add_parameter_error(
+        &mut self,
+        identifier: ir::Identifier,
+        error: ParameterResolutionError,
+    ) {
         self.parameter_errors
             .entry(identifier)
             .or_default()
             .push(error);
     }
 
-    pub fn get_parameter_errors(&self) -> &HashMap<Identifier, Vec<ParameterResolutionError>> {
+    pub fn get_parameter_errors(&self) -> &HashMap<ir::Identifier, Vec<ParameterResolutionError>> {
         &self.parameter_errors
     }
 
-    pub fn mark_as_visited(&mut self, identifier: Identifier) {
+    pub fn mark_as_visited(&mut self, identifier: ir::Identifier) {
         self.visited.insert(identifier);
     }
 
-    pub fn has_visited(&self, identifier: &Identifier) -> bool {
+    pub fn has_visited(&self, identifier: &ir::Identifier) -> bool {
         self.visited.contains(identifier)
     }
 
     pub fn into_parameter_collection_and_errors(
         self,
     ) -> (
-        ParameterCollection,
-        HashMap<Identifier, Vec<ParameterResolutionError>>,
+        ir::ParameterCollection,
+        HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
     ) {
         (
-            ParameterCollection::new(self.parameters),
+            ir::ParameterCollection::new(self.parameters),
             self.parameter_errors,
         )
     }

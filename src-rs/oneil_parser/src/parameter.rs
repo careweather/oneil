@@ -26,15 +26,10 @@ use nom::Parser;
 use nom::branch::alt;
 use nom::combinator::{all_consuming, opt};
 use nom::multi::{many0, separated_list1};
-use oneil_ast::debug_info::{TraceLevel, TraceLevelNode};
-use oneil_ast::naming::{Identifier, Label};
-use oneil_ast::node::Node;
-use oneil_ast::parameter::{
-    LimitsNode, ParameterValueNode, PerformanceMarker, PerformanceMarkerNode, PiecewisePartNode,
-};
 use oneil_ast::{
-    AstSpan,
-    parameter::{Limits, Parameter, ParameterNode, ParameterValue, PiecewisePart},
+    AstSpan, Identifier, Label, Limits, LimitsNode, Node, Parameter, ParameterNode, ParameterValue,
+    ParameterValueNode, PerformanceMarker, PerformanceMarkerNode, PiecewisePart, PiecewisePartNode,
+    TraceLevel, TraceLevelNode,
 };
 
 use crate::error::{ErrorHandlingParser, ParserError};
@@ -50,7 +45,7 @@ use crate::token::{
     },
 };
 use crate::unit::parse as parse_unit;
-use crate::util::{Result, InputSpan};
+use crate::util::{InputSpan, Result};
 
 /// Parse a parameter declaration, e.g. `$ * x(0,100): y = 2*z : kg`.
 ///
@@ -570,10 +565,7 @@ mod tests {
         Config,
         error::reason::{ExpectKind, IncompleteKind, ParameterKind, ParserErrorReason},
     };
-    use oneil_ast::{
-        expression::{Expr, Literal},
-        unit::{UnitExpr, UnitOp},
-    };
+    use oneil_ast::{Expr, Literal, UnitExpr, UnitOp};
 
     mod success_tests {
         use super::*;
@@ -638,7 +630,7 @@ mod tests {
             let input = InputSpan::new_extra("x[1, 2, 3]: y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with discrete limits");
 
-            match param.limits().map(oneil_ast::node::Node::node_value) {
+            match param.limits().map(Node::node_value) {
                 Some(Limits::Discrete { values }) => {
                     let expected_literals = [
                         Node::new(&AstSpan::new(2, 1, 0), Literal::number(1.0)),
@@ -743,7 +735,8 @@ mod tests {
 
         #[test]
         fn test_parse_piecewise_parameter() {
-            let input = InputSpan::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
+            let input =
+                InputSpan::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
             let (_, param) = parse(input).expect("should parse piecewise parameter");
             match param.node_value().value().node_value() {
                 ParameterValue::Piecewise(piecewise, unit) => {
@@ -1408,7 +1401,8 @@ mod tests {
 
         #[test]
         fn test_error_piecewise_missing_newline_between_parts() {
-            let input = InputSpan::new_extra("x: y = {2*z if z > 0 {0 if z <= 0\n", Config::default());
+            let input =
+                InputSpan::new_extra("x: y = {2*z if z > 0 {0 if z <= 0\n", Config::default());
             let result = parse(input);
             let expected_first_part_span = AstSpan::new(7, 13, 1);
 

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use oneil_error::{AsOneilError, Context, ErrorLocation};
-use oneil_ir::{reference::Identifier, span::IrSpan};
+use oneil_ir::{self as ir, IrSpan};
 
 use crate::error::VariableResolutionError;
 
@@ -14,7 +14,7 @@ pub enum TestResolutionError {
     /// Error indicating that an input parameter has been declared multiple times.
     DuplicateInput {
         /// The identifier of the duplicate input parameter.
-        identifier: Identifier,
+        identifier: ir::Identifier,
         /// The span of the original input parameter declaration.
         original_span: IrSpan,
         /// The span of the duplicate input parameter declaration.
@@ -38,7 +38,7 @@ impl TestResolutionError {
     /// A new `TestResolutionError` instance.
     #[must_use]
     pub const fn duplicate_input(
-        identifier: Identifier,
+        identifier: ir::Identifier,
         original_span: IrSpan,
         duplicate_span: IrSpan,
     ) -> Self {

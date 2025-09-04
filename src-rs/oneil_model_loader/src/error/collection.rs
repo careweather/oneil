@@ -23,7 +23,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use oneil_ir::reference::{Identifier, ModelPath, PythonPath};
+use oneil_ir as ir;
 
 use crate::error::{CircularDependencyError, LoadError, ParameterResolutionError};
 
@@ -45,9 +45,9 @@ use crate::error::{CircularDependencyError, LoadError, ParameterResolutionError}
 /// - **Import errors**: Python import validation errors
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelErrorMap<Ps, Py> {
-    model: HashMap<ModelPath, LoadError<Ps>>,
-    circular_dependency: HashMap<ModelPath, Vec<CircularDependencyError>>,
-    import: HashMap<PythonPath, Py>,
+    model: HashMap<ir::ModelPath, LoadError<Ps>>,
+    circular_dependency: HashMap<ir::ModelPath, Vec<CircularDependencyError>>,
+    import: HashMap<ir::PythonPath, Py>,
 }
 
 impl<Ps, Py> ModelErrorMap<Ps, Py> {
@@ -57,7 +57,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     ///
     /// A reference to the `HashMap` containing model paths and their associated load errors.
     #[must_use]
-    pub const fn get_model_errors(&self) -> &HashMap<ModelPath, LoadError<Ps>> {
+    pub const fn get_model_errors(&self) -> &HashMap<ir::ModelPath, LoadError<Ps>> {
         &self.model
     }
 
@@ -69,7 +69,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     #[must_use]
     pub const fn get_circular_dependency_errors(
         &self,
-    ) -> &HashMap<ModelPath, Vec<CircularDependencyError>> {
+    ) -> &HashMap<ir::ModelPath, Vec<CircularDependencyError>> {
         &self.circular_dependency
     }
 
@@ -79,7 +79,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     ///
     /// A reference to the `HashMap` containing Python paths and their associated import errors.
     #[must_use]
-    pub const fn get_import_errors(&self) -> &HashMap<PythonPath, Py> {
+    pub const fn get_import_errors(&self) -> &HashMap<ir::PythonPath, Py> {
         &self.import
     }
 
@@ -108,7 +108,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     ///
     /// Panics if a model error already exists for the given model path.
     /// This ensures that each model can only have one error recorded.
-    pub(crate) fn add_model_error(&mut self, model_path: ModelPath, error: LoadError<Ps>) {
+    pub(crate) fn add_model_error(&mut self, model_path: ir::ModelPath, error: LoadError<Ps>) {
         assert!(!self.model.contains_key(&model_path));
         self.model.insert(model_path, error);
     }
@@ -124,7 +124,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     /// as a model might be involved in multiple circular dependency cycles.
     pub(crate) fn add_circular_dependency_error(
         &mut self,
-        model_path: ModelPath,
+        model_path: ir::ModelPath,
         circular_dependency: CircularDependencyError,
     ) {
         self.circular_dependency
@@ -143,7 +143,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     /// # Panics
     ///
     /// Panics if an import error already exists for the given Python path.
-    pub(crate) fn add_import_error(&mut self, python_path: PythonPath, error: Py) {
+    pub(crate) fn add_import_error(&mut self, python_path: ir::PythonPath, error: Py) {
         assert!(!self.import.contains_key(&python_path));
         self.import.insert(python_path, error);
     }
@@ -156,7 +156,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     /// # Returns
     ///
     /// A set of model paths that have any type of error.
-    pub(crate) fn get_models_with_errors(&self) -> HashSet<&ModelPath> {
+    pub(crate) fn get_models_with_errors(&self) -> HashSet<&ir::ModelPath> {
         self.model
             .keys()
             .chain(self.circular_dependency.keys())
@@ -185,7 +185,7 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     /// A set of Python paths that failed to import.
     #[cfg(test)]
     #[must_use]
-    pub fn get_imports_with_errors(&self) -> HashSet<&PythonPath> {
+    pub fn get_imports_with_errors(&self) -> HashSet<&ir::PythonPath> {
         self.import.keys().collect()
     }
 }
@@ -203,13 +203,13 @@ impl<Ps, Py> Default for ModelErrorMap<Ps, Py> {
 /// what those errors are.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParameterErrorMap {
-    errors: HashMap<Identifier, Vec<ParameterResolutionError>>,
+    errors: HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
 }
 
 impl<Ps, Py, S> From<ModelErrorMap<Ps, Py>>
     for (
-        HashMap<ModelPath, (Option<LoadError<Ps>>, Option<Vec<CircularDependencyError>>), S>,
-        HashMap<PythonPath, Py, S>,
+        HashMap<ir::ModelPath, (Option<LoadError<Ps>>, Option<Vec<CircularDependencyError>>), S>,
+        HashMap<ir::PythonPath, Py, S>,
     )
 where
     S: ::std::hash::BuildHasher + Default,
@@ -263,7 +263,7 @@ impl ParameterErrorMap {
     ///
     /// Multiple errors can be added for the same parameter, as a parameter might
     /// have multiple resolution issues.
-    pub fn add_error(&mut self, identifier: Identifier, error: ParameterResolutionError) {
+    pub fn add_error(&mut self, identifier: ir::Identifier, error: ParameterResolutionError) {
         self.errors.entry(identifier).or_default().push(error);
     }
 
@@ -283,7 +283,7 @@ impl ParameterErrorMap {
     ///
     /// A set of parameter identifiers that have resolution errors.
     #[must_use]
-    pub fn get_parameters_with_errors(&self) -> HashSet<&Identifier> {
+    pub fn get_parameters_with_errors(&self) -> HashSet<&ir::Identifier> {
         self.errors.keys().collect()
     }
 }
@@ -294,7 +294,7 @@ impl Default for ParameterErrorMap {
     }
 }
 
-impl<S> From<ParameterErrorMap> for HashMap<Identifier, Vec<ParameterResolutionError>, S>
+impl<S> From<ParameterErrorMap> for HashMap<ir::Identifier, Vec<ParameterResolutionError>, S>
 where
     S: ::std::hash::BuildHasher + Default,
 {

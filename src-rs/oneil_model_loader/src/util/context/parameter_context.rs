@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use oneil_ir::{parameter::Parameter, reference::Identifier};
+use oneil_ir as ir;
 
 use crate::{
     error::ParameterResolutionError,
@@ -8,14 +8,14 @@ use crate::{
 };
 
 pub struct ParameterContext<'parameter> {
-    parameters: &'parameter HashMap<Identifier, Parameter>,
-    parameter_errors: &'parameter HashMap<Identifier, Vec<ParameterResolutionError>>,
+    parameters: &'parameter HashMap<ir::Identifier, ir::Parameter>,
+    parameter_errors: &'parameter HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
 }
 
 impl<'parameter> ParameterContext<'parameter> {
     pub fn new(
-        parameters: &'parameter HashMap<Identifier, Parameter>,
-        parameter_errors: &'parameter HashMap<Identifier, Vec<ParameterResolutionError>>,
+        parameters: &'parameter HashMap<ir::Identifier, ir::Parameter>,
+        parameter_errors: &'parameter HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
     ) -> Self {
         Self {
             parameters,
@@ -25,7 +25,7 @@ impl<'parameter> ParameterContext<'parameter> {
 
     pub fn lookup_parameter(
         &self,
-        parameter_identifier: &Identifier,
+        parameter_identifier: &ir::Identifier,
     ) -> ParameterContextResult<'parameter> {
         let lookup_result = lookup::lookup_with(
             parameter_identifier,
@@ -38,13 +38,15 @@ impl<'parameter> ParameterContext<'parameter> {
 }
 
 pub enum ParameterContextResult<'parameter> {
-    Found(&'parameter Parameter),
+    Found(&'parameter ir::Parameter),
     HasError,
     NotFound,
 }
 
-impl<'parameter> From<LookupResult<&'parameter Parameter>> for ParameterContextResult<'parameter> {
-    fn from(result: LookupResult<&'parameter Parameter>) -> Self {
+impl<'parameter> From<LookupResult<&'parameter ir::Parameter>>
+    for ParameterContextResult<'parameter>
+{
+    fn from(result: LookupResult<&'parameter ir::Parameter>) -> Self {
         match result {
             LookupResult::Found(parameter) => ParameterContextResult::Found(parameter),
             LookupResult::HasError => ParameterContextResult::HasError,

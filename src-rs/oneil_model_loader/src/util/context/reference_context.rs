@@ -1,10 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use oneil_ir::{
-    model::Model,
-    model_import::{ReferenceImport, ReferenceName},
-    reference::ModelPath,
-};
+use oneil_ir as ir;
 
 use crate::{
     error::ModelImportResolutionError,
@@ -12,19 +8,19 @@ use crate::{
 };
 
 pub struct ReferenceContext<'model, 'reference> {
-    models: &'model HashMap<ModelPath, Model>,
-    model_errors: &'model HashSet<&'model ModelPath>,
-    references: &'reference HashMap<ReferenceName, ReferenceImport>,
-    reference_errors: &'reference HashMap<ReferenceName, ModelImportResolutionError>,
+    models: &'model HashMap<ir::ModelPath, ir::Model>,
+    model_errors: &'model HashSet<&'model ir::ModelPath>,
+    references: &'reference HashMap<ir::ReferenceName, ir::ReferenceImport>,
+    reference_errors: &'reference HashMap<ir::ReferenceName, ModelImportResolutionError>,
 }
 
 impl<'model, 'reference> ReferenceContext<'model, 'reference> {
     #[must_use]
     pub const fn new(
-        models: &'model HashMap<ModelPath, Model>,
-        model_errors: &'model HashSet<&'model ModelPath>,
-        references: &'reference HashMap<ReferenceName, ReferenceImport>,
-        reference_errors: &'reference HashMap<ReferenceName, ModelImportResolutionError>,
+        models: &'model HashMap<ir::ModelPath, ir::Model>,
+        model_errors: &'model HashSet<&'model ir::ModelPath>,
+        references: &'reference HashMap<ir::ReferenceName, ir::ReferenceImport>,
+        reference_errors: &'reference HashMap<ir::ReferenceName, ModelImportResolutionError>,
     ) -> Self {
         Self {
             models,
@@ -37,7 +33,7 @@ impl<'model, 'reference> ReferenceContext<'model, 'reference> {
     #[must_use]
     pub fn lookup_reference(
         &self,
-        reference_name: &ReferenceName,
+        reference_name: &ir::ReferenceName,
     ) -> ReferenceContextResult<'model, 'reference> {
         let lookup_reference_result = lookup::lookup_with(
             reference_name,
@@ -70,9 +66,9 @@ impl<'model, 'reference> ReferenceContext<'model, 'reference> {
 }
 
 pub enum ReferenceContextResult<'model, 'reference> {
-    Found(&'model Model, &'reference ModelPath),
+    Found(&'model ir::Model, &'reference ir::ModelPath),
     ReferenceHasResolutionError,
     ReferenceNotFound,
-    ModelHasResolutionError(&'reference ModelPath),
-    ModelNotFound(&'reference ModelPath),
+    ModelHasResolutionError(&'reference ir::ModelPath),
+    ModelNotFound(&'reference ir::ModelPath),
 }

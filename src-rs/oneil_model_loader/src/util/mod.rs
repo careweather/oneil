@@ -22,7 +22,7 @@
 use std::path::Path;
 
 use oneil_ast as ast;
-use oneil_ir::span::IrSpan;
+use oneil_ir::IrSpan;
 
 pub mod builder;
 pub mod builtin_ref;
@@ -68,7 +68,7 @@ pub trait FileLoader {
     ///
     /// Returns `Err(Self::ParseError)` if the file cannot be read, parsed, or if any other
     /// parsing-related error occurs.
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::model::ModelNode, Self::ParseError>;
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError>;
 
     /// Validates a Python import.
     ///

@@ -12,11 +12,7 @@
 //! - **`UnexpectedToken`**: Found a token that wasn't expected in the current context
 //! - **`TokenError`**: Low-level tokenization errors
 //! - **`NomError`**: Internal nom parsing library errors
-use oneil_ast::{
-    AstSpan as AstSpan,
-    expression::{BinaryOp, ComparisonOp, UnaryOp},
-    unit::UnitOp,
-};
+use oneil_ast::{AstSpan, BinaryOp, ComparisonOp, UnaryOp, UnitOp};
 
 use crate::token::error::TokenErrorKind;
 

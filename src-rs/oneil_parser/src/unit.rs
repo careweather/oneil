@@ -7,12 +7,7 @@ use nom::{
     multi::many0,
 };
 
-use oneil_ast::{
-    AstSpan as AstSpan,
-    naming::Identifier,
-    node::Node,
-    unit::{UnitExponent, UnitExpr, UnitExprNode, UnitOp},
-};
+use oneil_ast::{AstSpan, Identifier, Node, UnitExponent, UnitExpr, UnitExprNode, UnitOp};
 
 use crate::{
     error::{ErrorHandlingParser, ParserError},
@@ -21,7 +16,7 @@ use crate::{
         naming::unit_identifier,
         symbol::{caret, paren_left, paren_right, slash, star},
     },
-    util::{Result, InputSpan},
+    util::{InputSpan, Result},
 };
 
 /// Parses a unit expression

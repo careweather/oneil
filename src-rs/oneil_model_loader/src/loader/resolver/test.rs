@@ -36,7 +36,7 @@
 use std::collections::HashMap;
 
 use oneil_ast as ast;
-use oneil_ir::test::{Test, TestIndex};
+use oneil_ir as ir;
 
 use crate::{
     BuiltinRef,
@@ -69,16 +69,16 @@ use crate::{
 /// All errors are collected and returned rather than causing the function to fail.
 /// Each test is processed independently, so errors in one test don't affect others.
 pub fn resolve_tests(
-    tests: Vec<&ast::test::TestNode>,
+    tests: Vec<&ast::TestNode>,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
 ) -> (
-    HashMap<TestIndex, Test>,
-    HashMap<TestIndex, Vec<TestResolutionError>>,
+    HashMap<ir::TestIndex, ir::Test>,
+    HashMap<ir::TestIndex, Vec<TestResolutionError>>,
 ) {
     let tests = tests.into_iter().enumerate().map(|(test_index, test)| {
-        let test_index = TestIndex::new(test_index);
+        let test_index = ir::TestIndex::new(test_index);
 
         let trace_level = resolve_trace_level(test.trace_level());
 
@@ -90,7 +90,7 @@ pub fn resolve_tests(
         )
         .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
-        Ok((test_index, Test::new(trace_level, test_expr)))
+        Ok((test_index, ir::Test::new(trace_level, test_expr)))
     });
 
     error::split_ok_and_errors(tests)

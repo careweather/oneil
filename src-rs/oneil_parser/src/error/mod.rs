@@ -24,12 +24,7 @@
 
 use std::fmt;
 
-use oneil_ast::{
-    AstSpan as AstSpan,
-    expression::{BinaryOpNode, ComparisonOpNode, UnaryOpNode},
-    span::SpanLike,
-    unit::UnitOpNode,
-};
+use oneil_ast::{AstSpan, BinaryOpNode, ComparisonOpNode, SpanLike, UnaryOpNode, UnitOpNode};
 use oneil_error::{AsOneilError, Context, ErrorLocation};
 
 use crate::{

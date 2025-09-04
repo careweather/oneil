@@ -15,12 +15,8 @@ use nom::{
 };
 
 use oneil_ast::{
-    AstSpan,
-    expression::{
-        BinaryOp, BinaryOpNode, ComparisonOp, Expr, ExprNode, Literal, UnaryOp, Variable,
-    },
-    naming::Identifier,
-    node::Node,
+    AstSpan, BinaryOp, BinaryOpNode, ComparisonOp, Expr, ExprNode, Identifier, Literal, Node,
+    UnaryOp, Variable,
 };
 
 use crate::{

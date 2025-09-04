@@ -51,7 +51,7 @@
 
 use std::{collections::HashSet, path::Path};
 
-use oneil_ir::{model::ModelCollection, reference::ModelPath};
+use oneil_ir as ir;
 
 use crate::util::{Stack, builder::ModelCollectionBuilder};
 
@@ -66,8 +66,8 @@ pub use crate::error::collection::ModelErrorMap;
 pub use crate::util::FileLoader;
 pub use crate::util::builtin_ref::BuiltinRef;
 
-type LoadModelOk = Box<ModelCollection>;
-type LoadModelErr<Ps, Py> = Box<(ModelCollection, ModelErrorMap<Ps, Py>)>;
+type LoadModelOk = Box<ir::ModelCollection>;
+type LoadModelErr<Ps, Py> = Box<(ir::ModelCollection, ModelErrorMap<Ps, Py>)>;
 
 /// Loads a single model and all its dependencies.
 ///
@@ -216,13 +216,13 @@ where
     let initial_model_paths: HashSet<_> = model_paths
         .iter()
         .map(AsRef::as_ref)
-        .map(ModelPath::new)
+        .map(ir::ModelPath::new)
         .collect();
 
     let builder = ModelCollectionBuilder::new(initial_model_paths);
 
     let builder = model_paths.iter().fold(builder, |builder, model_path| {
-        let model_path = ModelPath::new(model_path.as_ref());
+        let model_path = ir::ModelPath::new(model_path.as_ref());
         let mut load_stack = Stack::new();
 
         loader::load_model(

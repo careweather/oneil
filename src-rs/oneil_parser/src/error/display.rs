@@ -1,3 +1,5 @@
+use oneil_ast::{BinaryOp, ComparisonOp, UnaryOp, UnitOp};
+
 use crate::{
     error::reason::{
         DeclKind, ExpectKind, ExprKind, ImportKind, IncompleteKind, ParameterKind,
@@ -73,36 +75,36 @@ impl fmt::Display for ExprKind {
         match self {
             Self::ComparisonOpMissingSecondOperand { operator } => {
                 let operator_str = match operator {
-                    oneil_ast::expression::ComparisonOp::LessThan => "<",
-                    oneil_ast::expression::ComparisonOp::LessThanEq => "<=",
-                    oneil_ast::expression::ComparisonOp::GreaterThan => ">",
-                    oneil_ast::expression::ComparisonOp::GreaterThanEq => ">=",
-                    oneil_ast::expression::ComparisonOp::Eq => "==",
-                    oneil_ast::expression::ComparisonOp::NotEq => "!=",
+                    ComparisonOp::LessThan => "<",
+                    ComparisonOp::LessThanEq => "<=",
+                    ComparisonOp::GreaterThan => ">",
+                    ComparisonOp::GreaterThanEq => ">=",
+                    ComparisonOp::Eq => "==",
+                    ComparisonOp::NotEq => "!=",
                 };
                 write!(f, "expected operand after `{operator_str}`")
             }
             Self::BinaryOpMissingSecondOperand { operator } => {
                 let operator_str = match operator {
-                    oneil_ast::expression::BinaryOp::Add => "+",
-                    oneil_ast::expression::BinaryOp::Sub => "-",
-                    oneil_ast::expression::BinaryOp::TrueSub => "--",
-                    oneil_ast::expression::BinaryOp::Mul => "*",
-                    oneil_ast::expression::BinaryOp::Div => "/",
-                    oneil_ast::expression::BinaryOp::TrueDiv => "//",
-                    oneil_ast::expression::BinaryOp::Mod => "%",
-                    oneil_ast::expression::BinaryOp::Pow => "^",
-                    oneil_ast::expression::BinaryOp::And => "&&",
-                    oneil_ast::expression::BinaryOp::Or => "||",
-                    oneil_ast::expression::BinaryOp::MinMax => "|",
+                    BinaryOp::Add => "+",
+                    BinaryOp::Sub => "-",
+                    BinaryOp::TrueSub => "--",
+                    BinaryOp::Mul => "*",
+                    BinaryOp::Div => "/",
+                    BinaryOp::TrueDiv => "//",
+                    BinaryOp::Mod => "%",
+                    BinaryOp::Pow => "^",
+                    BinaryOp::And => "&&",
+                    BinaryOp::Or => "||",
+                    BinaryOp::MinMax => "|",
                 };
                 write!(f, "expected operand after `{operator_str}`")
             }
             Self::ParenMissingExpr => write!(f, "expected expression inside parentheses"),
             Self::UnaryOpMissingOperand { operator } => {
                 let operator_str = match operator {
-                    oneil_ast::expression::UnaryOp::Neg => "-",
-                    oneil_ast::expression::UnaryOp::Not => "!",
+                    UnaryOp::Neg => "-",
+                    UnaryOp::Not => "!",
                 };
                 write!(f, "expected operand after `{operator_str}`")
             }
@@ -158,8 +160,8 @@ impl fmt::Display for UnitKind {
         match self {
             Self::MissingSecondTerm { operator } => {
                 let operator_str = match operator {
-                    oneil_ast::unit::UnitOp::Multiply => "*",
-                    oneil_ast::unit::UnitOp::Divide => "/",
+                    UnitOp::Multiply => "*",
+                    UnitOp::Divide => "/",
                 };
                 write!(f, "expected second operand after `{operator_str}`")
             }

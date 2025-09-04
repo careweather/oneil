@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use oneil_ir::reference::Identifier;
+use oneil_ir as ir;
 
 use crate::BuiltinRef;
 
@@ -37,11 +37,11 @@ impl TestBuiltinRef {
 }
 
 impl BuiltinRef for TestBuiltinRef {
-    fn has_builtin_value(&self, identifier: &Identifier) -> bool {
+    fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool {
         self.builtin_variables.contains(identifier.as_str())
     }
 
-    fn has_builtin_function(&self, identifier: &Identifier) -> bool {
+    fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
         self.builtin_functions.contains(identifier.as_str())
     }
 }

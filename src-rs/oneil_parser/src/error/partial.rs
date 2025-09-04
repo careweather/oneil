@@ -25,6 +25,7 @@
 //! scenarios.
 
 use nom::error::ParseError;
+use oneil_ast::Model;
 
 use crate::error::ParserError;
 
@@ -111,7 +112,7 @@ impl<T: CanBeEmpty> CanBeEmpty for Box<T> {
 /// Implementation for `Model` - returns an empty model
 ///
 /// An empty model represents no successfully parsed model.
-impl CanBeEmpty for oneil_ast::model::Model {
+impl CanBeEmpty for Model {
     fn empty() -> Self {
         Self::new(None, vec![], vec![])
     }

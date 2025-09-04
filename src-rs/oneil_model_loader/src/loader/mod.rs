@@ -12,7 +12,7 @@
 //!
 
 use oneil_ast as ast;
-use oneil_ir::{model::Model, reference::ModelPath};
+use oneil_ir as ir;
 
 use crate::{
     BuiltinRef,
@@ -70,10 +70,10 @@ mod resolver;
 /// in the builder. If a model has already been visited, it returns early without
 /// re-processing the model.
 pub fn load_model<F>(
-    model_path: ModelPath,
+    model_path: ir::ModelPath,
     mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
     builtin_ref: &impl BuiltinRef,
-    load_stack: &mut Stack<ModelPath>,
+    load_stack: &mut Stack<ir::ModelPath>,
     file_loader: &F,
 ) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
 where
@@ -163,7 +163,7 @@ where
     }
 
     // build model
-    let model = Model::new(python_imports, submodels, references, parameters, tests);
+    let model = ir::Model::new(python_imports, submodels, references, parameters, tests);
 
     // add model to builder
     builder.add_model(model_path, model);
@@ -197,12 +197,12 @@ where
 ///
 /// This separation is necessary for the different processing steps in model loading.
 fn split_model_ast(
-    model_ast: &ast::model::ModelNode,
+    model_ast: &ast::ModelNode,
 ) -> (
-    Vec<&ast::declaration::ImportNode>,
-    Vec<&ast::declaration::UseModelNode>,
-    Vec<&ast::parameter::ParameterNode>,
-    Vec<&ast::test::TestNode>,
+    Vec<&ast::ImportNode>,
+    Vec<&ast::UseModelNode>,
+    Vec<&ast::ParameterNode>,
+    Vec<&ast::TestNode>,
 ) {
     let mut imports = vec![];
     let mut use_models = vec![];
@@ -211,20 +211,20 @@ fn split_model_ast(
 
     for decl in model_ast.decls() {
         match decl.node_value() {
-            ast::declaration::Decl::Import(import) => imports.push(import),
-            ast::declaration::Decl::UseModel(use_model) => use_models.push(use_model),
-            ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter),
-            ast::declaration::Decl::Test(test) => tests.push(test),
+            ast::Decl::Import(import) => imports.push(import),
+            ast::Decl::UseModel(use_model) => use_models.push(use_model),
+            ast::Decl::Parameter(parameter) => parameters.push(parameter),
+            ast::Decl::Test(test) => tests.push(test),
         }
     }
 
     for section in model_ast.sections() {
         for decl in section.decls() {
             match decl.node_value() {
-                ast::declaration::Decl::Import(import) => imports.push(import),
-                ast::declaration::Decl::UseModel(use_model) => use_models.push(use_model),
-                ast::declaration::Decl::Parameter(parameter) => parameters.push(parameter),
-                ast::declaration::Decl::Test(test) => tests.push(test),
+                ast::Decl::Import(import) => imports.push(import),
+                ast::Decl::UseModel(use_model) => use_models.push(use_model),
+                ast::Decl::Parameter(parameter) => parameters.push(parameter),
+                ast::Decl::Test(test) => tests.push(test),
             }
         }
     }
@@ -261,11 +261,11 @@ fn split_model_ast(
 /// Use model paths are resolved relative to the current model path using
 /// `model_path.get_sibling_path(&use_model.model_name)`.
 fn load_use_models<F>(
-    model_path: &ModelPath,
+    model_path: &ir::ModelPath,
     builtin_ref: &impl BuiltinRef,
-    load_stack: &mut Stack<ModelPath>,
+    load_stack: &mut Stack<ir::ModelPath>,
     file_loader: &F,
-    use_models: &[&ast::declaration::UseModelNode],
+    use_models: &[&ast::UseModelNode],
     builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
 ) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
 where
@@ -277,7 +277,7 @@ where
         // get the use model path
         let use_model_relative_path = use_model.get_model_relative_path();
         let use_model_path = model_path.get_sibling_path(&use_model_relative_path);
-        let use_model_path = ModelPath::new(use_model_path);
+        let use_model_path = ir::ModelPath::new(use_model_path);
 
         // load the use model (and its submodels)
         load_model(
@@ -296,8 +296,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use oneil_ast::declaration::ModelKind;
-    use oneil_ir::model_import::SubmodelName;
+    use oneil_ast::{self as ast, AstSpan};
+    use oneil_ir::{self as ir, IrSpan};
 
     use super::*;
     use crate::{
@@ -307,28 +307,16 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use std::path::PathBuf;
 
-    // re-export ast types for testing convenience
-    mod ast {
-        pub use oneil_ast::{
-            AstSpan,
-            declaration::{Decl, ModelInfo, ModelKind, UseModel},
-            model::{Model, ModelNode, Section, SectionHeader},
-            naming::{Identifier, Label},
-            node::Node,
-        };
-    }
-
     mod helper {
-        use super::ast;
-
+        use super::*;
         use crate::test::TestBuiltinRef;
 
-        pub fn unimportant_span() -> ast::AstSpan {
-            ast::AstSpan::new(0, 0, 0)
+        pub fn unimportant_span() -> AstSpan {
+            AstSpan::new(0, 0, 0)
         }
 
-        pub fn span_from_str(s: &str) -> ast::AstSpan {
-            ast::AstSpan::new(0, s.len(), 0)
+        pub fn span_from_str(s: &str) -> AstSpan {
+            AstSpan::new(0, s.len(), 0)
         }
 
         /// Creates an empty test model
@@ -421,7 +409,7 @@ mod tests {
     #[test]
     fn test_load_model_success() {
         // create initial context
-        let model_path = ModelPath::new("test");
+        let model_path = ir::ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
         let builtin_ref = helper::create_test_builtin_ref();
@@ -454,7 +442,7 @@ mod tests {
     #[test]
     fn test_load_model_parse_error() {
         // create initial context
-        let model_path = ModelPath::new("nonexistent");
+        let model_path = ir::ModelPath::new("nonexistent");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
         let builtin_ref = helper::create_test_builtin_ref();
@@ -486,7 +474,7 @@ mod tests {
     #[test]
     fn test_load_model_circular_dependency() {
         // create initial context
-        let model_path = ModelPath::new("main");
+        let model_path = ir::ModelPath::new("main");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
         let builtin_ref = helper::create_test_builtin_ref();
@@ -513,16 +501,16 @@ mod tests {
         let errors = result.get_model_errors();
         assert_eq!(errors.len(), 2);
 
-        let main_errors = errors.get(&ModelPath::new("main"));
+        let main_errors = errors.get(&ir::ModelPath::new("main"));
         assert_eq!(
             main_errors,
             Some(&LoadError::resolution_errors(ResolutionErrors::new(
                 HashMap::new(),
                 HashMap::from([(
-                    SubmodelName::new("sub".to_string()),
+                    ir::SubmodelName::new("sub".to_string()),
                     ModelImportResolutionError::model_has_error(
-                        ModelPath::new("sub"),
-                        oneil_ir::span::IrSpan::new(0, 3)
+                        ir::ModelPath::new("sub"),
+                        ir::IrSpan::new(0, 3)
                     )
                 )]),
                 HashMap::new(),
@@ -531,16 +519,16 @@ mod tests {
             )))
         );
 
-        let sub_errors = errors.get(&ModelPath::new("sub"));
+        let sub_errors = errors.get(&ir::ModelPath::new("sub"));
         assert_eq!(
             sub_errors,
             Some(&LoadError::resolution_errors(ResolutionErrors::new(
                 HashMap::new(),
                 HashMap::from([(
-                    SubmodelName::new("main".to_string()),
+                    ir::SubmodelName::new("main".to_string()),
                     ModelImportResolutionError::model_has_error(
-                        ModelPath::new("main"),
-                        oneil_ir::span::IrSpan::new(0, 4)
+                        ir::ModelPath::new("main"),
+                        IrSpan::new(0, 4)
                     )
                 )]),
                 HashMap::new(),
@@ -553,7 +541,7 @@ mod tests {
         let circular_dependency_errors = result.get_circular_dependency_errors();
         assert_eq!(circular_dependency_errors.len(), 1);
 
-        let circular_dependency_error = circular_dependency_errors.get(&ModelPath::new("main"));
+        let circular_dependency_error = circular_dependency_errors.get(&ir::ModelPath::new("main"));
         assert!(circular_dependency_error.is_some());
 
         let circular_dependency_error =
@@ -562,23 +550,23 @@ mod tests {
         assert_eq!(
             circular_dependency_error[0],
             CircularDependencyError::new(vec![
-                ModelPath::new("main"),
-                ModelPath::new("sub"),
-                ModelPath::new("main"),
+                ir::ModelPath::new("main"),
+                ir::ModelPath::new("sub"),
+                ir::ModelPath::new("main"),
             ])
         );
 
         // check the models
         let models = result.get_models();
         assert_eq!(models.len(), 2);
-        assert!(models.contains_key(&ModelPath::new("main")));
-        assert!(models.contains_key(&ModelPath::new("sub")));
+        assert!(models.contains_key(&ir::ModelPath::new("main")));
+        assert!(models.contains_key(&ir::ModelPath::new("sub")));
     }
 
     #[test]
     fn test_load_model_already_visited() {
         // create initial context
-        let model_path = ModelPath::new("test");
+        let model_path = ir::ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
         let mut builder = ModelCollectionBuilder::new(initial_models);
         let builtin_ref = helper::create_test_builtin_ref();
@@ -613,7 +601,7 @@ mod tests {
     #[test]
     fn test_load_use_models_empty() {
         // create initial context
-        let model_path = ModelPath::new("parent");
+        let model_path = ir::ModelPath::new("parent");
         let mut load_stack = Stack::new();
         let builtin_ref = helper::create_test_builtin_ref();
         let file_loader = TestFileParser::empty();
@@ -642,7 +630,7 @@ mod tests {
     #[test]
     fn test_load_use_models_with_existing_models() {
         // create initial context
-        let model_path = ModelPath::new("parent");
+        let model_path = ir::ModelPath::new("parent");
         let mut load_stack = Stack::new();
         let builder = ModelCollectionBuilder::new(HashSet::new());
         let file_loader = TestFileParser::new(vec![
@@ -667,12 +655,12 @@ mod tests {
             {
                 let model_info = ast::ModelInfo::new(child1_identifier_node, vec![], None);
                 let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-                ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel)
+                ast::UseModel::new(vec![], model_info_node, None, ast::ModelKind::Submodel)
             },
             {
                 let model_info = ast::ModelInfo::new(child2_identifier_node, vec![], None);
                 let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-                ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel)
+                ast::UseModel::new(vec![], model_info_node, None, ast::ModelKind::Submodel)
             },
         ];
         let use_models = use_models
@@ -700,14 +688,14 @@ mod tests {
         // check the models
         let models = result.get_models();
         assert_eq!(models.len(), 2);
-        assert!(models.contains_key(&ModelPath::new("child1")));
-        assert!(models.contains_key(&ModelPath::new("child2")));
+        assert!(models.contains_key(&ir::ModelPath::new("child1")));
+        assert!(models.contains_key(&ir::ModelPath::new("child2")));
     }
 
     #[test]
     fn test_load_use_models_with_parse_errors() {
         // create initial context
-        let model_path = ModelPath::new("parent");
+        let model_path = ir::ModelPath::new("parent");
         let builtin_ref = helper::create_test_builtin_ref();
         let mut load_stack = Stack::new();
         let file_loader = TestFileParser::empty(); // No models available
@@ -719,7 +707,7 @@ mod tests {
         let use_models = vec![{
             let model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
             let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-            ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel)
+            ast::UseModel::new(vec![], model_info_node, None, ast::ModelKind::Submodel)
         }];
         let use_models = use_models
             .into_iter()
@@ -743,7 +731,7 @@ mod tests {
         let errors = result.get_model_errors();
         assert_eq!(errors.len(), 1);
 
-        let error = errors.get(&ModelPath::new("nonexistent"));
+        let error = errors.get(&ir::ModelPath::new("nonexistent"));
         assert_eq!(error, Some(&LoadError::ParseError(())));
 
         // check the models
@@ -754,7 +742,7 @@ mod tests {
     #[test]
     fn test_load_model_complex_dependency_chain() {
         // create initial context
-        let model_path = ModelPath::new("root");
+        let model_path = ir::ModelPath::new("root");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
         let builtin_ref = helper::create_test_builtin_ref();
@@ -787,15 +775,15 @@ mod tests {
         // check the models
         let models = result.get_models();
         assert_eq!(models.len(), 3);
-        assert!(models.contains_key(&ModelPath::new("root")));
-        assert!(models.contains_key(&ModelPath::new("level1")));
-        assert!(models.contains_key(&ModelPath::new("level2")));
+        assert!(models.contains_key(&ir::ModelPath::new("root")));
+        assert!(models.contains_key(&ir::ModelPath::new("level1")));
+        assert!(models.contains_key(&ir::ModelPath::new("level2")));
     }
 
     #[test]
     fn test_load_model_with_sections() {
         // create initial context
-        let model_path = ModelPath::new("test");
+        let model_path = ir::ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
         let builder = ModelCollectionBuilder::new(initial_models);
         let builtin_ref = helper::create_test_builtin_ref();
@@ -816,7 +804,7 @@ mod tests {
             ast::Node::new(&helper::span_from_str("submodel"), use_model_name);
         let model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
         let model_info_node = ast::Node::new(&helper::unimportant_span(), model_info);
-        let use_model = ast::UseModel::new(vec![], model_info_node, None, ModelKind::Submodel);
+        let use_model = ast::UseModel::new(vec![], model_info_node, None, ast::ModelKind::Submodel);
         let use_model_node = ast::Node::new(&helper::unimportant_span(), use_model);
         let use_model_decl = ast::Node::new(
             &helper::unimportant_span(),
@@ -852,7 +840,7 @@ mod tests {
         // check the models
         let models = result.get_models();
         assert_eq!(models.len(), 2);
-        assert!(models.contains_key(&ModelPath::new("test")));
-        assert!(models.contains_key(&ModelPath::new("submodel")));
+        assert!(models.contains_key(&ir::ModelPath::new("test")));
+        assert!(models.contains_key(&ir::ModelPath::new("submodel")));
     }
 }

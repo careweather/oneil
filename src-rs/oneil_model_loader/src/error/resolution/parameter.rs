@@ -1,7 +1,7 @@
 use std::fmt;
 
 use oneil_error::{AsOneilError, Context, ErrorLocation};
-use oneil_ir::{reference::Identifier, span::IrSpan};
+use oneil_ir::{self as ir, IrSpan};
 
 use crate::error::VariableResolutionError;
 
@@ -15,7 +15,7 @@ pub enum ParameterResolutionError {
     /// A circular dependency was detected during parameter resolution.
     CircularDependency {
         /// The list of parameter identifiers that form the circular dependency.
-        circular_dependency: Vec<Identifier>,
+        circular_dependency: Vec<ir::Identifier>,
         /// The span of the parameter that caused the circular dependency.
         reference_span: IrSpan,
     },
@@ -24,7 +24,7 @@ pub enum ParameterResolutionError {
     /// A duplicate parameter was detected.
     DuplicateParameter {
         /// The identifier of the parameter.
-        identifier: Identifier,
+        identifier: ir::Identifier,
         /// The span of the original parameter.
         original_span: IrSpan,
         /// The span of the duplicate parameter.
@@ -44,7 +44,7 @@ impl ParameterResolutionError {
     /// A new `ParameterResolutionError::CircularDependency` variant.
     #[must_use]
     pub const fn circular_dependency(
-        circular_dependency: Vec<Identifier>,
+        circular_dependency: Vec<ir::Identifier>,
         reference_span: IrSpan,
     ) -> Self {
         Self::CircularDependency {
@@ -77,7 +77,7 @@ impl ParameterResolutionError {
     /// A new `ParameterResolutionError::DuplicateParameter` variant.
     #[must_use]
     pub const fn duplicate_parameter(
-        identifier: Identifier,
+        identifier: ir::Identifier,
         original_span: IrSpan,
         duplicate_span: IrSpan,
     ) -> Self {
@@ -98,7 +98,7 @@ impl fmt::Display for ParameterResolutionError {
             } => {
                 let dependency_chain = circular_dependency
                     .iter()
-                    .map(Identifier::as_str)
+                    .map(ir::Identifier::as_str)
                     .collect::<Vec<_>>()
                     .join(" -> ");
                 write!(

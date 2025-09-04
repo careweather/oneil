@@ -21,7 +21,7 @@ use std::io::{self, Write};
 
 use oneil_ast::Model as AstModel;
 use oneil_error::OneilError;
-use oneil_ir::model::ModelCollection as IrModelCollection;
+use oneil_ir::ModelCollection as IrModelCollection;
 
 /// Main printer for formatting and displaying Oneil CLI output
 ///

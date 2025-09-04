@@ -59,18 +59,8 @@
 
 use std::collections::HashMap;
 
-use oneil_ast::{
-    self as ast,
-    declaration::{ModelInfo, ModelKind},
-};
-use oneil_ir::{
-    model_import::{
-        ReferenceMap, ReferenceName, ReferenceNameWithSpan, SubmodelImport, SubmodelMap,
-        SubmodelName, SubmodelNameWithSpan,
-    },
-    reference::ModelPath,
-    span::IrSpan,
-};
+use oneil_ast as ast;
+use oneil_ir::{self as ir, IrSpan};
 
 use crate::{
     error::ModelImportResolutionError,
@@ -107,14 +97,14 @@ use crate::{
 ///
 /// All errors are collected and returned rather than causing the function to fail.
 pub fn resolve_model_imports(
-    use_models: Vec<&ast::declaration::UseModelNode>,
-    model_path: &ModelPath,
+    use_models: Vec<&ast::UseModelNode>,
+    model_path: &ir::ModelPath,
     context: &ModelContext<'_>,
 ) -> (
-    SubmodelMap,
-    ReferenceMap,
-    HashMap<SubmodelName, ModelImportResolutionError>,
-    HashMap<ReferenceName, ModelImportResolutionError>,
+    ir::SubmodelMap,
+    ir::ReferenceMap,
+    HashMap<ir::SubmodelName, ModelImportResolutionError>,
+    HashMap<ir::ReferenceName, ModelImportResolutionError>,
 ) {
     let mut builder = ModelImportsBuilder::new();
 
@@ -124,7 +114,7 @@ pub fn resolve_model_imports(
         let reference_name = get_reference_name(use_model.model_info());
         let submodel_name = get_submodel_name(use_model.model_info());
 
-        let is_submodel = use_model.model_kind() == ModelKind::Submodel;
+        let is_submodel = use_model.model_kind() == ast::ModelKind::Submodel;
 
         // check for duplicates
         let maybe_reference_duplicate_error =
@@ -250,28 +240,25 @@ pub fn resolve_model_imports(
     builder.into_submodels_and_references_and_resolution_errors()
 }
 
-fn get_submodel_name(model_info: &ModelInfo) -> SubmodelNameWithSpan {
+fn get_submodel_name(model_info: &ast::ModelInfo) -> ir::SubmodelNameWithSpan {
     let model_name = model_info.get_model_name();
-    let name = SubmodelName::new(model_name.as_str().to_string());
+    let name = ir::SubmodelName::new(model_name.as_str().to_string());
     let span = get_span_from_ast_span(model_name.node_span());
-    SubmodelNameWithSpan::new(name, span)
+    ir::SubmodelNameWithSpan::new(name, span)
 }
 
-fn get_reference_name(model_info: &ModelInfo) -> ReferenceNameWithSpan {
+fn get_reference_name(model_info: &ast::ModelInfo) -> ir::ReferenceNameWithSpan {
     let model_name = model_info.get_alias();
-    let name = ReferenceName::new(model_name.as_str().to_string());
+    let name = ir::ReferenceName::new(model_name.as_str().to_string());
     let span = get_span_from_ast_span(model_name.node_span());
-    ReferenceNameWithSpan::new(name, span)
+    ir::ReferenceNameWithSpan::new(name, span)
 }
 
-fn calc_import_path(
-    model_path: &ModelPath,
-    use_model: &oneil_ast::node::Node<oneil_ast::declaration::UseModel>,
-) -> ModelPath {
+fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -> ir::ModelPath {
     let use_model_relative_path = use_model.get_model_relative_path();
     let use_model_path = model_path.get_sibling_path(&use_model_relative_path);
 
-    ModelPath::new(use_model_path)
+    ir::ModelPath::new(use_model_path)
 }
 
 /// Recursively resolves a model path by traversing subcomponents.
@@ -316,11 +303,11 @@ fn calc_import_path(
     reason = "panic enforces a function invariant"
 )]
 fn resolve_model_path(
-    model_path: ModelPath,
+    model_path: ir::ModelPath,
     model_name_span: IrSpan,
-    model_subcomponents: &[ast::naming::IdentifierNode],
+    model_subcomponents: &[ast::IdentifierNode],
     context: &ModelContext<'_>,
-) -> Result<ModelPath, ModelImportResolutionError> {
+) -> Result<ir::ModelPath, ModelImportResolutionError> {
     // if the model that we are trying to resolve has had an error, this
     // operation should fail
     let model = match context.lookup_model(&model_path) {
@@ -339,11 +326,11 @@ fn resolve_model_path(
         return Ok(model_path);
     }
 
-    let submodel_name = SubmodelName::new(model_subcomponents[0].as_str().to_string());
+    let submodel_name = ir::SubmodelName::new(model_subcomponents[0].as_str().to_string());
     let submodel_name_span = get_span_from_ast_span(model_subcomponents[0].node_span());
     let submodel_path = model
         .get_submodel(&submodel_name)
-        .map(SubmodelImport::path)
+        .map(ir::SubmodelImport::path)
         .ok_or_else(|| {
             ModelImportResolutionError::undefined_submodel_in_submodel(
                 model_path,

@@ -51,7 +51,7 @@
 //! fail immediately.
 
 use oneil_ast as ast;
-use oneil_ir::{expr::Expr, reference::Identifier, span::WithSpan};
+use oneil_ir::{self as ir, IrSpan};
 
 use crate::{
     BuiltinRef,
@@ -92,11 +92,11 @@ use crate::{
 /// All errors are collected and returned rather than causing the function to fail
 /// immediately.
 pub fn resolve_expr(
-    value: &ast::expression::ExprNode,
+    value: &ast::ExprNode,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+) -> Result<ir::ExprWithSpan, Vec<VariableResolutionError>> {
     let value_span = get_span_from_ast_span(value.node_span());
     match value.node_value() {
         ast::Expr::ComparisonOp {
@@ -170,15 +170,15 @@ pub fn resolve_expr(
 ///
 /// The resolved comparison expression or error collection
 fn resolve_comparison_expression(
-    op: &ast::expression::ComparisonOpNode,
-    left: &ast::expression::ExprNode,
-    right: &ast::expression::ExprNode,
-    rest_chained: &[(ast::expression::ComparisonOpNode, ast::expression::ExprNode)],
-    value_span: oneil_ir::span::IrSpan,
+    op: &ast::ComparisonOpNode,
+    left: &ast::ExprNode,
+    right: &ast::ExprNode,
+    rest_chained: &[(ast::ComparisonOpNode, ast::ExprNode)],
+    value_span: IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+) -> Result<ir::ExprWithSpan, Vec<VariableResolutionError>> {
     let left = resolve_expr(left, builtin_ref, reference_context, parameter_context);
     let right = resolve_expr(right, builtin_ref, reference_context, parameter_context);
     let op_with_span = resolve_comparison_op(op);
@@ -195,8 +195,8 @@ fn resolve_comparison_expression(
     let ((left, right), rest_chained) =
         error::combine_errors(left_right_result, rest_chained_result)?;
 
-    let expr = Expr::comparison_op(op_with_span, left, right, rest_chained);
-    Ok(WithSpan::new(expr, value_span))
+    let expr = ir::Expr::comparison_op(op_with_span, left, right, rest_chained);
+    Ok(ir::WithSpan::new(expr, value_span))
 }
 
 /// Resolves a binary operation expression.
@@ -216,22 +216,22 @@ fn resolve_comparison_expression(
 ///
 /// The resolved binary expression or error collection
 fn resolve_binary_expression(
-    op: &ast::expression::BinaryOpNode,
-    left: &ast::expression::ExprNode,
-    right: &ast::expression::ExprNode,
-    value_span: oneil_ir::span::IrSpan,
+    op: &ast::BinaryOpNode,
+    left: &ast::ExprNode,
+    right: &ast::ExprNode,
+    value_span: IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+) -> Result<ir::ExprWithSpan, Vec<VariableResolutionError>> {
     let left = resolve_expr(left, builtin_ref, reference_context, parameter_context);
     let right = resolve_expr(right, builtin_ref, reference_context, parameter_context);
     let op_with_span = resolve_binary_op(op);
 
     let (left, right) = error::combine_errors(left, right)?;
 
-    let expr = Expr::binary_op(op_with_span, left, right);
-    Ok(WithSpan::new(expr, value_span))
+    let expr = ir::Expr::binary_op(op_with_span, left, right);
+    Ok(ir::WithSpan::new(expr, value_span))
 }
 
 /// Resolves a unary operation expression.
@@ -250,19 +250,19 @@ fn resolve_binary_expression(
 ///
 /// The resolved unary expression or error collection
 fn resolve_unary_expression(
-    op: &ast::expression::UnaryOpNode,
-    expr: &ast::expression::ExprNode,
-    value_span: oneil_ir::span::IrSpan,
+    op: &ast::UnaryOpNode,
+    expr: &ast::ExprNode,
+    value_span: IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+) -> Result<ir::ExprWithSpan, Vec<VariableResolutionError>> {
     let expr = resolve_expr(expr, builtin_ref, reference_context, parameter_context);
     let op_with_span = resolve_unary_op(op);
 
     match expr {
-        Ok(expr) => Ok(WithSpan::new(
-            Expr::unary_op(op_with_span, expr),
+        Ok(expr) => Ok(ir::WithSpan::new(
+            ir::Expr::unary_op(op_with_span, expr),
             value_span,
         )),
         Err(errors) => Err(errors),
@@ -285,13 +285,13 @@ fn resolve_unary_expression(
 ///
 /// The resolved function call expression or error collection
 fn resolve_function_call_expression(
-    name: &ast::naming::IdentifierNode,
-    args: &[ast::expression::ExprNode],
-    value_span: oneil_ir::span::IrSpan,
+    name: &ast::IdentifierNode,
+    args: &[ast::ExprNode],
+    value_span: IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+) -> Result<ir::ExprWithSpan, Vec<VariableResolutionError>> {
     let name_with_span = resolve_function_name(name, builtin_ref);
     let args = args
         .iter()
@@ -299,8 +299,8 @@ fn resolve_function_call_expression(
 
     let args = error::combine_error_list(args)?;
 
-    let expr = Expr::function_call(name_with_span, args);
-    Ok(WithSpan::new(expr, value_span))
+    let expr = ir::Expr::function_call(name_with_span, args);
+    Ok(ir::WithSpan::new(expr, value_span))
 }
 
 /// Resolves a variable expression.
@@ -317,11 +317,11 @@ fn resolve_function_call_expression(
 ///
 /// The resolved variable expression or error collection
 fn resolve_variable_expression(
-    variable: &ast::expression::VariableNode,
+    variable: &ast::VariableNode,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+) -> Result<ir::ExprWithSpan, Vec<VariableResolutionError>> {
     resolve_variable(variable, builtin_ref, reference_context, parameter_context)
         .map_err(|error| vec![error])
 }
@@ -337,12 +337,12 @@ fn resolve_variable_expression(
 ///
 /// The resolved literal expression
 fn resolve_literal_expression(
-    literal: &ast::expression::LiteralNode,
-    value_span: oneil_ir::span::IrSpan,
-) -> oneil_ir::span::WithSpan<oneil_ir::expr::Expr> {
+    literal: &ast::LiteralNode,
+    value_span: IrSpan,
+) -> ir::WithSpan<ir::Expr> {
     let literal = resolve_literal(literal);
-    let expr = Expr::literal(literal);
-    WithSpan::new(expr, value_span)
+    let expr = ir::Expr::literal(literal);
+    ir::WithSpan::new(expr, value_span)
 }
 
 /// Resolves a parenthesized expression.
@@ -359,11 +359,11 @@ fn resolve_literal_expression(
 ///
 /// The resolved expression (parentheses are removed during resolution)
 fn resolve_parenthesized_expression(
-    expr: &ast::expression::ExprNode,
+    expr: &ast::ExprNode,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<oneil_ir::expr::ExprWithSpan, Vec<VariableResolutionError>> {
+) -> Result<ir::ExprWithSpan, Vec<VariableResolutionError>> {
     resolve_expr(expr, builtin_ref, reference_context, parameter_context)
 }
 
@@ -379,19 +379,17 @@ fn resolve_parenthesized_expression(
 /// # Returns
 ///
 /// The corresponding model comparison operation
-fn resolve_comparison_op(
-    op: &ast::expression::ComparisonOpNode,
-) -> WithSpan<oneil_ir::expr::ComparisonOp> {
+fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::WithSpan<ir::ComparisonOp> {
     let op_value = match op.node_value() {
-        ast::expression::ComparisonOp::LessThan => oneil_ir::expr::ComparisonOp::LessThan,
-        ast::expression::ComparisonOp::LessThanEq => oneil_ir::expr::ComparisonOp::LessThanEq,
-        ast::expression::ComparisonOp::GreaterThan => oneil_ir::expr::ComparisonOp::GreaterThan,
-        ast::expression::ComparisonOp::GreaterThanEq => oneil_ir::expr::ComparisonOp::GreaterThanEq,
-        ast::expression::ComparisonOp::Eq => oneil_ir::expr::ComparisonOp::Eq,
-        ast::expression::ComparisonOp::NotEq => oneil_ir::expr::ComparisonOp::NotEq,
+        ast::ComparisonOp::LessThan => ir::ComparisonOp::LessThan,
+        ast::ComparisonOp::LessThanEq => ir::ComparisonOp::LessThanEq,
+        ast::ComparisonOp::GreaterThan => ir::ComparisonOp::GreaterThan,
+        ast::ComparisonOp::GreaterThanEq => ir::ComparisonOp::GreaterThanEq,
+        ast::ComparisonOp::Eq => ir::ComparisonOp::Eq,
+        ast::ComparisonOp::NotEq => ir::ComparisonOp::NotEq,
     };
     let op_span = get_span_from_ast_span(op.node_span());
-    WithSpan::new(op_value, op_span)
+    ir::WithSpan::new(op_value, op_span)
 }
 
 /// Converts an AST binary operation to a model binary operation.
@@ -406,22 +404,22 @@ fn resolve_comparison_op(
 /// # Returns
 ///
 /// The corresponding model binary operation
-fn resolve_binary_op(op: &ast::expression::BinaryOpNode) -> WithSpan<oneil_ir::expr::BinaryOp> {
+fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::WithSpan<ir::BinaryOp> {
     let op_value = match op.node_value() {
-        ast::expression::BinaryOp::Add => oneil_ir::expr::BinaryOp::Add,
-        ast::expression::BinaryOp::Sub => oneil_ir::expr::BinaryOp::Sub,
-        ast::expression::BinaryOp::TrueSub => oneil_ir::expr::BinaryOp::TrueSub,
-        ast::expression::BinaryOp::Mul => oneil_ir::expr::BinaryOp::Mul,
-        ast::expression::BinaryOp::Div => oneil_ir::expr::BinaryOp::Div,
-        ast::expression::BinaryOp::TrueDiv => oneil_ir::expr::BinaryOp::TrueDiv,
-        ast::expression::BinaryOp::Mod => oneil_ir::expr::BinaryOp::Mod,
-        ast::expression::BinaryOp::Pow => oneil_ir::expr::BinaryOp::Pow,
-        ast::expression::BinaryOp::And => oneil_ir::expr::BinaryOp::And,
-        ast::expression::BinaryOp::Or => oneil_ir::expr::BinaryOp::Or,
-        ast::expression::BinaryOp::MinMax => oneil_ir::expr::BinaryOp::MinMax,
+        ast::BinaryOp::Add => ir::BinaryOp::Add,
+        ast::BinaryOp::Sub => ir::BinaryOp::Sub,
+        ast::BinaryOp::TrueSub => ir::BinaryOp::TrueSub,
+        ast::BinaryOp::Mul => ir::BinaryOp::Mul,
+        ast::BinaryOp::Div => ir::BinaryOp::Div,
+        ast::BinaryOp::TrueDiv => ir::BinaryOp::TrueDiv,
+        ast::BinaryOp::Mod => ir::BinaryOp::Mod,
+        ast::BinaryOp::Pow => ir::BinaryOp::Pow,
+        ast::BinaryOp::And => ir::BinaryOp::And,
+        ast::BinaryOp::Or => ir::BinaryOp::Or,
+        ast::BinaryOp::MinMax => ir::BinaryOp::MinMax,
     };
     let op_span = get_span_from_ast_span(op.node_span());
-    WithSpan::new(op_value, op_span)
+    ir::WithSpan::new(op_value, op_span)
 }
 
 /// Converts an AST unary operation to a model unary operation.
@@ -436,13 +434,13 @@ fn resolve_binary_op(op: &ast::expression::BinaryOpNode) -> WithSpan<oneil_ir::e
 /// # Returns
 ///
 /// The corresponding model unary operation
-fn resolve_unary_op(op: &ast::expression::UnaryOpNode) -> WithSpan<oneil_ir::expr::UnaryOp> {
+fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::WithSpan<ir::UnaryOp> {
     let op_value = match op.node_value() {
-        ast::expression::UnaryOp::Neg => oneil_ir::expr::UnaryOp::Neg,
-        ast::expression::UnaryOp::Not => oneil_ir::expr::UnaryOp::Not,
+        ast::UnaryOp::Neg => ir::UnaryOp::Neg,
+        ast::UnaryOp::Not => ir::UnaryOp::Not,
     };
     let op_span = get_span_from_ast_span(op.node_span());
-    WithSpan::new(op_value, op_span)
+    ir::WithSpan::new(op_value, op_span)
 }
 
 /// Resolves a function name to a model function name.
@@ -459,19 +457,19 @@ fn resolve_unary_op(op: &ast::expression::UnaryOpNode) -> WithSpan<oneil_ir::exp
 ///
 /// A model function name representing either a built-in or imported function
 fn resolve_function_name(
-    name: &ast::naming::IdentifierNode,
+    name: &ast::IdentifierNode,
     builtin_ref: &impl BuiltinRef,
-) -> WithSpan<oneil_ir::expr::FunctionName> {
+) -> ir::WithSpan<ir::FunctionName> {
     let span = get_span_from_ast_span(name.node_span());
-    let name = Identifier::new(name.as_str());
+    let name = ir::Identifier::new(name.as_str());
 
     let name = if builtin_ref.has_builtin_function(&name) {
-        oneil_ir::expr::FunctionName::builtin(name)
+        ir::FunctionName::builtin(name)
     } else {
-        oneil_ir::expr::FunctionName::imported(name)
+        ir::FunctionName::imported(name)
     };
 
-    WithSpan::new(name, span)
+    ir::WithSpan::new(name, span)
 }
 
 /// Converts an AST literal to a model literal.
@@ -486,11 +484,11 @@ fn resolve_function_name(
 /// # Returns
 ///
 /// The corresponding model literal
-fn resolve_literal(literal: &ast::expression::LiteralNode) -> oneil_ir::expr::Literal {
+fn resolve_literal(literal: &ast::LiteralNode) -> ir::Literal {
     match literal.node_value() {
-        ast::expression::Literal::Number(number) => oneil_ir::expr::Literal::number(*number),
-        ast::expression::Literal::String(string) => oneil_ir::expr::Literal::string(string.clone()),
-        ast::expression::Literal::Boolean(boolean) => oneil_ir::expr::Literal::boolean(*boolean),
+        ast::Literal::Number(number) => ir::Literal::number(*number),
+        ast::Literal::String(string) => ir::Literal::string(string.clone()),
+        ast::Literal::Boolean(boolean) => ir::Literal::boolean(*boolean),
     }
 }
 

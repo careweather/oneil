@@ -1,11 +1,7 @@
 use std::fmt;
 
 use oneil_error::{AsOneilError, ErrorLocation};
-use oneil_ir::{
-    model_import::ReferenceName,
-    reference::{Identifier, ModelPath},
-    span::IrSpan,
-};
+use oneil_ir::{self as ir, IrSpan};
 
 /// Represents an error that occurred during variable resolution within expressions.
 ///
@@ -17,37 +13,37 @@ pub enum VariableResolutionError {
     /// The model that should contain the variable has errors.
     ModelHasError {
         /// The path of the model that has errors
-        path: ModelPath,
+        path: ir::ModelPath,
         /// The span of where the model is referenced
         reference_span: IrSpan,
     },
     /// The parameter that should contain the variable has errors.
     ParameterHasError {
         /// The identifier of the parameter that has errors
-        identifier: Identifier,
+        identifier: ir::Identifier,
         /// The span of where the parameter is referenced
         reference_span: IrSpan,
     },
     /// The resolution of a submodel that is referenced by a variable has failed.
     ReferenceResolutionFailed {
         /// The identifier of the reference that has errors
-        identifier: ReferenceName,
+        identifier: ir::ReferenceName,
         /// The span of where the reference is referenced
         reference_span: IrSpan,
     },
     /// The parameter is not defined in the current context.
     UndefinedParameter {
         /// The path of the model that contains the parameter (if None, the parameter is not defined in the current model)
-        model_path: Option<ModelPath>,
+        model_path: Option<ir::ModelPath>,
         /// The identifier of the parameter that is undefined
-        parameter: Identifier,
+        parameter: ir::Identifier,
         /// The span of where the parameter is referenced
         reference_span: IrSpan,
     },
     /// The reference is not defined in the current model.
     UndefinedReference {
         /// The identifier of the reference that is undefined
-        reference: ReferenceName,
+        reference: ir::ReferenceName,
         /// The span of where the reference is referenced
         reference_span: IrSpan,
     },
@@ -65,7 +61,7 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::ModelHasError` variant.
     #[must_use]
-    pub const fn model_has_error(model_path: ModelPath, reference_span: IrSpan) -> Self {
+    pub const fn model_has_error(model_path: ir::ModelPath, reference_span: IrSpan) -> Self {
         Self::ModelHasError {
             path: model_path,
             reference_span,
@@ -83,7 +79,7 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::ParameterHasError` variant.
     #[must_use]
-    pub const fn parameter_has_error(identifier: Identifier, reference_span: IrSpan) -> Self {
+    pub const fn parameter_has_error(identifier: ir::Identifier, reference_span: IrSpan) -> Self {
         Self::ParameterHasError {
             identifier,
             reference_span,
@@ -103,7 +99,7 @@ impl VariableResolutionError {
     /// A new `VariableResolutionError::SubmodelResolutionFailed` variant.
     #[must_use]
     pub const fn reference_resolution_failed(
-        identifier: ReferenceName,
+        identifier: ir::ReferenceName,
         reference_span: IrSpan,
     ) -> Self {
         Self::ReferenceResolutionFailed {
@@ -123,7 +119,7 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::UndefinedParameter` variant.
     #[must_use]
-    pub const fn undefined_parameter(parameter: Identifier, reference_span: IrSpan) -> Self {
+    pub const fn undefined_parameter(parameter: ir::Identifier, reference_span: IrSpan) -> Self {
         Self::UndefinedParameter {
             model_path: None,
             parameter,
@@ -143,8 +139,8 @@ impl VariableResolutionError {
     /// A new `VariableResolutionError::UndefinedParameter` variant.
     #[must_use]
     pub const fn undefined_parameter_in_submodel(
-        submodel_path: ModelPath,
-        parameter: Identifier,
+        submodel_path: ir::ModelPath,
+        parameter: ir::Identifier,
         reference_span: IrSpan,
     ) -> Self {
         Self::UndefinedParameter {
@@ -165,7 +161,7 @@ impl VariableResolutionError {
     ///
     /// A new `VariableResolutionError::UndefinedSubmodel` variant.
     #[must_use]
-    pub const fn undefined_reference(reference: ReferenceName, reference_span: IrSpan) -> Self {
+    pub const fn undefined_reference(reference: ir::ReferenceName, reference_span: IrSpan) -> Self {
         Self::UndefinedReference {
             reference,
             reference_span,
