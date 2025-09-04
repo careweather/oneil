@@ -26,11 +26,10 @@ pub enum Decl {
     UseModel(UseModelNode),
 
     /// Parameter declaration for defining model parameters
-    /// (boxed because of large size of `ParameterNode`)
-    Parameter(Box<ParameterNode>),
+    Parameter(ParameterNode),
+
     /// Test declaration for verifying model behavior
-    /// (boxed because of large size of `TestNode`)
-    Test(Box<TestNode>),
+    Test(TestNode),
 }
 
 /// A node containing a declaration
@@ -52,13 +51,13 @@ impl Decl {
     /// Creates a parameter declaration
     #[must_use]
     pub fn parameter(parameter: ParameterNode) -> Self {
-        Self::Parameter(Box::new(parameter))
+        Self::Parameter(parameter)
     }
 
     /// Creates a test declaration
     #[must_use]
     pub fn test(test: TestNode) -> Self {
-        Self::Test(Box::new(test))
+        Self::Test(test)
     }
 }
 

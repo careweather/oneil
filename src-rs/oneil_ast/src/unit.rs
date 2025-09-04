@@ -13,14 +13,14 @@ pub enum UnitExpr {
         /// The unit operator
         op: UnitOpNode,
         /// The left operand
-        left: Box<UnitExprNode>,
+        left: UnitExprNode,
         /// The right operand
-        right: Box<UnitExprNode>,
+        right: UnitExprNode,
     },
     /// Parenthesized unit expression
     Parenthesized {
         /// The expression inside parentheses
-        expr: Box<UnitExprNode>,
+        expr: UnitExprNode,
     },
     /// A unitless 1, usually used for units like 1/s
     UnitOne,
@@ -40,17 +40,13 @@ impl UnitExpr {
     /// Creates a binary operation unit expression
     #[must_use]
     pub fn binary_op(op: UnitOpNode, left: UnitExprNode, right: UnitExprNode) -> Self {
-        let left = Box::new(left);
-        let right = Box::new(right);
         Self::BinaryOp { op, left, right }
     }
 
     /// Creates a parenthesized unit expression
     #[must_use]
     pub fn parenthesized(expr: UnitExprNode) -> Self {
-        Self::Parenthesized {
-            expr: Box::new(expr),
-        }
+        Self::Parenthesized { expr }
     }
 
     /// Creates a unitless 1, usually used for units like 1/s

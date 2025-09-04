@@ -420,7 +420,7 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, parameter) = parse_parameter.parse(input)?;
 
     let span = AstSpan::from(&parameter);
-    let decl_node = Node::new(&span, Decl::Parameter(Box::new(parameter)));
+    let decl_node = Node::new(&span, Decl::Parameter(parameter));
 
     Ok((rest, decl_node))
 }
@@ -442,7 +442,7 @@ fn test_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, test) = parse_test.parse(input)?;
 
     let span = AstSpan::from(&test);
-    let decl_node = Node::new(&span, Decl::Test(Box::new(test)));
+    let decl_node = Node::new(&span, Decl::Test(test));
 
     Ok((rest, decl_node))
 }

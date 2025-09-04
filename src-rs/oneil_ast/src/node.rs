@@ -14,13 +14,14 @@ use crate::{Span, span::SpanLike};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
     span: Span,
-    value: T,
+    value: Box<T>,
 }
 
 impl<T> Node<T> {
     /// Creates a new node with the given span and value
     pub fn new(spanlike: &impl SpanLike, value: T) -> Self {
         let span = Span::from(spanlike);
+        let value = Box::new(value);
         Self { span, value }
     }
 
@@ -39,7 +40,7 @@ impl<T> Node<T> {
     /// Consumes the node and returns its value
     #[must_use]
     pub fn take_value(self) -> T {
-        self.value
+        *self.value
     }
 }
 

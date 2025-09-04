@@ -11,11 +11,11 @@ pub enum Expr {
     /// Comparison operation with left and right operands
     ComparisonOp {
         /// The left operand
-        left: Box<ExprNode>,
+        left: ExprNode,
         /// The comparison operator
         op: ComparisonOpNode,
         /// The right operand
-        right: Box<ExprNode>,
+        right: ExprNode,
         /// Chained comparison operations (order matters)
         rest_chained: Vec<(ComparisonOpNode, ExprNode)>,
     },
@@ -24,9 +24,9 @@ pub enum Expr {
         /// The binary operator
         op: BinaryOpNode,
         /// The left operand
-        left: Box<ExprNode>,
+        left: ExprNode,
         /// The right operand
-        right: Box<ExprNode>,
+        right: ExprNode,
     },
 
     /// Unary operation with a single operand
@@ -34,7 +34,7 @@ pub enum Expr {
         /// The unary operator
         op: UnaryOpNode,
         /// The operand expression
-        expr: Box<ExprNode>,
+        expr: ExprNode,
     },
 
     /// Function call with arguments
@@ -48,7 +48,7 @@ pub enum Expr {
     /// Parenthesized expression
     Parenthesized {
         /// The expression inside parentheses
-        expr: Box<ExprNode>,
+        expr: ExprNode,
     },
 
     /// Variable reference
@@ -72,8 +72,8 @@ impl Expr {
     ) -> Self {
         Self::ComparisonOp {
             op,
-            left: Box::new(left),
-            right: Box::new(right),
+            left,
+            right,
             rest_chained,
         }
     }
@@ -81,20 +81,13 @@ impl Expr {
     /// Creates a binary operation expression
     #[must_use]
     pub fn binary_op(op: BinaryOpNode, left: ExprNode, right: ExprNode) -> Self {
-        Self::BinaryOp {
-            op,
-            left: Box::new(left),
-            right: Box::new(right),
-        }
+        Self::BinaryOp { op, left, right }
     }
 
     /// Creates a unary operation expression
     #[must_use]
     pub fn unary_op(op: UnaryOpNode, expr: ExprNode) -> Self {
-        Self::UnaryOp {
-            op,
-            expr: Box::new(expr),
-        }
+        Self::UnaryOp { op, expr }
     }
 
     /// Creates a function call expression
@@ -106,9 +99,7 @@ impl Expr {
     /// Creates a parenthesized expression
     #[must_use]
     pub fn parenthesized(expr: ExprNode) -> Self {
-        Self::Parenthesized {
-            expr: Box::new(expr),
-        }
+        Self::Parenthesized { expr }
     }
 
     /// Creates a variable reference expression
