@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ir::{
     model::Model,
-    model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
+    model_import::{ReferenceImport, ReferenceName},
     reference::ModelPath,
 };
 
@@ -30,24 +30,13 @@ impl<'builder> ModelsLoadedContext<'builder> {
 
     pub fn with_model_imports_resolved<'model_imports>(
         self,
-        submodels: &'model_imports HashMap<SubmodelName, SubmodelImport>,
-        submodel_resolution_errors: &'model_imports HashMap<
-            SubmodelName,
-            ModelImportResolutionError,
-        >,
         references: &'model_imports HashMap<ReferenceName, ReferenceImport>,
         reference_resolution_errors: &'model_imports HashMap<
             ReferenceName,
             ModelImportResolutionError,
         >,
     ) -> ModelImportsResolvedContext<'builder, 'model_imports> {
-        ModelImportsResolvedContext::new(
-            self,
-            submodels,
-            submodel_resolution_errors,
-            references,
-            reference_resolution_errors,
-        )
+        ModelImportsResolvedContext::new(self, references, reference_resolution_errors)
     }
 }
 

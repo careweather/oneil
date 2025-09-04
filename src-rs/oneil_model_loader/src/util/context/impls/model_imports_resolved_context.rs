@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use oneil_ir::model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName};
+use oneil_ir::model_import::{ReferenceImport, ReferenceName};
 
 use crate::{
     error::ModelImportResolutionError,
@@ -13,8 +13,6 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelImportsResolvedContext<'builder, 'model_imports> {
     models_loaded_context: ModelsLoadedContext<'builder>,
-    submodels: &'model_imports HashMap<SubmodelName, SubmodelImport>,
-    submodel_resolution_errors: &'model_imports HashMap<SubmodelName, ModelImportResolutionError>,
     references: &'model_imports HashMap<ReferenceName, ReferenceImport>,
     reference_resolution_errors: &'model_imports HashMap<ReferenceName, ModelImportResolutionError>,
 }
@@ -22,11 +20,6 @@ pub struct ModelImportsResolvedContext<'builder, 'model_imports> {
 impl<'builder, 'model_imports> ModelImportsResolvedContext<'builder, 'model_imports> {
     pub fn new(
         models_loaded_context: ModelsLoadedContext<'builder>,
-        submodels: &'model_imports HashMap<SubmodelName, SubmodelImport>,
-        submodel_resolution_errors: &'model_imports HashMap<
-            SubmodelName,
-            ModelImportResolutionError,
-        >,
         references: &'model_imports HashMap<ReferenceName, ReferenceImport>,
         reference_resolution_errors: &'model_imports HashMap<
             ReferenceName,
@@ -35,8 +28,6 @@ impl<'builder, 'model_imports> ModelImportsResolvedContext<'builder, 'model_impo
     ) -> Self {
         Self {
             models_loaded_context,
-            submodels,
-            submodel_resolution_errors,
             references,
             reference_resolution_errors,
         }
@@ -59,14 +50,6 @@ impl ModelContext for ModelImportsResolvedContext<'_, '_> {
 }
 
 impl ModelImportsContext for ModelImportsResolvedContext<'_, '_> {
-    fn lookup_submodel(&self, submodel_name: &SubmodelName) -> LookupResult<&SubmodelImport> {
-        lookup::lookup_with(
-            submodel_name,
-            |submodel_name| self.submodels.get(submodel_name),
-            |submodel_name| self.submodel_resolution_errors.contains_key(submodel_name),
-        )
-    }
-
     fn lookup_reference(&self, reference_name: &ReferenceName) -> LookupResult<&ReferenceImport> {
         lookup::lookup_with(
             reference_name,

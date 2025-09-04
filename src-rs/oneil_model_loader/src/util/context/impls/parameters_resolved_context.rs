@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use oneil_ir::{
     model::Model,
-    model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
+    model_import::{ReferenceImport, ReferenceName},
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath},
 };
@@ -55,11 +55,6 @@ impl ModelContext for ParametersResolvingContext<'_, '_> {
 }
 
 impl ModelImportsContext for ParametersResolvingContext<'_, '_> {
-    fn lookup_submodel(&self, submodel_name: &SubmodelName) -> LookupResult<&SubmodelImport> {
-        self.model_imports_resolved_context
-            .lookup_submodel(submodel_name)
-    }
-
     fn lookup_reference(&self, reference_name: &ReferenceName) -> LookupResult<&ReferenceImport> {
         self.model_imports_resolved_context
             .lookup_reference(reference_name)

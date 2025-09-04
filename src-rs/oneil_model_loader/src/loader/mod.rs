@@ -126,12 +126,7 @@ where
         resolver::resolve_model_imports(use_models, &model_path, &context);
 
     // TODO: add references to the context as well
-    let context = context.with_model_imports_resolved(
-        &submodels,
-        &submodel_resolution_errors,
-        &references,
-        &reference_resolution_errors,
-    );
+    let context = context.with_model_imports_resolved(&references, &reference_resolution_errors);
     let context = context.begin_parameter_resolution();
 
     // resolve parameters
