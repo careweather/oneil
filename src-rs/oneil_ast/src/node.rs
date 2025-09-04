@@ -5,7 +5,7 @@
 
 use std::{fmt::Debug, ops::Deref};
 
-use crate::{Span, span::SpanLike};
+use crate::{AstSpan, span::SpanLike};
 
 /// A wrapper around AST elements that includes source location information
 ///
@@ -13,21 +13,21 @@ use crate::{Span, span::SpanLike};
 /// information for error reporting, debugging, and other source-aware operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
-    span: Span,
+    span: AstSpan,
     value: Box<T>,
 }
 
 impl<T> Node<T> {
     /// Creates a new node with the given span and value
     pub fn new(spanlike: &impl SpanLike, value: T) -> Self {
-        let span = Span::from(spanlike);
+        let span = AstSpan::from(spanlike);
         let value = Box::new(value);
         Self { span, value }
     }
 
     /// Returns a reference to the node's span information
     #[must_use]
-    pub const fn node_span(&self) -> Span {
+    pub const fn node_span(&self) -> AstSpan {
         self.span
     }
 

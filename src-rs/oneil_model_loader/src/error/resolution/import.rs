@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use oneil_error::{AsOneilError, Context, ErrorLocation};
-use oneil_ir::{reference::PythonPath, span::Span};
+use oneil_ir::{reference::PythonPath, span::IrSpan};
 
 /// Represents an error that occurred during Python import validation.
 ///
@@ -12,16 +12,16 @@ pub enum ImportResolutionError {
     /// A duplicate import was detected.
     DuplicateImport {
         /// The span of the original import declaration.
-        original_span: Span,
+        original_span: IrSpan,
         /// The span of the duplicate import declaration.
-        duplicate_span: Span,
+        duplicate_span: IrSpan,
         /// The Python path of the duplicate import.
         python_path: PythonPath,
     },
     /// A validation error occurred during import resolution.
     FailedValidation {
         /// The span of the import declaration that caused the validation error.
-        ident_span: Span,
+        ident_span: IrSpan,
         /// The Python path of the import that failed validation.
         python_path: PythonPath,
     },
@@ -41,8 +41,8 @@ impl ImportResolutionError {
     /// A new `ImportResolutionError::DuplicateImport` variant.
     #[must_use]
     pub const fn duplicate_import(
-        original_span: Span,
-        duplicate_span: Span,
+        original_span: IrSpan,
+        duplicate_span: IrSpan,
         python_path: PythonPath,
     ) -> Self {
         Self::DuplicateImport {
@@ -63,7 +63,7 @@ impl ImportResolutionError {
     ///
     /// A new `ImportResolutionError::FailedValidation` variant.
     #[must_use]
-    pub const fn failed_validation(ident_span: Span, python_path: PythonPath) -> Self {
+    pub const fn failed_validation(ident_span: IrSpan, python_path: PythonPath) -> Self {
         Self::FailedValidation {
             ident_span,
             python_path,

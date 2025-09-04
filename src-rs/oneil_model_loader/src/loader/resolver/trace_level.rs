@@ -47,7 +47,7 @@ mod tests {
             let expected_model_level = oneil_ir::debug_info::TraceLevel::Trace;
 
             // Create a trace level node
-            let trace_level_node = ast::node::Node::new(&ast::Span::new(0, 0, 0), ast_level);
+            let trace_level_node = ast::node::Node::new(&ast::AstSpan::new(0, 0, 0), ast_level);
             let result = resolve_trace_level(Some(&trace_level_node));
             assert_eq!(
                 result,
@@ -67,7 +67,7 @@ mod tests {
             let expected_model_level = oneil_ir::debug_info::TraceLevel::Debug;
 
             // Create a trace level node
-            let trace_level_node = ast::node::Node::new(&ast::Span::new(0, 0, 0), ast_level);
+            let trace_level_node = ast::node::Node::new(&ast::AstSpan::new(0, 0, 0), ast_level);
             let result = resolve_trace_level(Some(&trace_level_node));
             assert_eq!(
                 result,

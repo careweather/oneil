@@ -20,7 +20,7 @@ use nom::{
     combinator::{eof, opt, value},
 };
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan,
     declaration::DeclNode,
     model::{Model, ModelNode, Section, SectionHeader, SectionHeaderNode, SectionNode},
     naming::Label,
@@ -36,14 +36,14 @@ use crate::{
     },
     note::parse as parse_note,
     token::{keyword::section, naming::label, structure::end_of_line},
-    util::{Result, Span},
+    util::{InputSpan, Result},
 };
 
 /// Parses a model definition, consuming the complete input
 ///
 /// This function **fails if the complete input is not consumed**.
 pub fn parse_complete(
-    input: Span<'_>,
+    input: InputSpan<'_>,
 ) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
     let (rest, model) = model(input)?;
     let result = eof(rest);
@@ -91,7 +91,7 @@ pub fn parse_complete(
 /// 2. Any declarations within the failed section are moved to the top-level
 /// 3. Parsing continues with the next section
 fn model(
-    input: Span<'_>,
+    input: InputSpan<'_>,
 ) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
     let (rest, _) = opt(end_of_line).convert_errors().parse(input)?;
     let (rest, note) = opt(parse_note).convert_errors().parse(rest)?;
@@ -149,13 +149,13 @@ fn model(
 /// In addition, because it returns partial results, the results may be used
 /// in order to determine other partial information, such as the associated
 /// units of the declarations that were successfully parsed.
-fn parse_decls(input: Span<'_>) -> (Span<'_>, Vec<DeclNode>, Vec<ParserError>) {
+fn parse_decls(input: InputSpan<'_>) -> (InputSpan<'_>, Vec<DeclNode>, Vec<ParserError>) {
     fn parse_decls_recur(
-        input: Span<'_>,
+        input: InputSpan<'_>,
         mut acc_decls: Vec<DeclNode>,
         mut acc_errors: Vec<ParserError>,
         last_was_error: bool,
-    ) -> (Span<'_>, Vec<DeclNode>, Vec<ParserError>) {
+    ) -> (InputSpan<'_>, Vec<DeclNode>, Vec<ParserError>) {
         let result = parse_decl(input);
 
         match result {
@@ -219,14 +219,24 @@ fn parse_decls(input: Span<'_>) -> (Span<'_>, Vec<DeclNode>, Vec<ParserError>) {
 /// - Vector of declarations that were parsed but couldn't be assigned to a section
 /// - Vector of parsing errors encountered
 fn parse_sections(
-    input: Span<'_>,
-) -> (Span<'_>, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
+    input: InputSpan<'_>,
+) -> (
+    InputSpan<'_>,
+    Vec<SectionNode>,
+    Vec<DeclNode>,
+    Vec<ParserError>,
+) {
     fn parse_sections_recur(
-        input: Span<'_>,
+        input: InputSpan<'_>,
         mut acc_sections: Vec<SectionNode>,
         mut acc_decls: Vec<DeclNode>,
         mut acc_errors: Vec<ParserError>,
-    ) -> (Span<'_>, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
+    ) -> (
+        InputSpan<'_>,
+        Vec<SectionNode>,
+        Vec<DeclNode>,
+        Vec<ParserError>,
+    ) {
         let section_result = parse_section(input);
 
         match section_result {
@@ -279,7 +289,7 @@ type SectionErrors = Vec<ParserError>;
 /// - The remaining unparsed input
 /// - Either a successfully parsed section node or a vector of declarations
 /// - Vector of parsing errors encountered
-fn parse_section(input: Span<'_>) -> Option<(Span<'_>, SectionResult, SectionErrors)> {
+fn parse_section(input: InputSpan<'_>) -> Option<(InputSpan<'_>, SectionResult, SectionErrors)> {
     let section_header_result = parse_section_header(input);
 
     let (rest, header, mut errors) = match section_header_result {
@@ -344,7 +354,7 @@ fn parse_section(input: Span<'_>) -> Option<(Span<'_>, SectionResult, SectionErr
 /// - **Missing label**: When the `section` keyword is followed by whitespace or newline
 /// - **Missing newline**: When the label is not followed by a proper line terminator
 /// - **Invalid label**: When the label contains invalid characters
-fn parse_section_header(input: Span<'_>) -> Result<'_, SectionHeaderNode, ParserError> {
+fn parse_section_header(input: InputSpan<'_>) -> Result<'_, SectionHeaderNode, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
 
     let (rest, label) = label
@@ -378,7 +388,7 @@ fn parse_section_header(input: Span<'_>) -> Result<'_, SectionHeaderNode, Parser
 /// # Returns
 ///
 /// Returns the remaining input after skipping to the next line.
-fn skip_to_next_line_with_content(input: Span<'_>) -> Span<'_> {
+fn skip_to_next_line_with_content(input: InputSpan<'_>) -> InputSpan<'_> {
     let (rest, _) = take_while::<_, _, nom::error::Error<_>>(|c| c != '\n')
         .parse(input)
         .expect("should never fail");
@@ -402,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_empty_model() {
-        let input = Span::new_extra("", Config::default());
+        let input = InputSpan::new_extra("", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
@@ -412,7 +422,7 @@ mod tests {
 
     #[test]
     fn test_model_with_note() {
-        let input = Span::new_extra("~ This is a note\n", Config::default());
+        let input = InputSpan::new_extra("~ This is a note\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with note");
         assert!(model.note().is_some());
         assert!(model.decls().is_empty());
@@ -422,7 +432,7 @@ mod tests {
 
     #[test]
     fn test_model_with_import() {
-        let input = Span::new_extra("import foo\n", Config::default());
+        let input = InputSpan::new_extra("import foo\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with import");
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 1);
@@ -436,7 +446,7 @@ mod tests {
 
     #[test]
     fn test_use_without_as() {
-        let input = Span::new_extra("use foo\n", Config::default());
+        let input = InputSpan::new_extra("use foo\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with use declaration");
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 1);
@@ -455,7 +465,7 @@ mod tests {
 
     #[test]
     fn test_model_with_section() {
-        let input = Span::new_extra("section foo\nimport bar\n", Config::default());
+        let input = InputSpan::new_extra("section foo\nimport bar\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with section");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
@@ -472,7 +482,7 @@ mod tests {
 
     #[test]
     fn test_model_with_multiple_sections() {
-        let input = Span::new_extra(
+        let input = InputSpan::new_extra(
             "section foo\nimport bar\nsection baz\nimport qux\n",
             Config::default(),
         );
@@ -503,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_parse_complete_empty_model_success() {
-        let input = Span::new_extra("\n", Config::default());
+        let input = InputSpan::new_extra("\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
@@ -513,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_parse_complete_with_declarations_success() {
-        let input = Span::new_extra("import foo\nimport bar\n", Config::default());
+        let input = InputSpan::new_extra("import foo\nimport bar\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with declarations");
         assert_eq!(model.decls().len(), 2);
         match &model.decls()[0].node_value() {
@@ -529,14 +539,14 @@ mod tests {
 
     #[test]
     fn test_parse_complete_with_remaining_input() {
-        let input = Span::new_extra("import foo\n<rest>", Config::default());
+        let input = InputSpan::new_extra("import foo\n<rest>", Config::default());
         let result = parse_complete(input);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_parse_empty_model() {
-        let input = Span::new_extra("", Config::default());
+        let input = InputSpan::new_extra("", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
@@ -546,7 +556,7 @@ mod tests {
 
     #[test]
     fn test_parse_model_with_parameters() {
-        let input = Span::new_extra(
+        let input = InputSpan::new_extra(
             "1st parameter: x = 1\n2nd parameter: y = 2\n",
             Config::default(),
         );
@@ -558,7 +568,7 @@ mod tests {
 
     #[test]
     fn test_parse_model_with_section_and_declarations() {
-        let input = Span::new_extra(
+        let input = InputSpan::new_extra(
             "X: x = 1 + 2\nsection My Section\nimport foo\nimport bar\nY: y = 3 * 4",
             Config::default(),
         );
@@ -575,7 +585,7 @@ mod tests {
 
     #[test]
     fn test_parse_model_failure_with_partial_result() {
-        let input = Span::new_extra(
+        let input = InputSpan::new_extra(
             "\
             use foo as bar
 
@@ -622,7 +632,7 @@ mod tests {
 
             #[test]
             fn test_parse_complete_with_remaining_input() {
-                let input = Span::new_extra("import foo\nrest", Config::default());
+                let input = InputSpan::new_extra("import foo\nrest", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -647,7 +657,7 @@ mod tests {
 
             #[test]
             fn test_section_missing_label() {
-                let input = Span::new_extra("section\nimport foo\n", Config::default());
+                let input = InputSpan::new_extra("section\nimport foo\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -673,7 +683,7 @@ mod tests {
 
             #[test]
             fn test_section_missing_end_of_line() {
-                let input = Span::new_extra("section foo :\n import foo", Config::default());
+                let input = InputSpan::new_extra("section foo :\n import foo", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -699,7 +709,7 @@ mod tests {
 
             #[test]
             fn test_section_with_invalid_declaration() {
-                let input = Span::new_extra("section foo\nimport\n", Config::default());
+                let input = InputSpan::new_extra("section foo\nimport\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -730,7 +740,7 @@ mod tests {
 
             #[test]
             fn test_import_missing_path() {
-                let input = Span::new_extra("import\n", Config::default());
+                let input = InputSpan::new_extra("import\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -756,7 +766,7 @@ mod tests {
 
             #[test]
             fn test_parameter_missing_equals() {
-                let input = Span::new_extra("X: x\n", Config::default());
+                let input = InputSpan::new_extra("X: x\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -782,7 +792,7 @@ mod tests {
 
             #[test]
             fn test_parameter_missing_value() {
-                let input = Span::new_extra("X: x =\n", Config::default());
+                let input = InputSpan::new_extra("X: x =\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -808,7 +818,7 @@ mod tests {
 
             #[test]
             fn test_test_missing_colon() {
-                let input = Span::new_extra("test x > 0\n", Config::default());
+                let input = InputSpan::new_extra("test x > 0\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -838,7 +848,8 @@ mod tests {
 
             #[test]
             fn test_unterminated_note() {
-                let input = Span::new_extra("~~~\nThis is an unterminated note", Config::default());
+                let input =
+                    InputSpan::new_extra("~~~\nThis is an unterminated note", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -862,7 +873,7 @@ mod tests {
 
             #[test]
             fn test_multiple_declaration_errors() {
-                let input = Span::new_extra("import\nuse\nX: x\n", Config::default());
+                let input = InputSpan::new_extra("import\nuse\nX: x\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -889,7 +900,8 @@ mod tests {
 
             #[test]
             fn test_section_with_multiple_errors() {
-                let input = Span::new_extra("section foo\nimport\nuse\nX: x\n", Config::default());
+                let input =
+                    InputSpan::new_extra("section foo\nimport\nuse\nX: x\n", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Failure(e)) => {
@@ -927,7 +939,7 @@ mod tests {
 
             #[test]
             fn test_mixed_valid_and_invalid_declarations() {
-                let input = Span::new_extra(
+                let input = InputSpan::new_extra(
                     "import valid\nimport\nuse foo as bar\nuse invalid.\n",
                     Config::default(),
                 );

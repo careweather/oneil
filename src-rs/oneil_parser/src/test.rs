@@ -41,7 +41,7 @@ use nom::{
     combinator::{all_consuming, opt},
 };
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan as AstSpan,
     debug_info::{TraceLevel, TraceLevelNode},
     node::Node,
     test::{Test, TestNode},
@@ -56,20 +56,20 @@ use crate::{
         structure::end_of_line,
         symbol::{colon, star, star_star},
     },
-    util::{Result, Span},
+    util::{Result, InputSpan},
 };
 
 /// Parse a test declaration, e.g. `* test: x > y`.
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
+pub fn parse(input: InputSpan<'_>) -> Result<'_, TestNode, ParserError> {
     test_decl(input)
 }
 
 /// Parse a test declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
+pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, TestNode, ParserError> {
     all_consuming(test_decl).parse(input)
 }
 
@@ -118,7 +118,7 @@ pub fn parse_complete(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
 /// // Test with all components
 /// let test = parse_test("** test: a > b and b > c", None).unwrap();
 /// ```
-fn test_decl(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
+fn test_decl(input: InputSpan<'_>) -> Result<'_, TestNode, ParserError> {
     let (rest, trace_level) = opt(trace_level).parse(input)?;
 
     let (rest, test_keyword_token) = test_keyword
@@ -186,7 +186,7 @@ fn test_decl(input: Span<'_>) -> Result<'_, TestNode, ParserError> {
 /// let test = parse_test("** test: x > 0", None).unwrap();
 /// assert!(test.trace_level().is_some());
 /// ```
-fn trace_level(input: Span<'_>) -> Result<'_, TraceLevelNode, ParserError> {
+fn trace_level(input: InputSpan<'_>) -> Result<'_, TraceLevelNode, ParserError> {
     let single_star = star.map(|token| Node::new(&token, TraceLevel::Trace));
     let double_star = star_star.map(|token| Node::new(&token, TraceLevel::Debug));
 
@@ -209,7 +209,7 @@ mod tests {
 
         #[test]
         fn test_decl_basic() {
-            let input = Span::new_extra("test: true\n", Config::default());
+            let input = InputSpan::new_extra("test: true\n", Config::default());
             let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 1);
@@ -227,7 +227,7 @@ mod tests {
 
         #[test]
         fn test_decl_at_eof() {
-            let input = Span::new_extra("test: true", Config::default());
+            let input = InputSpan::new_extra("test: true", Config::default());
             let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 0);
@@ -245,7 +245,7 @@ mod tests {
 
         #[test]
         fn test_decl_with_trace() {
-            let input = Span::new_extra("* test: true\n", Config::default());
+            let input = InputSpan::new_extra("* test: true\n", Config::default());
             let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 12, 1);
@@ -261,7 +261,7 @@ mod tests {
 
         #[test]
         fn test_decl_with_debug() {
-            let input = Span::new_extra("** test: true\n", Config::default());
+            let input = InputSpan::new_extra("** test: true\n", Config::default());
             let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 13, 1);
@@ -277,7 +277,7 @@ mod tests {
 
         #[test]
         fn test_decl_with_note() {
-            let input = Span::new_extra("test: true\n~ This is a note\n", Config::default());
+            let input = InputSpan::new_extra("test: true\n~ This is a note\n", Config::default());
             let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 18);
@@ -292,7 +292,7 @@ mod tests {
 
         #[test]
         fn test_decl_full() {
-            let input = Span::new_extra("** test: x > y\n", Config::default());
+            let input = InputSpan::new_extra("** test: x > y\n", Config::default());
             let (rest, test) = parse(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 14, 1);
@@ -312,7 +312,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_success() {
-            let input = Span::new_extra("test: true\n", Config::default());
+            let input = InputSpan::new_extra("test: true\n", Config::default());
             let (rest, test) = parse_complete(input).expect("should parse test");
 
             let expected_span = AstSpan::new(0, 10, 1);
@@ -329,7 +329,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_with_remaining_input() {
-            let input = Span::new_extra("test: true\n extra", Config::default());
+            let input = InputSpan::new_extra("test: true\n extra", Config::default());
             let result = parse_complete(input);
             assert!(result.is_err());
         }
@@ -340,7 +340,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_test_keyword() {
-            let input = Span::new_extra(": true\n", Config::default());
+            let input = InputSpan::new_extra(": true\n", Config::default());
             let result = parse(input);
 
             match result {
@@ -357,7 +357,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_colon_after_test() {
-            let input = Span::new_extra("test true\n", Config::default());
+            let input = InputSpan::new_extra("test true\n", Config::default());
             let result = parse(input);
             let expected_test_span = AstSpan::new(0, 4, 1);
 
@@ -380,7 +380,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_expression() {
-            let input = Span::new_extra("test:\n", Config::default());
+            let input = InputSpan::new_extra("test:\n", Config::default());
             let result = parse(input);
             let expected_colon_span = AstSpan::new(4, 1, 0);
 
@@ -403,7 +403,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_colon_with_debug() {
-            let input = Span::new_extra("** test true\n", Config::default());
+            let input = InputSpan::new_extra("** test true\n", Config::default());
             let result = parse(input);
             let expected_test_span = AstSpan::new(3, 4, 1);
 
@@ -426,7 +426,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_expression_with_trace() {
-            let input = Span::new_extra("* test:\n", Config::default());
+            let input = InputSpan::new_extra("* test:\n", Config::default());
             let result = parse(input);
             let expected_colon_span = AstSpan::new(6, 1, 0);
 
@@ -449,7 +449,7 @@ mod tests {
 
         #[test]
         fn test_error_invalid_trace_level() {
-            let input = Span::new_extra("*** test: true\n", Config::default());
+            let input = InputSpan::new_extra("*** test: true\n", Config::default());
             let result = parse(input);
 
             match result {
@@ -466,7 +466,7 @@ mod tests {
 
         #[test]
         fn test_error_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let result = parse(input);
 
             match result {
@@ -483,7 +483,7 @@ mod tests {
 
         #[test]
         fn test_error_whitespace_only() {
-            let input = Span::new_extra("   \n", Config::default());
+            let input = InputSpan::new_extra("   \n", Config::default());
             let result = parse(input);
 
             match result {

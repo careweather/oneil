@@ -22,14 +22,14 @@
 use std::path::Path;
 
 use oneil_ast as ast;
-use oneil_ir::span::Span;
+use oneil_ir::span::IrSpan;
 
 pub mod builder;
 pub mod builtin_ref;
 pub mod context;
 
-pub fn get_span_from_ast_span(ast_span: ast::Span) -> Span {
-    Span::new(ast_span.start(), ast_span.length())
+pub fn get_span_from_ast_span(ast_span: ast::AstSpan) -> IrSpan {
+    IrSpan::new(ast_span.start(), ast_span.length())
 }
 
 /// Trait for loading and parsing Oneil model files.

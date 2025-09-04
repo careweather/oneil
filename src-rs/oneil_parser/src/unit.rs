@@ -8,7 +8,7 @@ use nom::{
 };
 
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan as AstSpan,
     naming::Identifier,
     node::Node,
     unit::{UnitExponent, UnitExpr, UnitExprNode, UnitOp},
@@ -21,20 +21,20 @@ use crate::{
         naming::unit_identifier,
         symbol::{caret, paren_left, paren_right, slash, star},
     },
-    util::{Result, Span},
+    util::{Result, InputSpan},
 };
 
 /// Parses a unit expression
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
+pub fn parse(input: InputSpan<'_>) -> Result<'_, UnitExprNode, ParserError> {
     unit_expr(input)
 }
 
 /// Parses a unit expression
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
+pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, UnitExprNode, ParserError> {
     all_consuming(unit_expr).parse(input)
 }
 
@@ -56,7 +56,7 @@ pub fn parse_complete(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> 
 /// # Returns
 ///
 /// Returns a unit expression node with proper operator precedence and associativity.
-fn unit_expr(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
+fn unit_expr(input: InputSpan<'_>) -> Result<'_, UnitExprNode, ParserError> {
     let (rest, first_term) = unit_term
         .convert_error_to(ParserError::expect_unit)
         .parse(input)?;
@@ -103,7 +103,7 @@ fn unit_expr(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns a unit expression node representing the parsed term.
-fn unit_term(input: Span<'_>) -> Result<'_, UnitExprNode, ParserError> {
+fn unit_term(input: InputSpan<'_>) -> Result<'_, UnitExprNode, ParserError> {
     let parse_unit = |input| {
         let (rest, id_token) = unit_identifier.convert_errors().parse(input)?;
         let id_value = Identifier::new(id_token.lexeme().to_string());
@@ -192,7 +192,7 @@ mod tests {
 
         #[test]
         fn test_simple_unit() {
-            let input = Span::new_extra("kg", Config::default());
+            let input = InputSpan::new_extra("kg", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_id = Node::new(&AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
@@ -204,7 +204,7 @@ mod tests {
 
         #[test]
         fn test_unit_one() {
-            let input = Span::new_extra("1", Config::default());
+            let input = InputSpan::new_extra("1", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_unit = Node::new(&AstSpan::new(0, 1, 0), UnitExpr::UnitOne);
@@ -214,7 +214,7 @@ mod tests {
 
         #[test]
         fn test_unit_one_with_whitespace() {
-            let input = Span::new_extra("1 ", Config::default());
+            let input = InputSpan::new_extra("1 ", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             // The span should include the whitespace length
@@ -225,7 +225,7 @@ mod tests {
 
         #[test]
         fn test_unit_one_in_compound_expression() {
-            let input = Span::new_extra("1/s", Config::default());
+            let input = InputSpan::new_extra("1/s", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             // 1
@@ -249,7 +249,7 @@ mod tests {
 
         #[test]
         fn test_unit_one_in_complex_expression() {
-            let input = Span::new_extra("kg*1/s^2", Config::default());
+            let input = InputSpan::new_extra("kg*1/s^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             // kg
@@ -290,7 +290,7 @@ mod tests {
 
         #[test]
         fn test_unit_with_exponent() {
-            let input = Span::new_extra("m^2", Config::default());
+            let input = InputSpan::new_extra("m^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_id = Node::new(&AstSpan::new(0, 1, 0), Identifier::new("m".to_string()));
@@ -305,7 +305,7 @@ mod tests {
 
         #[test]
         fn test_compound_unit_multiply() {
-            let input = Span::new_extra("kg*m", Config::default());
+            let input = InputSpan::new_extra("kg*m", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_kg_id =
@@ -329,7 +329,7 @@ mod tests {
 
         #[test]
         fn test_compound_unit_divide() {
-            let input = Span::new_extra("m/s", Config::default());
+            let input = InputSpan::new_extra("m/s", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_m_id = Node::new(&AstSpan::new(0, 1, 0), Identifier::new("m".to_string()));
@@ -352,7 +352,7 @@ mod tests {
 
         #[test]
         fn test_complex_unit() {
-            let input = Span::new_extra("m^2*kg/s^2", Config::default());
+            let input = InputSpan::new_extra("m^2*kg/s^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             // m^2
@@ -398,7 +398,7 @@ mod tests {
 
         #[test]
         fn test_unit_with_dollar_terminator() {
-            let input = Span::new_extra("k$", Config::default());
+            let input = InputSpan::new_extra("k$", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_id = Node::new(&AstSpan::new(0, 2, 0), Identifier::new("k$".to_string()));
@@ -410,7 +410,7 @@ mod tests {
 
         #[test]
         fn test_unit_with_percent_terminator() {
-            let input = Span::new_extra("%", Config::default());
+            let input = InputSpan::new_extra("%", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_id = Node::new(&AstSpan::new(0, 1, 0), Identifier::new("%".to_string()));
@@ -422,7 +422,7 @@ mod tests {
 
         #[test]
         fn test_unit_with_terminator_and_exponent() {
-            let input = Span::new_extra("k$^2", Config::default());
+            let input = InputSpan::new_extra("k$^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_id = Node::new(&AstSpan::new(0, 2, 0), Identifier::new("k$".to_string()));
@@ -437,7 +437,7 @@ mod tests {
 
         #[test]
         fn test_compound_unit_with_terminators() {
-            let input = Span::new_extra("k$*%", Config::default());
+            let input = InputSpan::new_extra("k$*%", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             let expected_k_id =
@@ -464,7 +464,7 @@ mod tests {
 
         #[test]
         fn test_parenthesized_unit() {
-            let input = Span::new_extra("(kg*m)/s^2", Config::default());
+            let input = InputSpan::new_extra("(kg*m)/s^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
             // kg
@@ -514,7 +514,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_success() {
-            let input = Span::new_extra("kg", Config::default());
+            let input = InputSpan::new_extra("kg", Config::default());
             let (rest, unit) = parse_complete(input).expect("should parse unit");
 
             let expected_id = Node::new(&AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
@@ -531,7 +531,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_success() {
-            let input = Span::new_extra("kg", Config::default());
+            let input = InputSpan::new_extra("kg", Config::default());
             let (rest, unit) = parse_complete(input).expect("should parse unit");
 
             let expected_id = Node::new(&AstSpan::new(0, 2, 0), Identifier::new("kg".to_string()));
@@ -544,7 +544,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_with_remaining_input() {
-            let input = Span::new_extra("kg rest", Config::default());
+            let input = InputSpan::new_extra("kg rest", Config::default());
             let result = parse_complete(input);
             assert!(result.is_err());
         }
@@ -555,7 +555,7 @@ mod tests {
 
         #[test]
         fn test_error_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let result = parse(input);
 
             match result {
@@ -572,7 +572,7 @@ mod tests {
 
         #[test]
         fn test_error_whitespace_only() {
-            let input = Span::new_extra("   ", Config::default());
+            let input = InputSpan::new_extra("   ", Config::default());
             let result = parse(input);
 
             match result {
@@ -589,7 +589,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_second_term_after_multiply() {
-            let input = Span::new_extra("kg*", Config::default());
+            let input = InputSpan::new_extra("kg*", Config::default());
             let result = parse(input);
             let expected_op_span = AstSpan::new(2, 1, 0);
 
@@ -613,7 +613,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_second_term_after_divide() {
-            let input = Span::new_extra("kg/", Config::default());
+            let input = InputSpan::new_extra("kg/", Config::default());
             let result = parse(input);
             let expected_op_span = AstSpan::new(2, 1, 0);
 
@@ -637,7 +637,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_exponent() {
-            let input = Span::new_extra("kg^", Config::default());
+            let input = InputSpan::new_extra("kg^", Config::default());
             let result = parse(input);
             let expected_caret_span = AstSpan::new(2, 1, 0);
 
@@ -660,7 +660,7 @@ mod tests {
 
         #[test]
         fn test_error_parenthesized_missing_expr() {
-            let input = Span::new_extra("()", Config::default());
+            let input = InputSpan::new_extra("()", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(0, 1, 0);
 
@@ -683,7 +683,7 @@ mod tests {
 
         #[test]
         fn test_error_unclosed_paren() {
-            let input = Span::new_extra("(kg*m", Config::default());
+            let input = InputSpan::new_extra("(kg*m", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(0, 1, 0);
 
@@ -706,7 +706,7 @@ mod tests {
 
         #[test]
         fn test_error_invalid_identifier() {
-            let input = Span::new_extra("@invalid", Config::default());
+            let input = InputSpan::new_extra("@invalid", Config::default());
             let result = parse(input);
 
             match result {
@@ -723,7 +723,7 @@ mod tests {
 
         #[test]
         fn test_error_invalid_exponent() {
-            let input = Span::new_extra("kg^@invalid", Config::default());
+            let input = InputSpan::new_extra("kg^@invalid", Config::default());
             let result = parse(input);
             let expected_caret_span = AstSpan::new(2, 1, 0);
 
@@ -746,7 +746,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_second_term_in_complex_expression() {
-            let input = Span::new_extra("kg*m/", Config::default());
+            let input = InputSpan::new_extra("kg*m/", Config::default());
             let result = parse(input);
             let expected_op_span = AstSpan::new(4, 1, 0);
 
@@ -770,7 +770,7 @@ mod tests {
 
         #[test]
         fn test_error_nested_unclosed_paren() {
-            let input = Span::new_extra("((kg*m)", Config::default());
+            let input = InputSpan::new_extra("((kg*m)", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(0, 1, 0);
 
@@ -793,7 +793,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_operator_between_terms() {
-            let input = Span::new_extra("kg m", Config::default());
+            let input = InputSpan::new_extra("kg m", Config::default());
             let result = parse(input);
 
             // This test should actually succeed because the parser can handle
@@ -803,7 +803,7 @@ mod tests {
 
         #[test]
         fn test_error_invalid_operator() {
-            let input = Span::new_extra("kg+m", Config::default());
+            let input = InputSpan::new_extra("kg+m", Config::default());
             let result = parse(input);
 
             // This test should actually succeed because the parser can handle
@@ -813,7 +813,7 @@ mod tests {
 
         #[test]
         fn test_error_unit_one_with_digits() {
-            let input = Span::new_extra("123", Config::default());
+            let input = InputSpan::new_extra("123", Config::default());
             let result = parse(input);
 
             // This should fail because "123" should not be parsed as a unit_one
@@ -832,7 +832,7 @@ mod tests {
 
         #[test]
         fn test_unit_one_with_decimal_parses_partially() {
-            let input = Span::new_extra("1.5", Config::default());
+            let input = InputSpan::new_extra("1.5", Config::default());
             let (rest, unit) = parse(input).expect("should parse unit");
 
             // Should parse "1" as unit_one and leave ".5" as remainder
@@ -843,7 +843,7 @@ mod tests {
 
         #[test]
         fn test_unit_one_with_exponent_parses_partially() {
-            let input = Span::new_extra("1^2", Config::default());
+            let input = InputSpan::new_extra("1^2", Config::default());
             let (rest, unit) = parse(input).expect("should parse unit");
 
             // Should parse "1" as unit_one and leave "^2" as remainder

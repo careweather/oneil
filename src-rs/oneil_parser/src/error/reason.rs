@@ -13,7 +13,7 @@
 //! - **`TokenError`**: Low-level tokenization errors
 //! - **`NomError`**: Internal nom parsing library errors
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan as AstSpan,
     expression::{BinaryOp, ComparisonOp, UnaryOp},
     unit::UnitOp,
 };

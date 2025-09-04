@@ -20,6 +20,6 @@ pub use expression::Expr;
 pub use model::Model;
 pub use note::Note;
 pub use parameter::Parameter;
-pub use span::Span;
+pub use span::AstSpan;
 pub use test::Test;
 pub use unit::UnitExpr;

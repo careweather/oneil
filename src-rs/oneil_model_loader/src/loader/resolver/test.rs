@@ -116,8 +116,8 @@ mod tests {
         use super::*;
 
         /// Helper function to create a test span
-        pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
-            ast::Span::new(start, end - start, 0)
+        pub fn test_ast_span(start: usize, end: usize) -> ast::AstSpan {
+            ast::AstSpan::new(start, end - start, 0)
         }
 
         /// Helper function to create an identifier node

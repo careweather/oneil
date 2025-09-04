@@ -174,7 +174,7 @@ fn resolve_comparison_expression(
     left: &ast::expression::ExprNode,
     right: &ast::expression::ExprNode,
     rest_chained: &[(ast::expression::ComparisonOpNode, ast::expression::ExprNode)],
-    value_span: oneil_ir::span::Span,
+    value_span: oneil_ir::span::IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
@@ -219,7 +219,7 @@ fn resolve_binary_expression(
     op: &ast::expression::BinaryOpNode,
     left: &ast::expression::ExprNode,
     right: &ast::expression::ExprNode,
-    value_span: oneil_ir::span::Span,
+    value_span: oneil_ir::span::IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
@@ -252,7 +252,7 @@ fn resolve_binary_expression(
 fn resolve_unary_expression(
     op: &ast::expression::UnaryOpNode,
     expr: &ast::expression::ExprNode,
-    value_span: oneil_ir::span::Span,
+    value_span: oneil_ir::span::IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
@@ -287,7 +287,7 @@ fn resolve_unary_expression(
 fn resolve_function_call_expression(
     name: &ast::naming::IdentifierNode,
     args: &[ast::expression::ExprNode],
-    value_span: oneil_ir::span::Span,
+    value_span: oneil_ir::span::IrSpan,
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
@@ -338,7 +338,7 @@ fn resolve_variable_expression(
 /// The resolved literal expression
 fn resolve_literal_expression(
     literal: &ast::expression::LiteralNode,
-    value_span: oneil_ir::span::Span,
+    value_span: oneil_ir::span::IrSpan,
 ) -> oneil_ir::span::WithSpan<oneil_ir::expr::Expr> {
     let literal = resolve_literal(literal);
     let expr = Expr::literal(literal);
@@ -502,7 +502,7 @@ mod tests {
 
     use oneil_ast as ast;
     use oneil_ir as ir;
-    use oneil_ir::span::Span;
+    use oneil_ir::span::IrSpan;
     use oneil_ir::{
         expr::{BinaryOp, FunctionName, Literal, UnaryOp},
         reference::Identifier,
@@ -516,8 +516,8 @@ mod tests {
         /// Helper function to create basic test data structures for tests that
         /// don't rely on any context.
         /// Helper function to create a test span
-        pub fn test_span(start: usize, end: usize) -> ast::Span {
-            ast::Span::new(start, end - start, 0)
+        pub fn test_span(start: usize, end: usize) -> ast::AstSpan {
+            ast::AstSpan::new(start, end - start, 0)
         }
 
         /// Helper function to create a literal expression node

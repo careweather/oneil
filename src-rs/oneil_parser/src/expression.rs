@@ -15,7 +15,7 @@ use nom::{
 };
 
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan,
     expression::{
         BinaryOp, BinaryOpNode, ComparisonOp, Expr, ExprNode, Literal, UnaryOp, Variable,
     },
@@ -35,7 +35,7 @@ use crate::{
             plus, slash, slash_slash, star,
         },
     },
-    util::{Parser, Result, Span},
+    util::{InputSpan, Parser, Result},
 };
 
 /// Creates a left-associative binary operator parser.
@@ -87,14 +87,14 @@ fn left_associative_binary_op<'a>(
 /// Parses an expression
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+pub fn parse(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     expr(input)
 }
 
 /// Parses an expression
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     all_consuming(expr).parse(input)
 }
 
@@ -122,7 +122,7 @@ pub fn parse_complete(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node with proper operator precedence.
-fn expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     or_expr
         .convert_error_to(ParserError::expect_expr)
         .parse(input)
@@ -148,7 +148,7 @@ fn expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the OR expression with proper associativity.
-fn or_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn or_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let or = or
         .map(|token| Node::new(&token, BinaryOp::Or))
         .convert_errors();
@@ -175,7 +175,7 @@ fn or_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the AND expression with proper associativity.
-fn and_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn and_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let and = and
         .map(|token| Node::new(&token, BinaryOp::And))
         .convert_errors();
@@ -203,7 +203,7 @@ fn and_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a NOT expression or a comparison expression.
-fn not_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn not_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         |input| {
             let (rest, not_op) = not
@@ -255,7 +255,7 @@ fn not_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a comparison expression or a single operand.
-fn comparison_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn comparison_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let mut op = alt((
         less_than_equals.map(|token| Node::new(&token, ComparisonOp::LessThanEq)),
         greater_than_equals.map(|token| Node::new(&token, ComparisonOp::GreaterThanEq)),
@@ -326,7 +326,7 @@ fn comparison_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a min/max expression or a single operand.
-fn minmax_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn minmax_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, first_operand) = additive_expr.parse(input)?;
     let (rest, second_operand) = opt(|input| {
         let (rest, operator) = bar
@@ -384,7 +384,7 @@ fn minmax_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the additive expression with proper associativity.
-fn additive_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn additive_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
         plus.map(|token| Node::new(&token, BinaryOp::Add)),
         minus.map(|token| Node::new(&token, BinaryOp::Sub)),
@@ -424,7 +424,7 @@ fn additive_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the multiplicative expression with proper associativity.
-fn multiplicative_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn multiplicative_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
         star.map(|token| Node::new(&token, BinaryOp::Mul)),
         slash.map(|token| Node::new(&token, BinaryOp::Div)),
@@ -461,7 +461,7 @@ fn multiplicative_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either an exponential expression or a single operand.
-fn exponential_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn exponential_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let mut op = caret
         .map(|token| Node::new(&token, BinaryOp::Pow))
         .convert_errors();
@@ -516,7 +516,7 @@ fn exponential_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing either a negation expression or a primary expression.
-fn neg_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn neg_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         |input| {
             let (rest, minus_op) = minus
@@ -566,7 +566,7 @@ fn neg_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 /// # Returns
 ///
 /// Returns an expression node representing the parsed primary expression.
-fn primary_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn primary_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         map(number.convert_errors(), |n| {
             let parse_result = n.lexeme().parse::<f64>();
@@ -625,7 +625,7 @@ fn primary_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 ///
 /// Returns an expression node representing the function call, or an error if
 /// the function call is malformed (e.g., unclosed parentheses).
-fn function_call(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn function_call(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, name) = identifier.convert_errors().parse(input)?;
     let name_span = AstSpan::from(&name);
     let name = Node::new(&name_span, Identifier::new(name.lexeme().to_string()));
@@ -669,7 +669,7 @@ fn function_call(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 ///
 /// Returns an expression node representing the variable, which can be either
 /// a simple identifier or a nested accessor structure.
-fn variable(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn variable(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, parameter_id) = identifier.convert_errors().parse(input)?;
     let parameter_id_span = AstSpan::from(&parameter_id);
     let parameter_id = Node::new(
@@ -741,7 +741,7 @@ fn variable(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
 ///
 /// Returns an expression node representing the parenthesized expression, or an error if
 /// the parentheses are malformed (e.g., unclosed parentheses or missing expression).
-fn parenthesized_expr(input: Span<'_>) -> Result<'_, ExprNode, ParserError> {
+fn parenthesized_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
 
     let (rest, expr) = expr
@@ -768,7 +768,7 @@ mod tests {
 
     #[test]
     fn test_primary_expr_number() {
-        let input = Span::new_extra("42", Config::default());
+        let input = InputSpan::new_extra("42", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_expr = Node::new(
@@ -781,7 +781,7 @@ mod tests {
 
     #[test]
     fn test_primary_expr_string() {
-        let input = Span::new_extra("'hello'", Config::default());
+        let input = InputSpan::new_extra("'hello'", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_expr = Node::new(
@@ -797,7 +797,7 @@ mod tests {
 
     #[test]
     fn test_primary_expr_boolean_true() {
-        let input = Span::new_extra("true", Config::default());
+        let input = InputSpan::new_extra("true", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_expr = Node::new(
@@ -810,7 +810,7 @@ mod tests {
 
     #[test]
     fn test_primary_expr_boolean_false() {
-        let input = Span::new_extra("false", Config::default());
+        let input = InputSpan::new_extra("false", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_expr = Node::new(
@@ -823,7 +823,7 @@ mod tests {
 
     #[test]
     fn test_primary_expr_simple_identifier() {
-        let input = Span::new_extra("foo", Config::default());
+        let input = InputSpan::new_extra("foo", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_id = Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
@@ -841,7 +841,7 @@ mod tests {
 
     #[test]
     fn test_primary_expr_multiword_identifier() {
-        let input = Span::new_extra("foo.bar", Config::default());
+        let input = InputSpan::new_extra("foo.bar", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_id = Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
@@ -858,7 +858,7 @@ mod tests {
 
     #[test]
     fn test_function_call() {
-        let input = Span::new_extra("foo(1, 2)", Config::default());
+        let input = InputSpan::new_extra("foo(1, 2)", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_foo = Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
@@ -879,7 +879,7 @@ mod tests {
 
     #[test]
     fn test_neg_expr() {
-        let input = Span::new_extra("-42", Config::default());
+        let input = InputSpan::new_extra("-42", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_42 = Node::new(&AstSpan::new(1, 2, 0), Literal::number(42.0));
@@ -894,7 +894,7 @@ mod tests {
 
     #[test]
     fn test_exponential_expr() {
-        let input = Span::new_extra("2^3", Config::default());
+        let input = InputSpan::new_extra("2^3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
@@ -915,7 +915,7 @@ mod tests {
 
     #[test]
     fn test_multiplicative_expr() {
-        let input = Span::new_extra("2*3", Config::default());
+        let input = InputSpan::new_extra("2*3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
@@ -936,7 +936,7 @@ mod tests {
 
     #[test]
     fn test_additive_expr() {
-        let input = Span::new_extra("2+3", Config::default());
+        let input = InputSpan::new_extra("2+3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
@@ -957,7 +957,7 @@ mod tests {
 
     #[test]
     fn test_minmax_expr() {
-        let input = Span::new_extra("min_weight | max_weight", Config::default());
+        let input = InputSpan::new_extra("min_weight | max_weight", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_min = Node::new(
@@ -986,7 +986,7 @@ mod tests {
 
     #[test]
     fn test_comparison_expr() {
-        let input = Span::new_extra("2<3", Config::default());
+        let input = InputSpan::new_extra("2<3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
@@ -1007,7 +1007,7 @@ mod tests {
 
     #[test]
     fn test_not_expr() {
-        let input = Span::new_extra("not true", Config::default());
+        let input = InputSpan::new_extra("not true", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_true = Node::new(&AstSpan::new(4, 4, 0), Literal::boolean(true));
@@ -1022,7 +1022,7 @@ mod tests {
 
     #[test]
     fn test_and_expr() {
-        let input = Span::new_extra("true and false", Config::default());
+        let input = InputSpan::new_extra("true and false", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_true = Node::new(&AstSpan::new(0, 4, 1), Literal::boolean(true));
@@ -1043,7 +1043,7 @@ mod tests {
 
     #[test]
     fn test_or_expr() {
-        let input = Span::new_extra("true or false", Config::default());
+        let input = InputSpan::new_extra("true or false", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_true = Node::new(&AstSpan::new(0, 4, 1), Literal::boolean(true));
@@ -1064,7 +1064,7 @@ mod tests {
 
     #[test]
     fn test_chained_comparison_expr() {
-        let input = Span::new_extra("1 < 2 < 3", Config::default());
+        let input = InputSpan::new_extra("1 < 2 < 3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_1 = Node::new(&AstSpan::new(0, 1, 1), Literal::number(1.0));
@@ -1089,7 +1089,7 @@ mod tests {
 
     #[test]
     fn test_chained_comparison_expr_different_ops() {
-        let input = Span::new_extra("x <= y < z", Config::default());
+        let input = InputSpan::new_extra("x <= y < z", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_x = Node::new(&AstSpan::new(0, 1, 1), Identifier::new("x".to_string()));
@@ -1117,7 +1117,7 @@ mod tests {
 
     #[test]
     fn test_chained_comparison_expr_three_ops() {
-        let input = Span::new_extra("a >= b == c", Config::default());
+        let input = InputSpan::new_extra("a >= b == c", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_a = Node::new(&AstSpan::new(0, 1, 1), Identifier::new("a".to_string()));
@@ -1145,7 +1145,7 @@ mod tests {
 
     #[test]
     fn test_chained_comparison_expr_with_expressions() {
-        let input = Span::new_extra("x + 1 < y * 2 <= z - 3", Config::default());
+        let input = InputSpan::new_extra("x + 1 < y * 2 <= z - 3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         // This is a complex expression, so we just verify it parses correctly
@@ -1155,7 +1155,7 @@ mod tests {
 
     #[test]
     fn test_single_comparison_expr() {
-        let input = Span::new_extra("x != y", Config::default());
+        let input = InputSpan::new_extra("x != y", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_x = Node::new(&AstSpan::new(0, 1, 1), Identifier::new("x".to_string()));
@@ -1178,7 +1178,7 @@ mod tests {
 
     #[test]
     fn test_no_comparison_expr() {
-        let input = Span::new_extra("42", Config::default());
+        let input = InputSpan::new_extra("42", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
         let expected_42 = Node::new(&AstSpan::new(0, 2, 0), Literal::number(42.0));
@@ -1189,7 +1189,7 @@ mod tests {
 
     #[test]
     fn test_complex_expr() {
-        let input = Span::new_extra("-(2 + 3*4^2) < foo(5, 6) and not bar", Config::default());
+        let input = InputSpan::new_extra("-(2 + 3*4^2) < foo(5, 6) and not bar", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
         // The exact structure is complex but we just verify it parses
         assert!(matches!(expr.node_value(), Expr::BinaryOp { .. }));
@@ -1197,7 +1197,7 @@ mod tests {
 
     #[test]
     fn test_parse_complete_success() {
-        let input = Span::new_extra("42", Config::default());
+        let input = InputSpan::new_extra("42", Config::default());
         let (rest, expr) = parse_complete(input).expect("parsing should succeed");
 
         let expected_42 = Node::new(&AstSpan::new(0, 2, 0), Literal::number(42.0));
@@ -1209,7 +1209,7 @@ mod tests {
 
     #[test]
     fn test_parse_complete_with_remaining_input() {
-        let input = Span::new_extra("42 rest", Config::default());
+        let input = InputSpan::new_extra("42 rest", Config::default());
         let result = parse_complete(input);
         assert!(result.is_err());
     }
@@ -1223,7 +1223,7 @@ mod tests {
 
             #[test]
             fn test_empty_input() {
-                let input = Span::new_extra("", Config::default());
+                let input = InputSpan::new_extra("", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1239,7 +1239,7 @@ mod tests {
 
             #[test]
             fn test_whitespace_only() {
-                let input = Span::new_extra("   ", Config::default());
+                let input = InputSpan::new_extra("   ", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1255,7 +1255,7 @@ mod tests {
 
             #[test]
             fn test_symbols_only() {
-                let input = Span::new_extra("+++", Config::default());
+                let input = InputSpan::new_extra("+++", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1271,7 +1271,7 @@ mod tests {
 
             #[test]
             fn test_parse_complete_with_remaining_input() {
-                let input = Span::new_extra("42 + 1 rest", Config::default());
+                let input = InputSpan::new_extra("42 + 1 rest", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1288,7 +1288,7 @@ mod tests {
 
             #[test]
             fn test_negation_missing_operand() {
-                let input = Span::new_extra("-", Config::default());
+                let input = InputSpan::new_extra("-", Config::default());
                 let result = parse(input);
                 let expected_minus_span = AstSpan::new(0, 1, 0);
 
@@ -1313,7 +1313,7 @@ mod tests {
 
             #[test]
             fn test_not_missing_operand() {
-                let input = Span::new_extra("not", Config::default());
+                let input = InputSpan::new_extra("not", Config::default());
                 let result = parse(input);
                 let expected_not_span = AstSpan::new(0, 3, 0);
 
@@ -1342,7 +1342,7 @@ mod tests {
 
             #[test]
             fn test_addition_missing_second_operand() {
-                let input = Span::new_extra("1 +", Config::default());
+                let input = InputSpan::new_extra("1 +", Config::default());
                 let result = parse(input);
                 let expected_plus_span = AstSpan::new(2, 1, 0);
 
@@ -1369,7 +1369,7 @@ mod tests {
 
             #[test]
             fn test_multiplication_missing_second_operand() {
-                let input = Span::new_extra("2 *", Config::default());
+                let input = InputSpan::new_extra("2 *", Config::default());
                 let result = parse(input);
                 let expected_star_span = AstSpan::new(2, 1, 0);
 
@@ -1396,7 +1396,7 @@ mod tests {
 
             #[test]
             fn test_exponentiation_missing_second_operand() {
-                let input = Span::new_extra("2 ^", Config::default());
+                let input = InputSpan::new_extra("2 ^", Config::default());
                 let result = parse(input);
                 let expected_caret_span = AstSpan::new(2, 1, 0);
 
@@ -1423,7 +1423,7 @@ mod tests {
 
             #[test]
             fn test_comparison_missing_second_operand() {
-                let input = Span::new_extra("x <", Config::default());
+                let input = InputSpan::new_extra("x <", Config::default());
                 let result = parse(input);
                 let expected_less_span = AstSpan::new(2, 1, 0);
 
@@ -1450,7 +1450,7 @@ mod tests {
 
             #[test]
             fn test_logical_and_missing_second_operand() {
-                let input = Span::new_extra("true and", Config::default());
+                let input = InputSpan::new_extra("true and", Config::default());
                 let result = parse(input);
                 let expected_and_span = AstSpan::new(5, 3, 0);
 
@@ -1477,7 +1477,7 @@ mod tests {
 
             #[test]
             fn test_logical_or_missing_second_operand() {
-                let input = Span::new_extra("false or", Config::default());
+                let input = InputSpan::new_extra("false or", Config::default());
                 let result = parse(input);
                 let expected_or_span = AstSpan::new(6, 2, 0);
 
@@ -1504,7 +1504,7 @@ mod tests {
 
             #[test]
             fn test_minmax_missing_second_operand() {
-                let input = Span::new_extra("min_weight |", Config::default());
+                let input = InputSpan::new_extra("min_weight |", Config::default());
                 let result = parse(input);
                 let expected_bar_span = AstSpan::new(11, 1, 0);
 
@@ -1535,7 +1535,7 @@ mod tests {
 
             #[test]
             fn test_missing_expression_in_parentheses() {
-                let input = Span::new_extra("()", Config::default());
+                let input = InputSpan::new_extra("()", Config::default());
                 let result = parse(input);
                 let expected_paren_left_span = AstSpan::new(0, 1, 0);
 
@@ -1558,7 +1558,7 @@ mod tests {
 
             #[test]
             fn test_unclosed_parentheses() {
-                let input = Span::new_extra("(1 + 2", Config::default());
+                let input = InputSpan::new_extra("(1 + 2", Config::default());
                 let result = parse(input);
                 let expected_paren_left_span = AstSpan::new(0, 1, 0);
 
@@ -1581,7 +1581,7 @@ mod tests {
 
             #[test]
             fn test_nested_unclosed_parentheses() {
-                let input = Span::new_extra("((1 + 2)", Config::default());
+                let input = InputSpan::new_extra("((1 + 2)", Config::default());
                 let result = parse(input);
                 let expected_paren_left_span = AstSpan::new(0, 1, 0);
 
@@ -1608,7 +1608,7 @@ mod tests {
 
             #[test]
             fn test_missing_opening_paren() {
-                let input = Span::new_extra("foo", Config::default());
+                let input = InputSpan::new_extra("foo", Config::default());
                 let result = parse(input);
                 // This should succeed as it's a valid variable
                 assert!(result.is_ok());
@@ -1616,7 +1616,7 @@ mod tests {
 
             #[test]
             fn test_missing_closing_paren() {
-                let input = Span::new_extra("foo(1, 2", Config::default());
+                let input = InputSpan::new_extra("foo(1, 2", Config::default());
                 let result = parse(input);
                 let expected_paren_left_span = AstSpan::new(3, 1, 0);
 
@@ -1639,7 +1639,7 @@ mod tests {
 
             #[test]
             fn test_empty_function_call() {
-                let input = Span::new_extra("foo()", Config::default());
+                let input = InputSpan::new_extra("foo()", Config::default());
                 let result = parse(input);
                 // This should succeed as it's a valid function call with no arguments
                 assert!(result.is_ok());
@@ -1647,7 +1647,7 @@ mod tests {
 
             #[test]
             fn test_missing_argument_after_comma() {
-                let input = Span::new_extra("foo(1,)", Config::default());
+                let input = InputSpan::new_extra("foo(1,)", Config::default());
                 let result = parse(input);
                 let expected_paren_left_span = AstSpan::new(3, 1, 0);
 
@@ -1674,7 +1674,7 @@ mod tests {
 
             #[test]
             fn test_missing_identifier_after_dot() {
-                let input = Span::new_extra("foo.", Config::default());
+                let input = InputSpan::new_extra("foo.", Config::default());
                 let result = parse(input);
                 let expected_dot_span = AstSpan::new(3, 1, 0);
 
@@ -1701,7 +1701,7 @@ mod tests {
 
             #[test]
             fn test_unterminated_string() {
-                let input = Span::new_extra("'hello", Config::default());
+                let input = InputSpan::new_extra("'hello", Config::default());
                 let result = parse(input);
                 // This should be a token error for unterminated string
                 match result {
@@ -1715,7 +1715,7 @@ mod tests {
 
             #[test]
             fn test_invalid_number() {
-                let input = Span::new_extra("@", Config::default());
+                let input = InputSpan::new_extra("@", Config::default());
                 let result = parse(input);
                 // This should be an Expect(Expr) error since @ is not a valid expression start
                 match result {
@@ -1738,7 +1738,7 @@ mod tests {
 
             #[test]
             fn test_chained_binary_ops_missing_operand() {
-                let input = Span::new_extra("1 + 2 *", Config::default());
+                let input = InputSpan::new_extra("1 + 2 *", Config::default());
                 let result = parse(input);
                 let expected_star_span = AstSpan::new(6, 1, 0);
 
@@ -1765,7 +1765,7 @@ mod tests {
 
             #[test]
             fn test_complex_expression_missing_operand() {
-                let input = Span::new_extra("(1 + 2) * 3 +", Config::default());
+                let input = InputSpan::new_extra("(1 + 2) * 3 +", Config::default());
                 let result = parse(input);
                 let expected_plus_span = AstSpan::new(12, 1, 0);
 

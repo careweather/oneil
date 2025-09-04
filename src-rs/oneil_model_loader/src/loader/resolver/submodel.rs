@@ -69,7 +69,7 @@ use oneil_ir::{
         SubmodelName, SubmodelNameWithSpan,
     },
     reference::ModelPath,
-    span::Span,
+    span::IrSpan,
 };
 
 use crate::{
@@ -317,7 +317,7 @@ fn calc_import_path(
 )]
 fn resolve_model_path(
     model_path: ModelPath,
-    model_name_span: Span,
+    model_name_span: IrSpan,
     model_subcomponents: &[ast::naming::IdentifierNode],
     context: &ModelContext<'_>,
 ) -> Result<ModelPath, ModelImportResolutionError> {
@@ -378,13 +378,13 @@ mod tests {
         use super::*;
 
         /// Helper function to create a test AST span
-        pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
-            ast::Span::new(start, end - start, 0)
+        pub fn test_ast_span(start: usize, end: usize) -> ast::AstSpan {
+            ast::AstSpan::new(start, end - start, 0)
         }
 
         /// Helper function to create a test IR span
-        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::Span {
-            oneil_ir::span::Span::new(start, end - start)
+        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::IrSpan {
+            oneil_ir::span::IrSpan::new(start, end - start)
         }
 
         /// Helper function to create a use model node
@@ -534,7 +534,7 @@ mod tests {
         }
 
         /// Helper function to create a test model with specified submodels
-        pub fn create_test_model(submodels: Vec<(&str, (ModelPath, Span))>) -> Model {
+        pub fn create_test_model(submodels: Vec<(&str, (ModelPath, IrSpan))>) -> Model {
             let mut submodel_map = HashMap::new();
             for (name, path) in submodels {
                 let identifier = Identifier::new(name);

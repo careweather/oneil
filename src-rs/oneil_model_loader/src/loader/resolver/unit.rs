@@ -56,7 +56,7 @@ fn resolve_unit_recursive(
 
             let name_span = get_span_from_ast_span(identifier.node_span());
             let exponent_span = exponent.as_ref().map_or_else(
-                || oneil_ir::span::Span::new(identifier.node_span().end(), 0),
+                || oneil_ir::span::IrSpan::new(identifier.node_span().end(), 0),
                 |exp| get_span_from_ast_span(exp.node_span()),
             );
             let unit = oneil_ir::unit::Unit::new(
@@ -83,8 +83,8 @@ mod tests {
         use super::*;
 
         /// Helper function to create a test span
-        pub fn test_span(start: usize, end: usize) -> ast::Span {
-            ast::Span::new(start, end - start, 0)
+        pub fn test_span(start: usize, end: usize) -> ast::AstSpan {
+            ast::AstSpan::new(start, end - start, 0)
         }
 
         /// Helper function to create an identifier node

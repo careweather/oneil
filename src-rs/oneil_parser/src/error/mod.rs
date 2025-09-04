@@ -25,7 +25,7 @@
 use std::fmt;
 
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan as AstSpan,
     expression::{BinaryOpNode, ComparisonOpNode, UnaryOpNode},
     span::SpanLike,
     unit::UnitOpNode,
@@ -33,7 +33,7 @@ use oneil_ast::{
 use oneil_error::{AsOneilError, Context, ErrorLocation};
 
 use crate::{
-    Span,
+    InputSpan,
     token::{
         Token,
         error::{TokenError, TokenErrorKind},
@@ -490,8 +490,8 @@ impl fmt::Display for ParserError {
     }
 }
 
-impl<'a> nom::error::ParseError<Span<'a>> for ParserError {
-    fn from_error_kind(input: Span<'a>, reason: nom::error::ErrorKind) -> Self {
+impl<'a> nom::error::ParseError<InputSpan<'a>> for ParserError {
+    fn from_error_kind(input: InputSpan<'a>, reason: nom::error::ErrorKind) -> Self {
         let reason = match reason {
             // If `all_consuming` is used, we expect the parser to consume the entire input
             nom::error::ErrorKind::Eof => ParserErrorReason::unexpected_token(),
@@ -504,7 +504,7 @@ impl<'a> nom::error::ParseError<Span<'a>> for ParserError {
         }
     }
 
-    fn append(_input: Span<'a>, _kind: nom::error::ErrorKind, other: Self) -> Self {
+    fn append(_input: InputSpan<'a>, _kind: nom::error::ErrorKind, other: Self) -> Self {
         other
     }
 }

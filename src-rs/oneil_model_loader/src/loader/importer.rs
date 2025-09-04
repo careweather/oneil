@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use oneil_ir::{
     reference::{ModelPath, PythonPath},
-    span::Span,
+    span::IrSpan,
 };
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     util::{builder::ModelCollectionBuilder, get_span_from_ast_span},
 };
 
-type ValidatedImports = HashMap<PythonPath, Span>;
+type ValidatedImports = HashMap<PythonPath, IrSpan>;
 type ImportErrors = HashMap<PythonPath, ImportResolutionError>;
 
 /// Validates a list of Python import declarations for a given model.
@@ -105,7 +105,7 @@ mod tests {
     mod helper {
         use std::collections::HashSet;
 
-        use oneil_ast::{Span, declaration::Import, node::Node};
+        use oneil_ast::{AstSpan, declaration::Import, node::Node};
 
         use super::*;
 
@@ -119,7 +119,7 @@ mod tests {
 
         pub fn build_import(path: &str) -> ImportNode {
             // for simplicity's sake, we'll use a span that's the length of the path
-            let span = Span::new(0, path.len(), 0);
+            let span = AstSpan::new(0, path.len(), 0);
             let import = Import::new(Node::new(&span, path.to_string()));
             Node::new(&span, import)
         }
@@ -130,7 +130,7 @@ mod tests {
             end: usize,
             line: usize,
         ) -> ImportNode {
-            let span = Span::new(start, end, line);
+            let span = AstSpan::new(start, end, line);
             let import = Import::new(Node::new(&span, path.to_string()));
             Node::new(&span, import)
         }

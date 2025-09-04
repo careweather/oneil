@@ -310,7 +310,7 @@ mod tests {
     // re-export ast types for testing convenience
     mod ast {
         pub use oneil_ast::{
-            Span,
+            AstSpan,
             declaration::{Decl, ModelInfo, ModelKind, UseModel},
             model::{Model, ModelNode, Section, SectionHeader},
             naming::{Identifier, Label},
@@ -323,12 +323,12 @@ mod tests {
 
         use crate::test::TestBuiltinRef;
 
-        pub fn unimportant_span() -> ast::Span {
-            ast::Span::new(0, 0, 0)
+        pub fn unimportant_span() -> ast::AstSpan {
+            ast::AstSpan::new(0, 0, 0)
         }
 
-        pub fn span_from_str(s: &str) -> ast::Span {
-            ast::Span::new(0, s.len(), 0)
+        pub fn span_from_str(s: &str) -> ast::AstSpan {
+            ast::AstSpan::new(0, s.len(), 0)
         }
 
         /// Creates an empty test model
@@ -522,7 +522,7 @@ mod tests {
                     SubmodelName::new("sub".to_string()),
                     ModelImportResolutionError::model_has_error(
                         ModelPath::new("sub"),
-                        oneil_ir::span::Span::new(0, 3)
+                        oneil_ir::span::IrSpan::new(0, 3)
                     )
                 )]),
                 HashMap::new(),
@@ -540,7 +540,7 @@ mod tests {
                     SubmodelName::new("main".to_string()),
                     ModelImportResolutionError::model_has_error(
                         ModelPath::new("main"),
-                        oneil_ir::span::Span::new(0, 4)
+                        oneil_ir::span::IrSpan::new(0, 4)
                     )
                 )]),
                 HashMap::new(),

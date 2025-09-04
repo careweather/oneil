@@ -4,7 +4,7 @@ use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{
     model_import::{ReferenceName, SubmodelName},
     reference::ModelPath,
-    span::Span,
+    span::IrSpan,
 };
 
 /// Represents an error that occurred during submodel resolution.
@@ -19,7 +19,7 @@ pub enum ModelImportResolutionError {
         /// The path of the model that has errors
         model_path: ModelPath,
         /// The span of where the model is referenced
-        reference_span: Span,
+        reference_span: IrSpan,
     },
     /// The submodel identifier is not defined in the referenced model.
     UndefinedSubmodel {
@@ -28,25 +28,25 @@ pub enum ModelImportResolutionError {
         /// The identifier of the submodel that is undefined
         submodel: SubmodelName,
         /// The span of where the submodel is referenced
-        reference_span: Span,
+        reference_span: IrSpan,
     },
     /// The submodel name is a duplicate.
     DuplicateSubmodel {
         /// The identifier of the duplicate submodel
         submodel: SubmodelName,
         /// The span of where the original submodel is referenced
-        original_span: Span,
+        original_span: IrSpan,
         /// The span of where the duplicate submodel is referenced
-        duplicate_span: Span,
+        duplicate_span: IrSpan,
     },
     /// The reference name is a duplicate.
     DuplicateReference {
         /// The identifier of the duplicate reference
         reference: ReferenceName,
         /// The span of where the original reference is referenced
-        original_span: Span,
+        original_span: IrSpan,
         /// The span of where the duplicate reference is referenced
-        duplicate_span: Span,
+        duplicate_span: IrSpan,
     },
 }
 
@@ -62,7 +62,7 @@ impl ModelImportResolutionError {
     ///
     /// A new `SubmodelResolutionError::ModelHasError` variant.
     #[must_use]
-    pub const fn model_has_error(model_path: ModelPath, reference_span: Span) -> Self {
+    pub const fn model_has_error(model_path: ModelPath, reference_span: IrSpan) -> Self {
         Self::ModelHasError {
             model_path,
             reference_span,
@@ -84,7 +84,7 @@ impl ModelImportResolutionError {
     pub const fn undefined_submodel_in_submodel(
         parent_model_path: ModelPath,
         submodel: SubmodelName,
-        reference_span: Span,
+        reference_span: IrSpan,
     ) -> Self {
         Self::UndefinedSubmodel {
             parent_model_path,
@@ -107,8 +107,8 @@ impl ModelImportResolutionError {
     #[must_use]
     pub const fn duplicate_submodel(
         submodel: SubmodelName,
-        original_span: Span,
-        duplicate_span: Span,
+        original_span: IrSpan,
+        duplicate_span: IrSpan,
     ) -> Self {
         Self::DuplicateSubmodel {
             submodel,
@@ -131,8 +131,8 @@ impl ModelImportResolutionError {
     #[must_use]
     pub const fn duplicate_reference(
         reference: ReferenceName,
-        original_span: Span,
-        duplicate_span: Span,
+        original_span: IrSpan,
+        duplicate_span: IrSpan,
     ) -> Self {
         Self::DuplicateReference {
             reference,

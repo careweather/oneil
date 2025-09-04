@@ -87,7 +87,7 @@ pub mod error;
 mod token;
 
 mod util;
-use util::{Result as InternalResult, Span};
+use util::{Result as InternalResult, InputSpan};
 
 mod declaration;
 mod expression;
@@ -381,10 +381,10 @@ pub fn parse_unit(input: &str, config: Option<Config>) -> Result<UnitExprNode, e
 fn parse<T, E>(
     input: &str,
     config: Option<Config>,
-    parser: impl Fn(Span<'_>) -> InternalResult<'_, T, E>,
+    parser: impl Fn(InputSpan<'_>) -> InternalResult<'_, T, E>,
 ) -> Result<T, E> {
     let config = config.unwrap_or_default();
-    let input = Span::new_extra(input, config);
+    let input = InputSpan::new_extra(input, config);
     let result = parser(input);
 
     match result {

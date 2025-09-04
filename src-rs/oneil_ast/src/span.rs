@@ -8,13 +8,13 @@
 /// Spans are used throughout the AST to provide precise location information
 /// for error reporting, debugging, and other source-aware operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Span {
+pub struct AstSpan {
     start: usize,
     length: usize,
     whitespace_length: usize,
 }
 
-impl Span {
+impl AstSpan {
     /// Creates a new span with the given positions
     #[must_use]
     pub const fn new(start: usize, length: usize, whitespace_length: usize) -> Self {
@@ -117,7 +117,7 @@ pub trait SpanLike {
     }
 }
 
-impl SpanLike for Span {
+impl SpanLike for AstSpan {
     fn get_start(&self) -> usize {
         self.start
     }
@@ -131,7 +131,7 @@ impl SpanLike for Span {
     }
 }
 
-impl<T> From<&T> for Span
+impl<T> From<&T> for AstSpan
 where
     T: SpanLike,
 {

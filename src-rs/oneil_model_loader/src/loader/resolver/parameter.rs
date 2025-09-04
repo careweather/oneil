@@ -26,7 +26,7 @@ use oneil_ast::{self as ast, node::Node};
 use oneil_ir::{
     parameter::{Parameter, ParameterCollection, ParameterValue, PiecewiseExpr},
     reference::Identifier,
-    span::{Span, WithSpan},
+    span::{IrSpan, WithSpan},
 };
 
 use crate::{
@@ -102,7 +102,7 @@ pub fn resolve_parameters(
     // split the parameter map into two maps, one for the spans and one for the
     // AST nodes
     let (parameter_span_map, parameter_ast_map): (
-        HashMap<_, Span>,
+        HashMap<_, IrSpan>,
         HashMap<_, &ast::parameter::ParameterNode>,
     ) = parameter_map
         .into_iter()
@@ -558,8 +558,8 @@ mod tests {
         use super::*;
 
         /// Helper function to create a test span
-        pub fn test_span(start: usize, end: usize) -> ast::Span {
-            ast::Span::new(start, end - start, 0)
+        pub fn test_span(start: usize, end: usize) -> ast::AstSpan {
+            ast::AstSpan::new(start, end - start, 0)
         }
 
         /// Helper function to create a literal expression node

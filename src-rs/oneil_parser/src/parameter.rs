@@ -33,7 +33,7 @@ use oneil_ast::parameter::{
     LimitsNode, ParameterValueNode, PerformanceMarker, PerformanceMarkerNode, PiecewisePartNode,
 };
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan,
     parameter::{Limits, Parameter, ParameterNode, ParameterValue, PiecewisePart},
 };
 
@@ -50,19 +50,19 @@ use crate::token::{
     },
 };
 use crate::unit::parse as parse_unit;
-use crate::util::{Result, Span};
+use crate::util::{Result, InputSpan};
 
 /// Parse a parameter declaration, e.g. `$ * x(0,100): y = 2*z : kg`.
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
+pub fn parse(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError> {
     parameter_decl(input)
 }
 
 /// Parse a parameter declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
+pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError> {
     all_consuming(parameter_decl).parse(input)
 }
 
@@ -127,7 +127,7 @@ pub fn parse_complete(input: Span<'_>) -> Result<'_, ParameterNode, ParserError>
 /// // Piecewise parameter
 /// let param = parse_parameter("Force: f = { 2*x if x > 0\n{ 0 if x <= 0\n", None).unwrap();
 /// ```
-fn parameter_decl(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
+fn parameter_decl(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError> {
     let (rest, performance_marker) = opt(performance_marker).parse(input)?;
 
     let (rest, trace_level) = opt(trace_level).parse(rest)?;
@@ -216,7 +216,7 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, ParameterNode, ParserError> {
 /// let param = parse_parameter("$ Speed: v = 10.0 :m/s", None).unwrap();
 /// assert!(param.performance_marker().is_some());
 /// ```
-fn performance_marker(input: Span<'_>) -> Result<'_, PerformanceMarkerNode, ParserError> {
+fn performance_marker(input: InputSpan<'_>) -> Result<'_, PerformanceMarkerNode, ParserError> {
     dollar
         .convert_errors()
         .map(|token| Node::new(&token, PerformanceMarker::new()))
@@ -237,7 +237,7 @@ fn performance_marker(input: Span<'_>) -> Result<'_, PerformanceMarkerNode, Pars
 ///
 /// Returns a trace level node if a valid trace indicator is found, or an error
 /// if the token is malformed.
-fn trace_level(input: Span<'_>) -> Result<'_, TraceLevelNode, ParserError> {
+fn trace_level(input: InputSpan<'_>) -> Result<'_, TraceLevelNode, ParserError> {
     let single_star = star.map(|token| Node::new(&token, TraceLevel::Trace));
     let double_star = star_star.map(|token| Node::new(&token, TraceLevel::Debug));
 
@@ -258,7 +258,7 @@ fn trace_level(input: Span<'_>) -> Result<'_, TraceLevelNode, ParserError> {
 ///
 /// Returns a limits node if valid limits are found, or an error if the
 /// limits are malformed.
-fn limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
+fn limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
     alt((continuous_limits, discrete_limits)).parse(input)
 }
 
@@ -284,7 +284,7 @@ fn limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
 /// - **Missing comma**: When no comma separates the minimum and maximum values
 /// - **Missing maximum value**: When no expression follows the comma
 /// - **Missing closing parenthesis**: When the limits are not properly closed
-fn continuous_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
+fn continuous_limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
     let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
     let (rest, min) = parse_expr
@@ -330,7 +330,7 @@ fn continuous_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
 /// - **Missing opening bracket**: When the input doesn't start with `[`
 /// - **Missing values**: When no expressions are found after the opening bracket
 /// - **Missing closing bracket**: When the limits are not properly closed
-fn discrete_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
+fn discrete_limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
     let (rest, bracket_left_token) = bracket_left.convert_errors().parse(input)?;
 
     let (rest, values) = separated_list1(comma.convert_errors(), parse_expr)
@@ -374,7 +374,7 @@ fn discrete_limits(input: Span<'_>) -> Result<'_, LimitsNode, ParserError> {
 /// // Piecewise value
 /// let param = parse_parameter("Force: f = { 2*x if x > 0\n{ 0 if x <= 0", None).unwrap();
 /// ```
-fn parameter_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> {
+fn parameter_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, ParserError> {
     simple_value.or(piecewise_value).parse(input)
 }
 
@@ -412,7 +412,7 @@ fn parameter_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserErro
 /// // Simple value with compound unit
 /// let param = parse_parameter("Speed: v = 5.0 :m/s", None).unwrap();
 /// ```
-fn simple_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> {
+fn simple_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, ParserError> {
     let (rest, expr) = parse_expr.parse(input)?;
 
     let (rest, unit) = opt(|input| {
@@ -472,7 +472,7 @@ fn simple_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> 
 /// // Multiple pieces
 /// let param = parse_parameter("Function: y = { x^2 if x > 0\n{ 0 if x == 0\n{ -x^2 if x < 0\n", None).unwrap();
 /// ```
-fn piecewise_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserError> {
+fn piecewise_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, ParserError> {
     let (rest, first_part) = piecewise_part.parse(input)?;
 
     let (rest, unit) = opt(|input| {
@@ -540,7 +540,7 @@ fn piecewise_value(input: Span<'_>) -> Result<'_, ParameterValueNode, ParserErro
 /// // Complex piecewise part
 /// let param = parse_parameter("Result: r = { 2*x + 1 if x >= 0 and x < 10\n", None).unwrap();
 /// ```
-fn piecewise_part(input: Span<'_>) -> Result<'_, PiecewisePartNode, ParserError> {
+fn piecewise_part(input: InputSpan<'_>) -> Result<'_, PiecewisePartNode, ParserError> {
     let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
 
     let (rest, expr) = parse_expr
@@ -580,7 +580,7 @@ mod tests {
 
         #[test]
         fn test_parse_simple_parameter() {
-            let input = Span::new_extra("x: y = 42", Config::default());
+            let input = InputSpan::new_extra("x: y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse simple parameter");
 
             assert_eq!(param.label().as_str(), "x");
@@ -605,14 +605,14 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_multiword_label() {
-            let input = Span::new_extra("Value of x: x = 42", Config::default());
+            let input = InputSpan::new_extra("Value of x: x = 42", Config::default());
             let (_, param) = parse(input).expect("Parameter should parse");
             assert_eq!(param.label().as_str(), "Value of x");
         }
 
         #[test]
         fn test_parse_parameter_with_continuous_limits() {
-            let input = Span::new_extra("x(0, 100): y = 42", Config::default());
+            let input = InputSpan::new_extra("x(0, 100): y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with continuous limits");
 
             match param.limits().map(Node::node_value) {
@@ -635,7 +635,7 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_discrete_limits() {
-            let input = Span::new_extra("x[1, 2, 3]: y = 42", Config::default());
+            let input = InputSpan::new_extra("x[1, 2, 3]: y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with discrete limits");
 
             match param.limits().map(oneil_ast::node::Node::node_value) {
@@ -665,7 +665,7 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_performance() {
-            let input = Span::new_extra("$ x: y = 42", Config::default());
+            let input = InputSpan::new_extra("$ x: y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with performance");
 
             assert!(param.performance_marker().is_some());
@@ -673,7 +673,7 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_trace() {
-            let input = Span::new_extra("* x: y = 42", Config::default());
+            let input = InputSpan::new_extra("* x: y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with trace");
 
             assert_eq!(
@@ -684,7 +684,7 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_debug() {
-            let input = Span::new_extra("** x: y = 42", Config::default());
+            let input = InputSpan::new_extra("** x: y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with debug");
 
             assert_eq!(
@@ -695,7 +695,7 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_simple_units() {
-            let input = Span::new_extra("x: y = 42 : kg", Config::default());
+            let input = InputSpan::new_extra("x: y = 42 : kg", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with simple units");
             match param.value().node_value() {
                 ParameterValue::Simple(expr, unit) => {
@@ -722,7 +722,7 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_compound_units() {
-            let input = Span::new_extra("x: y = 42 : m/s^2", Config::default());
+            let input = InputSpan::new_extra("x: y = 42 : m/s^2", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with compound units");
             match param.value().node_value() {
                 ParameterValue::Simple(_expr, unit) => {
@@ -743,7 +743,7 @@ mod tests {
 
         #[test]
         fn test_parse_piecewise_parameter() {
-            let input = Span::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
+            let input = InputSpan::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
             let (_, param) = parse(input).expect("should parse piecewise parameter");
             match param.node_value().value().node_value() {
                 ParameterValue::Piecewise(piecewise, unit) => {
@@ -781,7 +781,7 @@ mod tests {
 
         #[test]
         fn test_parse_piecewise_parameter_with_units() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "x: y = {2*z if z > 0 : m/s \n {0 if z <= 0 ",
                 Config::default(),
             );
@@ -798,7 +798,7 @@ mod tests {
 
         #[test]
         fn test_parse_parameter_with_all_features() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "$ ** x(0, 100): y = {2*z if z > 0 : kg/m^2 \n {-z if z <= 0",
                 Config::default(),
             );
@@ -843,7 +843,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_success() {
-            let input = Span::new_extra("x: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x: y = 42\n", Config::default());
             let (rest, param) = parse_complete(input).expect("should parse complete parameter");
             assert_eq!(param.label().as_str(), "x");
             assert_eq!(param.ident().as_str(), "y");
@@ -867,7 +867,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_success() {
-            let input = Span::new_extra("x: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x: y = 42\n", Config::default());
             let (rest, param) = parse_complete(input).expect("should parse complete parameter");
             assert_eq!(param.label().as_str(), "x");
             assert_eq!(param.ident().as_str(), "y");
@@ -887,7 +887,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_with_remaining_input() {
-            let input = Span::new_extra("x: y = 42\nrest", Config::default());
+            let input = InputSpan::new_extra("x: y = 42\nrest", Config::default());
             let result = parse_complete(input);
             assert!(result.is_err());
         }
@@ -898,7 +898,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_label() {
-            let input = Span::new_extra(": y = 42\n", Config::default());
+            let input = InputSpan::new_extra(": y = 42\n", Config::default());
             let result = parse(input);
 
             match result {
@@ -915,7 +915,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_identifier() {
-            let input = Span::new_extra("x: = 42\n", Config::default());
+            let input = InputSpan::new_extra("x: = 42\n", Config::default());
             let result = parse(input);
             let expected_colon_span = AstSpan::new(1, 1, 1);
 
@@ -938,7 +938,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_equals_sign() {
-            let input = Span::new_extra("x: y 42\n", Config::default());
+            let input = InputSpan::new_extra("x: y 42\n", Config::default());
             let result = parse(input);
             let expected_ident_span = AstSpan::new(3, 1, 1);
 
@@ -961,7 +961,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_value() {
-            let input = Span::new_extra("x: y =\n", Config::default());
+            let input = InputSpan::new_extra("x: y =\n", Config::default());
             let result = parse(input);
             let expected_equals_span = AstSpan::new(5, 1, 0);
 
@@ -984,7 +984,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_unit_after_colon() {
-            let input = Span::new_extra("x: y = 42 :\n", Config::default());
+            let input = InputSpan::new_extra("x: y = 42 :\n", Config::default());
             let result = parse(input);
             let expected_colon_span = AstSpan::new(10, 1, 0);
 
@@ -1007,7 +1007,7 @@ mod tests {
 
         #[test]
         fn test_error_continuous_limits_missing_min() {
-            let input = Span::new_extra("x(, 100): y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x(, 100): y = 42\n", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(1, 1, 0);
 
@@ -1030,7 +1030,7 @@ mod tests {
 
         #[test]
         fn test_error_continuous_limits_missing_comma() {
-            let input = Span::new_extra("x(0 100): y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x(0 100): y = 42\n", Config::default());
             let result = parse(input);
             let expected_min_span = AstSpan::new(2, 1, 1);
 
@@ -1053,7 +1053,7 @@ mod tests {
 
         #[test]
         fn test_error_continuous_limits_missing_max() {
-            let input = Span::new_extra("x(0,): y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x(0,): y = 42\n", Config::default());
             let result = parse(input);
             let expected_comma_span = AstSpan::new(3, 1, 0);
 
@@ -1076,7 +1076,7 @@ mod tests {
 
         #[test]
         fn test_error_continuous_limits_unclosed_paren() {
-            let input = Span::new_extra("x(0, 100: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x(0, 100: y = 42\n", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(1, 1, 0);
 
@@ -1099,7 +1099,7 @@ mod tests {
 
         #[test]
         fn test_error_discrete_limits_missing_values() {
-            let input = Span::new_extra("x[]: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x[]: y = 42\n", Config::default());
             let result = parse(input);
             let expected_bracket_span = AstSpan::new(1, 1, 0);
 
@@ -1122,7 +1122,7 @@ mod tests {
 
         #[test]
         fn test_error_discrete_limits_unclosed_bracket() {
-            let input = Span::new_extra("x[1, 2, 3: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x[1, 2, 3: y = 42\n", Config::default());
             let result = parse(input);
             let expected_bracket_span = AstSpan::new(1, 1, 0);
 
@@ -1145,7 +1145,7 @@ mod tests {
 
         #[test]
         fn test_error_piecewise_missing_expr() {
-            let input = Span::new_extra("x: y = { if z > 0\n", Config::default());
+            let input = InputSpan::new_extra("x: y = { if z > 0\n", Config::default());
             let result = parse(input);
             let expected_brace_span = AstSpan::new(7, 1, 1);
 
@@ -1168,7 +1168,7 @@ mod tests {
 
         #[test]
         fn test_error_piecewise_missing_if() {
-            let input = Span::new_extra("x: y = {2*z z > 0\n", Config::default());
+            let input = InputSpan::new_extra("x: y = {2*z z > 0\n", Config::default());
             let result = parse(input);
             let expected_expr_span = AstSpan::new(8, 3, 1);
 
@@ -1191,7 +1191,7 @@ mod tests {
 
         #[test]
         fn test_error_piecewise_missing_if_expr() {
-            let input = Span::new_extra("x: y = {2*z if\n", Config::default());
+            let input = InputSpan::new_extra("x: y = {2*z if\n", Config::default());
             let result = parse(input);
             let expected_if_span = AstSpan::new(12, 2, 0);
 
@@ -1214,7 +1214,7 @@ mod tests {
 
         #[test]
         fn test_error_piecewise_missing_unit_after_colon() {
-            let input = Span::new_extra("x: y = {2*z if z > 0 :\n", Config::default());
+            let input = InputSpan::new_extra("x: y = {2*z if z > 0 :\n", Config::default());
             let result = parse(input);
             let expected_colon_span = AstSpan::new(21, 1, 0);
 
@@ -1237,7 +1237,7 @@ mod tests {
 
         #[test]
         fn test_error_invalid_expression() {
-            let input = Span::new_extra("x: y = @invalid\n", Config::default());
+            let input = InputSpan::new_extra("x: y = @invalid\n", Config::default());
             let result = parse(input);
             let expected_equals_span = AstSpan::new(5, 1, 1);
 
@@ -1260,7 +1260,7 @@ mod tests {
 
         #[test]
         fn test_error_invalid_unit() {
-            let input = Span::new_extra("x: y = 42 : @invalid\n", Config::default());
+            let input = InputSpan::new_extra("x: y = 42 : @invalid\n", Config::default());
             let result = parse(input);
             let expected_colon_span = AstSpan::new(10, 1, 1);
 
@@ -1283,7 +1283,7 @@ mod tests {
 
         #[test]
         fn test_error_malformed_performance_marker() {
-            let input = Span::new_extra("$$ x: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("$$ x: y = 42\n", Config::default());
             let result = parse(input);
 
             match result {
@@ -1300,7 +1300,7 @@ mod tests {
 
         #[test]
         fn test_error_malformed_trace_level() {
-            let input = Span::new_extra("*** x: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("*** x: y = 42\n", Config::default());
             let result = parse(input);
 
             match result {
@@ -1317,7 +1317,7 @@ mod tests {
 
         #[test]
         fn test_error_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let result = parse(input);
 
             match result {
@@ -1334,7 +1334,7 @@ mod tests {
 
         #[test]
         fn test_error_whitespace_only() {
-            let input = Span::new_extra("   \n", Config::default());
+            let input = InputSpan::new_extra("   \n", Config::default());
             let result = parse(input);
 
             match result {
@@ -1351,7 +1351,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_colon_after_label() {
-            let input = Span::new_extra("x y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x y = 42\n", Config::default());
             let result = parse(input);
 
             match result {
@@ -1368,7 +1368,7 @@ mod tests {
 
         #[test]
         fn test_error_missing_colon_after_limits() {
-            let input = Span::new_extra("x(0, 100) y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x(0, 100) y = 42\n", Config::default());
             let result = parse(input);
 
             match result {
@@ -1385,7 +1385,7 @@ mod tests {
 
         #[test]
         fn test_error_mixed_limits_syntax() {
-            let input = Span::new_extra("x(0, 100][1, 2]: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x(0, 100][1, 2]: y = 42\n", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(1, 1, 0);
 
@@ -1408,7 +1408,7 @@ mod tests {
 
         #[test]
         fn test_error_piecewise_missing_newline_between_parts() {
-            let input = Span::new_extra("x: y = {2*z if z > 0 {0 if z <= 0\n", Config::default());
+            let input = InputSpan::new_extra("x: y = {2*z if z > 0 {0 if z <= 0\n", Config::default());
             let result = parse(input);
             let expected_first_part_span = AstSpan::new(7, 13, 1);
 
@@ -1431,7 +1431,7 @@ mod tests {
 
         #[test]
         fn test_error_continuous_limits_with_extra_comma() {
-            let input = Span::new_extra("x(0, 100,): y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x(0, 100,): y = 42\n", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(1, 1, 0);
 
@@ -1454,7 +1454,7 @@ mod tests {
 
         #[test]
         fn test_error_discrete_limits_with_trailing_comma() {
-            let input = Span::new_extra("x[1, 2, 3,]: y = 42\n", Config::default());
+            let input = InputSpan::new_extra("x[1, 2, 3,]: y = 42\n", Config::default());
             let result = parse(input);
             let expected_bracket_span = AstSpan::new(1, 1, 0);
 
@@ -1477,7 +1477,7 @@ mod tests {
 
         #[test]
         fn test_error_piecewise_with_unit_on_wrong_line() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "x: y = {2*z if z > 0\n{0 if z <= 0 : m/s\n",
                 Config::default(),
             );

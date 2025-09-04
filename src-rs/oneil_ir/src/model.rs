@@ -11,7 +11,7 @@ use crate::{
     model_import::{ReferenceMap, SubmodelImport, SubmodelMap, SubmodelName},
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
-    span::Span,
+    span::IrSpan,
     test::{Test, TestIndex},
 };
 
@@ -31,7 +31,7 @@ use crate::{
 /// identifier.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
-    python_imports: HashMap<PythonPath, Span>,
+    python_imports: HashMap<PythonPath, IrSpan>,
     submodels: SubmodelMap,
     references: ReferenceMap,
     parameters: ParameterCollection,
@@ -49,7 +49,7 @@ impl Model {
     /// * `tests` - Tests for the entire model
     #[must_use]
     pub const fn new(
-        python_imports: HashMap<PythonPath, Span>,
+        python_imports: HashMap<PythonPath, IrSpan>,
         submodels: SubmodelMap,
         references: ReferenceMap,
         parameters: ParameterCollection,
@@ -69,7 +69,7 @@ impl Model {
     /// Python imports allow models to use external Python functionality
     /// for complex calculations or data processing.
     #[must_use]
-    pub const fn get_python_imports(&self) -> &HashMap<PythonPath, Span> {
+    pub const fn get_python_imports(&self) -> &HashMap<PythonPath, IrSpan> {
         &self.python_imports
     }
 

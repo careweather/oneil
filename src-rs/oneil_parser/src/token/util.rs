@@ -2,7 +2,7 @@ use nom::{Parser as NomParser, character::complete::space0, combinator::recogniz
 use oneil_ast::span::SpanLike;
 
 use crate::token::{
-    Parser, Result, Span,
+    Parser, Result, InputSpan,
     error::{ErrorHandlingParser, TokenError},
 };
 
@@ -16,8 +16,8 @@ use crate::token::{
 /// while handling whitespace appropriately during tokenization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token<'a> {
-    lexeme: Span<'a>,
-    whitespace: Span<'a>,
+    lexeme: InputSpan<'a>,
+    whitespace: InputSpan<'a>,
 }
 
 impl<'a> Token<'a> {
@@ -31,7 +31,7 @@ impl<'a> Token<'a> {
     /// # Returns
     ///
     /// A new `Token` instance.
-    pub fn new(lexeme: Span<'a>, whitespace: Span<'a>) -> Self {
+    pub fn new(lexeme: InputSpan<'a>, whitespace: InputSpan<'a>) -> Self {
         Self { lexeme, whitespace }
     }
 
@@ -92,7 +92,7 @@ impl SpanLike for Token<'_> {
 ///
 /// Returns `Ok((remaining_input, parsed_whitespace))` on success, where the
 /// remaining input excludes the consumed whitespace.
-pub fn inline_whitespace(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
+pub fn inline_whitespace(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     space0.parse(input)
 }
 
@@ -133,21 +133,21 @@ mod tests {
 
     #[test]
     fn test_inline_whitespace_spaces() {
-        let input = Span::new_extra("   abc", Config::default());
+        let input = InputSpan::new_extra("   abc", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse leading spaces");
         assert_eq!(rest.fragment(), &"abc");
     }
 
     #[test]
     fn test_inline_whitespace_tabs() {
-        let input = Span::new_extra("\t\tfoo", Config::default());
+        let input = InputSpan::new_extra("\t\tfoo", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse leading tabs");
         assert_eq!(rest.fragment(), &"foo");
     }
 
     #[test]
     fn test_inline_whitespace_none() {
-        let input = Span::new_extra("bar", Config::default());
+        let input = InputSpan::new_extra("bar", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse no whitespace");
         assert_eq!(rest.fragment(), &"bar");
     }
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn test_token_with_whitespace() {
         let mut parser = token(tag("foo"), TokenError::expected_identifier);
-        let input = Span::new_extra("foo   bar", Config::default());
+        let input = InputSpan::new_extra("foo   bar", Config::default());
         let (rest, matched) = parser
             .parse(input)
             .expect("should parse token with trailing whitespace");
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_token_no_match() {
         let mut parser = token(tag("baz"), TokenError::expected_identifier);
-        let input = Span::new_extra("foo   bar", Config::default());
+        let input = InputSpan::new_extra("foo   bar", Config::default());
         let res = parser.parse(input);
         assert!(res.is_err());
     }

@@ -12,7 +12,7 @@ use nom::combinator::{consumed, flat_map, recognize, verify};
 use nom::multi::many0;
 
 use crate::token::{
-    Result, Span,
+    Result, InputSpan,
     error::{ErrorHandlingParser, TokenError},
     structure::end_of_line,
     util::{Token, inline_whitespace},
@@ -41,7 +41,7 @@ pub enum NoteKind {
 /// # Returns
 ///
 /// Returns the span containing the end-of-line sequence.
-fn end_of_line_span(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
+fn end_of_line_span(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     recognize(end_of_line).parse(input)
 }
 
@@ -60,7 +60,7 @@ fn end_of_line_span(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
 /// # Returns
 ///
 /// Returns a token containing the single-line note with its trailing whitespace.
-fn single_line_note(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
+fn single_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     let (rest, matched) = recognize((char('~'), not_line_ending)).parse(input)?;
     let (rest, whitespace) = end_of_line_span(rest)?;
 
@@ -85,10 +85,10 @@ fn single_line_note(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
 /// # Returns
 ///
 /// Returns the span containing the delimiter with its surrounding whitespace.
-fn multi_line_note_delimiter(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
+fn multi_line_note_delimiter(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     recognize((
         inline_whitespace,
-        verify(take_while(|c: char| c == '~'), |s: &Span<'_>| s.len() >= 3),
+        verify(take_while(|c: char| c == '~'), |s: &InputSpan<'_>| s.len() >= 3),
         inline_whitespace,
     ))
     .parse(input)
@@ -107,7 +107,7 @@ fn multi_line_note_delimiter(input: Span<'_>) -> Result<'_, Span<'_>, TokenError
 /// # Returns
 ///
 /// Returns the span containing all the note content.
-fn multi_line_note_content(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> {
+fn multi_line_note_content(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     recognize(many0(verify((not_line_ending, line_ending), |(s, _)| {
         multi_line_note_delimiter.parse(*s).is_err()
     })))
@@ -132,7 +132,7 @@ fn multi_line_note_content(input: Span<'_>) -> Result<'_, Span<'_>, TokenError> 
 /// # Returns
 ///
 /// Returns a token containing the multi-line note with its trailing whitespace.
-fn multi_line_note(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
+fn multi_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     flat_map(
         consumed(|input| {
             let (rest, delimiter_span) = multi_line_note_delimiter.parse(input)?;
@@ -194,7 +194,7 @@ fn multi_line_note(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
 /// let input = "~~~\nThis is a\nmulti-line note\n~~~\n";
 /// let _ = parse_note(input, None).unwrap();
 /// ```
-pub fn note(input: Span<'_>) -> Result<'_, (Token<'_>, NoteKind), TokenError> {
+pub fn note(input: InputSpan<'_>) -> Result<'_, (Token<'_>, NoteKind), TokenError> {
     let single_line_note = single_line_note.map(|token| (token, NoteKind::SingleLine));
     let multi_line_note = multi_line_note.map(|token| (token, NoteKind::MultiLine));
     let note = single_line_note.or(multi_line_note);
@@ -213,7 +213,7 @@ mod tests {
 
         #[test]
         fn test_basic() {
-            let input = Span::new_extra("~ this is a note\nrest", Config::default());
+            let input = InputSpan::new_extra("~ this is a note\nrest", Config::default());
             let (rest, (matched, kind)) = note(input).expect("should parse single line note");
             assert_eq!(kind, NoteKind::SingleLine);
             assert_eq!(matched.lexeme(), "~ this is a note");
@@ -222,7 +222,7 @@ mod tests {
 
         #[test]
         fn test_at_eof() {
-            let input = Span::new_extra("~ note", Config::default());
+            let input = InputSpan::new_extra("~ note", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note at EOF");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -232,7 +232,7 @@ mod tests {
 
         #[test]
         fn test_with_trailing_whitespace() {
-            let input = Span::new_extra("~ note with spaces   \nrest", Config::default());
+            let input = InputSpan::new_extra("~ note with spaces   \nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with trailing whitespace");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -242,7 +242,7 @@ mod tests {
 
         #[test]
         fn test_with_special_characters() {
-            let input = Span::new_extra("~ note with @#$% symbols\nrest", Config::default());
+            let input = InputSpan::new_extra("~ note with @#$% symbols\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with special characters");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -252,7 +252,7 @@ mod tests {
 
         #[test]
         fn test_with_numbers() {
-            let input = Span::new_extra("~ note with 123 numbers\nrest", Config::default());
+            let input = InputSpan::new_extra("~ note with 123 numbers\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with numbers");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -262,7 +262,7 @@ mod tests {
 
         #[test]
         fn test_with_tab() {
-            let input = Span::new_extra("~ note\twith\ttabs\nrest", Config::default());
+            let input = InputSpan::new_extra("~ note\twith\ttabs\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with tabs");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -272,7 +272,7 @@ mod tests {
 
         #[test]
         fn test_empty_content() {
-            let input = Span::new_extra("~\nrest", Config::default());
+            let input = InputSpan::new_extra("~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with empty content");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -282,7 +282,7 @@ mod tests {
 
         #[test]
         fn test_with_carriage_return() {
-            let input = Span::new_extra("~ note\r\nrest", Config::default());
+            let input = InputSpan::new_extra("~ note\r\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with carriage return");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -292,7 +292,7 @@ mod tests {
 
         #[test]
         fn test_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -305,7 +305,7 @@ mod tests {
 
         #[test]
         fn test_no_tilde() {
-            let input = Span::new_extra("not a note\n", Config::default());
+            let input = InputSpan::new_extra("not a note\n", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -318,7 +318,7 @@ mod tests {
 
         #[test]
         fn test_only_tilde() {
-            let input = Span::new_extra("~", Config::default());
+            let input = InputSpan::new_extra("~", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse only tilde as single line note");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -328,7 +328,7 @@ mod tests {
 
         #[test]
         fn test_tilde_without_newline() {
-            let input = Span::new_extra("~ note without newline", Config::default());
+            let input = InputSpan::new_extra("~ note without newline", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse tilde without newline as single line note");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -338,7 +338,7 @@ mod tests {
 
         #[test]
         fn test_multi_line_delimiter_as_single_line() {
-            let input = Span::new_extra("~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~\nrest", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -351,7 +351,7 @@ mod tests {
 
         #[test]
         fn test_unicode_characters() {
-            let input = Span::new_extra("~ note with 世界 characters\nrest", Config::default());
+            let input = InputSpan::new_extra("~ note with 世界 characters\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with unicode");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -361,7 +361,7 @@ mod tests {
 
         #[test]
         fn test_emoji() {
-            let input = Span::new_extra("~ note with 😀 emoji\nrest", Config::default());
+            let input = InputSpan::new_extra("~ note with 😀 emoji\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with emoji");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -375,7 +375,7 @@ mod tests {
 
         #[test]
         fn test_basic() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "~~~\nThis is a multi-line note.\nSecond line.\n~~~\nrest",
                 Config::default(),
             );
@@ -388,7 +388,7 @@ mod tests {
 
         #[test]
         fn test_extra_tildes() {
-            let input = Span::new_extra("~~~~~\nfoo\nbar\n~~~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~~~\nfoo\nbar\n~~~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with extra tildes");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -399,7 +399,7 @@ mod tests {
 
         #[test]
         fn test_empty() {
-            let input = Span::new_extra("~~~\n~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) = note(input).expect("should parse empty multi-line note");
             assert_eq!(kind, NoteKind::MultiLine);
             assert_eq!(matched.lexeme(), "~~~\n~~~");
@@ -409,7 +409,7 @@ mod tests {
 
         #[test]
         fn test_with_whitespace_around_delimiters() {
-            let input = Span::new_extra("   ~~~   \ncontent\n   ~~~   \nrest", Config::default());
+            let input = InputSpan::new_extra("   ~~~   \ncontent\n   ~~~   \nrest", Config::default());
             let (rest, (matched, kind)) = note(input)
                 .expect("should parse multi-line note with whitespace around delimiters");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -419,7 +419,7 @@ mod tests {
 
         #[test]
         fn test_multiple_lines() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "~~~\nLine 1\nLine 2\nLine 3\nLine 4\n~~~\nrest",
                 Config::default(),
             );
@@ -436,7 +436,7 @@ mod tests {
         #[test]
         fn test_with_special_characters() {
             let input =
-                Span::new_extra("~~~\nLine with @#$% symbols\n~~~\nrest", Config::default());
+                InputSpan::new_extra("~~~\nLine with @#$% symbols\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with special characters");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -446,7 +446,7 @@ mod tests {
 
         #[test]
         fn test_with_numbers() {
-            let input = Span::new_extra("~~~\nLine with 123 numbers\n~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~\nLine with 123 numbers\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with numbers");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -456,7 +456,7 @@ mod tests {
 
         #[test]
         fn test_with_tabs() {
-            let input = Span::new_extra("~~~\nLine\twith\ttabs\n~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~\nLine\twith\ttabs\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with tabs");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -466,7 +466,7 @@ mod tests {
 
         #[test]
         fn test_with_carriage_returns() {
-            let input = Span::new_extra("~~~\r\nLine with CR\r\n~~~\r\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~\r\nLine with CR\r\n~~~\r\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with carriage returns");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -476,7 +476,7 @@ mod tests {
 
         #[test]
         fn test_with_unicode() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "~~~\nLine with 世界 characters\n~~~\nrest",
                 Config::default(),
             );
@@ -489,7 +489,7 @@ mod tests {
 
         #[test]
         fn test_with_emoji() {
-            let input = Span::new_extra("~~~\nLine with 😀 emoji\n~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~\nLine with 😀 emoji\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with emoji");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -499,7 +499,7 @@ mod tests {
 
         #[test]
         fn test_with_tilde_in_content() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "~~~\nLine with ~ tilde in content\n~~~\nrest",
                 Config::default(),
             );
@@ -512,7 +512,7 @@ mod tests {
 
         #[test]
         fn test_with_partial_delimiter_in_content() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "~~~\nLine with ~~ partial delimiter\n~~~\nrest",
                 Config::default(),
             );
@@ -525,7 +525,7 @@ mod tests {
 
         #[test]
         fn test_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -538,7 +538,7 @@ mod tests {
 
         #[test]
         fn test_no_opening_delimiter() {
-            let input = Span::new_extra("not a note\n", Config::default());
+            let input = InputSpan::new_extra("not a note\n", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -551,7 +551,7 @@ mod tests {
 
         #[test]
         fn test_incomplete_delimiter() {
-            let input = Span::new_extra("~~\ncontent\n~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~\ncontent\n~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse incomplete delimiter as single line note");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -561,7 +561,7 @@ mod tests {
 
         #[test]
         fn test_unclosed() {
-            let input = Span::new_extra("~~~\nUnclosed note\n", Config::default());
+            let input = InputSpan::new_extra("~~~\nUnclosed note\n", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -574,7 +574,7 @@ mod tests {
 
         #[test]
         fn test_unclosed_with_content() {
-            let input = Span::new_extra("~~~\nLine 1\nLine 2\n", Config::default());
+            let input = InputSpan::new_extra("~~~\nLine 1\nLine 2\n", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -587,7 +587,7 @@ mod tests {
 
         #[test]
         fn test_delimiter_in_content_line() {
-            let input = Span::new_extra("~~~\nLine 1\n~~~\nLine 2\n~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~\nLine 1\n~~~\nLine 2\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with delimiter in content");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -597,7 +597,7 @@ mod tests {
 
         #[test]
         fn test_mismatched_delimiters() {
-            let input = Span::new_extra("~~~~\ncontent\n~~~\nrest", Config::default());
+            let input = InputSpan::new_extra("~~~~\ncontent\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with mismatched delimiters");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -607,7 +607,7 @@ mod tests {
 
         #[test]
         fn test_no_content_after_opening() {
-            let input = Span::new_extra("~~~\n", Config::default());
+            let input = InputSpan::new_extra("~~~\n", Config::default());
             let res = note(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(

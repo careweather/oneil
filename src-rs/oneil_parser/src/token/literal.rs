@@ -13,7 +13,7 @@ use nom::{
 };
 
 use crate::token::{
-    Result, Span,
+    Result, InputSpan,
     error::{ErrorHandlingParser, TokenError},
     util::{Token, token},
 };
@@ -43,7 +43,7 @@ use crate::token::{
 /// # Returns
 ///
 /// Returns a token containing the parsed number literal.
-pub fn number(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
+pub fn number(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     // Optional sign (+ or -) at the beginning
     let opt_sign_1 = opt(one_of("+-"));
     let opt_sign_2 = opt(one_of("+-"));
@@ -124,7 +124,7 @@ pub fn number(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
 /// # Returns
 ///
 /// Returns a token containing the parsed string literal including the quotes.
-pub fn string(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
+pub fn string(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         |input| {
             let (rest, open_quote_span) = tag("\'").parse(input)?;
@@ -159,7 +159,7 @@ pub fn string(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
 /// # Returns
 ///
 /// Returns a token containing the parsed unit one literal.
-pub fn unit_one(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
+pub fn unit_one(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         |input| {
             let next_char_is_not_digit = satisfy(|c: char| !c.is_dec_digit()).map(|_| ());
@@ -179,7 +179,7 @@ pub fn unit_one(input: Span<'_>) -> Result<'_, Token<'_>, TokenError> {
 mod tests {
     use super::*;
     use crate::{
-        Config, Span,
+        Config, InputSpan,
         token::error::{ExpectKind, IncompleteKind, TokenErrorKind},
     };
 
@@ -190,7 +190,7 @@ mod tests {
         // Success cases
         #[test]
         fn test_integer() {
-            let input = Span::new_extra("42 rest", Config::default());
+            let input = InputSpan::new_extra("42 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse integer");
             assert_eq!(matched.lexeme(), "42");
             assert_eq!(rest.fragment(), &"rest");
@@ -198,7 +198,7 @@ mod tests {
 
         #[test]
         fn test_negative_integer() {
-            let input = Span::new_extra("-17 rest", Config::default());
+            let input = InputSpan::new_extra("-17 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse negative integer");
             assert_eq!(matched.lexeme(), "-17");
             assert_eq!(rest.fragment(), &"rest");
@@ -206,7 +206,7 @@ mod tests {
 
         #[test]
         fn test_decimal() {
-            let input = Span::new_extra("3.1415 rest", Config::default());
+            let input = InputSpan::new_extra("3.1415 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse decimal");
             assert_eq!(matched.lexeme(), "3.1415");
             assert_eq!(rest.fragment(), &"rest");
@@ -214,7 +214,7 @@ mod tests {
 
         #[test]
         fn test_exponent() {
-            let input = Span::new_extra("2.5e10 rest", Config::default());
+            let input = InputSpan::new_extra("2.5e10 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse exponent");
             assert_eq!(matched.lexeme(), "2.5e10");
             assert_eq!(rest.fragment(), &"rest");
@@ -222,7 +222,7 @@ mod tests {
 
         #[test]
         fn test_negative_exponent() {
-            let input = Span::new_extra("-1.2E-3 rest", Config::default());
+            let input = InputSpan::new_extra("-1.2E-3 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse negative exponent");
             assert_eq!(matched.lexeme(), "-1.2E-3");
             assert_eq!(rest.fragment(), &"rest");
@@ -230,7 +230,7 @@ mod tests {
 
         #[test]
         fn test_multiple_decimal_points() {
-            let input = Span::new_extra("123.456.789", Config::default());
+            let input = InputSpan::new_extra("123.456.789", Config::default());
             let (rest, matched) = number(input).expect("should parse first decimal part");
             assert_eq!(matched.lexeme(), "123.456");
             assert_eq!(rest.fragment(), &".789");
@@ -238,7 +238,7 @@ mod tests {
 
         #[test]
         fn test_multiple_exponents() {
-            let input = Span::new_extra("123e10e5", Config::default());
+            let input = InputSpan::new_extra("123e10e5", Config::default());
             let (rest, matched) = number(input).expect("should parse first exponent part");
             assert_eq!(matched.lexeme(), "123e10");
             assert_eq!(rest.fragment(), &"e5");
@@ -246,7 +246,7 @@ mod tests {
 
         #[test]
         fn test_exponent_before_decimal() {
-            let input = Span::new_extra("123e5.456", Config::default());
+            let input = InputSpan::new_extra("123e5.456", Config::default());
             let (rest, matched) = number(input).expect("should parse exponent part");
             assert_eq!(matched.lexeme(), "123e5");
             assert_eq!(rest.fragment(), &".456");
@@ -254,7 +254,7 @@ mod tests {
 
         #[test]
         fn test_invalid_exponent_letter() {
-            let input = Span::new_extra("123f5", Config::default());
+            let input = InputSpan::new_extra("123f5", Config::default());
             let (rest, matched) = number(input).expect("should parse digits only");
             assert_eq!(matched.lexeme(), "123");
             assert_eq!(rest.fragment(), &"f5");
@@ -262,7 +262,7 @@ mod tests {
 
         #[test]
         fn test_invalid_exponent_letter_uppercase() {
-            let input = Span::new_extra("123F5", Config::default());
+            let input = InputSpan::new_extra("123F5", Config::default());
             let (rest, matched) = number(input).expect("should parse digits only");
             assert_eq!(matched.lexeme(), "123");
             assert_eq!(rest.fragment(), &"F5");
@@ -270,7 +270,7 @@ mod tests {
 
         #[test]
         fn test_with_letters_mixed() {
-            let input = Span::new_extra("123abc", Config::default());
+            let input = InputSpan::new_extra("123abc", Config::default());
             let (rest, matched) = number(input).expect("should parse digits only");
             assert_eq!(matched.lexeme(), "123");
             assert_eq!(rest.fragment(), &"abc");
@@ -278,7 +278,7 @@ mod tests {
 
         #[test]
         fn test_with_symbols_mixed() {
-            let input = Span::new_extra("123+456", Config::default());
+            let input = InputSpan::new_extra("123+456", Config::default());
             let (rest, matched) = number(input).expect("should parse digits only");
             assert_eq!(matched.lexeme(), "123");
             assert_eq!(rest.fragment(), &"+456");
@@ -286,7 +286,7 @@ mod tests {
 
         #[test]
         fn test_leading_zeros() {
-            let input = Span::new_extra("00123 rest", Config::default());
+            let input = InputSpan::new_extra("00123 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse leading zeros");
             assert_eq!(matched.lexeme(), "00123");
             assert_eq!(rest.fragment(), &"rest");
@@ -294,7 +294,7 @@ mod tests {
 
         #[test]
         fn test_negative_zero() {
-            let input = Span::new_extra("-0 rest", Config::default());
+            let input = InputSpan::new_extra("-0 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse negative zero");
             assert_eq!(matched.lexeme(), "-0");
             assert_eq!(rest.fragment(), &"rest");
@@ -302,7 +302,7 @@ mod tests {
 
         #[test]
         fn test_positive_zero() {
-            let input = Span::new_extra("+0 rest", Config::default());
+            let input = InputSpan::new_extra("+0 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse positive zero");
             assert_eq!(matched.lexeme(), "+0");
             assert_eq!(rest.fragment(), &"rest");
@@ -310,7 +310,7 @@ mod tests {
 
         #[test]
         fn test_zero_decimal() {
-            let input = Span::new_extra("0.123 rest", Config::default());
+            let input = InputSpan::new_extra("0.123 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse zero decimal");
             assert_eq!(matched.lexeme(), "0.123");
             assert_eq!(rest.fragment(), &"rest");
@@ -318,7 +318,7 @@ mod tests {
 
         #[test]
         fn test_zero_exponent() {
-            let input = Span::new_extra("123e0 rest", Config::default());
+            let input = InputSpan::new_extra("123e0 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse zero exponent");
             assert_eq!(matched.lexeme(), "123e0");
             assert_eq!(rest.fragment(), &"rest");
@@ -326,7 +326,7 @@ mod tests {
 
         #[test]
         fn test_max_precision() {
-            let input = Span::new_extra("3.141592653589793 rest", Config::default());
+            let input = InputSpan::new_extra("3.141592653589793 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse high precision");
             assert_eq!(matched.lexeme(), "3.141592653589793");
             assert_eq!(rest.fragment(), &"rest");
@@ -334,7 +334,7 @@ mod tests {
 
         #[test]
         fn test_large_exponent() {
-            let input = Span::new_extra("1e308 rest", Config::default());
+            let input = InputSpan::new_extra("1e308 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse large exponent");
             assert_eq!(matched.lexeme(), "1e308");
             assert_eq!(rest.fragment(), &"rest");
@@ -342,7 +342,7 @@ mod tests {
 
         #[test]
         fn test_small_exponent() {
-            let input = Span::new_extra("1e-308 rest", Config::default());
+            let input = InputSpan::new_extra("1e-308 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse small exponent");
             assert_eq!(matched.lexeme(), "1e-308");
             assert_eq!(rest.fragment(), &"rest");
@@ -350,7 +350,7 @@ mod tests {
 
         #[test]
         fn test_decimal_without_digits() {
-            let input = Span::new_extra(".123 rest", Config::default());
+            let input = InputSpan::new_extra(".123 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse .123 successfully");
             assert_eq!(matched.lexeme(), ".123");
             assert_eq!(rest.fragment(), &"rest");
@@ -358,7 +358,7 @@ mod tests {
 
         #[test]
         fn test_decimal_without_digits_with_sign() {
-            let input = Span::new_extra("-.123 rest", Config::default());
+            let input = InputSpan::new_extra("-.123 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse -.123 successfully");
             assert_eq!(matched.lexeme(), "-.123");
             assert_eq!(rest.fragment(), &"rest");
@@ -366,7 +366,7 @@ mod tests {
 
         #[test]
         fn test_decimal_without_digits_with_exponent() {
-            let input = Span::new_extra(".123e10 rest", Config::default());
+            let input = InputSpan::new_extra(".123e10 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse .123e10 successfully");
             assert_eq!(matched.lexeme(), ".123e10");
             assert_eq!(rest.fragment(), &"rest");
@@ -374,7 +374,7 @@ mod tests {
 
         #[test]
         fn test_decimal_without_digits_with_sign_and_exponent() {
-            let input = Span::new_extra("-.123e-10 rest", Config::default());
+            let input = InputSpan::new_extra("-.123e-10 rest", Config::default());
             let (rest, matched) = number(input).expect("should parse -.123e-10 successfully");
             assert_eq!(matched.lexeme(), "-.123e-10");
             assert_eq!(rest.fragment(), &"rest");
@@ -382,7 +382,7 @@ mod tests {
 
         #[test]
         fn test_inf_literal() {
-            let input = Span::new_extra("inf rest", Config::default());
+            let input = InputSpan::new_extra("inf rest", Config::default());
             let (rest, matched) = number(input).expect("should parse inf literal");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"rest");
@@ -390,7 +390,7 @@ mod tests {
 
         #[test]
         fn test_positive_inf_literal() {
-            let input = Span::new_extra("+inf rest", Config::default());
+            let input = InputSpan::new_extra("+inf rest", Config::default());
             let (rest, matched) = number(input).expect("should parse +inf literal");
             assert_eq!(matched.lexeme(), "+inf");
             assert_eq!(rest.fragment(), &"rest");
@@ -398,7 +398,7 @@ mod tests {
 
         #[test]
         fn test_negative_inf_literal() {
-            let input = Span::new_extra("-inf rest", Config::default());
+            let input = InputSpan::new_extra("-inf rest", Config::default());
             let (rest, matched) = number(input).expect("should parse -inf literal");
             assert_eq!(matched.lexeme(), "-inf");
             assert_eq!(rest.fragment(), &"rest");
@@ -406,7 +406,7 @@ mod tests {
 
         #[test]
         fn test_inf_at_end_of_file() {
-            let input = Span::new_extra("inf", Config::default());
+            let input = InputSpan::new_extra("inf", Config::default());
             let (rest, matched) = number(input).expect("should parse inf at end of file");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"");
@@ -414,7 +414,7 @@ mod tests {
 
         #[test]
         fn test_positive_inf_at_end_of_file() {
-            let input = Span::new_extra("+inf", Config::default());
+            let input = InputSpan::new_extra("+inf", Config::default());
             let (rest, matched) = number(input).expect("should parse +inf at end of file");
             assert_eq!(matched.lexeme(), "+inf");
             assert_eq!(rest.fragment(), &"");
@@ -422,7 +422,7 @@ mod tests {
 
         #[test]
         fn test_negative_inf_at_end_of_file() {
-            let input = Span::new_extra("-inf", Config::default());
+            let input = InputSpan::new_extra("-inf", Config::default());
             let (rest, matched) = number(input).expect("should parse -inf at end of file");
             assert_eq!(matched.lexeme(), "-inf");
             assert_eq!(rest.fragment(), &"");
@@ -430,7 +430,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_whitespace() {
-            let input = Span::new_extra("inf   rest", Config::default());
+            let input = InputSpan::new_extra("inf   rest", Config::default());
             let (rest, matched) = number(input).expect("should parse inf with trailing whitespace");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"rest");
@@ -438,7 +438,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_punctuation() {
-            let input = Span::new_extra("inf,", Config::default());
+            let input = InputSpan::new_extra("inf,", Config::default());
             let (rest, matched) = number(input).expect("should parse inf with comma");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &",");
@@ -446,7 +446,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_parentheses() {
-            let input = Span::new_extra("inf(", Config::default());
+            let input = InputSpan::new_extra("inf(", Config::default());
             let (rest, matched) = number(input).expect("should parse inf with opening parenthesis");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"(");
@@ -454,7 +454,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_symbols() {
-            let input = Span::new_extra("inf+", Config::default());
+            let input = InputSpan::new_extra("inf+", Config::default());
             let (rest, matched) = number(input).expect("should parse inf with plus symbol");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"+");
@@ -462,7 +462,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_newline() {
-            let input = Span::new_extra("inf\n", Config::default());
+            let input = InputSpan::new_extra("inf\n", Config::default());
             let (rest, matched) = number(input).expect("should parse inf with newline");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"\n");
@@ -470,7 +470,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_tab() {
-            let input = Span::new_extra("inf\t", Config::default());
+            let input = InputSpan::new_extra("inf\t", Config::default());
             let (rest, matched) = number(input).expect("should parse inf with tab");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"");
@@ -478,7 +478,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_carriage_return() {
-            let input = Span::new_extra("inf\r", Config::default());
+            let input = InputSpan::new_extra("inf\r", Config::default());
             let (rest, matched) = number(input).expect("should parse inf with carriage return");
             assert_eq!(matched.lexeme(), "inf");
             assert_eq!(rest.fragment(), &"\r");
@@ -487,7 +487,7 @@ mod tests {
         // Error cases
         #[test]
         fn test_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -500,7 +500,7 @@ mod tests {
 
         #[test]
         fn test_whitespace_only() {
-            let input = Span::new_extra("   ", Config::default());
+            let input = InputSpan::new_extra("   ", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -513,7 +513,7 @@ mod tests {
 
         #[test]
         fn test_letters_only() {
-            let input = Span::new_extra("abc", Config::default());
+            let input = InputSpan::new_extra("abc", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -526,7 +526,7 @@ mod tests {
 
         #[test]
         fn test_symbols_only() {
-            let input = Span::new_extra("+-", Config::default());
+            let input = InputSpan::new_extra("+-", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -539,7 +539,7 @@ mod tests {
 
         #[test]
         fn test_decimal_point_only() {
-            let input = Span::new_extra(".", Config::default());
+            let input = InputSpan::new_extra(".", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -552,7 +552,7 @@ mod tests {
 
         #[test]
         fn test_exponent_only() {
-            let input = Span::new_extra("e", Config::default());
+            let input = InputSpan::new_extra("e", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -565,7 +565,7 @@ mod tests {
 
         #[test]
         fn test_exponent_without_digits() {
-            let input = Span::new_extra("123e", Config::default());
+            let input = InputSpan::new_extra("123e", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -578,7 +578,7 @@ mod tests {
 
         #[test]
         fn test_exponent_with_sign_only() {
-            let input = Span::new_extra("123e+", Config::default());
+            let input = InputSpan::new_extra("123e+", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -591,7 +591,7 @@ mod tests {
 
         #[test]
         fn test_exponent_with_sign_only_negative() {
-            let input = Span::new_extra("123e-", Config::default());
+            let input = InputSpan::new_extra("123e-", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -604,7 +604,7 @@ mod tests {
 
         #[test]
         fn test_error_messages_are_specific() {
-            let input = Span::new_extra("abc", Config::default());
+            let input = InputSpan::new_extra("abc", Config::default());
             let res = number(input);
             assert!(res.is_err(), "should fail with specific error");
 
@@ -620,7 +620,7 @@ mod tests {
 
         #[test]
         fn test_invalid_decimal_part_error() {
-            let input = Span::new_extra("123.", Config::default());
+            let input = InputSpan::new_extra("123.", Config::default());
             let res = number(input);
             assert!(res.is_err(), "should fail on invalid decimal part");
 
@@ -639,7 +639,7 @@ mod tests {
 
         #[test]
         fn test_invalid_exponent_part_error() {
-            let input = Span::new_extra("123e", Config::default());
+            let input = InputSpan::new_extra("123e", Config::default());
             let res = number(input);
             assert!(res.is_err(), "should fail on invalid exponent part");
 
@@ -659,7 +659,7 @@ mod tests {
         // Error cases for inf literals
         #[test]
         fn test_inf_with_letters_after() {
-            let input = Span::new_extra("infinity", Config::default());
+            let input = InputSpan::new_extra("infinity", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -672,7 +672,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_numbers_after() {
-            let input = Span::new_extra("inf123", Config::default());
+            let input = InputSpan::new_extra("inf123", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -685,7 +685,7 @@ mod tests {
 
         #[test]
         fn test_inf_with_underscore_after() {
-            let input = Span::new_extra("inf_", Config::default());
+            let input = InputSpan::new_extra("inf_", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -698,7 +698,7 @@ mod tests {
 
         #[test]
         fn test_partial_inf_match() {
-            let input = Span::new_extra("in", Config::default());
+            let input = InputSpan::new_extra("in", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -711,7 +711,7 @@ mod tests {
 
         #[test]
         fn test_case_sensitive_inf() {
-            let input = Span::new_extra("INF", Config::default());
+            let input = InputSpan::new_extra("INF", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -724,7 +724,7 @@ mod tests {
 
         #[test]
         fn test_mixed_case_inf() {
-            let input = Span::new_extra("Inf", Config::default());
+            let input = InputSpan::new_extra("Inf", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -737,7 +737,7 @@ mod tests {
 
         #[test]
         fn test_inf_not_at_start() {
-            let input = Span::new_extra("foo inf bar", Config::default());
+            let input = InputSpan::new_extra("foo inf bar", Config::default());
             let res = number(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -755,7 +755,7 @@ mod tests {
         // Success cases
         #[test]
         fn test_simple() {
-            let input = Span::new_extra("'hello' rest", Config::default());
+            let input = InputSpan::new_extra("'hello' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse string");
             assert_eq!(matched.lexeme(), "'hello'");
             assert_eq!(rest.fragment(), &"rest");
@@ -763,7 +763,7 @@ mod tests {
 
         #[test]
         fn test_with_spaces() {
-            let input = Span::new_extra("'foo bar' baz", Config::default());
+            let input = InputSpan::new_extra("'foo bar' baz", Config::default());
             let (rest, matched) = string(input).expect("should parse string with spaces");
             assert_eq!(matched.lexeme(), "'foo bar'");
             assert_eq!(rest.fragment(), &"baz");
@@ -771,7 +771,7 @@ mod tests {
 
         #[test]
         fn test_escape_sequences_not_supported() {
-            let input = Span::new_extra("'foo \\' bar", Config::default());
+            let input = InputSpan::new_extra("'foo \\' bar", Config::default());
             let (rest, matched) =
                 string(input).expect("should parse string (escape sequences not supported)");
             assert_eq!(matched.lexeme(), "'foo \\'");
@@ -780,7 +780,7 @@ mod tests {
 
         #[test]
         fn test_empty_string() {
-            let input = Span::new_extra("'' rest", Config::default());
+            let input = InputSpan::new_extra("'' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse empty string");
             assert_eq!(matched.lexeme(), "''");
             assert_eq!(rest.fragment(), &"rest");
@@ -788,7 +788,7 @@ mod tests {
 
         #[test]
         fn test_with_carriage_return() {
-            let input = Span::new_extra("'hello\rworld' rest", Config::default());
+            let input = InputSpan::new_extra("'hello\rworld' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse string with carriage return");
             assert_eq!(matched.lexeme(), "'hello\rworld'");
             assert_eq!(rest.fragment(), &"rest");
@@ -796,7 +796,7 @@ mod tests {
 
         #[test]
         fn test_with_tab() {
-            let input = Span::new_extra("'hello\tworld' rest", Config::default());
+            let input = InputSpan::new_extra("'hello\tworld' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse string with tab");
             assert_eq!(matched.lexeme(), "'hello\tworld'");
             assert_eq!(rest.fragment(), &"rest");
@@ -804,7 +804,7 @@ mod tests {
 
         #[test]
         fn test_with_numbers() {
-            let input = Span::new_extra("'123 456' rest", Config::default());
+            let input = InputSpan::new_extra("'123 456' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse string with numbers");
             assert_eq!(matched.lexeme(), "'123 456'");
             assert_eq!(rest.fragment(), &"rest");
@@ -812,7 +812,7 @@ mod tests {
 
         #[test]
         fn test_with_double_quotes() {
-            let input = Span::new_extra("'hello \"world\"' rest", Config::default());
+            let input = InputSpan::new_extra("'hello \"world\"' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse string with double quotes");
             assert_eq!(matched.lexeme(), "'hello \"world\"'");
             assert_eq!(rest.fragment(), &"rest");
@@ -820,7 +820,7 @@ mod tests {
 
         #[test]
         fn test_with_backslashes() {
-            let input = Span::new_extra("'hello\\world' rest", Config::default());
+            let input = InputSpan::new_extra("'hello\\world' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse string with backslashes");
             assert_eq!(matched.lexeme(), "'hello\\world'");
             assert_eq!(rest.fragment(), &"rest");
@@ -828,7 +828,7 @@ mod tests {
 
         #[test]
         fn test_with_whitespace_only() {
-            let input = Span::new_extra("'   ' rest", Config::default());
+            let input = InputSpan::new_extra("'   ' rest", Config::default());
             let (rest, matched) = string(input).expect("should parse string with whitespace only");
             assert_eq!(matched.lexeme(), "'   '");
             assert_eq!(rest.fragment(), &"rest");
@@ -838,7 +838,7 @@ mod tests {
         fn test_very_long() {
             let long_content = "a".repeat(1000);
             let input_str = format!("'{long_content}' rest");
-            let input = Span::new_extra(&input_str, Config::default());
+            let input = InputSpan::new_extra(&input_str, Config::default());
             let (rest, matched) = string(input).expect("should parse very long string");
             let expected_lexeme = format!("'{long_content}'");
             assert_eq!(matched.lexeme(), expected_lexeme);
@@ -847,7 +847,7 @@ mod tests {
 
         #[test]
         fn test_with_nested_single_quotes() {
-            let input = Span::new_extra("'hello'world' rest", Config::default());
+            let input = InputSpan::new_extra("'hello'world' rest", Config::default());
             let (rest, matched) =
                 string(input).expect("should parse string ending at first closing quote");
             assert_eq!(matched.lexeme(), "'hello'");
@@ -856,7 +856,7 @@ mod tests {
 
         #[test]
         fn test_at_end_of_file() {
-            let input = Span::new_extra("'hello'", Config::default());
+            let input = InputSpan::new_extra("'hello'", Config::default());
             let (rest, matched) = string(input).expect("should parse string at end of file");
             assert_eq!(matched.lexeme(), "'hello'");
             assert_eq!(rest.fragment(), &"");
@@ -865,7 +865,7 @@ mod tests {
         // Error cases
         #[test]
         fn test_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let res = string(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -878,7 +878,7 @@ mod tests {
 
         #[test]
         fn test_no_opening_quote() {
-            let input = Span::new_extra("hello'", Config::default());
+            let input = InputSpan::new_extra("hello'", Config::default());
             let res = string(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -891,7 +891,7 @@ mod tests {
 
         #[test]
         fn test_no_closing_quote() {
-            let input = Span::new_extra("'hello", Config::default());
+            let input = InputSpan::new_extra("'hello", Config::default());
             let res = string(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -904,7 +904,7 @@ mod tests {
 
         #[test]
         fn test_with_newline() {
-            let input = Span::new_extra("'hello\nworld'", Config::default());
+            let input = InputSpan::new_extra("'hello\nworld'", Config::default());
             let res = string(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -917,7 +917,7 @@ mod tests {
 
         #[test]
         fn test_with_mixed_whitespace() {
-            let input = Span::new_extra("' \t\n\r ' rest", Config::default());
+            let input = InputSpan::new_extra("' \t\n\r ' rest", Config::default());
             let res = string(input);
             assert!(
                 res.is_err(),
@@ -927,7 +927,7 @@ mod tests {
 
         #[test]
         fn test_unterminated_at_end_of_file() {
-            let input = Span::new_extra("'hello", Config::default());
+            let input = InputSpan::new_extra("'hello", Config::default());
             let res = string(input);
             match res {
                 Err(nom::Err::Failure(token_error)) => assert!(matches!(
@@ -940,7 +940,7 @@ mod tests {
 
         #[test]
         fn test_error_messages_are_specific() {
-            let input = Span::new_extra("abc", Config::default());
+            let input = InputSpan::new_extra("abc", Config::default());
             let res = string(input);
             assert!(res.is_err(), "should fail with specific error");
 
@@ -956,7 +956,7 @@ mod tests {
 
         #[test]
         fn test_unclosed_string_error() {
-            let input = Span::new_extra("'hello", Config::default());
+            let input = InputSpan::new_extra("'hello", Config::default());
             let res = string(input);
             assert!(res.is_err(), "should fail on unclosed string");
 
@@ -975,7 +975,7 @@ mod tests {
 
         #[test]
         fn test_unclosed_string_with_newline_error() {
-            let input = Span::new_extra("'hello\n", Config::default());
+            let input = InputSpan::new_extra("'hello\n", Config::default());
             let res = string(input);
             assert!(res.is_err(), "should fail on unclosed string with newline");
 
@@ -999,7 +999,7 @@ mod tests {
         // Success cases
         #[test]
         fn test_simple() {
-            let input = Span::new_extra("1 rest", Config::default());
+            let input = InputSpan::new_extra("1 rest", Config::default());
             let (rest, matched) = unit_one(input).expect("should parse unit one");
             assert_eq!(matched.lexeme(), "1");
             assert_eq!(rest.fragment(), &"rest");
@@ -1007,7 +1007,7 @@ mod tests {
 
         #[test]
         fn test_at_end_of_file() {
-            let input = Span::new_extra("1", Config::default());
+            let input = InputSpan::new_extra("1", Config::default());
             let (rest, matched) = unit_one(input).expect("should parse unit one at end of file");
             assert_eq!(matched.lexeme(), "1");
             assert_eq!(rest.fragment(), &"");
@@ -1015,7 +1015,7 @@ mod tests {
 
         #[test]
         fn test_with_whitespace() {
-            let input = Span::new_extra("1  ", Config::default());
+            let input = InputSpan::new_extra("1  ", Config::default());
             let (rest, matched) = unit_one(input).expect("should parse unit one with whitespace");
             assert_eq!(matched.lexeme(), "1");
             assert_eq!(rest.fragment(), &"");
@@ -1023,7 +1023,7 @@ mod tests {
 
         #[test]
         fn test_with_other_digits() {
-            let input = Span::new_extra("123", Config::default());
+            let input = InputSpan::new_extra("123", Config::default());
             let res = unit_one(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -1036,7 +1036,7 @@ mod tests {
 
         #[test]
         fn test_with_letters() {
-            let input = Span::new_extra("1abc", Config::default());
+            let input = InputSpan::new_extra("1abc", Config::default());
             let (rest, matched) = unit_one(input).expect("should parse unit one with letters");
             assert_eq!(matched.lexeme(), "1");
             assert_eq!(rest.fragment(), &"abc");
@@ -1044,7 +1044,7 @@ mod tests {
 
         #[test]
         fn test_with_symbols() {
-            let input = Span::new_extra("1+2", Config::default());
+            let input = InputSpan::new_extra("1+2", Config::default());
             let (rest, matched) = unit_one(input).expect("should parse unit one with symbols");
             assert_eq!(matched.lexeme(), "1");
             assert_eq!(rest.fragment(), &"+2");
@@ -1053,7 +1053,7 @@ mod tests {
         // Error cases
         #[test]
         fn test_empty_input() {
-            let input = Span::new_extra("", Config::default());
+            let input = InputSpan::new_extra("", Config::default());
             let res = unit_one(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -1066,7 +1066,7 @@ mod tests {
 
         #[test]
         fn test_whitespace_only() {
-            let input = Span::new_extra("   ", Config::default());
+            let input = InputSpan::new_extra("   ", Config::default());
             let res = unit_one(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -1079,7 +1079,7 @@ mod tests {
 
         #[test]
         fn test_other_digits() {
-            let input = Span::new_extra("2", Config::default());
+            let input = InputSpan::new_extra("2", Config::default());
             let res = unit_one(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -1092,7 +1092,7 @@ mod tests {
 
         #[test]
         fn test_letters_only() {
-            let input = Span::new_extra("abc", Config::default());
+            let input = InputSpan::new_extra("abc", Config::default());
             let res = unit_one(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -1105,7 +1105,7 @@ mod tests {
 
         #[test]
         fn test_symbols_only() {
-            let input = Span::new_extra("+-", Config::default());
+            let input = InputSpan::new_extra("+-", Config::default());
             let res = unit_one(input);
             match res {
                 Err(nom::Err::Error(token_error)) => assert!(matches!(
@@ -1118,7 +1118,7 @@ mod tests {
 
         #[test]
         fn test_error_messages_are_specific() {
-            let input = Span::new_extra("abc", Config::default());
+            let input = InputSpan::new_extra("abc", Config::default());
             let res = unit_one(input);
             assert!(res.is_err(), "should fail with specific error");
 

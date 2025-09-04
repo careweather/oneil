@@ -15,41 +15,24 @@ use std::ops::Deref;
 /// # Examples
 ///
 /// ```rust
-/// use oneil_ir::span::Span;
+/// use oneil_ir::span::IrSpan;
 ///
 /// // A span starting at position 10 with length 5
-/// let span = Span::new(10, 5);
+/// let span = IrSpan::new(10, 5);
 /// assert_eq!(span.start(), 10);
 /// assert_eq!(span.length(), 5);
 /// assert_eq!(span.end(), 15);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Span {
+pub struct IrSpan {
     start: usize,
     length: usize,
 }
 
-impl Span {
+impl IrSpan {
     /// Creates a new span with the given start position and length.
     ///
-    /// # Arguments
-    ///
-    /// * `start` - The starting position (0-indexed)
-    /// * `length` - The number of characters in the span
-    ///
-    /// # Returns
-    ///
-    /// A new `Span` instance.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use oneil_ir::span::Span;
-    ///
-    /// let span = Span::new(5, 10);
-    /// assert_eq!(span.start(), 5);
-    /// assert_eq!(span.length(), 10);
-    /// ```
+    /// NOTE: the starting position is 0-indexed.
     #[must_use]
     pub const fn new(start: usize, length: usize) -> Self {
         Self { start, length }
@@ -57,19 +40,13 @@ impl Span {
 
     /// Returns the starting position of this span.
     ///
-    /// # Returns
-    ///
-    /// The 0-indexed starting position.
+    /// NOTE: the starting position is 0-indexed.
     #[must_use]
     pub const fn start(&self) -> usize {
         self.start
     }
 
     /// Returns the length of this span.
-    ///
-    /// # Returns
-    ///
-    /// The number of characters in the span.
     #[must_use]
     pub const fn length(&self) -> usize {
         self.length
@@ -77,18 +54,7 @@ impl Span {
 
     /// Returns the ending position of this span (exclusive).
     ///
-    /// # Returns
-    ///
-    /// The 0-indexed ending position (start + length).
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use oneil_ir::span::Span;
-    ///
-    /// let span = Span::new(10, 5);
-    /// assert_eq!(span.end(), 15);
-    /// ```
+    /// NOTE: the ending position is 0-indexed.
     #[must_use]
     pub const fn end(&self) -> usize {
         self.start + self.length
@@ -100,26 +66,10 @@ impl Span {
 /// `WithSpan<T>` wraps a value of type `T` with source location information.
 /// The span may not represent the exact location of the value itself, but rather
 /// indicates where the value was derived from in the source code.
-///
-/// (TODO: is this a good idea?)
-///
-/// This is commonly used in parsers and compilers to maintain source location
-/// information for error reporting and debugging.
-///
-/// # Examples
-///
-/// ```rust
-/// use oneil_ir::span::{Span, WithSpan};
-///
-/// let span = Span::new(10, 5);
-/// let value = WithSpan::new("hello", span);
-/// assert_eq!(value.value(), &"hello");
-/// assert_eq!(value.span().start(), 10);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WithSpan<T> {
     value: T,
-    span: Span,
+    span: IrSpan,
 }
 
 impl<T> WithSpan<T> {
@@ -144,7 +94,7 @@ impl<T> WithSpan<T> {
     /// assert_eq!(*wrapped, 42);
     /// ```
     #[must_use]
-    pub const fn new(value: T, span: Span) -> Self {
+    pub const fn new(value: T, span: IrSpan) -> Self {
         Self { value, span }
     }
 
@@ -171,7 +121,7 @@ impl<T> WithSpan<T> {
     /// ```
     #[must_use]
     pub const fn test_new(value: T) -> Self {
-        Self::new(value, Span::new(0, 0))
+        Self::new(value, IrSpan::new(0, 0))
     }
 
     /// Returns a reference to the wrapped value.
@@ -209,7 +159,7 @@ impl<T> WithSpan<T> {
     /// assert_eq!(wrapped.span().start(), 10);
     /// ```
     #[must_use]
-    pub const fn span(&self) -> Span {
+    pub const fn span(&self) -> IrSpan {
         self.span
     }
 

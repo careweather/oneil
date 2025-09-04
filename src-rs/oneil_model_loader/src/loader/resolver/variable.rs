@@ -206,13 +206,13 @@ mod tests {
         use super::*;
 
         /// Helper function to create a test span
-        pub fn test_ast_span(start: usize, end: usize) -> ast::Span {
-            ast::Span::new(start, end - start, 0)
+        pub fn test_ast_span(start: usize, end: usize) -> ast::AstSpan {
+            ast::AstSpan::new(start, end - start, 0)
         }
 
         /// Helper function to create a test IR span
-        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::Span {
-            oneil_ir::span::Span::new(start, end - start)
+        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::IrSpan {
+            oneil_ir::span::IrSpan::new(start, end - start)
         }
 
         /// Helper function to create an identifier node
@@ -303,7 +303,7 @@ mod tests {
         /// Helper function for getting the span of an accessor parent identifier
         pub fn get_accessor_parent_identifier_span(
             accessor: &ast::expression::VariableNode,
-        ) -> oneil_ir::span::Span {
+        ) -> oneil_ir::span::IrSpan {
             let parent_span = match accessor.node_value() {
                 ast::expression::Variable::Accessor { parent, .. } => parent.node_span(),
                 ast::expression::Variable::Identifier(_) => {

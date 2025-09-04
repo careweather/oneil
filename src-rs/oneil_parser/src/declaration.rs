@@ -8,7 +8,7 @@ use nom::{
 };
 
 use oneil_ast::{
-    Span as AstSpan,
+    AstSpan as AstSpan,
     declaration::{
         Decl, DeclNode, Import, ModelInfo, ModelInfoNode, ModelKind, SubmodelList,
         SubmodelListNode, UseModel,
@@ -27,20 +27,20 @@ use crate::{
         structure::end_of_line,
         symbol::{bracket_left, bracket_right, comma, dot, dot_dot, slash},
     },
-    util::{Result, Span},
+    util::{Result, InputSpan},
 };
 
 /// Parses a declaration
 ///
 /// This function **may not consume the complete input**.
-pub fn parse(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
+pub fn parse(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     decl.parse(input)
 }
 
 /// Parses a declaration
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
+pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     all_consuming(decl).parse(input)
 }
 
@@ -63,7 +63,7 @@ pub fn parse_complete(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 ///
 /// Returns a declaration node of the appropriate type, or an error if no
 /// declaration type matches.
-fn decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
+fn decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     alt((import_decl, use_decl, parameter_decl, test_decl))
         .convert_error_to(ParserError::expect_decl)
         .parse(input)
@@ -92,7 +92,7 @@ fn decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 ///
 /// Returns a declaration node containing the parsed import, or an error if
 /// the import declaration is malformed.
-fn import_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
+fn import_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
     let (rest, import_path_token) = identifier
@@ -140,7 +140,7 @@ fn import_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 ///
 /// Returns a declaration node containing the parsed use declaration, or an error if
 /// the declaration is malformed.
-fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
+fn use_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let ref_keyword = |input| {
         let (rest, ref_token) = ref_.convert_errors().parse(input)?;
         Ok((rest, (ModelKind::Reference, ref_token)))
@@ -209,7 +209,7 @@ fn use_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 /// - `Directory::Name(String)` for an identifier
 /// - `Directory::Current` for "."
 /// - `Directory::Parent` for ".."
-fn opt_directory_path(input: Span<'_>) -> Result<'_, Vec<DirectoryNode>, ParserError> {
+fn opt_directory_path(input: InputSpan<'_>) -> Result<'_, Vec<DirectoryNode>, ParserError> {
     many0(|input| {
         let (rest, directory_name) = directory_name(input)?;
         let (rest, _slash_token) = slash.convert_errors().parse(rest)?;
@@ -236,7 +236,7 @@ fn opt_directory_path(input: Span<'_>) -> Result<'_, Vec<DirectoryNode>, ParserE
 /// - `Directory::Name(String)` for an identifier
 /// - `Directory::Current` for "."
 /// - `Directory::Parent` for ".."
-fn directory_name(input: Span<'_>) -> Result<'_, DirectoryNode, ParserError> {
+fn directory_name(input: InputSpan<'_>) -> Result<'_, DirectoryNode, ParserError> {
     let directory_name = |input| {
         let (rest, directory_name_token) = identifier.convert_errors().parse(input)?;
         let directory_name = Node::new(
@@ -261,7 +261,7 @@ fn directory_name(input: Span<'_>) -> Result<'_, DirectoryNode, ParserError> {
     alt((directory_name, current_directory, parent_directory)).parse(input)
 }
 
-pub fn model_info(input: Span<'_>) -> Result<'_, ModelInfoNode, ParserError> {
+pub fn model_info(input: InputSpan<'_>) -> Result<'_, ModelInfoNode, ParserError> {
     let (rest, top_component) = identifier.convert_errors().parse(input)?;
     let top_component_ident = Identifier::new(top_component.lexeme().to_string());
     let top_component = Node::new(&top_component, top_component_ident);
@@ -280,7 +280,7 @@ pub fn model_info(input: Span<'_>) -> Result<'_, ModelInfoNode, ParserError> {
     Ok((rest, Node::new(&model_info_span, model_info)))
 }
 
-fn opt_subcomponents(input: Span<'_>) -> Result<'_, Vec<IdentifierNode>, ParserError> {
+fn opt_subcomponents(input: InputSpan<'_>) -> Result<'_, Vec<IdentifierNode>, ParserError> {
     many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
         let (rest, subcomponent) = identifier
@@ -316,7 +316,7 @@ fn opt_subcomponents(input: Span<'_>) -> Result<'_, Vec<IdentifierNode>, ParserE
 /// as      -> Error(MissingAlias)
 /// as 123  -> Error(UnexpectedToken)
 /// ```
-fn as_alias(input: Span<'_>) -> Result<'_, IdentifierNode, ParserError> {
+fn as_alias(input: InputSpan<'_>) -> Result<'_, IdentifierNode, ParserError> {
     let (rest, as_token) = as_.convert_errors().parse(input)?;
 
     let (rest, alias) = identifier
@@ -347,7 +347,7 @@ fn as_alias(input: Span<'_>) -> Result<'_, IdentifierNode, ParserError> {
 /// Returns a vector of submodel nodes. For a single submodel, returns a vector of length 1.
 /// For multiple submodels in brackets, returns a vector containing all parsed submodels.
 /// Returns an error if the submodel list is malformed (e.g., unclosed brackets).
-fn submodel_list(input: Span<'_>) -> Result<'_, SubmodelListNode, ParserError> {
+fn submodel_list(input: InputSpan<'_>) -> Result<'_, SubmodelListNode, ParserError> {
     let single_submodel = |input| {
         let (rest, submodel) = model_info.parse(input)?;
         let submodel_span = submodel.node_span();
@@ -416,7 +416,7 @@ fn submodel_list(input: Span<'_>) -> Result<'_, SubmodelListNode, ParserError> {
 /// # Returns
 ///
 /// Returns a declaration node containing the parsed parameter.
-fn parameter_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
+fn parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, parameter) = parse_parameter.parse(input)?;
 
     let span = AstSpan::from(&parameter);
@@ -438,7 +438,7 @@ fn parameter_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
 /// # Returns
 ///
 /// Returns a declaration node containing the parsed test.
-fn test_decl(input: Span<'_>) -> Result<'_, DeclNode, ParserError> {
+fn test_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, test) = parse_test.parse(input)?;
 
     let span = AstSpan::from(&test);
@@ -461,7 +461,7 @@ mod tests {
 
         #[test]
         fn test_import_decl() {
-            let input = Span::new_extra("import foo\n", Config::default());
+            let input = InputSpan::new_extra("import foo\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::Import(import_node) => {
@@ -477,7 +477,7 @@ mod tests {
 
         #[test]
         fn test_ref_decl() {
-            let input = Span::new_extra("ref foo\n", Config::default());
+            let input = InputSpan::new_extra("ref foo\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -494,7 +494,7 @@ mod tests {
 
         #[test]
         fn test_use_decl() {
-            let input = Span::new_extra("use foo.bar as baz\n", Config::default());
+            let input = InputSpan::new_extra("use foo.bar as baz\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -511,7 +511,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_without_alias() {
-            let input = Span::new_extra("use foo.bar\n", Config::default());
+            let input = InputSpan::new_extra("use foo.bar\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -528,7 +528,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_simple_without_alias() {
-            let input = Span::new_extra("use foo\n", Config::default());
+            let input = InputSpan::new_extra("use foo\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -544,7 +544,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_import_success() {
-            let input = Span::new_extra("import foo\n", Config::default());
+            let input = InputSpan::new_extra("import foo\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::Import(import_node) => {
@@ -559,7 +559,7 @@ mod tests {
 
         #[test]
         fn test_parse_complete_use_success() {
-            let input = Span::new_extra("use foo.bar as baz\n", Config::default());
+            let input = InputSpan::new_extra("use foo.bar as baz\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -575,7 +575,7 @@ mod tests {
 
         #[test]
         fn test_use_with_single_directory() {
-            let input = Span::new_extra("use utils/math as calculator\n", Config::default());
+            let input = InputSpan::new_extra("use utils/math as calculator\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -598,7 +598,7 @@ mod tests {
 
         #[test]
         fn test_use_with_single_directory_without_alias() {
-            let input = Span::new_extra("use utils/math\n", Config::default());
+            let input = InputSpan::new_extra("use utils/math\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -621,7 +621,7 @@ mod tests {
 
         #[test]
         fn test_use_with_multiple_directories() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "use models/physics/mechanics as dynamics\n",
                 Config::default(),
             );
@@ -651,7 +651,7 @@ mod tests {
 
         #[test]
         fn test_use_with_directory_and_subcomponents() {
-            let input = Span::new_extra("use utils/math.trigonometry as trig\n", Config::default());
+            let input = InputSpan::new_extra("use utils/math.trigonometry as trig\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -675,7 +675,7 @@ mod tests {
 
         #[test]
         fn test_use_with_current_directory() {
-            let input = Span::new_extra("use ./local_model as local\n", Config::default());
+            let input = InputSpan::new_extra("use ./local_model as local\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -698,7 +698,7 @@ mod tests {
 
         #[test]
         fn test_use_with_parent_directory() {
-            let input = Span::new_extra("use ../parent_model as parent\n", Config::default());
+            let input = InputSpan::new_extra("use ../parent_model as parent\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -721,7 +721,7 @@ mod tests {
 
         #[test]
         fn test_use_with_mixed_directory_types() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "use ../shared/./utils/math as shared_math\n",
                 Config::default(),
             );
@@ -759,7 +759,7 @@ mod tests {
 
         #[test]
         fn test_use_with_complex_path_and_subcomponents() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "use models/physics/mechanics.rotational.dynamics as rotation\n",
                 Config::default(),
             );
@@ -792,19 +792,19 @@ mod tests {
         #[test]
         fn test_directory_name_parsing() {
             // Test parent directory
-            let input = Span::new_extra("..", Config::default());
+            let input = InputSpan::new_extra("..", Config::default());
             let (rest, dir) = directory_name(input).expect("should parse parent directory");
             assert_eq!(dir.node_value().as_str(), "..");
             assert_eq!(rest.fragment(), &"");
 
             // Test current directory
-            let input = Span::new_extra(".", Config::default());
+            let input = InputSpan::new_extra(".", Config::default());
             let (rest, dir) = directory_name(input).expect("should parse current directory");
             assert_eq!(dir.node_value().as_str(), ".");
             assert_eq!(rest.fragment(), &"");
 
             // Test regular directory name
-            let input = Span::new_extra("foo", Config::default());
+            let input = InputSpan::new_extra("foo", Config::default());
             let (rest, dir) = directory_name(input).expect("should parse regular directory name");
             assert_eq!(dir.node_value().as_str(), "foo");
             assert_eq!(rest.fragment(), &"");
@@ -812,7 +812,7 @@ mod tests {
 
         #[test]
         fn test_mixed_directory_path_parsing() {
-            let input = Span::new_extra("../shared/./utils/", Config::default());
+            let input = InputSpan::new_extra("../shared/./utils/", Config::default());
             let (_rest, directory_path) =
                 opt_directory_path(input).expect("should parse mixed directory path");
 
@@ -831,7 +831,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_single_submodel() {
-            let input = Span::new_extra("use foo with bar\n", Config::default());
+            let input = InputSpan::new_extra("use foo with bar\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -856,7 +856,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_single_submodel_with_alias() {
-            let input = Span::new_extra("use foo with bar as baz\n", Config::default());
+            let input = InputSpan::new_extra("use foo with bar as baz\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -881,7 +881,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_single_submodel_with_subcomponents() {
-            let input = Span::new_extra("use foo with bar.qux\n", Config::default());
+            let input = InputSpan::new_extra("use foo with bar.qux\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -907,7 +907,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_multiple_submodels() {
-            let input = Span::new_extra("use foo with [bar, qux]\n", Config::default());
+            let input = InputSpan::new_extra("use foo with [bar, qux]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -937,7 +937,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_multiple_submodels_with_aliases() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "use foo with [bar as baz, qux as quux]\n",
                 Config::default(),
             );
@@ -971,7 +971,7 @@ mod tests {
         #[test]
         fn test_use_decl_with_multiple_submodels_with_subcomponents() {
             let input =
-                Span::new_extra("use foo with [bar.qux, baz.quux.quuz]\n", Config::default());
+                InputSpan::new_extra("use foo with [bar.qux, baz.quux.quuz]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -1004,7 +1004,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_multiple_submodels_with_trailing_comma() {
-            let input = Span::new_extra("use foo with [bar, qux,]\n", Config::default());
+            let input = InputSpan::new_extra("use foo with [bar, qux,]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -1034,7 +1034,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_empty_submodel_list() {
-            let input = Span::new_extra("use foo with []\n", Config::default());
+            let input = InputSpan::new_extra("use foo with []\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -1054,7 +1054,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_model_alias_and_submodels() {
-            let input = Span::new_extra("use foo as bar with [qux, baz]\n", Config::default());
+            let input = InputSpan::new_extra("use foo as bar with [qux, baz]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -1084,7 +1084,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_complex_path_and_submodels() {
-            let input = Span::new_extra(
+            let input = InputSpan::new_extra(
                 "use utils/math.trigonometry as trig with [sin, cos as cosine]\n",
                 Config::default(),
             );
@@ -1125,7 +1125,7 @@ mod tests {
 
         #[test]
         fn test_use_decl_with_submodels_and_newlines() {
-            let input = Span::new_extra("use foo with [\nbar,\nqux\n]\n", Config::default());
+            let input = InputSpan::new_extra("use foo with [\nbar,\nqux\n]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
             match decl.node_value() {
                 Decl::UseModel(use_model_node) => {
@@ -1166,7 +1166,7 @@ mod tests {
 
             #[test]
             fn test_empty_input() {
-                let input = Span::new_extra("", Config::default());
+                let input = InputSpan::new_extra("", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1182,7 +1182,7 @@ mod tests {
 
             #[test]
             fn test_missing_import_keyword() {
-                let input = Span::new_extra("foo\n", Config::default());
+                let input = InputSpan::new_extra("foo\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1198,7 +1198,7 @@ mod tests {
 
             #[test]
             fn test_missing_path() {
-                let input = Span::new_extra("import\n", Config::default());
+                let input = InputSpan::new_extra("import\n", Config::default());
                 let result = parse(input);
                 let expected_import_span = AstSpan::new(0, 6, 0);
 
@@ -1222,7 +1222,7 @@ mod tests {
 
             #[test]
             fn test_invalid_path_identifier() {
-                let input = Span::new_extra("import 123\n", Config::default());
+                let input = InputSpan::new_extra("import 123\n", Config::default());
                 let result = parse(input);
                 let expected_import_span = AstSpan::new(0, 6, 1);
 
@@ -1246,7 +1246,7 @@ mod tests {
 
             #[test]
             fn test_path_with_missing_end_of_line() {
-                let input = Span::new_extra("import foo@bar\n", Config::default());
+                let input = InputSpan::new_extra("import foo@bar\n", Config::default());
                 let result = parse(input);
                 let expected_foo_span = AstSpan::new(7, 3, 0);
 
@@ -1270,7 +1270,7 @@ mod tests {
 
             #[test]
             fn test_whitespace_only() {
-                let input = Span::new_extra("   \n", Config::default());
+                let input = InputSpan::new_extra("   \n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1286,7 +1286,7 @@ mod tests {
 
             #[test]
             fn test_comment_only() {
-                let input = Span::new_extra("# comment\n", Config::default());
+                let input = InputSpan::new_extra("# comment\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1310,7 +1310,7 @@ mod tests {
 
             #[test]
             fn test_missing_use_keyword() {
-                let input = Span::new_extra("foo.bar as baz\n", Config::default());
+                let input = InputSpan::new_extra("foo.bar as baz\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1326,7 +1326,7 @@ mod tests {
 
             #[test]
             fn test_missing_as_keyword() {
-                let input = Span::new_extra("use foo.bar baz\n", Config::default());
+                let input = InputSpan::new_extra("use foo.bar baz\n", Config::default());
                 let result = parse(input);
                 // This should fail because 'baz' is not a valid continuation after a use declaration
                 // The parser correctly parses "use foo.bar" but then expects a newline
@@ -1350,7 +1350,7 @@ mod tests {
 
             #[test]
             fn test_missing_alias() {
-                let input = Span::new_extra("use foo.bar as\n", Config::default());
+                let input = InputSpan::new_extra("use foo.bar as\n", Config::default());
                 let result = parse(input);
                 let expected_as_span = AstSpan::new(12, 2, 0);
 
@@ -1375,7 +1375,7 @@ mod tests {
             #[test]
             fn test_invalid_path_identifier() {
                 // TODO: Add context to this error (in error module): "invalid path identifier"
-                let input = Span::new_extra("use 123.bar as baz\n", Config::default());
+                let input = InputSpan::new_extra("use 123.bar as baz\n", Config::default());
                 let result = parse(input);
                 let expected_use_span = AstSpan::new(0, 3, 1);
 
@@ -1400,7 +1400,7 @@ mod tests {
             #[test]
             fn test_invalid_alias_identifier() {
                 // TODO: Add context to this error (in error module): "invalid alias identifier"
-                let input = Span::new_extra("use foo.bar as 123\n", Config::default());
+                let input = InputSpan::new_extra("use foo.bar as 123\n", Config::default());
                 let result = parse(input);
                 let expected_as_span = AstSpan::new(12, 2, 1);
 
@@ -1431,7 +1431,7 @@ mod tests {
 
             #[test]
             fn test_empty_path() {
-                let input = Span::new_extra("", Config::default());
+                let input = InputSpan::new_extra("", Config::default());
                 let result = model_info(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1449,7 +1449,7 @@ mod tests {
 
             #[test]
             fn test_invalid_first_identifier() {
-                let input = Span::new_extra("123.bar", Config::default());
+                let input = InputSpan::new_extra("123.bar", Config::default());
                 let result = model_info(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1467,7 +1467,7 @@ mod tests {
 
             #[test]
             fn test_missing_subcomponent_after_dot() {
-                let input = Span::new_extra("foo.", Config::default());
+                let input = InputSpan::new_extra("foo.", Config::default());
                 let result = model_info(input);
                 let expected_dot_span = AstSpan::new(3, 1, 0);
 
@@ -1490,7 +1490,7 @@ mod tests {
 
             #[test]
             fn test_invalid_subcomponent_after_dot() {
-                let input = Span::new_extra("foo.123", Config::default());
+                let input = InputSpan::new_extra("foo.123", Config::default());
                 let result = model_info(input);
                 let expected_dot_span = AstSpan::new(3, 1, 0);
 
@@ -1513,7 +1513,7 @@ mod tests {
 
             #[test]
             fn test_dot_at_end() {
-                let input = Span::new_extra("foo.bar.", Config::default());
+                let input = InputSpan::new_extra("foo.bar.", Config::default());
                 let result = model_info(input);
                 let expected_dot_span = AstSpan::new(7, 1, 0);
 
@@ -1542,7 +1542,7 @@ mod tests {
 
             #[test]
             fn test_no_valid_declaration() {
-                let input = Span::new_extra("invalid syntax\n", Config::default());
+                let input = InputSpan::new_extra("invalid syntax\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1558,7 +1558,7 @@ mod tests {
 
             #[test]
             fn test_partial_keyword() {
-                let input = Span::new_extra("impor\n", Config::default());
+                let input = InputSpan::new_extra("impor\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1574,7 +1574,7 @@ mod tests {
 
             #[test]
             fn test_wrong_keyword() {
-                let input = Span::new_extra("export foo\n", Config::default());
+                let input = InputSpan::new_extra("export foo\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1590,7 +1590,7 @@ mod tests {
 
             #[test]
             fn test_mixed_case_keywords() {
-                let input = Span::new_extra("Import foo\n", Config::default());
+                let input = InputSpan::new_extra("Import foo\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1606,7 +1606,7 @@ mod tests {
 
             #[test]
             fn test_symbols_only() {
-                let input = Span::new_extra("+++---\n", Config::default());
+                let input = InputSpan::new_extra("+++---\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1622,7 +1622,7 @@ mod tests {
 
             #[test]
             fn test_numbers_only() {
-                let input = Span::new_extra("123 456\n", Config::default());
+                let input = InputSpan::new_extra("123 456\n", Config::default());
                 let result = parse(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1638,7 +1638,7 @@ mod tests {
 
             #[test]
             fn test_parse_complete_with_remaining_input() {
-                let input = Span::new_extra("import foo\nrest", Config::default());
+                let input = InputSpan::new_extra("import foo\nrest", Config::default());
                 let result = parse_complete(input);
                 match result {
                     Err(nom::Err::Error(error)) => {
@@ -1651,7 +1651,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_empty() {
-                let input = Span::new_extra("use foo with [\n", Config::default());
+                let input = InputSpan::new_extra("use foo with [\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1674,7 +1674,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_single_submodel() {
-                let input = Span::new_extra("use foo with [bar\n", Config::default());
+                let input = InputSpan::new_extra("use foo with [bar\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1697,7 +1697,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_multiple_submodels() {
-                let input = Span::new_extra("use foo with [bar, baz\n", Config::default());
+                let input = InputSpan::new_extra("use foo with [bar, baz\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1720,7 +1720,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_trailing_comma() {
-                let input = Span::new_extra("use foo with [bar, baz,\n", Config::default());
+                let input = InputSpan::new_extra("use foo with [bar, baz,\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1743,7 +1743,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_subcomponents() {
-                let input = Span::new_extra("use foo with [bar.qux, baz.quux\n", Config::default());
+                let input = InputSpan::new_extra("use foo with [bar.qux, baz.quux\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1767,7 +1767,7 @@ mod tests {
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_aliases() {
                 let input =
-                    Span::new_extra("use foo with [bar as baz, qux as quux\n", Config::default());
+                    InputSpan::new_extra("use foo with [bar as baz, qux as quux\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1790,7 +1790,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_model_alias() {
-                let input = Span::new_extra("use foo as bar with [qux, baz\n", Config::default());
+                let input = InputSpan::new_extra("use foo as bar with [qux, baz\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(20, 1, 0);
 
@@ -1813,7 +1813,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_newlines() {
-                let input = Span::new_extra("use foo with [\nbar,\nbaz\n", Config::default());
+                let input = InputSpan::new_extra("use foo with [\nbar,\nbaz\n", Config::default());
                 let result = parse(input);
                 let expected_bracket_span = AstSpan::new(13, 1, 0);
 
@@ -1836,7 +1836,7 @@ mod tests {
 
             #[test]
             fn test_use_decl_with_unclosed_bracket_with_complex_path() {
-                let input = Span::new_extra(
+                let input = InputSpan::new_extra(
                     "use utils/math.trigonometry as trig with [sin, cos as cosine\n",
                     Config::default(),
                 );

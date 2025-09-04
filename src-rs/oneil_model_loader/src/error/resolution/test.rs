@@ -1,7 +1,7 @@
 use std::fmt;
 
 use oneil_error::{AsOneilError, Context, ErrorLocation};
-use oneil_ir::{reference::Identifier, span::Span};
+use oneil_ir::{reference::Identifier, span::IrSpan};
 
 use crate::error::VariableResolutionError;
 
@@ -16,9 +16,9 @@ pub enum TestResolutionError {
         /// The identifier of the duplicate input parameter.
         identifier: Identifier,
         /// The span of the original input parameter declaration.
-        original_span: Span,
+        original_span: IrSpan,
         /// The span of the duplicate input parameter declaration.
-        duplicate_span: Span,
+        duplicate_span: IrSpan,
     },
     /// Error indicating that a variable resolution failed within a test.
     VariableResolution(VariableResolutionError),
@@ -39,8 +39,8 @@ impl TestResolutionError {
     #[must_use]
     pub const fn duplicate_input(
         identifier: Identifier,
-        original_span: Span,
-        duplicate_span: Span,
+        original_span: IrSpan,
+        duplicate_span: IrSpan,
     ) -> Self {
         Self::DuplicateInput {
             identifier,

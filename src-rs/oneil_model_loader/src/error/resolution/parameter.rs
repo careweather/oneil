@@ -1,7 +1,7 @@
 use std::fmt;
 
 use oneil_error::{AsOneilError, Context, ErrorLocation};
-use oneil_ir::{reference::Identifier, span::Span};
+use oneil_ir::{reference::Identifier, span::IrSpan};
 
 use crate::error::VariableResolutionError;
 
@@ -17,7 +17,7 @@ pub enum ParameterResolutionError {
         /// The list of parameter identifiers that form the circular dependency.
         circular_dependency: Vec<Identifier>,
         /// The span of the parameter that caused the circular dependency.
-        reference_span: Span,
+        reference_span: IrSpan,
     },
     /// A variable resolution error occurred within the parameter's value.
     VariableResolution(VariableResolutionError),
@@ -26,9 +26,9 @@ pub enum ParameterResolutionError {
         /// The identifier of the parameter.
         identifier: Identifier,
         /// The span of the original parameter.
-        original_span: Span,
+        original_span: IrSpan,
         /// The span of the duplicate parameter.
-        duplicate_span: Span,
+        duplicate_span: IrSpan,
     },
 }
 
@@ -45,7 +45,7 @@ impl ParameterResolutionError {
     #[must_use]
     pub const fn circular_dependency(
         circular_dependency: Vec<Identifier>,
-        reference_span: Span,
+        reference_span: IrSpan,
     ) -> Self {
         Self::CircularDependency {
             circular_dependency,
@@ -78,8 +78,8 @@ impl ParameterResolutionError {
     #[must_use]
     pub const fn duplicate_parameter(
         identifier: Identifier,
-        original_span: Span,
-        duplicate_span: Span,
+        original_span: IrSpan,
+        duplicate_span: IrSpan,
     ) -> Self {
         Self::DuplicateParameter {
             identifier,
