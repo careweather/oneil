@@ -13,11 +13,6 @@ fn unimportant_span() -> IrSpan {
 
 // SIMPLE CONSTRUCTORS
 
-pub fn identifier_with_span(ident: &str) -> ir::IdentifierWithSpan {
-    let ident = ir::Identifier::new(ident);
-    ir::IdentifierWithSpan::new(ident, unimportant_span())
-}
-
 pub fn reference_name_with_span(reference_name: &str) -> ir::ReferenceNameWithSpan {
     let reference_name = ir::ReferenceName::new(reference_name.to_string());
     ir::ReferenceNameWithSpan::new(reference_name, unimportant_span())
@@ -67,17 +62,6 @@ impl ModelBuilder {
         let submodel_import = ir::SubmodelImport::new(submodel_name_with_span, model_path);
 
         self.submodels.insert(submodel_name, submodel_import);
-        self
-    }
-
-    pub fn with_reference(mut self, reference_name: &str, reference_path: &str) -> Self {
-        let reference_name = ir::ReferenceName::new(reference_name.to_string());
-        let reference_name_with_span =
-            ir::WithSpan::new(reference_name.clone(), unimportant_span());
-        let reference_import =
-            ir::ReferenceImport::new(reference_name_with_span, ir::ModelPath::new(reference_path));
-
-        self.references.insert(reference_name, reference_import);
         self
     }
 

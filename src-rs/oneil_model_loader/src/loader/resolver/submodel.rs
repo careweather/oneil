@@ -1554,4 +1554,132 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn test_resolve_reference() {
+        // create the import model list
+        // > ref temperature
+        let temp_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_kind(ast::ModelKind::Reference)
+            .build();
+
+        let model_imports = vec![&temp_model];
+
+        // create the current model path
+        let model_path = ir::ModelPath::new("/parent_model");
+
+        // create the context
+        let temperature_path = ir::ModelPath::new("/temperature");
+
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
+        let context = context_builder.build();
+
+        // resolve the submodels
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
+
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
+
+        // check the submodels
+        assert_has_submodels!(&submodel_map, []);
+
+        // check the references
+        assert_has_references!(&reference_map, [("temperature", &temperature_path)]);
+    }
+
+    #[test]
+    fn test_resolve_reference_with_alias() {
+        // create the import model list
+        // > ref temperature as temp
+        let temp_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Reference)
+            .build();
+
+        let model_imports = vec![&temp_model];
+
+        // create the current model path
+        let model_path = ir::ModelPath::new("/parent_model");
+
+        // create the context
+        let temperature_path = ir::ModelPath::new("/temperature");
+
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
+        let context = context_builder.build();
+
+        // resolve the submodels
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
+
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
+
+        // check the submodels
+        assert_has_submodels!(&submodel_map, []);
+
+        // check the references
+        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
+    }
+
+    #[test]
+    fn test_resolve_reference_with_alias_and_submodels() {
+        // create the import model list
+        // > ref temperature as temp with [pressure as press]
+        let pressure_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("pressure")
+            .with_alias("press")
+            .build();
+
+        let temp_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Reference)
+            .with_submodels([pressure_submodel])
+            .build();
+
+        let model_imports = vec![&temp_model];
+
+        // create the current model path
+        let model_path = ir::ModelPath::new("/parent_model");
+
+        // create the context
+        let pressure_path = ir::ModelPath::new("/pressure");
+        let temperature_path = ir::ModelPath::new("/temperature");
+        let temperature_model = test_ir::ModelBuilder::new()
+            .with_submodel("pressure", "/pressure")
+            .build();
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (pressure_path.clone(), test_ir::empty_model()),
+            (temperature_path.clone(), temperature_model),
+        ]);
+        let context = context_builder.build();
+
+        // resolve the submodels
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
+
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+        assert!(reference_errors.is_empty());
+
+        // check the submodels
+        assert_has_submodels!(&submodel_map, []);
+        // check the references
+        assert_has_references!(
+            &reference_map,
+            [("temp", &temperature_path), ("press", &pressure_path)]
+        );
+    }
 }

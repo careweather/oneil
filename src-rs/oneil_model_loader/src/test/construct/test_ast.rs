@@ -252,21 +252,6 @@ impl ModelNodeBuilder {
         self
     }
 
-    pub fn with_reference(mut self, reference: &'static str) -> Self {
-        let reference_name = ast::Identifier::new(reference.to_string());
-        let reference_name_node = ast::Node::new(&unimportant_span(), reference_name);
-        let reference_info = ast::ModelInfo::new(reference_name_node, vec![], None);
-        let reference_info_node = ast::Node::new(&unimportant_span(), reference_info);
-        let reference =
-            ast::UseModel::new(vec![], reference_info_node, None, ast::ModelKind::Reference);
-        let reference_node = ast::Node::new(&unimportant_span(), reference);
-        let decl = ast::Decl::use_model(reference_node);
-        let decl_node = ast::Node::new(&unimportant_span(), decl);
-
-        self.decls.push(decl_node);
-        self
-    }
-
     pub fn with_section(mut self, section: &'static str, decls: Vec<ast::DeclNode>) -> Self {
         let section_label = ast::Label::new(section.to_string());
         let section_label_node = ast::Node::new(&unimportant_span(), section_label);
