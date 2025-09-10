@@ -1,7 +1,7 @@
 use crate::util::get_span_from_ast_span;
 
 use oneil_ast as ast;
-use oneil_ir::{self as ir, IrSpan};
+use oneil_ir as ir;
 
 /// Resolves an AST unit expression into a composite unit representation.
 ///
@@ -57,14 +57,14 @@ fn resolve_unit_recursive(
             };
 
             let name_span = get_span_from_ast_span(identifier.node_span());
-            let exponent_span = exponent.as_ref().map_or_else(
-                || IrSpan::new(identifier.node_span().end(), 0),
-                |exp| get_span_from_ast_span(exp.node_span()),
-            );
+            let exponent_span = exponent
+                .as_ref()
+                .map(|exp| get_span_from_ast_span(exp.node_span()));
             let unit = ir::Unit::new(
                 identifier.as_str().to_string(),
                 name_span,
                 exponent_value,
+                // TODO: should this be an Option rather than filling in with an arbitrary span?
                 exponent_span,
             );
             units.push(unit);

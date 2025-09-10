@@ -72,7 +72,7 @@
 //!
 //! ```rust
 //! use oneil_parser::parse_model;
-//! use oneil_ast::model::ModelNode;
+//! use oneil_ast::ModelNode;
 //!
 //! let ast: ModelNode = parse_model("Parameter radius: r = 5.0 :cm", None).unwrap();
 //! // Use the AST for further processing...

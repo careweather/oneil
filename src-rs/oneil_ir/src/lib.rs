@@ -1,18 +1,4 @@
-//! # Oneil Model
-//!
-//! This crate provides the core data structures and abstractions for representing
-//! models in the Oneil programming language. It defines the fundamental building
-//! blocks for modeling systems, including parameters, expressions, tests, and
-//! model organization.
-//!
-//! "IR" stands for "Intermediate Representation".
-//!
-//! This crate follows a functional programming approach with immutable data structures.
-//! All major types implement `Clone`, `Debug`, and `PartialEq` for easy manipulation
-//! and testing.
-
-// TODO: get rid of this after prototyping
-#![allow(missing_docs)]
+//! # Oneil Intermediate Representation (IR)
 
 mod debug_info;
 mod expr;
