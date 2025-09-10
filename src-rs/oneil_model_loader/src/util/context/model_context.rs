@@ -6,14 +6,14 @@ use crate::util::context::lookup::{self, LookupResult};
 
 pub struct ModelContext<'model> {
     models: &'model HashMap<ir::ModelPath, ir::Model>,
-    model_errors: &'model HashSet<&'model ir::ModelPath>,
+    model_errors: HashSet<&'model ir::ModelPath>,
 }
 
 impl<'model> ModelContext<'model> {
     #[must_use]
     pub const fn new(
         models: &'model HashMap<ir::ModelPath, ir::Model>,
-        model_errors: &'model HashSet<&'model ir::ModelPath>,
+        model_errors: HashSet<&'model ir::ModelPath>,
     ) -> Self {
         Self {
             models,

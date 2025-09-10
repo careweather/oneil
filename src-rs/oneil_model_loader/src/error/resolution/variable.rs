@@ -127,24 +127,24 @@ impl VariableResolutionError {
         }
     }
 
-    /// Creates a new error indicating that the parameter is undefined in a specific submodel.
+    /// Creates a new error indicating that the parameter is undefined in a specific reference.
     ///
     /// # Arguments
     ///
-    /// * `submodel_path` - The path of the submodel where the parameter should be defined
+    /// * `reference_path` - The path of the reference where the parameter should be defined
     /// * `identifier` - The identifier of the undefined parameter
     ///
     /// # Returns
     ///
     /// A new `VariableResolutionError::UndefinedParameter` variant.
     #[must_use]
-    pub const fn undefined_parameter_in_submodel(
-        submodel_path: ir::ModelPath,
+    pub const fn undefined_parameter_in_reference(
+        reference_path: ir::ModelPath,
         parameter: ir::Identifier,
         reference_span: IrSpan,
     ) -> Self {
         Self::UndefinedParameter {
-            model_path: Some(submodel_path),
+            model_path: Some(reference_path),
             parameter,
             reference_span,
         }

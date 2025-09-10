@@ -9,7 +9,7 @@ use crate::{
 
 pub struct ReferenceContext<'model, 'reference> {
     models: &'model HashMap<ir::ModelPath, ir::Model>,
-    model_errors: &'model HashSet<&'model ir::ModelPath>,
+    model_errors: HashSet<&'model ir::ModelPath>,
     references: &'reference HashMap<ir::ReferenceName, ir::ReferenceImport>,
     reference_errors: &'reference HashMap<ir::ReferenceName, ModelImportResolutionError>,
 }
@@ -18,7 +18,7 @@ impl<'model, 'reference> ReferenceContext<'model, 'reference> {
     #[must_use]
     pub const fn new(
         models: &'model HashMap<ir::ModelPath, ir::Model>,
-        model_errors: &'model HashSet<&'model ir::ModelPath>,
+        model_errors: HashSet<&'model ir::ModelPath>,
         references: &'reference HashMap<ir::ReferenceName, ir::ReferenceImport>,
         reference_errors: &'reference HashMap<ir::ReferenceName, ModelImportResolutionError>,
     ) -> Self {

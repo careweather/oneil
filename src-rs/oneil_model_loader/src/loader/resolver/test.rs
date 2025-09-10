@@ -97,77 +97,18 @@ pub fn resolve_tests(
 }
 
 #[cfg(test)]
-#[cfg(never)]
 mod tests {
     use crate::{
         error::VariableResolutionError,
-        test::{TestBuiltinRef, TestContext},
-        util::get_span_from_ast_span,
+        test::{
+            TestBuiltinRef,
+            construct::{ParameterContextBuilder, ReferenceContextBuilder, test_ast},
+        },
     };
 
     use super::*;
 
-    use oneil_ir::{debug_info::TraceLevel as ModelTraceLevel, reference::Identifier};
-
-    // TODO: write tests that test the span of the test inputs
-
-    mod helper {
-
-        use super::*;
-
-        /// Helper function to create a test span
-        pub fn test_ast_span(start: usize, end: usize) -> ast::AstSpan {
-            ast::AstSpan::new(start, end - start, 0)
-        }
-
-        /// Helper function to create an identifier node
-        pub fn create_identifier_node(name: &str, start: usize) -> ast::naming::IdentifierNode {
-            let identifier = ast::naming::Identifier::new(name.to_string());
-            ast::node::Node::new(&test_ast_span(start, start + name.len()), identifier)
-        }
-
-        /// Helper function to create a literal expression node
-        pub fn create_literal_expr_node(
-            literal: ast::expression::Literal,
-            start: usize,
-            end: usize,
-        ) -> ast::expression::ExprNode {
-            let literal_node = ast::node::Node::new(&test_ast_span(start, end), literal);
-            let expr = ast::expression::Expr::Literal(literal_node);
-            ast::node::Node::new(&test_ast_span(start, end), expr)
-        }
-
-        /// Helper function to create a simple identifier variable
-        pub fn create_identifier_variable(name: &str) -> ast::expression::VariableNode {
-            let identifier_node = create_identifier_node(name, 0);
-            let variable = ast::expression::Variable::Identifier(identifier_node);
-            ast::node::Node::new(&test_ast_span(0, name.len()), variable)
-        }
-
-        /// Helper function to create a variable expression node
-        pub fn create_variable_expr_node(
-            variable: ast::expression::VariableNode,
-            start: usize,
-            end: usize,
-        ) -> ast::expression::ExprNode {
-            let expr = ast::expression::Expr::Variable(variable);
-            ast::node::Node::new(&test_ast_span(start, end), expr)
-        }
-
-        /// Helper function to create a test node
-        pub fn create_test_node(
-            trace_level: Option<ast::debug_info::TraceLevel>,
-            expr: ast::expression::ExprNode,
-            start: usize,
-            end: usize,
-        ) -> ast::test::TestNode {
-            let trace_level_node =
-                trace_level.map(|tl| ast::node::Node::new(&test_ast_span(start, start + 1), tl));
-
-            let test = ast::test::Test::new(trace_level_node, expr, None);
-            ast::node::Node::new(&test_ast_span(start, end), test)
-        }
-    }
+    use oneil_ir as ir;
 
     #[test]
     fn test_resolve_tests_empty() {
@@ -176,11 +117,21 @@ mod tests {
         let tests_refs = tests.iter().collect();
 
         // create the context and builtin ref
-        let context = TestContext::new();
+        let reference_context_builder = ReferenceContextBuilder::new();
+        let reference_context = reference_context_builder.build();
+
+        let parameter_context_builder = ParameterContextBuilder::new();
+        let parameter_context = parameter_context_builder.build();
+
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
+        let (resolved_tests, errors) = resolve_tests(
+            tests_refs,
+            &builtin_ref,
+            &reference_context,
+            &parameter_context,
+        );
 
         // check the errors
         assert!(errors.is_empty());
@@ -192,23 +143,30 @@ mod tests {
     #[test]
     fn test_resolve_tests_basic() {
         // create the tests with various configurations
-        let tests = vec![
-            // test: true
-            helper::create_test_node(
-                None,
-                helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
-                0,
-                4,
-            ),
+        let tests = [
+            // > test: true
+            test_ast::TestNodeBuilder::new()
+                .with_boolean_expr(true)
+                .build(),
         ];
         let tests_refs = tests.iter().collect();
 
         // create the context and builtin ref
-        let context = TestContext::new();
+        let reference_context_builder = ReferenceContextBuilder::new();
+        let reference_context = reference_context_builder.build();
+
+        let parameter_context_builder = ParameterContextBuilder::new();
+        let parameter_context = parameter_context_builder.build();
+
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
+        let (resolved_tests, errors) = resolve_tests(
+            tests_refs,
+            &builtin_ref,
+            &reference_context,
+            &parameter_context,
+        );
 
         // check the errors
         assert!(errors.is_empty());
@@ -217,31 +175,39 @@ mod tests {
         assert_eq!(resolved_tests.len(), 1);
 
         let test_0 = resolved_tests
-            .get(&TestIndex::new(0))
+            .get(&ir::TestIndex::new(0))
             .expect("test should exist");
-        assert_eq!(test_0.trace_level(), ModelTraceLevel::None);
+        assert_eq!(test_0.trace_level(), ir::TraceLevel::None);
     }
 
     #[test]
     fn test_resolve_tests_with_debug_trace() {
         // create the tests with debug trace level
-        let tests = vec![
-            // ** test: true
-            helper::create_test_node(
-                Some(ast::debug_info::TraceLevel::Debug),
-                helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
-                0,
-                4,
-            ),
+        let tests = [
+            // > ** test: true
+            test_ast::TestNodeBuilder::new()
+                .with_boolean_expr(true)
+                .with_debug_trace_level()
+                .build(),
         ];
         let tests_refs = tests.iter().collect();
 
         // create the context and builtin ref
-        let context = TestContext::new();
+        let reference_context_builder = ReferenceContextBuilder::new();
+        let reference_context = reference_context_builder.build();
+
+        let parameter_context_builder = ParameterContextBuilder::new();
+        let parameter_context = parameter_context_builder.build();
+
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
+        let (resolved_tests, errors) = resolve_tests(
+            tests_refs,
+            &builtin_ref,
+            &reference_context,
+            &parameter_context,
+        );
 
         // check the errors
         assert!(errors.is_empty());
@@ -249,48 +215,65 @@ mod tests {
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = resolved_tests
-            .get(&TestIndex::new(0))
+            .get(&ir::TestIndex::new(0))
             .expect("test should exist");
-        assert_eq!(test.trace_level(), ModelTraceLevel::Debug);
+        assert_eq!(test.trace_level(), ir::TraceLevel::Debug);
     }
 
     #[test]
     fn test_resolve_tests_with_undefined_variable() {
         // create the tests with undefined variable
-        let undefined_var = helper::create_identifier_variable("undefined_var");
-        let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
-        let tests = vec![
-            // test: undefined_var
-            helper::create_test_node(
-                None,
-                helper::create_variable_expr_node(undefined_var, 0, 13),
-                0,
-                13,
-            ),
+        let tests = [
+            // > test: undefined_var
+            test_ast::TestNodeBuilder::new()
+                .with_variable_expr("undefined_var")
+                .build(),
         ];
         let tests_refs = tests.iter().collect();
 
         // create the context and builtin ref
-        let context = TestContext::new();
+        let reference_context_builder = ReferenceContextBuilder::new();
+        let reference_context = reference_context_builder.build();
+
+        let parameter_context_builder = ParameterContextBuilder::new();
+        let parameter_context = parameter_context_builder.build();
+
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
+        let (resolved_tests, errors) = resolve_tests(
+            tests_refs,
+            &builtin_ref,
+            &reference_context,
+            &parameter_context,
+        );
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let test_errors = errors
-            .get(&TestIndex::new(0))
+            .get(&ir::TestIndex::new(0))
             .expect("test errors should exist");
+
         assert!(test_errors.len() == 1);
-        assert_eq!(
-            test_errors[0],
-            TestResolutionError::variable_resolution(VariableResolutionError::undefined_parameter(
-                Identifier::new("undefined_var"),
-                undefined_var_span,
-            )),
-        );
+
+        let error = &test_errors[0];
+
+        let TestResolutionError::VariableResolution(error) = error else {
+            panic!("expected variable resolution error, got {error:?}");
+        };
+
+        let VariableResolutionError::UndefinedParameter {
+            model_path,
+            parameter,
+            reference_span: _,
+        } = error
+        else {
+            panic!("expected undefined parameter error, got {error:?}");
+        };
+
+        assert_eq!(model_path, &None);
+        assert_eq!(parameter, &ir::Identifier::new("undefined_var"));
 
         // check the resolved tests
         assert!(resolved_tests.is_empty());
@@ -299,56 +282,66 @@ mod tests {
     #[test]
     fn test_resolve_tests_mixed_success_and_error() {
         // create the tests with mixed success and error cases
-        let undefined_var = helper::create_identifier_variable("undefined_var");
-        let undefined_var_span = get_span_from_ast_span(undefined_var.node_span());
-        let tests = vec![
-            // test: true
-            helper::create_test_node(
-                None,
-                helper::create_literal_expr_node(ast::expression::Literal::Boolean(true), 0, 4),
-                0,
-                4,
-            ),
-            // test: undefined_var
-            helper::create_test_node(
-                Some(ast::debug_info::TraceLevel::Trace),
-                helper::create_variable_expr_node(
-                    helper::create_identifier_variable("undefined_var"),
-                    0,
-                    13,
-                ),
-                0,
-                13,
-            ),
+        let tests = [
+            // > test: true
+            test_ast::TestNodeBuilder::new()
+                .with_boolean_expr(true)
+                .build(),
+            // > test: undefined_var
+            test_ast::TestNodeBuilder::new()
+                .with_variable_expr("undefined_var")
+                .build(),
         ];
         let tests_refs = tests.iter().collect();
 
         // create the context and builtin ref
-        let context = TestContext::new();
+        let reference_context_builder = ReferenceContextBuilder::new();
+        let reference_context = reference_context_builder.build();
+
+        let parameter_context_builder = ParameterContextBuilder::new();
+        let parameter_context = parameter_context_builder.build();
+
         let builtin_ref = TestBuiltinRef::new();
 
         // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(tests_refs, &builtin_ref, &context);
+        let (resolved_tests, errors) = resolve_tests(
+            tests_refs,
+            &builtin_ref,
+            &reference_context,
+            &parameter_context,
+        );
 
         // check the errors
         assert_eq!(errors.len(), 1);
         let test_errors = errors
-            .get(&TestIndex::new(1))
+            .get(&ir::TestIndex::new(1))
             .expect("test errors should exist");
+
         assert!(test_errors.len() == 1);
-        assert_eq!(
-            test_errors[0],
-            TestResolutionError::variable_resolution(VariableResolutionError::undefined_parameter(
-                Identifier::new("undefined_var"),
-                undefined_var_span,
-            )),
-        );
+
+        let error = &test_errors[0];
+
+        let TestResolutionError::VariableResolution(error) = error else {
+            panic!("expected variable resolution error, got {error:?}");
+        };
+
+        let VariableResolutionError::UndefinedParameter {
+            model_path,
+            parameter,
+            reference_span: _,
+        } = error
+        else {
+            panic!("expected undefined parameter error, got {error:?}");
+        };
+
+        assert_eq!(model_path, &None);
+        assert_eq!(parameter, &ir::Identifier::new("undefined_var"));
 
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);
         let test = resolved_tests
-            .get(&TestIndex::new(0))
+            .get(&ir::TestIndex::new(0))
             .expect("test should exist");
-        assert_eq!(test.trace_level(), ModelTraceLevel::None);
+        assert_eq!(test.trace_level(), ir::TraceLevel::None);
     }
 }

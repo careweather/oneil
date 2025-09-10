@@ -305,7 +305,7 @@ pub enum Variable {
     /// This could reference a parameter in the current model or a built-in variable
     Identifier(IdentifierNode),
     /// A parameter in a reference model
-    ReferenceModelParameter {
+    ModelParameter {
         /// The reference model
         reference_model: IdentifierNode,
         /// The parameter being accessed
@@ -323,13 +323,10 @@ impl Variable {
         Self::Identifier(id)
     }
 
-    /// Creates an accessor variable reference
+    /// Creates a model parameter variable reference
     #[must_use]
-    pub fn reference_model_accessor(
-        reference_model: IdentifierNode,
-        parameter: IdentifierNode,
-    ) -> Self {
-        Self::ReferenceModelParameter {
+    pub fn model_parameter(reference_model: IdentifierNode, parameter: IdentifierNode) -> Self {
+        Self::ModelParameter {
             reference_model,
             parameter,
         }

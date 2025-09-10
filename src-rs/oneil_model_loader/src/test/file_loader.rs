@@ -54,7 +54,11 @@ impl TestPythonValidator {
     ///
     /// A `TestPythonValidator` that will return `Ok(())` for the specified imports
     /// and `Err(())` for all other imports.
-    pub fn validate_some(imports: Vec<PathBuf>) -> Self {
+    pub fn validate_some(imports: impl IntoIterator<Item = impl AsRef<Path>>) -> Self {
+        let imports = imports
+            .into_iter()
+            .map(|path| path.as_ref().to_path_buf())
+            .collect();
         Self::ValidateSome(imports)
     }
 }
@@ -133,10 +137,13 @@ impl TestFileParser {
     ///
     /// A new `TestFileParser` that will return the specified models when their
     /// corresponding paths are requested.
-    pub fn new(models: impl IntoIterator<Item = (PathBuf, ast::ModelNode)>) -> Self {
-        Self {
-            models: models.into_iter().collect(),
-        }
+    pub fn new(models: impl IntoIterator<Item = (impl AsRef<Path>, ast::ModelNode)>) -> Self {
+        let models = models
+            .into_iter()
+            .map(|(path, model)| (path.as_ref().to_path_buf(), model))
+            .collect();
+
+        Self { models }
     }
 
     /// Creates a new test file parser with no predefined models.

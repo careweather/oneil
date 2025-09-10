@@ -16,8 +16,8 @@
 //! successful imports, failed imports, and different AST structures.
 
 mod builtin_ref;
+pub mod construct;
 mod file_loader;
-mod helper;
 
 pub use builtin_ref::TestBuiltinRef;
 pub use file_loader::{TestFileParser, TestPythonValidator};

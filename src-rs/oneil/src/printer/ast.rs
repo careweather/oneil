@@ -305,7 +305,7 @@ fn print_variable(
                 id.node_value().as_str()
             )?;
         }
-        ast::Variable::ReferenceModelParameter {
+        ast::Variable::ModelParameter {
             reference_model,
             parameter,
         } => {

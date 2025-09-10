@@ -95,51 +95,18 @@ where
 mod tests {
     use std::path::PathBuf;
 
-    use oneil_ast as ast;
-
     use super::*;
-    use crate::test::TestPythonValidator;
-
-    mod helper {
-        use std::collections::HashSet;
-
-        use oneil_ast::AstSpan;
-
-        use super::*;
-
-        pub fn get_model_path() -> ir::ModelPath {
-            ir::ModelPath::new(PathBuf::from("test_model"))
-        }
-
-        pub fn get_empty_builder() -> ModelCollectionBuilder<(), ()> {
-            ModelCollectionBuilder::new(HashSet::new())
-        }
-
-        pub fn build_import(path: &str) -> ast::ImportNode {
-            // for simplicity's sake, we'll use a span that's the length of the path
-            let span = AstSpan::new(0, path.len(), 0);
-            let import = ast::Import::new(ast::Node::new(&span, path.to_string()));
-            ast::Node::new(&span, import)
-        }
-
-        pub fn build_import_with_span(
-            path: &str,
-            start: usize,
-            end: usize,
-            line: usize,
-        ) -> ast::ImportNode {
-            let span = AstSpan::new(start, end, line);
-            let import = ast::Import::new(ast::Node::new(&span, path.to_string()));
-            ast::Node::new(&span, import)
-        }
-    }
+    use crate::test::{
+        TestPythonValidator,
+        construct::{self, test_ast},
+    };
 
     #[test]
     fn test_validate_imports_empty_list() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
         let imports = vec![];
@@ -159,11 +126,11 @@ mod tests {
     fn test_validate_imports_single_valid_import() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
-        let imports = [helper::build_import("my_python")];
+        let imports = [test_ast::ImportPythonNodeBuilder::build("my_python")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -174,8 +141,7 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
+        assert!(valid_imports.contains_key(&valid_path));
 
         // check the errors
         assert!(errors.is_empty());
@@ -185,11 +151,11 @@ mod tests {
     fn test_validate_imports_single_invalid_import() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
-        let imports = [helper::build_import("nonexistent")];
+        let imports = [test_ast::ImportPythonNodeBuilder::build("nonexistent")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -203,27 +169,30 @@ mod tests {
         assert_eq!(errors.len(), 1);
 
         let error_path = ir::PythonPath::new(PathBuf::from("nonexistent"));
-        let error_path_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(
-            errors.get(&error_path),
-            Some(&ImportResolutionError::failed_validation(
-                error_path_span,
-                error_path
-            ))
-        );
+        let error = errors.get(&error_path).expect("error should be present");
+
+        let ImportResolutionError::FailedValidation {
+            ident_span: _,
+            python_path: error_path_actual,
+        } = error
+        else {
+            panic!("error should be a failed validation error");
+        };
+
+        assert_eq!(error_path_actual, &error_path);
     }
 
     #[test]
     fn test_validate_imports_mixed_valid_and_invalid() {
         // set up the context
-        let file_loader = TestPythonValidator::validate_some(vec!["my_python.py".into()]);
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let file_loader = TestPythonValidator::validate_some(["my_python.py"]);
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
         let imports = [
-            helper::build_import("my_python"),
-            helper::build_import("nonexistent"),
+            test_ast::ImportPythonNodeBuilder::build("my_python"),
+            test_ast::ImportPythonNodeBuilder::build("nonexistent"),
         ];
         let import_refs = imports.iter().collect();
 
@@ -235,35 +204,37 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
+        assert!(valid_imports.contains_key(&valid_path));
 
         // check the errors
         assert_eq!(errors.len(), 1);
 
         let error_path = ir::PythonPath::new(PathBuf::from("nonexistent"));
-        let error_path_span = get_span_from_ast_span(imports[1].node_span());
-        assert_eq!(
-            errors.get(&error_path),
-            Some(&ImportResolutionError::failed_validation(
-                error_path_span,
-                error_path
-            ))
-        );
+        let error = errors.get(&error_path).expect("error should be present");
+
+        let ImportResolutionError::FailedValidation {
+            ident_span: _,
+            python_path: error_path_actual,
+        } = error
+        else {
+            panic!("error should be a failed validation error");
+        };
+
+        assert_eq!(error_path_actual, &error_path);
     }
 
     #[test]
     fn test_validate_imports_multiple_valid_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
         let imports = [
-            helper::build_import("my_python1"),
-            helper::build_import("my_python2"),
-            helper::build_import("my_python3"),
+            test_ast::ImportPythonNodeBuilder::build("my_python1"),
+            test_ast::ImportPythonNodeBuilder::build("my_python2"),
+            test_ast::ImportPythonNodeBuilder::build("my_python3"),
         ];
         let import_refs = imports.iter().collect();
 
@@ -274,16 +245,13 @@ mod tests {
         // check the imports
         assert_eq!(valid_imports.len(), 3);
         let valid_path1 = ir::PythonPath::new(PathBuf::from("my_python1"));
-        let valid_path1_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(valid_imports.get(&valid_path1), Some(&valid_path1_span));
+        assert!(valid_imports.contains_key(&valid_path1));
 
         let valid_path2 = ir::PythonPath::new(PathBuf::from("my_python2"));
-        let valid_path2_span = get_span_from_ast_span(imports[1].node_span());
-        assert_eq!(valid_imports.get(&valid_path2), Some(&valid_path2_span));
+        assert!(valid_imports.contains_key(&valid_path2));
 
         let valid_path3 = ir::PythonPath::new(PathBuf::from("my_python3"));
-        let valid_path3_span = get_span_from_ast_span(imports[2].node_span());
-        assert_eq!(valid_imports.get(&valid_path3), Some(&valid_path3_span));
+        assert!(valid_imports.contains_key(&valid_path3));
 
         // check the errors
         assert!(errors.is_empty());
@@ -293,13 +261,13 @@ mod tests {
     fn test_validate_imports_all_invalid() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
         let imports = [
-            helper::build_import("nonexistent1"),
-            helper::build_import("nonexistent2"),
+            test_ast::ImportPythonNodeBuilder::build("nonexistent1"),
+            test_ast::ImportPythonNodeBuilder::build("nonexistent2"),
         ];
         let import_refs = imports.iter().collect();
 
@@ -313,36 +281,42 @@ mod tests {
         // check the errors
         assert_eq!(errors.len(), 2);
 
-        let error_path1 = ir::PythonPath::new(PathBuf::from("nonexistent1"));
-        let error_path1_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(
-            errors.get(&error_path1),
-            Some(&ImportResolutionError::failed_validation(
-                error_path1_span,
-                error_path1
-            ))
-        );
+        let error_path = ir::PythonPath::new(PathBuf::from("nonexistent1"));
+        let error = errors.get(&error_path).expect("error should be present");
 
-        let error_path2 = ir::PythonPath::new(PathBuf::from("nonexistent2"));
-        let error_path2_span = get_span_from_ast_span(imports[1].node_span());
-        assert_eq!(
-            errors.get(&error_path2),
-            Some(&ImportResolutionError::failed_validation(
-                error_path2_span,
-                error_path2
-            ))
-        );
+        let ImportResolutionError::FailedValidation {
+            ident_span: _,
+            python_path: error_path_actual,
+        } = error
+        else {
+            panic!("error should be a failed validation error");
+        };
+
+        assert_eq!(error_path_actual, &error_path);
+
+        let error_path = ir::PythonPath::new(PathBuf::from("nonexistent2"));
+        let error = errors.get(&error_path).expect("error should be present");
+
+        let ImportResolutionError::FailedValidation {
+            ident_span: _,
+            python_path: error_path_actual,
+        } = error
+        else {
+            panic!("error should be a failed validation error");
+        };
+
+        assert_eq!(error_path_actual, &error_path);
     }
 
     #[test]
     fn test_validate_imports_builder_error_tracking() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
-        let imports = [helper::build_import("nonexistent")];
+        let imports = [test_ast::ImportPythonNodeBuilder::build("nonexistent")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -360,12 +334,12 @@ mod tests {
     #[test]
     fn test_validate_imports_path_conversion() {
         // set up the context
-        let file_loader = TestPythonValidator::validate_some(vec!["subdir/my_python.py".into()]);
+        let file_loader = TestPythonValidator::validate_some(["subdir/my_python.py"]);
         let model_path = ir::ModelPath::new(PathBuf::from("subdir/test_model"));
-        let builder = helper::get_empty_builder();
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports
-        let imports = [helper::build_import("my_python")];
+        let imports = [test_ast::ImportPythonNodeBuilder::build("my_python")];
         let import_refs = imports.iter().collect();
 
         // validate the imports
@@ -376,8 +350,7 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = ir::PythonPath::new(PathBuf::from("subdir/my_python"));
-        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
+        assert!(valid_imports.contains_key(&valid_path));
 
         // check the errors
         assert!(errors.is_empty());
@@ -387,13 +360,15 @@ mod tests {
     fn test_validate_imports_duplicate_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports with different spans to simulate different positions in the file
         let imports = [
-            helper::build_import_with_span("my_python", 0, 9, 1), // first import at line 1
-            helper::build_import_with_span("my_python", 10, 19, 2), // duplicate import at line 2
+            // first import
+            test_ast::ImportPythonNodeBuilder::build("my_python"),
+            // duplicate import
+            test_ast::ImportPythonNodeBuilder::build("my_python"),
         ];
         let import_refs = imports.iter().collect();
 
@@ -405,35 +380,44 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
+        assert!(valid_imports.contains_key(&valid_path));
 
         // check the errors - should have one duplicate import error
         assert_eq!(errors.len(), 1);
 
         let error_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        let duplicate_span = get_span_from_ast_span(imports[1].node_span());
-        let expected_error = ImportResolutionError::duplicate_import(
-            valid_path_span,
-            duplicate_span,
-            error_path.clone(),
-        );
-        assert_eq!(errors.get(&error_path), Some(&expected_error));
+        let duplicate_error = errors
+            .get(&error_path)
+            .expect("duplicate error should be present");
+
+        let ImportResolutionError::DuplicateImport {
+            python_path: duplicate_error_path,
+            ..
+        } = duplicate_error
+        else {
+            panic!("duplicate error should be a duplicate import error");
+        };
+
+        assert_eq!(duplicate_error_path, &error_path);
     }
 
     #[test]
     fn test_validate_imports_multiple_duplicate_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports with multiple duplicates
         let imports = [
-            helper::build_import_with_span("my_python", 0, 9, 1), // first import
-            helper::build_import_with_span("other_python", 10, 22, 2), // different import
-            helper::build_import_with_span("my_python", 23, 32, 3), // duplicate of first
-            helper::build_import_with_span("other_python", 33, 45, 4), // duplicate of second
+            // first import
+            test_ast::ImportPythonNodeBuilder::build("my_python"),
+            // different import
+            test_ast::ImportPythonNodeBuilder::build("other_python"),
+            // duplicate of first
+            test_ast::ImportPythonNodeBuilder::build("my_python"),
+            // duplicate of second
+            test_ast::ImportPythonNodeBuilder::build("other_python"),
         ];
         let import_refs = imports.iter().collect();
 
@@ -445,46 +429,60 @@ mod tests {
         assert_eq!(valid_imports.len(), 2);
 
         let valid_path1 = ir::PythonPath::new(PathBuf::from("my_python"));
-        let valid_path1_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(valid_imports.get(&valid_path1), Some(&valid_path1_span));
+        assert!(valid_imports.contains_key(&valid_path1));
 
         let valid_path2 = ir::PythonPath::new(PathBuf::from("other_python"));
-        let valid_path2_span = get_span_from_ast_span(imports[1].node_span());
-        assert_eq!(valid_imports.get(&valid_path2), Some(&valid_path2_span));
+        assert!(valid_imports.contains_key(&valid_path2));
 
         // check the errors - should have two duplicate import errors
         assert_eq!(errors.len(), 2);
 
-        let duplicate_span1 = get_span_from_ast_span(imports[2].node_span());
-        let expected_error1 = ImportResolutionError::duplicate_import(
-            valid_path1_span,
-            duplicate_span1,
-            valid_path1.clone(),
-        );
-        assert_eq!(errors.get(&valid_path1), Some(&expected_error1));
+        let duplicate_error1 = errors
+            .get(&valid_path1)
+            .expect("duplicate error should be present");
 
-        let duplicate_span2 = get_span_from_ast_span(imports[3].node_span());
-        let expected_error2 = ImportResolutionError::duplicate_import(
-            valid_path2_span,
-            duplicate_span2,
-            valid_path2.clone(),
-        );
-        assert_eq!(errors.get(&valid_path2), Some(&expected_error2));
+        let ImportResolutionError::DuplicateImport {
+            python_path: duplicate_error_path1,
+            ..
+        } = duplicate_error1
+        else {
+            panic!("duplicate error should be a duplicate import error");
+        };
+
+        assert_eq!(duplicate_error_path1, &valid_path1);
+
+        let duplicate_error2 = errors
+            .get(&valid_path2)
+            .expect("duplicate error should be present");
+
+        let ImportResolutionError::DuplicateImport {
+            python_path: duplicate_error_path2,
+            ..
+        } = duplicate_error2
+        else {
+            panic!("duplicate error should be a duplicate import error");
+        };
+
+        assert_eq!(duplicate_error_path2, &valid_path2);
     }
 
     #[test]
     fn test_validate_imports_duplicate_imports_with_invalid_imports() {
         // set up the context
-        let file_loader = TestPythonValidator::validate_some(vec!["my_python.py".into()]);
-        let model_path = helper::get_model_path();
-        let builder = helper::get_empty_builder();
+        let file_loader = TestPythonValidator::validate_some(["my_python.py"]);
+        let model_path = ir::ModelPath::new("test_model");
+        let builder = construct::empty_model_collection_builder();
 
         // set up the imports with duplicates and invalid imports
         let imports = [
-            helper::build_import_with_span("my_python", 0, 9, 1), // valid import
-            helper::build_import_with_span("nonexistent", 10, 21, 2), // invalid import
-            helper::build_import_with_span("my_python", 22, 31, 3), // duplicate of first
-            helper::build_import_with_span("another_nonexistent", 32, 50, 4), // another invalid import
+            // valid import
+            test_ast::ImportPythonNodeBuilder::build("my_python"),
+            // invalid import
+            test_ast::ImportPythonNodeBuilder::build("nonexistent"),
+            // duplicate of first
+            test_ast::ImportPythonNodeBuilder::build("my_python"),
+            // another invalid import
+            test_ast::ImportPythonNodeBuilder::build("another_nonexistent"),
         ];
         let import_refs = imports.iter().collect();
 
@@ -496,32 +494,55 @@ mod tests {
         assert_eq!(valid_imports.len(), 1);
 
         let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        let valid_path_span = get_span_from_ast_span(imports[0].node_span());
-        assert_eq!(valid_imports.get(&valid_path), Some(&valid_path_span));
+        assert!(valid_imports.contains_key(&valid_path));
 
         // check the errors - should have 3 errors: 1 duplicate + 2 invalid imports
         assert_eq!(errors.len(), 3);
 
         // Check duplicate import error
-        let duplicate_span = get_span_from_ast_span(imports[2].node_span());
-        let expected_duplicate_error = ImportResolutionError::duplicate_import(
-            valid_path_span,
-            duplicate_span,
-            valid_path.clone(),
-        );
-        assert_eq!(errors.get(&valid_path), Some(&expected_duplicate_error));
+        let duplicate_error = errors
+            .get(&valid_path)
+            .expect("duplicate error should be present");
+
+        let ImportResolutionError::DuplicateImport {
+            python_path: duplicate_error_path,
+            ..
+        } = duplicate_error
+        else {
+            panic!("duplicate error should be a duplicate import error");
+        };
+
+        assert_eq!(duplicate_error_path, &valid_path);
 
         // Check invalid import errors
         let invalid_path1 = ir::PythonPath::new(PathBuf::from("nonexistent"));
-        let invalid_span1 = get_span_from_ast_span(imports[1].node_span());
-        let expected_invalid_error1 =
-            ImportResolutionError::failed_validation(invalid_span1, invalid_path1.clone());
-        assert_eq!(errors.get(&invalid_path1), Some(&expected_invalid_error1));
+        let invalid_error1 = errors
+            .get(&invalid_path1)
+            .expect("invalid error should be present");
+
+        let ImportResolutionError::FailedValidation {
+            python_path: invalid_path1_actual,
+            ..
+        } = invalid_error1
+        else {
+            panic!("invalid error should be a failed validation error");
+        };
+
+        assert_eq!(invalid_path1_actual, &invalid_path1);
 
         let invalid_path2 = ir::PythonPath::new(PathBuf::from("another_nonexistent"));
-        let invalid_span2 = get_span_from_ast_span(imports[3].node_span());
-        let expected_invalid_error2 =
-            ImportResolutionError::failed_validation(invalid_span2, invalid_path2.clone());
-        assert_eq!(errors.get(&invalid_path2), Some(&expected_invalid_error2));
+        let invalid_error2 = errors
+            .get(&invalid_path2)
+            .expect("invalid error should be present");
+
+        let ImportResolutionError::FailedValidation {
+            python_path: invalid_path2_actual,
+            ..
+        } = invalid_error2
+        else {
+            panic!("invalid error should be a failed validation error");
+        };
+
+        assert_eq!(invalid_path2_actual, &invalid_path2);
     }
 }

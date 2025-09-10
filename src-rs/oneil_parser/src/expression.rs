@@ -694,7 +694,7 @@ fn variable(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
         Some(reference_model_id) => {
             let variable_span =
                 AstSpan::calc_span(&parameter_id_span, &reference_model_id.node_span());
-            let variable = Variable::reference_model_accessor(parameter_id, reference_model_id);
+            let variable = Variable::model_parameter(parameter_id, reference_model_id);
             Node::new(&variable_span, variable)
         }
         None => Node::new(&parameter_id_span, Variable::identifier(parameter_id)),
@@ -845,7 +845,7 @@ mod tests {
 
         let variable = Node::new(
             &AstSpan::new(0, 7, 0),
-            Variable::reference_model_accessor(expected_id, expected_id2),
+            Variable::model_parameter(expected_id, expected_id2),
         );
 
         let expected_expr = Node::new(&AstSpan::new(0, 7, 0), Expr::variable(variable));

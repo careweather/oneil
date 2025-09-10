@@ -351,1478 +351,1207 @@ fn resolve_model_path(
 }
 
 #[cfg(test)]
-#[cfg(never)]
 mod tests {
-    use crate::test::TestContext;
+    // TODO: go through and ensure that these mean what they should
+    // TODO: create helper functions for assertions
+
+    use crate::test::construct::{ModelContextBuilder, test_ast, test_ir};
 
     use super::*;
-    use oneil_ast::declaration::ModelKind;
-    use oneil_ir::model::Model;
+    use oneil_ast as ast;
+    use oneil_ir as ir;
 
-    // TODO: write tests that test the span of the submodel path
+    // This is a macro, as opposed to a function, because we want the error
+    // location to show the line in the test where the assertion failed, rather
+    // than some line in an `assert_has_submodels` function
+    macro_rules! assert_has_submodels {
+        ($actual_submodel_map:expr, $expected_submodels:expr $(,)?) => {
+            let actual_submodel_map: &ir::SubmodelMap = $actual_submodel_map;
+            let expected_submodels: Vec<(&'static str, &ir::ModelPath)> =
+                $expected_submodels.into_iter().collect();
 
-    mod helper {
-        use super::*;
-
-        /// Helper function to create a test AST span
-        pub fn test_ast_span(start: usize, end: usize) -> ast::AstSpan {
-            ast::AstSpan::new(start, end - start, 0)
-        }
-
-        /// Helper function to create a test IR span
-        pub fn test_ir_span(start: usize, end: usize) -> oneil_ir::span::IrSpan {
-            oneil_ir::span::IrSpan::new(start, end - start)
-        }
-
-        /// Helper function to create a use model node
-        pub fn create_use_model_node(
-            model_name: &str,
-            subcomponents: Vec<ast::naming::IdentifierNode>,
-            alias: Option<&str>,
-            model_kind: ast::declaration::ModelKind,
-            start: usize,
-            end: usize,
-        ) -> ast::declaration::UseModelNode {
-            let identifier = ast::naming::Identifier::new(model_name.to_string());
-            let model_name_node =
-                ast::node::Node::new(&test_ast_span(start, start + model_name.len()), identifier);
-
-            let alias_node = alias.map(|name| {
-                let identifier = ast::naming::Identifier::new(name.to_string());
-                ast::node::Node::new(&test_ast_span(end - name.len(), end), identifier)
-            });
-
-            // Create the model info
-            let model_info =
-                ast::declaration::ModelInfo::new(model_name_node, subcomponents, alias_node);
-            let model_info_node = ast::node::Node::new(&test_ast_span(start, end), model_info);
-
-            // Create an empty directory path for tests
-            let directory_path = vec![];
-
-            let use_model = ast::declaration::UseModel::new(
-                directory_path,
-                model_info_node,
-                None, // No submodel list
-                model_kind,
+            // check that the submodel map length is the same as the number of submodels
+            assert_eq!(
+                actual_submodel_map.len(),
+                expected_submodels.len(),
+                "length of *actual* submodel map differs from *expected* submodel map",
             );
-            ast::node::Node::new(&test_ast_span(start, end), use_model)
-        }
 
-        /// Helper function to create a use model node with a specific directory path
-        pub fn create_use_model_node_with_directory_path(
-            model_name: &str,
-            subcomponents: Vec<ast::naming::IdentifierNode>,
-            alias: Option<&str>,
-            model_kind: ast::declaration::ModelKind,
-            directory_path: &[&str],
-            start: usize,
-            end: usize,
-        ) -> ast::declaration::UseModelNode {
-            let identifier = ast::naming::Identifier::new(model_name.to_string());
-            let model_name_node =
-                ast::node::Node::new(&test_ast_span(start, start + model_name.len()), identifier);
+            // check that the submodel map contains the expected submodels
+            for (submodel_name, expected_submodel_path) in expected_submodels {
+                let submodel_name = ir::SubmodelName::new(submodel_name.to_string());
+                let submodel_import = actual_submodel_map.get(&submodel_name).expect(
+                    format!(
+                        "did not find submodel path for '{}'",
+                        submodel_name.as_str()
+                    )
+                    .as_str(),
+                );
 
-            let alias_node = alias.map(|name| {
-                let identifier = ast::naming::Identifier::new(name.to_string());
-                ast::node::Node::new(&test_ast_span(end - name.len(), end), identifier)
-            });
-
-            // Create the model info
-            let model_info =
-                ast::declaration::ModelInfo::new(model_name_node, subcomponents, alias_node);
-            let model_info_node = ast::node::Node::new(&test_ast_span(start, end), model_info);
-
-            // Convert string directory paths to DirectoryNode objects
-            let directory_nodes: Vec<ast::naming::DirectoryNode> = directory_path
-                .iter()
-                .map(|dir_str| {
-                    let directory = match *dir_str {
-                        ".." => ast::naming::Directory::parent(),
-                        "." => ast::naming::Directory::current(),
-                        _ => ast::naming::Directory::name((*dir_str).to_string()),
-                    };
-                    ast::node::Node::new(&test_ast_span(start, start + dir_str.len()), directory)
-                })
-                .collect();
-
-            let use_model = ast::declaration::UseModel::new(
-                directory_nodes,
-                model_info_node,
-                None, // No submodel list
-                model_kind,
-            );
-            ast::node::Node::new(&test_ast_span(start, end), use_model)
-        }
-
-        /// Helper function to create a submodel node for the "with" clause
-        pub fn create_submodel_node(
-            name: &str,
-            subcomponents: Vec<ast::naming::IdentifierNode>,
-            alias: Option<&str>,
-            start: usize,
-            end: usize,
-        ) -> ast::declaration::ModelInfoNode {
-            let identifier = ast::naming::Identifier::new(name.to_string());
-            let name_node =
-                ast::node::Node::new(&test_ast_span(start, start + name.len()), identifier);
-
-            let alias_node = alias.map(|alias_name| {
-                let alias_identifier = ast::naming::Identifier::new(alias_name.to_string());
-                ast::node::Node::new(
-                    &test_ast_span(end - alias_name.len(), end),
-                    alias_identifier,
-                )
-            });
-
-            let submodel = ast::declaration::ModelInfo::new(name_node, subcomponents, alias_node);
-            ast::node::Node::new(&test_ast_span(start, end), submodel)
-        }
-
-        /// Helper function to create a use model node with submodels in the "with" clause
-        pub fn create_use_model_node_with_submodels(
-            model_name: &str,
-            subcomponents: Vec<ast::naming::IdentifierNode>,
-            alias: Option<&str>,
-            submodels: Vec<ast::declaration::ModelInfoNode>,
-            model_kind: ast::declaration::ModelKind,
-            start: usize,
-            end: usize,
-        ) -> ast::declaration::UseModelNode {
-            let identifier = ast::naming::Identifier::new(model_name.to_string());
-            let model_name_node =
-                ast::node::Node::new(&test_ast_span(start, start + model_name.len()), identifier);
-
-            let alias_node = alias.map(|name| {
-                let identifier = ast::naming::Identifier::new(name.to_string());
-                ast::node::Node::new(&test_ast_span(end - name.len(), end), identifier)
-            });
-
-            // Create the model info
-            let model_info =
-                ast::declaration::ModelInfo::new(model_name_node, subcomponents, alias_node);
-            let model_info_node = ast::node::Node::new(&test_ast_span(start, end), model_info);
-
-            // Create an empty directory path for tests
-            let directory_path = vec![];
-
-            // Create the submodel list
-            let submodel_list = ast::declaration::SubmodelList::new(submodels);
-            let submodel_list_node =
-                ast::node::Node::new(&test_ast_span(start, end), submodel_list);
-
-            let use_model = ast::declaration::UseModel::new(
-                directory_path,
-                model_info_node,
-                Some(submodel_list_node),
-                model_kind,
-            );
-            ast::node::Node::new(&test_ast_span(start, end), use_model)
-        }
-
-        /// Helper function to create a test model with specified submodels
-        pub fn create_test_model(submodels: Vec<(&str, (ModelPath, IrSpan))>) -> Model {
-            let mut submodel_map = HashMap::new();
-            for (name, path) in submodels {
-                let identifier = Identifier::new(name);
-                submodel_map.insert(identifier, path);
+                assert_eq!(
+                    submodel_import.path(),
+                    expected_submodel_path,
+                    "actual submodel path for '{}' differs from expected submodel path",
+                    submodel_name.as_str(),
+                );
             }
+        };
+    }
 
-            Model::new(
-                HashMap::new(),                                                // python_imports
-                submodel_map,                                                  // submodels
-                oneil_ir::parameter::ParameterCollection::new(HashMap::new()), // parameters
-                HashMap::new(),                                                // tests
-            )
-        }
+    // This is a macro, as opposed to a function, because we want the error
+    // location to show the line in the test where the assertion failed, rather
+    // than some line in an `assert_has_references` function
+    macro_rules! assert_has_references {
+        ($reference_map:expr, $references:expr $(,)?) => {
+            let reference_map: &ir::ReferenceMap = $reference_map;
+            let references: Vec<(&'static str, &ir::ModelPath)> = $references.into_iter().collect();
+
+            // check that the reference map length is the same as the number of references
+            assert_eq!(
+                reference_map.len(),
+                references.len(),
+                "length of *actual* reference map differs from *expected* reference map",
+            );
+
+            // check that the reference map contains the expected references
+            for (reference_name, reference_path) in references {
+                let reference_name = ir::ReferenceName::new(reference_name.to_string());
+                let reference_import = reference_map.get(&reference_name).expect(
+                    format!(
+                        "did not find reference path for '{}'",
+                        reference_name.as_str()
+                    )
+                    .as_str(),
+                );
+
+                assert_eq!(
+                    reference_import.path(),
+                    reference_path,
+                    "actual reference path for '{}' differs from expected reference path",
+                    reference_name.as_str(),
+                );
+            }
+        };
     }
 
     #[test]
     fn test_resolve_simple_submodel() {
-        // create the use model list
-        let use_model = helper::create_use_model_node(
-            "temperature",
-            vec![],
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            20,
-        );
-        let use_models = vec![&use_model];
+        // create the model import list
+        // > use temperature as temp
+        let model_import = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&model_import];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temperature_id = Identifier::new("temp");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_submodel = helper::create_test_model(vec![]);
+        let temperature_path = ir::ModelPath::new("/temperature");
 
-        let context = TestContext::new()
-            .with_model_context([(temperature_path.clone(), temperature_submodel)]);
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
 
-        let result = submodels.get(&temperature_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &temperature_path);
+        // check the references
+        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
     }
 
     #[test]
     fn test_resolve_nested_submodel() {
         // create the use model list with nested subcomponents
-        // use weather.atmosphere.temperature as temp
-        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
-        let temperature_identifier = ast::naming::Identifier::new("temperature".to_string());
-        let temperature_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 11), temperature_identifier);
-        let subcomponents = vec![atmosphere_node, temperature_node];
-
-        let use_model = helper::create_use_model_node(
-            "weather",
-            subcomponents,
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            35,
-        );
-        let use_models = vec![&use_model];
+        // > use weather.atmosphere.temperature as temp
+        let model_import = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_subcomponents(["atmosphere", "temperature"])
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&model_import];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temperature_id = Identifier::new("temp");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_submodel = helper::create_test_model(vec![]);
-        let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model = helper::create_test_model(vec![(
-            "temperature",
-            (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
-        )]);
-        let weather_path = ModelPath::new("/weather");
-        let weather_model = helper::create_test_model(vec![(
-            "atmosphere",
-            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
-        )]);
-        let context = TestContext::new().with_model_context([
-            (weather_path, weather_model),
+        let temperature_path = ir::ModelPath::new("/temperature");
+
+        let atmosphere_path = ir::ModelPath::new("/atmosphere");
+        let atmosphere_model = test_ir::ModelBuilder::new()
+            .with_submodel("temperature", "/temperature")
+            .build();
+
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("atmosphere", "/atmosphere")
+            .build();
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
             (atmosphere_path, atmosphere_model),
-            (temperature_path.clone(), temperature_submodel),
+            (weather_path, weather_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
 
-        let result = submodels.get(&temperature_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &temperature_path);
+        // check the references
+        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
     }
 
     #[test]
     fn test_resolve_submodel_without_alias() {
         // create the use model list without alias
-        // use temperature
-        let use_model =
-            helper::create_use_model_node("temperature", vec![], None, ModelKind::Submodel, 0, 12);
-        let use_models = vec![&use_model];
+        // > use temperature
+        let model_import = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&model_import];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temperature_id = Identifier::new("temperature");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_submodel = helper::create_test_model(vec![]);
-        let context = TestContext::new()
-            .with_model_context([(temperature_path.clone(), temperature_submodel)]);
+        let temperature_path = ir::ModelPath::new("/temperature");
+
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
 
-        let result = submodels.get(&temperature_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &temperature_path);
+        // check the references
+        assert_has_references!(&reference_map, [("temperature", &temperature_path)]);
     }
 
     #[test]
     fn test_resolve_submodel_with_subcomponent_alias() {
         // create the use model list with subcomponent as alias
-        // use weather.atmosphere
-        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
-        let subcomponents = vec![atmosphere_node];
-
-        let use_model = helper::create_use_model_node(
-            "weather",
-            subcomponents,
-            None,
-            ModelKind::Submodel,
-            0,
-            20,
-        );
-        let use_models = vec![&use_model];
+        // > use weather.atmosphere
+        let model_import = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_subcomponents(["atmosphere"])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&model_import];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let atmosphere_id = Identifier::new("atmosphere");
-        let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_submodel = helper::create_test_model(vec![]);
-        let weather_path = ModelPath::new("/weather");
-        let weather_submodel = helper::create_test_model(vec![(
-            "atmosphere",
-            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
-        )]);
+        let atmosphere_path = ir::ModelPath::new("/atmosphere");
 
-        let context = TestContext::new().with_model_context([
-            (weather_path, weather_submodel),
-            (atmosphere_path.clone(), atmosphere_submodel),
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("atmosphere", "/atmosphere")
+            .build();
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (atmosphere_path.clone(), test_ir::empty_model()),
+            (weather_path, weather_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
         // check the errors
-        assert!(errors.is_empty());
+        assert!(submodel_errors.is_empty());
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("atmosphere", &atmosphere_path)]);
 
-        let result = submodels.get(&atmosphere_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &atmosphere_path);
+        // check the references
+        assert_has_references!(&reference_map, [("atmosphere", &atmosphere_path)]);
     }
 
     #[test]
     fn test_resolve_model_with_error() {
         // create the use model list with error model
-        // use error_model as error
-        let use_model = helper::create_use_model_node(
-            "error_model",
-            vec![],
-            Some("error"),
-            ModelKind::Submodel,
-            0,
-            25,
-        );
-        let use_model_alias = use_model.model_info().alias().expect("alias should exist");
-        let use_model_name_span = get_span_from_ast_span(use_model_alias.node_span());
-        let use_models = vec![&use_model];
+        // > use error_model as error
+        let model_import = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("error_model")
+            .with_alias("error")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&model_import];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let error_id = Identifier::new("error");
-        let error_path = ModelPath::new("/error_model");
-        let error_submodel = helper::create_test_model(vec![]);
-        let context = TestContext::new()
-            .with_model_context([(error_path.clone(), error_submodel)])
-            .with_model_errors([error_path.clone()]);
+        let error_path = ir::ModelPath::new("/error_model");
+
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(error_path.clone(), test_ir::empty_model())])
+            .with_model_error_context([error_path.clone()]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
-        let error = errors.get(&error_id).expect("error should exist");
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 1);
+        let error = submodel_errors
+            .get(&ir::SubmodelName::new("error_model".to_string()))
+            .expect("error should exist");
 
-        match error {
-            ModelImportResolutionError::ModelHasError {
-                model_path,
-                reference_span,
-            } => {
-                assert_eq!(model_path, &error_path);
-                assert_eq!(reference_span, &use_model_name_span);
-            }
-            _ => panic!("Expected ModelHasError, got {error:?}"),
-        }
+        let ModelImportResolutionError::ModelHasError {
+            model_path,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected ModelHasError, got {error:?}");
+        };
+
+        assert_eq!(model_path, &error_path);
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert!(submodels.is_empty());
+        assert_has_submodels!(&submodel_map, []);
+
+        // check the references
+        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn test_resolve_undefined_submodel() {
         // create the use model list with undefined submodel
-        let undefined_identifier = ast::naming::Identifier::new("undefined_submodel".to_string());
-        let undefined_identifier_span = helper::test_ast_span(0, 16);
-        let undefined_node =
-            ast::node::Node::new(&undefined_identifier_span.clone(), undefined_identifier);
-        let subcomponents = vec![undefined_node];
-
-        let use_model = helper::create_use_model_node(
-            "weather",
-            subcomponents,
-            Some("weather"),
-            ModelKind::Submodel,
-            0,
-            30,
-        );
-        let use_models = vec![&use_model];
+        // > use weather.undefined_submodel
+        let model_import = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_subcomponents(["undefined_submodel"])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&model_import];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let weather_id = Identifier::new("weather");
-        let weather_path = ModelPath::new("/weather");
-        let weather_model = helper::create_test_model(vec![]); // No submodels
-        let context =
-            TestContext::new().with_model_context([(weather_path.clone(), weather_model)]);
+        let weather_path = ir::ModelPath::new("/weather");
+
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(weather_path.clone(), test_ir::empty_model())]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 1);
 
-        let error = errors.get(&weather_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::UndefinedSubmodel {
-                parent_model_path,
-                submodel,
-                reference_span,
-            } => {
-                assert_eq!(parent_model_path, &weather_path);
-                assert_eq!(submodel.as_str(), "undefined_submodel");
-                assert_eq!(
-                    reference_span,
-                    &get_span_from_ast_span(undefined_identifier_span)
-                );
-            }
-            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
-        }
+        let error = submodel_errors
+            .get(&ir::SubmodelName::new("undefined_submodel".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &weather_path);
+        assert_eq!(submodel.as_str(), "undefined_submodel");
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert!(submodels.is_empty());
+        assert_has_submodels!(&submodel_map, []);
+
+        // check the references
+        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn test_resolve_undefined_submodel_in_submodel() {
         // create the use model list with nested undefined submodel
-        // use weather.atmosphere.undefined as undefined
-        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
-        let undefined_identifier = ast::naming::Identifier::new("undefined".to_string());
-        let undefined_identifier_span = helper::test_ast_span(0, 9);
-        let undefined_node =
-            ast::node::Node::new(&undefined_identifier_span.clone(), undefined_identifier);
-        let subcomponents = vec![atmosphere_node, undefined_node];
-
-        let use_model = helper::create_use_model_node(
-            "weather",
-            subcomponents,
-            Some("undefined"),
-            ModelKind::Submodel,
-            0,
-            35,
-        );
-        let use_models = vec![&use_model];
+        // > use weather.atmosphere.undefined
+        let model_import = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_subcomponents(["atmosphere", "undefined"])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&model_import];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let undefined_id = Identifier::new("undefined");
-        let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model = helper::create_test_model(vec![]); // No submodels
-        let weather_path = ModelPath::new("/weather");
-        let weather_model = helper::create_test_model(vec![(
-            "atmosphere",
-            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
-        )]);
-        let context = TestContext::new().with_model_context([
+        let atmosphere_path = ir::ModelPath::new("/atmosphere");
+
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("atmosphere", "/atmosphere")
+            .build();
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (atmosphere_path.clone(), test_ir::empty_model()),
             (weather_path, weather_model),
-            (atmosphere_path.clone(), atmosphere_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
         // check the errors
-        assert_eq!(errors.len(), 1);
+        assert_eq!(submodel_errors.len(), 1);
 
-        let error = errors.get(&undefined_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::UndefinedSubmodel {
-                parent_model_path,
-                submodel,
-                reference_span,
-            } => {
-                assert_eq!(parent_model_path, &atmosphere_path);
-                assert_eq!(submodel.as_str(), "undefined");
-                assert_eq!(
-                    reference_span,
-                    &get_span_from_ast_span(undefined_identifier_span)
-                );
-            }
-            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
-        }
+        let error = submodel_errors
+            .get(&ir::SubmodelName::new("undefined".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &atmosphere_path);
+        assert_eq!(submodel.as_str(), "undefined");
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert!(submodels.is_empty());
+        assert_has_submodels!(&submodel_map, []);
+
+        // check the references
+        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn test_resolve_multiple_submodels() {
         // create the use model list with multiple submodels
-        // use temperature as temp
-        let temp_model = helper::create_use_model_node(
-            "temperature",
-            vec![],
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            20,
-        );
+        // > use temperature as temp
+        let temp_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
-        // use pressure as press
-        let press_model = helper::create_use_model_node(
-            "pressure",
-            vec![],
-            Some("press"),
-            ModelKind::Submodel,
-            0,
-            25,
-        );
+        // > use pressure as press
+        let press_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("pressure")
+            .with_alias("press")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
-        let use_models = vec![&temp_model, &press_model];
+        let model_imports = vec![&temp_model, &press_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temperature_id = Identifier::new("temp");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = helper::create_test_model(vec![]);
-        let pressure_id = Identifier::new("press");
-        let pressure_path = ModelPath::new("/pressure");
-        let pressure_model = helper::create_test_model(vec![]);
-        let context = TestContext::new().with_model_context([
-            (temperature_path.clone(), temperature_model),
-            (pressure_path.clone(), pressure_model),
+        let temperature_path = ir::ModelPath::new("/temperature");
+
+        let pressure_path = ir::ModelPath::new("/pressure");
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
+            (pressure_path.clone(), test_ir::empty_model()),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 2);
+        assert_has_submodels!(
+            &submodel_map,
+            [
+                ("temperature", &temperature_path),
+                ("pressure", &pressure_path),
+            ],
+        );
 
-        let result = submodels.get(&temperature_id);
-        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
-
-        let result = submodels.get(&pressure_id);
-        let (press_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(press_submodel_path, &pressure_path);
+        // check the references
+        assert_has_references!(
+            &reference_map,
+            [("temp", &temperature_path), ("press", &pressure_path)],
+        );
     }
 
     #[test]
     fn test_resolve_mixed_success_and_error() {
         // create the use model list with mixed success and error cases
-        // use temperature as temp
-        let temp_model = helper::create_use_model_node(
-            "temperature",
-            vec![],
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            20,
-        );
+        // > use temperature as temp
+        let temp_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
-        // use error_model as error
-        let error_model = helper::create_use_model_node(
-            "error_model",
-            vec![],
-            Some("error"),
-            ModelKind::Submodel,
-            0,
-            25,
-        );
-        let error_model_alias = error_model
-            .model_info()
-            .alias()
-            .expect("alias should exist");
-        let error_model_name_span = get_span_from_ast_span(error_model_alias.node_span());
+        // > use error_model as error
+        let error_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("error_model")
+            .with_alias("error")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
-        let use_models = vec![&temp_model, &error_model];
+        let model_imports = vec![&temp_model, &error_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temperature_id = Identifier::new("temp");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = helper::create_test_model(vec![]);
-        let error_id = Identifier::new("error");
-        let error_path = ModelPath::new("/error_model");
-        let error_model = helper::create_test_model(vec![]);
+        let temperature_path = ir::ModelPath::new("/temperature");
 
-        let context = TestContext::new()
+        let error_path = ir::ModelPath::new("/error_model");
+
+        let context_builder = ModelContextBuilder::new()
             .with_model_context([
-                (temperature_path.clone(), temperature_model),
-                (error_path.clone(), error_model),
+                (temperature_path.clone(), test_ir::empty_model()),
+                (error_path.clone(), test_ir::empty_model()),
             ])
-            .with_model_errors([error_path.clone()]);
+            .with_model_error_context([error_path.clone()]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 1);
 
-        let error = errors.get(&error_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::ModelHasError {
-                model_path,
-                reference_span,
-            } => {
-                assert_eq!(model_path, &error_path);
-                assert_eq!(reference_span, &error_model_name_span);
-            }
-            _ => panic!("Expected ModelHasError, got {error:?}"),
-        }
+        let error = submodel_errors
+            .get(&ir::SubmodelName::new("error_model".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::ModelHasError {
+            model_path,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected ModelHasError, got {error:?}");
+        };
+
+        assert_eq!(model_path, &error_path);
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
 
-        let result = submodels.get(&temperature_id);
-        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
+        // check the references
+        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
     }
 
     #[test]
     fn test_resolve_submodel_with_directory_path_success() {
         // create the use model list with directory path that exists
-        // use utils/math as math
-        let use_model = helper::create_use_model_node_with_directory_path(
-            "math",
-            vec![],
-            Some("math"),
-            ModelKind::Submodel,
-            &["utils"],
-            0,
-            20,
-        );
-        let use_models = vec![&use_model];
+        // > use utils/math as math
+        let math_model = test_ast::ImportModelNodeBuilder::new()
+            .with_directory_path(["utils"])
+            .with_top_component("math")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&math_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let math_id = Identifier::new("math");
-        let math_path = ModelPath::new("/utils/math");
-        let math_submodel = helper::create_test_model(vec![]);
-        let context = TestContext::new().with_model_context([(math_path.clone(), math_submodel)]);
+        let math_path = ir::ModelPath::new("/utils/math");
+
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(math_path.clone(), test_ir::empty_model())]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("math", &math_path)]);
 
-        let result = submodels.get(&math_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &math_path);
+        // check the references
+        assert_has_references!(&reference_map, [("math", &math_path)]);
     }
 
     #[test]
     fn test_resolve_submodel_with_directory_path_error() {
         // create the use model list with directory path that doesn't exist
-        // use nonexistent/math as math
-        let use_model = helper::create_use_model_node_with_directory_path(
-            "math",
-            vec![],
-            Some("math"),
-            ModelKind::Submodel,
-            &["nonexistent"],
-            0,
-            20,
-        );
-        let use_models = vec![&use_model];
+        // > use nonexistent/math as math
+        let math_model = test_ast::ImportModelNodeBuilder::new()
+            .with_directory_path(["nonexistent"])
+            .with_top_component("math")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+        let model_imports = vec![&math_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let math_id = Identifier::new("math");
-        let math_path = ModelPath::new("/nonexistent/math");
-        let context = TestContext::new().with_model_errors([math_path.clone()]);
+        let math_path = ir::ModelPath::new("/nonexistent/math");
+        let context_builder =
+            ModelContextBuilder::new().with_model_error_context([math_path.clone()]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 1);
 
-        let error = errors.get(&math_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::ModelHasError { .. } => {
-                // This is expected when the model has an error
-            }
-            _ => panic!("Expected ModelHasError, got {error:?}"),
-        }
+        let error = submodel_errors
+            .get(&ir::SubmodelName::new("math".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::ModelHasError {
+            model_path,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected ModelHasError, got {error:?}");
+        };
+
+        assert_eq!(model_path, &math_path);
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 0);
+        assert_has_submodels!(&submodel_map, []);
+
+        // check the references
+        assert_has_references!(&reference_map, []);
     }
 
     #[test]
-    fn test_resolve_duplicate_submodel_names() {
+    fn test_resolve_duplicate_submodel_aliases() {
         // create the use model list with duplicate submodel names
-        // use temperature as temp
-        let temp_model1 = helper::create_use_model_node(
-            "temperature",
-            vec![],
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            20,
-        );
-        // use pressure as temp (duplicate alias)
-        let temp_model2 = helper::create_use_model_node(
-            "pressure",
-            vec![],
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            25,
-        );
-        let temp_model2_alias = temp_model2
-            .model_info()
-            .alias()
-            .expect("alias should exist");
-        let temp_model2_name_span = get_span_from_ast_span(temp_model2_alias.node_span());
+        // > use temperature as temp
+        let temp_model1 = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+
+        // > use pressure as temp (duplicate alias)
+        let temp_model2 = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("other_temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
         let use_models = vec![&temp_model1, &temp_model2];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = helper::create_test_model(vec![]);
-        let pressure_path = ModelPath::new("/pressure");
-        let pressure_model = helper::create_test_model(vec![]);
-        let context = TestContext::new().with_model_context([
-            (temperature_path.clone(), temperature_model),
-            (pressure_path, pressure_model),
+        let temperature_path = ir::ModelPath::new("/temperature");
+
+        let other_temperature_path = ir::ModelPath::new("/other_temperature");
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
+            (other_temperature_path.clone(), test_ir::empty_model()),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(use_models, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
 
-        let temp_id = Identifier::new("temp");
-        let error = errors.get(&temp_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::DuplicateSubmodel {
-                submodel,
-                original_span: _,
-                duplicate_span,
-            } => {
-                assert_eq!(submodel.as_str(), "temp");
-                assert_eq!(duplicate_span, &temp_model2_name_span);
-            }
-            _ => panic!("Expected DuplicateSubmodel, got {error:?}"),
-        }
+        // check the reference errors
+        assert_eq!(reference_errors.len(), 1);
 
-        // check the submodels - should only contain the first one
-        assert_eq!(submodels.len(), 1);
+        let temp_id = ir::ReferenceName::new("temp".to_string());
+        let error = reference_errors.get(&temp_id).expect("error should exist");
+        let ModelImportResolutionError::DuplicateReference {
+            reference,
+            original_span: _,
+            duplicate_span: _,
+        } = error
+        else {
+            panic!("Expected DuplicateReference, got {error:?}");
+        };
 
-        let result = submodels.get(&temp_id);
-        let (submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(submodel_path, &temperature_path);
-    }
+        assert_eq!(reference.as_str(), "temp");
 
-    #[test]
-    fn test_resolve_use_declaration_with_multiple_submodels_complex() {
-        // create the use model list with multiple submodels with different structures
-        // use weather.atmosphere.temperature as temp
-        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
-        let temperature_identifier = ast::naming::Identifier::new("temperature".to_string());
-        let temperature_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 11), temperature_identifier);
-        let temp_subcomponents = vec![atmosphere_node, temperature_node];
-        let temp_model = helper::create_use_model_node(
-            "weather",
-            temp_subcomponents,
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            35,
-        );
+        // check the submodels - should contain only the successful one
+        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path),],);
 
-        // use sensor.location as loc
-        let location_identifier = ast::naming::Identifier::new("location".to_string());
-        let location_node = ast::node::Node::new(&helper::test_ast_span(0, 8), location_identifier);
-        let loc_subcomponents = vec![location_node];
-        let loc_model = helper::create_use_model_node(
-            "sensor",
-            loc_subcomponents,
-            Some("loc"),
-            ModelKind::Submodel,
-            0,
-            25,
-        );
-
-        // use pressure as press
-        let press_model = helper::create_use_model_node(
-            "pressure",
-            vec![],
-            Some("press"),
-            ModelKind::Submodel,
-            0,
-            20,
-        );
-
-        let use_models = vec![&temp_model, &loc_model, &press_model];
-
-        // create the current model path
-        let model_path = ModelPath::new("/parent_model");
-
-        // create the context
-        let temp_id = Identifier::new("temp");
-        let loc_id = Identifier::new("loc");
-        let press_id = Identifier::new("press");
-
-        let temperature_path = ModelPath::new("/temperature");
-        let location_path = ModelPath::new("/location");
-        let pressure_path = ModelPath::new("/pressure");
-
-        let temperature_submodel = helper::create_test_model(vec![]);
-        let location_submodel = helper::create_test_model(vec![]);
-        let pressure_submodel = helper::create_test_model(vec![]);
-
-        let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model = helper::create_test_model(vec![(
-            "temperature",
-            (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
-        )]);
-
-        let weather_path = ModelPath::new("/weather");
-        let weather_model = helper::create_test_model(vec![(
-            "atmosphere",
-            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
-        )]);
-
-        let sensor_path = ModelPath::new("/sensor");
-        let sensor_model = helper::create_test_model(vec![(
-            "location",
-            (ModelPath::new("/location"), helper::test_ir_span(0, 8)),
-        )]);
-
-        let context = TestContext::new().with_model_context([
-            (weather_path, weather_model),
-            (atmosphere_path, atmosphere_model),
-            (temperature_path.clone(), temperature_submodel),
-            (sensor_path, sensor_model),
-            (location_path.clone(), location_submodel),
-            (pressure_path.clone(), pressure_submodel),
-        ]);
-
-        // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
-
-        // check the errors
-        assert!(errors.is_empty());
-
-        // check the submodels
-        assert_eq!(submodels.len(), 3);
-
-        let result = submodels.get(&temp_id);
-        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
-
-        let result = submodels.get(&loc_id);
-        let (loc_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(loc_submodel_path, &location_path);
-
-        let result = submodels.get(&press_id);
-        let (press_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(press_submodel_path, &pressure_path);
+        // check the references - should only contain one reference
+        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
     }
 
     #[test]
     fn test_resolve_use_declaration_with_failing_submodel() {
         // create the use model list with a submodel that fails to resolve
-        // use weather.atmosphere.temperature as temp
-        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
-        let temperature_identifier = ast::naming::Identifier::new("temperature".to_string());
-        let temperature_span = helper::test_ast_span(0, 11);
-        let temperature_node =
-            ast::node::Node::new(&temperature_span.clone(), temperature_identifier);
-        let subcomponents = vec![atmosphere_node, temperature_node];
+        // > use weather.atmosphere.temperature
+        let weather_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_subcomponents(["atmosphere", "temperature"])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
-        let use_model = helper::create_use_model_node(
-            "weather",
-            subcomponents,
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            35,
-        );
-        let use_models = vec![&use_model];
+        let model_imports = vec![&weather_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temp_id = Identifier::new("temp");
-        let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model = helper::create_test_model(vec![]); // No temperature submodel
-        let weather_path = ModelPath::new("/weather");
-        let weather_model = helper::create_test_model(vec![(
-            "atmosphere",
-            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
-        )]);
+        let atmosphere_path = ir::ModelPath::new("/atmosphere");
 
-        let context = TestContext::new().with_model_context([
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("atmosphere", "/atmosphere")
+            .build();
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
             (weather_path, weather_model),
-            (atmosphere_path.clone(), atmosphere_model),
+            (atmosphere_path.clone(), test_ir::empty_model()),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 1);
 
-        let error = errors.get(&temp_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::UndefinedSubmodel {
-                parent_model_path,
-                submodel,
-                reference_span,
-            } => {
-                assert_eq!(parent_model_path, &atmosphere_path);
-                assert_eq!(submodel.as_str(), "temperature");
-                assert_eq!(reference_span, &get_span_from_ast_span(temperature_span));
-            }
-            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
-        }
+        let error = submodel_errors
+            .get(&ir::SubmodelName::new("temperature".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &atmosphere_path);
+        assert_eq!(submodel.as_str(), "temperature");
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert!(submodels.is_empty());
+        assert_has_submodels!(&submodel_map, []);
+
+        // check the references
+        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn test_resolve_use_declaration_with_successful_and_failing_submodels() {
         // create the use model list with both successful and failing submodels
-        // use temperature as temp (successful)
-        let temp_model = helper::create_use_model_node(
-            "temperature",
-            vec![],
-            Some("temp"),
-            ModelKind::Submodel,
-            0,
-            20,
-        );
+        // > use temperature as temp  # successful
+        let temp_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
-        // use weather.atmosphere.undefined as undefined (failing)
-        let atmosphere_identifier = ast::naming::Identifier::new("atmosphere".to_string());
-        let atmosphere_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 10), atmosphere_identifier);
-        let undefined_identifier = ast::naming::Identifier::new("undefined".to_string());
-        let undefined_span = helper::test_ast_span(0, 9);
-        let undefined_node = ast::node::Node::new(&undefined_span.clone(), undefined_identifier);
-        let undefined_subcomponents = vec![atmosphere_node, undefined_node];
-        let undefined_model = helper::create_use_model_node(
-            "weather",
-            undefined_subcomponents,
-            Some("undefined"),
-            ModelKind::Submodel,
-            0,
-            35,
-        );
+        // > use weather.atmosphere.undefined  # failing
+        let undefined_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_subcomponents(["atmosphere", "undefined"])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
 
-        let use_models = vec![&temp_model, &undefined_model];
+        let model_imports = vec![&temp_model, &undefined_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temp_id = Identifier::new("temp");
-        let undefined_id = Identifier::new("undefined");
+        let temperature_path = ir::ModelPath::new("/temperature");
 
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = helper::create_test_model(vec![]);
+        let atmosphere_path = ir::ModelPath::new("/atmosphere");
 
-        let atmosphere_path = ModelPath::new("/atmosphere");
-        let atmosphere_model = helper::create_test_model(vec![]); // No undefined submodel
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("atmosphere", "/atmosphere")
+            .build();
 
-        let weather_path = ModelPath::new("/weather");
-        let weather_model = helper::create_test_model(vec![(
-            "atmosphere",
-            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 11)),
-        )]);
-
-        let context = TestContext::new().with_model_context([
-            (temperature_path.clone(), temperature_model),
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
+            (atmosphere_path.clone(), test_ir::empty_model()),
             (weather_path, weather_model),
-            (atmosphere_path.clone(), atmosphere_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 1);
 
-        let error = errors.get(&undefined_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::UndefinedSubmodel {
-                parent_model_path,
-                submodel,
-                reference_span,
-            } => {
-                assert_eq!(parent_model_path, &atmosphere_path);
-                assert_eq!(submodel.as_str(), "undefined");
-                assert_eq!(reference_span, &get_span_from_ast_span(undefined_span));
-            }
-            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
-        }
+        let submodel_name = ir::SubmodelName::new("undefined".to_string());
+        let error = submodel_errors
+            .get(&submodel_name)
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &atmosphere_path);
+        assert_eq!(submodel.as_str(), "undefined");
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels - should only contain the successful one
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
 
-        let result = submodels.get(&temp_id);
-        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
+        // check the references - should only contain the successful one
+        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
     }
-
-    // Tests for the "with" clause functionality
-    // These tests assume that the resolve_submodels function will be updated to handle the with clause
 
     #[test]
     fn test_resolve_use_declaration_with_single_submodel() {
         // create the use model list with a single submodel in the with clause
-        // use weather with temperature as temp
-        let temperature_submodel =
-            helper::create_submodel_node("temperature", vec![], Some("temp"), 0, 20);
-        let use_model = helper::create_use_model_node_with_submodels(
-            "weather",
-            vec![],
-            None,
-            vec![temperature_submodel],
-            ModelKind::Submodel,
-            0,
-            25,
-        );
-        let use_models = vec![&use_model];
+        // > use weather with temperature as temp
+        let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .build();
+
+        let weather_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_submodels([temperature_submodel])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+
+        let model_imports = vec![&weather_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temp_id = Identifier::new("temp");
-        let weather_path = ModelPath::new("/weather");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = helper::create_test_model(vec![]);
-        let weather_model = helper::create_test_model(vec![(
-            "temperature",
-            (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
-        )]);
+        let temperature_path = ir::ModelPath::new("/temperature");
 
-        let context = TestContext::new().with_model_context([
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("temperature", "/temperature")
+            .build();
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
             (weather_path.clone(), weather_model),
-            (temperature_path.clone(), temperature_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 2);
+        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
 
-        let (temp_submodel_path, _span) = submodels
-            .get(&temp_id)
-            .expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
-
-        let weather_id = Identifier::new("weather");
-        let (weather_submodel_path, _span) = submodels
-            .get(&weather_id)
-            .expect("submodel path should be present");
-        assert_eq!(weather_submodel_path, &weather_path);
+        // check the references
+        assert_has_references!(
+            &reference_map,
+            [("temp", &temperature_path), ("weather", &weather_path)],
+        );
     }
 
     #[test]
     fn test_resolve_use_declaration_with_multiple_submodels() {
         // create the use model list with multiple submodels in the with clause
-        // use weather with [temperature as temp, pressure as press]
-        let temperature_submodel =
-            helper::create_submodel_node("temperature", vec![], Some("temp"), 0, 20);
-        let pressure_submodel =
-            helper::create_submodel_node("pressure", vec![], Some("press"), 0, 20);
-        let use_model = helper::create_use_model_node_with_submodels(
-            "weather",
-            vec![],
-            None,
-            vec![temperature_submodel, pressure_submodel],
-            ModelKind::Submodel,
-            0,
-            45,
-        );
+        // > use weather with [temperature as temp, pressure as press]
+        let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .build();
+        let pressure_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("pressure")
+            .with_alias("press")
+            .build();
+        let use_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_submodels([temperature_submodel, pressure_submodel])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
         let use_models = vec![&use_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temp_id = Identifier::new("temp");
-        let press_id = Identifier::new("press");
-        let weather_path = ModelPath::new("/weather");
-        let temperature_path = ModelPath::new("/temperature");
-        let pressure_path = ModelPath::new("/pressure");
-        let temperature_model = helper::create_test_model(vec![]);
-        let pressure_model = helper::create_test_model(vec![]);
-        let weather_model = helper::create_test_model(vec![
-            (
-                "temperature",
-                (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
-            ),
-            (
-                "pressure",
-                (ModelPath::new("/pressure"), helper::test_ir_span(0, 8)),
-            ),
-        ]);
+        let temperature_path = ir::ModelPath::new("/temperature");
+        let pressure_path = ir::ModelPath::new("/pressure");
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("temperature", "/temperature")
+            .with_submodel("pressure", "/pressure")
+            .build();
 
-        let context = TestContext::new().with_model_context([
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
+            (pressure_path.clone(), test_ir::empty_model()),
             (weather_path.clone(), weather_model),
-            (temperature_path.clone(), temperature_model),
-            (pressure_path.clone(), pressure_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(use_models, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 3);
+        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
 
-        let (temp_submodel_path, _span) = submodels
-            .get(&temp_id)
-            .expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
-
-        let (press_submodel_path, _span) = submodels
-            .get(&press_id)
-            .expect("submodel path should be present");
-        assert_eq!(press_submodel_path, &pressure_path);
-
-        let weather_id = Identifier::new("weather");
-        let (weather_submodel_path, _span) = submodels
-            .get(&weather_id)
-            .expect("submodel path should be present");
-        assert_eq!(weather_submodel_path, &weather_path);
+        // check the references
+        assert_has_references!(
+            &reference_map,
+            [
+                ("temp", &temperature_path),
+                ("press", &pressure_path),
+                ("weather", &weather_path),
+            ],
+        );
     }
 
     #[test]
     fn test_resolve_use_declaration_with_nested_submodel() {
         // create the use model list with a nested submodel in the with clause
-        // use weather with atmosphere.temperature as temp
-        let temperature_identifier = ast::naming::Identifier::new("temperature".to_string());
-        let temperature_node =
-            ast::node::Node::new(&helper::test_ast_span(0, 11), temperature_identifier);
-        let temperature_submodel =
-            helper::create_submodel_node("atmosphere", vec![temperature_node], Some("temp"), 0, 25);
-        let use_model = helper::create_use_model_node_with_submodels(
-            "weather",
-            vec![],
-            None,
-            vec![temperature_submodel],
-            ModelKind::Submodel,
-            0,
-            30,
-        );
-        let use_models = vec![&use_model];
+        // > use weather with atmosphere.temperature as temp
+        let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("atmosphere")
+            .with_subcomponents(["temperature"])
+            .with_alias("temp")
+            .build();
+
+        let weather_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_submodels([temperature_submodel])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+
+        let model_imports = vec![&weather_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temp_id = Identifier::new("temp");
-        let weather_path = ModelPath::new("/weather");
-        let atmosphere_path = ModelPath::new("/atmosphere");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = helper::create_test_model(vec![]);
-        let atmosphere_model = helper::create_test_model(vec![(
-            "temperature",
-            (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
-        )]);
-        let weather_model = helper::create_test_model(vec![(
-            "atmosphere",
-            (ModelPath::new("/atmosphere"), helper::test_ir_span(0, 10)),
-        )]);
+        let temperature_path = ir::ModelPath::new("/temperature");
 
-        let context = TestContext::new().with_model_context([
-            (weather_path.clone(), weather_model),
+        let atmosphere_path = ir::ModelPath::new("/atmosphere");
+        let atmosphere_model = test_ir::ModelBuilder::new()
+            .with_submodel("temperature", "/temperature")
+            .build();
+
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("atmosphere", "/atmosphere")
+            .build();
+
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
             (atmosphere_path, atmosphere_model),
-            (temperature_path.clone(), temperature_model),
+            (weather_path.clone(), weather_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert!(errors.is_empty());
+        // check the submodel errors
+        assert!(submodel_errors.is_empty());
+
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
         // check the submodels
-        assert_eq!(submodels.len(), 2);
+        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
 
-        let (temp_submodel_path, _span) = submodels
-            .get(&temp_id)
-            .expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
-
-        let weather_id = Identifier::new("weather");
-        let (weather_submodel_path, _span) = submodels
-            .get(&weather_id)
-            .expect("submodel path should be present");
-        assert_eq!(weather_submodel_path, &weather_path);
+        // check the references
+        assert_has_references!(
+            &reference_map,
+            [("temp", &temperature_path), ("weather", &weather_path)],
+        );
     }
 
     #[test]
     fn test_resolve_use_declaration_with_failing_submodel_in_with_clause() {
         // create the use model list with a failing submodel in the with clause
-        // use weather with undefined as undefined
-        let undefined_submodel =
-            helper::create_submodel_node("undefined", vec![], Some("undefined"), 0, 20);
-        let use_model = helper::create_use_model_node_with_submodels(
-            "weather",
-            vec![],
-            None,
-            vec![undefined_submodel],
-            ModelKind::Submodel,
-            0,
-            30,
-        );
-        let use_models = vec![&use_model];
+        // use weather with undefined
+        let undefined_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("undefined")
+            .build();
+
+        let weather_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_submodels([undefined_submodel])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+
+        let model_imports = vec![&weather_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let undefined_id = Identifier::new("undefined");
-        let weather_path = ModelPath::new("/weather");
-        let weather_model = helper::create_test_model(vec![]); // No undefined submodel
+        let weather_path = ir::ModelPath::new("/weather");
 
-        let context =
-            TestContext::new().with_model_context([(weather_path.clone(), weather_model)]);
+        let context_builder = ModelContextBuilder::new()
+            .with_model_context([(weather_path.clone(), test_ir::empty_model())]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 0);
 
-        let error = errors.get(&undefined_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::UndefinedSubmodel {
-                parent_model_path,
-                submodel,
-                reference_span: _,
-            } => {
-                assert_eq!(parent_model_path, &weather_path);
-                assert_eq!(submodel.as_str(), "undefined");
-            }
-            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
-        }
+        // check the reference errors
+        assert_eq!(reference_errors.len(), 1);
+
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("undefined".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &weather_path);
+        assert_eq!(submodel.as_str(), "undefined");
 
         // check the submodels
-        assert_eq!(submodels.len(), 1);
+        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
 
-        let weather_id = Identifier::new("weather");
-        let (submodel_path, _span) = submodels
-            .get(&weather_id)
-            .expect("submodel path should be present");
-        assert_eq!(submodel_path, &weather_path);
+        // check the references
+        assert_has_references!(&reference_map, [("weather", &weather_path)]);
     }
 
     #[test]
     fn test_resolve_use_declaration_with_successful_and_failing_submodels_in_with_clause() {
         // create the use model list with both successful and failing submodels in the with clause
         // use weather with [temperature as temp, undefined as undefined]
-        let temperature_submodel =
-            helper::create_submodel_node("temperature", vec![], Some("temp"), 0, 20);
-        let undefined_submodel =
-            helper::create_submodel_node("undefined", vec![], Some("undefined"), 0, 20);
-        let use_model = helper::create_use_model_node_with_submodels(
-            "weather",
-            vec![],
-            None,
-            vec![temperature_submodel, undefined_submodel],
-            ModelKind::Submodel,
-            0,
-            50,
-        );
-        let use_models = vec![&use_model];
+        let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .build();
+        let undefined_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("undefined")
+            .build();
+        let weather_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_submodels([temperature_submodel, undefined_submodel])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+
+        let model_imports = vec![&weather_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let temp_id = Identifier::new("temp");
-        let undefined_id = Identifier::new("undefined");
-        let weather_path = ModelPath::new("/weather");
-        let temperature_path = ModelPath::new("/temperature");
-        let temperature_model = helper::create_test_model(vec![]);
-        let weather_model = helper::create_test_model(vec![(
-            "temperature",
-            (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
-        )]); // No undefined submodel
+        let temperature_path = ir::ModelPath::new("/temperature");
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("temperature", "/temperature")
+            .build();
 
-        let context = TestContext::new().with_model_context([
+        let context_builder = ModelContextBuilder::new().with_model_context([
             (weather_path.clone(), weather_model),
-            (temperature_path.clone(), temperature_model),
+            (temperature_path.clone(), test_ir::empty_model()),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(model_imports, &model_path, &context);
 
-        // check the errors
-        assert_eq!(errors.len(), 1);
+        // check the submodel errors
+        assert_eq!(submodel_errors.len(), 0);
 
-        let error = errors.get(&undefined_id).expect("error should exist");
-        match error {
-            ModelImportResolutionError::UndefinedSubmodel {
-                parent_model_path,
-                submodel,
-                reference_span: _,
-            } => {
-                assert_eq!(parent_model_path, &weather_path);
-                assert_eq!(submodel.as_str(), "undefined");
-            }
-            _ => panic!("Expected UndefinedSubmodel, got {error:?}"),
-        }
+        // check the reference errors
+        assert_eq!(reference_errors.len(), 1);
 
-        // check the submodels - should only contain the successful one
-        assert_eq!(submodels.len(), 2);
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("undefined".to_string()))
+            .expect("error should exist");
 
-        let (temp_submodel_path, _span) = submodels
-            .get(&temp_id)
-            .expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
 
-        let weather_id = Identifier::new("weather");
-        let (weather_submodel_path, _span) = submodels
-            .get(&weather_id)
-            .expect("submodel path should be present");
-        assert_eq!(weather_submodel_path, &weather_path);
+        assert_eq!(parent_model_path, &weather_path);
+        assert_eq!(submodel.as_str(), "undefined");
+
+        // check the submodels
+        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
+
+        // check the references
+        assert_has_references!(
+            &reference_map,
+            [("temp", &temperature_path), ("weather", &weather_path)],
+        );
     }
 
     #[test]
     fn test_resolve_use_declaration_with_model_alias_and_submodels() {
         // create the use model list with model alias and submodels in the with clause
         // use weather as weather_model with [temperature as temp, pressure as press]
-        let temperature_submodel =
-            helper::create_submodel_node("temperature", vec![], Some("temp"), 0, 20);
-        let pressure_submodel =
-            helper::create_submodel_node("pressure", vec![], Some("press"), 0, 20);
-        let use_model = helper::create_use_model_node_with_submodels(
-            "weather",
-            vec![],
-            Some("weather_model"),
-            vec![temperature_submodel, pressure_submodel],
-            ModelKind::Submodel,
-            0,
-            55,
-        );
-        let use_models = vec![&use_model];
+        let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("temperature")
+            .with_alias("temp")
+            .build();
+        let pressure_submodel = test_ast::ModelInfoNodeBuilder::new()
+            .with_top_component("pressure")
+            .with_alias("press")
+            .build();
+        let use_model = test_ast::ImportModelNodeBuilder::new()
+            .with_top_component("weather")
+            .with_alias("weather_model")
+            .with_submodels([temperature_submodel, pressure_submodel])
+            .with_kind(ast::ModelKind::Submodel)
+            .build();
+
+        let import_models = vec![&use_model];
 
         // create the current model path
-        let model_path = ModelPath::new("/parent_model");
+        let model_path = ir::ModelPath::new("/parent_model");
 
         // create the context
-        let weather_model_id = Identifier::new("weather_model");
-        let temp_id = Identifier::new("temp");
-        let press_id = Identifier::new("press");
-        let weather_path = ModelPath::new("/weather");
-        let temperature_path = ModelPath::new("/temperature");
-        let pressure_path = ModelPath::new("/pressure");
-        let temperature_model = helper::create_test_model(vec![]);
-        let pressure_model = helper::create_test_model(vec![]);
-        let weather_model = helper::create_test_model(vec![
-            (
-                "temperature",
-                (ModelPath::new("/temperature"), helper::test_ir_span(0, 11)),
-            ),
-            (
-                "pressure",
-                (ModelPath::new("/pressure"), helper::test_ir_span(0, 8)),
-            ),
-        ]);
+        let temperature_path = ir::ModelPath::new("/temperature");
+        let pressure_path = ir::ModelPath::new("/pressure");
+        let weather_path = ir::ModelPath::new("/weather");
+        let weather_model = test_ir::ModelBuilder::new()
+            .with_submodel("temperature", "/temperature")
+            .with_submodel("pressure", "/pressure")
+            .build();
 
-        let context = TestContext::new().with_model_context([
+        let context_builder = ModelContextBuilder::new().with_model_context([
+            (temperature_path.clone(), test_ir::empty_model()),
+            (pressure_path.clone(), test_ir::empty_model()),
             (weather_path.clone(), weather_model),
-            (temperature_path.clone(), temperature_model),
-            (pressure_path.clone(), pressure_model),
         ]);
+        let context = context_builder.build();
 
         // resolve the submodels
-        let (submodels, errors) = resolve_model_imports(use_models, &model_path, &context);
+        let (submodel_map, reference_map, submodel_errors, reference_errors) =
+            resolve_model_imports(import_models, &model_path, &context);
 
         // check the errors
-        assert!(errors.is_empty());
+        assert!(submodel_errors.is_empty());
 
-        // check the submodels - should include both the model alias and the with clause submodels
-        assert_eq!(submodels.len(), 3);
+        // check the reference errors
+        assert!(reference_errors.is_empty());
 
-        let result = submodels.get(&weather_model_id);
-        let (weather_model_path, _span) = result.expect("weather model path should be present");
-        assert_eq!(weather_model_path, &weather_path);
+        // check the submodels
+        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
 
-        let result = submodels.get(&temp_id);
-        let (temp_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(temp_submodel_path, &temperature_path);
-
-        let result = submodels.get(&press_id);
-        let (press_submodel_path, _span) = result.expect("submodel path should be present");
-        assert_eq!(press_submodel_path, &pressure_path);
+        // check the references
+        eprintln!("reference map: {reference_map:?}");
+        assert_has_references!(
+            &reference_map,
+            [
+                ("temp", &temperature_path),
+                ("press", &pressure_path),
+                ("weather_model", &weather_path),
+            ],
+        );
     }
 }
