@@ -173,7 +173,17 @@ pub fn resolve_model_imports(
         let resolved_path = match resolved_path {
             Ok(resolved_path) => resolved_path,
             Err(error) if is_submodel => {
-                builder.add_submodel_resolution_error(submodel_name.take_value(), error);
+                builder.add_submodel_resolution_error(submodel_name.take_value(), error.clone());
+
+                // It's currently necessary to add it to the reference
+                // resolution errors because otherwise, variable resolution will
+                // assume that the reference is not defined in the current model,
+                // not that the reference resolution failed
+                // TODO: figure out how to remove this duplication - maybe
+                // submodels point to references, since a reference will always
+                // exist for every submodel?
+                builder.add_reference_resolution_error(reference_name.take_value(), error);
+
                 continue;
             }
             Err(error) => {
