@@ -37,7 +37,7 @@ type ImportErrors = HashMap<ir::PythonPath, ImportResolutionError>;
 /// - Each import path is converted to a Python path relative to the model's location
 /// - Successful imports are added to the returned set of valid Python imports
 /// - Failed imports are recorded in both the error map and the builder
-pub fn validate_imports<F>(
+pub fn resolve_python_imports<F>(
     model_path: &ir::ModelPath,
     builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
     imports: Vec<&ast::ImportNode>,
@@ -113,7 +113,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, imports, &file_loader);
+            resolve_python_imports(&model_path, builder, imports, &file_loader);
 
         // check the imports
         assert!(valid_imports.is_empty());
@@ -135,7 +135,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports
         assert_eq!(valid_imports.len(), 1);
@@ -160,7 +160,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports
         assert!(valid_imports.is_empty());
@@ -198,7 +198,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports
         assert_eq!(valid_imports.len(), 1);
@@ -240,7 +240,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports
         assert_eq!(valid_imports.len(), 3);
@@ -273,7 +273,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports
         assert!(valid_imports.is_empty());
@@ -321,7 +321,7 @@ mod tests {
 
         // validate the imports
         let (_valid_imports, _errors, builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the builder
         assert!(
@@ -344,7 +344,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports
         assert_eq!(valid_imports.len(), 1);
@@ -374,7 +374,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports - only the first one should be valid
         assert_eq!(valid_imports.len(), 1);
@@ -423,7 +423,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports - only the first occurrence of each should be valid
         assert_eq!(valid_imports.len(), 2);
@@ -488,7 +488,7 @@ mod tests {
 
         // validate the imports
         let (valid_imports, errors, _builder) =
-            validate_imports(&model_path, builder, import_refs, &file_loader);
+            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
 
         // check the imports - only the first valid import should be present
         assert_eq!(valid_imports.len(), 1);

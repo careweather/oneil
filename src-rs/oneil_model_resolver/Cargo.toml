@@ -1,6 +1,6 @@
 [package]
-name = "oneil_model_loader"
-description = "Model loader for the Oneil programming language"
+name = "oneil_model_resolver"
+description = "Model resolver for the Oneil programming language"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

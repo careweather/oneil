@@ -24,8 +24,14 @@ use crate::{
     },
 };
 
-mod importer;
-mod resolver;
+mod resolve_expr;
+mod resolve_model_import;
+mod resolve_parameter;
+mod resolve_python_import;
+mod resolve_test;
+mod resolve_trace_level;
+mod resolve_unit;
+mod resolve_variable;
 
 /// Loads a model and all its dependencies, building a complete model collection.
 ///
@@ -111,7 +117,7 @@ where
 
     // validate imports
     let (python_imports, import_resolution_errors, builder) =
-        importer::validate_imports(&model_path, builder, imports, file_loader);
+        resolve_python_import::resolve_python_imports(&model_path, builder, imports, file_loader);
 
     // load use models and resolve them
     let mut builder = load_use_models(
@@ -130,7 +136,7 @@ where
 
     // resolve submodels
     let (submodels, references, submodel_resolution_errors, reference_resolution_errors) =
-        resolver::resolve_model_imports(use_models, &model_path, &model_context);
+        resolve_model_import::resolve_model_imports(use_models, &model_path, &model_context);
 
     let models_with_errors = builder.get_models_with_errors();
 
@@ -143,13 +149,13 @@ where
 
     // resolve parameters
     let (parameters, parameter_resolution_errors) =
-        resolver::resolve_parameters(parameters, builtin_ref, &reference_context);
+        resolve_parameter::resolve_parameters(parameters, builtin_ref, &reference_context);
 
     let parameter_context = ParameterContext::new(&parameters, &parameter_resolution_errors);
 
     // resolve tests
     let (tests, test_resolution_errors) =
-        resolver::resolve_tests(tests, builtin_ref, &reference_context, &parameter_context);
+        resolve_test::resolve_tests(tests, builtin_ref, &reference_context, &parameter_context);
 
     let resolution_errors = ResolutionErrors::new(
         import_resolution_errors,

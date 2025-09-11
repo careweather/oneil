@@ -28,7 +28,10 @@ use oneil_ir::{self as ir, IrSpan};
 use crate::{
     BuiltinRef,
     error::{self, ParameterResolutionError},
-    loader::resolver::{expr::resolve_expr, trace_level::resolve_trace_level, unit::resolve_unit},
+    resolver::{
+        resolve_expr::resolve_expr, resolve_trace_level::resolve_trace_level,
+        resolve_unit::resolve_unit,
+    },
     util::{
         Stack,
         builder::ParameterBuilder,

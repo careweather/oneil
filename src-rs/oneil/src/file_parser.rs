@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use oneil_ast as ast;
 use oneil_error::AsOneilError;
-use oneil_model_loader::FileLoader as ModelFileLoader;
+use oneil_model_resolver::FileLoader as ModelFileLoader;
 use oneil_parser as parser;
 
 /// Type alias for parser errors with partial results

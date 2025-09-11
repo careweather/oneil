@@ -56,7 +56,7 @@ use oneil_ir::{self as ir, IrSpan};
 use crate::{
     BuiltinRef,
     error::{self, VariableResolutionError},
-    loader::resolver::variable::resolve_variable,
+    resolver::resolve_variable::resolve_variable,
     util::{
         context::{ParameterContext, ReferenceContext},
         get_span_from_ast_span,

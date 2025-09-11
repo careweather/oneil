@@ -56,7 +56,7 @@ use oneil_ir as ir;
 use crate::util::{Stack, builder::ModelCollectionBuilder};
 
 pub mod error;
-mod loader;
+mod resolver;
 mod util;
 
 #[cfg(test)]
@@ -225,7 +225,7 @@ where
         let model_path = ir::ModelPath::new(model_path.as_ref());
         let mut load_stack = Stack::new();
 
-        loader::load_model(
+        resolver::load_model(
             model_path,
             builder,
             builtin_ref,

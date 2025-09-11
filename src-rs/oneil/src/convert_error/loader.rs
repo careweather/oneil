@@ -16,7 +16,7 @@ use std::{fs, path::Path};
 
 use oneil_error::{ErrorLocation, OneilError};
 use oneil_ir as ir;
-use oneil_model_loader::{
+use oneil_model_resolver::{
     ModelErrorMap,
     error::{
         CircularDependencyError, ImportResolutionError, LoadError, ModelImportResolutionError,

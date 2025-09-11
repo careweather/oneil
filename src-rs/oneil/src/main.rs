@@ -6,7 +6,7 @@
 use std::io::{self, Write};
 
 use clap::Parser;
-use oneil_model_loader::FileLoader;
+use oneil_model_resolver::FileLoader;
 
 use crate::{
     builtins::Builtins,
@@ -100,7 +100,7 @@ fn main() -> io::Result<()> {
 
                 let builtin_variables = Builtins::new();
 
-                let model_collection = oneil_model_loader::load_model(
+                let model_collection = oneil_model_resolver::load_model(
                     file,
                     &builtin_variables,
                     &file_parser::FileLoader,

@@ -190,7 +190,7 @@ dependencies = [
  "oneil_ast",
  "oneil_error",
  "oneil_ir",
- "oneil_model_loader",
+ "oneil_model_resolver",
  "oneil_parser",
 ]
 
@@ -207,7 +207,7 @@ name = "oneil_ir"
 version = "0.15.0"
 
 [[package]]
-name = "oneil_model_loader"
+name = "oneil_model_resolver"
 version = "0.15.0"
 dependencies = [
  "oneil_ast",

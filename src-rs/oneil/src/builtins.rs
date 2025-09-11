@@ -1,5 +1,5 @@
 use oneil_ir as ir;
-use oneil_model_loader::BuiltinRef;
+use oneil_model_resolver::BuiltinRef;
 
 // TODO: later, this will hold the actual values/functions that are built into the language
 //       right now, it just holds the names of the builtins

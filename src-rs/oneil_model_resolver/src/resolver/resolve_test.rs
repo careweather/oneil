@@ -41,7 +41,7 @@ use oneil_ir as ir;
 use crate::{
     BuiltinRef,
     error::{self, TestResolutionError},
-    loader::resolver::{expr::resolve_expr, trace_level::resolve_trace_level},
+    resolver::{resolve_expr::resolve_expr, resolve_trace_level::resolve_trace_level},
     util::context::{ParameterContext, ReferenceContext},
 };
 
