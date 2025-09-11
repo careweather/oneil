@@ -694,7 +694,7 @@ fn variable(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
         Some(reference_model_id) => {
             let variable_span =
                 AstSpan::calc_span(&parameter_id_span, &reference_model_id.node_span());
-            let variable = Variable::model_parameter(parameter_id, reference_model_id);
+            let variable = Variable::model_parameter(reference_model_id, parameter_id);
             Node::new(&variable_span, variable)
         }
         None => Node::new(&parameter_id_span, Variable::identifier(parameter_id)),
@@ -840,12 +840,14 @@ mod tests {
         let input = InputSpan::new_extra("foo.bar", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_id = Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
-        let expected_id2 = Node::new(&AstSpan::new(4, 3, 0), Identifier::new("bar".to_string()));
+        let expected_parameter_id =
+            Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
+        let expected_reference_model_id =
+            Node::new(&AstSpan::new(4, 3, 0), Identifier::new("bar".to_string()));
 
         let variable = Node::new(
             &AstSpan::new(0, 7, 0),
-            Variable::model_parameter(expected_id, expected_id2),
+            Variable::model_parameter(expected_reference_model_id, expected_parameter_id),
         );
 
         let expected_expr = Node::new(&AstSpan::new(0, 7, 0), Expr::variable(variable));

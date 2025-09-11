@@ -5,6 +5,8 @@ X: x = 2 + 1
 
 Y: y = x + 2
 
+Pi: pi = pi.s1
+
 # A section
 section My Section
 
