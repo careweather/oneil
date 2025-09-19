@@ -43,7 +43,8 @@ where
     ) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
-        E2: nom::error::ParseError<I> + From<E>,
+        E: Into<E2>,
+        E2: nom::error::ParseError<I>,
     {
         move |input| {
             self.parse(input).map_err(|e| match e {
@@ -79,7 +80,8 @@ where
     ) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
-        E2: nom::error::ParseError<I> + From<E>,
+        E: Into<E2>,
+        E2: nom::error::ParseError<I>,
     {
         move |input| {
             self.parse(input).map_err(|e| match e {
@@ -97,7 +99,8 @@ where
     fn convert_errors<E2>(mut self) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
-        E2: nom::error::ParseError<I> + From<E>,
+        E: Into<E2>,
+        E2: nom::error::ParseError<I>,
     {
         move |input| {
             self.parse(input).map_err(|e| match e {
