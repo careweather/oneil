@@ -308,10 +308,6 @@ fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -
 /// This function assumes that models referenced in `model_info` have been
 /// properly loaded and validated. If this assumption is violated, the function
 /// will panic, indicating a bug in the model loading process.
-#[allow(
-    clippy::panic_in_result_fn,
-    reason = "panic enforces a function invariant"
-)]
 fn resolve_model_path(
     model_path: ir::ModelPath,
     model_name_span: IrSpan,
@@ -328,7 +324,7 @@ fn resolve_model_path(
                 model_name_span,
             ));
         }
-        ModelContextResult::NotFound => panic!("model should have been visited already"),
+        ModelContextResult::NotFound => unreachable!("model should have been visited already"),
     };
 
     // if there are no more subcomponents, we have resolved the model path

@@ -15,10 +15,6 @@ use crate::{
 };
 
 /// Resolves a variable expression to its corresponding model expression.
-#[allow(
-    clippy::panic_in_result_fn,
-    reason = "panic enforces a function invariant"
-)]
 pub fn resolve_variable(
     variable: &ast::VariableNode,
     builtin_ref: &impl BuiltinRef,
@@ -84,7 +80,7 @@ pub fn resolve_variable(
                     ));
                 }
                 ReferenceContextResult::ModelNotFound(_reference_path) => {
-                    panic!("reference should have been visited already")
+                    unreachable!("reference should have been visited already")
                 }
                 ReferenceContextResult::Found(model, reference_path) => (model, reference_path),
             };
