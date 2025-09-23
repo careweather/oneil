@@ -206,7 +206,7 @@ fn use_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 /// - `Directory::Parent` for ".."
 fn opt_directory_path(input: InputSpan<'_>) -> Result<'_, Vec<DirectoryNode>, ParserError> {
     many0(|input| {
-        let (rest, directory_name) = directory_name(input)?;
+        let (rest, directory_name) = directory_name.parse(input)?;
         let (rest, _slash_token) = slash.convert_errors().parse(rest)?;
         Ok((rest, directory_name))
     })
