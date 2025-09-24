@@ -11,7 +11,7 @@ use nom::{
 };
 
 use crate::token::{
-    Parser, Result, InputSpan,
+    InputSpan, Parser, Result,
     error::{ExpectSymbol, TokenError},
     util::{Token, token},
 };

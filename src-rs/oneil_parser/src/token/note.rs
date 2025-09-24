@@ -12,7 +12,7 @@ use nom::combinator::{consumed, flat_map, recognize, verify};
 use nom::multi::many0;
 
 use crate::token::{
-    Result, InputSpan,
+    InputSpan, Result,
     error::{ErrorHandlingParser, TokenError},
     structure::end_of_line,
     util::{Token, inline_whitespace},
@@ -88,7 +88,9 @@ fn single_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
 fn multi_line_note_delimiter(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     recognize((
         inline_whitespace,
-        verify(take_while(|c: char| c == '~'), |s: &InputSpan<'_>| s.len() >= 3),
+        verify(take_while(|c: char| c == '~'), |s: &InputSpan<'_>| {
+            s.len() >= 3
+        }),
         inline_whitespace,
     ))
     .parse(input)
@@ -351,7 +353,8 @@ mod tests {
 
         #[test]
         fn test_unicode_characters() {
-            let input = InputSpan::new_extra("~ note with 世界 characters\nrest", Config::default());
+            let input =
+                InputSpan::new_extra("~ note with 世界 characters\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with unicode");
             assert_eq!(kind, NoteKind::SingleLine);
@@ -409,7 +412,8 @@ mod tests {
 
         #[test]
         fn test_with_whitespace_around_delimiters() {
-            let input = InputSpan::new_extra("   ~~~   \ncontent\n   ~~~   \nrest", Config::default());
+            let input =
+                InputSpan::new_extra("   ~~~   \ncontent\n   ~~~   \nrest", Config::default());
             let (rest, (matched, kind)) = note(input)
                 .expect("should parse multi-line note with whitespace around delimiters");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -446,7 +450,8 @@ mod tests {
 
         #[test]
         fn test_with_numbers() {
-            let input = InputSpan::new_extra("~~~\nLine with 123 numbers\n~~~\nrest", Config::default());
+            let input =
+                InputSpan::new_extra("~~~\nLine with 123 numbers\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with numbers");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -466,7 +471,8 @@ mod tests {
 
         #[test]
         fn test_with_carriage_returns() {
-            let input = InputSpan::new_extra("~~~\r\nLine with CR\r\n~~~\r\nrest", Config::default());
+            let input =
+                InputSpan::new_extra("~~~\r\nLine with CR\r\n~~~\r\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with carriage returns");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -489,7 +495,8 @@ mod tests {
 
         #[test]
         fn test_with_emoji() {
-            let input = InputSpan::new_extra("~~~\nLine with 😀 emoji\n~~~\nrest", Config::default());
+            let input =
+                InputSpan::new_extra("~~~\nLine with 😀 emoji\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with emoji");
             assert_eq!(kind, NoteKind::MultiLine);
@@ -587,7 +594,8 @@ mod tests {
 
         #[test]
         fn test_delimiter_in_content_line() {
-            let input = InputSpan::new_extra("~~~\nLine 1\n~~~\nLine 2\n~~~\nrest", Config::default());
+            let input =
+                InputSpan::new_extra("~~~\nLine 1\n~~~\nLine 2\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with delimiter in content");
             assert_eq!(kind, NoteKind::MultiLine);

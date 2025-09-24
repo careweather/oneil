@@ -13,7 +13,7 @@ use nom::{
 };
 
 use crate::token::{
-    Result, InputSpan,
+    InputSpan, Result,
     error::{ErrorHandlingParser, TokenError},
     util::{Token, token},
 };

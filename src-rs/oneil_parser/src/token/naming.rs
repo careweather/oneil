@@ -14,7 +14,7 @@ use nom::{
 };
 
 use crate::token::{
-    Result, InputSpan,
+    InputSpan, Result,
     error::TokenError,
     keyword,
     util::{Token, token},

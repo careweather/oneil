@@ -16,7 +16,7 @@
 //! All token parsers consume trailing whitespace after the matched content and
 //! return the matched content as a `Span`.
 
-use super::util::{Parser, Result, InputSpan};
+use super::util::{InputSpan, Parser, Result};
 
 pub mod error;
 mod util;

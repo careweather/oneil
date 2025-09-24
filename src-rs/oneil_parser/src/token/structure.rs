@@ -14,7 +14,7 @@ use nom::{
 };
 
 use crate::token::{
-    Result, InputSpan,
+    InputSpan, Result,
     error::{ErrorHandlingParser, TokenError},
     util::{Token, inline_whitespace},
 };
@@ -195,7 +195,8 @@ mod tests {
 
         #[test]
         fn test_comment_with_special_characters() {
-            let input = InputSpan::new_extra("# comment with @#$% symbols\nrest", Config::default());
+            let input =
+                InputSpan::new_extra("# comment with @#$% symbols\nrest", Config::default());
             let (rest, matched) =
                 comment(input).expect("should parse comment with special characters");
             assert_eq!(matched.fragment(), &"# comment with @#$% symbols\n");
@@ -212,7 +213,8 @@ mod tests {
 
         #[test]
         fn test_comment_with_unicode() {
-            let input = InputSpan::new_extra("# comment with 世界 characters\nrest", Config::default());
+            let input =
+                InputSpan::new_extra("# comment with 世界 characters\nrest", Config::default());
             let (rest, matched) = comment(input).expect("should parse comment with unicode");
             assert_eq!(matched.fragment(), &"# comment with 世界 characters\n");
             assert_eq!(rest.fragment(), &"rest");
@@ -409,7 +411,8 @@ mod tests {
 
         #[test]
         fn test_with_whitespace_between() {
-            let input = InputSpan::new_extra("\n   # foo   \n   \n   # bar   \nrest", Config::default());
+            let input =
+                InputSpan::new_extra("\n   # foo   \n   \n   # bar   \nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse with whitespace between");
             assert_eq!(rest.fragment(), &"rest");
             assert_eq!(matched.lexeme(), "\n");
