@@ -121,7 +121,8 @@ impl CanBeEmpty for Model {
 impl<T, E> ErrorsWithPartialResult<T, E> {
     /// Creates a new `ErrorsWithPartialResult` with the given partial result
     /// and errors
-    pub fn new(partial_result: T, errors: Vec<E>) -> Self {
+    #[must_use]
+    pub const fn new(partial_result: T, errors: Vec<E>) -> Self {
         Self {
             partial_result,
             errors,

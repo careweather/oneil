@@ -13,7 +13,7 @@ pub struct ParameterContext<'parameter> {
 }
 
 impl<'parameter> ParameterContext<'parameter> {
-    pub fn new(
+    pub const fn new(
         parameters: &'parameter HashMap<ir::Identifier, ir::Parameter>,
         parameter_errors: &'parameter HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
     ) -> Self {
@@ -23,6 +23,7 @@ impl<'parameter> ParameterContext<'parameter> {
         }
     }
 
+    #[must_use]
     pub fn lookup_parameter(
         &self,
         parameter_identifier: &ir::Identifier,

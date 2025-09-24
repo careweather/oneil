@@ -441,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_simple_submodel() {
+    fn resolve_simple_submodel() {
         // create the model import list
         // > use temperature as temp
         let model_import = test_ast::ImportModelNodeBuilder::new()
@@ -479,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_nested_submodel() {
+    fn resolve_nested_submodel() {
         // create the use model list with nested subcomponents
         // > use weather.atmosphere.temperature as temp
         let model_import = test_ast::ImportModelNodeBuilder::new()
@@ -531,7 +531,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_without_alias() {
+    fn resolve_submodel_without_alias() {
         // create the use model list without alias
         // > use temperature
         let model_import = test_ast::ImportModelNodeBuilder::new()
@@ -568,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_with_subcomponent_alias() {
+    fn resolve_submodel_with_subcomponent_alias() {
         // create the use model list with subcomponent as alias
         // > use weather.atmosphere
         let model_import = test_ast::ImportModelNodeBuilder::new()
@@ -611,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_with_error() {
+    fn resolve_model_with_error() {
         // create the use model list with error model
         // > use error_model as error
         let model_import = test_ast::ImportModelNodeBuilder::new()
@@ -663,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_undefined_submodel() {
+    fn resolve_undefined_submodel() {
         // create the use model list with undefined submodel
         // > use weather.undefined_submodel
         let model_import = test_ast::ImportModelNodeBuilder::new()
@@ -717,7 +717,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_undefined_submodel_in_submodel() {
+    fn resolve_undefined_submodel_in_submodel() {
         // create the use model list with nested undefined submodel
         // > use weather.atmosphere.undefined
         let model_import = test_ast::ImportModelNodeBuilder::new()
@@ -778,7 +778,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_multiple_submodels() {
+    fn resolve_multiple_submodels() {
         // create the use model list with multiple submodels
         // > use temperature as temp
         let temp_model = test_ast::ImportModelNodeBuilder::new()
@@ -837,7 +837,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_mixed_success_and_error() {
+    fn resolve_mixed_success_and_error() {
         // create the use model list with mixed success and error cases
         // > use temperature as temp
         let temp_model = test_ast::ImportModelNodeBuilder::new()
@@ -903,7 +903,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_with_directory_path_success() {
+    fn resolve_submodel_with_directory_path_success() {
         // create the use model list with directory path that exists
         // > use utils/math as math
         let math_model = test_ast::ImportModelNodeBuilder::new()
@@ -941,7 +941,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_submodel_with_directory_path_error() {
+    fn resolve_submodel_with_directory_path_error() {
         // create the use model list with directory path that doesn't exist
         // > use nonexistent/math as math
         let math_model = test_ast::ImportModelNodeBuilder::new()
@@ -992,7 +992,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_duplicate_submodel_aliases() {
+    fn resolve_duplicate_submodel_aliases() {
         // create the use model list with duplicate submodel names
         // > use temperature as temp
         let temp_model1 = test_ast::ImportModelNodeBuilder::new()
@@ -1020,7 +1020,7 @@ mod tests {
 
         let context_builder = ModelContextBuilder::new().with_model_context([
             (temperature_path.clone(), test_ir::empty_model()),
-            (other_temperature_path.clone(), test_ir::empty_model()),
+            (other_temperature_path, test_ir::empty_model()),
         ]);
         let context = context_builder.build();
 
@@ -1055,7 +1055,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_failing_submodel() {
+    fn resolve_use_declaration_with_failing_submodel() {
         // create the use model list with a submodel that fails to resolve
         // > use weather.atmosphere.temperature
         let weather_model = test_ast::ImportModelNodeBuilder::new()
@@ -1117,7 +1117,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_successful_and_failing_submodels() {
+    fn resolve_use_declaration_with_successful_and_failing_submodels() {
         // create the use model list with both successful and failing submodels
         // > use temperature as temp  # successful
         let temp_model = test_ast::ImportModelNodeBuilder::new()
@@ -1190,7 +1190,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_single_submodel() {
+    fn resolve_use_declaration_with_single_submodel() {
         // create the use model list with a single submodel in the with clause
         // > use weather with temperature as temp
         let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
@@ -1244,7 +1244,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_multiple_submodels() {
+    fn resolve_use_declaration_with_multiple_submodels() {
         // create the use model list with multiple submodels in the with clause
         // > use weather with [temperature as temp, pressure as press]
         let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
@@ -1306,7 +1306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_nested_submodel() {
+    fn resolve_use_declaration_with_nested_submodel() {
         // create the use model list with a nested submodel in the with clause
         // > use weather with atmosphere.temperature as temp
         let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
@@ -1367,7 +1367,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_failing_submodel_in_with_clause() {
+    fn resolve_use_declaration_with_failing_submodel_in_with_clause() {
         // create the use model list with a failing submodel in the with clause
         // use weather with undefined
         let undefined_submodel = test_ast::ModelInfoNodeBuilder::new()
@@ -1426,7 +1426,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_successful_and_failing_submodels_in_with_clause() {
+    fn resolve_use_declaration_with_successful_and_failing_submodels_in_with_clause() {
         // create the use model list with both successful and failing submodels in the with clause
         // use weather with [temperature as temp, undefined as undefined]
         let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
@@ -1497,7 +1497,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_use_declaration_with_model_alias_and_submodels() {
+    fn resolve_use_declaration_with_model_alias_and_submodels() {
         // create the use model list with model alias and submodels in the with clause
         // use weather as weather_model with [temperature as temp, pressure as press]
         let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
@@ -1550,7 +1550,6 @@ mod tests {
         assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
 
         // check the references
-        eprintln!("reference map: {reference_map:?}");
         assert_has_references!(
             &reference_map,
             [
@@ -1562,7 +1561,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_reference() {
+    fn resolve_reference() {
         // create the import model list
         // > ref temperature
         let temp_model = test_ast::ImportModelNodeBuilder::new()
@@ -1600,7 +1599,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_reference_with_alias() {
+    fn resolve_reference_with_alias() {
         // create the import model list
         // > ref temperature as temp
         let temp_model = test_ast::ImportModelNodeBuilder::new()
@@ -1639,7 +1638,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_reference_with_alias_and_submodels() {
+    fn resolve_reference_with_alias_and_submodels() {
         // create the import model list
         // > ref temperature as temp with [pressure as press]
         let pressure_submodel = test_ast::ModelInfoNodeBuilder::new()

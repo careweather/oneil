@@ -5,6 +5,11 @@
 //! all AST node types including models, declarations, expressions, parameters,
 //! and units.
 
+#![expect(
+    clippy::use_debug,
+    reason = "this is a debug function for developers, not for end users"
+)]
+
 use oneil_ast as ast;
 use std::io::{self, Write};
 

@@ -57,7 +57,8 @@ impl<Ps> LoadError<Ps> {
     /// # Returns
     ///
     /// A `LoadError::ParseError` variant containing the parse error.
-    pub fn parse_error(parse_error: Ps) -> Self {
+    #[must_use]
+    pub const fn parse_error(parse_error: Ps) -> Self {
         Self::ParseError(parse_error)
     }
 
@@ -97,7 +98,7 @@ impl CircularDependencyError {
     ///
     /// A new `CircularDependencyError` containing the circular dependency path.
     #[must_use]
-    pub fn new(circular_dependency: Vec<ir::ModelPath>) -> Self {
+    pub const fn new(circular_dependency: Vec<ir::ModelPath>) -> Self {
         Self(circular_dependency)
     }
 
@@ -107,8 +108,8 @@ impl CircularDependencyError {
     ///
     /// A vector of model paths that form the circular dependency.
     #[must_use]
-    pub fn circular_dependency(&self) -> &[ir::ModelPath] {
-        &self.0
+    pub const fn circular_dependency(&self) -> &[ir::ModelPath] {
+        self.0.as_slice()
     }
 }
 

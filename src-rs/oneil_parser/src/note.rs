@@ -71,7 +71,7 @@ mod tests {
     use oneil_ast::AstSpan;
 
     #[test]
-    fn test_single_line_note() {
+    fn single_line_note() {
         let input = InputSpan::new_extra("~ This is a note\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse single line note");
         assert_eq!(note.node_span(), AstSpan::new(0, 16, 1));
@@ -80,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_line_note_at_eof() {
+    fn single_line_note_at_eof() {
         let input = InputSpan::new_extra("~ note", Config::default());
         let (rest, note) = parse(input).expect("should parse single line note at EOF");
         assert_eq!(note.node_span(), AstSpan::new(0, 6, 0));
@@ -89,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_line_note() {
+    fn multi_line_note() {
         let input = InputSpan::new_extra("~~~\nLine 1\nLine 2\n~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse multi-line note");
         assert_eq!(note.node_span(), AstSpan::new(0, 21, 1));
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_line_note_extra_tildes() {
+    fn multi_line_note_extra_tildes() {
         let input = InputSpan::new_extra("~~~~~\nfoo\nbar\n~~~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse multi-line note with extra tildes");
         assert_eq!(note.node_span(), AstSpan::new(0, 19, 1));
@@ -107,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_line_note_empty() {
+    fn multi_line_note_empty() {
         let input = InputSpan::new_extra("~~~\n~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse empty multi-line note");
         assert_eq!(note.node_span(), AstSpan::new(0, 7, 1));
@@ -116,21 +116,21 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_line_note_unclosed() {
+    fn multi_line_note_unclosed() {
         let input = InputSpan::new_extra("~~~\nUnclosed note\n", Config::default());
         let result = parse(input);
         assert!(result.is_err(), "should not parse unclosed multi-line note");
     }
 
     #[test]
-    fn test_invalid_note() {
+    fn invalid_note() {
         let input = InputSpan::new_extra("not a note", Config::default());
         let result = parse(input);
         assert!(result.is_err(), "should not parse invalid note");
     }
 
     #[test]
-    fn test_parse_complete_single_line_success() {
+    fn parse_complete_single_line_success() {
         let input = InputSpan::new_extra("~ This is a note\n", Config::default());
         let (rest, note) = parse_complete(input).expect("should parse single line note");
         assert_eq!(note.node_span(), AstSpan::new(0, 16, 1));
@@ -139,7 +139,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_complete_multi_line_success() {
+    fn parse_complete_multi_line_success() {
         let input = InputSpan::new_extra("~~~\nLine 1\nLine 2\n~~~\n", Config::default());
         let (rest, note) = parse_complete(input).expect("should parse multi-line note");
         assert_eq!(note.node_span(), AstSpan::new(0, 21, 1));
@@ -148,7 +148,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_complete_with_remaining_input() {
+    fn parse_complete_with_remaining_input() {
         let input = InputSpan::new_extra("~ This is a note\nrest", Config::default());
         let result = parse_complete(input);
         assert!(
@@ -157,155 +157,149 @@ mod tests {
         );
     }
 
-    mod error_tests {
+    mod single_line_error {
         use super::*;
 
-        mod single_line_error_tests {
-            use super::*;
+        #[test]
+        fn single_line_note_missing_tilde() {
+            let input = InputSpan::new_extra("This is not a note\n", Config::default());
+            let result = parse(input);
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
 
-            #[test]
-            fn test_single_line_note_missing_tilde() {
-                let input = InputSpan::new_extra("This is not a note\n", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Note)
-                        ));
-                    }
-                    _ => panic!("Expected error for input without tilde"),
-                }
-            }
-
-            #[test]
-            fn test_single_line_note_empty_input() {
-                let input = InputSpan::new_extra("", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Note)
-                        ));
-                    }
-                    _ => panic!("Expected error for empty input"),
-                }
-            }
-
-            #[test]
-            fn test_single_line_note_whitespace_only() {
-                let input = InputSpan::new_extra("   \n", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 3); // fails after the whitespace
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Note)
-                        ));
-                    }
-                    _ => panic!("Expected error for whitespace-only input"),
-                }
-            }
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Note)
+            ));
         }
 
-        mod multi_line_error_tests {
-            use super::*;
+        #[test]
+        fn single_line_note_empty_input() {
+            let input = InputSpan::new_extra("", Config::default());
+            let result = parse(input);
 
-            #[test]
-            fn test_multi_line_note_missing_opening_delimiter() {
-                let input = InputSpan::new_extra("content\n~~~\n", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Note)
-                        ));
-                    }
-                    _ => panic!("Expected error for content without opening delimiter"),
-                }
-            }
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
 
-            #[test]
-            fn test_multi_line_note_missing_closing_delimiter() {
-                let input = InputSpan::new_extra("~~~\ncontent\n", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Failure(error)) => {
-                        assert_eq!(error.error_offset, 12); // error at end of content
-                        match error.reason {
-                            ParserErrorReason::TokenError(TokenErrorKind::Incomplete(
-                                IncompleteKind::UnclosedNote {
-                                    delimiter_start_offset,
-                                    delimiter_length,
-                                },
-                            )) => {
-                                assert_eq!(delimiter_start_offset, 0);
-                                assert_eq!(delimiter_length, 3);
-                            }
-                            _ => panic!("Unexpected reason {:?}", error.reason),
-                        }
-                    }
-                    _ => panic!("Expected failure for unclosed multi-line note"),
-                }
-            }
-
-            #[test]
-            fn test_multi_line_note_empty_input() {
-                let input = InputSpan::new_extra("", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Note)
-                        ));
-                    }
-                    _ => panic!("Expected error for empty input"),
-                }
-            }
-
-            #[test]
-            fn test_multi_line_note_whitespace_only() {
-                let input = InputSpan::new_extra("   \n", Config::default());
-                let result = parse(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 3); // fails after the whitespace
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Note)
-                        ));
-                    }
-                    _ => panic!("Expected error for whitespace-only input"),
-                }
-            }
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Note)
+            ));
         }
 
-        mod parse_complete_error_tests {
-            use super::*;
+        #[test]
+        fn single_line_note_whitespace_only() {
+            let input = InputSpan::new_extra("   \n", Config::default());
+            let result = parse(input);
 
-            #[test]
-            fn test_parse_complete_invalid_input() {
-                let input = InputSpan::new_extra("invalid input", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Error(error)) => {
-                        assert_eq!(error.error_offset, 0);
-                        assert!(matches!(
-                            error.reason,
-                            ParserErrorReason::Expect(ExpectKind::Note)
-                        ));
-                    }
-                    _ => panic!("Expected error for invalid input"),
-                }
-            }
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 3); // fails after the whitespace
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Note)
+            ));
+        }
+    }
+
+    mod multi_line_error {
+        use super::*;
+
+        #[test]
+        fn multi_line_note_missing_opening_delimiter() {
+            let input = InputSpan::new_extra("content\n~~~\n", Config::default());
+            let result = parse(input);
+
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Note)
+            ));
+        }
+
+        #[test]
+        fn multi_line_note_missing_closing_delimiter() {
+            let input = InputSpan::new_extra("~~~\ncontent\n", Config::default());
+            let result = parse(input);
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Expected failure for unclosed multi-line note");
+            };
+
+            assert_eq!(error.error_offset, 12); // error at end of content
+            let ParserErrorReason::TokenError(TokenErrorKind::Incomplete(
+                IncompleteKind::UnclosedNote {
+                    delimiter_start_offset,
+                    delimiter_length,
+                },
+            )) = error.reason
+            else {
+                panic!("Unexpected reason {:?}", error.reason);
+            };
+
+            assert_eq!(delimiter_start_offset, 0);
+            assert_eq!(delimiter_length, 3);
+        }
+
+        #[test]
+        fn multi_line_note_empty_input() {
+            let input = InputSpan::new_extra("", Config::default());
+            let result = parse(input);
+
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Note)
+            ));
+        }
+
+        #[test]
+        fn multi_line_note_whitespace_only() {
+            let input = InputSpan::new_extra("   \n", Config::default());
+            let result = parse(input);
+
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 3); // fails after the whitespace
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Note)
+            ));
+        }
+    }
+
+    mod parse_complete_error {
+        use super::*;
+
+        #[test]
+        fn parse_complete_invalid_input() {
+            let input = InputSpan::new_extra("invalid input", Config::default());
+            let result = parse_complete(input);
+
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Note)
+            ));
         }
     }
 }

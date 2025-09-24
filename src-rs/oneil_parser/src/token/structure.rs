@@ -110,11 +110,11 @@ mod tests {
     use crate::Config;
     use crate::token::error::{ExpectKind, TokenErrorKind};
 
-    mod linebreak_tests {
+    mod linebreak {
         use super::*;
 
         #[test]
-        fn test_unix_newline() {
+        fn unix_newline() {
             let input = InputSpan::new_extra("\nrest", Config::default());
             let (rest, matched) = linebreak(input).expect("should parse unix newline");
             assert_eq!(matched.fragment(), &"\n");
@@ -122,7 +122,7 @@ mod tests {
         }
 
         #[test]
-        fn test_windows_newline() {
+        fn windows_newline() {
             let input = InputSpan::new_extra("\r\nrest", Config::default());
             let (rest, matched) = linebreak(input).expect("should parse windows newline");
             assert_eq!(matched.fragment(), &"\r\n");
@@ -130,47 +130,44 @@ mod tests {
         }
 
         #[test]
-        fn test_no_newline() {
+        fn no_newline() {
             let input = InputSpan::new_extra("no newline", Config::default());
             let res = linebreak(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_empty_input() {
+        fn empty_input() {
             let input = InputSpan::new_extra("", Config::default());
             let res = linebreak(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_whitespace_before_newline() {
+        fn whitespace_before_newline() {
             let input = InputSpan::new_extra("   \nrest", Config::default());
             let res = linebreak(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
     }
 
-    mod comment_tests {
+    mod comment {
         use super::*;
 
         #[test]
-        fn test_basic_comment() {
+        fn basic_comment() {
             let input = InputSpan::new_extra("# this is a comment\nrest", Config::default());
             let (rest, matched) = comment(input).expect("should parse basic comment");
             assert_eq!(matched.fragment(), &"# this is a comment\n");
@@ -178,7 +175,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comment_at_eof() {
+        fn comment_at_eof() {
             let input = InputSpan::new_extra("# only comment", Config::default());
             let (rest, matched) = comment(input).expect("should parse comment at EOF");
             assert_eq!(matched.fragment(), &"# only comment");
@@ -186,7 +183,7 @@ mod tests {
         }
 
         #[test]
-        fn test_empty_comment() {
+        fn empty_comment() {
             let input = InputSpan::new_extra("#\nrest", Config::default());
             let (rest, matched) = comment(input).expect("should parse empty comment");
             assert_eq!(matched.fragment(), &"#\n");
@@ -194,7 +191,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comment_with_special_characters() {
+        fn comment_with_special_characters() {
             let input =
                 InputSpan::new_extra("# comment with @#$% symbols\nrest", Config::default());
             let (rest, matched) =
@@ -204,7 +201,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comment_with_numbers() {
+        fn comment_with_numbers() {
             let input = InputSpan::new_extra("# comment with 123 numbers\nrest", Config::default());
             let (rest, matched) = comment(input).expect("should parse comment with numbers");
             assert_eq!(matched.fragment(), &"# comment with 123 numbers\n");
@@ -212,7 +209,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comment_with_unicode() {
+        fn comment_with_unicode() {
             let input =
                 InputSpan::new_extra("# comment with 世界 characters\nrest", Config::default());
             let (rest, matched) = comment(input).expect("should parse comment with unicode");
@@ -221,7 +218,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comment_with_emoji() {
+        fn comment_with_emoji() {
             let input = InputSpan::new_extra("# comment with 😀 emoji\nrest", Config::default());
             let (rest, matched) = comment(input).expect("should parse comment with emoji");
             assert_eq!(matched.fragment(), &"# comment with 😀 emoji\n");
@@ -229,7 +226,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comment_with_tabs() {
+        fn comment_with_tabs() {
             let input = InputSpan::new_extra("# comment\twith\ttabs\nrest", Config::default());
             let (rest, matched) = comment(input).expect("should parse comment with tabs");
             assert_eq!(matched.fragment(), &"# comment\twith\ttabs\n");
@@ -237,7 +234,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comment_with_carriage_return() {
+        fn comment_with_carriage_return() {
             let input = InputSpan::new_extra("# comment\r\nrest", Config::default());
             let (rest, matched) =
                 comment(input).expect("should parse comment with carriage return");
@@ -246,19 +243,18 @@ mod tests {
         }
 
         #[test]
-        fn test_no_hash() {
+        fn no_hash() {
             let input = InputSpan::new_extra("not a comment\n", Config::default());
             let res = comment(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_hash_without_content() {
+        fn hash_without_content() {
             let input = InputSpan::new_extra("#", Config::default());
             let (rest, matched) = comment(input).expect("should parse hash without content");
             assert_eq!(matched.fragment(), &"#");
@@ -266,35 +262,33 @@ mod tests {
         }
 
         #[test]
-        fn test_empty_input() {
+        fn empty_input() {
             let input = InputSpan::new_extra("", Config::default());
             let res = comment(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_whitespace_before_hash() {
+        fn whitespace_before_hash() {
             let input = InputSpan::new_extra("   # comment\nrest", Config::default());
             let res = comment(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
     }
 
-    mod end_of_file_tests {
+    mod end_of_file {
         use super::*;
 
         #[test]
-        fn test_empty_input() {
+        fn empty_input() {
             let input = InputSpan::new_extra("", Config::default());
             let (rest, matched) = end_of_file(input).expect("should parse end of file");
             assert_eq!(matched.fragment(), &"");
@@ -302,59 +296,55 @@ mod tests {
         }
 
         #[test]
-        fn test_not_empty() {
+        fn not_empty() {
             let input = InputSpan::new_extra("not empty", Config::default());
             let res = end_of_file(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_whitespace_only() {
+        fn whitespace_only() {
             let input = InputSpan::new_extra("   ", Config::default());
             let res = end_of_file(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_newline() {
+        fn newline() {
             let input = InputSpan::new_extra("\n", Config::default());
             let res = end_of_file(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_comment() {
+        fn comment() {
             let input = InputSpan::new_extra("# comment", Config::default());
             let res = end_of_file(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
     }
 
-    mod end_of_line_tests {
+    mod end_of_line {
         use super::*;
 
         #[test]
-        fn test_single_linebreak() {
+        fn single_linebreak() {
             let input = InputSpan::new_extra("\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse single linebreak");
             assert_eq!(rest.fragment(), &"rest");
@@ -363,7 +353,7 @@ mod tests {
         }
 
         #[test]
-        fn test_single_comment() {
+        fn single_comment() {
             let input = InputSpan::new_extra("# comment\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse single comment");
             assert_eq!(rest.fragment(), &"rest");
@@ -372,7 +362,7 @@ mod tests {
         }
 
         #[test]
-        fn test_eof() {
+        fn eof() {
             let input = InputSpan::new_extra("", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse EOF");
             assert_eq!(rest.fragment(), &"");
@@ -381,7 +371,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multiple_linebreaks() {
+        fn multiple_linebreaks() {
             let input = InputSpan::new_extra("\n\n\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse multiple linebreaks");
             assert_eq!(rest.fragment(), &"rest");
@@ -390,7 +380,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multiple_comments() {
+        fn multiple_comments() {
             let input = InputSpan::new_extra("# foo\n# bar\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse multiple comments");
             assert_eq!(rest.fragment(), &"rest");
@@ -399,7 +389,7 @@ mod tests {
         }
 
         #[test]
-        fn test_mixed_linebreaks_and_comments() {
+        fn mixed_linebreaks_and_comments() {
             let input = InputSpan::new_extra("\n# foo\n\n# bar\nrest", Config::default());
             let (rest, matched) =
                 end_of_line(input).expect("should parse mixed linebreaks and comments");
@@ -410,7 +400,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_whitespace_between() {
+        fn with_whitespace_between() {
             let input =
                 InputSpan::new_extra("\n   # foo   \n   \n   # bar   \nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse with whitespace between");
@@ -421,7 +411,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_tabs_between() {
+        fn with_tabs_between() {
             let input = InputSpan::new_extra("\n\t# foo\t\n\t\n\t# bar\t\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse with tabs between");
             assert_eq!(rest.fragment(), &"rest");
@@ -431,7 +421,7 @@ mod tests {
         }
 
         #[test]
-        fn test_ending_with_eof() {
+        fn ending_with_eof() {
             let input = InputSpan::new_extra("\n# comment\n\n", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse ending with EOF");
             assert_eq!(rest.fragment(), &"");
@@ -440,7 +430,7 @@ mod tests {
         }
 
         #[test]
-        fn test_windows_line_endings() {
+        fn windows_line_endings() {
             let input = InputSpan::new_extra("\r\n# comment\r\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse windows line endings");
             assert_eq!(rest.fragment(), &"rest");
@@ -449,7 +439,7 @@ mod tests {
         }
 
         #[test]
-        fn test_mixed_line_endings() {
+        fn mixed_line_endings() {
             let input = InputSpan::new_extra(
                 "\n# unix comment\r\n# windows comment\nrest",
                 Config::default(),
@@ -462,7 +452,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comments_with_special_characters() {
+        fn comments_with_special_characters() {
             let input = InputSpan::new_extra(
                 "# comment with @#$% symbols\n# another comment with 123\nrest",
                 Config::default(),
@@ -479,7 +469,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comments_with_unicode() {
+        fn comments_with_unicode() {
             let input = InputSpan::new_extra(
                 "# comment with 世界 characters\n# another comment with 😀 emoji\nrest",
                 Config::default(),
@@ -495,55 +485,59 @@ mod tests {
         }
 
         #[test]
-        fn test_no_end_of_line() {
+        fn no_end_of_line() {
             let input = InputSpan::new_extra("no end of line", Config::default());
             let res = end_of_line(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::EndOfLine)
-                )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(EndOfLine), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::EndOfLine)
+            ));
         }
 
         #[test]
-        fn test_whitespace_only() {
+        fn whitespace_only() {
             let input = InputSpan::new_extra("   ", Config::default());
             let res = end_of_line(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::EndOfLine)
-                )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(EndOfLine), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::EndOfLine)
+            ));
         }
 
         #[test]
-        fn test_whitespace_before_linebreak() {
+        fn whitespace_before_linebreak() {
             let input = InputSpan::new_extra("   \nrest", Config::default());
             let res = end_of_line(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::EndOfLine)
-                )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(EndOfLine), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::EndOfLine)
+            ));
         }
 
         #[test]
-        fn test_whitespace_before_comment() {
+        fn whitespace_before_comment() {
             let input = InputSpan::new_extra("   # comment\nrest", Config::default());
             let res = end_of_line(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::EndOfLine)
-                )),
-                _ => panic!("expected TokenError::Expect(EndOfLine), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(EndOfLine), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::EndOfLine)
+            ));
         }
     }
 }

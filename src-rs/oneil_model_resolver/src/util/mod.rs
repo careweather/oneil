@@ -28,7 +28,7 @@ pub mod builder;
 pub mod builtin_ref;
 pub mod context;
 
-pub fn get_span_from_ast_span(ast_span: ast::AstSpan) -> IrSpan {
+pub const fn get_span_from_ast_span(ast_span: ast::AstSpan) -> IrSpan {
     IrSpan::new(ast_span.start(), ast_span.length())
 }
 
@@ -107,7 +107,8 @@ impl<T: PartialEq + Clone> Stack<T> {
     /// # Returns
     ///
     /// A new empty `Stack`.
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self { items: vec![] }
     }
 
@@ -144,6 +145,7 @@ impl<T: PartialEq + Clone> Stack<T> {
     ///
     /// Returns `Some(circular_dependency)` if a circular dependency is found,
     /// or `None` if the item is not in the stack.
+    #[must_use]
     pub fn find_circular_dependency(&self, item: &T) -> Option<Vec<T>> {
         let item_index = self.items.iter().position(|i| i == item)?;
 

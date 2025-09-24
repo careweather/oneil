@@ -1,4 +1,5 @@
-#![doc = include_str!("../README.md")]
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! Parser for the Oneil programming language
 
 use oneil_ast::{
     DeclNode, ExprNode, Model, ModelNode, NoteNode, ParameterNode, TestNode, UnitExprNode,

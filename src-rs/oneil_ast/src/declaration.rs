@@ -50,13 +50,13 @@ impl Decl {
 
     /// Creates a parameter declaration
     #[must_use]
-    pub fn parameter(parameter: ParameterNode) -> Self {
+    pub const fn parameter(parameter: ParameterNode) -> Self {
         Self::Parameter(parameter)
     }
 
     /// Creates a test declaration
     #[must_use]
-    pub fn test(test: TestNode) -> Self {
+    pub const fn test(test: TestNode) -> Self {
         Self::Test(test)
     }
 }
@@ -127,7 +127,7 @@ impl UseModel {
 
     /// Returns the list of submodels being used
     #[must_use]
-    pub fn submodels(&self) -> Option<&SubmodelListNode> {
+    pub const fn submodels(&self) -> Option<&SubmodelListNode> {
         self.submodel_list.as_ref()
     }
 

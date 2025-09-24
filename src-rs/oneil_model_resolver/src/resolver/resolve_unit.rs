@@ -113,7 +113,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_unit() {
+    fn simple_unit() {
         // create a simple unit expression
         let unit_expr = test_ast::unit_node("m");
 
@@ -125,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_with_default_exponent() {
+    fn unit_with_default_exponent() {
         // create a unit expression without explicit exponent
         let unit_expr = test_ast::unit_node("kg");
 
@@ -137,7 +137,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_with_custom_exponent() {
+    fn unit_with_custom_exponent() {
         // create a unit expression with custom exponent
         let unit_expr = test_ast::unit_with_exponent_node("m", 2.0);
 
@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multiplication() {
+    fn multiplication() {
         // create a multiplication expression: m * kg
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Multiply,
@@ -165,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    fn test_division() {
+    fn division() {
         // create a division expression: m / s
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Divide,
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complex_expression() {
+    fn complex_expression() {
         // create a complex expression: (m * kg) / (s * K)
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Divide,
@@ -208,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nested_division() {
+    fn nested_division() {
         // create a nested division expression: m / (s / kg)
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Divide,
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn test_units_with_exponents() {
+    fn units_with_exponents() {
         // create an expression with exponents: m^2 * kg^3 * s^-1 / K^1
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Multiply,
@@ -255,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn test_negative_exponents_in_division() {
+    fn negative_exponents_in_division() {
         // create an expression with negative exponents: m^-2 / s^-3
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Divide,
@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deeply_nested_expression() {
+    fn deeply_nested_expression() {
         // create a deeply nested expression: ((m * kg) / s) * (N / m^2)
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Multiply,
@@ -308,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fractional_exponents() {
+    fn fractional_exponents() {
         // create a unit expression with fractional exponent
         // m^0.5
         let unit_expr = test_ast::unit_with_exponent_node("m", 0.5);
@@ -321,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parenthesized_expression() {
+    fn parenthesized_expression() {
         // create a simple parenthesized expression: (m * kg)
         let inner_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Multiply,
@@ -338,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nested_parenthesized_expression() {
+    fn nested_parenthesized_expression() {
         // create nested parentheses: ((m * kg) / s)
         let inner_mult = test_ast::unit_binary_op_node(
             ast::UnitOp::Multiply,
@@ -361,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_unit_multiple_parentheses() {
+    fn single_unit_multiple_parentheses() {
         // create a single unit wrapped in multiple parentheses: ((m))
         let inner_unit = test_ast::unit_node("m");
         let first_parentheses = test_ast::parenthesized_unit_node(inner_unit);
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_one() {
+    fn unit_one() {
         // create a UnitOne expression
         let unit_expr = test_ast::unit_one_node();
 
@@ -391,7 +391,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_one_in_multiplication() {
+    fn unit_one_in_multiplication() {
         // create a multiplication expression with UnitOne: 1 * m
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Multiply,
@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_one_in_division() {
+    fn unit_one_in_division() {
         // create a division expression with UnitOne: m / 1
         let unit_expr = test_ast::unit_binary_op_node(
             ast::UnitOp::Divide,

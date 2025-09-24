@@ -102,7 +102,7 @@ mod tests {
     };
 
     #[test]
-    fn test_validate_imports_empty_list() {
+    fn validate_imports_empty_list() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = ir::ModelPath::new("test_model");
@@ -123,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_single_valid_import() {
+    fn validate_imports_single_valid_import() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = ir::ModelPath::new("test_model");
@@ -148,7 +148,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_single_invalid_import() {
+    fn validate_imports_single_invalid_import() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
         let model_path = ir::ModelPath::new("test_model");
@@ -183,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_mixed_valid_and_invalid() {
+    fn validate_imports_mixed_valid_and_invalid() {
         // set up the context
         let file_loader = TestPythonValidator::validate_some(["my_python.py"]);
         let model_path = ir::ModelPath::new("test_model");
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_multiple_valid_imports() {
+    fn validate_imports_multiple_valid_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = ir::ModelPath::new("test_model");
@@ -258,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_all_invalid() {
+    fn validate_imports_all_invalid() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
         let model_path = ir::ModelPath::new("test_model");
@@ -309,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_builder_error_tracking() {
+    fn validate_imports_builder_error_tracking() {
         // set up the context
         let file_loader = TestPythonValidator::validate_none();
         let model_path = ir::ModelPath::new("test_model");
@@ -332,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_path_conversion() {
+    fn validate_imports_path_conversion() {
         // set up the context
         let file_loader = TestPythonValidator::validate_some(["subdir/my_python.py"]);
         let model_path = ir::ModelPath::new(PathBuf::from("subdir/test_model"));
@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_duplicate_imports() {
+    fn validate_imports_duplicate_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = ir::ModelPath::new("test_model");
@@ -402,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_multiple_duplicate_imports() {
+    fn validate_imports_multiple_duplicate_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_all();
         let model_path = ir::ModelPath::new("test_model");
@@ -467,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_imports_duplicate_imports_with_invalid_imports() {
+    fn validate_imports_duplicate_imports_with_invalid_imports() {
         // set up the context
         let file_loader = TestPythonValidator::validate_some(["my_python.py"]);
         let model_path = ir::ModelPath::new("test_model");

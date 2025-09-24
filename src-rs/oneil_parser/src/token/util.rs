@@ -31,7 +31,8 @@ impl<'a> Token<'a> {
     /// # Returns
     ///
     /// A new `Token` instance.
-    pub fn new(lexeme: InputSpan<'a>, whitespace: InputSpan<'a>) -> Self {
+    #[must_use]
+    pub const fn new(lexeme: InputSpan<'a>, whitespace: InputSpan<'a>) -> Self {
         Self { lexeme, whitespace }
     }
 
@@ -132,28 +133,28 @@ mod tests {
     use nom::bytes::complete::tag;
 
     #[test]
-    fn test_inline_whitespace_spaces() {
+    fn inline_whitespace_spaces() {
         let input = InputSpan::new_extra("   abc", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse leading spaces");
         assert_eq!(rest.fragment(), &"abc");
     }
 
     #[test]
-    fn test_inline_whitespace_tabs() {
+    fn inline_whitespace_tabs() {
         let input = InputSpan::new_extra("\t\tfoo", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse leading tabs");
         assert_eq!(rest.fragment(), &"foo");
     }
 
     #[test]
-    fn test_inline_whitespace_none() {
+    fn inline_whitespace_none() {
         let input = InputSpan::new_extra("bar", Config::default());
         let (rest, _) = inline_whitespace(input).expect("should parse no whitespace");
         assert_eq!(rest.fragment(), &"bar");
     }
 
     #[test]
-    fn test_token_with_whitespace() {
+    fn token_with_whitespace() {
         let mut parser = token(tag("foo"), TokenError::expected_identifier);
         let input = InputSpan::new_extra("foo   bar", Config::default());
         let (rest, matched) = parser
@@ -164,7 +165,11 @@ mod tests {
     }
 
     #[test]
-    fn test_token_no_match() {
+    #[expect(
+        clippy::assertions_on_result_states,
+        reason = "we don't care about the result, just that it's an error"
+    )]
+    fn token_no_match() {
         let mut parser = token(tag("baz"), TokenError::expected_identifier);
         let input = InputSpan::new_extra("foo   bar", Config::default());
         let res = parser.parse(input);

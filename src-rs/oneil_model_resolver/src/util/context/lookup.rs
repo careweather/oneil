@@ -14,9 +14,6 @@ pub fn lookup_with<K, V>(
     if has_error(key) {
         LookupResult::HasError
     } else {
-        match lookup_value(key) {
-            Some(value) => LookupResult::Found(value),
-            None => LookupResult::NotFound,
-        }
+        lookup_value(key).map_or(LookupResult::NotFound, |value| LookupResult::Found(value))
     }
 }

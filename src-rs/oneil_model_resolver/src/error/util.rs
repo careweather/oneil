@@ -29,7 +29,7 @@ use std::{collections::HashMap, hash::Hash};
 ///
 /// Returns `Ok((T, U))` if both operations succeed, or `Err(Vec<E>)` if either
 /// operation fails, containing all errors from the failed operations.
-#[allow(
+#[expect(
     clippy::missing_errors_doc,
     reason = "this is a utility function for merging errors"
 )]
@@ -59,14 +59,14 @@ pub fn combine_errors<T, U, E>(
 ///
 /// Returns `Ok(Vec<T>)` if all operations succeed, or `Err(Vec<E>)` if any
 /// operation fails, containing all errors from all failed operations.
-#[allow(
+#[expect(
     clippy::missing_errors_doc,
     reason = "this is a utility function for merging errors"
 )]
 pub fn combine_error_list<T, E>(
     results: impl IntoIterator<Item = Result<T, Vec<E>>>,
 ) -> Result<Vec<T>, Vec<E>> {
-    #[allow(
+    #[expect(
         clippy::manual_try_fold,
         reason = "we want to consume *all* errors, not just the first one"
     )]

@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_builtin_variable() {
+    fn resolve_builtin_variable() {
         // create a local variable
         let variable = test_ast::identifier_variable_node("pi");
 
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameter_variable() {
+    fn resolve_parameter_variable() {
         // create a parameter variable
         let variable = test_ast::identifier_variable_node("temperature");
 
@@ -235,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_undefined_parameter() {
+    fn resolve_undefined_parameter() {
         // create a variable for undefined parameter
         let variable = test_ast::identifier_variable_node("undefined_param");
 
@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameter_with_error() {
+    fn resolve_parameter_with_error() {
         // create a variable for parameter with error
         let variable = test_ast::identifier_variable_node("error_param");
 
@@ -306,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_undefined_reference() {
+    fn resolve_undefined_reference() {
         // create an accessor variable for undefined reference
         let variable = test_ast::model_parameter_variable_node("undefined_reference", "parameter");
 
@@ -343,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_reference_with_error() {
+    fn resolve_reference_with_error() {
         // create an accessor variable for reference with error
         let variable = test_ast::model_parameter_variable_node("error_reference", "parameter");
 
@@ -381,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_nested_accessor() {
+    fn resolve_nested_accessor() {
         // create a model parameter variable: parameter.reference
         let variable = test_ast::model_parameter_variable_node("reference", "parameter");
 
@@ -418,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_undefined_parameter_in_reference() {
+    fn resolve_undefined_parameter_in_reference() {
         // create an accessor variable for undefined parameter in reference
         // undefined_param.reference
         let variable = test_ast::model_parameter_variable_node("reference", "undefined_param");
@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_model_with_error() {
+    fn resolve_model_with_error() {
         // create an model parameter variable for model with error
         // parameter.reference
         let variable = test_ast::model_parameter_variable_node("reference", "parameter");
@@ -505,7 +505,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parameter_takes_precedence_over_builtin() {
+    fn parameter_takes_precedence_over_builtin() {
         // create a variable that conflicts between builtin and parameter
         let variable = test_ast::identifier_variable_node("conflict");
 

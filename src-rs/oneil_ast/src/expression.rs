@@ -64,7 +64,7 @@ pub type ExprNode = Node<Expr>;
 impl Expr {
     /// Creates a comparison operation expression
     #[must_use]
-    pub fn comparison_op(
+    pub const fn comparison_op(
         op: ComparisonOpNode,
         left: ExprNode,
         right: ExprNode,
@@ -80,13 +80,13 @@ impl Expr {
 
     /// Creates a binary operation expression
     #[must_use]
-    pub fn binary_op(op: BinaryOpNode, left: ExprNode, right: ExprNode) -> Self {
+    pub const fn binary_op(op: BinaryOpNode, left: ExprNode, right: ExprNode) -> Self {
         Self::BinaryOp { op, left, right }
     }
 
     /// Creates a unary operation expression
     #[must_use]
-    pub fn unary_op(op: UnaryOpNode, expr: ExprNode) -> Self {
+    pub const fn unary_op(op: UnaryOpNode, expr: ExprNode) -> Self {
         Self::UnaryOp { op, expr }
     }
 
@@ -98,7 +98,7 @@ impl Expr {
 
     /// Creates a parenthesized expression
     #[must_use]
-    pub fn parenthesized(expr: ExprNode) -> Self {
+    pub const fn parenthesized(expr: ExprNode) -> Self {
         Self::Parenthesized { expr }
     }
 
@@ -298,7 +298,7 @@ impl UnaryOp {
 }
 
 /// Variable references in expressions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Variable {
     /// A simple variable
     ///
@@ -325,7 +325,10 @@ impl Variable {
 
     /// Creates a model parameter variable reference
     #[must_use]
-    pub fn model_parameter(reference_model: IdentifierNode, parameter: IdentifierNode) -> Self {
+    pub const fn model_parameter(
+        reference_model: IdentifierNode,
+        parameter: IdentifierNode,
+    ) -> Self {
         Self::ModelParameter {
             reference_model,
             parameter,

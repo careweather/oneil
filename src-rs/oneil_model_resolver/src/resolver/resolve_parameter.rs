@@ -551,7 +551,7 @@ mod tests {
     use oneil_ir as ir;
 
     #[test]
-    fn test_resolve_parameters_empty() {
+    fn resolve_parameters_empty() {
         // create the parameters
         let parameters = vec![];
 
@@ -573,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameters_simple() {
+    fn resolve_parameters_simple() {
         // create the parameters
         let param_a = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -615,7 +615,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameters_with_dependencies() {
+    fn resolve_parameters_with_dependencies() {
         // create the parameters
         let param_a = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -655,7 +655,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameters_circular_dependency() {
+    fn resolve_parameters_circular_dependency() {
         // create the parameters with circular dependency
         let param_a = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -731,7 +731,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_parameter_internal_dependencies_simple() {
+    fn get_parameter_internal_dependencies_simple() {
         // create a simple parameter
         let parameter = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -750,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_parameter_internal_dependencies_with_variable() {
+    fn get_parameter_internal_dependencies_with_variable() {
         // create a dependent parameter
         let parameter = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -770,7 +770,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_parameter_internal_dependencies_with_limits() {
+    fn get_parameter_internal_dependencies_with_limits() {
         // create the parameter
         let parameter = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("test")
@@ -792,7 +792,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_literal() {
+    fn get_expr_internal_dependencies_literal() {
         // create a literal expression
         let expr = test_ast::literal_number_expr_node(42.0);
 
@@ -805,7 +805,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_variable() {
+    fn get_expr_internal_dependencies_variable() {
         // create a variable expression
         let variable = test_ast::identifier_variable_node("test_var");
         let expr = test_ast::variable_expr_node(variable);
@@ -820,7 +820,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_binary_op() {
+    fn get_expr_internal_dependencies_binary_op() {
         // create a binary operation with variables
         let left_var = test_ast::identifier_variable_node("a");
         let left_expr = test_ast::variable_expr_node(left_var);
@@ -843,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_function_call() {
+    fn get_expr_internal_dependencies_function_call() {
         // create a function call with variable arguments
         let arg1_var = test_ast::identifier_variable_node("arg1");
         let arg1_expr = test_ast::variable_expr_node(arg1_var);
@@ -865,7 +865,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_accessor() {
+    fn get_expr_internal_dependencies_accessor() {
         // create an accessor variable
         let variable = test_ast::model_parameter_variable_node("reference_model", "parameter");
         let expr = test_ast::variable_expr_node(variable);
@@ -879,7 +879,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameter_value_simple() {
+    fn resolve_parameter_value_simple() {
         // create a simple parameter value
         let expr = test_ast::literal_number_expr_node(42.0);
         let value_node = test_ast::simple_parameter_value_node(expr);
@@ -905,7 +905,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_limits_none() {
+    fn resolve_limits_none() {
         // create the context and builtin ref
         let reference_context_builder = ReferenceContextBuilder::new();
         let reference_context = reference_context_builder.build();
@@ -923,7 +923,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_limits_continuous() {
+    fn resolve_limits_continuous() {
         // create continuous limits with literal values
         let limits_node = test_ast::continuous_limits_node(0.0, 100.0);
 
@@ -948,7 +948,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_limits_discrete() {
+    fn resolve_limits_discrete() {
         // create discrete limits with literal values
         let limits_node = test_ast::discrete_limits_node([1.0, 2.0, 3.0]);
 
@@ -973,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameters_duplicate_parameters() {
+    fn resolve_parameters_duplicate_parameters() {
         // create the parameters with duplicate identifiers
         let param_a1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -1024,7 +1024,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameters_multiple_duplicate_parameters() {
+    fn resolve_parameters_multiple_duplicate_parameters() {
         // create the parameters with multiple duplicates
         let param_foo1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("foo")
@@ -1101,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameters_duplicate_parameters_with_valid_parameters() {
+    fn resolve_parameters_duplicate_parameters_with_valid_parameters() {
         // create the parameters with duplicates and valid parameters
         let param_a1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -1161,7 +1161,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_parameters_duplicate_parameters_with_dependencies() {
+    fn resolve_parameters_duplicate_parameters_with_dependencies() {
         // create the parameters with duplicates and dependencies
         let param_a1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
@@ -1247,7 +1247,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_comparison_op() {
+    fn get_expr_internal_dependencies_comparison_op() {
         // create a comparison expression with variables
         let left_var = test_ast::identifier_variable_node("a");
         let left_expr = test_ast::variable_expr_node(left_var);
@@ -1269,7 +1269,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_chained_comparison_op() {
+    fn get_expr_internal_dependencies_chained_comparison_op() {
         // create a chained comparison expression: a < b < c
         let left_var = test_ast::identifier_variable_node("a");
         let left_expr = test_ast::variable_expr_node(left_var);
@@ -1297,7 +1297,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_comparison_op_with_literals() {
+    fn get_expr_internal_dependencies_comparison_op_with_literals() {
         // create a comparison expression with one variable and one literal
         let left_var = test_ast::identifier_variable_node("x");
         let left_expr = test_ast::variable_expr_node(left_var);
@@ -1317,7 +1317,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_expr_internal_dependencies_comparison_op_with_complex_expressions() {
+    fn get_expr_internal_dependencies_comparison_op_with_complex_expressions() {
         // create a comparison expression with complex expressions on both sides
         // (a + b) < (c * d)
         let a_var = test_ast::identifier_variable_node("a");
@@ -1355,7 +1355,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_parameter_internal_dependencies_with_comparison_conditions() {
+    fn get_parameter_internal_dependencies_with_comparison_conditions() {
         // create a parameter with a piecewise value that uses comparison conditions
         // create the value expression
         let value_expr = test_ast::literal_number_expr_node(5.0);

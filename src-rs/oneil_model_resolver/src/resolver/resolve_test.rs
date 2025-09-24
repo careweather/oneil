@@ -111,7 +111,7 @@ mod tests {
     use oneil_ir as ir;
 
     #[test]
-    fn test_resolve_tests_empty() {
+    fn resolve_tests_empty() {
         // create the tests
         let tests = [];
         let tests_refs = tests.iter().collect();
@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_tests_basic() {
+    fn resolve_tests_basic() {
         // create the tests with various configurations
         let tests = [
             // > test: true
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_tests_with_debug_trace() {
+    fn resolve_tests_with_debug_trace() {
         // create the tests with debug trace level
         let tests = [
             // > ** test: true
@@ -221,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_tests_with_undefined_variable() {
+    fn resolve_tests_with_undefined_variable() {
         // create the tests with undefined variable
         let tests = [
             // > test: undefined_var
@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_tests_mixed_success_and_error() {
+    fn resolve_tests_mixed_success_and_error() {
         // create the tests with mixed success and error cases
         let tests = [
             // > test: true

@@ -169,6 +169,10 @@ pub fn resolve_expr(
 /// # Returns
 ///
 /// The resolved comparison expression or error collection
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the first five arguments are parts of the same piece of data"
+)]
 fn resolve_comparison_expression(
     op: &ast::ComparisonOpNode,
     left: &ast::ExprNode,
@@ -379,7 +383,7 @@ fn resolve_parenthesized_expression(
 /// # Returns
 ///
 /// The corresponding model comparison operation
-fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::WithSpan<ir::ComparisonOp> {
+const fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::WithSpan<ir::ComparisonOp> {
     let op_value = match op.node_value() {
         ast::ComparisonOp::LessThan => ir::ComparisonOp::LessThan,
         ast::ComparisonOp::LessThanEq => ir::ComparisonOp::LessThanEq,
@@ -404,7 +408,7 @@ fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::WithSpan<ir::Compari
 /// # Returns
 ///
 /// The corresponding model binary operation
-fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::WithSpan<ir::BinaryOp> {
+const fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::WithSpan<ir::BinaryOp> {
     let op_value = match op.node_value() {
         ast::BinaryOp::Add => ir::BinaryOp::Add,
         ast::BinaryOp::Sub => ir::BinaryOp::Sub,
@@ -434,7 +438,7 @@ fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::WithSpan<ir::BinaryOp> {
 /// # Returns
 ///
 /// The corresponding model unary operation
-fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::WithSpan<ir::UnaryOp> {
+const fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::WithSpan<ir::UnaryOp> {
     let op_value = match op.node_value() {
         ast::UnaryOp::Neg => ir::UnaryOp::Neg,
         ast::UnaryOp::Not => ir::UnaryOp::Not,
@@ -504,7 +508,7 @@ mod tests {
     use oneil_ir as ir;
 
     #[test]
-    fn test_resolve_literal_number() {
+    fn resolve_literal_number() {
         // create the expression
         let literal = test_ast::literal_number_expr_node(42.0);
 
@@ -526,19 +530,19 @@ mod tests {
         );
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::Literal { value } => {
-                    assert_eq!(value, &ir::Literal::Number(42.0));
-                }
-                _ => panic!("Expected literal expression, got {result:?}"),
-            },
-            _ => panic!("Expected literal expression, got {result:?}"),
-        }
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
+
+        let ir::Expr::Literal { value } = result.value() else {
+            panic!("Expected literal expression, got {result:?}");
+        };
+
+        assert_eq!(value, &ir::Literal::Number(42.0));
     }
 
     #[test]
-    fn test_resolve_literal_string() {
+    fn resolve_literal_string() {
         // create the expression
         let literal = test_ast::literal_string_expr_node("hello");
 
@@ -560,19 +564,19 @@ mod tests {
         );
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::Literal { value } => {
-                    assert_eq!(value, &ir::Literal::String("hello".to_string()));
-                }
-                _ => panic!("Expected literal expression, got {result:?}"),
-            },
-            _ => panic!("Expected literal expression, got {result:?}"),
-        }
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
+
+        let ir::Expr::Literal { value } = result.value() else {
+            panic!("Expected literal expression, got {result:?}");
+        };
+
+        assert_eq!(value, &ir::Literal::String("hello".to_string()));
     }
 
     #[test]
-    fn test_resolve_literal_boolean() {
+    fn resolve_literal_boolean() {
         // create the expression
         let literal = test_ast::literal_boolean_expr_node(true);
 
@@ -594,24 +598,24 @@ mod tests {
         );
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::Literal { value } => {
-                    assert_eq!(value, &ir::Literal::Boolean(true));
-                }
-                _ => panic!("Expected literal expression, got {result:?}"),
-            },
-            _ => panic!("Expected literal expression, got {result:?}"),
-        }
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
+
+        let ir::Expr::Literal { value } = result.value() else {
+            panic!("Expected literal expression, got {result:?}");
+        };
+
+        assert_eq!(value, &ir::Literal::Boolean(true));
     }
 
     #[test]
-    fn test_resolve_binary_op() {
+    fn resolve_binary_op_() {
         // create the expression
         let ast_left = test_ast::literal_number_expr_node(1.0);
         let ast_right = test_ast::literal_number_expr_node(2.0);
         let ast_op = test_ast::binary_op_node(ast::BinaryOp::Add);
-        let expr = test_ast::binary_op_expr_node(ast_op.clone(), ast_left, ast_right);
+        let expr = test_ast::binary_op_expr_node(ast_op, ast_left, ast_right);
 
         // create the context and builtin ref
         let reference_context_builder = ReferenceContextBuilder::new();
@@ -626,37 +630,33 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::BinaryOp { op, left, right } => {
-                    assert_eq!(op.value(), &ir::BinaryOp::Add);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                    match left.value() {
-                        ir::Expr::Literal { value } => {
-                            assert_eq!(value, &ir::Literal::Number(1.0));
-                        }
-                        _ => panic!("Expected literal expression on left, got {left:?}"),
-                    }
+        let ir::Expr::BinaryOp { op, left, right } = result.value() else {
+            panic!("Expected binary operation, got {result:?}");
+        };
 
-                    match right.value() {
-                        ir::Expr::Literal { value } => {
-                            assert_eq!(value, &ir::Literal::Number(2.0));
-                        }
-                        _ => panic!("Expected literal expression on right, got {right:?}"),
-                    }
-                }
-                _ => panic!("Expected binary operation, got {result:?}"),
-            },
-            _ => panic!("Expected binary operation, got {result:?}"),
-        }
+        assert_eq!(op.value(), &ir::BinaryOp::Add);
+
+        let ir::Expr::Literal { value } = left.value() else {
+            panic!("Expected literal expression on left, got {left:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(1.0));
+
+        let ir::Expr::Literal { value } = right.value() else {
+            panic!("Expected literal expression on right, got {right:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(2.0));
     }
 
     #[test]
-    fn test_resolve_unary_op() {
+    fn resolve_unary_op_() {
         // create the expression
         let ast_inner_expr = test_ast::literal_number_expr_node(5.0);
         let ast_op = test_ast::unary_op_node(ast::UnaryOp::Neg);
-        let expr = test_ast::unary_op_expr_node(ast_op.clone(), ast_inner_expr);
+        let expr = test_ast::unary_op_expr_node(ast_op, ast_inner_expr);
 
         // create the builtin ref and contexts
         let builtin_ref = TestBuiltinRef::new();
@@ -671,37 +671,28 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => {
-                let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), expected_span);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                match result.value() {
-                    ir::Expr::UnaryOp { op, expr } => {
-                        let expected_op_span = get_span_from_ast_span(ast_op.node_span());
-                        assert_eq!(op.span(), expected_op_span);
-                        assert_eq!(op.value(), &ir::UnaryOp::Neg);
+        let ir::Expr::UnaryOp { op, expr } = result.value() else {
+            panic!("Expected unary operation, got {result:?}");
+        };
 
-                        match expr.value() {
-                            ir::Expr::Literal { value } => {
-                                assert_eq!(value, &ir::Literal::Number(5.0));
-                            }
-                            _ => panic!("Expected literal expression, got {expr:?}"),
-                        }
-                    }
-                    _ => panic!("Expected unary operation, got {result:?}"),
-                }
-            }
-            _ => panic!("Expected unary operation, got {result:?}"),
-        }
+        assert_eq!(op.value(), &ir::UnaryOp::Neg);
+
+        let ir::Expr::Literal { value } = expr.value() else {
+            panic!("Expected literal expression, got {expr:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(5.0));
     }
 
     #[test]
-    fn test_resolve_function_call_builtin() {
+    fn resolve_function_call_builtin() {
         // create the expression
         let ast_arg = test_ast::literal_number_expr_node(1.0);
         let ast_name = test_ast::identifier_node("foo");
-        let expr = test_ast::function_call_expr_node(ast_name.clone(), vec![ast_arg]);
+        let expr = test_ast::function_call_expr_node(ast_name, vec![ast_arg]);
 
         // create the builtin ref and contexts
         let builtin_ref = TestBuiltinRef::new().with_builtin_functions(["foo"]);
@@ -716,42 +707,34 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => {
-                let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), expected_span);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                match result.value() {
-                    ir::Expr::FunctionCall { name, args } => {
-                        let expected_name_span = get_span_from_ast_span(ast_name.node_span());
-                        assert_eq!(name.span(), expected_name_span);
-                        assert_eq!(
-                            name.value(),
-                            &ir::FunctionName::builtin(ir::Identifier::new("foo"))
-                        );
+        let ir::Expr::FunctionCall { name, args } = result.value() else {
+            panic!("Expected function call, got {result:?}");
+        };
 
-                        assert_eq!(args.len(), 1);
+        assert_eq!(
+            name.value(),
+            &ir::FunctionName::builtin(ir::Identifier::new("foo"))
+        );
 
-                        match &args[0].value() {
-                            ir::Expr::Literal { value } => {
-                                assert_eq!(value, &ir::Literal::Number(1.0));
-                            }
-                            _ => panic!("Expected literal argument, got {:?}", args[0]),
-                        }
-                    }
-                    _ => panic!("Expected function call, got {result:?}"),
-                }
-            }
-            _ => panic!("Expected function call, got {result:?}"),
-        }
+        assert_eq!(args.len(), 1);
+
+        let ir::Expr::Literal { value } = args[0].value() else {
+            panic!("Expected literal argument, got {:?}", args[0]);
+        };
+
+        assert_eq!(value, &ir::Literal::Number(1.0));
     }
 
     #[test]
-    fn test_resolve_function_call_imported() {
+    fn resolve_function_call_imported() {
         // create the expression
         let ast_arg = test_ast::literal_number_expr_node(42.0);
         let ast_name = test_ast::identifier_node("custom_function");
-        let expr = test_ast::function_call_expr_node(ast_name.clone(), vec![ast_arg]);
+        let expr = test_ast::function_call_expr_node(ast_name, vec![ast_arg]);
 
         // create the builtin ref and contexts
         let builtin_ref = TestBuiltinRef::new();
@@ -766,38 +749,30 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => {
-                let expected_span = get_span_from_ast_span(expr.node_span());
-                assert_eq!(result.span(), expected_span);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                match result.value() {
-                    ir::Expr::FunctionCall { name, args } => {
-                        let expected_name_span = get_span_from_ast_span(ast_name.node_span());
-                        assert_eq!(name.span(), expected_name_span);
-                        assert_eq!(
-                            name.value(),
-                            &ir::FunctionName::imported(ir::Identifier::new("custom_function"))
-                        );
+        let ir::Expr::FunctionCall { name, args } = result.value() else {
+            panic!("Expected function call, got {result:?}");
+        };
 
-                        assert_eq!(args.len(), 1);
+        assert_eq!(
+            name.value(),
+            &ir::FunctionName::imported(ir::Identifier::new("custom_function"))
+        );
 
-                        match &args[0].value() {
-                            ir::Expr::Literal { value } => {
-                                assert_eq!(value, &ir::Literal::Number(42.0));
-                            }
-                            _ => panic!("Expected literal argument, got {:?}", args[0]),
-                        }
-                    }
-                    _ => panic!("Expected function call, got {result:?}"),
-                }
-            }
-            _ => panic!("Expected function call, got {result:?}"),
-        }
+        assert_eq!(args.len(), 1);
+
+        let ir::Expr::Literal { value } = args[0].value() else {
+            panic!("Expected literal argument, got {:?}", args[0]);
+        };
+
+        assert_eq!(value, &ir::Literal::Number(42.0));
     }
 
     #[test]
-    fn test_resolve_variable_builtin() {
+    fn resolve_variable_builtin() {
         // create the expression
         let ast_variable = test_ast::identifier_variable_node("x");
         let expr = test_ast::variable_expr_node(ast_variable);
@@ -815,19 +790,19 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::Variable(variable) => {
-                    assert_eq!(variable, &ir::Variable::Builtin(ir::Identifier::new("x")));
-                }
-                _ => panic!("Expected variable expression, got {result:?}"),
-            },
-            _ => panic!("Expected local variable, got {result:?}"),
-        }
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
+
+        let ir::Expr::Variable(variable) = result.value() else {
+            panic!("Expected variable expression, got {result:?}");
+        };
+
+        assert_eq!(variable, &ir::Variable::Builtin(ir::Identifier::new("x")));
     }
 
     #[test]
-    fn test_resolve_variable_parameter() {
+    fn resolve_variable_parameter() {
         // create the expression
         let variable_ast = test_ast::identifier_variable_node("param");
         let expr = test_ast::variable_expr_node(variable_ast);
@@ -851,22 +826,22 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::Variable(variable) => {
-                    assert_eq!(
-                        variable,
-                        &ir::Variable::Parameter(ir::Identifier::new("param"))
-                    );
-                }
-                _ => panic!("Expected variable expression, got {result:?}"),
-            },
-            _ => panic!("Expected parameter variable, got {result:?}"),
-        }
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
+
+        let ir::Expr::Variable(variable) = result.value() else {
+            panic!("Expected variable expression, got {result:?}");
+        };
+
+        assert_eq!(
+            variable,
+            &ir::Variable::Parameter(ir::Identifier::new("param"))
+        );
     }
 
     #[test]
-    fn test_resolve_variable_undefined() {
+    fn resolve_variable_undefined() {
         // create the expression
         let variable_ast = test_ast::identifier_variable_node("undefined");
         let expr = test_ast::variable_expr_node(variable_ast);
@@ -884,45 +859,39 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Err(errors) => {
-                assert_eq!(errors.len(), 1);
-                match &errors[0] {
-                    VariableResolutionError::UndefinedParameter {
-                        model_path: None,
-                        parameter,
-                        reference_span: _,
-                    } => {
-                        assert_eq!(parameter, &ir::Identifier::new("undefined"));
-                    }
-                    _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
-                }
-            }
-            _ => panic!("Expected error, got {result:?}"),
-        }
+        let Err(errors) = result else {
+            panic!("Expected error, got {result:?}");
+        };
+
+        assert_eq!(errors.len(), 1);
+
+        let error = &errors[0];
+        let VariableResolutionError::UndefinedParameter {
+            model_path: None,
+            parameter,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected undefined parameter error, got {error:?}");
+        };
+
+        assert_eq!(parameter, &ir::Identifier::new("undefined"));
     }
 
     #[test]
-    #[allow(clippy::too_many_lines, reason = "this is a complex test")]
-    fn test_resolve_complex_expression() {
+    fn resolve_complex_expression() {
         // create the expression: (1 + 2) * foo(1)
         let ast_left_1 = test_ast::literal_number_expr_node(1.0);
         let ast_right_1 = test_ast::literal_number_expr_node(2.0);
         let ast_add_op = test_ast::binary_op_node(ast::BinaryOp::Add);
-        let inner_binary = test_ast::binary_op_expr_node(
-            ast_add_op.clone(),
-            ast_left_1.clone(),
-            ast_right_1.clone(),
-        );
+        let inner_binary = test_ast::binary_op_expr_node(ast_add_op, ast_left_1, ast_right_1);
 
         let ast_func_arg = test_ast::literal_number_expr_node(1.0);
         let ast_func_name = test_ast::identifier_node("foo");
-        let func_call =
-            test_ast::function_call_expr_node(ast_func_name.clone(), vec![ast_func_arg.clone()]);
+        let func_call = test_ast::function_call_expr_node(ast_func_name, vec![ast_func_arg]);
 
         let ast_mul_op = test_ast::binary_op_node(ast::BinaryOp::Mul);
-        let expr =
-            test_ast::binary_op_expr_node(ast_mul_op.clone(), inner_binary.clone(), func_call);
+        let expr = test_ast::binary_op_expr_node(ast_mul_op, inner_binary, func_call);
 
         // create the context and builtin ref
         let builtin_ref = TestBuiltinRef::new();
@@ -937,81 +906,59 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => {
-                match result.value() {
-                    ir::Expr::BinaryOp { op, left, right } => {
-                        assert_eq!(op.value(), &ir::BinaryOp::Mul);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                        // check left side (1 + 2)
-                        match left.value() {
-                            ir::Expr::BinaryOp {
-                                op: left_op,
-                                left: left_left,
-                                right: left_right,
-                            } => {
-                                assert_eq!(left_op.value(), &ir::BinaryOp::Add);
+        let ir::Expr::BinaryOp { op, left, right } = result.value() else {
+            panic!("Expected binary operation, got {result:?}");
+        };
 
-                                match left_left.value() {
-                                    ir::Expr::Literal { value } => {
-                                        assert_eq!(value, &ir::Literal::Number(1.0));
-                                    }
-                                    _ => panic!(
-                                        "Expected literal on left side, got {:?}",
-                                        left_left.value()
-                                    ),
-                                }
+        assert_eq!(op.value(), &ir::BinaryOp::Mul);
 
-                                match left_right.value() {
-                                    ir::Expr::Literal { value } => {
-                                        assert_eq!(value, &ir::Literal::Number(2.0));
-                                    }
-                                    _ => panic!(
-                                        "Expected literal on right side, got {:?}",
-                                        left_right.value()
-                                    ),
-                                }
-                            }
-                            _ => panic!(
-                                "Expected binary operation on left side, got {:?}",
-                                left.value()
-                            ),
-                        }
+        // check left side (1 + 2)
+        let ir::Expr::BinaryOp {
+            op: left_op,
+            left: left_left,
+            right: left_right,
+        } = left.value()
+        else {
+            panic!("Expected binary operation on left side, got {left:?}");
+        };
 
-                        // check right side (foo(3.14))
-                        match right.value() {
-                            ir::Expr::FunctionCall { name, args } => {
-                                assert_eq!(
-                                    name.value(),
-                                    &ir::FunctionName::imported(ir::Identifier::new("foo"))
-                                );
+        assert_eq!(left_op.value(), &ir::BinaryOp::Add);
 
-                                assert_eq!(args.len(), 1);
-                                match args[0].value() {
-                                    ir::Expr::Literal { value } => {
-                                        assert_eq!(value, &ir::Literal::Number(1.0));
-                                    }
-                                    _ => panic!(
-                                        "Expected literal argument, got {:?}",
-                                        args[0].value()
-                                    ),
-                                }
-                            }
-                            _ => panic!(
-                                "Expected function call on right side, got {:?}",
-                                right.value()
-                            ),
-                        }
-                    }
-                    _ => panic!("Expected binary operation, got {:?}", result.value()),
-                }
-            }
-            _ => panic!("Expected successful result, got {result:?}"),
-        }
+        let ir::Expr::Literal { value } = left_left.value() else {
+            panic!("Expected literal on left side, got {left_left:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(1.0));
+
+        let ir::Expr::Literal { value } = left_right.value() else {
+            panic!("Expected literal on right side, got {left_right:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(2.0));
+
+        // check right side (foo(3.14))
+        let ir::Expr::FunctionCall { name, args } = right.value() else {
+            panic!("Expected function call on right side, got {right:?}");
+        };
+
+        assert_eq!(
+            name.value(),
+            &ir::FunctionName::imported(ir::Identifier::new("foo"))
+        );
+
+        assert_eq!(args.len(), 1);
+
+        let ir::Expr::Literal { value } = args[0].value() else {
+            panic!("Expected literal argument, got {:?}", args[0]);
+        };
+
+        assert_eq!(value, &ir::Literal::Number(1.0));
     }
 
     #[test]
-    fn test_resolve_binary_op_all_operations() {
+    fn resolve_binary_op_all_operations() {
         // create the operations
         let operations = vec![
             (ast::BinaryOp::Add, ir::BinaryOp::Add),
@@ -1040,7 +987,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_comparison_op_all_operations() {
+    fn resolve_comparison_op_all_operations() {
         // create the operations
         let operations = vec![
             (ast::ComparisonOp::LessThan, ir::ComparisonOp::LessThan),
@@ -1070,7 +1017,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_unary_op_all_operations() {
+    fn resolve_unary_op_all_operations() {
         // create the operations
         let operations = vec![
             (ast::UnaryOp::Neg, ir::UnaryOp::Neg),
@@ -1090,7 +1037,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_function_name_builtin() {
+    fn resolve_function_name_builtin() {
         // create the builtin functions
         let builtin_functions = ["min", "max", "sin", "cos", "tan"];
 
@@ -1111,7 +1058,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_function_name_imported() {
+    fn resolve_function_name_imported() {
         // create the function names
         let imported_functions = vec![
             "custom_function",
@@ -1131,19 +1078,16 @@ mod tests {
             let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
-            match result.value() {
-                ir::FunctionName::Imported(name) => {
-                    assert_eq!(name.as_str(), func_name);
-                }
-                ir::FunctionName::Builtin(_) => {
-                    panic!("Expected imported function for '{func_name}', got {result:?}")
-                }
-            }
+            let ir::FunctionName::Imported(name) = result.value() else {
+                panic!("Expected imported function, got {result:?}");
+            };
+
+            assert_eq!(name.as_str(), func_name);
         }
     }
 
     #[test]
-    fn test_resolve_literal_all_types() {
+    fn resolve_literal_all_types() {
         // Test number
         let ast_number = test_ast::literal_number_node(42.5);
         let ir_number = resolve_literal(&ast_number);
@@ -1161,7 +1105,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_expression_with_errors() {
+    fn resolve_expression_with_errors() {
         // create the expression
         let ast_left_var = test_ast::identifier_variable_node("undefined1");
         let ast_left_expr = test_ast::variable_expr_node(ast_left_var);
@@ -1183,42 +1127,40 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Err(errors) => {
-                assert_eq!(errors.len(), 2);
+        let Err(errors) = result else {
+            panic!("Expected error, got {result:?}");
+        };
 
-                let error_identifiers: Vec<_> = errors
-                    .iter()
-                    .filter_map(|e| {
-                        if let VariableResolutionError::UndefinedParameter {
-                            model_path: None,
-                            parameter,
-                            reference_span: _,
-                        } = e
-                        {
-                            Some(parameter.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+        assert_eq!(errors.len(), 2);
 
-                assert!(error_identifiers.contains(&ir::Identifier::new("undefined1")));
-                assert!(error_identifiers.contains(&ir::Identifier::new("undefined2")));
-            }
-            _ => panic!("Expected error, got {result:?}"),
-        }
+        let error_identifiers: Vec<_> = errors
+            .iter()
+            .filter_map(|e| {
+                if let VariableResolutionError::UndefinedParameter {
+                    model_path: None,
+                    parameter,
+                    reference_span: _,
+                } = e
+                {
+                    Some(parameter.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert!(error_identifiers.contains(&ir::Identifier::new("undefined1")));
+        assert!(error_identifiers.contains(&ir::Identifier::new("undefined2")));
     }
 
     #[test]
-    fn test_resolve_parenthesized_expression() {
+    fn resolve_parenthesized_expression() {
         // Test a simple parenthesized expression: (1 + 2)
         let ast_left = test_ast::literal_number_expr_node(1.0);
         let ast_right = test_ast::literal_number_expr_node(2.0);
         let ast_add_op = test_ast::binary_op_node(ast::BinaryOp::Add);
-        let inner_expr =
-            test_ast::binary_op_expr_node(ast_add_op.clone(), ast_left.clone(), ast_right.clone());
-        let expr = test_ast::parenthesized_expr_node(inner_expr.clone());
+        let inner_expr = test_ast::binary_op_expr_node(ast_add_op, ast_left, ast_right);
+        let expr = test_ast::parenthesized_expr_node(inner_expr);
 
         // create the builtin ref and context
         let builtin_ref = TestBuiltinRef::new();
@@ -1233,50 +1175,38 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::BinaryOp { op, left, right } => {
-                    assert_eq!(op.value(), &ir::BinaryOp::Add);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                    match left.value() {
-                        ir::Expr::Literal { value } => {
-                            assert_eq!(value, &ir::Literal::Number(1.0));
-                        }
-                        _ => panic!("Expected literal on left side, got {:?}", left.value()),
-                    }
+        let ir::Expr::BinaryOp { op, left, right } = result.value() else {
+            panic!("Expected binary operation, got {result:?}");
+        };
+        assert_eq!(op.value(), &ir::BinaryOp::Add);
 
-                    match right.value() {
-                        ir::Expr::Literal { value } => {
-                            assert_eq!(value, &ir::Literal::Number(2.0));
-                        }
-                        _ => panic!("Expected literal on right side, got {:?}", right.value()),
-                    }
-                }
-                _ => panic!("Expected binary operation, got {:?}", result.value()),
-            },
-            _ => panic!("Expected successful result, got {result:?}"),
-        }
+        let ir::Expr::Literal { value } = left.value() else {
+            panic!("Expected literal on left side, got {left:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(1.0));
+
+        let ir::Expr::Literal { value } = right.value() else {
+            panic!("Expected literal on right side, got {right:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(2.0));
     }
 
     #[test]
-    fn test_resolve_nested_parenthesized_expression() {
+    fn resolve_nested_parenthesized_expression() {
         // Test nested parentheses: ((1 + 2) * 3)
         let ast_inner_left = test_ast::literal_number_expr_node(1.0);
         let ast_inner_right = test_ast::literal_number_expr_node(2.0);
         let ast_add_op = test_ast::binary_op_node(ast::BinaryOp::Add);
-        let inner_binary = test_ast::binary_op_expr_node(
-            ast_add_op.clone(),
-            ast_inner_left.clone(),
-            ast_inner_right.clone(),
-        );
-        let inner_parenthesized = test_ast::parenthesized_expr_node(inner_binary.clone());
+        let inner_binary =
+            test_ast::binary_op_expr_node(ast_add_op, ast_inner_left, ast_inner_right);
+        let inner_parenthesized = test_ast::parenthesized_expr_node(inner_binary);
         let ast_outer_right = test_ast::literal_number_expr_node(3.0);
         let ast_mul_op = test_ast::binary_op_node(ast::BinaryOp::Mul);
-        let expr = test_ast::binary_op_expr_node(
-            ast_mul_op.clone(),
-            inner_parenthesized.clone(),
-            ast_outer_right.clone(),
-        );
+        let expr = test_ast::binary_op_expr_node(ast_mul_op, inner_parenthesized, ast_outer_right);
 
         // create the context
         let builtin_ref = TestBuiltinRef::new();
@@ -1291,67 +1221,46 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => {
-                match result.value() {
-                    ir::Expr::BinaryOp { op, left, right } => {
-                        assert_eq!(op.value(), &ir::BinaryOp::Mul);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                        // check left side ((1 + 2))
-                        match left.value() {
-                            ir::Expr::BinaryOp {
-                                op: left_op,
-                                left: left_left,
-                                right: left_right,
-                            } => {
-                                assert_eq!(left_op.value(), &ir::BinaryOp::Add);
+        let ir::Expr::BinaryOp { op, left, right } = result.value() else {
+            panic!("Expected binary operation, got {result:?}");
+        };
+        assert_eq!(op.value(), &ir::BinaryOp::Mul);
 
-                                match left_left.value() {
-                                    ir::Expr::Literal { value } => {
-                                        assert_eq!(value, &ir::Literal::Number(1.0));
-                                    }
-                                    _ => panic!(
-                                        "Expected literal on left side, got {:?}",
-                                        left_left.value()
-                                    ),
-                                }
+        let ir::Expr::BinaryOp {
+            op: left_op,
+            left: left_left,
+            right: left_right,
+        } = left.value()
+        else {
+            panic!("Expected binary operation on left side, got {left:?}");
+        };
+        assert_eq!(left_op.value(), &ir::BinaryOp::Add);
 
-                                match left_right.value() {
-                                    ir::Expr::Literal { value } => {
-                                        assert_eq!(value, &ir::Literal::Number(2.0));
-                                    }
-                                    _ => panic!(
-                                        "Expected literal on right side, got {:?}",
-                                        left_right.value()
-                                    ),
-                                }
-                            }
-                            _ => panic!(
-                                "Expected binary operation on left side, got {:?}",
-                                left.value()
-                            ),
-                        }
+        let ir::Expr::Literal { value } = left_left.value() else {
+            panic!("Expected literal on left side, got {left_left:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(1.0));
 
-                        // check right side (3)
-                        match right.value() {
-                            ir::Expr::Literal { value } => {
-                                assert_eq!(value, &ir::Literal::Number(3.0));
-                            }
-                            _ => panic!("Expected literal on right side, got {:?}", right.value()),
-                        }
-                    }
-                    _ => panic!("Expected binary operation, got {:?}", result.value()),
-                }
-            }
-            _ => panic!("Expected successful result, got {result:?}"),
-        }
+        let ir::Expr::Literal { value } = left_right.value() else {
+            panic!("Expected literal on right side, got {left_right:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(2.0));
+
+        let ir::Expr::Literal { value } = right.value() else {
+            panic!("Expected literal on right side, got {right:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(3.0));
     }
 
     #[test]
-    fn test_resolve_single_literal_multiple_parentheses() {
+    fn resolve_single_literal_multiple_parentheses() {
         // Test a single literal wrapped in multiple parentheses: ((42))
         let ast_inner_literal = test_ast::literal_number_expr_node(42.0);
-        let first_parentheses = test_ast::parenthesized_expr_node(ast_inner_literal.clone());
+        let first_parentheses = test_ast::parenthesized_expr_node(ast_inner_literal);
         let expr = test_ast::parenthesized_expr_node(first_parentheses);
 
         // create the builtin ref and context
@@ -1367,19 +1276,18 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::Literal { value } => {
-                    assert_eq!(value, &ir::Literal::Number(42.0));
-                }
-                _ => panic!("Expected literal expression, got {:?}", result.value()),
-            },
-            _ => panic!("Expected successful result, got {result:?}"),
-        }
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
+
+        let ir::Expr::Literal { value } = result.value() else {
+            panic!("Expected literal expression, got {result:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(42.0));
     }
 
     #[test]
-    fn test_resolve_comparison_expression() {
+    fn resolve_comparison_expression() {
         // Test a simple comparison expression: x < 5
         let left_var = test_ast::identifier_variable_node("x");
         let left_expr = test_ast::variable_expr_node(left_var);
@@ -1387,12 +1295,7 @@ mod tests {
         let op = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
         let rest_chained = [];
 
-        let expr = test_ast::comparison_op_expr_node(
-            op.clone(),
-            left_expr.clone(),
-            right_expr.clone(),
-            rest_chained,
-        );
+        let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, rest_chained);
 
         // create the context
         let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
@@ -1407,40 +1310,36 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::ComparisonOp {
-                    op,
-                    left,
-                    right,
-                    rest_chained,
-                } => {
-                    assert_eq!(op.value(), &ir::ComparisonOp::LessThan);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                    match left.value() {
-                        ir::Expr::Variable(variable) => {
-                            assert_eq!(variable, &ir::Variable::Builtin(ir::Identifier::new("x")));
-                        }
-                        _ => panic!("Expected variable expression, got {:?}", left.value()),
-                    }
+        let ir::Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            rest_chained,
+        } = result.value()
+        else {
+            panic!("Expected comparison operation, got {result:?}");
+        };
+        assert_eq!(op.value(), &ir::ComparisonOp::LessThan);
 
-                    match right.value() {
-                        ir::Expr::Literal { value } => {
-                            assert_eq!(value, &ir::Literal::Number(5.0));
-                        }
-                        _ => panic!("Expected literal expression, got {:?}", right.value()),
-                    }
+        let ir::Expr::Variable(variable) = left.value() else {
+            panic!("Expected variable expression, got {left:?}");
+        };
+        assert_eq!(variable, &ir::Variable::Builtin(ir::Identifier::new("x")));
 
-                    assert_eq!(rest_chained.len(), 0);
-                }
-                _ => panic!("Expected comparison operation, got {:?}", result.value()),
-            },
-            _ => panic!("Expected comparison operation, got {result:?}"),
-        }
+        let ir::Expr::Literal { value } = right.value() else {
+            panic!("Expected literal expression, got {right:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(5.0));
+
+        assert!(rest_chained.is_empty());
     }
 
     #[test]
-    fn test_resolve_chained_comparison_expression() {
+    fn resolve_chained_comparison_expression() {
         // Test a chained comparison expression: 1 < x < 10
         let left_expr = test_ast::literal_number_expr_node(1.0);
         let middle_var = test_ast::identifier_variable_node("x");
@@ -1450,12 +1349,8 @@ mod tests {
         let op1 = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
         let op2 = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
 
-        let expr = test_ast::comparison_op_expr_node(
-            op1.clone(),
-            left_expr.clone(),
-            middle_expr.clone(),
-            [(op2.clone(), right_expr.clone())],
-        );
+        let expr =
+            test_ast::comparison_op_expr_node(op1, left_expr, middle_expr, [(op2, right_expr)]);
 
         // create the context and builtin ref
         let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
@@ -1470,52 +1365,44 @@ mod tests {
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
         // check the result
-        match result {
-            Ok(result) => match result.value() {
-                ir::Expr::ComparisonOp {
-                    op,
-                    left,
-                    right,
-                    rest_chained,
-                } => {
-                    assert_eq!(op.value(), &ir::ComparisonOp::LessThan);
+        let Ok(result) = result else {
+            panic!("Expected successful result, got {result:?}");
+        };
 
-                    match left.value() {
-                        ir::Expr::Literal { value } => {
-                            assert_eq!(value, &ir::Literal::Number(1.0));
-                        }
-                        _ => panic!("Expected literal expression, got {:?}", left.value()),
-                    }
+        let ir::Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            rest_chained,
+        } = result.value()
+        else {
+            panic!("Expected comparison operation, got {result:?}");
+        };
 
-                    match right.value() {
-                        ir::Expr::Variable(variable) => {
-                            assert_eq!(variable, &ir::Variable::Builtin(ir::Identifier::new("x")));
-                        }
-                        _ => panic!("Expected variable expression, got {:?}", right.value()),
-                    }
+        assert_eq!(op.value(), &ir::ComparisonOp::LessThan);
 
-                    assert_eq!(rest_chained.len(), 1);
-                    let (chained_op, chained_expr) = &rest_chained[0];
-                    assert_eq!(chained_op.value(), &ir::ComparisonOp::LessThan);
+        let ir::Expr::Literal { value } = left.value() else {
+            panic!("Expected literal expression, got {left:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(1.0));
 
-                    match chained_expr.value() {
-                        ir::Expr::Literal { value } => {
-                            assert_eq!(value, &ir::Literal::Number(10.0));
-                        }
-                        _ => panic!(
-                            "Expected literal expression in chained comparison, got {:?}",
-                            chained_expr.value()
-                        ),
-                    }
-                }
-                _ => panic!("Expected comparison operation, got {:?}", result.value()),
-            },
-            _ => panic!("Expected comparison operation, got {result:?}"),
-        }
+        let ir::Expr::Variable(variable) = right.value() else {
+            panic!("Expected variable expression, got {right:?}");
+        };
+        assert_eq!(variable, &ir::Variable::Builtin(ir::Identifier::new("x")));
+
+        assert_eq!(rest_chained.len(), 1);
+        let (chained_op, chained_expr) = &rest_chained[0];
+        assert_eq!(chained_op.value(), &ir::ComparisonOp::LessThan);
+
+        let ir::Expr::Literal { value } = chained_expr.value() else {
+            panic!("Expected literal expression, got {chained_expr:?}");
+        };
+        assert_eq!(value, &ir::Literal::Number(10.0));
     }
 
     #[test]
-    fn test_resolve_comparison_expression_error_from_left_operand() {
+    fn resolve_comparison_expression_error_from_left_operand() {
         // Test error propagation from left operand of comparison expression
         let left_var = test_ast::identifier_variable_node("undefined_left");
         let left_expr = test_ast::variable_expr_node(left_var);
@@ -1523,12 +1410,7 @@ mod tests {
         let op = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
         let rest_chained = [];
 
-        let expr = test_ast::comparison_op_expr_node(
-            op,
-            left_expr.clone(),
-            right_expr.clone(),
-            rest_chained,
-        );
+        let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, rest_chained);
 
         // create the context and builtin ref
         let builtin_ref = TestBuiltinRef::new();
@@ -1541,33 +1423,34 @@ mod tests {
 
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
-        match result {
-            Err(errors) => {
-                assert_eq!(errors.len(), 1);
-                match &errors[0] {
-                    VariableResolutionError::UndefinedParameter {
-                        model_path: None,
-                        parameter,
-                        reference_span: _,
-                    } => {
-                        assert_eq!(parameter, &ir::Identifier::new("undefined_left"));
-                    }
-                    _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
-                }
-            }
-            _ => panic!("Expected error, got {result:?}"),
-        }
+        let Err(errors) = result else {
+            panic!("Expected error, got {result:?}");
+        };
+
+        assert_eq!(errors.len(), 1);
+
+        let error = &errors[0];
+        let VariableResolutionError::UndefinedParameter {
+            model_path: None,
+            parameter,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected undefined parameter error, got {error:?}");
+        };
+
+        assert_eq!(parameter, &ir::Identifier::new("undefined_left"));
     }
 
     #[test]
-    fn test_resolve_comparison_expression_error_from_right_operand() {
+    fn resolve_comparison_expression_error_from_right_operand() {
         // Test error propagation from right operand of comparison expression
         let left_expr = test_ast::literal_number_expr_node(1.0);
         let right_var = test_ast::identifier_variable_node("undefined_right");
         let right_expr = test_ast::variable_expr_node(right_var);
         let op = test_ast::comparison_op_node(ast::ComparisonOp::GreaterThan);
 
-        let expr = test_ast::comparison_op_expr_node(op, left_expr.clone(), right_expr.clone(), []);
+        let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, []);
 
         // create the context and builtin ref
         let builtin_ref = TestBuiltinRef::new();
@@ -1580,26 +1463,27 @@ mod tests {
 
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
-        match result {
-            Err(errors) => {
-                assert_eq!(errors.len(), 1);
-                match &errors[0] {
-                    VariableResolutionError::UndefinedParameter {
-                        model_path: None,
-                        parameter,
-                        reference_span: _,
-                    } => {
-                        assert_eq!(parameter, &ir::Identifier::new("undefined_right"));
-                    }
-                    _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
-                }
-            }
-            _ => panic!("Expected error, got {result:?}"),
-        }
+        let Err(errors) = result else {
+            panic!("Expected error, got {result:?}");
+        };
+
+        assert_eq!(errors.len(), 1);
+
+        let error = &errors[0];
+        let VariableResolutionError::UndefinedParameter {
+            model_path: None,
+            parameter,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected undefined parameter error, got {error:?}");
+        };
+
+        assert_eq!(parameter, &ir::Identifier::new("undefined_right"));
     }
 
     #[test]
-    fn test_resolve_comparison_expression_error_from_chained_operand() {
+    fn resolve_comparison_expression_error_from_chained_operand() {
         // Test error propagation from chained comparison operand
         let left_expr = test_ast::literal_number_expr_node(1.0);
         let middle_expr = test_ast::literal_number_expr_node(2.0);
@@ -1609,12 +1493,8 @@ mod tests {
         let op1 = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
         let op2 = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
 
-        let expr = test_ast::comparison_op_expr_node(
-            op1.clone(),
-            left_expr.clone(),
-            middle_expr.clone(),
-            [(op2.clone(), chained_expr.clone())],
-        );
+        let expr =
+            test_ast::comparison_op_expr_node(op1, left_expr, middle_expr, [(op2, chained_expr)]);
 
         // create the context and builtin ref
         let builtin_ref = TestBuiltinRef::new();
@@ -1627,26 +1507,27 @@ mod tests {
 
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
-        match result {
-            Err(errors) => {
-                assert_eq!(errors.len(), 1);
-                match &errors[0] {
-                    VariableResolutionError::UndefinedParameter {
-                        model_path: None,
-                        parameter,
-                        reference_span: _,
-                    } => {
-                        assert_eq!(parameter, &ir::Identifier::new("undefined_chained"));
-                    }
-                    _ => panic!("Expected undefined parameter error, got {:?}", errors[0]),
-                }
-            }
-            _ => panic!("Expected error, got {result:?}"),
-        }
+        let Err(errors) = result else {
+            panic!("Expected error, got {result:?}");
+        };
+
+        assert_eq!(errors.len(), 1);
+
+        let error = &errors[0];
+        let VariableResolutionError::UndefinedParameter {
+            model_path: None,
+            parameter,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected undefined parameter error, got {error:?}");
+        };
+
+        assert_eq!(parameter, &ir::Identifier::new("undefined_chained"));
     }
 
     #[test]
-    fn test_resolve_comparison_expression_multiple_errors() {
+    fn resolve_comparison_expression_multiple_errors() {
         // Test multiple errors from different parts of comparison expression
         let left_var = test_ast::identifier_variable_node("undefined_left");
         let left_expr = test_ast::variable_expr_node(left_var);
@@ -1658,12 +1539,8 @@ mod tests {
         let op1 = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
         let op2 = test_ast::comparison_op_node(ast::ComparisonOp::LessThan);
 
-        let expr = test_ast::comparison_op_expr_node(
-            op1.clone(),
-            left_expr.clone(),
-            right_expr.clone(),
-            [(op2.clone(), chained_expr.clone())],
-        );
+        let expr =
+            test_ast::comparison_op_expr_node(op1, left_expr, right_expr, [(op2, chained_expr)]);
 
         let builtin_ref = TestBuiltinRef::new();
 
@@ -1675,31 +1552,30 @@ mod tests {
 
         let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
 
-        match result {
-            Err(errors) => {
-                assert_eq!(errors.len(), 3);
+        let Err(errors) = result else {
+            panic!("Expected error, got {result:?}");
+        };
 
-                let error_identifiers: Vec<_> = errors
-                    .iter()
-                    .filter_map(|e| {
-                        if let VariableResolutionError::UndefinedParameter {
-                            model_path: None,
-                            parameter,
-                            reference_span: _,
-                        } = e
-                        {
-                            Some(parameter.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+        assert_eq!(errors.len(), 3);
 
-                assert!(error_identifiers.contains(&ir::Identifier::new("undefined_left")));
-                assert!(error_identifiers.contains(&ir::Identifier::new("undefined_right")));
-                assert!(error_identifiers.contains(&ir::Identifier::new("undefined_chained")));
-            }
-            _ => panic!("Expected multiple errors, got {result:?}"),
-        }
+        let error_identifiers: Vec<_> = errors
+            .iter()
+            .filter_map(|e| {
+                if let VariableResolutionError::UndefinedParameter {
+                    model_path: None,
+                    parameter,
+                    reference_span: _,
+                } = e
+                {
+                    Some(parameter.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert!(error_identifiers.contains(&ir::Identifier::new("undefined_left")));
+        assert!(error_identifiers.contains(&ir::Identifier::new("undefined_right")));
+        assert!(error_identifiers.contains(&ir::Identifier::new("undefined_chained")));
     }
 }

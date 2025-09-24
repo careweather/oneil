@@ -27,7 +27,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_resolve_none_trace_level() {
+    fn resolve_none_trace_level() {
         {
             let expected_model_level = ir::TraceLevel::None;
 
@@ -40,7 +40,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_trace_trace_level() {
+    fn resolve_trace_trace_level() {
         {
             let ast_level = ast::TraceLevel::Trace;
             let expected_model_level = ir::TraceLevel::Trace;
@@ -60,7 +60,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_debug_trace_level() {
+    fn resolve_debug_trace_level() {
         {
             let ast_level = ast::TraceLevel::Debug;
             let expected_model_level = ir::TraceLevel::Debug;

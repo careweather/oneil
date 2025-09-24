@@ -3,7 +3,7 @@ use std::{collections::HashMap, ops::Deref};
 use crate::{reference::ModelPath, span::WithSpan};
 
 /// A map of submodels with their names and imports.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubmodelMap(HashMap<SubmodelName, SubmodelImport>);
 
 impl SubmodelMap {
@@ -72,13 +72,13 @@ impl SubmodelImport {
 }
 
 /// A map of references with their names and imports.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceMap(HashMap<ReferenceName, ReferenceImport>);
 
 impl ReferenceMap {
     /// Creates a new reference map with the given references.
     #[must_use]
-    pub fn new(references: HashMap<ReferenceName, ReferenceImport>) -> Self {
+    pub const fn new(references: HashMap<ReferenceName, ReferenceImport>) -> Self {
         Self(references)
     }
 }

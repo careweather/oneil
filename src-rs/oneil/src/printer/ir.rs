@@ -11,6 +11,11 @@
 //! - `└──` for final children
 //! - Indentation to show nesting levels
 
+#![expect(
+    clippy::use_debug,
+    reason = "this is a debug function for developers, not for end users"
+)]
+
 use std::{
     collections::HashMap,
     io::{self, Write},

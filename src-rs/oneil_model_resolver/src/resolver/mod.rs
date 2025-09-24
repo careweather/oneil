@@ -304,7 +304,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use oneil_ast::{self as ast};
+    use oneil_ast as ast;
     use oneil_ir as ir;
 
     use super::*;
@@ -315,7 +315,7 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn test_split_model_ast_empty() {
+    fn split_model_ast_empty() {
         let model = test_ast::empty_model_node();
         let (imports, use_models, parameters, tests) = split_model_ast(&model);
 
@@ -326,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn test_split_model_ast_with_all_declarations() {
+    fn split_model_ast_with_all_declarations() {
         let model = test_ast::ModelNodeBuilder::new()
             .with_submodel("submodel")
             .build();
@@ -344,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn test_split_model_ast_use_model_only() {
+    fn split_model_ast_use_model_only() {
         let model = test_ast::ModelNodeBuilder::new()
             .with_submodel("submodel1")
             .with_submodel("submodel2")
@@ -367,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_model_success() {
+    fn load_model_success() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
@@ -397,7 +397,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_model_parse_error() {
+    fn load_model_parse_error() {
         // create initial context
         let model_path = ir::ModelPath::new("nonexistent");
         let initial_models = HashSet::from([model_path.clone()]);
@@ -429,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_model_circular_dependency() {
+    fn load_model_circular_dependency() {
         // create initial context
         let model_path = ir::ModelPath::new("main");
         let initial_models = HashSet::from([model_path.clone()]);
@@ -519,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_model_already_visited() {
+    fn load_model_already_visited() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);
@@ -551,7 +551,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_use_models_empty() {
+    fn load_use_models_empty() {
         // create initial context
         let model_path = ir::ModelPath::new("parent");
         let mut load_stack = Stack::new();
@@ -580,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_use_models_with_existing_models() {
+    fn load_use_models_with_existing_models() {
         // create initial context
         let model_path = ir::ModelPath::new("parent");
         let builtin_ref = TestBuiltinRef::new();
@@ -626,7 +626,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_use_models_with_parse_errors() {
+    fn load_use_models_with_parse_errors() {
         // create initial context
         let model_path = ir::ModelPath::new("parent");
         let builtin_ref = TestBuiltinRef::new();
@@ -664,7 +664,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_model_complex_dependency_chain() {
+    fn load_model_complex_dependency_chain() {
         // create initial context
         let model_path = ir::ModelPath::new("root");
         let initial_models = HashSet::from([model_path.clone()]);
@@ -709,7 +709,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_model_with_sections() {
+    fn load_model_with_sections() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
         let initial_models = HashSet::from([model_path.clone()]);

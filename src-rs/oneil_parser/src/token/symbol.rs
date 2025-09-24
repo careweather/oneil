@@ -261,11 +261,11 @@ mod tests {
     use super::*;
     use crate::{Config, InputSpan, token::error::TokenErrorKind};
 
-    mod success_tests {
+    mod success {
         use super::*;
 
         #[test]
-        fn test_bar() {
+        fn bar_symbol() {
             let input = InputSpan::new_extra("| rest", Config::default());
             let (rest, matched) = bar(input).expect("should parse '|' symbol");
             assert_eq!(matched.lexeme(), "|");
@@ -273,7 +273,7 @@ mod tests {
         }
 
         #[test]
-        fn test_brace_left() {
+        fn brace_left_symbol() {
             let input = InputSpan::new_extra("{ rest", Config::default());
             let (rest, matched) = brace_left(input).expect("should parse '{' symbol");
             assert_eq!(matched.lexeme(), "{");
@@ -281,7 +281,7 @@ mod tests {
         }
 
         #[test]
-        fn test_bracket_left() {
+        fn bracket_left_symbol() {
             let input = InputSpan::new_extra("[ rest", Config::default());
             let (rest, matched) = bracket_left(input).expect("should parse '[' symbol");
             assert_eq!(matched.lexeme(), "[");
@@ -289,7 +289,7 @@ mod tests {
         }
 
         #[test]
-        fn test_bracket_right() {
+        fn bracket_right_symbol() {
             let input = InputSpan::new_extra("] rest", Config::default());
             let (rest, matched) = bracket_right(input).expect("should parse ']' symbol");
             assert_eq!(matched.lexeme(), "]");
@@ -297,7 +297,7 @@ mod tests {
         }
 
         #[test]
-        fn test_caret() {
+        fn caret_symbol() {
             let input = InputSpan::new_extra("^ rest", Config::default());
             let (rest, matched) = caret(input).expect("should parse '^' symbol");
             assert_eq!(matched.lexeme(), "^");
@@ -305,7 +305,7 @@ mod tests {
         }
 
         #[test]
-        fn test_colon() {
+        fn colon_symbol() {
             let input = InputSpan::new_extra(": rest", Config::default());
             let (rest, matched) = colon(input).expect("should parse ':' symbol");
             assert_eq!(matched.lexeme(), ":");
@@ -313,7 +313,7 @@ mod tests {
         }
 
         #[test]
-        fn test_comma() {
+        fn comma_symbol() {
             let input = InputSpan::new_extra(", rest", Config::default());
             let (rest, matched) = comma(input).expect("should parse ',' symbol");
             assert_eq!(matched.lexeme(), ",");
@@ -321,7 +321,7 @@ mod tests {
         }
 
         #[test]
-        fn test_dollar() {
+        fn dollar_symbol() {
             let input = InputSpan::new_extra("$ rest", Config::default());
             let (rest, matched) = dollar(input).expect("should parse '$' symbol");
             assert_eq!(matched.lexeme(), "$");
@@ -329,7 +329,7 @@ mod tests {
         }
 
         #[test]
-        fn test_dot() {
+        fn dot_symbol() {
             let input = InputSpan::new_extra(". rest", Config::default());
             let (rest, matched) = dot(input).expect("should parse '.' symbol");
             assert_eq!(matched.lexeme(), ".");
@@ -337,7 +337,7 @@ mod tests {
         }
 
         #[test]
-        fn test_dot_dot() {
+        fn dot_dot_symbol() {
             let input = InputSpan::new_extra(".. rest", Config::default());
             let (rest, matched) = dot_dot(input).expect("should parse '..' symbol");
             assert_eq!(matched.lexeme(), "..");
@@ -345,7 +345,7 @@ mod tests {
         }
 
         #[test]
-        fn test_paren_left() {
+        fn paren_left_symbol() {
             let input = InputSpan::new_extra("( rest", Config::default());
             let (rest, matched) = paren_left(input).expect("should parse '(' symbol");
             assert_eq!(matched.lexeme(), "(");
@@ -353,7 +353,7 @@ mod tests {
         }
 
         #[test]
-        fn test_paren_right() {
+        fn paren_right_symbol() {
             let input = InputSpan::new_extra(") rest", Config::default());
             let (rest, matched) = paren_right(input).expect("should parse ')' symbol");
             assert_eq!(matched.lexeme(), ")");
@@ -361,7 +361,7 @@ mod tests {
         }
 
         #[test]
-        fn test_percent() {
+        fn percent_symbol() {
             let input = InputSpan::new_extra("% rest", Config::default());
             let (rest, matched) = percent(input).expect("should parse '%' symbol");
             assert_eq!(matched.lexeme(), "%");
@@ -369,7 +369,7 @@ mod tests {
         }
 
         #[test]
-        fn test_plus() {
+        fn plus_symbol() {
             let input = InputSpan::new_extra("+ rest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' symbol");
             assert_eq!(matched.lexeme(), "+");
@@ -377,7 +377,7 @@ mod tests {
         }
 
         #[test]
-        fn test_bang_equals() {
+        fn bang_equals_symbol() {
             let input = InputSpan::new_extra("!= rest", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' symbol");
             assert_eq!(matched.lexeme(), "!=");
@@ -385,7 +385,7 @@ mod tests {
         }
 
         #[test]
-        fn test_equals_equals() {
+        fn equals_equals_symbol() {
             let input = InputSpan::new_extra("== rest", Config::default());
             let (rest, matched) = equals_equals(input).expect("should parse '==' symbol");
             assert_eq!(matched.lexeme(), "==");
@@ -393,7 +393,7 @@ mod tests {
         }
 
         #[test]
-        fn test_greater_than_equals() {
+        fn greater_than_equals_symbol() {
             let input = InputSpan::new_extra(">= rest", Config::default());
             let (rest, matched) = greater_than_equals(input).expect("should parse '>=' symbol");
             assert_eq!(matched.lexeme(), ">=");
@@ -401,7 +401,7 @@ mod tests {
         }
 
         #[test]
-        fn test_less_than_equals() {
+        fn less_than_equals_symbol() {
             let input = InputSpan::new_extra("<= rest", Config::default());
             let (rest, matched) = less_than_equals(input).expect("should parse '<=' symbol");
             assert_eq!(matched.lexeme(), "<=");
@@ -409,7 +409,7 @@ mod tests {
         }
 
         #[test]
-        fn test_minus_minus() {
+        fn minus_minus_symbol() {
             let input = InputSpan::new_extra("-- rest", Config::default());
             let (rest, matched) = minus_minus(input).expect("should parse '--' symbol");
             assert_eq!(matched.lexeme(), "--");
@@ -417,7 +417,7 @@ mod tests {
         }
 
         #[test]
-        fn test_star_star() {
+        fn star_star_symbol() {
             let input = InputSpan::new_extra("** rest", Config::default());
             let (rest, matched) = star_star(input).expect("should parse '**' symbol");
             assert_eq!(matched.lexeme(), "**");
@@ -425,7 +425,7 @@ mod tests {
         }
 
         #[test]
-        fn test_slash_slash() {
+        fn slash_slash_symbol() {
             let input = InputSpan::new_extra("// rest", Config::default());
             let (rest, matched) = slash_slash(input).expect("should parse '//' symbol");
             assert_eq!(matched.lexeme(), "//");
@@ -433,7 +433,7 @@ mod tests {
         }
 
         #[test]
-        fn test_equals() {
+        fn equals_symbol() {
             let input = InputSpan::new_extra("= rest", Config::default());
             let (rest, matched) = equals(input).expect("should parse '=' symbol");
             assert_eq!(matched.lexeme(), "=");
@@ -441,7 +441,7 @@ mod tests {
         }
 
         #[test]
-        fn test_greater_than() {
+        fn greater_than_symbol() {
             let input = InputSpan::new_extra("> rest", Config::default());
             let (rest, matched) = greater_than(input).expect("should parse '>' symbol");
             assert_eq!(matched.lexeme(), ">");
@@ -449,7 +449,7 @@ mod tests {
         }
 
         #[test]
-        fn test_less_than() {
+        fn less_than_symbol() {
             let input = InputSpan::new_extra("< rest", Config::default());
             let (rest, matched) = less_than(input).expect("should parse '<' symbol");
             assert_eq!(matched.lexeme(), "<");
@@ -457,7 +457,7 @@ mod tests {
         }
 
         #[test]
-        fn test_minus() {
+        fn minus_symbol() {
             let input = InputSpan::new_extra("- rest", Config::default());
             let (rest, matched) = minus(input).expect("should parse '-' symbol");
             assert_eq!(matched.lexeme(), "-");
@@ -465,7 +465,7 @@ mod tests {
         }
 
         #[test]
-        fn test_star() {
+        fn star_symbol() {
             let input = InputSpan::new_extra("* rest", Config::default());
             let (rest, matched) = star(input).expect("should parse '*' symbol");
             assert_eq!(matched.lexeme(), "*");
@@ -473,7 +473,7 @@ mod tests {
         }
 
         #[test]
-        fn test_slash() {
+        fn slash_symbol() {
             let input = InputSpan::new_extra("/ rest", Config::default());
             let (rest, matched) = slash(input).expect("should parse '/' symbol");
             assert_eq!(matched.lexeme(), "/");
@@ -482,7 +482,7 @@ mod tests {
 
         // Edge cases for all symbol types
         #[test]
-        fn test_at_end_of_file() {
+        fn symbol_at_end_of_file() {
             let input = InputSpan::new_extra("+", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' at end of file");
             assert_eq!(matched.lexeme(), "+");
@@ -490,7 +490,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multi_char_at_end_of_file() {
+        fn multi_char_symbol_at_end_of_file() {
             let input = InputSpan::new_extra("!=", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' at end of file");
             assert_eq!(matched.lexeme(), "!=");
@@ -498,7 +498,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_trailing_whitespace() {
+        fn symbol_with_trailing_whitespace() {
             let input = InputSpan::new_extra("+   rest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with trailing whitespace");
             assert_eq!(matched.lexeme(), "+");
@@ -506,7 +506,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multi_char_with_trailing_whitespace() {
+        fn multi_char_symbol_with_trailing_whitespace() {
             let input = InputSpan::new_extra("!=   rest", Config::default());
             let (rest, matched) =
                 bang_equals(input).expect("should parse '!=' with trailing whitespace");
@@ -515,7 +515,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_tab() {
+        fn symbol_with_tab() {
             let input = InputSpan::new_extra("+\trest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with tab");
             assert_eq!(matched.lexeme(), "+");
@@ -523,7 +523,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multi_char_with_tab() {
+        fn multi_char_symbol_with_tab() {
             let input = InputSpan::new_extra("!=\trest", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' with tab");
             assert_eq!(matched.lexeme(), "!=");
@@ -531,15 +531,7 @@ mod tests {
         }
 
         #[test]
-        fn test_conditional_with_tab() {
-            let input = InputSpan::new_extra("=\trest", Config::default());
-            let (rest, matched) = equals(input).expect("should parse '=' with tab");
-            assert_eq!(matched.lexeme(), "=");
-            assert_eq!(rest.fragment(), &"rest");
-        }
-
-        #[test]
-        fn test_with_newline() {
+        fn symbol_with_newline() {
             let input = InputSpan::new_extra("+\nrest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with newline");
             assert_eq!(matched.lexeme(), "+");
@@ -547,7 +539,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multi_char_with_newline() {
+        fn multi_char_symbol_with_newline() {
             let input = InputSpan::new_extra("!=\nrest", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' with newline");
             assert_eq!(matched.lexeme(), "!=");
@@ -555,15 +547,7 @@ mod tests {
         }
 
         #[test]
-        fn test_conditional_with_newline() {
-            let input = InputSpan::new_extra("=\nrest", Config::default());
-            let (rest, matched) = equals(input).expect("should parse '=' with newline");
-            assert_eq!(matched.lexeme(), "=");
-            assert_eq!(rest.fragment(), &"\nrest");
-        }
-
-        #[test]
-        fn test_with_carriage_return() {
+        fn symbol_with_carriage_return() {
             let input = InputSpan::new_extra("+\rrest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with carriage return");
             assert_eq!(matched.lexeme(), "+");
@@ -571,212 +555,199 @@ mod tests {
         }
     }
 
-    mod error_tests {
+    mod error {
         use crate::token::error::ExpectKind;
 
         use super::*;
 
         #[test]
-        fn test_empty_input() {
+        fn empty_input() {
             let input = InputSpan::new_extra("", Config::default());
             let res = plus(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
+            ));
         }
 
         #[test]
-        fn test_symbol_not_at_start() {
+        fn symbol_not_at_start() {
             let input = InputSpan::new_extra("foo + bar", Config::default());
             let res = plus(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
+            ));
         }
 
         #[test]
-        fn test_whitespace_only() {
+        fn whitespace_only() {
             let input = InputSpan::new_extra("   ", Config::default());
             let res = plus(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
+            ));
         }
 
         #[test]
-        fn test_wrong_symbol() {
+        fn wrong_symbol() {
             let input = InputSpan::new_extra("x", Config::default());
             let res = plus(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Plus))
+            ));
         }
 
         #[test]
-        fn test_dot_not_dot_dot() {
+        fn dot_not_dot_dot() {
             let input = InputSpan::new_extra(".. rest", Config::default());
             let res = dot(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Dot))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Dot))
+            ));
         }
 
         #[test]
-        fn test_equals_not_equals_equals() {
+        fn equals_not_equals_equals() {
             let input = InputSpan::new_extra("== rest", Config::default());
             let res = equals(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Equals))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Equals))
+            ));
         }
 
         #[test]
-        fn test_greater_than_not_greater_than_equals() {
+        fn greater_than_not_greater_than_equals() {
             let input = InputSpan::new_extra(">= rest", Config::default());
             let res = greater_than(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::GreaterThan))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::GreaterThan))
+            ));
         }
 
         #[test]
-        fn test_less_than_not_less_than_equals() {
+        fn less_than_not_less_than_equals() {
             let input = InputSpan::new_extra("<= rest", Config::default());
             let res = less_than(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::LessThan))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::LessThan))
+            ));
         }
 
         #[test]
-        fn test_minus_not_minus_minus() {
+        fn minus_not_minus_minus() {
             let input = InputSpan::new_extra("-- rest", Config::default());
             let res = minus(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Minus))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Minus))
+            ));
         }
 
         #[test]
-        fn test_star_not_star_star() {
+        fn star_not_star_star() {
             let input = InputSpan::new_extra("** rest", Config::default());
             let res = star(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Star))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Star))
+            ));
         }
 
         #[test]
-        fn test_slash_not_slash_slash() {
+        fn slash_not_slash_slash() {
             let input = InputSpan::new_extra("// rest", Config::default());
             let res = slash(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Slash))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::Slash))
+            ));
         }
 
         #[test]
-        fn test_multi_char_symbol_partial() {
+        fn multi_char_symbol_partial() {
             let input = InputSpan::new_extra("!", Config::default());
             let res = bang_equals(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::BangEquals))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::BangEquals))
+            ));
         }
 
         #[test]
-        fn test_multi_char_symbol_wrong_second_char() {
+        fn multi_char_symbol_wrong_second_char() {
             let input = InputSpan::new_extra("!x rest", Config::default());
             let res = bang_equals(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::BangEquals))
-                    ));
-                }
-                _ => panic!("expected TokenError::Expect(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(_), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Symbol(ExpectSymbol::BangEquals))
+            ));
         }
     }
 
-    mod next_char_is_not_tests {
+    mod next_char_is_not {
         use super::*;
 
         #[test]
-        fn test_next_char_is_not_succeeds() {
+        fn next_char_is_not_succeeds() {
             let input = InputSpan::new_extra("abc", Config::default());
             let (rest, ()) = next_char_is_not('b')
                 .parse(input)
@@ -785,7 +756,7 @@ mod tests {
         }
 
         #[test]
-        fn test_next_char_is_not_succeeds_with_eof() {
+        fn next_char_is_not_succeeds_with_eof() {
             let input = InputSpan::new_extra("", Config::default());
             let (rest, ()) = next_char_is_not('b')
                 .parse(input)
@@ -794,19 +765,18 @@ mod tests {
         }
 
         #[test]
-        fn test_next_char_is_not_fails() {
+        fn next_char_is_not_fails() {
             let input = InputSpan::new_extra("abc", Config::default());
             let res = next_char_is_not('a').parse(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => {
-                    assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
-                }
-                _ => panic!("expected TokenError::NomError(_), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::NomError(_), got {res:?}");
+            };
+
+            assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
         }
 
         #[test]
-        fn test_next_char_is_not_with_whitespace() {
+        fn next_char_is_not_with_whitespace() {
             let input = InputSpan::new_extra(" b", Config::default());
             let (rest, ()) = next_char_is_not('a')
                 .parse(input)
@@ -815,7 +785,7 @@ mod tests {
         }
 
         #[test]
-        fn test_next_char_is_not_with_special_characters() {
+        fn next_char_is_not_with_special_characters() {
             let input = InputSpan::new_extra("!bc", Config::default());
             let (rest, ()) = next_char_is_not('a')
                 .parse(input)
@@ -824,7 +794,7 @@ mod tests {
         }
 
         #[test]
-        fn test_next_char_is_not_with_numbers() {
+        fn next_char_is_not_with_numbers() {
             let input = InputSpan::new_extra("123", Config::default());
             let (rest, ()) = next_char_is_not('a')
                 .parse(input)
@@ -833,7 +803,7 @@ mod tests {
         }
 
         #[test]
-        fn test_next_char_is_not_with_unicode() {
+        fn next_char_is_not_with_unicode() {
             let input = InputSpan::new_extra("αβγ", Config::default());
             let (rest, ()) = next_char_is_not('a')
                 .parse(input)
@@ -842,7 +812,7 @@ mod tests {
         }
 
         #[test]
-        fn test_next_char_is_not_with_emoji() {
+        fn next_char_is_not_with_emoji() {
             let input = InputSpan::new_extra("🚀bc", Config::default());
             let (rest, ()) = next_char_is_not('a')
                 .parse(input)

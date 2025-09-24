@@ -306,18 +306,12 @@ impl TokenError {
 
     /// Checks if the error is a keyword error
     pub fn is_keyword_error(&self, kind: ExpectKeyword) -> bool {
-        match self.kind {
-            TokenErrorKind::Expect(ExpectKind::Keyword(keyword_kind)) => kind == keyword_kind,
-            _ => false,
-        }
+        matches!(self.kind, TokenErrorKind::Expect(ExpectKind::Keyword(keyword_kind)) if kind == keyword_kind)
     }
 
     /// Checks if the error is a symbol error
     pub fn is_symbol_error(&self, kind: ExpectSymbol) -> bool {
-        match self.kind {
-            TokenErrorKind::Expect(ExpectKind::Symbol(symbol_kind)) => kind == symbol_kind,
-            _ => false,
-        }
+        matches!(self.kind, TokenErrorKind::Expect(ExpectKind::Symbol(symbol_kind)) if kind == symbol_kind)
     }
 }
 

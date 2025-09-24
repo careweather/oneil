@@ -87,7 +87,8 @@ impl ParserError {
     /// Creates a new `ParserError` from a `TokenError` with a specific reason
     ///
     /// This is used to convert token-level errors to parser-level errors
-    fn new_from_token_error(error: TokenError, reason: ParserErrorReason) -> Self {
+    #[must_use]
+    const fn new_from_token_error(error: TokenError, reason: ParserErrorReason) -> Self {
         Self {
             reason,
             error_offset: error.offset,
@@ -105,17 +106,17 @@ impl ParserError {
     }
 
     /// Creates a new `ParserError` for an expected note
-    pub(crate) fn expect_note(error: TokenError) -> Self {
+    pub(crate) const fn expect_note(error: TokenError) -> Self {
         Self::new_from_token_error(error, ParserErrorReason::expect_note())
     }
 
     /// Creates a new `ParserError` for an expected parameter
-    pub(crate) fn expect_parameter(error: TokenError) -> Self {
+    pub(crate) const fn expect_parameter(error: TokenError) -> Self {
         Self::new_from_token_error(error, ParserErrorReason::expect_parameter())
     }
 
     /// Creates a new `ParserError` for an expected test
-    pub(crate) fn expect_test(error: TokenError) -> Self {
+    pub(crate) const fn expect_test(error: TokenError) -> Self {
         Self::new_from_token_error(error, ParserErrorReason::expect_test())
     }
 
@@ -486,11 +487,15 @@ impl fmt::Display for ParserError {
 }
 
 impl<'a> nom::error::ParseError<InputSpan<'a>> for ParserError {
-    fn from_error_kind(input: InputSpan<'a>, reason: nom::error::ErrorKind) -> Self {
-        let reason = match reason {
+    fn from_error_kind(input: InputSpan<'a>, kind: nom::error::ErrorKind) -> Self {
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "this will only ever care about the EOF error kind"
+        )]
+        let reason = match kind {
             // If `all_consuming` is used, we expect the parser to consume the entire input
             nom::error::ErrorKind::Eof => ParserErrorReason::unexpected_token(),
-            _ => ParserErrorReason::nom_error(reason),
+            _ => ParserErrorReason::nom_error(kind),
         };
 
         Self {

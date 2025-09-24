@@ -135,11 +135,11 @@ mod tests {
         token::error::{ExpectKind, TokenErrorKind},
     };
 
-    mod success_tests {
+    mod success {
         use super::*;
 
         #[test]
-        fn test_and() {
+        fn and_keyword() {
             let input = InputSpan::new_extra("and rest", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' keyword");
             assert_eq!(matched.lexeme(), "and");
@@ -147,7 +147,7 @@ mod tests {
         }
 
         #[test]
-        fn test_as() {
+        fn as_keyword() {
             let input = InputSpan::new_extra("as foo", Config::default());
             let (rest, matched) = as_(input).expect("should parse 'as' keyword");
             assert_eq!(matched.lexeme(), "as");
@@ -155,7 +155,7 @@ mod tests {
         }
 
         #[test]
-        fn test_false() {
+        fn false_keyword() {
             let input = InputSpan::new_extra("false true", Config::default());
             let (rest, matched) = false_(input).expect("should parse 'false' keyword");
             assert_eq!(matched.lexeme(), "false");
@@ -163,7 +163,7 @@ mod tests {
         }
 
         #[test]
-        fn test_if() {
+        fn if_keyword() {
             let input = InputSpan::new_extra("if baz", Config::default());
             let (rest, matched) = if_(input).expect("should parse 'if' keyword");
             assert_eq!(matched.lexeme(), "if");
@@ -171,7 +171,7 @@ mod tests {
         }
 
         #[test]
-        fn test_import() {
+        fn import_keyword() {
             let input = InputSpan::new_extra("import foo", Config::default());
             let (rest, matched) = import(input).expect("should parse 'import' keyword");
             assert_eq!(matched.lexeme(), "import");
@@ -179,7 +179,7 @@ mod tests {
         }
 
         #[test]
-        fn test_not() {
+        fn not_keyword() {
             let input = InputSpan::new_extra("not bar", Config::default());
             let (rest, matched) = not(input).expect("should parse 'not' keyword");
             assert_eq!(matched.lexeme(), "not");
@@ -187,7 +187,7 @@ mod tests {
         }
 
         #[test]
-        fn test_or() {
+        fn or_keyword() {
             let input = InputSpan::new_extra("or baz", Config::default());
             let (rest, matched) = or(input).expect("should parse 'or' keyword");
             assert_eq!(matched.lexeme(), "or");
@@ -195,7 +195,7 @@ mod tests {
         }
 
         #[test]
-        fn test_ref() {
+        fn ref_keyword() {
             let input = InputSpan::new_extra("ref foo", Config::default());
             let (rest, matched) = ref_(input).expect("should parse 'ref' keyword");
             assert_eq!(matched.lexeme(), "ref");
@@ -203,7 +203,7 @@ mod tests {
         }
 
         #[test]
-        fn test_section() {
+        fn section_keyword() {
             let input = InputSpan::new_extra("section test", Config::default());
             let (rest, matched) = section(input).expect("should parse 'section' keyword");
             assert_eq!(matched.lexeme(), "section");
@@ -211,7 +211,8 @@ mod tests {
         }
 
         #[test]
-        fn test_test() {
+        #[expect(clippy::redundant_test_prefix, reason = "'test' describes the keyword")]
+        fn test_keyword() {
             let input = InputSpan::new_extra("test use", Config::default());
             let (rest, matched) = test(input).expect("should parse 'test' keyword");
             assert_eq!(matched.lexeme(), "test");
@@ -219,7 +220,7 @@ mod tests {
         }
 
         #[test]
-        fn test_true() {
+        fn true_keyword() {
             let input = InputSpan::new_extra("true false", Config::default());
             let (rest, matched) = true_(input).expect("should parse 'true' keyword");
             assert_eq!(matched.lexeme(), "true");
@@ -227,7 +228,7 @@ mod tests {
         }
 
         #[test]
-        fn test_use() {
+        fn use_keyword() {
             let input = InputSpan::new_extra("use foo", Config::default());
             let (rest, matched) = use_(input).expect("should parse 'use' keyword");
             assert_eq!(matched.lexeme(), "use");
@@ -235,7 +236,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with() {
+        fn with_keyword() {
             let input = InputSpan::new_extra("with foo", Config::default());
             let (rest, matched) = with(input).expect("should parse 'with' keyword");
             assert_eq!(matched.lexeme(), "with");
@@ -243,7 +244,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_trailing_whitespace() {
+        fn with_trailing_whitespace_keyword() {
             let input = InputSpan::new_extra("and   foo", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' with trailing whitespace");
             assert_eq!(matched.lexeme(), "and");
@@ -251,7 +252,7 @@ mod tests {
         }
 
         #[test]
-        fn test_at_end_of_file() {
+        fn at_end_of_file_keyword() {
             let input = InputSpan::new_extra("and", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' at end of file");
             assert_eq!(matched.lexeme(), "and");
@@ -259,7 +260,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_punctuation() {
+        fn with_punctuation_keyword() {
             let input = InputSpan::new_extra("and,", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' with comma");
             assert_eq!(matched.lexeme(), "and");
@@ -267,7 +268,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_parentheses() {
+        fn with_parentheses_keyword() {
             let input = InputSpan::new_extra("if(", Config::default());
             let (rest, matched) = if_(input).expect("should parse 'if' with opening parenthesis");
             assert_eq!(matched.lexeme(), "if");
@@ -275,20 +276,22 @@ mod tests {
         }
 
         #[test]
-        fn test_with_underscore() {
+        fn with_underscore_keyword() {
             let input = InputSpan::new_extra("import_", Config::default());
             let res = import(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Import))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Import)), got {res:?}"),
-            }
+
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Import))
+            ));
         }
 
         #[test]
-        fn test_with_symbols() {
+        fn with_symbols_keyword() {
             let input = InputSpan::new_extra("not+", Config::default());
             let (rest, matched) = not(input).expect("should parse 'not' with plus symbol");
             assert_eq!(matched.lexeme(), "not");
@@ -296,7 +299,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_newline() {
+        fn with_newline_keyword() {
             let input = InputSpan::new_extra("true\n", Config::default());
             let (rest, matched) = true_(input).expect("should parse 'true' with newline");
             assert_eq!(matched.lexeme(), "true");
@@ -304,7 +307,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_tab() {
+        fn with_tab_keyword() {
             let input = InputSpan::new_extra("import\t", Config::default());
             let (rest, matched) = import(input).expect("should parse 'import' with tab");
             assert_eq!(matched.lexeme(), "import");
@@ -312,7 +315,7 @@ mod tests {
         }
 
         #[test]
-        fn test_with_carriage_return() {
+        fn with_carriage_return_keyword() {
             let input = InputSpan::new_extra("section\r", Config::default());
             let (rest, matched) =
                 section(input).expect("should parse 'section' with carriage return");
@@ -321,373 +324,347 @@ mod tests {
         }
     }
 
-    mod error_tests {
+    mod general_error {
         use super::*;
 
         #[test]
-        fn test_empty_input() {
+        fn empty_input() {
             let input = InputSpan::new_extra("", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_whitespace_only() {
+        fn whitespace_only() {
             let input = InputSpan::new_extra("   ", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_wrong_keyword() {
+        fn wrong_keyword() {
             let input = InputSpan::new_extra("or", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_partial_match() {
-            let input = InputSpan::new_extra("andrew", Config::default());
-            let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_prefix_match() {
-            let input = InputSpan::new_extra("android", Config::default());
-            let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_with_letters_after() {
+        fn with_letters_after_keyword() {
             let input = InputSpan::new_extra("andx", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_with_numbers_after() {
+        fn with_numbers_after_keyword() {
             let input = InputSpan::new_extra("and123", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_with_underscore_after() {
+        fn with_underscore_after_keyword() {
             let input = InputSpan::new_extra("and_", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_not_at_start() {
+        fn keyword_not_at_start() {
             let input = InputSpan::new_extra("foo and bar", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_case_sensitive() {
+        fn case_sensitive_keyword() {
             let input = InputSpan::new_extra("AND", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_mixed_case() {
+        fn mixed_case_keyword() {
             let input = InputSpan::new_extra("And", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_special_characters() {
+        fn special_characters() {
             let input = InputSpan::new_extra("!@#", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
 
         #[test]
-        fn test_numbers_only() {
+        fn numbers_only() {
             let input = InputSpan::new_extra("123", Config::default());
             let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
-        }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
 
-        #[test]
-        fn test_symbols_only() {
-            let input = InputSpan::new_extra("+-*/", Config::default());
-            let res = and(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(And)), got {res:?}"),
-            }
-        }
-
-        // Test all keywords with error cases
-        #[test]
-        fn test_as_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = as_(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::As))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(As)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_false_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = false_(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::False))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(False)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_if_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = if_(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::If))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(If)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_import_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = import(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Import))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Import)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_not_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = not(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Not))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Not)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_or_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = or(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Or))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Or)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_section_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = section(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Section))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Section)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_ref_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = ref_(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Ref))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Ref)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_test_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = test(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Test))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Test)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_true_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = true_(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::True))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(True)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_use_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = use_(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Use))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(Use)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_with_error() {
-            let input = InputSpan::new_extra("wrong", Config::default());
-            let res = with(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::With))
-                )),
-                _ => panic!("expected TokenError::Expect(Keyword(With)), got {res:?}"),
-            }
-        }
-
-        #[test]
-        fn test_error_messages_are_specific() {
-            let input = InputSpan::new_extra("abc", Config::default());
-            let res = and(input);
-            assert!(res.is_err(), "should fail with specific error");
-
-            if let Err(nom::Err::Error(token_error)) = res {
-                assert!(
-                    matches!(
-                        token_error.kind,
-                        TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
-                    ),
-                    "error should be for And keyword"
-                );
-            } else {
-                panic!("expected TokenError but got different error type: {res:?}");
-            }
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::And))
+            ));
         }
     }
 
-    mod keyword_constants_tests {
+    mod keyword_error {
+        use super::*;
+
+        // Test all keywords with error cases
+
+        #[test]
+        fn as_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = as_(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::As))
+            ));
+        }
+
+        #[test]
+        fn false_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = false_(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("Unexpected result {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::False))
+            ));
+        }
+
+        #[test]
+        fn if_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = if_(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(If)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::If))
+            ));
+        }
+
+        #[test]
+        fn import_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = import(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(Import)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Import))
+            ));
+        }
+
+        #[test]
+        fn not_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = not(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(Not)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Not))
+            ));
+        }
+
+        #[test]
+        fn or_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = or(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(Or)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Or))
+            ));
+        }
+
+        #[test]
+        fn section_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = section(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(Section)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Section))
+            ));
+        }
+
+        #[test]
+        fn ref_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = ref_(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(Ref)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Ref))
+            ));
+        }
+
+        #[test]
+        #[expect(clippy::redundant_test_prefix, reason = "'test' describes the keyword")]
+        fn test_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = test(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(Test)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Test))
+            ));
+        }
+
+        #[test]
+        fn true_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = true_(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(True)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::True))
+            ));
+        }
+
+        #[test]
+        fn use_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = use_(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(Use)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::Use))
+            ));
+        }
+
+        #[test]
+        fn with_keyword() {
+            let input = InputSpan::new_extra("wrong", Config::default());
+            let res = with(input);
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Keyword(With)), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Keyword(error::ExpectKeyword::With))
+            ));
+        }
+    }
+
+    mod keyword_constants {
         use super::*;
 
         #[test]
-        fn test_keywords_constant_contains_no_duplicates() {
+        fn keywords_constant_contains_no_duplicates() {
             let mut sorted = KEYWORDS.to_vec();
             sorted.sort_unstable();
             let mut deduped = sorted.clone();

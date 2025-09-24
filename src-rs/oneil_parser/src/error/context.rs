@@ -1,3 +1,8 @@
+#![expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "contexts only apply to a subset of reasons, and that subset is unlikely to change, even if more reasons are added"
+)]
+
 use oneil_error::{Context, ErrorLocation};
 
 use crate::{
@@ -95,25 +100,23 @@ fn parameter_label_has_invalid_characters(
         })
         .map(|index| index + remaining_source_offset);
 
-    match invalid_char_index {
-        Some(index) => {
-            let note_message = "parameter labels must only contain `a-z`, `A-Z`, `0-9`, `_`, `-`, `'`, and whitespace";
+    let Some(index) = invalid_char_index else {
+        return vec![];
+    };
 
-            let invalid_char_note_message = "invalid character found here";
-            let invalid_char_location = ErrorLocation::from_source_and_offset(source, index);
+    let note_message =
+        "parameter labels must only contain `a-z`, `A-Z`, `0-9`, `_`, `-`, `'`, and whitespace";
 
-            vec![
-                (Context::Note(note_message.to_string()), None),
-                (
-                    Context::Note(invalid_char_note_message.to_string()),
-                    Some(invalid_char_location),
-                ),
-            ]
-        }
-        None => {
-            vec![]
-        }
-    }
+    let invalid_char_note_message = "invalid character found here";
+    let invalid_char_location = ErrorLocation::from_source_and_offset(source, index);
+
+    vec![
+        (Context::Note(note_message.to_string()), None),
+        (
+            Context::Note(invalid_char_note_message.to_string()),
+            Some(invalid_char_location),
+        ),
+    ]
 }
 
 fn string_literal_uses_double_quotes(

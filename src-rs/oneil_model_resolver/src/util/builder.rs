@@ -99,7 +99,8 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// # Returns
     ///
     /// A reference to the map of model paths to loaded models.
-    pub fn get_models(&self) -> &HashMap<ir::ModelPath, ir::Model> {
+    #[must_use]
+    pub const fn get_models(&self) -> &HashMap<ir::ModelPath, ir::Model> {
         &self.models
     }
 
@@ -111,6 +112,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// # Returns
     ///
     /// A set of model paths that have any type of error.
+    #[must_use]
     pub fn get_models_with_errors(&self) -> HashSet<&ir::ModelPath> {
         self.errors.get_models_with_errors()
     }
@@ -168,12 +170,12 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     }
 
     #[cfg(test)]
-    pub fn get_model_errors(&self) -> &HashMap<ir::ModelPath, LoadError<Ps>> {
+    pub const fn get_model_errors(&self) -> &HashMap<ir::ModelPath, LoadError<Ps>> {
         self.errors.get_model_errors()
     }
 
     #[cfg(test)]
-    pub fn get_circular_dependency_errors(
+    pub const fn get_circular_dependency_errors(
         &self,
     ) -> &HashMap<ir::ModelPath, Vec<CircularDependencyError>> {
         self.errors.get_circular_dependency_errors()
@@ -203,7 +205,7 @@ impl<Ps, Py> TryInto<ir::ModelCollection> for ModelCollectionBuilder<Ps, Py> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelImportsBuilder {
     submodels: HashMap<ir::SubmodelName, ir::SubmodelImport>,
     submodel_resolution_errors: HashMap<ir::SubmodelName, ModelImportResolutionError>,
@@ -308,7 +310,7 @@ impl ParameterBuilder {
         self.parameters.insert(identifier, parameter);
     }
 
-    pub fn get_parameters(&self) -> &HashMap<ir::Identifier, ir::Parameter> {
+    pub const fn get_parameters(&self) -> &HashMap<ir::Identifier, ir::Parameter> {
         &self.parameters
     }
 
@@ -323,7 +325,9 @@ impl ParameterBuilder {
             .push(error);
     }
 
-    pub fn get_parameter_errors(&self) -> &HashMap<ir::Identifier, Vec<ParameterResolutionError>> {
+    pub const fn get_parameter_errors(
+        &self,
+    ) -> &HashMap<ir::Identifier, Vec<ParameterResolutionError>> {
         &self.parameter_errors
     }
 

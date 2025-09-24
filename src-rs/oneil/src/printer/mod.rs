@@ -111,6 +111,7 @@ where
     /// Returns an error if writing to the underlying writer fails.
     pub fn print_ast(&mut self, ast: &AstModel) -> io::Result<()> {
         if self.print_debug {
+            #[expect(clippy::use_debug, reason = "a debug output is expected")]
             writeln!(self.writer, "AST: {ast:?}")?;
         } else {
             ast::print(ast, self.writer)?;
@@ -137,6 +138,7 @@ where
     /// Returns an error if writing to the underlying writer fails.
     pub fn print_ir(&mut self, ir: &IrModelCollection) -> io::Result<()> {
         if self.print_debug {
+            #[expect(clippy::use_debug, reason = "a debug output is expected")]
             writeln!(self.writer, "IR: {ir:?}")?;
         } else {
             ir::print(ir, self.writer)?;
@@ -163,6 +165,7 @@ where
     /// Returns an error if writing to the underlying writer fails.
     pub fn print_error(&mut self, error: &OneilError) -> io::Result<()> {
         if self.print_debug {
+            #[expect(clippy::use_debug, reason = "a debug output is expected")]
             writeln!(self.error_writer, "Error: {error:?}")?;
         } else {
             error::print(error, self.color_choice, self.error_writer)?;

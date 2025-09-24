@@ -125,10 +125,9 @@ fn unit_term(input: InputSpan<'_>) -> Result<'_, UnitExprNode, ParserError> {
             None => None,
         };
 
-        let span = match &exp {
-            Some(n) => AstSpan::calc_span(&id, n),
-            None => AstSpan::from(&id),
-        };
+        let span = exp
+            .as_ref()
+            .map_or_else(|| AstSpan::from(&id), |n| AstSpan::calc_span(&id, n));
 
         let expr = Node::new(&span, UnitExpr::unit(id, exp));
 
@@ -171,7 +170,7 @@ fn unit_term(input: InputSpan<'_>) -> Result<'_, UnitExprNode, ParserError> {
 }
 
 #[cfg(test)]
-#[allow(
+#[expect(
     clippy::similar_names,
     reason = "test code uses names where only difference is variable name"
 )]
@@ -182,11 +181,11 @@ mod tests {
         error::reason::{ExpectKind, IncompleteKind, ParserErrorReason, UnitKind},
     };
 
-    mod success_tests {
+    mod success {
         use super::*;
 
         #[test]
-        fn test_simple_unit() {
+        fn simple_unit() {
             let input = InputSpan::new_extra("kg", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -198,7 +197,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_one() {
+        fn unit_one() {
             let input = InputSpan::new_extra("1", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -208,7 +207,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_one_with_whitespace() {
+        fn unit_one_with_whitespace() {
             let input = InputSpan::new_extra("1 ", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -219,7 +218,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_one_in_compound_expression() {
+        fn unit_one_in_compound_expression() {
             let input = InputSpan::new_extra("1/s", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -243,7 +242,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_one_in_complex_expression() {
+        fn unit_one_in_complex_expression() {
             let input = InputSpan::new_extra("kg*1/s^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -284,7 +283,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_with_exponent() {
+        fn unit_with_exponent() {
             let input = InputSpan::new_extra("m^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -299,7 +298,7 @@ mod tests {
         }
 
         #[test]
-        fn test_compound_unit_multiply() {
+        fn compound_unit_multiply() {
             let input = InputSpan::new_extra("kg*m", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -323,7 +322,7 @@ mod tests {
         }
 
         #[test]
-        fn test_compound_unit_divide() {
+        fn compound_unit_divide() {
             let input = InputSpan::new_extra("m/s", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -346,7 +345,7 @@ mod tests {
         }
 
         #[test]
-        fn test_complex_unit() {
+        fn complex_unit() {
             let input = InputSpan::new_extra("m^2*kg/s^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -392,7 +391,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_with_dollar_terminator() {
+        fn unit_with_dollar_terminator() {
             let input = InputSpan::new_extra("k$", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -404,7 +403,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_with_percent_terminator() {
+        fn unit_with_percent_terminator() {
             let input = InputSpan::new_extra("%", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -416,7 +415,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_with_terminator_and_exponent() {
+        fn unit_with_terminator_and_exponent() {
             let input = InputSpan::new_extra("k$^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -431,7 +430,7 @@ mod tests {
         }
 
         #[test]
-        fn test_compound_unit_with_terminators() {
+        fn compound_unit_with_terminators() {
             let input = InputSpan::new_extra("k$*%", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -458,7 +457,7 @@ mod tests {
         }
 
         #[test]
-        fn test_parenthesized_unit() {
+        fn parenthesized_unit() {
             let input = InputSpan::new_extra("(kg*m)/s^2", Config::default());
             let (_, unit) = parse(input).expect("should parse unit");
 
@@ -508,7 +507,7 @@ mod tests {
         }
 
         #[test]
-        fn test_parse_complete_success() {
+        fn parse_complete_success() {
             let input = InputSpan::new_extra("kg", Config::default());
             let (rest, unit) = parse_complete(input).expect("should parse unit");
 
@@ -521,11 +520,11 @@ mod tests {
         }
     }
 
-    mod parse_complete_tests {
+    mod parse_complete {
         use super::*;
 
         #[test]
-        fn test_parse_complete_success() {
+        fn parse_complete_success() {
             let input = InputSpan::new_extra("kg", Config::default());
             let (rest, unit) = parse_complete(input).expect("should parse unit");
 
@@ -538,256 +537,254 @@ mod tests {
         }
 
         #[test]
-        fn test_parse_complete_with_remaining_input() {
+        #[expect(
+            clippy::assertions_on_result_states,
+            reason = "we don't care about the result, just that it's an error"
+        )]
+        fn parse_complete_with_remaining_input() {
             let input = InputSpan::new_extra("kg rest", Config::default());
             let result = parse_complete(input);
             assert!(result.is_err());
         }
     }
 
-    mod error_tests {
+    mod error {
         use super::*;
 
         #[test]
-        fn test_error_empty_input() {
+        fn empty_input() {
             let input = InputSpan::new_extra("", Config::default());
             let result = parse(input);
 
-            match result {
-                Err(nom::Err::Error(error)) => {
-                    assert_eq!(error.error_offset, 0);
-                    assert!(matches!(
-                        error.reason,
-                        ParserErrorReason::Expect(ExpectKind::Unit)
-                    ));
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Unit)
+            ));
         }
 
         #[test]
-        fn test_error_whitespace_only() {
+        fn whitespace_only() {
             let input = InputSpan::new_extra("   ", Config::default());
             let result = parse(input);
 
-            match result {
-                Err(nom::Err::Error(error)) => {
-                    assert_eq!(error.error_offset, 0);
-                    assert!(matches!(
-                        error.reason,
-                        ParserErrorReason::Expect(ExpectKind::Unit)
-                    ));
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Unit)
+            ));
         }
 
         #[test]
-        fn test_error_missing_second_term_after_multiply() {
+        fn missing_second_term_after_multiply() {
             let input = InputSpan::new_extra("kg*", Config::default());
             let result = parse(input);
             let expected_op_span = AstSpan::new(2, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 3); // After "*"
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::Unit(UnitKind::MissingSecondTerm { operator }),
-                            cause,
-                        } => {
-                            assert_eq!(operator, UnitOp::Multiply);
-                            assert_eq!(cause, expected_op_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 3); // After "*"
+
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Unit(UnitKind::MissingSecondTerm { operator }),
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {:?}", error.reason);
+            };
+
+            assert_eq!(operator, UnitOp::Multiply);
+            assert_eq!(cause, expected_op_span);
         }
 
         #[test]
-        fn test_error_missing_second_term_after_divide() {
+        fn missing_second_term_after_divide() {
             let input = InputSpan::new_extra("kg/", Config::default());
             let result = parse(input);
             let expected_op_span = AstSpan::new(2, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 3); // After "/"
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::Unit(UnitKind::MissingSecondTerm { operator }),
-                            cause,
-                        } => {
-                            assert_eq!(operator, UnitOp::Divide);
-                            assert_eq!(cause, expected_op_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 3); // After "/"
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Unit(UnitKind::MissingSecondTerm { operator }),
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {error:?}");
+            };
+
+            assert_eq!(operator, UnitOp::Divide);
+            assert_eq!(cause, expected_op_span);
         }
 
         #[test]
-        fn test_error_missing_exponent() {
+        fn missing_exponent() {
             let input = InputSpan::new_extra("kg^", Config::default());
             let result = parse(input);
             let expected_caret_span = AstSpan::new(2, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 3); // After "^"
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::Unit(UnitKind::MissingExponent),
-                            cause,
-                        } => {
-                            assert_eq!(cause, expected_caret_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 3); // After "^"
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Unit(UnitKind::MissingExponent),
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {error:?}");
+            };
+
+            assert_eq!(cause, expected_caret_span);
         }
 
         #[test]
-        fn test_error_parenthesized_missing_expr() {
+        fn parenthesized_missing_expr() {
             let input = InputSpan::new_extra("()", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(0, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 1); // After "("
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::Unit(UnitKind::ParenMissingExpr),
-                            cause,
-                        } => {
-                            assert_eq!(cause, expected_paren_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 1); // After "("
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Unit(UnitKind::ParenMissingExpr),
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {error:?}");
+            };
+
+            assert_eq!(cause, expected_paren_span);
         }
 
         #[test]
-        fn test_error_unclosed_paren() {
+        fn unclosed_paren() {
             let input = InputSpan::new_extra("(kg*m", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(0, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 5); // After "m"
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::UnclosedParen,
-                            cause,
-                        } => {
-                            assert_eq!(cause, expected_paren_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 5); // After "m"
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::UnclosedParen,
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {error:?}");
+            };
+
+            assert_eq!(cause, expected_paren_span);
         }
 
         #[test]
-        fn test_error_invalid_identifier() {
+        fn invalid_identifier() {
             let input = InputSpan::new_extra("@invalid", Config::default());
             let result = parse(input);
 
-            match result {
-                Err(nom::Err::Error(error)) => {
-                    assert_eq!(error.error_offset, 0); // At "@"
-                    assert!(matches!(
-                        error.reason,
-                        ParserErrorReason::Expect(ExpectKind::Unit)
-                    ));
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 0); // At "@"
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Unit)
+            ));
         }
 
         #[test]
-        fn test_error_invalid_exponent() {
+        fn invalid_exponent() {
             let input = InputSpan::new_extra("kg^@invalid", Config::default());
             let result = parse(input);
             let expected_caret_span = AstSpan::new(2, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 3); // After "^"
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::Unit(UnitKind::MissingExponent),
-                            cause,
-                        } => {
-                            assert_eq!(cause, expected_caret_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 3); // After "^"
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Unit(UnitKind::MissingExponent),
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {error:?}");
+            };
+
+            assert_eq!(cause, expected_caret_span);
         }
 
         #[test]
-        fn test_error_missing_second_term_in_complex_expression() {
+        fn missing_second_term_in_complex_expression() {
             let input = InputSpan::new_extra("kg*m/", Config::default());
             let result = parse(input);
             let expected_op_span = AstSpan::new(4, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 5); // After "/"
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::Unit(UnitKind::MissingSecondTerm { operator }),
-                            cause,
-                        } => {
-                            assert_eq!(operator, UnitOp::Divide);
-                            assert_eq!(cause, expected_op_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 5); // After "/"
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Unit(UnitKind::MissingSecondTerm { operator }),
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {error:?}");
+            };
+
+            assert_eq!(operator, UnitOp::Divide);
+            assert_eq!(cause, expected_op_span);
         }
 
         #[test]
-        fn test_error_nested_unclosed_paren() {
+        fn nested_unclosed_paren() {
             let input = InputSpan::new_extra("((kg*m)", Config::default());
             let result = parse(input);
             let expected_paren_span = AstSpan::new(0, 1, 0);
 
-            match result {
-                Err(nom::Err::Failure(error)) => {
-                    assert_eq!(error.error_offset, 7); // After "m"
-                    match error.reason {
-                        ParserErrorReason::Incomplete {
-                            kind: IncompleteKind::UnclosedParen,
-                            cause,
-                        } => {
-                            assert_eq!(cause, expected_paren_span);
-                        }
-                        error => panic!("Unexpected error {error:?}"),
-                    }
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+            let Err(nom::Err::Failure(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 7); // After "m"
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::UnclosedParen,
+                cause,
+            } = error.reason
+            else {
+                panic!("Unexpected error {error:?}");
+            };
+
+            assert_eq!(cause, expected_paren_span);
         }
 
         #[test]
-        fn test_error_missing_operator_between_terms() {
+        #[expect(
+            clippy::assertions_on_result_states,
+            reason = "we don't care about the result, just that it's ok"
+        )]
+        fn missing_operator_between_terms() {
             let input = InputSpan::new_extra("kg m", Config::default());
             let result = parse(input);
 
@@ -797,7 +794,11 @@ mod tests {
         }
 
         #[test]
-        fn test_error_invalid_operator() {
+        #[expect(
+            clippy::assertions_on_result_states,
+            reason = "we don't care about the result, just that it's ok"
+        )]
+        fn invalid_operator() {
             let input = InputSpan::new_extra("kg+m", Config::default());
             let result = parse(input);
 
@@ -807,26 +808,26 @@ mod tests {
         }
 
         #[test]
-        fn test_error_unit_one_with_digits() {
+        fn unit_one_with_digits() {
             let input = InputSpan::new_extra("123", Config::default());
             let result = parse(input);
 
             // This should fail because "123" should not be parsed as a unit_one
             // The parser should try to parse it as a unit identifier instead
-            match result {
-                Err(nom::Err::Error(error)) => {
-                    assert_eq!(error.error_offset, 0);
-                    assert!(matches!(
-                        error.reason,
-                        ParserErrorReason::Expect(ExpectKind::Unit)
-                    ));
-                }
-                _ => panic!("Unexpected result {result:?}"),
-            }
+
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 0);
+            assert!(matches!(
+                error.reason,
+                ParserErrorReason::Expect(ExpectKind::Unit)
+            ));
         }
 
         #[test]
-        fn test_unit_one_with_decimal_parses_partially() {
+        fn unit_one_with_decimal_parses_partially() {
             let input = InputSpan::new_extra("1.5", Config::default());
             let (rest, unit) = parse(input).expect("should parse unit");
 
@@ -837,7 +838,7 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_one_with_exponent_parses_partially() {
+        fn unit_one_with_exponent_parses_partially() {
             let input = InputSpan::new_extra("1^2", Config::default());
             let (rest, unit) = parse(input).expect("should parse unit");
 

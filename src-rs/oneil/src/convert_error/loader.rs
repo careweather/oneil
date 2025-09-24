@@ -189,7 +189,7 @@ fn convert_model_errors(
 /// This function attempts to read the source file to provide location information.
 /// If the file cannot be read, it adds a file reading error and processes the
 /// resolution errors without location information.
-#[allow(
+#[expect(
     clippy::too_many_lines,
     reason = "this is a repetitive and easy-to-read function"
 )]

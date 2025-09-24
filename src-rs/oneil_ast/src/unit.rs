@@ -39,13 +39,13 @@ pub type UnitExprNode = Node<UnitExpr>;
 impl UnitExpr {
     /// Creates a binary operation unit expression
     #[must_use]
-    pub fn binary_op(op: UnitOpNode, left: UnitExprNode, right: UnitExprNode) -> Self {
+    pub const fn binary_op(op: UnitOpNode, left: UnitExprNode, right: UnitExprNode) -> Self {
         Self::BinaryOp { op, left, right }
     }
 
     /// Creates a parenthesized unit expression
     #[must_use]
-    pub fn parenthesized(expr: UnitExprNode) -> Self {
+    pub const fn parenthesized(expr: UnitExprNode) -> Self {
         Self::Parenthesized { expr }
     }
 

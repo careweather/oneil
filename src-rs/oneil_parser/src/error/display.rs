@@ -16,6 +16,11 @@ impl fmt::Display for ParserErrorReason {
             Self::Incomplete { cause: _, kind } => kind.fmt(f),
             Self::UnexpectedToken => write!(f, "unexpected token"),
             Self::TokenError(token_error_kind) => token_error_kind.fmt(f),
+
+            #[expect(
+                clippy::use_debug,
+                reason = "a debug output the best output we can give here"
+            )]
             Self::NomError(error_kind) => {
                 write!(
                     f,
@@ -204,9 +209,14 @@ impl fmt::Display for TokenErrorKind {
                     write!(f, "invalid exponent part")
                 }
             },
-            _ => write!(
+
+            #[expect(
+                clippy::use_debug,
+                reason = "a debug output the best output we can give here"
+            )]
+            error @ (Self::Expect(_) | Self::NomError(_)) => write!(
                 f,
-                "unexpected token error `{self:?}`. please submit an issue at <https://github.com/oneil-lang/oneil/issues>"
+                "unexpected token error `{error:?}`. please submit an issue at <https://github.com/oneil-lang/oneil/issues>"
             ),
         }
     }
