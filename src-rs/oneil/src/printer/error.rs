@@ -1,14 +1,4 @@
 //! Error message formatting and display functionality
-//!
-//! This module provides functionality for formatting and displaying error messages
-//! in a user-friendly format. It includes source location highlighting, color coding,
-//! and structured error output that matches common compiler error formats.
-//!
-//! The error display format includes:
-//! - Error message with color coding
-//! - File path and line/column information
-//! - Source code snippet with error highlighting
-//! - Visual indicators pointing to the error location
 
 // TODO: create a unified function for the full message format so that errors with source and
 //       context with source can be formatted reusing the same code
@@ -37,23 +27,6 @@ use oneil_error::{Context, ErrorLocation, OneilError};
 use crate::printer::ColorChoice;
 
 /// Prints a formatted error message to the specified writer
-///
-/// Formats the error with appropriate color coding and structure, including
-/// the error message, file location, and source code snippet with highlighting.
-///
-/// # Arguments
-///
-/// * `error` - The error to format and display
-/// * `color_choice` - Color configuration for the output
-/// * `writer` - The writer to output the formatted error to
-///
-/// # Returns
-///
-/// Returns `io::Result<()>` indicating success or failure of the write operation.
-///
-/// # Errors
-///
-/// Returns an error if writing to the writer fails.
 pub fn print(
     error: &OneilError,
     color_choice: ColorChoice,
@@ -66,18 +39,6 @@ pub fn print(
 }
 
 /// Converts an error to a formatted string representation
-///
-/// Creates a complete error message string including the error message,
-/// location information, and source code snippet with proper formatting.
-///
-/// # Arguments
-///
-/// * `error` - The error to format
-/// * `color_choice` - Color configuration for the output
-///
-/// # Returns
-///
-/// Returns a formatted string representation of the error.
 fn error_to_string(error: &OneilError, color_choice: ColorChoice) -> String {
     let message_line = get_error_message_line(error.message(), color_choice);
     let location_line = get_location_line(error.path(), error.location(), color_choice);
@@ -97,83 +58,21 @@ fn error_to_string(error: &OneilError, color_choice: ColorChoice) -> String {
 }
 
 /// Formats the main error message line
-///
-/// Creates the primary error message line in the format "error: <message>"
-/// with appropriate color coding.
-///
-/// # Arguments
-///
-/// * `error` - The error to format
-/// * `color_choice` - Color configuration for the output
-///
-/// # Returns
-///
-/// Returns the formatted error message line as a string.
 fn get_error_message_line(message: &str, color_choice: ColorChoice) -> String {
     get_message_line("error", ColorChoice::bold_red, message, color_choice)
 }
 
 /// Formats a note message line
-///
-/// Creates a note message line in the format "note: <message>" with blue coloring
-/// for the "note" prefix.
-///
-/// # Arguments
-///
-/// * `message` - The note message to format
-/// * `color_choice` - Color configuration for the output
-///
-/// # Returns
-///
-/// Returns the formatted note message line as a string.
 fn get_note_message_line(message: &str, color_choice: ColorChoice) -> String {
     get_message_line("note", ColorChoice::bold_blue, message, color_choice)
 }
 
 /// Formats a help message line
-///
-/// Creates a help message line in the format "help: <message>" with blue coloring
-/// for the "help" prefix.
-///
-/// # Arguments
-///
-/// * `message` - The help message to format
-/// * `color_choice` - Color configuration for the output
-///
-/// # Returns
-///
-/// Returns the formatted help message line as a string.
 fn get_help_message_line(message: &str, color_choice: ColorChoice) -> String {
     get_message_line("help", ColorChoice::bold_blue, message, color_choice)
 }
 
 /// Formats a message line with a colored prefix
-///
-/// Creates a message line in the format "<kind>: <message>" where the kind prefix
-/// is colored according to the provided color function and the entire line is bold.
-///
-/// # Arguments
-///
-/// * `kind` - The prefix text (e.g. "error", "note", "help")
-/// * `kind_color` - Function to apply color formatting to the kind prefix
-/// * `message` - The message text to display
-/// * `color_choice` - Color configuration for the output
-///
-/// # Returns
-///
-/// Returns the formatted message line as a string with appropriate coloring.
-///
-/// # Examples
-///
-/// ```
-/// let message = get_message_line(
-///     "error",
-///     ColorChoice::bold_red,
-///     "invalid syntax",
-///     &color_choice
-/// );
-/// // Returns bold "error: invalid syntax" with red "error"
-/// ```
 fn get_message_line(
     kind: &str,
     kind_color: impl FnOnce(ColorChoice, &str) -> String,
@@ -188,18 +87,6 @@ fn get_message_line(
 }
 
 /// Formats the location information line
-///
-/// Creates the location line showing file path and optional line/column information
-/// in the format " --> <path>" or " --> <path> (line <line>, column <column>)".
-///
-/// # Arguments
-///
-/// * `error` - The error to format
-/// * `color_choice` - Color configuration for the output
-///
-/// # Returns
-///
-/// Returns the formatted location line as a string.
 fn get_location_line(
     path: &Path,
     location: Option<&ErrorLocation>,
@@ -208,7 +95,7 @@ fn get_location_line(
     // location line (line and column are optional)
     //  --> <path>
     // OR
-    //  --> <path> (line <line>, column <column>)
+    //  --> <path>:<line>:<column>
     let arrow = color_choice.bold_blue("-->");
     let path = path.display();
 
@@ -219,20 +106,6 @@ fn get_location_line(
 }
 
 /// Formats the source code snippet with error highlighting
-///
-/// Creates a visual representation of the source code around the error location,
-/// including line numbers, source code, and error indicators pointing to the
-/// specific location of the error.
-///
-/// # Arguments
-///
-/// * `error` - The error to format
-/// * `color_choice` - Color configuration for the output
-///
-/// # Returns
-///
-/// Returns `Some(String)` with the formatted source code snippet if location
-/// information is available, or `None` if no location information exists.
 fn get_source_lines(
     location: &ErrorLocation,
     context: &[Context],

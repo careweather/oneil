@@ -1,15 +1,4 @@
 //! Intermediate Representation (IR) printing functionality for the Oneil CLI
-//!
-//! This module provides functionality for printing Oneil IR structures in a
-//! hierarchical tree format suitable for debugging and development. It handles
-//! all IR node types including model collections, models, parameters, expressions,
-//! and tests.
-//!
-//! The printing format uses a tree-like structure with indentation and special
-//! characters to show the hierarchical relationship between IR nodes:
-//! - `├──` for non-final children
-//! - `└──` for final children
-//! - Indentation to show nesting levels
 
 #![expect(
     clippy::use_debug,

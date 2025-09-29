@@ -1,7 +1,5 @@
-//! Oneil CLI - Command-line interface for the Oneil programming language
-//!
-//! This module provides the main entry point for the Oneil CLI tool, which offers
-//! development utilities for parsing, analyzing, and debugging Oneil source files.
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! CLI for the Oneil programming language
 
 use std::io::{self, Write};
 
@@ -21,15 +19,6 @@ mod file_parser;
 mod printer;
 
 /// Main entry point for the Oneil CLI application
-///
-/// Parses command-line arguments and executes the appropriate command based on
-/// the user's input. Handles both AST and IR printing operations with error
-/// reporting and partial result display capabilities.
-///
-/// # Returns
-///
-/// Returns `io::Result<()>` indicating success or failure of printing to the
-/// console. All errors are properly formatted and displayed to the user.
 fn main() -> io::Result<()> {
     let cli = CliCommand::parse();
 
