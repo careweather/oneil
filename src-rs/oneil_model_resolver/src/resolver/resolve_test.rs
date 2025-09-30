@@ -1,37 +1,4 @@
 //! Test resolution for the Oneil model loader
-//!
-//! This module provides functionality for resolving tests in Oneil models.
-//! Test resolution involves processing test declarations to create executable
-//! test structures.
-//!
-//! # Overview
-//!
-//! Tests in Oneil allow models to define validation logic and test scenarios.
-//! This module handles two types of tests:
-//!
-//! ## Tests
-//! Tests are defined using the `test` declaration syntax:
-//! ```oneil
-//! test: x > 0
-//! test {x, y}: x + y == 10
-//! test {param}: param > 100
-//! ```
-//!
-//! # Resolution Process
-//!
-//! The resolution process involves:
-//! 1. **Trace Level Resolution**: Converting trace level indicators to `TraceLevel` enum
-//! 2. **Input Processing**: Converting input identifiers to `Identifier` types
-//! 3. **Expression Resolution**: Resolving test expressions with proper variable scope
-//! 4. **Error Collection**: Gathering and categorizing resolution errors
-//!
-//! # Error Handling
-//!
-//! The model provides comprehensive error handling for various failure scenarios:
-//! - **Variable Resolution Errors**: When test expressions reference undefined variables
-//!
-//! All errors are collected and returned rather than causing the function to fail,
-//! allowing for partial success scenarios.
 
 use std::collections::HashMap;
 
@@ -46,28 +13,6 @@ use crate::{
 };
 
 /// Resolves tests from AST test declarations.
-///
-/// This function processes a collection of `ast::Test` declarations and resolves
-/// them into executable `Test` structures with proper variable scoping and
-/// error handling.
-///
-/// # Arguments
-///
-/// * `tests` - A vector of AST test declarations to resolve
-/// * `defined_parameters_info` - Information about available parameters in the model
-/// * `submodel_info` - Information about available submodels in the model
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// A tuple containing:
-/// * `HashMap<TestIndex, Test>` - Successfully resolved tests mapped to their indices
-/// * `HashMap<TestIndex, Vec<TestResolutionError>>` - Any resolution errors that occurred
-///
-/// # Error Handling
-///
-/// All errors are collected and returned rather than causing the function to fail.
-/// Each test is processed independently, so errors in one test don't affect others.
 pub fn resolve_tests(
     tests: Vec<&ast::TestNode>,
     builtin_ref: &impl BuiltinRef,

@@ -27,33 +27,16 @@ pub enum TestPythonValidator {
 
 impl TestPythonValidator {
     /// Creates a validator that accepts all Python imports.
-    ///
-    /// # Returns
-    ///
-    /// A `TestPythonValidator` that will return `Ok(())` for any Python import.
     pub fn validate_all() -> Self {
         Self::ValidateAll
     }
 
     /// Creates a validator that rejects all Python imports.
-    ///
-    /// # Returns
-    ///
-    /// A `TestPythonValidator` that will return `Err(())` for any Python import.
     pub fn validate_none() -> Self {
         Self::ValidateNone
     }
 
     /// Creates a validator that only accepts the specified Python imports.
-    ///
-    /// # Arguments
-    ///
-    /// * `imports` - A vector of Python file paths that should be accepted
-    ///
-    /// # Returns
-    ///
-    /// A `TestPythonValidator` that will return `Ok(())` for the specified imports
-    /// and `Err(())` for all other imports.
     pub fn validate_some(imports: impl IntoIterator<Item = impl AsRef<Path>>) -> Self {
         let imports = imports
             .into_iter()
@@ -68,38 +51,12 @@ impl FileLoader for TestPythonValidator {
     type PythonError = ();
 
     /// Attempts to parse an AST from a file path.
-    ///
-    /// This implementation always panics because `TestPythonValidator` is designed
-    /// only for testing Python import validation, not AST parsing.
-    ///
-    /// # Arguments
-    ///
-    /// * `_path` - The path to the file to parse (ignored)
-    ///
-    /// # Panics
-    ///
-    /// Always panics with the message "`TestPythonLoader` does not support parsing ASTs".
     #[expect(clippy::panic_in_result_fn, reason = "this is a test implementation")]
     fn parse_ast(&self, _path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
         panic!("TestPythonLoader does not support parsing ASTs");
     }
 
     /// Validates a Python import based on the validator's configuration.
-    ///
-    /// This method implements the Python import validation logic based on the
-    /// validator's variant:
-    ///
-    /// - `ValidateAll`: Always returns `Ok(())`
-    /// - `ValidateNone`: Always returns `Err(())`
-    /// - `ValidateSome`: Returns `Ok(())` if the path is in the list, `Err(())` otherwise
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - The path to the Python file to validate
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the import should be accepted, or `Err(())` if it should be rejected.
     fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError> {
         let path = path.as_ref().to_path_buf();
 
@@ -128,15 +85,6 @@ pub struct TestFileParser {
 
 impl TestFileParser {
     /// Creates a new test file parser with the specified models.
-    ///
-    /// # Arguments
-    ///
-    /// * `models` - An iterator of (path, model) pairs that define the available AST models
-    ///
-    /// # Returns
-    ///
-    /// A new `TestFileParser` that will return the specified models when their
-    /// corresponding paths are requested.
     pub fn new(models: impl IntoIterator<Item = (impl AsRef<Path>, ast::ModelNode)>) -> Self {
         let models = models
             .into_iter()
@@ -147,12 +95,6 @@ impl TestFileParser {
     }
 
     /// Creates a new test file parser with no predefined models.
-    ///
-    /// This parser will return `Err(())` for any file parsing request.
-    ///
-    /// # Returns
-    ///
-    /// A new `TestFileParser` with no predefined models.
     pub fn empty() -> Self {
         Self {
             models: HashMap::new(),
@@ -165,37 +107,12 @@ impl FileLoader for TestFileParser {
     type PythonError = ();
 
     /// Attempts to parse an AST from a file path.
-    ///
-    /// This method looks up the requested path in the predefined models map.
-    /// If the path exists, it returns the corresponding model. If the path
-    /// doesn't exist, it returns `Err(())`.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - The path to the file to parse
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(Model)` if the path exists in the predefined models,
-    /// or `Err(())` if the path is not found.
     fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
         let path = path.as_ref().to_path_buf();
         self.models.get(&path).cloned().ok_or(())
     }
 
     /// Validates a Python import.
-    ///
-    /// This implementation always returns `Ok(())`, accepting all Python imports.
-    /// This allows tests to focus on AST parsing behavior without worrying about
-    /// Python import validation.
-    ///
-    /// # Arguments
-    ///
-    /// * `_path` - The path to the Python file to validate (ignored)
-    ///
-    /// # Returns
-    ///
-    /// Always returns `Ok(())`.
     fn validate_python_import(
         &self,
         _path: impl AsRef<std::path::Path>,

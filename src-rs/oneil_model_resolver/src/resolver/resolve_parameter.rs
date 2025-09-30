@@ -1,24 +1,4 @@
 //! Parameter resolution model for the Oneil model loader.
-//!
-//! This module handles the resolution of parameters within a Oneil model. It performs
-//! dependency analysis, circular dependency detection, and converts AST parameters into
-//! resolved model parameters.
-//!
-//! # Overview
-//!
-//! The parameter resolution process consists of several steps:
-//!
-//! 1. **Dependency Analysis**: Extract all internal dependencies between parameters
-//! 2. **Topological Resolution**: Resolve parameters in dependency order
-//! 3. **Circular Dependency Detection**: Detect and report circular dependencies
-//! 4. **Expression Resolution**: Resolve parameter values and limits
-//!
-//! # Key Concepts
-//!
-//! - **Internal Dependencies**: Dependencies on parameters defined within the same model
-//! - **External Dependencies**: Dependencies on parameters from other models (handled elsewhere)
-//! - **Circular Dependencies**: When parameter A depends on parameter B, which depends on A
-//!
 
 use std::collections::{HashMap, HashSet};
 
@@ -43,33 +23,6 @@ use crate::{
 pub type ParameterErrorMap = HashMap<ir::Identifier, Vec<ParameterResolutionError>>;
 
 /// Resolves a collection of AST parameters into resolved model parameters.
-///
-/// This function performs the complete parameter resolution process:
-/// - Analyzes dependencies between parameters
-/// - Detects circular dependencies
-/// - Resolves parameter values and limits
-/// - Handles both simple and piecewise parameter values
-///
-/// # Arguments
-///
-/// * `parameters` - Vector of AST parameters to resolve
-/// * `builtin_ref` - Set of builtin variables
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about available models
-///
-/// # Returns
-///
-/// A tuple containing:
-/// - `ParameterCollection`: Successfully resolved parameters
-/// - `HashMap<Identifier, Vec<ParameterResolutionError>>`: Resolution errors by parameter identifier
-///
-/// # Errors
-///
-/// The function may return errors for:
-/// - Circular dependencies between parameters
-/// - Undefined variable references
-/// - Invalid expressions in parameter values or limits
-/// - Missing submodel references
 pub fn resolve_parameters(
     parameters: Vec<&ast::ParameterNode>,
     builtin_ref: &impl BuiltinRef,
@@ -133,17 +86,6 @@ pub fn resolve_parameters(
 }
 
 /// Analyzes all parameters to extract their internal dependencies.
-///
-/// Creates a mapping from parameter identifier to the set of other parameters
-/// it depends on within the same model.
-///
-/// # Arguments
-///
-/// * `parameter_map` - Map of parameter identifiers to AST parameters
-///
-/// # Returns
-///
-/// A map from parameter identifier to its set of internal dependencies
 fn get_all_parameter_internal_dependencies<'a>(
     parameter_map: &'a HashMap<ir::Identifier, &'a ast::ParameterNode>,
 ) -> HashMap<&'a ir::Identifier, HashSet<ir::WithSpan<ir::Identifier>>> {
@@ -165,17 +107,6 @@ fn get_all_parameter_internal_dependencies<'a>(
 }
 
 /// Extracts internal dependencies from a single parameter.
-///
-/// Analyzes the parameter's value and limits to find references to other
-/// parameters within the same model.
-///
-/// # Arguments
-///
-/// * `parameter` - The AST parameter to analyze
-///
-/// # Returns
-///
-/// A set of parameter identifiers that this parameter depends on
 fn get_parameter_internal_dependencies(
     parameter: &ast::Parameter,
 ) -> HashSet<ir::WithSpan<ir::Identifier>> {
@@ -207,18 +138,6 @@ fn get_parameter_internal_dependencies(
 }
 
 /// Extracts internal dependencies from an expression.
-///
-/// Recursively traverses the expression tree to find variable references
-/// that correspond to parameters within the same model.
-///
-/// # Arguments
-///
-/// * `expr` - The expression to analyze
-/// * `dependencies` - Accumulated set of dependencies
-///
-/// # Returns
-///
-/// Updated set of dependencies including any found in this expression
 fn get_expr_internal_dependencies(
     expr: &ast::Expr,
     mut dependencies: HashSet<ir::WithSpan<ir::Identifier>>,
@@ -277,30 +196,6 @@ fn get_expr_internal_dependencies(
 }
 
 /// Resolves a single parameter with dependency tracking.
-///
-/// This function handles the recursive resolution of a parameter, including:
-/// - Circular dependency detection
-/// - Dependency resolution order
-/// - Parameter value and limit resolution
-///
-/// # Arguments
-///
-/// * `parameter_identifier` - Identifier of the parameter to resolve
-/// * `parameter_map` - Map of all available parameters
-/// * `dependencies` - Dependency graph for all parameters
-/// * `builtin_ref` - Set of builtin variables
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about available models
-/// * `parameter_stack` - Stack for tracking resolution order (for circular dependency detection)
-/// * `resolved_parameters` - Builder for collecting resolved parameters
-/// * `visited` - Set of already visited parameters
-///
-/// # Returns
-///
-/// A tuple containing:
-/// - Updated parameter collection builder
-/// - Updated visited set
-/// - Result indicating success or resolution errors
 fn resolve_parameter(
     parameter_identifier: ir::WithSpan<ir::Identifier>,
     parameter_ast_map: &HashMap<ir::Identifier, &ast::ParameterNode>,
@@ -427,20 +322,6 @@ fn resolve_parameter(
 }
 
 /// Resolves a parameter value expression.
-///
-/// Handles both simple and piecewise parameter values, resolving expressions
-/// and converting them to the appropriate model types.
-///
-/// # Arguments
-///
-/// * `value` - The AST parameter value to resolve
-/// * `defined_parameters_info` - Information about already resolved parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about available models
-///
-/// # Returns
-///
-/// A resolved parameter value or a list of resolution errors
 fn resolve_parameter_value(
     value: &ast::ParameterValue,
     builtin_ref: &impl BuiltinRef,
@@ -490,20 +371,6 @@ fn resolve_parameter_value(
 }
 
 /// Resolves parameter limits.
-///
-/// Handles both continuous (min/max) and discrete limits, resolving expressions
-/// and converting them to the appropriate model types.
-///
-/// # Arguments
-///
-/// * `limits` - Optional AST parameter limits to resolve
-/// * `defined_parameters_info` - Information about already resolved parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about available models
-///
-/// # Returns
-///
-/// Resolved parameter limits or a list of resolution errors
 fn resolve_limits(
     limits: Option<&ast::LimitsNode>,
     builtin_ref: &impl BuiltinRef,

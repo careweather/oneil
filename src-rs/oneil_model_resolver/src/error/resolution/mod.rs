@@ -12,12 +12,6 @@
 //! - **Parameter resolution errors**: Errors that occur when resolving parameter references
 //! - **Test resolution errors**: Errors that occur when resolving test references
 //! - **Variable resolution errors**: Errors that occur when resolving variable references within expressions
-//!
-//! # Error Hierarchy
-//!
-//! The error types form a hierarchy where higher-level errors (like parameter resolution)
-//! can contain lower-level errors (like variable resolution). This allows for detailed
-//! error reporting while maintaining a clean error structure.
 
 mod import;
 mod parameter;
@@ -36,10 +30,6 @@ pub use test::TestResolutionError;
 pub use variable::VariableResolutionError;
 
 /// A collection of all resolution errors that occurred during model loading.
-///
-/// This struct aggregates errors from all resolution phases, including import validation,
-/// submodel resolution, parameter resolution, and test resolution. It provides methods
-/// for checking if any errors occurred and accessing the different error categories.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolutionErrors {
     import: HashMap<ir::PythonPath, ImportResolutionError>,
@@ -51,17 +41,6 @@ pub struct ResolutionErrors {
 
 impl ResolutionErrors {
     /// Creates a new collection of resolution errors.
-    ///
-    /// # Arguments
-    ///
-    /// * `import_errors` - Errors that occurred during Python import validation
-    /// * `submodel_resolution_errors` - Errors that occurred during submodel resolution
-    /// * `parameter_resolution_errors` - Errors that occurred during parameter resolution
-    /// * `test_resolution_errors` - Errors that occurred during test resolution
-    ///
-    /// # Returns
-    ///
-    /// A new `ResolutionErrors` instance containing all the specified errors.
     #[must_use]
     pub const fn new(
         import_errors: HashMap<ir::PythonPath, ImportResolutionError>,
@@ -80,10 +59,6 @@ impl ResolutionErrors {
     }
 
     /// Returns whether there are any resolution errors.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if there are no errors in any category, `false` otherwise.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.import.is_empty()
@@ -93,29 +68,12 @@ impl ResolutionErrors {
     }
 
     /// Returns a reference to the map of import resolution errors.
-    ///
-    /// This method provides access to any errors that occurred during Python import validation.
-    /// The errors are mapped from the Python path (with source span information) to the
-    /// corresponding `ImportResolutionError`.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the `HashMap` containing Python paths and their associated import resolution errors.
     #[must_use]
     pub const fn get_import_errors(&self) -> &HashMap<ir::PythonPath, ImportResolutionError> {
         &self.import
     }
 
     /// Returns a reference to the map of submodel resolution errors.
-    ///
-    /// This method provides access to any errors that occurred during submodel resolution.
-    /// The errors are mapped from the submodel identifier to the corresponding `SubmodelResolutionError`.
-    /// These errors occur when a `use model` declaration cannot be resolved, either because the referenced
-    /// model has errors or the submodel identifier is not defined.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the `HashMap` containing submodel identifiers and their associated resolution errors.
     #[must_use]
     pub const fn get_submodel_resolution_errors(
         &self,
@@ -145,15 +103,6 @@ impl ResolutionErrors {
     }
 
     /// Returns a reference to the map of test resolution errors.
-    ///
-    /// This method provides access to any errors that occurred during test resolution.
-    /// The errors are mapped from the test index to a vector of `TestResolutionError`s.
-    /// Multiple errors can occur for a single test, for example when a test references
-    /// undefined variables or has invalid assertions.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the `HashMap` containing test indices and their associated resolution errors.
     #[must_use]
     pub const fn get_test_resolution_errors(
         &self,

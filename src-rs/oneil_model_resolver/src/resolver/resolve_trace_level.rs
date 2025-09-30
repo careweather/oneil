@@ -2,18 +2,6 @@ use oneil_ast as ast;
 use oneil_ir as ir;
 
 /// Resolves an AST trace level into a model trace level.
-///
-/// This function converts between the AST representation of trace levels
-/// (used during parsing) and the model representation (used during
-/// model loading and execution).
-///
-/// # Arguments
-///
-/// * `trace_level` - The AST trace level to convert
-///
-/// # Returns
-///
-/// The corresponding model trace level
 pub fn resolve_trace_level(trace_level: Option<&ast::TraceLevelNode>) -> ir::TraceLevel {
     match trace_level.map(ast::Node::node_value) {
         Some(ast::TraceLevel::Trace) => ir::TraceLevel::Trace,

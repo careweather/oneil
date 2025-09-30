@@ -9,23 +9,6 @@ use oneil_ir as ir;
 /// into a `CompositeUnit` that represents the same unit in a flattened form.
 /// The resolution process handles multiplication, division, and exponents
 /// by recursively traversing the expression tree.
-///
-/// # Algorithm
-///
-/// The resolution process works by:
-/// 1. Recursively traversing the unit expression tree
-/// 2. For multiplication operations: process both operands with the same inverse flag
-/// 3. For division operations: process the left operand normally, right operand with inverted flag
-/// 4. For unit leaves: create a Unit with the identifier and exponent (negated if inverse)
-/// 5. Collect all units into a flat list that represents the composite unit
-///
-/// # Arguments
-///
-/// * `unit` - The AST unit expression to resolve
-///
-/// # Returns
-///
-/// A `CompositeUnit` containing the flattened representation of the unit expression
 pub fn resolve_unit(unit: &ast::UnitExprNode) -> ir::CompositeUnit {
     let units = resolve_unit_recursive(unit, false, Vec::new());
     ir::CompositeUnit::new(units)

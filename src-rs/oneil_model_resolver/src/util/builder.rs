@@ -1,21 +1,4 @@
 //! Builder types for constructing model and parameter collections.
-//!
-//! This module provides builder types that facilitate the construction of model and
-//! parameter collections while collecting errors that occur during the building process.
-//! The builders allow for incremental construction and error collection, making it
-//! easier to handle partial failures gracefully.
-//!
-//! # Key Types
-//!
-//! - `ModelCollectionBuilder`: Builds model collections while collecting loading errors
-//! - `ParameterCollectionBuilder`: Builds parameter collections while collecting resolution errors
-//!
-//! # Error Handling
-//!
-//! Both builder types collect errors during the building process and provide methods
-//! to query which items have errors. When converting to the final collection type,
-//! the builders return either the successful collection or a tuple containing the
-//! partial collection and the collected errors.
 
 use std::collections::{HashMap, HashSet};
 
@@ -32,13 +15,6 @@ use crate::error::{
 /// while collecting various types of errors that can occur during the loading
 /// process. It tracks visited models to prevent duplicate loading and provides
 /// methods for adding models and different types of errors.
-///
-/// # Error Types
-///
-/// - **Model errors**: Parse and resolution errors for specific models
-/// - **Circular dependency errors**: Detected circular dependencies
-/// - **Import errors**: Python import validation errors
-///
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelCollectionBuilder<Ps, Py> {
     initial_models: HashSet<ir::ModelPath>,
@@ -49,14 +25,6 @@ pub struct ModelCollectionBuilder<Ps, Py> {
 
 impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// Creates a new model collection builder.
-    ///
-    /// # Arguments
-    ///
-    /// * `initial_models` - The set of initial model paths that should be loaded
-    ///
-    /// # Returns
-    ///
-    /// A new `ModelCollectionBuilder` with the specified initial models.
     pub fn new(initial_models: HashSet<ir::ModelPath>) -> Self {
         Self {
             initial_models,
@@ -67,38 +35,16 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     }
 
     /// Checks if a model has already been visited during loading.
-    ///
-    /// This method is used to prevent loading the same model multiple times,
-    /// which is important for both performance and circular dependency detection.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model to check
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if the model has been visited, `false` otherwise.
     pub fn model_has_been_visited(&self, model_path: &ir::ModelPath) -> bool {
         self.visited_models.contains(model_path)
     }
 
     /// Marks a model as visited during loading.
-    ///
-    /// This method should be called when a model is about to be processed to
-    /// prevent it from being loaded again if it's referenced by other models.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model to mark as visited
     pub fn mark_model_as_visited(&mut self, model_path: &ir::ModelPath) {
         self.visited_models.insert(model_path.clone());
     }
 
     /// Returns a reference to the map of loaded models.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the map of model paths to loaded models.
     #[must_use]
     pub const fn get_models(&self) -> &HashMap<ir::ModelPath, ir::Model> {
         &self.models
@@ -108,31 +54,17 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     ///
     /// This includes models with parse/resolution errors and models with circular
     /// dependency errors.
-    ///
-    /// # Returns
-    ///
-    /// A set of model paths that have any type of error.
     #[must_use]
     pub fn get_models_with_errors(&self) -> HashSet<&ir::ModelPath> {
         self.errors.get_models_with_errors()
     }
 
     /// Adds a model error for the specified model.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model that has an error
-    /// * `error` - The loading error that occurred
     pub fn add_model_error(&mut self, model_path: ir::ModelPath, error: LoadError<Ps>) {
         self.errors.add_model_error(model_path, error);
     }
 
     /// Adds a circular dependency error for the specified model.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model that has a circular dependency
-    /// * `circular_dependency` - The circular dependency path
     pub fn add_circular_dependency_error(
         &mut self,
         model_path: ir::ModelPath,
@@ -145,21 +77,11 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     }
 
     /// Adds a Python import error for the specified import.
-    ///
-    /// # Arguments
-    ///
-    /// * `python_path` - The Python path that failed to import
-    /// * `error` - The import error that occurred
     pub fn add_import_error(&mut self, python_path: ir::PythonPath, error: Py) {
         self.errors.add_import_error(python_path, error);
     }
 
     /// Adds a successfully loaded model to the collection.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model
-    /// * `model` - The loaded model
     pub fn add_model(&mut self, model_path: ir::ModelPath, model: ir::Model) {
         self.models.insert(model_path, model);
     }
@@ -186,15 +108,6 @@ impl<Ps, Py> TryInto<ir::ModelCollection> for ModelCollectionBuilder<Ps, Py> {
     type Error = (ir::ModelCollection, ModelErrorMap<Ps, Py>);
 
     /// Attempts to convert the builder into a model collection.
-    ///
-    /// If there are no errors, returns `Ok(ModelCollection)`. If there are errors,
-    /// returns `Err((ModelCollection, ModelErrorMap))` where the collection contains
-    /// all successfully loaded models and the error map contains all collected errors.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(collection)` if no errors occurred, or `Err((partial_collection, errors))`
-    /// if there were errors during loading.
     fn try_into(self) -> Result<ir::ModelCollection, (ir::ModelCollection, ModelErrorMap<Ps, Py>)> {
         let model_collection = ir::ModelCollection::new(self.initial_models, self.models);
         if self.errors.is_empty() {

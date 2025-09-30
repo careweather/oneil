@@ -1,54 +1,4 @@
 //! Expression resolution for the Oneil model loader
-//!
-//! This module provides functionality for resolving AST expressions into model expressions.
-//! Expression resolution involves converting abstract syntax tree expressions into
-//! executable model expressions while handling variable resolution, function calls,
-//! and literal values.
-//!
-//! # Overview
-//!
-//! The expression resolver transforms AST expressions into model expressions that can be
-//! evaluated within the Oneil model system. This includes:
-//!
-//! - **Binary Operations**: Arithmetic, comparison, and logical operations
-//! - **Unary Operations**: Negation and logical NOT operations
-//! - **Function Calls**: Built-in functions and imported functions
-//! - **Variables**: Local variables, parameters, and submodel accessors
-//! - **Literals**: Numbers, strings, and boolean values
-//!
-//! # Expression Types
-//!
-//! ## Binary Operations
-//! Supports all standard arithmetic, comparison, and logical operations:
-//! - Arithmetic: `+`, `-`, `*`, `/`, `%`, `**`
-//! - Comparison: `<`, `<=`, `>`, `>=`, `==`, `!=`
-//! - Logical: `&&`, `||`, `minmax`
-//!
-//! ## Unary Operations
-//! Supports negation and logical NOT:
-//! - `-` for numeric negation
-//! - `!` for logical NOT
-//!
-//! ## Function Calls
-//! Handles both built-in functions and imported functions:
-//! - **Built-in**: `min`, `max`, `sin`, `cos`, `tan`, `sqrt`, `ln`, `log`, etc.
-//! - **Imported**: Any function name not in the built-in list
-//!
-//! ## Variables
-//! Resolves variables through the variable resolution system:
-//! - **Local variables**: Test inputs, function parameters
-//! - **Parameters**: Model parameters
-//! - **Submodel accessors**: `parameter.submodel` notation
-//!
-//! # Error Handling
-//!
-//! The model provides comprehensive error handling for various failure scenarios:
-//! - Variable resolution errors (undefined variables, submodels with errors)
-//! - Expression evaluation errors
-//! - Function call errors
-//!
-//! All errors are collected and returned rather than causing the function to
-//! fail immediately.
 
 use oneil_ast as ast;
 use oneil_ir::{self as ir, IrSpan};
@@ -64,33 +14,6 @@ use crate::{
 };
 
 /// Resolves an AST expression into a model expression.
-///
-/// This function transforms an abstract syntax tree expression into a model expression
-/// that can be evaluated within the Oneil model system. The resolution process handles
-/// variable lookup, function name resolution, and expression structure conversion.
-///
-/// # Arguments
-///
-/// * `value` - The AST expression to resolve
-/// * `builtin_ref` - Reference to built-in functions and variables
-/// * `defined_parameters_info` - Information about defined parameters and their status
-/// * `submodel_info` - Information about available submodels and their paths
-/// * `model_info` - Information about all available models and their loading status
-///
-/// # Returns
-///
-/// * `Ok(oneil_ir::expr::ExprWithSpan)` - The resolved model expression
-/// * `Err(Vec<VariableResolutionError>)` - Any variable resolution errors that occurred
-///
-/// # Error Conditions
-///
-/// The function may return errors in the following cases:
-/// - **Variable resolution failures**: When variables cannot be resolved
-/// - **Submodel access errors**: When submodel paths are invalid
-/// - **Parameter errors**: When parameters have resolution errors
-///
-/// All errors are collected and returned rather than causing the function to fail
-/// immediately.
 pub fn resolve_expr(
     value: &ast::ExprNode,
     builtin_ref: &impl BuiltinRef,
@@ -153,22 +76,6 @@ pub fn resolve_expr(
 }
 
 /// Resolves a comparison expression with optional chained comparisons.
-///
-/// # Arguments
-///
-/// * `op` - The comparison operator
-/// * `left` - The left operand expression
-/// * `right` - The right operand expression
-/// * `rest_chained` - Additional chained comparison operations
-/// * `value_span` - The span of the entire expression
-/// * `builtin_ref` - Reference to built-in functions and variables
-/// * `defined_parameters_info` - Information about defined parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// The resolved comparison expression or error collection
 #[expect(
     clippy::too_many_arguments,
     reason = "the first five arguments are parts of the same piece of data"
@@ -204,21 +111,6 @@ fn resolve_comparison_expression(
 }
 
 /// Resolves a binary operation expression.
-///
-/// # Arguments
-///
-/// * `op` - The binary operator
-/// * `left` - The left operand expression
-/// * `right` - The right operand expression
-/// * `value_span` - The span of the entire expression
-/// * `builtin_ref` - Reference to built-in functions and variables
-/// * `defined_parameters_info` - Information about defined parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// The resolved binary expression or error collection
 fn resolve_binary_expression(
     op: &ast::BinaryOpNode,
     left: &ast::ExprNode,
@@ -239,20 +131,6 @@ fn resolve_binary_expression(
 }
 
 /// Resolves a unary operation expression.
-///
-/// # Arguments
-///
-/// * `op` - The unary operator
-/// * `expr` - The operand expression
-/// * `value_span` - The span of the entire expression
-/// * `builtin_ref` - Reference to built-in functions and variables
-/// * `defined_parameters_info` - Information about defined parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// The resolved unary expression or error collection
 fn resolve_unary_expression(
     op: &ast::UnaryOpNode,
     expr: &ast::ExprNode,
@@ -274,20 +152,6 @@ fn resolve_unary_expression(
 }
 
 /// Resolves a function call expression.
-///
-/// # Arguments
-///
-/// * `name` - The function name identifier
-/// * `args` - The function arguments
-/// * `value_span` - The span of the entire expression
-/// * `builtin_ref` - Reference to built-in functions and variables
-/// * `defined_parameters_info` - Information about defined parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// The resolved function call expression or error collection
 fn resolve_function_call_expression(
     name: &ast::IdentifierNode,
     args: &[ast::ExprNode],
@@ -308,18 +172,6 @@ fn resolve_function_call_expression(
 }
 
 /// Resolves a variable expression.
-///
-/// # Arguments
-///
-/// * `variable` - The variable node to resolve
-/// * `builtin_ref` - Reference to built-in functions and variables
-/// * `defined_parameters_info` - Information about defined parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// The resolved variable expression or error collection
 fn resolve_variable_expression(
     variable: &ast::VariableNode,
     builtin_ref: &impl BuiltinRef,
@@ -331,15 +183,6 @@ fn resolve_variable_expression(
 }
 
 /// Resolves a literal expression.
-///
-/// # Arguments
-///
-/// * `literal` - The literal node to resolve
-/// * `value_span` - The span of the entire expression
-///
-/// # Returns
-///
-/// The resolved literal expression
 fn resolve_literal_expression(
     literal: &ast::LiteralNode,
     value_span: IrSpan,
@@ -350,18 +193,6 @@ fn resolve_literal_expression(
 }
 
 /// Resolves a parenthesized expression.
-///
-/// # Arguments
-///
-/// * `expr` - The expression inside parentheses
-/// * `builtin_ref` - Reference to built-in functions and variables
-/// * `defined_parameters_info` - Information about defined parameters
-/// * `submodel_info` - Information about available submodels
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// The resolved expression (parentheses are removed during resolution)
 fn resolve_parenthesized_expression(
     expr: &ast::ExprNode,
     builtin_ref: &impl BuiltinRef,
@@ -372,17 +203,6 @@ fn resolve_parenthesized_expression(
 }
 
 /// Converts an AST comparison operation to a model comparison operation.
-///
-/// This function maps AST comparison operations to their corresponding model comparison operations.
-/// All AST comparison operations have direct equivalents in the model system.
-///
-/// # Arguments
-///
-/// * `op` - The AST comparison operation to convert
-///
-/// # Returns
-///
-/// The corresponding model comparison operation
 const fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::WithSpan<ir::ComparisonOp> {
     let op_value = match op.node_value() {
         ast::ComparisonOp::LessThan => ir::ComparisonOp::LessThan,
@@ -397,17 +217,6 @@ const fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::WithSpan<ir::C
 }
 
 /// Converts an AST binary operation to a model binary operation.
-///
-/// This function maps AST binary operations to their corresponding model binary operations.
-/// All AST binary operations have direct equivalents in the model system.
-///
-/// # Arguments
-///
-/// * `op` - The AST binary operation to convert
-///
-/// # Returns
-///
-/// The corresponding model binary operation
 const fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::WithSpan<ir::BinaryOp> {
     let op_value = match op.node_value() {
         ast::BinaryOp::Add => ir::BinaryOp::Add,
@@ -427,17 +236,6 @@ const fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::WithSpan<ir::BinaryOp>
 }
 
 /// Converts an AST unary operation to a model unary operation.
-///
-/// This function maps AST unary operations to their corresponding model unary operations.
-/// Currently supports negation and logical NOT operations.
-///
-/// # Arguments
-///
-/// * `op` - The AST unary operation to convert
-///
-/// # Returns
-///
-/// The corresponding model unary operation
 const fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::WithSpan<ir::UnaryOp> {
     let op_value = match op.node_value() {
         ast::UnaryOp::Neg => ir::UnaryOp::Neg,
@@ -448,18 +246,6 @@ const fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::WithSpan<ir::UnaryOp> {
 }
 
 /// Resolves a function name to a model function name.
-///
-/// This function determines whether a function name refers to a built-in function
-/// or an imported function. Built-in functions are mapped to their corresponding
-/// enum variants, while other names are treated as imported functions.
-///
-/// # Arguments
-///
-/// * `name` - The function name to resolve
-///
-/// # Returns
-///
-/// A model function name representing either a built-in or imported function
 fn resolve_function_name(
     name: &ast::IdentifierNode,
     builtin_ref: &impl BuiltinRef,
@@ -477,17 +263,6 @@ fn resolve_function_name(
 }
 
 /// Converts an AST literal to a model literal.
-///
-/// This function maps AST literals to their corresponding model literals.
-/// Supports numbers, strings, and boolean values.
-///
-/// # Arguments
-///
-/// * `literal` - The AST literal to convert
-///
-/// # Returns
-///
-/// The corresponding model literal
 fn resolve_literal(literal: &ast::LiteralNode) -> ir::Literal {
     match literal.node_value() {
         ast::Literal::Number(number) => ir::Literal::number(*number),

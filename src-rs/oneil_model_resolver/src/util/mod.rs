@@ -1,23 +1,4 @@
 //! Utility types and traits for the Oneil model loader.
-//!
-//! This module provides utility types and traits that are used throughout the model
-//! loading process. It includes:
-//!
-//! - `FileLoader` trait: Defines the interface for file parsing and validation
-//! - `Stack` type: A generic stack implementation with circular dependency detection
-//! - Builder types: For constructing model and parameter collections
-//! - Info types: For passing information about models, submodels, and parameters
-//!
-//! # File Loading
-//!
-//! The `FileLoader` trait provides a flexible interface for parsing Oneil files and
-//! validating Python imports. This allows the model loader to work with different
-//! parsing implementations.
-//!
-//! # Circular Dependency Detection
-//!
-//! The `Stack` type provides circular dependency detection by tracking the loading
-//! path and detecting when a model appears twice in the path.
 
 use std::path::Path;
 
@@ -33,11 +14,6 @@ pub const fn get_span_from_ast_span(ast_span: ast::AstSpan) -> IrSpan {
 }
 
 /// Trait for loading and parsing Oneil model files.
-///
-/// This trait defines the interface that the model loader uses to parse Oneil files
-/// and validate Python imports. Implementations of this trait handle the actual file
-/// I/O and parsing logic, allowing the model loader to work with different parsing
-/// implementations.
 ///
 /// # Associated Types
 ///
@@ -92,10 +68,6 @@ pub trait FileLoader {
 }
 
 /// A generic stack implementation with circular dependency detection.
-///
-/// This stack is used during model loading to track the current loading path and
-/// detect circular dependencies. When a model appears twice in the loading path,
-/// a circular dependency is detected.
 #[derive(Debug, Clone)]
 pub struct Stack<T: PartialEq + Clone> {
     items: Vec<T>,
@@ -103,29 +75,17 @@ pub struct Stack<T: PartialEq + Clone> {
 
 impl<T: PartialEq + Clone> Stack<T> {
     /// Creates a new empty stack.
-    ///
-    /// # Returns
-    ///
-    /// A new empty `Stack`.
     #[must_use]
     pub const fn new() -> Self {
         Self { items: vec![] }
     }
 
     /// Pushes an item onto the top of the stack.
-    ///
-    /// # Arguments
-    ///
-    /// * `item` - The item to push onto the stack
     pub fn push(&mut self, item: T) {
         self.items.push(item);
     }
 
     /// Removes and returns the top item from the stack.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Some(item)` if the stack is not empty, or `None` if the stack is empty.
     pub fn pop(&mut self) -> Option<T> {
         self.items.pop()
     }
@@ -136,15 +96,6 @@ impl<T: PartialEq + Clone> Stack<T> {
     /// a vector containing the circular dependency path. The path includes all
     /// items from the first occurrence of the item to the end of the stack,
     /// plus the item itself at the end.
-    ///
-    /// # Arguments
-    ///
-    /// * `item` - The item to search for in the stack
-    ///
-    /// # Returns
-    ///
-    /// Returns `Some(circular_dependency)` if a circular dependency is found,
-    /// or `None` if the item is not in the stack.
     #[must_use]
     pub fn find_circular_dependency(&self, item: &T) -> Option<Vec<T>> {
         let item_index = self.items.iter().position(|i| i == item)?;

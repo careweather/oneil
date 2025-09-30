@@ -4,10 +4,6 @@ use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{self as ir, IrSpan};
 
 /// Represents an error that occurred during submodel resolution.
-///
-/// This error type is used when a `use model` declaration cannot be resolved to
-/// its corresponding model. This can happen when the referenced model has errors
-/// or when the submodel identifier is not defined in the referenced model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModelImportResolutionError {
     /// The referenced model has errors, preventing submodel resolution.
@@ -48,15 +44,6 @@ pub enum ModelImportResolutionError {
 
 impl ModelImportResolutionError {
     /// Creates a new error indicating that the referenced model has errors.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model that has errors
-    /// * `reference_span` - The span of where the model is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `SubmodelResolutionError::ModelHasError` variant.
     #[must_use]
     pub const fn model_has_error(model_path: ir::ModelPath, reference_span: IrSpan) -> Self {
         Self::ModelHasError {
@@ -66,16 +53,6 @@ impl ModelImportResolutionError {
     }
 
     /// Creates a new error indicating that the submodel is undefined in the referenced model.
-    ///
-    /// # Arguments
-    ///
-    /// * `parent_model_path` - The path of the parent model that contains the submodel reference
-    /// * `identifier` - The identifier of the undefined submodel
-    /// * `reference_span` - The span of where the submodel is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `SubmodelResolutionError::UndefinedSubmodel` variant.
     #[must_use]
     pub const fn undefined_submodel_in_submodel(
         parent_model_path: ir::ModelPath,
@@ -90,16 +67,6 @@ impl ModelImportResolutionError {
     }
 
     /// Creates a new error indicating that the submodel name is a duplicate.
-    ///
-    /// # Arguments
-    ///
-    /// * `submodel` - The identifier of the duplicate submodel
-    /// * `original_span` - The span of where the original submodel is referenced
-    /// * `duplicate_span` - The span of where the duplicate submodel is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `SubmodelResolutionError::DuplicateSubmodel` variant.
     #[must_use]
     pub const fn duplicate_submodel(
         submodel: ir::SubmodelName,
@@ -114,16 +81,6 @@ impl ModelImportResolutionError {
     }
 
     /// Creates a new error indicating that the reference name is a duplicate.
-    ///
-    /// # Arguments
-    ///
-    /// * `reference` - The identifier of the duplicate reference
-    /// * `original_span` - The span of where the original reference is referenced
-    /// * `duplicate_span` - The span of where the duplicate reference is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `SubmodelResolutionError::DuplicateReference` variant.
     #[must_use]
     pub const fn duplicate_reference(
         reference: ir::ReferenceName,

@@ -4,10 +4,6 @@ use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{self as ir, IrSpan};
 
 /// Represents an error that occurred during variable resolution within expressions.
-///
-/// This error type is used when a variable reference within an expression cannot
-/// be resolved. This is the most fundamental resolution error type, as it represents
-/// the failure to resolve a simple identifier to its definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VariableResolutionError {
     /// The model that should contain the variable has errors.
@@ -51,15 +47,6 @@ pub enum VariableResolutionError {
 
 impl VariableResolutionError {
     /// Creates a new error indicating that the model has errors.
-    ///
-    /// # Arguments
-    ///
-    /// * `model_path` - The path of the model that has errors
-    /// * `reference_span` - The span of where the model is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `VariableResolutionError::ModelHasError` variant.
     #[must_use]
     pub const fn model_has_error(model_path: ir::ModelPath, reference_span: IrSpan) -> Self {
         Self::ModelHasError {
@@ -69,15 +56,6 @@ impl VariableResolutionError {
     }
 
     /// Creates a new error indicating that the parameter has errors.
-    ///
-    /// # Arguments
-    ///
-    /// * `identifier` - The identifier of the parameter that has errors
-    /// * `reference_span` - The span of where the parameter is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `VariableResolutionError::ParameterHasError` variant.
     #[must_use]
     pub const fn parameter_has_error(identifier: ir::Identifier, reference_span: IrSpan) -> Self {
         Self::ParameterHasError {
@@ -88,15 +66,6 @@ impl VariableResolutionError {
 
     /// Creates a new error indicating that resolution of a submodel that is
     /// referenced by a variable has failed.
-    ///
-    /// # Arguments
-    ///
-    /// * `identifier` - The identifier of the submodel that has errors
-    /// * `reference_span` - The span of where the submodel is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `VariableResolutionError::SubmodelResolutionFailed` variant.
     #[must_use]
     pub const fn reference_resolution_failed(
         identifier: ir::ReferenceName,
@@ -109,15 +78,6 @@ impl VariableResolutionError {
     }
 
     /// Creates a new error indicating that the parameter is undefined in the current model.
-    ///
-    /// # Arguments
-    ///
-    /// * `parameter` - The identifier of the undefined parameter
-    /// * `reference_span` - The span of where the parameter is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `VariableResolutionError::UndefinedParameter` variant.
     #[must_use]
     pub const fn undefined_parameter(parameter: ir::Identifier, reference_span: IrSpan) -> Self {
         Self::UndefinedParameter {
@@ -128,15 +88,6 @@ impl VariableResolutionError {
     }
 
     /// Creates a new error indicating that the parameter is undefined in a specific reference.
-    ///
-    /// # Arguments
-    ///
-    /// * `reference_path` - The path of the reference where the parameter should be defined
-    /// * `identifier` - The identifier of the undefined parameter
-    ///
-    /// # Returns
-    ///
-    /// A new `VariableResolutionError::UndefinedParameter` variant.
     #[must_use]
     pub const fn undefined_parameter_in_reference(
         reference_path: ir::ModelPath,
@@ -151,15 +102,6 @@ impl VariableResolutionError {
     }
 
     /// Creates a new error indicating that the submodel is undefined in the current model.
-    ///
-    /// # Arguments
-    ///
-    /// * `submodel` - The identifier of the undefined submodel
-    /// * `reference_span` - The span of where the submodel is referenced
-    ///
-    /// # Returns
-    ///
-    /// A new `VariableResolutionError::UndefinedSubmodel` variant.
     #[must_use]
     pub const fn undefined_reference(reference: ir::ReferenceName, reference_span: IrSpan) -> Self {
         Self::UndefinedReference {
@@ -230,23 +172,10 @@ impl fmt::Display for VariableResolutionError {
 }
 
 impl AsOneilError for VariableResolutionError {
-    /// Returns the error message for this variable resolution error.
     fn message(&self) -> String {
         self.to_string()
     }
 
-    /// Returns the error location within the source code for this variable resolution error.
-    ///
-    /// This method extracts the span information from the error variant and converts
-    /// it to an `ErrorLocation` that can be used for displaying the error in context.
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - The source code string to calculate the location within
-    ///
-    /// # Returns
-    ///
-    /// An `ErrorLocation` representing where the error occurred in the source code.
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             Self::ModelHasError {

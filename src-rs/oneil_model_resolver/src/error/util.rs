@@ -1,16 +1,4 @@
 //! Utility functions for error handling and manipulation.
-//!
-//! This module provides utility functions for working with errors in a functional
-//! programming style. These functions help with combining errors from multiple
-//! operations, converting between error types, and separating successful results
-//! from errors.
-//!
-//! # Key Functions
-//!
-//! - `combine_errors`: Combines errors from two operations
-//! - `combine_error_list`: Combines errors from a list of operations
-//! - `split_ok_and_errors`: Separates successful results from errors
-//! - `convert_errors`: Converts errors from one type to another
 
 use std::{collections::HashMap, hash::Hash};
 

@@ -4,9 +4,6 @@ use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{self as ir, IrSpan};
 
 /// Represents an error that occurred during Python import validation.
-///
-/// This error type is used when a Python import declaration cannot be validated,
-/// typically because the referenced Python file does not exist or cannot be imported.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ImportResolutionError {
     /// A duplicate import was detected.
@@ -29,16 +26,6 @@ pub enum ImportResolutionError {
 
 impl ImportResolutionError {
     /// Creates a new import resolution error indicating that a duplicate import was detected.
-    ///
-    /// # Arguments
-    ///
-    /// * `original_span` - The span of the original import declaration.
-    /// * `duplicate_span` - The span of the duplicate import declaration.
-    /// * `python_path` - The Python path of the duplicate import.
-    ///
-    /// # Returns
-    ///
-    /// A new `ImportResolutionError::DuplicateImport` variant.
     #[must_use]
     pub const fn duplicate_import(
         original_span: IrSpan,
@@ -53,15 +40,6 @@ impl ImportResolutionError {
     }
 
     /// Creates a new import resolution error indicating that validation failed for a Python import.
-    ///
-    /// # Arguments
-    ///
-    /// * `ident_span` - The span of the import declaration that failed validation
-    /// * `python_path` - The Python path that could not be validated
-    ///
-    /// # Returns
-    ///
-    /// A new `ImportResolutionError::FailedValidation` variant.
     #[must_use]
     pub const fn failed_validation(ident_span: IrSpan, python_path: ir::PythonPath) -> Self {
         Self::FailedValidation {
@@ -73,13 +51,6 @@ impl ImportResolutionError {
 
 impl Display for ImportResolutionError {
     /// Converts the import resolution error to a string representation.
-    ///
-    /// This method delegates to the display module to format the error message
-    /// in a user-friendly way.
-    ///
-    /// # Returns
-    ///
-    /// A string representation of the import resolution error.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DuplicateImport { python_path, .. } => {

@@ -6,9 +6,6 @@ use oneil_ir::{self as ir, IrSpan};
 use crate::error::VariableResolutionError;
 
 /// Represents an error that occurred during test resolution.
-///
-/// This error type is used when a test cannot be resolved, typically due
-/// to variable resolution errors within the test's expressions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestResolutionError {
     /// Error indicating that an input parameter has been declared multiple times.
@@ -26,16 +23,6 @@ pub enum TestResolutionError {
 
 impl TestResolutionError {
     /// Creates a new duplicate input error.
-    ///
-    /// # Arguments
-    ///
-    /// * `identifier` - The identifier of the duplicate input
-    /// * `original_span` - The span of the original input
-    /// * `duplicate_span` - The span of the duplicate input
-    ///
-    /// # Returns
-    ///
-    /// A new `TestResolutionError` instance.
     #[must_use]
     pub const fn duplicate_input(
         identifier: ir::Identifier,
@@ -50,14 +37,6 @@ impl TestResolutionError {
     }
 
     /// Creates a new variable resolution error.
-    ///
-    /// # Arguments
-    ///
-    /// * `error` - The variable resolution error that occurred
-    ///
-    /// # Returns
-    ///
-    /// A new `TestResolutionError` instance.
     #[must_use]
     pub const fn variable_resolution(error: VariableResolutionError) -> Self {
         Self::VariableResolution(error)

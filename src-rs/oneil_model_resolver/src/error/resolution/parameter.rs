@@ -6,10 +6,6 @@ use oneil_ir::{self as ir, IrSpan};
 use crate::error::VariableResolutionError;
 
 /// Represents an error that occurred during parameter resolution.
-///
-/// This error type is used when a parameter reference cannot be resolved to its
-/// actual parameter definition. This can happen due to circular dependencies or
-/// variable resolution errors within the parameter's value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParameterResolutionError {
     /// A circular dependency was detected during parameter resolution.
@@ -34,14 +30,6 @@ pub enum ParameterResolutionError {
 
 impl ParameterResolutionError {
     /// Creates a new error indicating a circular dependency in parameter resolution.
-    ///
-    /// # Arguments
-    ///
-    /// * `circular_dependency` - The list of parameter identifiers that form the circular dependency
-    ///
-    /// # Returns
-    ///
-    /// A new `ParameterResolutionError::CircularDependency` variant.
     #[must_use]
     pub const fn circular_dependency(
         circular_dependency: Vec<ir::Identifier>,
@@ -54,27 +42,12 @@ impl ParameterResolutionError {
     }
 
     /// Creates a new error indicating a variable resolution error within a parameter.
-    ///
-    /// # Arguments
-    ///
-    /// * `error` - The variable resolution error that occurred
-    ///
-    /// # Returns
-    ///
-    /// A new `ParameterResolutionError::VariableResolution` variant.
     #[must_use]
     pub const fn variable_resolution(error: VariableResolutionError) -> Self {
         Self::VariableResolution(error)
     }
 
     /// Creates a new error indicating a duplicate parameter was detected.
-    /// # Arguments
-    ///
-    /// * `error` - The duplicate parameter error that occurred
-    ///
-    /// # Returns
-    ///
-    /// A new `ParameterResolutionError::DuplicateParameter` variant.
     #[must_use]
     pub const fn duplicate_parameter(
         identifier: ir::Identifier,

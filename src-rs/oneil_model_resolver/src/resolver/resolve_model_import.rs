@@ -1,61 +1,4 @@
 //! Submodel resolution for the Oneil model loader
-//!
-//! This module provides functionality for resolving submodels in Oneil models.
-//! Submodel resolution involves processing `use` and `from` declarations to
-//! establish relationships between models and their submodels.
-//!
-//! # Overview
-//!
-//! Submodels in Oneil allow models to reference and use other models as
-//! components. This is achieved through two main declaration types:
-//!
-//! ## Use Declarations
-//! ```oneil
-//! use model_name.subcomponent as alias
-//! use model_name(x=1, y=2) as alias
-//! ```
-//!
-//! ## From Declarations
-//! ```oneil
-//! from parent_model use submodel as alias
-//! from parent_model use submodel(x=1, y=2) as alias
-//! ```
-//!
-//! # Resolution Process
-//!
-//! The resolution process involves:
-//! 1. **Path Construction**: Building the model path from the declaration
-//! 2. **Model Loading**: Ensuring the target model is loaded and available
-//! 3. **Subcomponent Navigation**: Traversing nested subcomponents if specified
-//! 4. **Alias Assignment**: Mapping the resolved path to the specified alias
-//! 5. **Test Input Collection**: Gathering any test inputs for later resolution
-//!
-//! # Error Handling
-//!
-//! The model provides comprehensive error handling for various failure scenarios:
-//! - **Model Loading Errors**: When the target model fails to load
-//! - **Undefined Submodels**: When a submodel doesn't exist in the target model
-//! - **Nested Resolution Errors**: When subcomponents in the path don't exist
-//!
-//! # Examples
-//!
-//! ## Simple Submodel Usage
-//! ```oneil
-//! use temperature_model as temp
-//! ```
-//! This creates a submodel named `temp` that references the `temperature_model.on` file.
-//!
-//! ## Nested Submodel Access
-//! ```oneil
-//! use weather_model.atmosphere.temperature as temp
-//! ```
-//! This navigates through `weather_model.on` → `atmosphere` submodel → `temperature` submodel.
-//!
-//! ## Submodel with Test Inputs
-//! ```oneil
-//! use sensor_model(location="north", height=100) as sensor
-//! ```
-//! This creates a submodel with predefined test inputs for later evaluation.
 
 use std::collections::HashMap;
 
@@ -72,30 +15,6 @@ use crate::{
 };
 
 /// Resolves submodels and their associated tests from use model declarations.
-///
-/// This function processes a collection of `UseModel` declarations and resolves
-/// them into submodel mappings, test inputs, and any resolution errors that occur.
-///
-/// # Arguments
-///
-/// * `use_models` - A vector of use model declarations to resolve
-/// * `model_path` - The path of the current model being processed
-/// * `model_info` - Information about all available models and their loading status
-///
-/// # Returns
-///
-/// A tuple containing:
-/// * `HashMap<Identifier, ModelPath>` - Successfully resolved submodels mapped to their paths
-/// * `HashMap<Identifier, SubmodelResolutionError>` - Any resolution errors that occurred
-///
-/// # Error Handling
-///
-/// The function handles various error conditions gracefully:
-/// - **Model loading failures**: If a referenced model failed to load
-/// - **Undefined submodels**: If a submodel doesn't exist in the target model
-/// - **Invalid paths**: If the model path cannot be resolved
-///
-/// All errors are collected and returned rather than causing the function to fail.
 pub fn resolve_model_imports(
     use_models: Vec<&ast::UseModelNode>,
     model_path: &ir::ModelPath,
@@ -277,18 +196,6 @@ fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -
 /// when dealing with nested submodels (e.g., `parent.submodel1.submodel2`).
 /// It traverses the subcomponent chain and validates that each level exists.
 ///
-/// # Arguments
-///
-/// * `parent_model_path` - The path of the parent model (None for root resolution)
-/// * `model_path` - The current model path being resolved
-/// * `subcomponents` - The remaining subcomponents to traverse
-/// * `model_info` - Information about all available models
-///
-/// # Returns
-///
-/// * `Ok(ModelPath)` - The fully resolved model path
-/// * `Err(SubmodelResolutionError)` - An error if resolution fails
-///
 /// # Examples
 ///
 /// For a path like `weather.atmosphere.temperature`:
@@ -297,13 +204,7 @@ fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -
 /// 3. Third call: `resolve_model_path(Some("atmosphere"), "temperature", [], ...)`
 /// 4. Returns: `Ok("temperature")`
 ///
-/// # Error Conditions
-///
-/// * **Model has error**: If the target model failed to load
-/// * **Undefined submodel**: If a subcomponent doesn't exist in the parent model
-/// * **Invalid model**: If the model doesn't exist in `model_info`
-///
-/// # Safety
+/// # Panics
 ///
 /// This function assumes that models referenced in `model_info` have been
 /// properly loaded and validated. If this assumption is violated, the function
@@ -358,9 +259,6 @@ fn resolve_model_path(
 
 #[cfg(test)]
 mod tests {
-    // TODO: go through and ensure that these mean what they should
-    // TODO: create helper functions for assertions
-
     use crate::test::construct::{ModelContextBuilder, test_ast, test_ir};
 
     use super::*;

@@ -34,47 +34,6 @@ mod resolve_unit;
 mod resolve_variable;
 
 /// Loads a model and all its dependencies, building a complete model collection.
-///
-/// This function is the main entry point for model loading. It performs the following steps:
-///
-/// 1. **Circular dependency detection**: Checks if loading this model would create a circular dependency
-/// 2. **Model visitation tracking**: Prevents loading the same model multiple times
-/// 3. **AST parsing**: Parses the model file into an AST using the provided file loader
-/// 4. **Declaration splitting**: Separates imports, use models, parameters, and tests from the AST
-/// 5. **Import validation**: Validates Python imports and collects any validation errors
-/// 6. **Use model loading**: Recursively loads all referenced use models
-/// 7. **Resolution**: Resolves submodels, parameters, and tests using the loaded model information
-/// 8. **Model construction**: Builds the final model and adds it to the collection
-///
-/// # Arguments
-///
-/// * `model_path` - The path to the model to load
-/// * `builder` - The model collection builder that accumulates models and errors
-/// * `load_stack` - A stack tracking the current loading path for circular dependency detection
-/// * `file_loader` - The file loader implementation for parsing and validation
-///
-/// # Returns
-///
-/// Returns the updated model collection builder containing all loaded models and any errors.
-///
-/// # Error Handling
-///
-/// The function handles various error conditions:
-///
-/// - **Circular dependencies**: Returns early with a circular dependency error
-/// - **Parse errors**: Adds parse errors to the builder and returns early without attempting recovery
-/// - **Resolution errors**: Collects all resolution errors and adds them to the builder, but continues processing
-///
-/// # Circular Dependency Detection
-///
-/// The function detects circular dependencies by maintaining a loading stack. If a model
-/// appears in the stack while it's being loaded, a circular dependency is detected.
-///
-/// # Model Visitation
-///
-/// To prevent loading the same model multiple times, the function tracks visited models
-/// in the builder. If a model has already been visited, it returns early without
-/// re-processing the model.
 pub fn load_model<F>(
     model_path: ir::ModelPath,
     mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
@@ -113,7 +72,7 @@ where
     };
 
     // split model ast into imports, use models, parameters, and tests
-    let (imports, use_models, parameters, tests) = split_model_ast(&model_ast);
+    let (imports, model_imports, parameters, tests) = split_model_ast(&model_ast);
 
     // validate imports
     let (python_imports, import_resolution_errors, builder) =
@@ -125,7 +84,7 @@ where
         builtin_ref,
         load_stack,
         file_loader,
-        &use_models,
+        &model_imports,
         builder,
     );
 
@@ -134,9 +93,9 @@ where
 
     let model_context = ModelContext::new(models, models_with_errors);
 
-    // resolve submodels
+    // resolve submodels and references
     let (submodels, references, submodel_resolution_errors, reference_resolution_errors) =
-        resolve_model_import::resolve_model_imports(use_models, &model_path, &model_context);
+        resolve_model_import::resolve_model_imports(model_imports, &model_path, &model_context);
 
     let models_with_errors = builder.get_models_with_errors();
 

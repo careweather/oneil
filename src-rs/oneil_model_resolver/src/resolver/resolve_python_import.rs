@@ -13,30 +13,6 @@ type ValidatedImports = HashMap<ir::PythonPath, IrSpan>;
 type ImportErrors = HashMap<ir::PythonPath, ImportResolutionError>;
 
 /// Validates a list of Python import declarations for a given model.
-///
-/// This function processes import declarations from an Oneil model and validates
-/// that the referenced Python files exist. It uses a functional approach with `fold`
-/// to accumulate results across all imports.
-///
-/// # Arguments
-///
-/// * `model_path` - The path of the model containing the imports
-/// * `builder` - A builder for constructing the model collection
-/// * `imports` - A vector of import declarations to validate
-/// * `file_loader` - A file loader implementation for validating Python imports
-///
-/// # Returns
-///
-/// A tuple containing:
-/// * `HashSet<WithSpan<PythonPath>>` - Successfully validated Python import paths
-/// * `HashMap<PythonPath, ImportResolutionError>` - Failed imports with their errors
-/// * `ModelCollectionBuilder<F::ParseError, F::PythonError>` - Updated builder
-///
-/// # Notes
-///
-/// - Each import path is converted to a Python path relative to the model's location
-/// - Successful imports are added to the returned set of valid Python imports
-/// - Failed imports are recorded in both the error map and the builder
 pub fn resolve_python_imports<F>(
     model_path: &ir::ModelPath,
     builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
@@ -50,6 +26,7 @@ pub fn resolve_python_imports<F>(
 where
     F: FileLoader,
 {
+    // TODO: change this into a for loop
     imports.into_iter().fold(
         (HashMap::new(), HashMap::new(), builder),
         |(mut python_imports, mut import_resolution_errors, mut builder), import| {
