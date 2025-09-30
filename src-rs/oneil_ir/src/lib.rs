@@ -1,4 +1,5 @@
-//! # Oneil Intermediate Representation (IR)
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! Intermediate Representation (IR) for the Oneil programming language
 
 mod debug_info;
 mod expr;

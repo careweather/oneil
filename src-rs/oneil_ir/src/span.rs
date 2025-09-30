@@ -50,7 +50,6 @@ pub struct WithSpan<T> {
 
 impl<T> WithSpan<T> {
     /// Creates a new `WithSpan<T>` with the given value and span.
-    ///
     #[must_use]
     pub const fn new(value: T, span: IrSpan) -> Self {
         Self { value, span }
