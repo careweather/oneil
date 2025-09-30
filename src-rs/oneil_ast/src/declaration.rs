@@ -1,7 +1,4 @@
 //! Declaration constructs for the AST
-//!
-//! This module contains structures for representing declarations in Oneil programs,
-//! including imports, model usage, parameters, and tests.
 
 // TODO: rename `Import` to `ImportPython` and `UseModel` to `ImportModel`
 use std::ops::Deref;
@@ -14,9 +11,6 @@ use crate::{
 };
 
 /// A declaration in an Oneil program
-///
-/// Declarations are top-level constructs that define imports, model usage,
-/// parameters, and tests.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
     /// Import declaration for including other modules
@@ -200,7 +194,7 @@ impl ModelInfo {
     /// use foo/bar.baz as qux
     ///
     /// # name: `foo`
-    /// ref foo as bar         
+    /// ref foo as bar
     ///
     /// # name: `bar`
     /// use foo/bar
@@ -225,7 +219,7 @@ impl ModelInfo {
     /// use foo/bar.baz as qux
     ///
     /// # alias: `bar`
-    /// ref foo as bar         
+    /// ref foo as bar
     ///
     /// # alias: `bar`
     /// use foo/bar
@@ -240,14 +234,6 @@ impl ModelInfo {
 }
 
 /// A collection of submodel information nodes
-///
-/// `SubmodelList` represents a list of submodels that are being used or imported
-/// as part of a model usage declaration. Each submodel in the list contains
-/// information about the model's top component, subcomponents, and optional alias.
-///
-/// This is a newtype wrapper around `Vec<ModelInfoNode>` that provides
-/// semantic meaning to the collection and implements `Deref` for convenient
-/// access to the underlying vector methods.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubmodelList(Vec<ModelInfoNode>);
 

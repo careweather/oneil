@@ -1,7 +1,4 @@
 //! Parameter constructs for the AST
-//!
-//! This module contains structures for representing parameters in Oneil programs,
-//! including parameter definitions, values, limits, and performance markers.
 
 use crate::{
     debug_info::TraceLevelNode,
@@ -13,8 +10,6 @@ use crate::{
 };
 
 /// A parameter in an Oneil program
-///
-/// Parameters are used to define the values of variables in the model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     label: LabelNode,
@@ -96,9 +91,6 @@ impl Parameter {
 }
 
 /// A value assigned to a parameter.
-///
-/// Parameter values can be either simple expressions or piecewise expressions
-/// that evaluate to different values based on conditions.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     /// A simple parameter value with an expression and optional unit
@@ -125,9 +117,6 @@ impl ParameterValue {
 }
 
 /// Parameter limits that constrain the allowed values
-///
-/// Limits can be either continuous (with min/max bounds) or discrete
-/// (with a specific set of allowed values).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Limits {
     /// Continuous limits with minimum and maximum values

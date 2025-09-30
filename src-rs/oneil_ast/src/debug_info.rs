@@ -1,7 +1,4 @@
 //! Debug information and trace levels for the AST
-//!
-//! This module contains structures for handling debug information and trace levels
-//! that can be attached to AST nodes for debugging and tracing purposes.
 
 use crate::node::Node;
 

@@ -1,7 +1,4 @@
 //! Unit expression constructs for the AST
-//!
-//! This module contains structures for representing unit expressions in Oneil programs,
-//! including unit operations, unit definitions, and unit exponents.
 
 use crate::{naming::IdentifierNode, node::Node};
 
@@ -92,9 +89,6 @@ impl UnitOp {
 }
 
 /// A unit exponent value
-///
-/// Unit exponents specify the power to which a unit is raised
-/// (e.g., m², kg³).
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnitExponent(f64);
 

@@ -1,12 +1,6 @@
 //! Source location spans for error reporting and debugging
-//!
-//! This module provides the `Span` struct and related functionality for
-//! tracking source code locations in the AST.
 
 /// Represents a span of source code with start, end, and whitespace end positions
-///
-/// Spans are used throughout the AST to provide precise location information
-/// for error reporting, debugging, and other source-aware operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AstSpan {
     start: usize,
@@ -56,9 +50,6 @@ impl AstSpan {
     }
 
     /// Calculates a span from two span-like objects
-    ///
-    /// The resulting span starts at the start of the first object and ends
-    /// at the end of the second object, with whitespace end from the second object.
     #[must_use]
     pub fn calc_span<T, U>(start_span: &T, end_span: &U) -> Self
     where
@@ -73,9 +64,6 @@ impl AstSpan {
     }
 
     /// Calculates a span from three span-like objects
-    ///
-    /// The resulting span starts at the start of the first object, ends at the
-    /// end of the second object, and uses the whitespace end from the third object.
     pub fn calc_span_with_whitespace<T, U, V>(
         start_span: &T,
         end_span: &U,
@@ -95,9 +83,6 @@ impl AstSpan {
 }
 
 /// Trait for objects that can provide span information
-///
-/// This trait allows different types to provide their source location
-/// information in a uniform way.
 pub trait SpanLike {
     /// Returns the start position
     fn get_start(&self) -> usize;

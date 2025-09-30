@@ -1,7 +1,4 @@
 //! Expression constructs for the AST
-//!
-//! This module contains structures for representing expressions in the Oneil language,
-//! including binary operations, unary operations, function calls, variables, and literals.
 
 use crate::{naming::IdentifierNode, node::Node};
 

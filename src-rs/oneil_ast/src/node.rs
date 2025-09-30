@@ -1,16 +1,10 @@
 //! AST node wrapper with source location information
-//!
-//! This module provides the `Node<T>` wrapper that combines AST elements with
-//! source location information (spans) for error reporting and debugging.
 
 use std::{fmt::Debug, ops::Deref};
 
 use crate::{AstSpan, span::SpanLike};
 
 /// A wrapper around AST elements that includes source location information
-///
-/// Every AST element is wrapped in a `Node<T>` to provide source location
-/// information for error reporting, debugging, and other source-aware operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
     span: AstSpan,

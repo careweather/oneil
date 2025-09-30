@@ -1,14 +1,8 @@
 //! Model constructs for the AST
-//!
-//! This module contains structures for representing models in Oneil programs,
-//! including model definitions, sections, and section headers.
 
 use crate::{declaration::DeclNode, naming::LabelNode, node::Node, note::NoteNode};
 
 /// A model definition in an Oneil program
-///
-/// Models are the primary organizational unit in Oneil, containing declarations
-/// and optionally divided into labeled sections.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
     note: Option<NoteNode>,

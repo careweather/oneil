@@ -1,14 +1,8 @@
 //! Test constructs for the AST
-//!
-//! This module contains structures for representing test declarations
-//! in Oneil programs.
 
 use crate::{debug_info::TraceLevelNode, expression::ExprNode, node::Node, note::NoteNode};
 
 /// A test declaration in an Oneil program
-///
-/// Tests are used to verify the behavior of models and expressions
-/// with expected outputs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
     trace_level: Option<TraceLevelNode>,

@@ -1,14 +1,8 @@
 //! Naming constructs for the AST
-//!
-//! This module contains structures for representing identifiers and labels
-//! used throughout the Oneil language AST.
 
 use crate::node::Node;
 
 /// An identifier in the Oneil language
-///
-/// Identifiers are used to name variables, functions, models, and other
-/// program elements. They are represented as strings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier(String);
 
@@ -30,9 +24,6 @@ impl Identifier {
 }
 
 /// A label in the Oneil language
-///
-/// Labels are used to provide human-readable names for parameters,
-/// sections, and other labeled elements in the language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label(String);
 
@@ -54,9 +45,6 @@ impl Label {
 }
 
 /// A directory name in the Oneil language
-///
-/// Directories are used to organize models and other resources into logical groups.
-/// This represents a single directory name, not a full path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Directory {
     /// A single directory name

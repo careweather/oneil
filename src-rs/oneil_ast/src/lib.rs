@@ -1,7 +1,5 @@
-//! Abstract Syntax Tree (AST) definitions for the Oneil language.
-//!
-//! This module contains the core data structures that represent Oneil programs
-//! in memory after parsing.
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! AST for the Oneil programming language
 
 mod debug_info;
 mod declaration;

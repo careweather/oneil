@@ -1,15 +1,8 @@
 //! Documentation note constructs for the AST
-//!
-//! This module contains structures for representing documentation notes
-//! that can be attached to various AST nodes.
 
 use crate::node::Node;
 
 /// A documentation note in the AST
-///
-/// Notes can be attached to various AST nodes to provide documentation,
-/// explanations, or other comments. They can be either single-line notes
-/// starting with `~` or multi-line notes delimited by `~~~`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note(String);
 
