@@ -4,6 +4,7 @@ Thank you for your interest in contributing to the Oneil programming language!
 This document provides guidelines and instructions for contributing to the
 project.
 
+*This document is a work in progress. If you have any suggestions for improvement, feel free to open a pull request!*
 
 ## Development Setup
 
