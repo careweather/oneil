@@ -1,10 +1,4 @@
 //! Provides parsers for structural elements in the Oneil language.
-//!
-//! This module currently contains parsers for end-of-line tokens, which include:
-//! - Line breaks (`\n`)
-//! - Comments (starting with `#` and continuing to end of line)
-//! - End-of-file markers
-//! - Any combination of the above with optional whitespace
 
 use nom::{
     Parser as _,
@@ -23,14 +17,6 @@ use crate::token::{
 ///
 /// This function recognizes various line ending sequences including `\n`, `\r\n`,
 /// and `\r`. It's used internally by the `end_of_line` parser.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns the span containing the line break sequence.
 fn linebreak(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     line_ending.parse(input)
 }
@@ -40,31 +26,11 @@ fn linebreak(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
 /// This function succeeds only when there is no more input to parse.
 /// It's used internally by the `end_of_line` parser to handle files
 /// that end without a final newline.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns an empty span when at end of file.
 fn end_of_file(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     eof.parse(input)
 }
 
 /// Parses a comment line starting with `#`.
-///
-/// This function recognizes comments that start with `#` and continue
-/// until the end of the line or end of file. Comments are treated
-/// as structural elements and can be part of end-of-line sequences.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns the span containing the comment including the `#` and newline.
 fn comment(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     recognize((char('#'), not_line_ending, line_ending.or(eof))).parse(input)
 }
@@ -78,15 +44,6 @@ fn comment(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
 ///
 /// It also captures any whitespace that follows these elements. This is used to properly
 /// handle line endings and comments in the Oneil language syntax.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the first line break/comment/EOF marker and any trailing
-/// whitespace including subsequent line breaks or comments.
 pub fn end_of_line(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     let (rest, first_line_break) = linebreak
         .or(comment)

@@ -1,7 +1,4 @@
 //! Provides parsers for symbols in the Oneil language.
-//!
-//! This module contains parsers for all symbol tokens in the Oneil language,
-//! including operators, delimiters, and other special characters.
 
 use nom::{
     Parser as _,
@@ -25,14 +22,6 @@ use crate::token::{
 /// The parser succeeds if:
 /// - The next character is different from the specified character, OR
 /// - We've reached the end of the input
-///
-/// # Arguments
-///
-/// * `c` - The character that should NOT be the next character
-///
-/// # Returns
-///
-/// A parser that succeeds when the next character is not `c` or at end of input.
 fn next_char_is_not<'a>(c: char) -> impl Parser<'a, (), TokenError> {
     let next_char_is_not_c = peek(satisfy(move |next_char: char| next_char != c)).map(|_| ());
     let reached_end_of_file = eof.map(|_| ());

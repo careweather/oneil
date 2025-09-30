@@ -32,15 +32,6 @@ pub const KEYWORDS: &[&str] = &[
 /// The parser succeeds if:
 /// - The input starts with the exact keyword string
 /// - The keyword is followed by a non-alphanumeric character (or end of input)
-///
-/// # Arguments
-///
-/// * `kw_str` - The keyword string to match
-/// * `error_kind` - The error kind to use if the keyword is not found
-///
-/// # Returns
-///
-/// A parser that matches the specified keyword with proper boundary checking.
 fn keyword(
     kw_str: &str,
     error_kind: error::ExpectKeyword,

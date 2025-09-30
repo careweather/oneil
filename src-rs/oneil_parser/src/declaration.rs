@@ -65,28 +65,6 @@ fn decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 }
 
 /// Parses an import declaration
-///
-/// An import declaration has the format: `import path` followed by a newline.
-/// The path is a simple identifier that represents the module or file to import.
-///
-/// Examples:
-/// - `import foo`
-/// - `import my_module`
-/// - `import utils`
-///
-/// The parser requires:
-/// - The `import` keyword
-/// - A valid identifier as the import path
-/// - A newline to terminate the declaration
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a declaration node containing the parsed import, or an error if
-/// the import declaration is malformed.
 fn import_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
@@ -110,31 +88,6 @@ fn import_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 }
 
 /// Parses a use declaration
-///
-/// A use declaration has the format: `use path [inputs] as alias` followed by a newline.
-/// This declaration imports a module or model and gives it a local alias.
-///
-/// Examples:
-/// - `use foo.bar as baz`
-/// - `use utils.math(x=1, y=2) as calculator`
-/// - `use my_module as local_name`
-///
-/// The parser requires:
-/// - The `use` keyword
-/// - A model path (e.g., "foo.bar")
-/// - Optional model inputs in parentheses
-/// - The `as` keyword
-/// - A valid identifier as the alias
-/// - A newline to terminate the declaration
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a declaration node containing the parsed use declaration, or an error if
-/// the declaration is malformed.
 fn use_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let ref_keyword = |input| {
         let (rest, ref_token) = ref_.convert_errors().parse(input)?;
@@ -182,27 +135,6 @@ fn use_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 }
 
 /// Parses a directory path in a model path
-///
-/// A directory path is a sequence of directory names separated by forward slashes.
-/// The directory path is optional - if no directory path is present, an empty vector is returned.
-///
-/// Examples:
-/// - `path/to/` (two directory names)
-/// - `../foo/` (parent directory followed by identifier)
-/// - `./bar/` (current directory followed by identifier)
-/// - ` ` (empty path)
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a vector of directory nodes representing the directory path.
-/// Each directory node contains one of:
-/// - `Directory::Name(String)` for an identifier
-/// - `Directory::Current` for "."
-/// - `Directory::Parent` for ".."
 fn opt_directory_path(input: InputSpan<'_>) -> Result<'_, Vec<DirectoryNode>, ParserError> {
     many0(|input| {
         let (rest, directory_name) = directory_name.parse(input)?;
@@ -213,23 +145,6 @@ fn opt_directory_path(input: InputSpan<'_>) -> Result<'_, Vec<DirectoryNode>, Pa
 }
 
 /// Parses a directory name in a model path
-///
-/// A directory name can be one of:
-/// - An identifier (e.g. "foo")
-/// - A current directory marker (".")
-/// - A parent directory marker ("..")
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a directory node containing the parsed directory name.
-/// The directory node will contain one of:
-/// - `Directory::Name(String)` for an identifier
-/// - `Directory::Current` for "."
-/// - `Directory::Parent` for ".."
 fn directory_name(input: InputSpan<'_>) -> Result<'_, DirectoryNode, ParserError> {
     let directory_name = |input| {
         let (rest, directory_name_token) = identifier.convert_errors().parse(input)?;
@@ -290,26 +205,6 @@ fn opt_subcomponents(input: InputSpan<'_>) -> Result<'_, Vec<IdentifierNode>, Pa
 }
 
 /// Parses an alias identifier after an `as` keyword.
-///
-/// This function parses the alias identifier that follows an `as` keyword in a use declaration.
-/// It expects a valid identifier token after the `as` keyword.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns an identifier node containing the parsed alias.
-/// Returns an error if no valid identifier follows the `as` keyword.
-///
-/// # Examples
-///
-/// ```text
-/// as foo  -> IdentifierNode("foo")
-/// as      -> Error(MissingAlias)
-/// as 123  -> Error(UnexpectedToken)
-/// ```
 fn as_alias(input: InputSpan<'_>) -> Result<'_, IdentifierNode, ParserError> {
     let (rest, as_token) = as_.convert_errors().parse(input)?;
 
@@ -322,25 +217,6 @@ fn as_alias(input: InputSpan<'_>) -> Result<'_, IdentifierNode, ParserError> {
 }
 
 /// Parses a list of submodels in a use declaration
-///
-/// A submodel list can be either a single submodel or multiple submodels enclosed in square brackets.
-/// For multiple submodels, they are separated by commas and can have an optional trailing comma. The
-/// trailing comma is allowed in order to make git diffs easier to read.
-///
-/// Examples:
-/// - Single submodel: `foo.bar as baz`
-/// - Multiple submodels: `[foo.bar as baz, qux.quux]`
-/// - Multiple with trailing comma: `[foo.bar, baz.qux,]`
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a vector of submodel nodes. For a single submodel, returns a vector of length 1.
-/// For multiple submodels in brackets, returns a vector containing all parsed submodels.
-/// Returns an error if the submodel list is malformed (e.g., unclosed brackets).
 fn submodel_list(input: InputSpan<'_>) -> Result<'_, SubmodelListNode, ParserError> {
     let single_submodel = |input| {
         let (rest, submodel) = model_info.parse(input)?;
@@ -398,18 +274,6 @@ fn submodel_list(input: InputSpan<'_>) -> Result<'_, SubmodelListNode, ParserErr
 }
 
 /// Parses a parameter declaration by delegating to the parameter parser.
-///
-/// This function wraps the parameter parser to create a declaration node.
-/// It handles the conversion from a parameter node to a declaration node
-/// with proper span calculation.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a declaration node containing the parsed parameter.
 fn parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, parameter) = parse_parameter.parse(input)?;
 
@@ -420,18 +284,6 @@ fn parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 }
 
 /// Parses a test declaration by delegating to the test parser.
-///
-/// This function wraps the test parser to create a declaration node.
-/// It handles the conversion from a test node to a declaration node
-/// with proper span calculation.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a declaration node containing the parsed test.
 fn test_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, test) = parse_test.parse(input)?;
 

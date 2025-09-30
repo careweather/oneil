@@ -22,21 +22,6 @@ where
     ///
     /// This method takes a function that converts errors (`nom::Err::Error`) into a new error type,
     /// while preserving unrecoverable errors (`nom::Err::Failure`) by using `From` conversion.
-    ///
-    /// # Arguments
-    ///
-    /// * `convert_error` - A function that converts errors to the new error type
-    ///
-    /// # Type Parameters
-    ///
-    /// * `E2` - The target error type that implements `ParseError<I>` and can be created `From<E>`
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use nom::Parser;
-    /// let parser = identifier.convert_error_to(|e| MyError::from_nom_error(e));
-    /// ```
     fn convert_error_to<E2>(
         mut self,
         convert_error: impl Fn(E) -> E2,
@@ -59,21 +44,6 @@ where
     ///
     /// This method takes a function that converts recoverable errors (`nom::Err::Error`) into a new error type,
     /// while preserving unrecoverable errors (`nom::Err::Failure`) by using `From` conversion.
-    ///
-    /// # Arguments
-    ///
-    /// * `convert_error` - A function that converts recoverable errors to the new error type
-    ///
-    /// # Type Parameters
-    ///
-    /// * `E2` - The target error type that implements `ParseError<I>` and can be created `From<E>`
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use nom::Parser;
-    /// let parser = identifier.or_fail_with(ParserError::expect_identifier);
-    /// ```
     fn or_fail_with<E2>(
         mut self,
         convert_error: impl Fn(E) -> E2,

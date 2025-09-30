@@ -1,26 +1,9 @@
 //! Detailed error reasons and categories for parser errors.
-//!
-//! This module contains the `ParserErrorReason` enum and related types that
-//! provide detailed categorization of parsing errors. It includes specific
-//! error types for different language constructs like declarations, expressions,
-//! parameters, and units.
-//!
-//! # Error Categories
-//!
-//! - **`Expect`**: Expected a specific language construct but found something else
-//! - **`Incomplete`**: Found an incomplete input with specific details about what's missing
-//! - **`UnexpectedToken`**: Found a token that wasn't expected in the current context
-//! - **`TokenError`**: Low-level tokenization errors
-//! - **`NomError`**: Internal nom parsing library errors
 use oneil_ast::{AstSpan, BinaryOp, ComparisonOp, UnaryOp, UnitOp};
 
 use crate::token::error::TokenErrorKind;
 
 /// The different kinds of errors that can occur during parsing.
-///
-/// This enum represents all possible high-level parsing errors in the Oneil
-/// language. Each variant describes a specific type of error, such as an
-/// invalid declaration or an unexpected token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParserErrorReason {
     /// Expected an AST node but found something else

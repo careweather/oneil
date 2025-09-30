@@ -1,7 +1,4 @@
 //! Error handling for the token parsing
-//!
-//! See [docs/parser/error-model.md](docs/parser/error-model.md) in the source
-//! code for more information.
 
 use nom::error::ParseError;
 

@@ -21,18 +21,6 @@ use crate::token::{
 };
 
 /// Parses an identifier span (alphabetic or underscore, then alphanumeric or underscore).
-///
-/// This function is used to parse the span of an identifier, which is used to
-/// create a token.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a span containing the parsed identifier, or an error if the input
-/// is not a valid identifier or is a reserved keyword.
 fn identifier_span(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     verify(
         recognize(|input| {
@@ -63,15 +51,6 @@ fn identifier_span(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError
 /// - `123abc` (starts with digit)
 /// - `my-var` (contains dash)
 /// - `if` (reserved keyword)
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed identifier, or an error if the input
-/// is not a valid identifier or is a reserved keyword.
 pub fn identifier(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(identifier_span, TokenError::expected_identifier).parse(input)
 }
@@ -86,15 +65,6 @@ pub fn identifier(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
 /// - Can be followed by any number of alphanumeric characters or underscores
 /// - Cannot be a reserved keyword
 /// - May optionally be terminated by '$' or '%'
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed unit identifier, or an error if the input
-/// is not a valid unit identifier or is a reserved keyword.
 pub fn unit_identifier(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         alt((
@@ -136,25 +106,12 @@ pub fn unit_identifier(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError
 /// - `_` (single underscore)
 ///
 /// Examples of invalid labels:
-/// - `-foo` (starts with dash)
 /// - `if` (reserved keyword)
 /// - `(section)` (contains parentheses)
 /// - `[test]` (contains brackets)
-/// - `name:` (contains colon)
-/// - `*important` (contains asterisk)
-/// - `$price` (contains dollar sign)
 ///
 /// Note that labels are often followed by a colon as a delimiter, but other
 /// tokens (such as a linebreak) can also be used depending on the context.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed label, or an error if the input
-/// is not a valid label or is a reserved keyword.
 pub fn label(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     verify(
         token(

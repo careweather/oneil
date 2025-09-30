@@ -1,8 +1,4 @@
 //! Provides parsers for literal values in the Oneil language.
-//!
-//! This module contains parsers for numeric and string literals. The numeric parser
-//! supports integers and floating point numbers with optional signs and exponents.
-//! The string parser handles double-quoted string literals.
 
 use nom::{
     AsChar, Parser as NomParser,
@@ -35,14 +31,6 @@ use crate::token::{
 /// - Decimals: `3.1415`, `-2.5`, `+0.1`, `.123`
 /// - Exponents: `2.5e10`, `-1.2E-3`, `1e+5`
 /// - Combined: `-1.23e-4`, `+5.67E+2`
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed number literal.
 pub fn number(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     // Optional sign (+ or -) at the beginning
     let opt_sign_1 = opt(one_of("+-"));
@@ -112,18 +100,6 @@ pub fn number(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
 /// - `'hello'`
 /// - `'foo bar'`
 /// - `'123'`
-///
-/// The parser will fail if:
-/// - The string is not properly closed with a single quote
-/// - The string contains a newline character
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed string literal including the quotes.
 pub fn string(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         |input| {
@@ -141,24 +117,10 @@ pub fn string(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
 
 /// Parses a unit one literal, which is simply the character "1".
 ///
-/// A unit one represents a unitless 1, usually used for units like 1/s.
-/// According to the grammar, this is just the literal "1" character.
-///
-/// Examples of valid unit ones:
-/// - `1`
-///
 /// The parser will fail if:
 /// - The input doesn't start with "1"
 /// - The input is empty
 /// - The "1" is followed by additional digits (e.g., "123" should fail)
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed unit one literal.
 pub fn unit_one(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         |input| {

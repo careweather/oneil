@@ -1,6 +1,4 @@
 //! Parser for notes in an Oneil program
-//!
-//! Notes are used to add additional information to a parameter or test.
 
 use nom::Parser;
 use nom::combinator::all_consuming;
@@ -35,14 +33,6 @@ pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, NoteNode, ParserError>
 /// For single-line notes, the leading `~` is removed and the content is trimmed.
 /// For multi-line notes, the leading and trailing `~~~` are removed and the
 /// content is trimmed.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a note node containing the parsed note with cleaned content.
 fn note(input: InputSpan<'_>) -> Result<'_, NoteNode, ParserError> {
     let (rest, (token, kind)) = note_token
         .convert_error_to(ParserError::expect_note)

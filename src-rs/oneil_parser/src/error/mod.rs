@@ -1,26 +1,4 @@
 //! Error handling for the Oneil language parser.
-//!
-//! This module provides a comprehensive error handling system for the parser,
-//! including:
-//!
-//! - A trait for consistent error handling across parser components
-//! - Error types that capture both the type of error and its location
-//! - Conversion functions between different error types
-//!
-//! The error system is built on top of nom's error handling, extending it with
-//! Oneil-specific error types and location tracking.
-//!
-//! Note that all constructor methods in both `ParserError` and `ParserErrorReason`
-//! have been made `pub(crate)` to improve encapsulation.
-//!
-//! # Error Handling Strategy
-//!
-//! The parser uses a two-level error handling approach:
-//!
-//! 1. Token-level errors (`TokenError`): For low-level parsing issues like
-//!    invalid characters or unterminated strings
-//! 2. Parser-level errors (`ParserError`): For higher-level issues like
-//!    invalid syntax or unexpected tokens
 
 use std::fmt;
 
@@ -49,11 +27,6 @@ pub mod partial;
 pub use partial::ErrorsWithPartialResult;
 
 /// An error that occurred during parsing.
-///
-/// This type represents high-level parsing errors, containing both the specific
-/// kind of error and the location where it occurred. It is used for errors that
-/// occur during the parsing of language constructs like declarations, expressions,
-/// and parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParserError {
     /// The location in the source where the error occurred

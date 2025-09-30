@@ -1,13 +1,5 @@
 //! Parser for model definitions in an Oneil program.
 //!
-//! This module provides parsing functionality for complete Oneil model definitions.
-//! A model consists of:
-//!
-//! 1. **Optional leading whitespace and newlines** - Ignored during parsing
-//! 2. **Optional note** - A comment starting with `~` at the beginning of the model
-//! 3. **Top-level declarations** - Import, from, use, parameter, and test declarations
-//! 4. **Sections** - Named groups of declarations with the format `section <label>`
-//!
 //! The parser uses error recovery to continue parsing even when individual
 //! declarations or sections fail, allowing multiple syntax errors to be
 //! reported in a single pass.
@@ -57,36 +49,9 @@ pub fn parse_complete(
 
 /// Parses a complete model definition with error recovery.
 ///
-/// This function parses a model that consists of:
-/// 1. Optional leading whitespace and newlines
-/// 2. Optional note at the beginning
-/// 3. Zero or more top-level declarations
-/// 4. Zero or more sections, each containing declarations
-///
 /// The function uses error recovery to continue parsing even when individual
 /// declarations or sections fail, allowing multiple syntax errors to be
 /// reported in a single pass.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a model node if parsing succeeds, or a partial result with errors
-/// if some parts failed to parse.
-///
-/// # Error Recovery Strategy
-///
-/// When a declaration fails to parse:
-/// 1. The error is recorded
-/// 2. The parser skips to the next line
-/// 3. Parsing continues with the next declaration
-///
-/// When a section fails to parse:
-/// 1. The section header error is recorded
-/// 2. Any declarations within the failed section are moved to the top-level
-/// 3. Parsing continues with the next section
 fn model(
     input: InputSpan<'_>,
 ) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
@@ -116,36 +81,9 @@ fn model(
 
 /// Attempts to parse declarations with error recovery
 ///
-/// This function parses zero or more top-level declarations. If it fails to
-/// parse a declaration, it attempts to recover and continue parsing. This
-/// allows for multiple syntax errors to be found in the model.
-///
-/// # Recovery Strategy
-///
-/// When a declaration fails to parse:
-/// 1. Check if the next token is a section header or end of file
-/// 2. If so, stop parsing declarations and return accumulated results
-/// 3. If not, record the error and skip to the next line
-/// 4. Continue parsing with the next declaration
-///
 /// The function handles consecutive errors by avoiding duplicate error
 /// reporting for lines that might be continuations of previous failed
 /// declarations (e.g., multi-line piecewise functions).
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a tuple containing:
-/// - The remaining unparsed input
-/// - Vector of successfully parsed declaration nodes
-/// - Vector of parsing errors encountered
-///
-/// In addition, because it returns partial results, the results may be used
-/// in order to determine other partial information, such as the associated
-/// units of the declarations that were successfully parsed.
 fn parse_decls(input: InputSpan<'_>) -> (InputSpan<'_>, Vec<DeclNode>, Vec<ParserError>) {
     fn parse_decls_recur(
         input: InputSpan<'_>,
@@ -198,23 +136,6 @@ fn parse_decls(input: InputSpan<'_>) -> (InputSpan<'_>, Vec<DeclNode>, Vec<Parse
 }
 
 /// Parses the sections of a model with error recovery
-///
-/// This function parses zero or more sections in the model. Each section
-/// consists of a section header followed by declarations. If a section
-/// header fails to parse, any declarations that follow are treated as
-/// top-level declarations.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a tuple containing:
-/// - The remaining unparsed input
-/// - Vector of successfully parsed section nodes
-/// - Vector of declarations that were parsed but couldn't be assigned to a section
-/// - Vector of parsing errors encountered
 fn parse_sections(
     input: InputSpan<'_>,
 ) -> (
@@ -264,28 +185,6 @@ type SectionResult = StdResult<SectionNode, Vec<DeclNode>>;
 type SectionErrors = Vec<ParserError>;
 
 /// Parses a section within a model
-///
-/// A section consists of:
-/// 1. A section header (`section <label>`)
-/// 2. Optional note
-/// 3. Zero or more declarations
-///
-/// If there is no section header, this function returns `None`, indicating that
-/// no section was found.
-///
-/// Otherwise, this function returns a tuple containing the section and the
-/// errors that occurred while parsing the section, if any.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns `None` if no section header is found, or `Some` containing:
-/// - The remaining unparsed input
-/// - Either a successfully parsed section node or a vector of declarations
-/// - Vector of parsing errors encountered
 fn parse_section(input: InputSpan<'_>) -> Option<(InputSpan<'_>, SectionResult, SectionErrors)> {
     let section_header_result = parse_section_header(input);
 
@@ -332,25 +231,6 @@ fn parse_section(input: InputSpan<'_>) -> Option<(InputSpan<'_>, SectionResult, 
 }
 
 /// Parses a section header with its label
-///
-/// A section header has the format: `section label` followed by a newline.
-/// The function parses the `section` keyword, extracts the label identifier,
-/// and ensures the header is properly terminated with a newline.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a section header node containing the parsed label, or an error
-/// if the header is malformed.
-///
-/// # Error Conditions
-///
-/// - **Missing label**: When the `section` keyword is followed by whitespace or newline
-/// - **Missing newline**: When the label is not followed by a proper line terminator
-/// - **Invalid label**: When the label contains invalid characters
 fn parse_section_header(input: InputSpan<'_>) -> Result<'_, SectionHeaderNode, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
 
@@ -377,14 +257,6 @@ fn parse_section_header(input: InputSpan<'_>) -> Result<'_, SectionHeaderNode, P
 /// end of file, then consumes the newline character itself.
 ///
 /// It also optionally skips a note that follows the line break.
-///
-/// # Arguments
-///
-/// * `input` - The input span to skip from
-///
-/// # Returns
-///
-/// Returns the remaining input after skipping to the next line.
 fn skip_to_next_line_with_content(input: InputSpan<'_>) -> InputSpan<'_> {
     let (rest, _) = take_while::<_, _, nom::error::Error<_>>(|c| c != '\n')
         .parse(input)
