@@ -33,7 +33,7 @@ pub enum Context {
     /// ```rust
     /// use oneil_error::Context;
     ///
-    /// let note = Context::Note("Function 'calculate' expects 2 parameters, but 3 were provided".to_string());
+    /// let note = Context::Note("Unclosed parenthesis found here".to_string());
     /// ```
     Note(String),
 
@@ -49,7 +49,7 @@ pub enum Context {
     /// ```rust
     /// use oneil_error::Context;
     ///
-    /// let help = Context::Help("Use 'let mut x = 0;' to declare a mutable variable".to_string());
+    /// let help = Context::Help("Strings in Oneil use single quotes; try using `'` instead of `\"`".to_string());
     /// ```
     Help(String),
 }
