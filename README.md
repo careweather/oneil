@@ -1,3 +1,7 @@
+<div align="center">
+    <img alt="The Oneil Logo" src="docs/icons/oneil-logo.svg" width="50%">
+</div>
+
 # The Oneil Design Language
 
 Oneil is a design specification language for rapid, comprehensive system modeling.
