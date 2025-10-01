@@ -2,6 +2,7 @@
   "name": "oneil",
   "displayName": "Oneil",
   "description": "VS Code support for the Oneil design specification language",
+  "icon": "./icons/oneil-logo-large.png",
   "version": "0.1.0",
   "publisher": "careweather",
   "license": "MPL-2.0",
