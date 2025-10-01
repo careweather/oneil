@@ -1,5 +1,5 @@
 <div align="center">
-    <img alt="The Oneil Logo" src="docs/icons/oneil-logo.svg" width="50%">
+    <img alt="The Oneil Logo" src="docs/icons/oneil-logo.svg" width="25%">
 </div>
 
 # The Oneil Design Language
