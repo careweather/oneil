@@ -398,13 +398,13 @@ mod tests {
 
         // create a circular dependency: main.on -> sub.on -> main.on
         let main_test_model = test_ast::ModelNodeBuilder::new()
-            .with_submodel("main")
-            .build();
-        let sub_test_model = test_ast::ModelNodeBuilder::new()
             .with_submodel("sub")
             .build();
+        let sub_test_model = test_ast::ModelNodeBuilder::new()
+            .with_submodel("main")
+            .build();
         let file_loader =
-            TestFileParser::new([("main.on", sub_test_model), ("sub.on", main_test_model)]);
+            TestFileParser::new([("main.on", main_test_model), ("sub.on", sub_test_model)]);
 
         // load the model
         let result = load_model(
@@ -430,20 +430,26 @@ mod tests {
         assert!(resolution_errors.get_import_errors().is_empty());
         assert!(
             resolution_errors
-                .get_reference_resolution_errors()
-                .is_empty()
-        );
-        assert!(
-            resolution_errors
                 .get_parameter_resolution_errors()
                 .is_empty()
         );
         assert!(resolution_errors.get_test_resolution_errors().is_empty());
 
         let sub_error = resolution_errors
+            .get_reference_resolution_errors()
+            .get(&ir::ReferenceName::new("sub".to_string()))
+            .expect("sub reference errors should be present");
+
+        let ModelImportResolutionError::ModelHasError { model_path, .. } = sub_error else {
+            panic!("sub reference error should be a model has error error");
+        };
+
+        assert_eq!(model_path, &ir::ModelPath::new("sub"));
+
+        let sub_error = resolution_errors
             .get_submodel_resolution_errors()
             .get(&ir::SubmodelName::new("sub".to_string()))
-            .expect("sub errors should be present");
+            .expect("sub submodel errors should be present");
 
         let ModelImportResolutionError::ModelHasError { model_path, .. } = sub_error else {
             panic!("sub errors should be a model has error error");

@@ -551,7 +551,20 @@ mod tests {
         assert_eq!(model_path, &error_path);
 
         // check the reference errors
-        assert!(reference_errors.is_empty());
+        assert_eq!(reference_errors.len(), 1);
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("error".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::ModelHasError {
+            model_path,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected ModelHasError, got {error:?}");
+        };
+
+        assert_eq!(model_path, &error_path);
 
         // check the submodels
         assert_has_submodels!(&submodel_map, []);
@@ -605,7 +618,22 @@ mod tests {
         assert_eq!(submodel.as_str(), "undefined_submodel");
 
         // check the reference errors
-        assert!(reference_errors.is_empty());
+        assert_eq!(reference_errors.len(), 1);
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("undefined_submodel".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &weather_path);
+        assert_eq!(submodel.as_str(), "undefined_submodel");
 
         // check the submodels
         assert_has_submodels!(&submodel_map, []);
@@ -666,7 +694,23 @@ mod tests {
         assert_eq!(submodel.as_str(), "undefined");
 
         // check the reference errors
-        assert!(reference_errors.is_empty());
+        assert_eq!(reference_errors.len(), 1);
+
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("undefined".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &atmosphere_path);
+        assert_eq!(submodel.as_str(), "undefined");
 
         // check the submodels
         assert_has_submodels!(&submodel_map, []);
@@ -791,7 +835,21 @@ mod tests {
         assert_eq!(model_path, &error_path);
 
         // check the reference errors
-        assert!(reference_errors.is_empty());
+        assert_eq!(reference_errors.len(), 1);
+
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("error".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::ModelHasError {
+            model_path,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected ModelHasError, got {error:?}");
+        };
+
+        assert_eq!(model_path, &error_path);
 
         // check the submodels
         assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
@@ -880,7 +938,21 @@ mod tests {
         assert_eq!(model_path, &math_path);
 
         // check the reference errors
-        assert!(reference_errors.is_empty());
+        assert_eq!(reference_errors.len(), 1);
+
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("math".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::ModelHasError {
+            model_path,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected ModelHasError, got {error:?}");
+        };
+
+        assert_eq!(model_path, &math_path);
 
         // check the submodels
         assert_has_submodels!(&submodel_map, []);
@@ -1005,7 +1077,23 @@ mod tests {
         assert_eq!(submodel.as_str(), "temperature");
 
         // check the reference errors
-        assert!(reference_errors.is_empty());
+        assert_eq!(reference_errors.len(), 1);
+
+        let error = reference_errors
+            .get(&ir::ReferenceName::new("temperature".to_string()))
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &atmosphere_path);
+        assert_eq!(submodel.as_str(), "temperature");
 
         // check the submodels
         assert_has_submodels!(&submodel_map, []);
@@ -1078,7 +1166,24 @@ mod tests {
         assert_eq!(submodel.as_str(), "undefined");
 
         // check the reference errors
-        assert!(reference_errors.is_empty());
+        assert_eq!(reference_errors.len(), 1);
+
+        let reference_name = ir::ReferenceName::new("undefined".to_string());
+        let error = reference_errors
+            .get(&reference_name)
+            .expect("error should exist");
+
+        let ModelImportResolutionError::UndefinedSubmodel {
+            parent_model_path,
+            submodel,
+            reference_span: _,
+        } = error
+        else {
+            panic!("Expected UndefinedSubmodel, got {error:?}");
+        };
+
+        assert_eq!(parent_model_path, &atmosphere_path);
+        assert_eq!(submodel.as_str(), "undefined");
 
         // check the submodels - should only contain the successful one
         assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
