@@ -26,6 +26,10 @@ type LoadModelErr<Ps, Py> = Box<(ir::ModelCollection, ModelErrorMap<Ps, Py>)>;
 /// This is the main entry point for loading a Oneil model. It loads the specified model
 /// and all of its dependencies, returning either a complete `ModelCollection` or a tuple
 /// containing a partial collection and any errors that occurred during loading.
+///
+/// # Errors
+///
+/// Returns an error if parsing fails, resolution errors occur, circular dependencies are detected, or files cannot be accessed.
 pub fn load_model<F>(
     model_path: impl AsRef<Path>,
     builtin_ref: &impl BuiltinRef,
@@ -38,6 +42,10 @@ where
 }
 
 /// Loads multiple models and all their dependencies.
+///
+/// # Errors
+///
+/// Returns an error if parsing fails, resolution errors occur, circular dependencies are detected, or files cannot be accessed.
 pub fn load_model_list<F>(
     model_paths: &[impl AsRef<Path>],
     builtin_ref: &impl BuiltinRef,
