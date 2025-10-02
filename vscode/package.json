@@ -32,7 +32,11 @@
         "extensions": [
           ".on"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/oneil-logo.svg",
+          "dark": "./icons/oneil-logo.svg"
+        }
       }
     ],
     "grammars": [
