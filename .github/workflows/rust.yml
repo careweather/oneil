@@ -1,0 +1,21 @@
+name: Rust
+
+on: pull_request
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build
+      run: cargo build --verbose
+    - name: Lint
+      run: cargo clippy
+    - name: Run tests
+      run: cargo test --verbose
