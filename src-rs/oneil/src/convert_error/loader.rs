@@ -14,7 +14,6 @@
 
 use std::{fs, path::Path};
 
-use oneil_error::{ErrorLocation, OneilError};
 use oneil_ir as ir;
 use oneil_model_resolver::{
     ModelErrorMap,
@@ -23,6 +22,7 @@ use oneil_model_resolver::{
         ParameterResolutionError, ResolutionErrors, TestResolutionError, VariableResolutionError,
     },
 };
+use oneil_shared::{ErrorLocation, OneilError};
 
 use crate::{
     convert_error::{file, parser},

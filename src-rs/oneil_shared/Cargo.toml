@@ -1,6 +1,6 @@
 [package]
-name = "oneil_error"
-description = "A unified structure for errors in the Oneil programming language"
+name = "oneil_shared"
+description = "Shared utilities for the Oneil programming language"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

@@ -1,7 +1,7 @@
 use std::fmt;
 
-use oneil_error::{AsOneilError, ErrorLocation};
 use oneil_ir::{self as ir, IrSpan};
+use oneil_shared::{AsOneilError, ErrorLocation};
 
 /// Represents an error that occurred during variable resolution within expressions.
 #[derive(Debug, Clone, PartialEq, Eq)]

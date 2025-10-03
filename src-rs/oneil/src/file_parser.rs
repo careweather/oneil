@@ -3,9 +3,9 @@
 use std::path::{Path, PathBuf};
 
 use oneil_ast as ast;
-use oneil_error::AsOneilError;
 use oneil_model_resolver::FileLoader as ModelFileLoader;
 use oneil_parser as parser;
+use oneil_shared::AsOneilError;
 
 /// Type alias for parser errors with partial results
 type OneilParserError =
@@ -60,7 +60,7 @@ impl AsOneilError for DoesNotExistError {
         format!("python file '{}' does not exist", self.0.display())
     }
 
-    fn context(&self) -> Vec<oneil_error::Context> {
+    fn context(&self) -> Vec<oneil_shared::Context> {
         vec![]
     }
 }

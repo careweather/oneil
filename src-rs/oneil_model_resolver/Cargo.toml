@@ -12,7 +12,7 @@ readme = "README.md"
 
 [dependencies]
 oneil_ast = { path = "../oneil_ast" }
-oneil_error = { path = "../oneil_error" }
+oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
 
 [dev-dependencies]

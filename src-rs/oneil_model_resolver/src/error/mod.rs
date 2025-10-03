@@ -2,8 +2,8 @@
 
 use std::fmt;
 
-use oneil_error::AsOneilError;
 use oneil_ir as ir;
+use oneil_shared::AsOneilError;
 
 pub mod collection;
 pub mod resolution;

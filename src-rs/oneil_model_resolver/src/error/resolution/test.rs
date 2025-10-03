@@ -1,7 +1,7 @@
 use std::fmt;
 
-use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{self as ir, IrSpan};
+use oneil_shared::{AsOneilError, Context, ErrorLocation};
 
 use crate::error::VariableResolutionError;
 

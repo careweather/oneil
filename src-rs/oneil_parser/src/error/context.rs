@@ -3,7 +3,7 @@
     reason = "contexts only apply to a subset of reasons, and that subset is unlikely to change, even if more reasons are added"
 )]
 
-use oneil_error::{Context, ErrorLocation};
+use oneil_shared::{Context, ErrorLocation};
 
 use crate::{
     error::reason::{ExpectKind, IncompleteKind, ParserErrorReason},

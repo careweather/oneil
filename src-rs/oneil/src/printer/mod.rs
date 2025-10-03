@@ -10,8 +10,8 @@ pub use util::ColorChoice;
 use std::io::{self, Write};
 
 use oneil_ast::Model as AstModel;
-use oneil_error::OneilError;
 use oneil_ir::ModelCollection as IrModelCollection;
+use oneil_shared::OneilError;
 
 /// Main printer for formatting and displaying Oneil CLI output
 pub struct Printer<'a, W1, W2>

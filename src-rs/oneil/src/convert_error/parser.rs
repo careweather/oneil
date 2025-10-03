@@ -7,8 +7,8 @@
 
 use std::path::Path;
 
-use oneil_error::OneilError;
 use oneil_parser::error::ParserError;
+use oneil_shared::OneilError;
 
 use crate::convert_error::file::convert as convert_file_error;
 

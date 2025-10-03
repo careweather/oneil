@@ -1,7 +1,7 @@
 use std::fmt;
 
-use oneil_error::{AsOneilError, Context, ErrorLocation};
 use oneil_ir::{self as ir, IrSpan};
+use oneil_shared::{AsOneilError, Context, ErrorLocation};
 
 use crate::error::VariableResolutionError;
 
@@ -122,7 +122,7 @@ impl AsOneilError for ParameterResolutionError {
     fn context_with_source(
         &self,
         source: &str,
-    ) -> Vec<(oneil_error::Context, Option<ErrorLocation>)> {
+    ) -> Vec<(oneil_shared::Context, Option<ErrorLocation>)> {
         match self {
             Self::DuplicateParameter { original_span, .. } => {
                 let original_location = ErrorLocation::from_source_and_span(
