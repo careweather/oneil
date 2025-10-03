@@ -22,6 +22,8 @@ pub enum Commands {
         #[command(subcommand)]
         command: DevCommands,
     },
+    /// Run the LSP
+    Lsp {},
 }
 
 /// Development-specific commands for the Oneil CLI

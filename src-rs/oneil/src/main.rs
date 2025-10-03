@@ -23,6 +23,10 @@ fn main() -> io::Result<()> {
     let cli = CliCommand::parse();
 
     match cli.command {
+        Commands::Lsp {} => {
+            oneil_lsp::run();
+            Ok(())
+        }
         Commands::Dev { command } => match command {
             DevCommands::PrintAst {
                 files,
