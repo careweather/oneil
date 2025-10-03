@@ -22,7 +22,7 @@ use oneil_model_resolver::{
         ParameterResolutionError, ResolutionErrors, TestResolutionError, VariableResolutionError,
     },
 };
-use oneil_shared::{ErrorLocation, OneilError};
+use oneil_shared::error::{ErrorLocation, OneilError};
 
 use crate::{
     convert_error::{file, parser},

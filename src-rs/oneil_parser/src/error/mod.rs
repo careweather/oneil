@@ -3,7 +3,7 @@
 use std::fmt;
 
 use oneil_ast::{AstSpan, BinaryOpNode, ComparisonOpNode, SpanLike, UnaryOpNode, UnitOpNode};
-use oneil_shared::{AsOneilError, Context, ErrorLocation};
+use oneil_shared::error::{AsOneilError, Context, ErrorLocation};
 
 use crate::{
     InputSpan,

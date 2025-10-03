@@ -3,7 +3,7 @@
 use std::fmt;
 
 use oneil_ir as ir;
-use oneil_shared::AsOneilError;
+use oneil_shared::error::AsOneilError;
 
 pub mod collection;
 pub mod resolution;

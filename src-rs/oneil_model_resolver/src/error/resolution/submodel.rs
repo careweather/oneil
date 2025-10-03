@@ -1,7 +1,7 @@
 use std::fmt;
 
 use oneil_ir::{self as ir, IrSpan};
-use oneil_shared::{AsOneilError, Context, ErrorLocation};
+use oneil_shared::error::{AsOneilError, Context, ErrorLocation};
 
 /// Represents an error that occurred during submodel resolution.
 #[derive(Debug, Clone, PartialEq, Eq)]
