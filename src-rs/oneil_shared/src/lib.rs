@@ -2,3 +2,4 @@
 //! Shared utilities for the Oneil programming language
 
 pub mod error;
+pub mod span;
