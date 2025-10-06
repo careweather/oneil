@@ -1,33 +1,44 @@
 //! AST node wrapper with source location information
 
-use std::{fmt::Debug, ops::Deref};
+use std::fmt::Debug;
 
-use crate::{AstSpan, span::SpanLike};
+use oneil_shared::span::Span;
 
 /// A wrapper around AST elements that includes source location information
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
-    span: AstSpan,
     value: Box<T>,
+    span: Span,
+    whitespace_span: Span,
 }
 
 impl<T> Node<T> {
     /// Creates a new node with the given span and value
-    pub fn new(spanlike: &impl SpanLike, value: T) -> Self {
-        let span = AstSpan::from(spanlike);
+    #[must_use]
+    pub fn new(value: T, span: Span, whitespace_span: Span) -> Self {
         let value = Box::new(value);
-        Self { span, value }
+        Self {
+            value,
+            span,
+            whitespace_span,
+        }
     }
 
     /// Returns a reference to the node's span information
     #[must_use]
-    pub const fn node_span(&self) -> AstSpan {
+    pub const fn span(&self) -> Span {
         self.span
     }
 
-    /// Returns a reference to the node's value
+    /// Returns a reference to the node's whitespace span information
     #[must_use]
-    pub const fn node_value(&self) -> &T {
+    pub const fn whitespace_span(&self) -> Span {
+        self.whitespace_span
+    }
+
+    /// Returns the value contained by the node
+    #[must_use]
+    pub fn node_value(&self) -> &T {
         &self.value
     }
 
@@ -35,51 +46,5 @@ impl<T> Node<T> {
     #[must_use]
     pub fn take_value(self) -> T {
         *self.value
-    }
-}
-
-impl<T> SpanLike for Node<T>
-where
-    T: Debug + Clone + PartialEq,
-{
-    fn get_start(&self) -> usize {
-        self.span.get_start()
-    }
-
-    fn get_length(&self) -> usize {
-        self.span.get_length()
-    }
-
-    fn get_whitespace_length(&self) -> usize {
-        self.span.get_whitespace_length()
-    }
-}
-
-impl<T> SpanLike for &Node<T>
-where
-    T: Debug + Clone + PartialEq,
-{
-    fn get_start(&self) -> usize {
-        self.span.get_start()
-    }
-
-    fn get_length(&self) -> usize {
-        self.span.get_length()
-    }
-
-    fn get_whitespace_length(&self) -> usize {
-        self.span.get_whitespace_length()
-    }
-}
-
-// this allows us to treat node as the value it contains
-impl<T> Deref for Node<T>
-where
-    T: Debug + Clone + PartialEq,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
     }
 }
