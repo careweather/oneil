@@ -6,6 +6,7 @@ use nom::{
     combinator::{eof, opt, recognize},
     multi::many0,
 };
+use oneil_shared::span::{SourceLocation, Span};
 
 use crate::token::{
     InputSpan, Result,
@@ -45,20 +46,79 @@ fn comment(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
 /// It also captures any whitespace that follows these elements. This is used to properly
 /// handle line endings and comments in the Oneil language syntax.
 pub fn end_of_line(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
-    let (rest, first_line_break) = linebreak
-        .or(comment)
-        .or(end_of_file)
-        .convert_error_to(TokenError::expected_end_of_line)
-        .parse(input)?;
+    // because the end of line is whitespace, the lexeme is empty
+    let lexeme_str = &input.fragment()[..0];
 
-    let (rest, rest_whitespace) = recognize((
-        inline_whitespace,
-        many0((linebreak.or(comment), inline_whitespace)),
-        opt(end_of_file),
+    let lexeme_start_line = usize::try_from(input.location_line())
+        .expect("usize should be greater than or equal to u32");
+    let lexeme_start = SourceLocation {
+        offset: input.location_offset(),
+        line: lexeme_start_line,
+        column: input.get_column(),
+    };
+
+    let lexeme_end_line = usize::try_from(input.location_line())
+        .expect("usize should be greater than or equal to u32");
+    let lexeme_end = SourceLocation {
+        offset: input.location_offset(),
+        line: lexeme_end_line,
+        column: input.get_column(),
+    };
+
+    let lexeme_span = Span::new(lexeme_start, lexeme_end);
+
+    // parse any whitespace, including the linebreak
+    let (rest, whitespace) = recognize(|input| {
+        // parse the first linebreak, comment, or end of file
+        let (rest, _) = linebreak
+            .or(comment)
+            .or(end_of_file)
+            .convert_error_to(TokenError::expected_end_of_line)
+            .parse(input)?;
+
+        // parse any additional linebreaks or comments
+        let (rest, _) = inline_whitespace.parse(rest)?;
+
+        let (rest, _) = many0(|input| {
+            let (rest, _) = linebreak.or(comment).parse(input)?;
+            let (rest, _) = inline_whitespace.parse(rest)?;
+            Ok((rest, ()))
+        })
+        .parse(rest)?;
+
+        // parse the end of file, if present
+        let (rest, _) = opt(end_of_file).parse(rest)?;
+
+        Ok((rest, ()))
+    })
+    .parse(input)?;
+
+    let whitespace_start_line = usize::try_from(whitespace.location_line())
+        .expect("usize should be greater than or equal to u32");
+    let whitespace_start = SourceLocation {
+        offset: whitespace.location_offset(),
+        line: whitespace_start_line,
+        column: whitespace.get_column(),
+    };
+
+    let whitespace_end_line = usize::try_from(rest.location_line())
+        .expect("usize should be greater than or equal to u32");
+    let whitespace_end = SourceLocation {
+        offset: rest.location_offset(),
+        line: whitespace_end_line,
+        column: rest.get_column(),
+    };
+
+    let whitespace_span = Span::new(whitespace_start, whitespace_end);
+
+    Ok((
+        rest,
+        Token {
+            lexeme_str,
+            lexeme_span,
+            whitespace_span,
+        },
     ))
-    .parse(rest)?;
-
-    Ok((rest, Token::new(first_line_break, rest_whitespace)))
 }
 
 #[cfg(test)]
@@ -305,8 +365,7 @@ mod tests {
             let input = InputSpan::new_extra("\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse single linebreak");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "\n");
-            assert!(matched.whitespace().is_empty());
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -314,8 +373,7 @@ mod tests {
             let input = InputSpan::new_extra("# comment\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse single comment");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "# comment\n");
-            assert!(matched.whitespace().is_empty());
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -323,8 +381,7 @@ mod tests {
             let input = InputSpan::new_extra("", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse EOF");
             assert_eq!(rest.fragment(), &"");
-            assert_eq!(matched.lexeme(), "");
-            assert_eq!(matched.whitespace(), "");
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -332,8 +389,7 @@ mod tests {
             let input = InputSpan::new_extra("\n\n\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse multiple linebreaks");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "\n");
-            assert!(matched.whitespace().contains("\n\n"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -341,8 +397,7 @@ mod tests {
             let input = InputSpan::new_extra("# foo\n# bar\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse multiple comments");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "# foo\n");
-            assert!(matched.whitespace().contains("# bar\n"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -351,9 +406,7 @@ mod tests {
             let (rest, matched) =
                 end_of_line(input).expect("should parse mixed linebreaks and comments");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "\n");
-            assert!(matched.whitespace().contains("# foo\n"));
-            assert!(matched.whitespace().contains("# bar\n"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -362,9 +415,7 @@ mod tests {
                 InputSpan::new_extra("\n   # foo   \n   \n   # bar   \nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse with whitespace between");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "\n");
-            assert!(matched.whitespace().contains("# foo"));
-            assert!(matched.whitespace().contains("# bar"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -372,9 +423,7 @@ mod tests {
             let input = InputSpan::new_extra("\n\t# foo\t\n\t\n\t# bar\t\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse with tabs between");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "\n");
-            assert!(matched.whitespace().contains("# foo"));
-            assert!(matched.whitespace().contains("# bar"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -382,8 +431,7 @@ mod tests {
             let input = InputSpan::new_extra("\n# comment\n\n", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse ending with EOF");
             assert_eq!(rest.fragment(), &"");
-            assert_eq!(matched.lexeme(), "\n");
-            assert!(matched.whitespace().contains("# comment\n"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -391,8 +439,7 @@ mod tests {
             let input = InputSpan::new_extra("\r\n# comment\r\nrest", Config::default());
             let (rest, matched) = end_of_line(input).expect("should parse windows line endings");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "\r\n");
-            assert!(matched.whitespace().contains("# comment\r\n"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -403,9 +450,7 @@ mod tests {
             );
             let (rest, matched) = end_of_line(input).expect("should parse mixed line endings");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "\n");
-            assert!(matched.whitespace().contains("# unix comment"));
-            assert!(matched.whitespace().contains("# windows comment"));
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -417,12 +462,7 @@ mod tests {
             let (rest, matched) =
                 end_of_line(input).expect("should parse comments with special characters");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "# comment with @#$% symbols\n");
-            assert!(
-                matched
-                    .whitespace()
-                    .contains("# another comment with 123\n")
-            );
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]
@@ -433,12 +473,7 @@ mod tests {
             );
             let (rest, matched) = end_of_line(input).expect("should parse comments with unicode");
             assert_eq!(rest.fragment(), &"rest");
-            assert_eq!(matched.lexeme(), "# comment with 世界 characters\n");
-            assert!(
-                matched
-                    .whitespace()
-                    .contains("# another comment with 😀 emoji\n")
-            );
+            assert_eq!(matched.lexeme_str, "");
         }
 
         #[test]

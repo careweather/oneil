@@ -1,5 +1,5 @@
 use nom::{Parser as NomParser, character::complete::space0, combinator::recognize};
-use oneil_ast::SpanLike;
+use oneil_shared::span::{SourceLocation, Span};
 
 use crate::token::{
     InputSpan, Parser, Result,
@@ -16,44 +16,9 @@ use crate::token::{
 /// while handling whitespace appropriately during tokenization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token<'a> {
-    lexeme: InputSpan<'a>,
-    whitespace: InputSpan<'a>,
-}
-
-impl<'a> Token<'a> {
-    /// Creates a new token with the specified lexeme and whitespace spans.
-    #[must_use]
-    pub const fn new(lexeme: InputSpan<'a>, whitespace: InputSpan<'a>) -> Self {
-        Self { lexeme, whitespace }
-    }
-
-    /// Returns the text content of the token.
-    pub fn lexeme(&self) -> &str {
-        self.lexeme.fragment()
-    }
-
-    /// Returns the trailing whitespace that follows the token.
-    #[cfg(test)]
-    pub fn whitespace(&self) -> &str {
-        self.whitespace.fragment()
-    }
-}
-
-impl SpanLike for Token<'_> {
-    /// Returns the starting offset of the token's lexeme.
-    fn get_start(&self) -> usize {
-        self.lexeme.location_offset()
-    }
-
-    /// Returns the ending offset of the token's lexeme.
-    fn get_length(&self) -> usize {
-        self.lexeme.fragment().len()
-    }
-
-    /// Returns the ending offset including trailing whitespace.
-    fn get_whitespace_length(&self) -> usize {
-        self.whitespace.fragment().len()
-    }
+    pub lexeme_str: &'a str,
+    pub lexeme_span: Span,
+    pub whitespace_span: Span,
 }
 
 /// Parses inline whitespace (spaces and tabs) and returns the parsed whitespace.
@@ -73,14 +38,66 @@ pub fn inline_whitespace(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, Toke
 ///
 /// This is useful for tokenizing where whitespace between tokens should be handled automatically.
 pub fn token<'a, O>(
-    f: impl Parser<'a, O, TokenError>,
+    mut f: impl Parser<'a, O, TokenError>,
     convert_error: impl Fn(TokenError) -> TokenError,
 ) -> impl Parser<'a, Token<'a>, TokenError> {
-    (
-        recognize(f).convert_error_to(convert_error),
-        inline_whitespace,
-    )
-        .map(|(lexeme, whitespace)| Token::new(lexeme, whitespace))
+    move |input| {
+        // capture the parser and convert the error function
+        let f = |input| (&mut f).parse(input);
+        let convert_error = |error| (&convert_error)(error);
+
+        // recognize the lexeme
+        let (rest, lexeme) = recognize(f).convert_error_to(convert_error).parse(input)?;
+
+        let lexeme_str = lexeme.fragment();
+
+        let lexeme_start_line = usize::try_from(lexeme.location_line())
+            .expect("usize should be greater than or equal to u32");
+        let lexeme_start = SourceLocation {
+            offset: lexeme.location_offset(),
+            line: lexeme_start_line,
+            column: lexeme.get_column(),
+        };
+
+        let lexeme_end_line = usize::try_from(rest.location_line())
+            .expect("usize should be greater than or equal to u32");
+        let lexeme_end = SourceLocation {
+            offset: rest.location_offset(),
+            line: lexeme_end_line,
+            column: rest.get_column(),
+        };
+
+        let lexeme_span = Span::new(lexeme_start, lexeme_end);
+
+        // consume the whitespace
+        let (rest, whitespace) = inline_whitespace.parse(rest)?;
+
+        let whitespace_start_line = usize::try_from(whitespace.location_line())
+            .expect("usize should be greater than or equal to u32");
+        let whitespace_start = SourceLocation {
+            offset: whitespace.location_offset(),
+            line: whitespace_start_line,
+            column: whitespace.get_column(),
+        };
+
+        let whitespace_end_line = usize::try_from(rest.location_line())
+            .expect("usize should be greater than or equal to u32");
+        let whitespace_end = SourceLocation {
+            offset: rest.location_offset(),
+            line: whitespace_end_line,
+            column: rest.get_column(),
+        };
+
+        let whitespace_span = Span::new(whitespace_start, whitespace_end);
+
+        let token = Token {
+            lexeme_str,
+            lexeme_span,
+            whitespace_span,
+        };
+
+        Ok((rest, token))
+    }
 }
 
 #[cfg(test)]
@@ -117,7 +134,7 @@ mod tests {
         let (rest, matched) = parser
             .parse(input)
             .expect("should parse token with trailing whitespace");
-        assert_eq!(matched.lexeme(), "foo");
+        assert_eq!(matched.lexeme_str, "foo");
         assert_eq!(rest.fragment(), &"bar");
     }
 

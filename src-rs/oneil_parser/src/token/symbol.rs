@@ -257,7 +257,7 @@ mod tests {
         fn bar_symbol() {
             let input = InputSpan::new_extra("| rest", Config::default());
             let (rest, matched) = bar(input).expect("should parse '|' symbol");
-            assert_eq!(matched.lexeme(), "|");
+            assert_eq!(matched.lexeme_str, "|");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -265,7 +265,7 @@ mod tests {
         fn brace_left_symbol() {
             let input = InputSpan::new_extra("{ rest", Config::default());
             let (rest, matched) = brace_left(input).expect("should parse '{' symbol");
-            assert_eq!(matched.lexeme(), "{");
+            assert_eq!(matched.lexeme_str, "{");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -273,7 +273,7 @@ mod tests {
         fn bracket_left_symbol() {
             let input = InputSpan::new_extra("[ rest", Config::default());
             let (rest, matched) = bracket_left(input).expect("should parse '[' symbol");
-            assert_eq!(matched.lexeme(), "[");
+            assert_eq!(matched.lexeme_str, "[");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -281,7 +281,7 @@ mod tests {
         fn bracket_right_symbol() {
             let input = InputSpan::new_extra("] rest", Config::default());
             let (rest, matched) = bracket_right(input).expect("should parse ']' symbol");
-            assert_eq!(matched.lexeme(), "]");
+            assert_eq!(matched.lexeme_str, "]");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -289,7 +289,7 @@ mod tests {
         fn caret_symbol() {
             let input = InputSpan::new_extra("^ rest", Config::default());
             let (rest, matched) = caret(input).expect("should parse '^' symbol");
-            assert_eq!(matched.lexeme(), "^");
+            assert_eq!(matched.lexeme_str, "^");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -297,7 +297,7 @@ mod tests {
         fn colon_symbol() {
             let input = InputSpan::new_extra(": rest", Config::default());
             let (rest, matched) = colon(input).expect("should parse ':' symbol");
-            assert_eq!(matched.lexeme(), ":");
+            assert_eq!(matched.lexeme_str, ":");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -305,7 +305,7 @@ mod tests {
         fn comma_symbol() {
             let input = InputSpan::new_extra(", rest", Config::default());
             let (rest, matched) = comma(input).expect("should parse ',' symbol");
-            assert_eq!(matched.lexeme(), ",");
+            assert_eq!(matched.lexeme_str, ",");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -313,7 +313,7 @@ mod tests {
         fn dollar_symbol() {
             let input = InputSpan::new_extra("$ rest", Config::default());
             let (rest, matched) = dollar(input).expect("should parse '$' symbol");
-            assert_eq!(matched.lexeme(), "$");
+            assert_eq!(matched.lexeme_str, "$");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -321,7 +321,7 @@ mod tests {
         fn dot_symbol() {
             let input = InputSpan::new_extra(". rest", Config::default());
             let (rest, matched) = dot(input).expect("should parse '.' symbol");
-            assert_eq!(matched.lexeme(), ".");
+            assert_eq!(matched.lexeme_str, ".");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -329,7 +329,7 @@ mod tests {
         fn dot_dot_symbol() {
             let input = InputSpan::new_extra(".. rest", Config::default());
             let (rest, matched) = dot_dot(input).expect("should parse '..' symbol");
-            assert_eq!(matched.lexeme(), "..");
+            assert_eq!(matched.lexeme_str, "..");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -337,7 +337,7 @@ mod tests {
         fn paren_left_symbol() {
             let input = InputSpan::new_extra("( rest", Config::default());
             let (rest, matched) = paren_left(input).expect("should parse '(' symbol");
-            assert_eq!(matched.lexeme(), "(");
+            assert_eq!(matched.lexeme_str, "(");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -345,7 +345,7 @@ mod tests {
         fn paren_right_symbol() {
             let input = InputSpan::new_extra(") rest", Config::default());
             let (rest, matched) = paren_right(input).expect("should parse ')' symbol");
-            assert_eq!(matched.lexeme(), ")");
+            assert_eq!(matched.lexeme_str, ")");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -353,7 +353,7 @@ mod tests {
         fn percent_symbol() {
             let input = InputSpan::new_extra("% rest", Config::default());
             let (rest, matched) = percent(input).expect("should parse '%' symbol");
-            assert_eq!(matched.lexeme(), "%");
+            assert_eq!(matched.lexeme_str, "%");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -361,7 +361,7 @@ mod tests {
         fn plus_symbol() {
             let input = InputSpan::new_extra("+ rest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' symbol");
-            assert_eq!(matched.lexeme(), "+");
+            assert_eq!(matched.lexeme_str, "+");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -369,7 +369,7 @@ mod tests {
         fn bang_equals_symbol() {
             let input = InputSpan::new_extra("!= rest", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' symbol");
-            assert_eq!(matched.lexeme(), "!=");
+            assert_eq!(matched.lexeme_str, "!=");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -377,7 +377,7 @@ mod tests {
         fn equals_equals_symbol() {
             let input = InputSpan::new_extra("== rest", Config::default());
             let (rest, matched) = equals_equals(input).expect("should parse '==' symbol");
-            assert_eq!(matched.lexeme(), "==");
+            assert_eq!(matched.lexeme_str, "==");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -385,7 +385,7 @@ mod tests {
         fn greater_than_equals_symbol() {
             let input = InputSpan::new_extra(">= rest", Config::default());
             let (rest, matched) = greater_than_equals(input).expect("should parse '>=' symbol");
-            assert_eq!(matched.lexeme(), ">=");
+            assert_eq!(matched.lexeme_str, ">=");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -393,7 +393,7 @@ mod tests {
         fn less_than_equals_symbol() {
             let input = InputSpan::new_extra("<= rest", Config::default());
             let (rest, matched) = less_than_equals(input).expect("should parse '<=' symbol");
-            assert_eq!(matched.lexeme(), "<=");
+            assert_eq!(matched.lexeme_str, "<=");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -401,7 +401,7 @@ mod tests {
         fn minus_minus_symbol() {
             let input = InputSpan::new_extra("-- rest", Config::default());
             let (rest, matched) = minus_minus(input).expect("should parse '--' symbol");
-            assert_eq!(matched.lexeme(), "--");
+            assert_eq!(matched.lexeme_str, "--");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -409,7 +409,7 @@ mod tests {
         fn star_star_symbol() {
             let input = InputSpan::new_extra("** rest", Config::default());
             let (rest, matched) = star_star(input).expect("should parse '**' symbol");
-            assert_eq!(matched.lexeme(), "**");
+            assert_eq!(matched.lexeme_str, "**");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -417,7 +417,7 @@ mod tests {
         fn slash_slash_symbol() {
             let input = InputSpan::new_extra("// rest", Config::default());
             let (rest, matched) = slash_slash(input).expect("should parse '//' symbol");
-            assert_eq!(matched.lexeme(), "//");
+            assert_eq!(matched.lexeme_str, "//");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -425,7 +425,7 @@ mod tests {
         fn equals_symbol() {
             let input = InputSpan::new_extra("= rest", Config::default());
             let (rest, matched) = equals(input).expect("should parse '=' symbol");
-            assert_eq!(matched.lexeme(), "=");
+            assert_eq!(matched.lexeme_str, "=");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -433,7 +433,7 @@ mod tests {
         fn greater_than_symbol() {
             let input = InputSpan::new_extra("> rest", Config::default());
             let (rest, matched) = greater_than(input).expect("should parse '>' symbol");
-            assert_eq!(matched.lexeme(), ">");
+            assert_eq!(matched.lexeme_str, ">");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -441,7 +441,7 @@ mod tests {
         fn less_than_symbol() {
             let input = InputSpan::new_extra("< rest", Config::default());
             let (rest, matched) = less_than(input).expect("should parse '<' symbol");
-            assert_eq!(matched.lexeme(), "<");
+            assert_eq!(matched.lexeme_str, "<");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -449,7 +449,7 @@ mod tests {
         fn minus_symbol() {
             let input = InputSpan::new_extra("- rest", Config::default());
             let (rest, matched) = minus(input).expect("should parse '-' symbol");
-            assert_eq!(matched.lexeme(), "-");
+            assert_eq!(matched.lexeme_str, "-");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -457,7 +457,7 @@ mod tests {
         fn star_symbol() {
             let input = InputSpan::new_extra("* rest", Config::default());
             let (rest, matched) = star(input).expect("should parse '*' symbol");
-            assert_eq!(matched.lexeme(), "*");
+            assert_eq!(matched.lexeme_str, "*");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -465,7 +465,7 @@ mod tests {
         fn slash_symbol() {
             let input = InputSpan::new_extra("/ rest", Config::default());
             let (rest, matched) = slash(input).expect("should parse '/' symbol");
-            assert_eq!(matched.lexeme(), "/");
+            assert_eq!(matched.lexeme_str, "/");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -474,7 +474,7 @@ mod tests {
         fn symbol_at_end_of_file() {
             let input = InputSpan::new_extra("+", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' at end of file");
-            assert_eq!(matched.lexeme(), "+");
+            assert_eq!(matched.lexeme_str, "+");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -482,7 +482,7 @@ mod tests {
         fn multi_char_symbol_at_end_of_file() {
             let input = InputSpan::new_extra("!=", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' at end of file");
-            assert_eq!(matched.lexeme(), "!=");
+            assert_eq!(matched.lexeme_str, "!=");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -490,7 +490,7 @@ mod tests {
         fn symbol_with_trailing_whitespace() {
             let input = InputSpan::new_extra("+   rest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with trailing whitespace");
-            assert_eq!(matched.lexeme(), "+");
+            assert_eq!(matched.lexeme_str, "+");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -499,7 +499,7 @@ mod tests {
             let input = InputSpan::new_extra("!=   rest", Config::default());
             let (rest, matched) =
                 bang_equals(input).expect("should parse '!=' with trailing whitespace");
-            assert_eq!(matched.lexeme(), "!=");
+            assert_eq!(matched.lexeme_str, "!=");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -507,7 +507,7 @@ mod tests {
         fn symbol_with_tab() {
             let input = InputSpan::new_extra("+\trest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with tab");
-            assert_eq!(matched.lexeme(), "+");
+            assert_eq!(matched.lexeme_str, "+");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -515,7 +515,7 @@ mod tests {
         fn multi_char_symbol_with_tab() {
             let input = InputSpan::new_extra("!=\trest", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' with tab");
-            assert_eq!(matched.lexeme(), "!=");
+            assert_eq!(matched.lexeme_str, "!=");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -523,7 +523,7 @@ mod tests {
         fn symbol_with_newline() {
             let input = InputSpan::new_extra("+\nrest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with newline");
-            assert_eq!(matched.lexeme(), "+");
+            assert_eq!(matched.lexeme_str, "+");
             assert_eq!(rest.fragment(), &"\nrest");
         }
 
@@ -531,7 +531,7 @@ mod tests {
         fn multi_char_symbol_with_newline() {
             let input = InputSpan::new_extra("!=\nrest", Config::default());
             let (rest, matched) = bang_equals(input).expect("should parse '!=' with newline");
-            assert_eq!(matched.lexeme(), "!=");
+            assert_eq!(matched.lexeme_str, "!=");
             assert_eq!(rest.fragment(), &"\nrest");
         }
 
@@ -539,7 +539,7 @@ mod tests {
         fn symbol_with_carriage_return() {
             let input = InputSpan::new_extra("+\rrest", Config::default());
             let (rest, matched) = plus(input).expect("should parse '+' with carriage return");
-            assert_eq!(matched.lexeme(), "+");
+            assert_eq!(matched.lexeme_str, "+");
             assert_eq!(rest.fragment(), &"\rrest");
         }
     }
