@@ -7,21 +7,16 @@ mod model;
 mod model_import;
 mod parameter;
 mod reference;
-mod span;
 mod test;
 mod unit;
 
 pub use debug_info::TraceLevel;
-pub use expr::{
-    BinaryOp, ComparisonOp, Expr, ExprWithSpan, FunctionName, Literal, UnaryOp, Variable,
-};
+pub use expr::{BinaryOp, ComparisonOp, Expr, FunctionName, Literal, UnaryOp, Variable};
 pub use model::{Model, ModelCollection};
 pub use model_import::{
-    ReferenceImport, ReferenceMap, ReferenceName, ReferenceNameWithSpan, SubmodelImport,
-    SubmodelMap, SubmodelName, SubmodelNameWithSpan,
+    ReferenceImport, ReferenceMap, ReferenceName, SubmodelImport, SubmodelMap, SubmodelName,
 };
 pub use parameter::{Limits, Parameter, ParameterCollection, ParameterValue, PiecewiseExpr};
-pub use reference::{Identifier, IdentifierWithSpan, ModelPath, PythonPath};
-pub use span::{IrSpan, WithSpan};
+pub use reference::{Identifier, ModelPath, PythonPath};
 pub use test::{Test, TestIndex};
 pub use unit::{CompositeUnit, Unit};

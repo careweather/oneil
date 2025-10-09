@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     debug_info::TraceLevel,
-    expr::ExprWithSpan,
+    expr::Expr,
     reference::{Identifier, IdentifierWithSpan},
     unit::CompositeUnit,
 };
@@ -109,7 +109,7 @@ impl Parameter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     /// A simple expression with an optional unit.
-    Simple(ExprWithSpan, Option<CompositeUnit>),
+    Simple(Expr, Option<CompositeUnit>),
     /// A piecewise function with multiple expressions and conditions.
     Piecewise(Vec<PiecewiseExpr>, Option<CompositeUnit>),
 }
@@ -117,7 +117,7 @@ pub enum ParameterValue {
 impl ParameterValue {
     /// Creates a simple parameter value from an expression and optional unit.
     #[must_use]
-    pub const fn simple(expr: ExprWithSpan, unit: Option<CompositeUnit>) -> Self {
+    pub const fn simple(expr: Expr, unit: Option<CompositeUnit>) -> Self {
         Self::Simple(expr, unit)
     }
 
@@ -131,26 +131,26 @@ impl ParameterValue {
 /// A single expression in a piecewise function with its associated condition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewiseExpr {
-    expr: ExprWithSpan,
-    if_expr: ExprWithSpan,
+    expr: Expr,
+    if_expr: Expr,
 }
 
 impl PiecewiseExpr {
     /// Creates a new piecewise expression with a value and condition.
     #[must_use]
-    pub const fn new(expr: ExprWithSpan, if_expr: ExprWithSpan) -> Self {
+    pub const fn new(expr: Expr, if_expr: Expr) -> Self {
         Self { expr, if_expr }
     }
 
     /// Returns the expression value.
     #[must_use]
-    pub const fn expr(&self) -> &ExprWithSpan {
+    pub const fn expr(&self) -> &Expr {
         &self.expr
     }
 
     /// Returns the condition expression.
     #[must_use]
-    pub const fn if_expr(&self) -> &ExprWithSpan {
+    pub const fn if_expr(&self) -> &Expr {
         &self.if_expr
     }
 }
@@ -163,14 +163,14 @@ pub enum Limits {
     /// Continuous range with minimum and maximum values.
     Continuous {
         /// The minimum allowed value expression.
-        min: ExprWithSpan,
+        min: Expr,
         /// The maximum allowed value expression.
-        max: ExprWithSpan,
+        max: Expr,
     },
     /// Discrete set of allowed values.
     Discrete {
         /// Vector of expressions representing allowed values.
-        values: Vec<ExprWithSpan>,
+        values: Vec<Expr>,
     },
 }
 
@@ -183,13 +183,13 @@ impl Limits {
 
     /// Creates continuous limits with minimum and maximum expressions.
     #[must_use]
-    pub const fn continuous(min: ExprWithSpan, max: ExprWithSpan) -> Self {
+    pub const fn continuous(min: Expr, max: Expr) -> Self {
         Self::Continuous { min, max }
     }
 
     /// Creates discrete limits with a set of allowed values.
     #[must_use]
-    pub const fn discrete(values: Vec<ExprWithSpan>) -> Self {
+    pub const fn discrete(values: Vec<Expr>) -> Self {
         Self::Discrete { values }
     }
 }

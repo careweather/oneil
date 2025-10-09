@@ -1,6 +1,6 @@
 //! Testing for Oneil model IR.
 
-use crate::{debug_info::TraceLevel, expr::ExprWithSpan};
+use crate::{debug_info::TraceLevel, expr::Expr};
 
 /// An index for identifying tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -18,13 +18,13 @@ impl TestIndex {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
     trace_level: TraceLevel,
-    test_expr: ExprWithSpan,
+    test_expr: Expr,
 }
 
 impl Test {
     /// Creates a new test with the specified properties.
     #[must_use]
-    pub const fn new(trace_level: TraceLevel, test_expr: ExprWithSpan) -> Self {
+    pub const fn new(trace_level: TraceLevel, test_expr: Expr) -> Self {
         Self {
             trace_level,
             test_expr,
@@ -39,7 +39,7 @@ impl Test {
 
     /// Returns the test expression that defines the expected behavior.
     #[must_use]
-    pub const fn test_expr(&self) -> &ExprWithSpan {
+    pub const fn test_expr(&self) -> &Expr {
         &self.test_expr
     }
 }

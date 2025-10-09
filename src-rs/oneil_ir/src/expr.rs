@@ -1,9 +1,6 @@
 //! Expression system for mathematical and logical operations in Oneil.
 
-use crate::{
-    reference::{Identifier, ModelPath},
-    span::WithSpan,
-};
+use crate::reference::{Identifier, ModelPath};
 
 /// Abstract syntax tree for mathematical and logical expressions.
 #[derive(Debug, Clone, PartialEq)]
@@ -11,36 +8,36 @@ pub enum Expr {
     /// Comparison operation with left and right operands, supporting chaining.
     ComparisonOp {
         /// The comparison operator to apply.
-        op: WithSpan<ComparisonOp>,
+        op: ComparisonOp,
         /// The left-hand operand.
-        left: Box<ExprWithSpan>,
+        left: Box<Expr>,
         /// The right-hand operand.
-        right: Box<ExprWithSpan>,
+        right: Box<Expr>,
         /// Chained comparison operations (order matters).
-        rest_chained: Vec<(WithSpan<ComparisonOp>, ExprWithSpan)>,
+        rest_chained: Vec<(ComparisonOp, Expr)>,
     },
     /// Binary operation combining two expressions with an operator.
     BinaryOp {
         /// The binary operator to apply.
-        op: WithSpan<BinaryOp>,
+        op: BinaryOp,
         /// The left-hand operand.
-        left: Box<ExprWithSpan>,
+        left: Box<Expr>,
         /// The right-hand operand.
-        right: Box<ExprWithSpan>,
+        right: Box<Expr>,
     },
     /// Unary operation applied to a single expression.
     UnaryOp {
         /// The unary operator to apply.
-        op: WithSpan<UnaryOp>,
+        op: UnaryOp,
         /// The operand expression.
-        expr: Box<ExprWithSpan>,
+        expr: Box<Expr>,
     },
     /// Function call with a name and argument list.
     FunctionCall {
         /// The name of the function to call.
-        name: WithSpan<FunctionName>,
+        name: FunctionName,
         /// The arguments to pass to the function.
-        args: Vec<ExprWithSpan>,
+        args: Vec<Expr>,
     },
     /// Variable reference (local, parameter, or external).
     Variable(Variable),
@@ -51,20 +48,14 @@ pub enum Expr {
     },
 }
 
-/// An expression with associated source location information.
-///
-/// This type alias provides a convenient way to work with expressions
-/// that include source location spans for error reporting and debugging.
-pub type ExprWithSpan = WithSpan<Expr>;
-
 impl Expr {
     /// Creates a comparison operation expression.
     #[must_use]
     pub fn comparison_op(
-        op: WithSpan<ComparisonOp>,
-        left: ExprWithSpan,
-        right: ExprWithSpan,
-        rest_chained: Vec<(WithSpan<ComparisonOp>, ExprWithSpan)>,
+        op: ComparisonOp,
+        left: Self,
+        right: Self,
+        rest_chained: Vec<(ComparisonOp, Self)>,
     ) -> Self {
         Self::ComparisonOp {
             op,
@@ -76,7 +67,7 @@ impl Expr {
 
     /// Creates a binary operation expression.
     #[must_use]
-    pub fn binary_op(op: WithSpan<BinaryOp>, left: ExprWithSpan, right: ExprWithSpan) -> Self {
+    pub fn binary_op(op: BinaryOp, left: Self, right: Self) -> Self {
         Self::BinaryOp {
             op,
             left: Box::new(left),
@@ -86,7 +77,7 @@ impl Expr {
 
     /// Creates a unary operation expression.
     #[must_use]
-    pub fn unary_op(op: WithSpan<UnaryOp>, expr: ExprWithSpan) -> Self {
+    pub fn unary_op(op: UnaryOp, expr: Self) -> Self {
         Self::UnaryOp {
             op,
             expr: Box::new(expr),
@@ -95,7 +86,7 @@ impl Expr {
 
     /// Creates a function call expression.
     #[must_use]
-    pub const fn function_call(name: WithSpan<FunctionName>, args: Vec<ExprWithSpan>) -> Self {
+    pub const fn function_call(name: FunctionName, args: Vec<Self>) -> Self {
         Self::FunctionCall { name, args }
     }
 

@@ -2,8 +2,6 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::span::WithSpan;
-
 /// An identifier for a variable, parameter, or other named entity in Oneil.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier(String);
@@ -23,7 +21,7 @@ impl Identifier {
 }
 
 /// An identifier with associated source location information.
-pub type IdentifierWithSpan = WithSpan<Identifier>;
+pub type IdentifierWithSpan = Identifier;
 
 /// A path to an Oneil model file.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -6,14 +6,13 @@ use crate::{
     model_import::{ReferenceMap, SubmodelImport, SubmodelMap, SubmodelName},
     parameter::{Parameter, ParameterCollection},
     reference::{Identifier, ModelPath, PythonPath},
-    span::IrSpan,
     test::{Test, TestIndex},
 };
 
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
-    python_imports: HashMap<PythonPath, IrSpan>,
+    python_imports: HashSet<PythonPath>,
     submodels: SubmodelMap,
     references: ReferenceMap,
     parameters: ParameterCollection,
@@ -24,7 +23,7 @@ impl Model {
     /// Creates a new model with the specified components.
     #[must_use]
     pub const fn new(
-        python_imports: HashMap<PythonPath, IrSpan>,
+        python_imports: HashSet<PythonPath>,
         submodels: SubmodelMap,
         references: ReferenceMap,
         parameters: ParameterCollection,
@@ -41,7 +40,7 @@ impl Model {
 
     /// Returns a reference to the set of Python imports for this model.
     #[must_use]
-    pub const fn get_python_imports(&self) -> &HashMap<PythonPath, IrSpan> {
+    pub const fn get_python_imports(&self) -> &HashSet<PythonPath> {
         &self.python_imports
     }
 
@@ -107,7 +106,7 @@ impl ModelCollection {
     pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
         self.models
             .values()
-            .flat_map(|model| model.python_imports.keys())
+            .flat_map(|model| &model.python_imports)
             .collect()
     }
 

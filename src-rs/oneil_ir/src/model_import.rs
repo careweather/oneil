@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use crate::{reference::ModelPath, span::WithSpan};
+use crate::reference::ModelPath;
 
 /// A map of submodels with their names and imports.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,7 +27,7 @@ impl Deref for SubmodelMap {
 pub struct SubmodelName(String);
 
 /// A name for a submodel with a span.
-pub type SubmodelNameWithSpan = WithSpan<SubmodelName>;
+pub type SubmodelNameWithSpan = SubmodelName;
 
 impl SubmodelName {
     /// Creates a new submodel name with the given name.
@@ -96,7 +96,7 @@ impl Deref for ReferenceMap {
 pub struct ReferenceName(String);
 
 /// A name for a reference with a span.
-pub type ReferenceNameWithSpan = WithSpan<ReferenceName>;
+pub type ReferenceNameWithSpan = ReferenceName;
 
 impl ReferenceName {
     /// Creates a new reference name with the given name.
