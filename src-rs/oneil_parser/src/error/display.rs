@@ -199,6 +199,9 @@ impl fmt::Display for TokenErrorKind {
                     delimiter_start_offset: _,
                     delimiter_length: _,
                 } => write!(f, "unclosed note"),
+                TokenIncompleteKind::InvalidClosingDelimiter => {
+                    write!(f, "invalid closing delimiter for note")
+                }
                 TokenIncompleteKind::UnclosedString {
                     open_quote_offset: _,
                 } => write!(f, "unclosed string"),

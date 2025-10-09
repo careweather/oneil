@@ -8,7 +8,7 @@
 use nom::Parser as _;
 use nom::bytes::complete::take_while;
 use nom::character::complete::{char, line_ending, not_line_ending};
-use nom::combinator::{consumed, recognize, verify};
+use nom::combinator::{recognize, verify};
 use nom::multi::many0;
 use oneil_shared::span::{SourceLocation, Span};
 
@@ -121,17 +121,17 @@ fn multi_line_note_content(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, To
 ///
 /// If the multi-line note is not closed properly, this parser will fail.
 fn multi_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
-    let (rest, (content, delimiter_span)) = consumed(|input| {
+    let (rest, content) = recognize(|input| {
         let (rest, delimiter_span) = multi_line_note_delimiter.parse(input)?;
-        let (rest, ()) = (|input| {
+        let (rest, closing_delimiter_span) = (|input| {
             let (rest, _) = line_ending.parse(input)?;
             let (rest, _) = multi_line_note_content.parse(rest)?;
-            let (rest, _) = multi_line_note_delimiter.parse(rest)?;
+            let (rest, closing_delimiter_span) = multi_line_note_delimiter.parse(rest)?;
             Ok((rest, ()))
         })
         .or_fail_with(TokenError::unclosed_note(delimiter_span))
         .parse(rest)?;
-        Ok((rest, (delimiter_span)))
+        Ok((rest, ()))
     })
     .parse(input)?;
 
@@ -156,8 +156,8 @@ fn multi_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     let lexeme_span = Span::new(lexeme_start, lexeme_end);
 
     let (rest, whitespace) = end_of_line_span
-        .or_fail_with(TokenError::unclosed_note(delimiter_span))
-        .parse(input)?;
+        .or_fail_with(TokenError::invalid_closing_delimiter)
+        .parse(rest)?;
 
     let whitespace_start_line = usize::try_from(whitespace.location_line())
         .expect("usize should be greater than or equal to u32");
@@ -626,6 +626,20 @@ mod tests {
             assert!(matches!(
                 token_error.kind,
                 TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote { .. })
+            ));
+        }
+
+        #[test]
+        fn with_characters_after_closing_delimiter() {
+            let input = InputSpan::new_extra("~~~\ncontent\n~~~foo", Config::default());
+            let res = note(input);
+            let Err(nom::Err::Failure(token_error)) = res else {
+                panic!("expected TokenError::Incomplete(InvalidClosingDelimiter), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Incomplete(IncompleteKind::InvalidClosingDelimiter)
             ));
         }
     }

@@ -23,6 +23,12 @@ impl Identifier {
     }
 }
 
+impl From<String> for Identifier {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
 /// A label in the Oneil language
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label(String);
@@ -41,6 +47,12 @@ impl Label {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl From<String> for Label {
+    fn from(value: String) -> Self {
+        Self::new(value)
     }
 }
 
@@ -85,5 +97,11 @@ impl Directory {
             Self::Parent => "..",
             Self::Current => ".",
         }
+    }
+}
+
+impl From<String> for Directory {
+    fn from(value: String) -> Self {
+        Self::name(value)
     }
 }

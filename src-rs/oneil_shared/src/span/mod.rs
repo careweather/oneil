@@ -35,6 +35,11 @@ impl Span {
     pub fn end(&self) -> &SourceLocation {
         &self.end
     }
+
+    /// Creates a span from the start of the start span to the end of the end span
+    pub fn from_start_and_end(start: &Span, end: &Span) -> Self {
+        Self::new(*start.start(), *end.end())
+    }
 }
 
 /// A source location
@@ -53,4 +58,22 @@ pub struct SourceLocation {
     pub line: usize,
     /// The column number (1-indexed)
     pub column: usize,
+}
+
+impl PartialOrd for SourceLocation {
+    /// Custom partial ordering that is based on the offset
+    ///
+    /// If two source locations have the same offset but different line or column,
+    /// there is no order between them. They likely come from different files.
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let same_offset = self.offset == other.offset;
+        let same_line = self.line == other.line;
+        let same_column = self.column == other.column;
+
+        if same_offset && (!same_line || !same_column) {
+            None
+        } else {
+            Some(self.offset.cmp(&other.offset))
+        }
+    }
 }

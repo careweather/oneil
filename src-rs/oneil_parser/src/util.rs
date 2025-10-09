@@ -26,3 +26,20 @@ pub trait Parser<'a, O, E = Error<InputSpan<'a>>>:
 }
 
 impl<'a, O, E, P> Parser<'a, O, E> for P where P: NomParser<InputSpan<'a>, Output = O, Error = E> {}
+
+#[cfg(test)]
+pub mod test {
+    macro_rules! assert_node_contains {
+        ($node:expr, $value:expr, start_offset: $start_offset:expr, end_offset: $end_offset:expr) => {
+            use oneil_ast::Node;
+
+            let node: &Node<_> = $node;
+
+            assert_eq!(**node, $value);
+            assert_eq!(node.span().start().offset, $start_offset);
+            assert_eq!(node.span().end().offset, $end_offset);
+        };
+    }
+
+    pub(crate) use assert_node_contains;
+}

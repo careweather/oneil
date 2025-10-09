@@ -137,15 +137,9 @@ impl UseModel {
         let mut path = self
             .directory_path
             .iter()
-            .map(|d| d.node_value().as_str())
+            .map(|d| d.as_str())
             .collect::<Vec<_>>();
-        path.push(
-            self.model
-                .node_value()
-                .top_component()
-                .node_value()
-                .as_str(),
-        );
+        path.push(self.model.top_component().as_str());
         path.join("/")
     }
 }

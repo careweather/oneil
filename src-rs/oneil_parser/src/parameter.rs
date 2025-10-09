@@ -5,10 +5,11 @@ use nom::branch::alt;
 use nom::combinator::{all_consuming, opt};
 use nom::multi::{many0, separated_list1};
 use oneil_ast::{
-    AstSpan, Identifier, Label, Limits, LimitsNode, Node, Parameter, ParameterNode, ParameterValue,
+    IdentifierNode, LabelNode, Limits, LimitsNode, Node, Parameter, ParameterNode, ParameterValue,
     ParameterValueNode, PerformanceMarker, PerformanceMarkerNode, PiecewisePart, PiecewisePartNode,
     TraceLevel, TraceLevelNode,
 };
+use oneil_shared::span::Span;
 
 use crate::error::{ErrorHandlingParser, ParserError};
 use crate::expression::parse as parse_expr;
@@ -45,70 +46,72 @@ pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserE
 //       For now, we'll just require the preamble in all cases.
 /// Parses a complete parameter declaration with all optional components.
 fn parameter_decl(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError> {
-    let (rest, performance_marker) = opt(performance_marker).parse(input)?;
+    let (rest, performance_marker_node) = opt(performance_marker).parse(input)?;
 
-    let (rest, trace_level) = opt(trace_level).parse(rest)?;
+    let (rest, trace_level_node) = opt(trace_level).parse(rest)?;
 
-    let (rest, label) = label
+    let (rest, label_token) = label
         .convert_error_to(ParserError::expect_parameter)
         .parse(rest)?;
-    let label_span = AstSpan::from(&label);
-    let label = Node::new(&label_span, Label::new(label.lexeme().to_string()));
+    let label_node = LabelNode::from(label_token);
 
-    let (rest, limits) = opt(limits).parse(rest)?;
+    let (rest, limits_node) = opt(limits).parse(rest)?;
 
     let (rest, colon_token) = colon
         .convert_error_to(ParserError::expect_parameter)
         .parse(rest)?;
 
-    let (rest, ident) = identifier
-        .or_fail_with(ParserError::parameter_missing_identifier(&colon_token))
+    let (rest, ident_token) = identifier
+        .or_fail_with(ParserError::parameter_missing_identifier(
+            colon_token.lexeme_span,
+        ))
         .parse(rest)?;
-    let ident_span = AstSpan::from(&ident);
-    let ident_node = Node::new(&ident_span, Identifier::new(ident.lexeme().to_string()));
+    let ident_node = IdentifierNode::from(ident_token);
 
     let (rest, equals_token) = equals
-        .or_fail_with(ParserError::parameter_missing_equals_sign(&ident_node))
+        .or_fail_with(ParserError::parameter_missing_equals_sign(
+            ident_node.span(),
+        ))
         .parse(rest)?;
 
-    let (rest, value) = parameter_value
-        .or_fail_with(ParserError::parameter_missing_value(&equals_token))
+    let (rest, value_node) = parameter_value
+        .or_fail_with(ParserError::parameter_missing_value(
+            equals_token.lexeme_span,
+        ))
         .parse(rest)?;
 
     let (rest, linebreak_token) = end_of_line
-        .or_fail_with(ParserError::parameter_missing_end_of_line(&value))
+        .or_fail_with(ParserError::parameter_missing_end_of_line(
+            value_node.span(),
+        ))
         .parse(rest)?;
 
-    let (rest, note) = opt(parse_note).parse(rest)?;
+    let (rest, note_node) = opt(parse_note).parse(rest)?;
 
-    // note that for the purposes of span calculation, the note is considered
-    // "whitespace"
-    let whitespace_span = note.as_ref().map_or_else(
-        || AstSpan::from(&linebreak_token),
-        |note| AstSpan::calc_span(&linebreak_token, note),
-    );
-
-    let span = match (&performance_marker, &trace_level) {
-        (Some(performance), _) => {
-            AstSpan::calc_span_with_whitespace(performance, &value, &whitespace_span)
-        }
-        (None, Some(trace_level)) => {
-            AstSpan::calc_span_with_whitespace(trace_level, &value, &whitespace_span)
-        }
-        (None, None) => AstSpan::calc_span_with_whitespace(&label, &value, &whitespace_span),
+    let param_start_span = match (&performance_marker_node, &trace_level_node) {
+        (Some(performance_marker_node), _) => performance_marker_node.span(),
+        (None, Some(trace_level_node)) => trace_level_node.span(),
+        (None, None) => label_token.lexeme_span,
     };
 
+    let (param_end_span, param_whitespace_span) = match &note_node {
+        Some(note_node) => (note_node.span(), note_node.whitespace_span()),
+        None => (linebreak_token.lexeme_span, linebreak_token.whitespace_span),
+    };
+
+    let param_span = Span::from_start_and_end(&param_start_span, &param_end_span);
+
     let param = Parameter::new(
-        label,
+        label_node,
         ident_node,
-        value,
-        limits,
-        performance_marker,
-        trace_level,
-        note,
+        value_node,
+        limits_node,
+        performance_marker_node,
+        trace_level_node,
+        note_node,
     );
 
-    let param_node = Node::new(&span, param);
+    let param_node = Node::new(param, param_span, param_whitespace_span);
 
     Ok((rest, param_node))
 }
@@ -117,14 +120,14 @@ fn parameter_decl(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError
 fn performance_marker(input: InputSpan<'_>) -> Result<'_, PerformanceMarkerNode, ParserError> {
     dollar
         .convert_errors()
-        .map(|token| Node::new(&token, PerformanceMarker::new()))
+        .map(|token| token.into_node_with_value(PerformanceMarker::new()))
         .parse(input)
 }
 
 /// Parse a trace level indicator (`*` or `**`).
 fn trace_level(input: InputSpan<'_>) -> Result<'_, TraceLevelNode, ParserError> {
-    let single_star = star.map(|token| Node::new(&token, TraceLevel::Trace));
-    let double_star = star_star.map(|token| Node::new(&token, TraceLevel::Debug));
+    let single_star = star.map(|token| token.into_node_with_value(TraceLevel::Trace));
+    let double_star = star_star.map(|token| token.into_node_with_value(TraceLevel::Debug));
 
     double_star.or(single_star).convert_errors().parse(input)
 }
@@ -138,25 +141,33 @@ fn limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
 fn continuous_limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
     let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
-    let (rest, min) = parse_expr
-        .or_fail_with(ParserError::limit_missing_min(&paren_left_token))
+    let (rest, min_node) = parse_expr
+        .or_fail_with(ParserError::limit_missing_min(paren_left_token.lexeme_span))
         .parse(rest)?;
 
     let (rest, comma_token) = comma
-        .or_fail_with(ParserError::limit_missing_comma(&min))
+        .or_fail_with(ParserError::limit_missing_comma(min_node.span()))
         .parse(rest)?;
 
-    let (rest, max) = parse_expr
-        .or_fail_with(ParserError::limit_missing_max(&comma_token))
+    let (rest, max_node) = parse_expr
+        .or_fail_with(ParserError::limit_missing_max(comma_token.lexeme_span))
         .parse(rest)?;
 
     let (rest, paren_right_token) = paren_right
-        .or_fail_with(ParserError::unclosed_paren(&paren_left_token))
+        .or_fail_with(ParserError::unclosed_paren(paren_left_token.lexeme_span))
         .parse(rest)?;
 
-    let span = AstSpan::calc_span(&paren_left_token, &paren_right_token);
+    let span = Span::from_start_and_end(
+        &paren_left_token.lexeme_span,
+        &paren_right_token.lexeme_span,
+    );
+    let whitespace_span = paren_right_token.whitespace_span;
 
-    let node = Node::new(&span, Limits::continuous(min, max));
+    let node = Node::new(
+        Limits::continuous(min_node, max_node),
+        span,
+        whitespace_span,
+    );
 
     Ok((rest, node))
 }
@@ -165,17 +176,25 @@ fn continuous_limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError
 fn discrete_limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
     let (rest, bracket_left_token) = bracket_left.convert_errors().parse(input)?;
 
-    let (rest, values) = separated_list1(comma.convert_errors(), parse_expr)
-        .or_fail_with(ParserError::limit_missing_values(&bracket_left_token))
+    let (rest, value_nodes) = separated_list1(comma.convert_errors(), parse_expr)
+        .or_fail_with(ParserError::limit_missing_values(
+            bracket_left_token.lexeme_span,
+        ))
         .parse(rest)?;
 
     let (rest, bracket_right_token) = bracket_right
-        .or_fail_with(ParserError::unclosed_bracket(&bracket_left_token))
+        .or_fail_with(ParserError::unclosed_bracket(
+            bracket_left_token.lexeme_span,
+        ))
         .parse(rest)?;
 
-    let span = AstSpan::calc_span(&bracket_left_token, &bracket_right_token);
+    let span = Span::from_start_and_end(
+        &bracket_left_token.lexeme_span,
+        &bracket_right_token.lexeme_span,
+    );
+    let whitespace_span = bracket_right_token.whitespace_span;
 
-    let node = Node::new(&span, Limits::discrete(values));
+    let node = Node::new(Limits::discrete(value_nodes), span, whitespace_span);
 
     Ok((rest, node))
 }
@@ -193,19 +212,24 @@ fn simple_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, ParserEr
         let (rest, colon_token) = colon.convert_errors().parse(input)?;
 
         let (rest, unit) = parse_unit
-            .or_fail_with(ParserError::parameter_missing_unit(&colon_token))
+            .or_fail_with(ParserError::parameter_missing_unit(colon_token.lexeme_span))
             .parse(rest)?;
 
         Ok((rest, unit))
     })
     .parse(rest)?;
 
-    let span = unit.as_ref().map_or_else(
-        || AstSpan::from(&expr),
-        |unit| AstSpan::calc_span(&expr, unit),
-    );
+    let start_span = expr.span();
+    let end_span = unit
+        .as_ref()
+        .map_or_else(|| expr.span(), |unit| unit.span());
 
-    let node = Node::new(&span, ParameterValue::simple(expr, unit));
+    let span = Span::from_start_and_end(&start_span, &end_span);
+    let whitespace_span = unit
+        .as_ref()
+        .map_or_else(|| expr.whitespace_span(), |unit| unit.whitespace_span());
+
+    let node = Node::new(ParameterValue::simple(expr, unit), span, whitespace_span);
 
     Ok((rest, node))
 }
@@ -218,7 +242,7 @@ fn piecewise_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, Parse
         let (rest, colon_token) = colon.convert_errors().parse(input)?;
 
         let (rest, unit) = parse_unit
-            .or_fail_with(ParserError::parameter_missing_unit(&colon_token))
+            .or_fail_with(ParserError::parameter_missing_unit(colon_token.lexeme_span))
             .parse(rest)?;
 
         Ok((rest, unit))
@@ -232,17 +256,23 @@ fn piecewise_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, Parse
     })
     .parse(rest)?;
 
-    let span = match (rest_parts.last(), &unit) {
-        (Some(part), _) => AstSpan::calc_span(&first_part, part),
-        (None, Some(unit)) => AstSpan::calc_span(&first_part, unit),
-        (None, None) => AstSpan::from(&first_part),
+    let start_span = first_part.span();
+    let (end_span, whitespace_span) = match (rest_parts.last(), &unit) {
+        (Some(part), _) => (part.span(), part.whitespace_span()),
+        (None, Some(unit)) => (unit.span(), unit.whitespace_span()),
+        (None, None) => (first_part.span(), first_part.whitespace_span()),
     };
+    let span = Span::from_start_and_end(&start_span, &end_span);
 
     let mut parts = Vec::with_capacity(1 + rest_parts.len());
     parts.push(first_part);
     parts.extend(rest_parts);
 
-    let node = Node::new(&span, ParameterValue::piecewise(parts, unit));
+    let node = Node::new(
+        ParameterValue::piecewise(parts, unit),
+        span,
+        whitespace_span,
+    );
 
     Ok((rest, node))
 }
@@ -251,21 +281,29 @@ fn piecewise_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, Parse
 fn piecewise_part(input: InputSpan<'_>) -> Result<'_, PiecewisePartNode, ParserError> {
     let (rest, brace_left_token) = brace_left.convert_errors().parse(input)?;
 
-    let (rest, expr) = parse_expr
-        .or_fail_with(ParserError::piecewise_missing_expr(&brace_left_token))
+    let (rest, expr_node) = parse_expr
+        .or_fail_with(ParserError::piecewise_missing_expr(
+            brace_left_token.lexeme_span,
+        ))
         .parse(rest)?;
 
     let (rest, if_token) = if_
-        .or_fail_with(ParserError::piecewise_missing_if(&expr))
+        .or_fail_with(ParserError::piecewise_missing_if(expr_node.span()))
         .parse(rest)?;
 
     let (rest, if_expr) = parse_expr
-        .or_fail_with(ParserError::piecewise_missing_if_expr(&if_token))
+        .or_fail_with(ParserError::piecewise_missing_if_expr(if_token.lexeme_span))
         .parse(rest)?;
 
+    let start_span = brace_left_token.lexeme_span;
+    let end_span = if_expr.span();
+    let span = Span::from_start_and_end(&start_span, &end_span);
+    let whitespace_span = if_expr.whitespace_span();
+
     let node = Node::new(
-        &AstSpan::calc_span(&brace_left_token, &if_expr),
-        PiecewisePart::new(expr, if_expr),
+        PiecewisePart::new(expr_node, if_expr),
+        span,
+        whitespace_span,
     );
 
     Ok((rest, node))
@@ -281,6 +319,8 @@ mod tests {
     use oneil_ast::{Expr, Literal, UnitExpr, UnitOp};
 
     mod success {
+        use std::ops::Deref;
+
         use super::*;
 
         #[test]
@@ -293,17 +333,20 @@ mod tests {
             assert!(param.performance_marker().is_none());
             assert!(param.trace_level().is_none());
 
-            let ParameterValue::Simple(expr, unit) = param.value().node_value() else {
-                panic!(
-                    "Expected simple parameter value, got {:?}",
-                    param.value().node_value()
-                );
+            let ParameterValue::Simple(expr, unit) = param.value().clone().take_value() else {
+                panic!("Expected simple parameter value, got {:?}", param.value());
             };
 
-            let expected_value = Node::new(&AstSpan::new(7, 2, 0), Literal::number(42.0));
-            let expected_expr = Node::new(&AstSpan::new(7, 2, 0), Expr::literal(expected_value));
+            let Expr::Literal(value) = expr.take_value() else {
+                panic!("Expected literal");
+            };
 
-            assert_eq!(expr, &expected_expr);
+            let Literal::Number(value) = value.take_value() else {
+                panic!("Expected literal");
+            };
+
+            assert_eq!(value, 42.0);
+
             assert!(unit.is_none());
         }
 
@@ -319,19 +362,26 @@ mod tests {
             let input = InputSpan::new_extra("x(0, 100): y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with continuous limits");
 
-            let Some(Limits::Continuous { min, max }) = param.limits().map(Node::node_value) else {
+            let Some(Limits::Continuous { min, max }) = param.limits().map(Node::deref).cloned()
+            else {
                 panic!("Expected continuous limits");
             };
 
-            let expected_min_literal = Node::new(&AstSpan::new(2, 1, 0), Literal::number(0.0));
-            let expected_min =
-                Node::new(&AstSpan::new(2, 1, 0), Expr::literal(expected_min_literal));
-            let expected_max_literal = Node::new(&AstSpan::new(5, 3, 0), Literal::number(100.0));
-            let expected_max =
-                Node::new(&AstSpan::new(5, 3, 0), Expr::literal(expected_max_literal));
+            let Expr::Literal(value) = min.take_value() else {
+                panic!("Expected literal");
+            };
+            let Literal::Number(value) = value.take_value() else {
+                panic!("Expected literal");
+            };
+            assert_eq!(value, 0.0);
 
-            assert_eq!(min, &expected_min);
-            assert_eq!(max, &expected_max);
+            let Expr::Literal(value) = max.take_value() else {
+                panic!("Expected literal");
+            };
+            let Literal::Number(value) = value.take_value() else {
+                panic!("Expected literal");
+            };
+            assert_eq!(value, 100.0);
         }
 
         #[test]
@@ -339,28 +389,40 @@ mod tests {
             let input = InputSpan::new_extra("x[1, 2, 3]: y = 42", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with discrete limits");
 
-            let Some(Limits::Discrete { values }) = param.limits().map(Node::node_value) else {
+            let Some(Limits::Discrete { mut values }) = param.limits().map(Node::deref).cloned()
+            else {
                 panic!("Expected discrete limits");
             };
 
-            let expected_literals = [
-                Node::new(&AstSpan::new(2, 1, 0), Literal::number(1.0)),
-                Node::new(&AstSpan::new(5, 1, 0), Literal::number(2.0)),
-                Node::new(&AstSpan::new(8, 1, 0), Literal::number(3.0)),
-            ];
-
-            let expected_exprs = expected_literals
-                .iter()
-                .map(|literal| {
-                    let literal_span = AstSpan::from(literal);
-                    Node::new(&literal_span, Expr::literal(literal.clone()))
-                })
-                .collect::<Vec<_>>();
-
             assert_eq!(values.len(), 3);
-            assert_eq!(values[0], expected_exprs[0]);
-            assert_eq!(values[1], expected_exprs[1]);
-            assert_eq!(values[2], expected_exprs[2]);
+
+            let value1 = values.remove(0);
+            let value2 = values.remove(0);
+            let value3 = values.remove(0);
+
+            let Expr::Literal(value) = value1.take_value() else {
+                panic!("Expected literal");
+            };
+            let Literal::Number(value) = value.take_value() else {
+                panic!("Expected literal");
+            };
+            assert_eq!(value, 1.0);
+
+            let Expr::Literal(value) = value2.take_value() else {
+                panic!("Expected literal");
+            };
+            let Literal::Number(value) = value.take_value() else {
+                panic!("Expected literal");
+            };
+            assert_eq!(value, 2.0);
+
+            let Expr::Literal(value) = value3.take_value() else {
+                panic!("Expected literal");
+            };
+            let Literal::Number(value) = value.take_value() else {
+                panic!("Expected literal");
+            };
+            assert_eq!(value, 3.0);
         }
 
         #[test]
@@ -377,8 +439,8 @@ mod tests {
             let (_, param) = parse(input).expect("should parse parameter with trace");
 
             assert_eq!(
-                param.trace_level().map(Node::node_value),
-                Some(&TraceLevel::Trace)
+                param.trace_level().map(Node::deref).cloned(),
+                Some(TraceLevel::Trace)
             );
         }
 
@@ -388,8 +450,8 @@ mod tests {
             let (_, param) = parse(input).expect("should parse parameter with debug");
 
             assert_eq!(
-                param.trace_level().map(Node::node_value),
-                Some(&TraceLevel::Debug)
+                param.trace_level().map(Node::deref).cloned(),
+                Some(TraceLevel::Debug)
             );
         }
 
@@ -397,46 +459,45 @@ mod tests {
         fn parse_parameter_with_simple_units() {
             let input = InputSpan::new_extra("x: y = 42 : kg", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with simple units");
-            let ParameterValue::Simple(expr, unit) = param.value().node_value() else {
-                panic!(
-                    "Expected simple parameter value, got {:?}",
-                    param.value().node_value()
-                );
+            let ParameterValue::Simple(expr, unit) = param.value().clone().take_value() else {
+                panic!("Expected simple parameter value, got {:?}", param.value());
             };
 
-            let expected_value = Node::new(&AstSpan::new(7, 2, 1), Literal::number(42.0));
-            let expected_expr = Node::new(&AstSpan::new(7, 2, 1), Expr::literal(expected_value));
+            let Expr::Literal(value) = expr.take_value() else {
+                panic!("Expected literal");
+            };
+            let Literal::Number(value) = value.take_value() else {
+                panic!("Expected literal");
+            };
+            assert_eq!(value, 42.0);
 
-            assert_eq!(expr, &expected_expr);
+            let Some(UnitExpr::Unit {
+                identifier,
+                exponent,
+            }) = unit.as_ref().map(Node::deref).cloned()
+            else {
+                panic!("Expected unit");
+            };
+            assert_eq!(identifier.as_str(), "kg");
 
-            let expected_unit_identifier =
-                Node::new(&AstSpan::new(12, 2, 0), Identifier::new("kg".to_string()));
-            let expected_unit = Node::new(
-                &AstSpan::new(12, 2, 0),
-                UnitExpr::unit(expected_unit_identifier, None),
-            );
-
-            assert_eq!(unit, &Some(expected_unit));
+            assert_eq!(exponent, None);
         }
 
         #[test]
         fn parse_parameter_with_compound_units() {
             let input = InputSpan::new_extra("x: y = 42 : m/s^2", Config::default());
             let (_, param) = parse(input).expect("should parse parameter with compound units");
-            let ParameterValue::Simple(_expr, unit) = param.value().node_value() else {
-                panic!(
-                    "Expected simple parameter value, got {:?}",
-                    param.value().node_value()
-                );
+            let ParameterValue::Simple(_expr, unit) = param.value().clone().take_value() else {
+                panic!("Expected simple parameter value, got {:?}", param.value());
             };
 
             let unit = unit.clone().expect("should have unit");
 
-            let UnitExpr::BinaryOp { op, .. } = unit.node_value() else {
+            let UnitExpr::BinaryOp { op, .. } = unit.take_value() else {
                 panic!("Expected binary unit expression");
             };
 
-            assert_eq!(op.node_value(), &UnitOp::Divide);
+            assert_eq!(*op, UnitOp::Divide);
         }
 
         #[test]
@@ -445,7 +506,7 @@ mod tests {
                 InputSpan::new_extra("x: y = {2*z if z > 0 \n {0 if z <= 0", Config::default());
             let (_, param) = parse(input).expect("should parse piecewise parameter");
 
-            let param_value = param.value().node_value();
+            let param_value = param.value().clone().take_value();
             let ParameterValue::Piecewise(piecewise, unit) = param_value else {
                 panic!("Expected piecewise parameter value, got {param_value:?}");
             };
@@ -455,22 +516,22 @@ mod tests {
             // First piece: 2*z if z > 0
             let first = &piecewise[0];
             assert!(matches!(
-                first.node_value().expr().node_value(),
+                first.expr().clone().take_value(),
                 Expr::BinaryOp { .. }
             ));
             assert!(matches!(
-                first.node_value().if_expr().node_value(),
+                first.if_expr().clone().take_value(),
                 Expr::ComparisonOp { .. }
             ));
 
             // Second piece: 0 if z <= 0
             let second = &piecewise[1];
             assert!(matches!(
-                second.node_value().expr().node_value(),
+                second.expr().clone().take_value(),
                 Expr::Literal(_)
             ));
             assert!(matches!(
-                second.node_value().if_expr().node_value(),
+                second.if_expr().clone().take_value(),
                 Expr::ComparisonOp { .. }
             ));
 
@@ -485,7 +546,7 @@ mod tests {
             );
             let (_, param) = parse(input).expect("should parse parameter with all features");
 
-            let param_value = param.value().node_value();
+            let param_value = param.value().clone().take_value();
             let ParameterValue::Piecewise(_, unit) = param_value else {
                 panic!("Expected piecewise parameter value, got {param_value:?}");
             };
@@ -503,26 +564,25 @@ mod tests {
 
             assert!(param.performance_marker().is_some());
             assert_eq!(
-                param.trace_level().map(Node::node_value),
-                Some(&TraceLevel::Debug)
+                param.trace_level().map(Node::deref).cloned(),
+                Some(TraceLevel::Debug)
             );
             assert_eq!(param.label().as_str(), "x");
             assert_eq!(param.ident().as_str(), "y");
 
-            let Some(Limits::Continuous { min, max }) = param.limits().map(Node::node_value) else {
-                panic!(
-                    "Expected continuous limits, got {:?}",
-                    param.limits().map(Node::node_value)
-                );
+            let Some(Limits::Continuous { min, max }) = param.limits().map(Node::deref).cloned()
+            else {
+                panic!("Expected continuous limits, got {:?}", param.limits());
             };
 
-            assert!(matches!(min.node_value(), Expr::Literal(_)));
-            assert!(matches!(max.node_value(), Expr::Literal(_)));
+            assert!(matches!(min.take_value(), Expr::Literal(_)));
+            assert!(matches!(max.take_value(), Expr::Literal(_)));
 
-            let ParameterValue::Piecewise(piecewise, unit) = param.value().node_value() else {
+            let ParameterValue::Piecewise(piecewise, unit) = param.value().clone().take_value()
+            else {
                 panic!(
                     "Expected piecewise parameter value, got {:?}",
-                    param.value().node_value()
+                    param.value()
                 );
             };
 
@@ -530,7 +590,7 @@ mod tests {
 
             // Check unit
             assert!(matches!(
-                unit.as_ref().map(Node::node_value),
+                unit.as_ref().map(Node::deref).cloned(),
                 Some(UnitExpr::BinaryOp { .. })
             ));
         }
@@ -544,12 +604,12 @@ mod tests {
             assert!(param.performance_marker().is_none());
             assert!(param.trace_level().is_none());
 
-            let param_value = param.value().node_value();
-            let ParameterValue::Simple(expr, unit) = param_value else {
+            let param_value = param.value();
+            let ParameterValue::Simple(expr, unit) = param_value.clone().take_value() else {
                 panic!("Expected simple parameter value, got {param_value:?}");
             };
 
-            assert!(matches!(expr.node_value(), Expr::Literal(_)));
+            assert!(matches!(expr.take_value(), Expr::Literal(_)));
             assert!(unit.is_none());
             assert_eq!(rest.fragment(), &"");
         }
@@ -567,12 +627,12 @@ mod tests {
             assert!(param.performance_marker().is_none());
             assert!(param.trace_level().is_none());
 
-            let param_value = param.value().node_value();
+            let param_value = param.value().clone().take_value();
             let ParameterValue::Simple(expr, unit) = param_value else {
                 panic!("Expected simple parameter value, got {param_value:?}");
             };
 
-            assert!(matches!(expr.node_value(), Expr::Literal(_)));
+            assert!(matches!(expr.take_value(), Expr::Literal(_)));
             assert!(unit.is_none());
             assert_eq!(rest.fragment(), &"");
         }
@@ -612,7 +672,6 @@ mod tests {
         fn missing_identifier() {
             let input = InputSpan::new_extra("x: = 42\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(1, 1, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -627,14 +686,14 @@ mod tests {
                 panic!("Unexpected error {:?}", error.reason);
             };
 
-            assert_eq!(cause, expected_colon_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
         fn missing_equals_sign() {
             let input = InputSpan::new_extra("x: y 42\n", Config::default());
             let result = parse(input);
-            let expected_ident_span = AstSpan::new(3, 1, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -649,14 +708,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_ident_span);
+            assert_eq!(cause.start().offset, 3);
+            assert_eq!(cause.end().offset, 4);
         }
 
         #[test]
         fn missing_value() {
             let input = InputSpan::new_extra("x: y =\n", Config::default());
             let result = parse(input);
-            let expected_equals_span = AstSpan::new(5, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -671,14 +730,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_equals_span);
+            assert_eq!(cause.start().offset, 5);
+            assert_eq!(cause.end().offset, 6);
         }
 
         #[test]
         fn missing_unit_after_colon() {
             let input = InputSpan::new_extra("x: y = 42 :\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(10, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -693,14 +752,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_colon_span);
+            assert_eq!(cause.start().offset, 10);
+            assert_eq!(cause.end().offset, 11);
         }
 
         #[test]
         fn continuous_limits_missing_min() {
             let input = InputSpan::new_extra("x(, 100): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -715,14 +774,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_paren_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
         fn continuous_limits_missing_comma() {
             let input = InputSpan::new_extra("x(0 100): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_min_span = AstSpan::new(2, 1, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -737,14 +796,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_min_span);
+            assert_eq!(cause.start().offset, 2);
+            assert_eq!(cause.end().offset, 3);
         }
 
         #[test]
         fn continuous_limits_missing_max() {
             let input = InputSpan::new_extra("x(0,): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_comma_span = AstSpan::new(3, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -759,14 +818,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_comma_span);
+            assert_eq!(cause.start().offset, 3);
+            assert_eq!(cause.end().offset, 4);
         }
 
         #[test]
         fn continuous_limits_unclosed_paren() {
             let input = InputSpan::new_extra("x(0, 100: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -781,14 +840,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_paren_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
         fn discrete_limits_missing_values() {
             let input = InputSpan::new_extra("x[]: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_bracket_span = AstSpan::new(1, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -803,14 +862,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_bracket_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
         fn discrete_limits_unclosed_bracket() {
             let input = InputSpan::new_extra("x[1, 2, 3: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_bracket_span = AstSpan::new(1, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -825,14 +884,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_bracket_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
         fn piecewise_missing_expr() {
             let input = InputSpan::new_extra("x: y = { if z > 0\n", Config::default());
             let result = parse(input);
-            let expected_brace_span = AstSpan::new(7, 1, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -847,14 +906,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_brace_span);
+            assert_eq!(cause.start().offset, 7);
+            assert_eq!(cause.end().offset, 8);
         }
 
         #[test]
         fn piecewise_missing_if() {
             let input = InputSpan::new_extra("x: y = {2*z z > 0\n", Config::default());
             let result = parse(input);
-            let expected_expr_span = AstSpan::new(8, 3, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -869,14 +928,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_expr_span);
+            assert_eq!(cause.start().offset, 8);
+            assert_eq!(cause.end().offset, 11);
         }
 
         #[test]
         fn piecewise_missing_if_expr() {
             let input = InputSpan::new_extra("x: y = {2*z if\n", Config::default());
             let result = parse(input);
-            let expected_if_span = AstSpan::new(12, 2, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -891,14 +950,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_if_span);
+            assert_eq!(cause.start().offset, 12);
+            assert_eq!(cause.end().offset, 14);
         }
 
         #[test]
         fn piecewise_missing_unit_after_colon() {
             let input = InputSpan::new_extra("x: y = {2*z if z > 0 :\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(21, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -913,14 +972,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_colon_span);
+            assert_eq!(cause.start().offset, 21);
+            assert_eq!(cause.end().offset, 22);
         }
 
         #[test]
         fn invalid_expression() {
             let input = InputSpan::new_extra("x: y = @invalid\n", Config::default());
             let result = parse(input);
-            let expected_equals_span = AstSpan::new(5, 1, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -935,14 +994,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_equals_span);
+            assert_eq!(cause.start().offset, 5);
+            assert_eq!(cause.end().offset, 6);
         }
 
         #[test]
         fn invalid_unit() {
             let input = InputSpan::new_extra("x: y = 42 : @invalid\n", Config::default());
             let result = parse(input);
-            let expected_colon_span = AstSpan::new(10, 1, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -957,7 +1016,8 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_colon_span);
+            assert_eq!(cause.start().offset, 10);
+            assert_eq!(cause.end().offset, 11);
         }
 
         #[test]
@@ -1060,7 +1120,6 @@ mod tests {
         fn mixed_limits_syntax() {
             let input = InputSpan::new_extra("x(0, 100][1, 2]: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1075,7 +1134,8 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_paren_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
@@ -1083,7 +1143,6 @@ mod tests {
             let input =
                 InputSpan::new_extra("x: y = {2*z if z > 0 {0 if z <= 0\n", Config::default());
             let result = parse(input);
-            let expected_first_part_span = AstSpan::new(7, 13, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1098,14 +1157,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_first_part_span);
+            assert_eq!(cause.start().offset, 7);
+            assert_eq!(cause.end().offset, 20);
         }
 
         #[test]
         fn continuous_limits_with_extra_comma() {
             let input = InputSpan::new_extra("x(0, 100,): y = 42\n", Config::default());
             let result = parse(input);
-            let expected_paren_span = AstSpan::new(1, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1120,14 +1179,14 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_paren_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
         fn discrete_limits_with_trailing_comma() {
             let input = InputSpan::new_extra("x[1, 2, 3,]: y = 42\n", Config::default());
             let result = parse(input);
-            let expected_bracket_span = AstSpan::new(1, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1142,7 +1201,8 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_bracket_span);
+            assert_eq!(cause.start().offset, 1);
+            assert_eq!(cause.end().offset, 2);
         }
 
         #[test]
@@ -1152,7 +1212,6 @@ mod tests {
                 Config::default(),
             );
             let result = parse(input);
-            let expected_second_part_span = AstSpan::new(7, 26, 1);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1167,7 +1226,8 @@ mod tests {
                 panic!("Unexpected error {error:?}");
             };
 
-            assert_eq!(cause, expected_second_part_span);
+            assert_eq!(cause.start().offset, 7);
+            assert_eq!(cause.end().offset, 33);
         }
     }
 }

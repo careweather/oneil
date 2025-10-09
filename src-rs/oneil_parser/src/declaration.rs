@@ -8,9 +8,10 @@ use nom::{
 };
 
 use oneil_ast::{
-    AstSpan, Decl, DeclNode, Directory, DirectoryNode, Identifier, IdentifierNode, Import,
-    ModelInfo, ModelInfoNode, ModelKind, Node, SubmodelList, SubmodelListNode, UseModel,
+    Decl, DeclNode, Directory, DirectoryNode, IdentifierNode, Import, ModelInfo, ModelInfoNode,
+    ModelKind, Node, SubmodelList, SubmodelListNode, UseModel,
 };
+use oneil_shared::span::Span;
 
 use crate::{
     error::{ErrorHandlingParser, ParserError},
@@ -68,21 +69,26 @@ fn decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 fn import_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
+    // TODO: allow a path here (ex. `import foo.bar`)
     let (rest, import_path_token) = identifier
-        .or_fail_with(ParserError::import_missing_path(&import_token))
+        .or_fail_with(ParserError::import_missing_path(import_token.lexeme_span))
         .parse(rest)?;
 
     let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::import_missing_end_of_line(&import_path_token))
+        .or_fail_with(ParserError::import_missing_end_of_line(
+            import_path_token.lexeme_span,
+        ))
         .parse(rest)?;
 
-    let span =
-        AstSpan::calc_span_with_whitespace(&import_token, &import_path_token, &end_of_line_token);
+    let node_span =
+        Span::from_start_and_end(&import_token.lexeme_span, &end_of_line_token.lexeme_span);
+    let whitespace_span = end_of_line_token.whitespace_span;
 
-    let import_path = Node::new(&import_path_token, import_path_token.lexeme().to_string());
-    let import_node = Node::new(&span, Import::new(import_path));
+    let import_path_str = Node::<String>::from(import_path_token);
 
-    let decl_node = Node::new(&span, Decl::Import(import_node));
+    let import_node = Node::new(Import::new(import_path_str), node_span, whitespace_span);
+
+    let decl_node = Node::new(Decl::Import(import_node), node_span, whitespace_span);
 
     Ok((rest, decl_node))
 }
@@ -105,7 +111,9 @@ fn use_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, directory_path) = opt_directory_path.parse(rest)?;
 
     let (rest, model_info) = model_info
-        .or_fail_with(ParserError::use_missing_model_info(&keyword_token))
+        .or_fail_with(ParserError::use_missing_model_info(
+            keyword_token.lexeme_span,
+        ))
         .parse(rest)?;
 
     let (rest, submodel_list) = opt(|input| {
@@ -116,20 +124,23 @@ fn use_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 
     let final_span = submodel_list
         .as_ref()
-        .map_or_else(|| model_info.node_span(), Node::node_span);
+        .map_or_else(|| model_info.span(), Node::span);
 
     let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::use_missing_end_of_line(&final_span))
+        .or_fail_with(ParserError::use_missing_end_of_line(final_span))
         .parse(rest)?;
 
-    let span = AstSpan::calc_span_with_whitespace(&keyword_token, &final_span, &end_of_line_token);
-
     let use_model_node = Node::new(
-        &span,
         UseModel::new(directory_path, model_info, submodel_list, is_ref_only),
+        final_span,
+        end_of_line_token.whitespace_span,
     );
 
-    let decl_node = Node::new(&span, Decl::UseModel(use_model_node));
+    let decl_node = Node::new(
+        Decl::UseModel(use_model_node),
+        final_span,
+        end_of_line_token.whitespace_span,
+    );
 
     Ok((rest, decl_node))
 }
@@ -148,22 +159,19 @@ fn opt_directory_path(input: InputSpan<'_>) -> Result<'_, Vec<DirectoryNode>, Pa
 fn directory_name(input: InputSpan<'_>) -> Result<'_, DirectoryNode, ParserError> {
     let directory_name = |input| {
         let (rest, directory_name_token) = identifier.convert_errors().parse(input)?;
-        let directory_name = Node::new(
-            &directory_name_token,
-            Directory::name(directory_name_token.lexeme().to_string()),
-        );
+        let directory_name = DirectoryNode::from(directory_name_token);
         Ok((rest, directory_name))
     };
 
     let current_directory = |input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
-        let current_directory = Node::new(&dot_token, Directory::current());
+        let current_directory = dot_token.into_node_with_value(Directory::current());
         Ok((rest, current_directory))
     };
 
     let parent_directory = |input| {
         let (rest, dot_dot_token) = dot_dot.convert_errors().parse(input)?;
-        let parent_directory = Node::new(&dot_dot_token, Directory::parent());
+        let parent_directory = dot_dot_token.into_node_with_value(Directory::parent());
         Ok((rest, parent_directory))
     };
 
@@ -171,34 +179,42 @@ fn directory_name(input: InputSpan<'_>) -> Result<'_, DirectoryNode, ParserError
 }
 
 pub fn model_info(input: InputSpan<'_>) -> Result<'_, ModelInfoNode, ParserError> {
-    let (rest, top_component) = identifier.convert_errors().parse(input)?;
-    let top_component_ident = Identifier::new(top_component.lexeme().to_string());
-    let top_component = Node::new(&top_component, top_component_ident);
+    let (rest, top_component_token) = identifier.convert_errors().parse(input)?;
+    let top_component_node = IdentifierNode::from(top_component_token);
 
     let (rest, subcomponents) = opt_subcomponents.parse(rest)?;
     let (rest, alias) = opt(as_alias).parse(rest)?;
 
-    let last_span = match (subcomponents.last(), &alias) {
-        (_, Some(alias)) => alias.node_span(),
-        (Some(subcomponent), None) => subcomponent.node_span(),
-        (None, None) => top_component.node_span(),
+    let (final_span, whitespace_span) = match (subcomponents.last(), &alias) {
+        (_, Some(alias)) => (alias.span(), alias.whitespace_span()),
+        (Some(subcomponent), None) => (subcomponent.span(), subcomponent.whitespace_span()),
+        (None, None) => (
+            top_component_node.span(),
+            top_component_node.whitespace_span(),
+        ),
     };
 
-    let model_info_span = AstSpan::calc_span(&top_component, &last_span);
-    let model_info = ModelInfo::new(top_component, subcomponents, alias);
-    Ok((rest, Node::new(&model_info_span, model_info)))
+    let model_info_span = Span::from_start_and_end(&top_component_node.span(), &final_span);
+    let model_info = ModelInfo::new(top_component_node, subcomponents, alias);
+
+    Ok((
+        rest,
+        Node::new(model_info, model_info_span, whitespace_span),
+    ))
 }
 
 fn opt_subcomponents(input: InputSpan<'_>) -> Result<'_, Vec<IdentifierNode>, ParserError> {
     many0(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
-        let (rest, subcomponent) = identifier
-            .or_fail_with(ParserError::model_path_missing_subcomponent(&dot_token))
+
+        let (rest, subcomponent_token) = identifier
+            .or_fail_with(ParserError::model_path_missing_subcomponent(
+                dot_token.lexeme_span,
+            ))
             .parse(rest)?;
-        let subcomponent_node = Node::new(
-            &subcomponent,
-            Identifier::new(subcomponent.lexeme().to_string()),
-        );
+
+        let subcomponent_node = IdentifierNode::from(subcomponent_token);
+
         Ok((rest, subcomponent_node))
     })
     .parse(input)
@@ -208,10 +224,11 @@ fn opt_subcomponents(input: InputSpan<'_>) -> Result<'_, Vec<IdentifierNode>, Pa
 fn as_alias(input: InputSpan<'_>) -> Result<'_, IdentifierNode, ParserError> {
     let (rest, as_token) = as_.convert_errors().parse(input)?;
 
-    let (rest, alias) = identifier
-        .or_fail_with(ParserError::as_missing_alias(&as_token))
+    let (rest, alias_token) = identifier
+        .or_fail_with(ParserError::as_missing_alias(as_token.lexeme_span))
         .parse(rest)?;
-    let alias_node = Node::new(&alias, Identifier::new(alias.lexeme().to_string()));
+
+    let alias_node = IdentifierNode::from(alias_token);
 
     Ok((rest, alias_node))
 }
@@ -220,10 +237,11 @@ fn as_alias(input: InputSpan<'_>) -> Result<'_, IdentifierNode, ParserError> {
 fn submodel_list(input: InputSpan<'_>) -> Result<'_, SubmodelListNode, ParserError> {
     let single_submodel = |input| {
         let (rest, submodel) = model_info.parse(input)?;
-        let submodel_span = submodel.node_span();
+        let submodel_span = submodel.span();
+        let submodel_whitespace_span = submodel.whitespace_span();
 
         let submodel_list = SubmodelList::new(vec![submodel]);
-        let submodel_list_node = Node::new(&submodel_span, submodel_list);
+        let submodel_list_node = Node::new(submodel_list, submodel_span, submodel_whitespace_span);
 
         Ok((rest, submodel_list_node))
     };
@@ -259,13 +277,23 @@ fn submodel_list(input: InputSpan<'_>) -> Result<'_, SubmodelListNode, ParserErr
         .parse(rest)?;
 
         let (rest, bracket_right_token) = bracket_right
-            .or_fail_with(ParserError::unclosed_bracket(&bracket_left_token))
+            .or_fail_with(ParserError::unclosed_bracket(
+                bracket_left_token.lexeme_span,
+            ))
             .parse(rest)?;
 
         let submodel_list = SubmodelList::new(submodel_list.unwrap_or_default());
+        let submodel_list_span = Span::from_start_and_end(
+            &bracket_left_token.lexeme_span,
+            &bracket_right_token.lexeme_span,
+        );
+        let submodel_list_whitespace_span = bracket_right_token.whitespace_span;
 
-        let submodel_list_span = AstSpan::calc_span(&bracket_left_token, &bracket_right_token);
-        let submodel_list_node = Node::new(&submodel_list_span, submodel_list);
+        let submodel_list_node = Node::new(
+            submodel_list,
+            submodel_list_span,
+            submodel_list_whitespace_span,
+        );
 
         Ok((rest, submodel_list_node))
     };
@@ -277,8 +305,13 @@ fn submodel_list(input: InputSpan<'_>) -> Result<'_, SubmodelListNode, ParserErr
 fn parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, parameter) = parse_parameter.parse(input)?;
 
-    let span = AstSpan::from(&parameter);
-    let decl_node = Node::new(&span, Decl::Parameter(parameter));
+    let parameter_span = parameter.span();
+    let parameter_whitespace_span = parameter.whitespace_span();
+    let decl_node = Node::new(
+        Decl::Parameter(parameter),
+        parameter_span,
+        parameter_whitespace_span,
+    );
 
     Ok((rest, decl_node))
 }
@@ -287,8 +320,9 @@ fn parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 fn test_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, test) = parse_test.parse(input)?;
 
-    let span = AstSpan::from(&test);
-    let decl_node = Node::new(&span, Decl::Test(test));
+    let span = test.span();
+    let whitespace_span = test.whitespace_span();
+    let decl_node = Node::new(Decl::Test(test), span, whitespace_span);
 
     Ok((rest, decl_node))
 }
@@ -301,6 +335,7 @@ fn test_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
 mod tests {
     use super::*;
     use crate::Config;
+    use crate::util::test::assert_node_contains;
 
     mod success {
         use super::*;
@@ -310,12 +345,12 @@ mod tests {
             let input = InputSpan::new_extra("import foo\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::Import(import_node) = decl.node_value() else {
+            let Decl::Import(ref import_node) = *decl else {
                 panic!("Expected import declaration");
             };
+
             let import_path = import_node.path();
-            assert_eq!(import_path.node_value(), "foo");
-            assert_eq!(import_path.node_span(), AstSpan::new(7, 3, 0));
+            assert_node_contains!(import_path, "foo".to_string(), start_offset: 7, end_offset: 10);
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -325,7 +360,7 @@ mod tests {
             let input = InputSpan::new_extra("ref foo\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -343,7 +378,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo.bar as baz\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -361,7 +396,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo.bar\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -379,7 +414,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -396,13 +431,12 @@ mod tests {
             let input = InputSpan::new_extra("import foo\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::Import(import_node) = decl.node_value() else {
+            let Decl::Import(ref import_node) = *decl else {
                 panic!("Expected import declaration");
             };
 
-            let import_path = import_node.path();
-            assert_eq!(import_path.node_value(), "foo");
-            assert_eq!(import_path.node_span(), AstSpan::new(7, 3, 0));
+            let import_path_node = import_node.path();
+            assert_node_contains!(import_path_node, "foo", start_offset: 7, end_offset: 10);
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -412,7 +446,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo.bar as baz\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -429,7 +463,7 @@ mod tests {
             let input = InputSpan::new_extra("use utils/math as calculator\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -440,10 +474,7 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 1);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                "utils"
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "utils");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -453,7 +484,7 @@ mod tests {
             let input = InputSpan::new_extra("use utils/math\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -464,10 +495,7 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 1);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                "utils"
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "utils");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -480,7 +508,7 @@ mod tests {
             );
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -491,14 +519,8 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 2);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                "models"
-            );
-            assert_eq!(
-                use_model_node.directory_path()[1].node_value().as_str(),
-                "physics"
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "models");
+            assert_eq!(use_model_node.directory_path()[1].as_str(), "physics");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -509,7 +531,7 @@ mod tests {
                 InputSpan::new_extra("use utils/math.trigonometry as trig\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -521,10 +543,7 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 1);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                "utils"
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "utils");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -534,7 +553,7 @@ mod tests {
             let input = InputSpan::new_extra("use ./local_model as local\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -545,10 +564,7 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 1);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                "."
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), ".");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -558,7 +574,7 @@ mod tests {
             let input = InputSpan::new_extra("use ../parent_model as parent\n", Config::default());
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -569,10 +585,7 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 1);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                ".."
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "..");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -585,7 +598,7 @@ mod tests {
             );
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -596,22 +609,10 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 4);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                ".."
-            );
-            assert_eq!(
-                use_model_node.directory_path()[1].node_value().as_str(),
-                "shared"
-            );
-            assert_eq!(
-                use_model_node.directory_path()[2].node_value().as_str(),
-                "."
-            );
-            assert_eq!(
-                use_model_node.directory_path()[3].node_value().as_str(),
-                "utils"
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "..");
+            assert_eq!(use_model_node.directory_path()[1].as_str(), "shared");
+            assert_eq!(use_model_node.directory_path()[2].as_str(), ".");
+            assert_eq!(use_model_node.directory_path()[3].as_str(), "utils");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -624,7 +625,7 @@ mod tests {
             );
             let (rest, decl) = parse_complete(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -637,14 +638,8 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 2);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                "models"
-            );
-            assert_eq!(
-                use_model_node.directory_path()[1].node_value().as_str(),
-                "physics"
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "models");
+            assert_eq!(use_model_node.directory_path()[1].as_str(), "physics");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -654,19 +649,19 @@ mod tests {
             // Test parent directory
             let input = InputSpan::new_extra("..", Config::default());
             let (rest, dir) = directory_name(input).expect("should parse parent directory");
-            assert_eq!(dir.node_value().as_str(), "..");
+            assert_eq!(dir.as_str(), "..");
             assert_eq!(rest.fragment(), &"");
 
             // Test current directory
             let input = InputSpan::new_extra(".", Config::default());
             let (rest, dir) = directory_name(input).expect("should parse current directory");
-            assert_eq!(dir.node_value().as_str(), ".");
+            assert_eq!(dir.as_str(), ".");
             assert_eq!(rest.fragment(), &"");
 
             // Test regular directory name
             let input = InputSpan::new_extra("foo", Config::default());
             let (rest, dir) = directory_name(input).expect("should parse regular directory name");
-            assert_eq!(dir.node_value().as_str(), "foo");
+            assert_eq!(dir.as_str(), "foo");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -677,16 +672,10 @@ mod tests {
                 opt_directory_path(input).expect("should parse mixed directory path");
 
             assert_eq!(directory_path.len(), 4);
-            assert_eq!(directory_path[0].node_value(), &Directory::Parent);
-            assert_eq!(
-                directory_path[1].node_value(),
-                &Directory::Name("shared".to_string())
-            );
-            assert_eq!(directory_path[2].node_value(), &Directory::Current);
-            assert_eq!(
-                directory_path[3].node_value(),
-                &Directory::Name("utils".to_string())
-            );
+            assert_eq!(*directory_path[0], Directory::Parent);
+            assert_eq!(*directory_path[1], Directory::Name("shared".to_string()));
+            assert_eq!(*directory_path[2], Directory::Current);
+            assert_eq!(*directory_path[3], Directory::Name("utils".to_string()));
         }
 
         #[test]
@@ -694,7 +683,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo with bar\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -708,9 +697,9 @@ mod tests {
             assert_eq!(submodels.len(), 1);
 
             let submodel = &submodels[0];
-            assert_eq!(submodel.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel.node_value().get_alias().as_str(), "bar");
+            assert_eq!(submodel.top_component().as_str(), "bar");
+            assert_eq!(submodel.subcomponents().len(), 0);
+            assert_eq!(submodel.get_alias().as_str(), "bar");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -720,7 +709,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo with bar as baz\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -734,9 +723,9 @@ mod tests {
             assert_eq!(submodels.len(), 1);
 
             let submodel = &submodels[0];
-            assert_eq!(submodel.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel.node_value().get_alias().as_str(), "baz");
+            assert_eq!(submodel.top_component().as_str(), "bar");
+            assert_eq!(submodel.subcomponents().len(), 0);
+            assert_eq!(submodel.get_alias().as_str(), "baz");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -746,7 +735,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo with bar.qux\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -760,10 +749,10 @@ mod tests {
             assert_eq!(submodels.len(), 1);
 
             let submodel = &submodels[0];
-            assert_eq!(submodel.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel.node_value().subcomponents().len(), 1);
-            assert_eq!(submodel.node_value().subcomponents()[0].as_str(), "qux");
-            assert_eq!(submodel.node_value().get_alias().as_str(), "qux");
+            assert_eq!(submodel.top_component().as_str(), "bar");
+            assert_eq!(submodel.subcomponents().len(), 1);
+            assert_eq!(submodel.subcomponents()[0].as_str(), "qux");
+            assert_eq!(submodel.get_alias().as_str(), "qux");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -773,7 +762,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo with [bar, qux]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -787,14 +776,14 @@ mod tests {
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
-            assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel1.node_value().get_alias().as_str(), "bar");
+            assert_eq!(submodel1.top_component().as_str(), "bar");
+            assert_eq!(submodel1.subcomponents().len(), 0);
+            assert_eq!(submodel1.get_alias().as_str(), "bar");
 
             let submodel2 = &submodels[1];
-            assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
-            assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel2.node_value().get_alias().as_str(), "qux");
+            assert_eq!(submodel2.top_component().as_str(), "qux");
+            assert_eq!(submodel2.subcomponents().len(), 0);
+            assert_eq!(submodel2.get_alias().as_str(), "qux");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -807,7 +796,7 @@ mod tests {
             );
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -821,14 +810,14 @@ mod tests {
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
-            assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel1.node_value().get_alias().as_str(), "baz");
+            assert_eq!(submodel1.top_component().as_str(), "bar");
+            assert_eq!(submodel1.subcomponents().len(), 0);
+            assert_eq!(submodel1.get_alias().as_str(), "baz");
 
             let submodel2 = &submodels[1];
-            assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
-            assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel2.node_value().get_alias().as_str(), "quux");
+            assert_eq!(submodel2.top_component().as_str(), "qux");
+            assert_eq!(submodel2.subcomponents().len(), 0);
+            assert_eq!(submodel2.get_alias().as_str(), "quux");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -839,7 +828,7 @@ mod tests {
                 InputSpan::new_extra("use foo with [bar.qux, baz.quux.quuz]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -853,17 +842,17 @@ mod tests {
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
-            assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel1.node_value().subcomponents().len(), 1);
-            assert_eq!(submodel1.node_value().subcomponents()[0].as_str(), "qux");
-            assert_eq!(submodel1.node_value().get_alias().as_str(), "qux");
+            assert_eq!(submodel1.top_component().as_str(), "bar");
+            assert_eq!(submodel1.subcomponents().len(), 1);
+            assert_eq!(submodel1.subcomponents()[0].as_str(), "qux");
+            assert_eq!(submodel1.get_alias().as_str(), "qux");
 
             let submodel2 = &submodels[1];
-            assert_eq!(submodel2.node_value().top_component().as_str(), "baz");
-            assert_eq!(submodel2.node_value().subcomponents().len(), 2);
-            assert_eq!(submodel2.node_value().subcomponents()[0].as_str(), "quux");
-            assert_eq!(submodel2.node_value().subcomponents()[1].as_str(), "quuz");
-            assert_eq!(submodel2.node_value().get_alias().as_str(), "quuz");
+            assert_eq!(submodel2.top_component().as_str(), "baz");
+            assert_eq!(submodel2.subcomponents().len(), 2);
+            assert_eq!(submodel2.subcomponents()[0].as_str(), "quux");
+            assert_eq!(submodel2.subcomponents()[1].as_str(), "quuz");
+            assert_eq!(submodel2.get_alias().as_str(), "quuz");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -873,7 +862,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo with [bar, qux,]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -887,14 +876,14 @@ mod tests {
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
-            assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel1.node_value().get_alias().as_str(), "bar");
+            assert_eq!(submodel1.top_component().as_str(), "bar");
+            assert_eq!(submodel1.subcomponents().len(), 0);
+            assert_eq!(submodel1.get_alias().as_str(), "bar");
 
             let submodel2 = &submodels[1];
-            assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
-            assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel2.node_value().get_alias().as_str(), "qux");
+            assert_eq!(submodel2.top_component().as_str(), "qux");
+            assert_eq!(submodel2.subcomponents().len(), 0);
+            assert_eq!(submodel2.get_alias().as_str(), "qux");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -904,7 +893,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo with []\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -925,7 +914,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo as bar with [qux, baz]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -939,14 +928,14 @@ mod tests {
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
-            assert_eq!(submodel1.node_value().top_component().as_str(), "qux");
-            assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel1.node_value().get_alias().as_str(), "qux");
+            assert_eq!(submodel1.top_component().as_str(), "qux");
+            assert_eq!(submodel1.subcomponents().len(), 0);
+            assert_eq!(submodel1.get_alias().as_str(), "qux");
 
             let submodel2 = &submodels[1];
-            assert_eq!(submodel2.node_value().top_component().as_str(), "baz");
-            assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel2.node_value().get_alias().as_str(), "baz");
+            assert_eq!(submodel2.top_component().as_str(), "baz");
+            assert_eq!(submodel2.subcomponents().len(), 0);
+            assert_eq!(submodel2.get_alias().as_str(), "baz");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -959,7 +948,7 @@ mod tests {
             );
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -971,24 +960,21 @@ mod tests {
 
             // Check directory path
             assert_eq!(use_model_node.directory_path().len(), 1);
-            assert_eq!(
-                use_model_node.directory_path()[0].node_value().as_str(),
-                "utils"
-            );
+            assert_eq!(use_model_node.directory_path()[0].as_str(), "utils");
 
             // Check submodels
             let submodels = use_model_node.submodels().expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
-            assert_eq!(submodel1.node_value().top_component().as_str(), "sin");
-            assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel1.node_value().get_alias().as_str(), "sin");
+            assert_eq!(submodel1.top_component().as_str(), "sin");
+            assert_eq!(submodel1.subcomponents().len(), 0);
+            assert_eq!(submodel1.get_alias().as_str(), "sin");
 
             let submodel2 = &submodels[1];
-            assert_eq!(submodel2.node_value().top_component().as_str(), "cos");
-            assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel2.node_value().get_alias().as_str(), "cosine");
+            assert_eq!(submodel2.top_component().as_str(), "cos");
+            assert_eq!(submodel2.subcomponents().len(), 0);
+            assert_eq!(submodel2.get_alias().as_str(), "cosine");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -998,7 +984,7 @@ mod tests {
             let input = InputSpan::new_extra("use foo with [\nbar,\nqux\n]\n", Config::default());
             let (rest, decl) = parse(input).expect("parsing should succeed");
 
-            let Decl::UseModel(use_model_node) = decl.node_value() else {
+            let Decl::UseModel(ref use_model_node) = *decl else {
                 panic!("Expected use declaration");
             };
 
@@ -1012,14 +998,14 @@ mod tests {
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
-            assert_eq!(submodel1.node_value().top_component().as_str(), "bar");
-            assert_eq!(submodel1.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel1.node_value().get_alias().as_str(), "bar");
+            assert_eq!(submodel1.top_component().as_str(), "bar");
+            assert_eq!(submodel1.subcomponents().len(), 0);
+            assert_eq!(submodel1.get_alias().as_str(), "bar");
 
             let submodel2 = &submodels[1];
-            assert_eq!(submodel2.node_value().top_component().as_str(), "qux");
-            assert_eq!(submodel2.node_value().subcomponents().len(), 0);
-            assert_eq!(submodel2.node_value().get_alias().as_str(), "qux");
+            assert_eq!(submodel2.top_component().as_str(), "qux");
+            assert_eq!(submodel2.subcomponents().len(), 0);
+            assert_eq!(submodel2.get_alias().as_str(), "qux");
 
             assert_eq!(rest.fragment(), &"");
         }
@@ -1071,7 +1057,6 @@ mod tests {
             fn missing_path() {
                 let input = InputSpan::new_extra("import\n", Config::default());
                 let result = parse(input);
-                let expected_import_span = AstSpan::new(0, 6, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1087,14 +1072,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_import_span);
+                assert_eq!(cause.start().offset, 0);
+                assert_eq!(cause.end().offset, 6);
             }
 
             #[test]
             fn invalid_path_identifier() {
                 let input = InputSpan::new_extra("import 123\n", Config::default());
                 let result = parse(input);
-                let expected_import_span = AstSpan::new(0, 6, 1);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1110,14 +1095,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_import_span);
+                assert_eq!(cause.start().offset, 0);
+                assert_eq!(cause.end().offset, 6);
             }
 
             #[test]
             fn path_with_missing_end_of_line() {
                 let input = InputSpan::new_extra("import foo@bar\n", Config::default());
                 let result = parse(input);
-                let expected_foo_span = AstSpan::new(7, 3, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1133,7 +1118,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_foo_span);
+                assert_eq!(cause.start().offset, 7);
+                assert_eq!(cause.end().offset, 10);
             }
 
             #[test]
@@ -1215,14 +1201,14 @@ mod tests {
                 };
 
                 // The cause should be the span of "foo.bar"
-                assert_eq!(cause, AstSpan::new(4, 7, 1));
+                assert_eq!(cause.start().offset, 4);
+                assert_eq!(cause.end().offset, 11);
             }
 
             #[test]
             fn missing_alias() {
                 let input = InputSpan::new_extra("use foo.bar as\n", Config::default());
                 let result = parse(input);
-                let expected_as_span = AstSpan::new(12, 2, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1238,7 +1224,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_as_span);
+                assert_eq!(cause.start().offset, 12);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
@@ -1246,7 +1233,6 @@ mod tests {
                 // TODO: Add context to this error (in error module): "invalid path identifier"
                 let input = InputSpan::new_extra("use 123.bar as baz\n", Config::default());
                 let result = parse(input);
-                let expected_use_span = AstSpan::new(0, 3, 1);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1262,7 +1248,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_use_span);
+                assert_eq!(cause.start().offset, 0);
+                assert_eq!(cause.end().offset, 3);
             }
 
             #[test]
@@ -1270,7 +1257,6 @@ mod tests {
                 // TODO: Add context to this error (in error module): "invalid alias identifier"
                 let input = InputSpan::new_extra("use foo.bar as 123\n", Config::default());
                 let result = parse(input);
-                let expected_as_span = AstSpan::new(12, 2, 1);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1286,7 +1272,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_as_span);
+                assert_eq!(cause.start().offset, 12);
+                assert_eq!(cause.end().offset, 14);
             }
         }
 
@@ -1332,7 +1319,6 @@ mod tests {
             fn missing_subcomponent_after_dot() {
                 let input = InputSpan::new_extra("foo.", Config::default());
                 let result = model_info(input);
-                let expected_dot_span = AstSpan::new(3, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1348,14 +1334,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_dot_span);
+                assert_eq!(cause.start().offset, 3);
+                assert_eq!(cause.end().offset, 4);
             }
 
             #[test]
             fn invalid_subcomponent_after_dot() {
                 let input = InputSpan::new_extra("foo.123", Config::default());
                 let result = model_info(input);
-                let expected_dot_span = AstSpan::new(3, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1371,14 +1357,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_dot_span);
+                assert_eq!(cause.start().offset, 3);
+                assert_eq!(cause.end().offset, 4);
             }
 
             #[test]
             fn dot_at_end() {
                 let input = InputSpan::new_extra("foo.bar.", Config::default());
                 let result = model_info(input);
-                let expected_dot_span = AstSpan::new(7, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1394,7 +1380,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_dot_span);
+                assert_eq!(cause.start().offset, 7);
+                assert_eq!(cause.end().offset, 8);
             }
         }
 
@@ -1516,7 +1503,6 @@ mod tests {
             fn use_decl_with_unclosed_bracket_empty() {
                 let input = InputSpan::new_extra("use foo with [\n", Config::default());
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(13, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1532,14 +1518,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 13);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
             fn use_decl_with_unclosed_bracket_single_submodel() {
                 let input = InputSpan::new_extra("use foo with [bar\n", Config::default());
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(13, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1555,14 +1541,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 13);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
             fn use_decl_with_unclosed_bracket_multiple_submodels() {
                 let input = InputSpan::new_extra("use foo with [bar, baz\n", Config::default());
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(13, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1578,14 +1564,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 13);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
             fn use_decl_with_unclosed_bracket_with_trailing_comma() {
                 let input = InputSpan::new_extra("use foo with [bar, baz,\n", Config::default());
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(13, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1601,7 +1587,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 13);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
@@ -1609,7 +1596,6 @@ mod tests {
                 let input =
                     InputSpan::new_extra("use foo with [bar.qux, baz.quux\n", Config::default());
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(13, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1625,7 +1611,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 13);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
@@ -1635,7 +1622,6 @@ mod tests {
                     Config::default(),
                 );
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(13, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1651,7 +1637,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 13);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
@@ -1659,7 +1646,6 @@ mod tests {
                 let input =
                     InputSpan::new_extra("use foo as bar with [qux, baz\n", Config::default());
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(20, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1675,14 +1661,14 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 20);
+                assert_eq!(cause.end().offset, 21);
             }
 
             #[test]
             fn use_decl_with_unclosed_bracket_with_newlines() {
                 let input = InputSpan::new_extra("use foo with [\nbar,\nbaz\n", Config::default());
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(13, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1698,7 +1684,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 13);
+                assert_eq!(cause.end().offset, 14);
             }
 
             #[test]
@@ -1708,7 +1695,6 @@ mod tests {
                     Config::default(),
                 );
                 let result = parse(input);
-                let expected_bracket_span = AstSpan::new(41, 1, 0);
 
                 let Err(nom::Err::Failure(error)) = result else {
                     panic!("Unexpected result {result:?}");
@@ -1724,7 +1710,8 @@ mod tests {
                     panic!("Unexpected reason {:?}", error.reason);
                 };
 
-                assert_eq!(cause, expected_bracket_span);
+                assert_eq!(cause.start().offset, 41);
+                assert_eq!(cause.end().offset, 42);
             }
         }
     }

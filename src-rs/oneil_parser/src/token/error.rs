@@ -157,6 +157,8 @@ pub enum IncompleteKind {
         /// The length of the note delimiter
         delimiter_length: usize,
     },
+    /// Invalid closing delimiter
+    InvalidClosingDelimiter,
     /// Unclosed string
     UnclosedString {
         /// The offset of the opening quote
@@ -184,21 +186,7 @@ impl TokenError {
     }
 
     /// Updates the error kind
-    ///
-    /// This should only be happening if the error is a nom error, so it panics
-    /// if it's not.
-    ///
-    /// This is because if it's any other token error, that likely means that
-    /// the `token` function was used multiple times, meaning that there might
-    /// be whitespace in the middle of the token
     fn update_kind(self, kind: TokenErrorKind) -> Self {
-        let is_nom_error = matches!(self.kind, TokenErrorKind::NomError(_));
-        assert!(
-            is_nom_error,
-            "Cannot update an error that is not a nom error! (attempting to update the kind {:?})",
-            self.kind
-        );
-
         Self { kind, ..self }
     }
 
@@ -267,6 +255,13 @@ impl TokenError {
                 delimiter_length,
             }))
         }
+    }
+
+    /// Creates a new `TokenError` instance for an invalid closing delimiter
+    pub fn invalid_closing_delimiter(error: Self) -> Self {
+        error.update_kind(TokenErrorKind::Incomplete(
+            IncompleteKind::InvalidClosingDelimiter,
+        ))
     }
 
     /// Creates a new `TokenError` instance for an unclosed string

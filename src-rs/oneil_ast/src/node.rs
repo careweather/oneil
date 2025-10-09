@@ -1,6 +1,6 @@
 //! AST node wrapper with source location information
 
-use std::fmt::Debug;
+use std::{fmt::Debug, ops::Deref};
 
 use oneil_shared::span::Span;
 
@@ -36,15 +36,27 @@ impl<T> Node<T> {
         self.whitespace_span
     }
 
-    /// Returns the value contained by the node
-    #[must_use]
-    pub fn node_value(&self) -> &T {
-        &self.value
-    }
-
     /// Consumes the node and returns its value
     #[must_use]
     pub fn take_value(self) -> T {
         *self.value
+    }
+
+    /// Wraps the node in a new node with the same span and whitespace span
+    #[must_use]
+    pub fn wrap<U>(self, wrapper: impl FnOnce(Self) -> U) -> Node<U> {
+        let span = self.span;
+        let whitespace_span = self.whitespace_span;
+        let value = wrapper(self);
+
+        Node::new(value, span, whitespace_span)
+    }
+}
+
+impl<T> Deref for Node<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
 }

@@ -12,9 +12,10 @@ use nom::{
     combinator::{eof, opt, value},
 };
 use oneil_ast::{
-    AstSpan, DeclNode, Label, Model, ModelNode, Node, Section, SectionHeader, SectionHeaderNode,
+    DeclNode, LabelNode, Model, ModelNode, Node, Section, SectionHeader, SectionHeaderNode,
     SectionNode,
 };
+use oneil_shared::span::{SourceLocation, Span};
 
 use crate::{
     declaration::parse as parse_decl,
@@ -55,7 +56,7 @@ pub fn parse_complete(
 fn model(
     input: InputSpan<'_>,
 ) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
-    let (rest, _) = opt(end_of_line).convert_errors().parse(input)?;
+    let (rest, end_of_line_token) = opt(end_of_line).convert_errors().parse(input)?;
     let (rest, note) = opt(parse_note).convert_errors().parse(rest)?;
     let (rest, mut decls, decl_errors) = parse_decls(rest);
     let (rest, sections, decls_without_section, section_errors) = parse_sections(rest);
@@ -65,18 +66,72 @@ fn model(
 
     let errors = [decl_errors, section_errors].concat();
 
-    if errors.is_empty() {
-        // assume that the model spans the entire file
-        let model_span = AstSpan::new(0, input.len(), 0);
-        let model_node = Node::new(&model_span, Model::new(note, decls, sections));
-
-        Ok((rest, model_node))
-    } else {
+    // if there were errors, return a partial result
+    if !errors.is_empty() {
         let model = Box::new(Model::new(note, decls, sections));
-        Err(nom::Err::Failure(ErrorsWithPartialResult::new(
+        return Err(nom::Err::Failure(ErrorsWithPartialResult::new(
             model, errors,
-        )))
+        )));
     }
+
+    // get the start of the model
+    let model_span_start = SourceLocation {
+        offset: input.location_offset(),
+        line: usize::try_from(input.location_line())
+            .expect("usize should be greater than or equal to u32"),
+        column: input.get_column(),
+    };
+
+    // get the last span/whitespace span of the model
+    let last_end_of_line_spans =
+        end_of_line_token.map(|token| (token.lexeme_span, token.whitespace_span));
+    let last_note_spans = note
+        .as_ref()
+        .map(|note| (note.span(), note.whitespace_span()));
+    let last_decl_spans = decls
+        .last()
+        .map(|decl| (decl.span(), decl.whitespace_span()));
+    let last_section_spans = sections
+        .last()
+        .map(|section| (section.span(), section.whitespace_span()));
+
+    let (last_node_span, last_node_whitespace_span) = [
+        last_end_of_line_spans,
+        last_note_spans,
+        last_decl_spans,
+        last_section_spans,
+    ]
+    .into_iter()
+    .filter_map(|spans| spans)
+    .max_by(|a, b| {
+        let a_end = a.0.end();
+        let b_end = b.0.end();
+        a_end
+            .partial_cmp(&b_end)
+            .expect("should always compare because they are from the same file")
+    })
+    .unzip();
+
+    // calculate the end of the model span
+    let model_span_end = last_node_span
+        .map(|span| *span.end())
+        .unwrap_or(model_span_start);
+
+    // build the model span
+    let model_span = Span::new(model_span_start, model_span_end);
+
+    // calculate the whitespace span of the model
+    // (if there was no last node, use the model span)
+    let model_whitespace_span = last_node_whitespace_span
+        .unwrap_or_else(|| Span::new(*model_span.end(), *model_span.end()));
+
+    let model_node = Node::new(
+        Model::new(note, decls, sections),
+        model_span,
+        model_whitespace_span,
+    );
+
+    Ok((rest, model_node))
 }
 
 /// Attempts to parse declarations with error recovery
@@ -211,16 +266,20 @@ fn parse_section(input: InputSpan<'_>) -> Option<(InputSpan<'_>, SectionResult, 
 
     match header {
         Some(header) => {
-            let span_start = &header;
-            let span_end = match (&note, decls.last()) {
-                (_, Some(decl)) => AstSpan::from(decl),
-                (Some(note), _) => AstSpan::from(note),
-                (_, _) => AstSpan::from(&header),
+            let section_start_span = header.span();
+            let (section_end_span, section_whitespace_span) = match (&note, decls.last()) {
+                (_, Some(decl)) => (decl.span(), decl.whitespace_span()),
+                (Some(note), _) => (note.span(), note.whitespace_span()),
+                (_, _) => (header.span(), header.whitespace_span()),
             };
 
-            let span = AstSpan::calc_span(&span_start, &span_end);
+            let section_span = Span::from_start_and_end(&section_start_span, &section_end_span);
 
-            let section_node = Node::new(&span, Section::new(header, note, decls));
+            let section_node = Node::new(
+                Section::new(header, note, decls),
+                section_span,
+                section_whitespace_span,
+            );
 
             Some((rest, Ok(section_node), errors))
         }
@@ -232,20 +291,29 @@ fn parse_section(input: InputSpan<'_>) -> Option<(InputSpan<'_>, SectionResult, 
 
 /// Parses a section header with its label
 fn parse_section_header(input: InputSpan<'_>) -> Result<'_, SectionHeaderNode, ParserError> {
-    let (rest, section_span) = section.convert_errors().parse(input)?;
+    let (rest, section_token) = section.convert_errors().parse(input)?;
 
-    let (rest, label) = label
-        .or_fail_with(ParserError::section_missing_label(&section_span))
+    let (rest, label_token) = label
+        .or_fail_with(ParserError::section_missing_label(
+            section_token.lexeme_span,
+        ))
         .parse(rest)?;
-    let label_value = Label::new(label.lexeme().to_string());
-    let label_node = Node::new(&label, label_value);
+    let label_node = LabelNode::from(label_token);
 
     let (rest, end_of_line_token) = end_of_line
-        .or_fail_with(ParserError::section_missing_end_of_line(&label))
+        .or_fail_with(ParserError::section_missing_end_of_line(
+            label_token.lexeme_span,
+        ))
         .parse(rest)?;
 
-    let span = AstSpan::calc_span_with_whitespace(&section_span, &label, &end_of_line_token);
-    let header_node = Node::new(&span, SectionHeader::new(label_node));
+    let label_span =
+        Span::from_start_and_end(&section_token.lexeme_span, &end_of_line_token.lexeme_span);
+    let label_whitespace_span = end_of_line_token.whitespace_span;
+    let header_node = Node::new(
+        SectionHeader::new(label_node),
+        label_span,
+        label_whitespace_span,
+    );
 
     Ok((rest, header_node))
 }
@@ -306,10 +374,10 @@ mod tests {
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 1);
 
-        let Decl::Import(import_node) = &model.decls()[0].node_value() else {
+        let Decl::Import(import_node) = model.decls()[0].clone().take_value() else {
             panic!("Expected import declaration");
         };
-        assert_eq!(import_node.path().node_value(), &"foo");
+        assert_eq!(import_node.path().as_str(), "foo");
 
         assert!(model.sections().is_empty());
         assert_eq!(rest.fragment(), &"");
@@ -322,7 +390,7 @@ mod tests {
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 1);
 
-        let Decl::UseModel(use_model_node) = &model.decls()[0].node_value() else {
+        let Decl::UseModel(use_model_node) = model.decls()[0].clone().take_value() else {
             panic!("Expected use declaration");
         };
 
@@ -345,10 +413,10 @@ mod tests {
         let section = &model.sections()[0];
         assert_eq!(section.header().label().as_str(), "foo");
         assert_eq!(section.decls().len(), 1);
-        let Decl::Import(import_node) = &section.decls()[0].node_value() else {
+        let Decl::Import(import_node) = section.decls()[0].clone().take_value() else {
             panic!("Expected import declaration");
         };
-        assert_eq!(import_node.path().node_value(), "bar");
+        assert_eq!(import_node.path().as_str(), "bar");
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -367,18 +435,18 @@ mod tests {
         let section1 = &model.sections()[0];
         assert_eq!(section1.header().label().as_str(), "foo");
         assert_eq!(section1.decls().len(), 1);
-        let Decl::Import(import_node) = &section1.decls()[0].node_value() else {
+        let Decl::Import(import_node) = section1.decls()[0].clone().take_value() else {
             panic!("Expected import declaration");
         };
-        assert_eq!(import_node.path().node_value(), "bar");
+        assert_eq!(import_node.path().as_str(), "bar");
 
         let section2 = &model.sections()[1];
         assert_eq!(section2.header().label().as_str(), "baz");
         assert_eq!(section2.decls().len(), 1);
-        let Decl::Import(import_node) = &section2.decls()[0].node_value() else {
+        let Decl::Import(import_node) = section2.decls()[0].clone().take_value() else {
             panic!("Expected import declaration");
         };
-        assert_eq!(import_node.path().node_value(), "qux");
+        assert_eq!(import_node.path().as_str(), "qux");
 
         assert_eq!(rest.fragment(), &"");
     }
@@ -398,14 +466,14 @@ mod tests {
         let input = InputSpan::new_extra("import foo\nimport bar\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with declarations");
         assert_eq!(model.decls().len(), 2);
-        let Decl::Import(import_node) = &model.decls()[0].node_value() else {
+        let Decl::Import(import_node) = model.decls()[0].clone().take_value() else {
             panic!("Expected import declaration");
         };
-        assert_eq!(import_node.path().node_value(), "foo");
-        let Decl::Import(import_node) = &model.decls()[1].node_value() else {
+        assert_eq!(import_node.path().as_str(), "foo");
+        let Decl::Import(import_node) = model.decls()[1].clone().take_value() else {
             panic!("Expected import declaration");
         };
-        assert_eq!(import_node.path().node_value(), "bar");
+        assert_eq!(import_node.path().as_str(), "bar");
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -552,7 +620,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", errors[0].reason);
             };
 
-            assert_eq!(cause, AstSpan::new(0, 7, 0));
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 7);
         }
 
         #[test]
@@ -577,7 +646,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", errors[0].reason);
             };
 
-            assert_eq!(cause, AstSpan::new(8, 3, 1));
+            assert_eq!(cause.start().offset, 8);
+            assert_eq!(cause.end().offset, 11);
         }
 
         #[test]
@@ -603,7 +673,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", errors[0].reason);
             };
 
-            assert_eq!(cause, AstSpan::new(12, 6, 0));
+            assert_eq!(cause.start().offset, 12);
+            assert_eq!(cause.end().offset, 18);
         }
     }
 
@@ -634,7 +705,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", errors[0].reason);
             };
 
-            assert_eq!(cause, AstSpan::new(0, 6, 0));
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 6);
         }
 
         #[test]
@@ -659,7 +731,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", errors[0].reason);
             };
 
-            assert_eq!(cause, AstSpan::new(3, 1, 0));
+            assert_eq!(cause.start().offset, 3);
+            assert_eq!(cause.end().offset, 4);
         }
 
         #[test]
@@ -684,7 +757,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", errors[0].reason);
             };
 
-            assert_eq!(cause, AstSpan::new(5, 1, 0));
+            assert_eq!(cause.start().offset, 5);
+            assert_eq!(cause.end().offset, 6);
         }
 
         #[test]
@@ -709,7 +783,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", errors[0].reason);
             };
 
-            assert_eq!(cause, AstSpan::new(0, 4, 1));
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 4);
         }
     }
 
@@ -804,11 +879,11 @@ mod tests {
             assert_eq!(errors.len(), 2);
 
             // Check that the valid declarations were parsed
-            let Decl::Import(import_node) = &model.decls()[0].node_value() else {
+            let Decl::Import(import_node) = model.decls()[0].clone().take_value() else {
                 panic!("Expected import declaration");
             };
-            assert_eq!(import_node.path().node_value(), "valid");
-            let Decl::UseModel(use_node) = &model.decls()[1].node_value() else {
+            assert_eq!(import_node.path().as_str(), "valid");
+            let Decl::UseModel(use_node) = model.decls()[1].clone().take_value() else {
                 panic!("Expected use model declaration");
             };
             let alias = use_node.model_info().get_alias();

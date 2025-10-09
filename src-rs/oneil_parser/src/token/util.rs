@@ -1,25 +1,11 @@
 use nom::{Parser as NomParser, character::complete::space0, combinator::recognize};
+use oneil_ast::Node;
 use oneil_shared::span::{SourceLocation, Span};
 
 use crate::token::{
     InputSpan, Parser, Result,
     error::{ErrorHandlingParser, TokenError},
 };
-
-/// A token representing a lexical element in Oneil source code.
-///
-/// A token consists of two parts:
-/// - **Lexeme**: The actual text content of the token (e.g., "if", "123", "+")
-/// - **Whitespace**: Any trailing whitespace that follows the lexeme
-///
-/// This structure allows the parser to maintain precise location information
-/// while handling whitespace appropriately during tokenization.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Token<'a> {
-    pub lexeme_str: &'a str,
-    pub lexeme_span: Span,
-    pub whitespace_span: Span,
-}
 
 /// Parses inline whitespace (spaces and tabs) and returns the parsed whitespace.
 ///
@@ -97,6 +83,44 @@ pub fn token<'a, O>(
         };
 
         Ok((rest, token))
+    }
+}
+
+/// A token representing a lexical element in Oneil source code.
+///
+/// A token consists of two parts:
+/// - **Lexeme**: The actual text content of the token (e.g., "if", "123", "+")
+/// - **Whitespace**: Any trailing whitespace that follows the lexeme
+///
+/// This structure allows the parser to maintain precise location information
+/// while handling whitespace appropriately during tokenization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Token<'a> {
+    pub lexeme_str: &'a str,
+    pub lexeme_span: Span,
+    pub whitespace_span: Span,
+}
+
+impl Token<'_> {
+    /// Converts the token to a `Node` with the given value.
+    #[must_use]
+    pub fn into_node_with_value<T>(self, value: T) -> Node<T> {
+        Node::new(value, self.lexeme_span, self.whitespace_span)
+    }
+}
+
+/// A convenience implementation for converting a `Token` to a `Node` for any
+/// `String`-based structure.
+impl<T> From<Token<'_>> for Node<T>
+where
+    String: Into<T>,
+{
+    fn from(token: Token<'_>) -> Self {
+        Node::new(
+            token.lexeme_str.to_string().into(),
+            token.lexeme_span,
+            token.whitespace_span,
+        )
     }
 }
 
