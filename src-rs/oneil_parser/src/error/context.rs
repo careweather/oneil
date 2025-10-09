@@ -142,15 +142,13 @@ fn unclosed(reason: &ParserErrorReason, source: &str) -> Vec<(Context, Option<Er
         ParserErrorReason::Incomplete { cause, kind } => match kind {
             IncompleteKind::UnclosedBracket => {
                 let message = "unclosed bracket found here";
-                // let location = ErrorLocation::from_source_and_offset(source, cause.start());
-                // vec![(Context::Note(message.to_string()), Some(location))]
-                vec![]
+                let location = ErrorLocation::from_source_and_offset(source, cause.start().offset);
+                vec![(Context::Note(message.to_string()), Some(location))]
             }
             IncompleteKind::UnclosedParen => {
                 let message = "unclosed parenthesis found here";
-                // let location = ErrorLocation::from_source_and_offset(source, cause.start());
-                // vec![(Context::Note(message.to_string()), Some(location))]
-                vec![]
+                let location = ErrorLocation::from_source_and_offset(source, cause.start().offset);
+                vec![(Context::Note(message.to_string()), Some(location))]
             }
             _ => vec![],
         },
@@ -218,13 +216,12 @@ fn invalid_closing_note_delimiter(
     reason: &ParserErrorReason,
 ) -> Vec<(Context, Option<ErrorLocation>)> {
     match reason {
-        ParserErrorReason::TokenError(TokenErrorKind::Incomplete(kind)) => match kind {
-            TokenIncompleteKind::InvalidClosingDelimiter => {
-                let message = "notes must be closed with `~~~` on their own line";
-                vec![(Context::Note(message.to_string()), None)]
-            }
-            _ => vec![],
-        },
+        ParserErrorReason::TokenError(TokenErrorKind::Incomplete(
+            TokenIncompleteKind::InvalidClosingDelimiter,
+        )) => {
+            let message = "notes must be closed with `~~~` on their own line";
+            vec![(Context::Note(message.to_string()), None)]
+        }
         _ => vec![],
     }
 }

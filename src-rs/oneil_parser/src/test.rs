@@ -57,15 +57,16 @@ fn test_decl(input: InputSpan<'_>) -> Result<'_, TestNode, ParserError> {
 
     let (rest, note_node) = opt(parse_note).parse(rest)?;
 
-    let test_start_span = match &trace_level_node {
-        Some(trace_level_node) => trace_level_node.span(),
-        None => test_keyword_token.lexeme_span,
-    };
+    let test_start_span = trace_level_node
+        .as_ref()
+        .map_or(test_keyword_token.lexeme_span, |trace_level_node| {
+            trace_level_node.span()
+        });
 
-    let (test_end_span, test_whitespace_span) = match &note_node {
-        Some(note_node) => (note_node.span(), note_node.whitespace_span()),
-        None => (linebreak_token.lexeme_span, linebreak_token.whitespace_span),
-    };
+    let (test_end_span, test_whitespace_span) = note_node.as_ref().map_or(
+        (linebreak_token.lexeme_span, linebreak_token.whitespace_span),
+        |note_node| (note_node.span(), note_node.whitespace_span()),
+    );
 
     let test_span = Span::from_start_and_end(&test_start_span, &test_end_span);
     let test_whitespace_span = Span::from_start_and_end(&test_start_span, &test_whitespace_span);
@@ -88,6 +89,10 @@ fn trace_level(input: InputSpan<'_>) -> Result<'_, TraceLevelNode, ParserError> 
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::bool_assert_comparison,
+    reason = "testing the contents of AST nodes"
+)]
 mod tests {
     use super::*;
     use crate::{
@@ -151,7 +156,7 @@ mod tests {
             let test = test.take_value();
 
             assert_eq!(
-                test.trace_level().map(Node::deref).cloned(),
+                test.trace_level().map(Node::deref).copied(),
                 Some(TraceLevel::Trace)
             );
 
@@ -166,7 +171,7 @@ mod tests {
             let test = test.take_value();
 
             assert_eq!(
-                test.trace_level().map(Node::deref).cloned(),
+                test.trace_level().map(Node::deref).copied(),
                 Some(TraceLevel::Debug)
             );
 
@@ -193,7 +198,7 @@ mod tests {
 
             let test = test.take_value();
             assert_eq!(
-                test.trace_level().map(Node::deref).cloned(),
+                test.trace_level().map(Node::deref).copied(),
                 Some(TraceLevel::Debug)
             );
 

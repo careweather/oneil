@@ -144,10 +144,6 @@ fn unit_term(input: InputSpan<'_>) -> Result<'_, UnitExprNode, ParserError> {
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::similar_names,
-    reason = "test code uses names where only difference is variable name"
-)]
 mod tests {
     use super::*;
     use crate::{

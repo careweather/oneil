@@ -338,21 +338,21 @@ fn primary_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
             let parse_result = parse_result.expect("all valid numbers should parse correctly");
 
             let literal_node = n.into_node_with_value(Literal::number(parse_result));
-            literal_node.wrap(|node| Expr::literal(node))
+            literal_node.wrap(Expr::literal)
         }),
         map(string.convert_errors(), |s| {
             // trim quotes from the string
             let s_contents = s.lexeme_str[1..s.lexeme_str.len() - 1].to_string();
             let literal_node = s.into_node_with_value(Literal::string(s_contents));
-            literal_node.wrap(|node| Expr::literal(node))
+            literal_node.wrap(Expr::literal)
         }),
         map(true_.convert_errors(), |t| {
             let literal_node = t.into_node_with_value(Literal::boolean(true));
-            literal_node.wrap(|node| Expr::literal(node))
+            literal_node.wrap(Expr::literal)
         }),
         map(false_.convert_errors(), |t| {
             let literal_node = t.into_node_with_value(Literal::boolean(false));
-            literal_node.wrap(|node| Expr::literal(node))
+            literal_node.wrap(Expr::literal)
         }),
         function_call,
         variable,
@@ -412,10 +412,10 @@ fn variable(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 
             Node::new(variable, variable_span, variable_whitespace_span)
         }
-        None => parameter_id_node.wrap(|node| Variable::identifier(node)),
+        None => parameter_id_node.wrap(Variable::identifier),
     };
 
-    let expr = variable_node.wrap(|node| Expr::variable(node));
+    let expr = variable_node.wrap(Expr::variable);
 
     Ok((rest, expr))
 }
@@ -449,6 +449,14 @@ fn parenthesized_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError>
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::float_cmp,
+    reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
+)]
+#[expect(
+    clippy::bool_assert_comparison,
+    reason = "testing the contents of AST nodes"
+)]
 mod tests {
     use super::*;
     use crate::Config;

@@ -29,8 +29,8 @@ pub fn token<'a, O>(
 ) -> impl Parser<'a, Token<'a>, TokenError> {
     move |input| {
         // capture the parser and convert the error function
-        let f = |input| (&mut f).parse(input);
-        let convert_error = |error| (&convert_error)(error);
+        let f = |input| f.parse(input);
+        let convert_error = |error| convert_error(error);
 
         // recognize the lexeme
         let (rest, lexeme) = recognize(f).convert_error_to(convert_error).parse(input)?;
@@ -116,7 +116,7 @@ where
     String: Into<T>,
 {
     fn from(token: Token<'_>) -> Self {
-        Node::new(
+        Self::new(
             token.lexeme_str.to_string().into(),
             token.lexeme_span,
             token.whitespace_span,

@@ -123,10 +123,10 @@ fn multi_line_note_content(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, To
 fn multi_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     let (rest, content) = recognize(|input| {
         let (rest, delimiter_span) = multi_line_note_delimiter.parse(input)?;
-        let (rest, closing_delimiter_span) = (|input| {
+        let (rest, ()) = (|input| {
             let (rest, _) = line_ending.parse(input)?;
             let (rest, _) = multi_line_note_content.parse(rest)?;
-            let (rest, closing_delimiter_span) = multi_line_note_delimiter.parse(rest)?;
+            let (rest, _) = multi_line_note_delimiter.parse(rest)?;
             Ok((rest, ()))
         })
         .or_fail_with(TokenError::unclosed_note(delimiter_span))

@@ -12,6 +12,14 @@ pub struct Span {
 
 impl Span {
     /// Creates a new span from a start and end source location
+    ///
+    /// # Panics
+    ///
+    /// Panics if:
+    /// - The start offset is greater than the end offset
+    /// - The start line is greater than the end line
+    /// - The lines are equal but the start column is greater than the end column
+    #[must_use]
     pub fn new(start: SourceLocation, end: SourceLocation) -> Self {
         assert!(
             start.offset <= end.offset,
@@ -27,17 +35,20 @@ impl Span {
     }
 
     /// Returns the start source location
-    pub fn start(&self) -> &SourceLocation {
+    #[must_use]
+    pub const fn start(&self) -> &SourceLocation {
         &self.start
     }
 
     /// Returns the end source location
-    pub fn end(&self) -> &SourceLocation {
+    #[must_use]
+    pub const fn end(&self) -> &SourceLocation {
         &self.end
     }
 
     /// Creates a span from the start of the start span to the end of the end span
-    pub fn from_start_and_end(start: &Span, end: &Span) -> Self {
+    #[must_use]
+    pub fn from_start_and_end(start: &Self, end: &Self) -> Self {
         Self::new(*start.start(), *end.end())
     }
 }

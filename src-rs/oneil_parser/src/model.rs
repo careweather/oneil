@@ -102,20 +102,18 @@ fn model(
         last_section_spans,
     ]
     .into_iter()
-    .filter_map(|spans| spans)
+    .flatten()
     .max_by(|a, b| {
         let a_end = a.0.end();
         let b_end = b.0.end();
         a_end
-            .partial_cmp(&b_end)
+            .partial_cmp(b_end)
             .expect("should always compare because they are from the same file")
     })
     .unzip();
 
     // calculate the end of the model span
-    let model_span_end = last_node_span
-        .map(|span| *span.end())
-        .unwrap_or(model_span_start);
+    let model_span_end = last_node_span.map_or(model_span_start, |span| *span.end());
 
     // build the model span
     let model_span = Span::new(model_span_start, model_span_end);

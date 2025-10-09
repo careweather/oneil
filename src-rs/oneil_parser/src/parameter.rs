@@ -94,10 +94,10 @@ fn parameter_decl(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError
         (None, None) => label_token.lexeme_span,
     };
 
-    let (param_end_span, param_whitespace_span) = match &note_node {
-        Some(note_node) => (note_node.span(), note_node.whitespace_span()),
-        None => (linebreak_token.lexeme_span, linebreak_token.whitespace_span),
-    };
+    let (param_end_span, param_whitespace_span) = note_node.as_ref().map_or(
+        (linebreak_token.lexeme_span, linebreak_token.whitespace_span),
+        |note_node| (note_node.span(), note_node.whitespace_span()),
+    );
 
     let param_span = Span::from_start_and_end(&param_start_span, &param_end_span);
 
@@ -220,14 +220,12 @@ fn simple_value(input: InputSpan<'_>) -> Result<'_, ParameterValueNode, ParserEr
     .parse(rest)?;
 
     let start_span = expr.span();
-    let end_span = unit
-        .as_ref()
-        .map_or_else(|| expr.span(), |unit| unit.span());
+    let end_span = unit.as_ref().map_or_else(|| expr.span(), Node::span);
 
     let span = Span::from_start_and_end(&start_span, &end_span);
     let whitespace_span = unit
         .as_ref()
-        .map_or_else(|| expr.whitespace_span(), |unit| unit.whitespace_span());
+        .map_or_else(|| expr.whitespace_span(), Node::whitespace_span);
 
     let node = Node::new(ParameterValue::simple(expr, unit), span, whitespace_span);
 
@@ -310,6 +308,10 @@ fn piecewise_part(input: InputSpan<'_>) -> Result<'_, PiecewisePartNode, ParserE
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::float_cmp,
+    reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
+)]
 mod tests {
     use super::*;
     use crate::{
@@ -439,7 +441,7 @@ mod tests {
             let (_, param) = parse(input).expect("should parse parameter with trace");
 
             assert_eq!(
-                param.trace_level().map(Node::deref).cloned(),
+                param.trace_level().map(Node::deref).copied(),
                 Some(TraceLevel::Trace)
             );
         }
@@ -450,7 +452,7 @@ mod tests {
             let (_, param) = parse(input).expect("should parse parameter with debug");
 
             assert_eq!(
-                param.trace_level().map(Node::deref).cloned(),
+                param.trace_level().map(Node::deref).copied(),
                 Some(TraceLevel::Debug)
             );
         }
@@ -474,7 +476,7 @@ mod tests {
             let Some(UnitExpr::Unit {
                 identifier,
                 exponent,
-            }) = unit.as_ref().map(Node::deref).cloned()
+            }) = unit.as_deref().cloned()
             else {
                 panic!("Expected unit");
             };
@@ -491,7 +493,7 @@ mod tests {
                 panic!("Expected simple parameter value, got {:?}", param.value());
             };
 
-            let unit = unit.clone().expect("should have unit");
+            let unit = unit.expect("should have unit");
 
             let UnitExpr::BinaryOp { op, .. } = unit.take_value() else {
                 panic!("Expected binary unit expression");
@@ -564,7 +566,7 @@ mod tests {
 
             assert!(param.performance_marker().is_some());
             assert_eq!(
-                param.trace_level().map(Node::deref).cloned(),
+                param.trace_level().map(Node::deref).copied(),
                 Some(TraceLevel::Debug)
             );
             assert_eq!(param.label().as_str(), "x");
@@ -590,7 +592,7 @@ mod tests {
 
             // Check unit
             assert!(matches!(
-                unit.as_ref().map(Node::deref).cloned(),
+                unit.as_deref().cloned(),
                 Some(UnitExpr::BinaryOp { .. })
             ));
         }

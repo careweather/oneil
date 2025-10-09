@@ -186,32 +186,32 @@ impl TokenError {
     }
 
     /// Updates the error kind
-    fn update_kind(self, kind: TokenErrorKind) -> Self {
+    const fn update_kind(self, kind: TokenErrorKind) -> Self {
         Self { kind, ..self }
     }
 
     /// Creates a new `TokenError` instance for an expected end of line
-    pub fn expected_end_of_line(error: Self) -> Self {
+    pub const fn expected_end_of_line(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::EndOfLine))
     }
 
     /// Creates a new `TokenError` instance for an expected identifier
-    pub fn expected_identifier(error: Self) -> Self {
+    pub const fn expected_identifier(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Identifier))
     }
 
     /// Creates a new `TokenError` instance for an expected keyword
-    pub fn expected_keyword(keyword: ExpectKeyword) -> impl Fn(Self) -> Self {
+    pub const fn expected_keyword(keyword: ExpectKeyword) -> impl Fn(Self) -> Self {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Keyword(keyword)))
     }
 
     /// Creates a new `TokenError` instance for an expected label
-    pub fn expected_label(error: Self) -> Self {
+    pub const fn expected_label(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Label))
     }
 
     /// Creates a new `TokenError` instance for an expected note
-    pub fn expected_note(error: Self) -> Self {
+    pub const fn expected_note(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Note))
     }
 
@@ -221,32 +221,32 @@ impl TokenError {
     }
 
     /// Creates a new `TokenError` instance for an expected number
-    pub fn expected_number(error: Self) -> Self {
+    pub const fn expected_number(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Number))
     }
 
     /// Creates a new `TokenError` instance for an expected string
-    pub fn expected_string(error: Self) -> Self {
+    pub const fn expected_string(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::String))
     }
 
     /// Creates a new `TokenError` instance for an expected symbol
-    pub fn expected_symbol(symbol: ExpectSymbol) -> impl Fn(Self) -> Self {
+    pub const fn expected_symbol(symbol: ExpectSymbol) -> impl Fn(Self) -> Self {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Symbol(symbol)))
     }
 
     /// Creates a new `TokenError` instance for an expected unit identifier
-    pub fn expected_unit_identifier(error: Self) -> Self {
+    pub const fn expected_unit_identifier(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitIdentifier))
     }
 
     /// Creates a new `TokenError` instance for an expected unit one
-    pub fn expected_unit_one(error: Self) -> Self {
+    pub const fn expected_unit_one(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitOne))
     }
 
     /// Creates a new `TokenError` instance for an unclosed note
-    pub fn unclosed_note(delimiter_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
+    pub const fn unclosed_note(delimiter_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let delimiter_start_offset = delimiter_span.location_offset();
             let delimiter_length = delimiter_span.len();
@@ -258,7 +258,7 @@ impl TokenError {
     }
 
     /// Creates a new `TokenError` instance for an invalid closing delimiter
-    pub fn invalid_closing_delimiter(error: Self) -> Self {
+    pub const fn invalid_closing_delimiter(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Incomplete(
             IncompleteKind::InvalidClosingDelimiter,
         ))
