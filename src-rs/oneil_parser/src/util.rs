@@ -1,5 +1,6 @@
 use nom::{IResult, Parser as NomParser, error::Error};
 use nom_locate::LocatedSpan;
+use oneil_shared::span::{SourceLocation, Span};
 
 use super::config::Config;
 
@@ -8,6 +9,22 @@ use super::config::Config;
 /// The span contains both the text content and the configuration for the parser.
 /// This type is used throughout the parser to track source locations and parser configuration.
 pub type InputSpan<'a> = LocatedSpan<&'a str, Config>;
+
+pub fn source_location_from(input_span: InputSpan<'_>) -> SourceLocation {
+    SourceLocation {
+        offset: input_span.location_offset(),
+        line: usize::try_from(input_span.location_line())
+            .expect("usize should be greater than or equal to u32"),
+        column: input_span.get_column(),
+    }
+}
+
+pub fn span_from(start_input_span: InputSpan<'_>, end_input_span: InputSpan<'_>) -> Span {
+    Span::new(
+        source_location_from(start_input_span),
+        source_location_from(end_input_span),
+    )
+}
 
 /// A result type for parser operations.
 ///

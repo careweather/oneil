@@ -1,10 +1,13 @@
 use nom::{Parser as NomParser, character::complete::space0, combinator::recognize};
 use oneil_ast::Node;
-use oneil_shared::span::{SourceLocation, Span};
+use oneil_shared::span::Span;
 
-use crate::token::{
-    InputSpan, Parser, Result,
-    error::{ErrorHandlingParser, TokenError},
+use crate::{
+    token::{
+        InputSpan, Parser, Result,
+        error::{ErrorHandlingParser, TokenError},
+    },
+    util::span_from,
 };
 
 /// Parses inline whitespace (spaces and tabs) and returns the parsed whitespace.
@@ -36,45 +39,12 @@ pub fn token<'a, O>(
         let (rest, lexeme) = recognize(f).convert_error_to(convert_error).parse(input)?;
 
         let lexeme_str = lexeme.fragment();
-
-        let lexeme_start_line = usize::try_from(lexeme.location_line())
-            .expect("usize should be greater than or equal to u32");
-        let lexeme_start = SourceLocation {
-            offset: lexeme.location_offset(),
-            line: lexeme_start_line,
-            column: lexeme.get_column(),
-        };
-
-        let lexeme_end_line = usize::try_from(rest.location_line())
-            .expect("usize should be greater than or equal to u32");
-        let lexeme_end = SourceLocation {
-            offset: rest.location_offset(),
-            line: lexeme_end_line,
-            column: rest.get_column(),
-        };
-
-        let lexeme_span = Span::new(lexeme_start, lexeme_end);
+        let lexeme_span = span_from(lexeme, rest);
 
         // consume the whitespace
         let (rest, whitespace) = inline_whitespace.parse(rest)?;
 
-        let whitespace_start_line = usize::try_from(whitespace.location_line())
-            .expect("usize should be greater than or equal to u32");
-        let whitespace_start = SourceLocation {
-            offset: whitespace.location_offset(),
-            line: whitespace_start_line,
-            column: whitespace.get_column(),
-        };
-
-        let whitespace_end_line = usize::try_from(rest.location_line())
-            .expect("usize should be greater than or equal to u32");
-        let whitespace_end = SourceLocation {
-            offset: rest.location_offset(),
-            line: whitespace_end_line,
-            column: rest.get_column(),
-        };
-
-        let whitespace_span = Span::new(whitespace_start, whitespace_end);
+        let whitespace_span = span_from(whitespace, rest);
 
         let token = Token {
             lexeme_str,

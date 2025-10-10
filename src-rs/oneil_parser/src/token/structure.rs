@@ -6,12 +6,14 @@ use nom::{
     combinator::{eof, opt, recognize},
     multi::many0,
 };
-use oneil_shared::span::{SourceLocation, Span};
 
-use crate::token::{
-    InputSpan, Result,
-    error::{ErrorHandlingParser, TokenError},
-    util::{Token, inline_whitespace},
+use crate::{
+    token::{
+        InputSpan, Result,
+        error::{ErrorHandlingParser, TokenError},
+        util::{Token, inline_whitespace},
+    },
+    util::span_from,
 };
 
 /// Parses a line break character or sequence.
@@ -48,24 +50,7 @@ fn comment(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
 pub fn end_of_line(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     // because the end of line is whitespace, the lexeme is empty
     let lexeme_str = &input.fragment()[..0];
-
-    let lexeme_start_line = usize::try_from(input.location_line())
-        .expect("usize should be greater than or equal to u32");
-    let lexeme_start = SourceLocation {
-        offset: input.location_offset(),
-        line: lexeme_start_line,
-        column: input.get_column(),
-    };
-
-    let lexeme_end_line = usize::try_from(input.location_line())
-        .expect("usize should be greater than or equal to u32");
-    let lexeme_end = SourceLocation {
-        offset: input.location_offset(),
-        line: lexeme_end_line,
-        column: input.get_column(),
-    };
-
-    let lexeme_span = Span::new(lexeme_start, lexeme_end);
+    let lexeme_span = span_from(input, input);
 
     // parse any whitespace, including the linebreak
     let (rest, whitespace) = recognize(|input| {
@@ -93,23 +78,7 @@ pub fn end_of_line(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     })
     .parse(input)?;
 
-    let whitespace_start_line = usize::try_from(whitespace.location_line())
-        .expect("usize should be greater than or equal to u32");
-    let whitespace_start = SourceLocation {
-        offset: whitespace.location_offset(),
-        line: whitespace_start_line,
-        column: whitespace.get_column(),
-    };
-
-    let whitespace_end_line = usize::try_from(rest.location_line())
-        .expect("usize should be greater than or equal to u32");
-    let whitespace_end = SourceLocation {
-        offset: rest.location_offset(),
-        line: whitespace_end_line,
-        column: rest.get_column(),
-    };
-
-    let whitespace_span = Span::new(whitespace_start, whitespace_end);
+    let whitespace_span = span_from(whitespace, rest);
 
     Ok((
         rest,

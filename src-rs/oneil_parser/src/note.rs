@@ -216,17 +216,14 @@ mod tests {
 
             assert_eq!(error.error_offset, 12); // error at end of content
             let ParserErrorReason::TokenError(TokenErrorKind::Incomplete(
-                IncompleteKind::UnclosedNote {
-                    delimiter_start_offset,
-                    delimiter_length,
-                },
+                IncompleteKind::UnclosedNote { delimeter_span },
             )) = error.reason
             else {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(delimiter_start_offset, 0);
-            assert_eq!(delimiter_length, 3);
+            assert_eq!(delimeter_span.start().offset, 0);
+            assert_eq!(delimeter_span.end().offset, 3);
         }
 
         #[test]

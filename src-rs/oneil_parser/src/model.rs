@@ -15,7 +15,7 @@ use oneil_ast::{
     DeclNode, LabelNode, Model, ModelNode, Node, Section, SectionHeader, SectionHeaderNode,
     SectionNode,
 };
-use oneil_shared::span::{SourceLocation, Span};
+use oneil_shared::span::Span;
 
 use crate::{
     declaration::parse as parse_decl,
@@ -26,7 +26,7 @@ use crate::{
     },
     note::parse as parse_note,
     token::{keyword::section, naming::label, structure::end_of_line},
-    util::{InputSpan, Result},
+    util::{InputSpan, Result, source_location_from},
 };
 
 /// Parses a model definition, consuming the complete input
@@ -75,12 +75,7 @@ fn model(
     }
 
     // get the start of the model
-    let model_span_start = SourceLocation {
-        offset: input.location_offset(),
-        line: usize::try_from(input.location_line())
-            .expect("usize should be greater than or equal to u32"),
-        column: input.get_column(),
-    };
+    let model_span_start = source_location_from(input);
 
     // get the last span/whitespace span of the model
     let last_end_of_line_spans =
