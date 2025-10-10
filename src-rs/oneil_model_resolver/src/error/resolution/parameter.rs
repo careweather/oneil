@@ -1,7 +1,10 @@
 use std::fmt;
 
-use oneil_ir::{self as ir, IrSpan};
-use oneil_shared::error::{AsOneilError, Context, ErrorLocation};
+use oneil_ir as ir;
+use oneil_shared::{
+    error::{AsOneilError, Context, ErrorLocation},
+    span::Span,
+};
 
 use crate::error::VariableResolutionError;
 
@@ -13,7 +16,7 @@ pub enum ParameterResolutionError {
         /// The list of parameter identifiers that form the circular dependency.
         circular_dependency: Vec<ir::Identifier>,
         /// The span of the parameter that caused the circular dependency.
-        reference_span: IrSpan,
+        reference_span: Span,
     },
     /// A variable resolution error occurred within the parameter's value.
     VariableResolution(VariableResolutionError),
@@ -22,9 +25,9 @@ pub enum ParameterResolutionError {
         /// The identifier of the parameter.
         identifier: ir::Identifier,
         /// The span of the original parameter.
-        original_span: IrSpan,
+        original_span: Span,
         /// The span of the duplicate parameter.
-        duplicate_span: IrSpan,
+        duplicate_span: Span,
     },
 }
 
@@ -33,7 +36,7 @@ impl ParameterResolutionError {
     #[must_use]
     pub const fn circular_dependency(
         circular_dependency: Vec<ir::Identifier>,
-        reference_span: IrSpan,
+        reference_span: Span,
     ) -> Self {
         Self::CircularDependency {
             circular_dependency,
@@ -51,8 +54,8 @@ impl ParameterResolutionError {
     #[must_use]
     pub const fn duplicate_parameter(
         identifier: ir::Identifier,
-        original_span: IrSpan,
-        duplicate_span: IrSpan,
+        original_span: Span,
+        duplicate_span: Span,
     ) -> Self {
         Self::DuplicateParameter {
             identifier,
@@ -104,16 +107,12 @@ impl AsOneilError for ParameterResolutionError {
                 circular_dependency: _,
                 reference_span,
             } => {
-                let offset_start = reference_span.start();
-                let length = reference_span.length();
-                let location = ErrorLocation::from_source_and_span(source, offset_start, length);
+                let location = ErrorLocation::from_source_and_span(source, *reference_span);
                 Some(location)
             }
             Self::VariableResolution(error) => error.error_location(source),
             Self::DuplicateParameter { duplicate_span, .. } => {
-                let offset_start = duplicate_span.start();
-                let length = duplicate_span.length();
-                let location = ErrorLocation::from_source_and_span(source, offset_start, length);
+                let location = ErrorLocation::from_source_and_span(source, *duplicate_span);
                 Some(location)
             }
         }
@@ -122,11 +121,7 @@ impl AsOneilError for ParameterResolutionError {
     fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
         match self {
             Self::DuplicateParameter { original_span, .. } => {
-                let original_location = ErrorLocation::from_source_and_span(
-                    source,
-                    original_span.start(),
-                    original_span.length(),
-                );
+                let original_location = ErrorLocation::from_source_and_span(source, *original_span);
                 let context = Context::Note("original parameter found here".to_string());
                 vec![(context, Some(original_location))]
             }

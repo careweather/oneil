@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
 use oneil_ast as ast;
-use oneil_ir::{self as ir, IrSpan};
+use oneil_ir as ir;
 
 use crate::{
-    FileLoader,
-    error::resolution::ImportResolutionError,
-    util::{builder::ModelCollectionBuilder, get_span_from_ast_span},
+    FileLoader, error::resolution::ImportResolutionError, util::builder::ModelCollectionBuilder,
 };
 
 type ValidatedImports = HashMap<ir::PythonPath, IrSpan>;
@@ -30,7 +28,7 @@ where
     imports.into_iter().fold(
         (HashMap::new(), HashMap::new(), builder),
         |(mut python_imports, mut import_resolution_errors, mut builder), import| {
-            let python_path = model_path.get_sibling_path(import.path().node_value());
+            let python_path = model_path.get_sibling_path(import.path());
             let python_path = ir::PythonPath::new(python_path);
             let python_path_span = get_span_from_ast_span(import.path().node_span());
 

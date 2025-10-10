@@ -1,16 +1,15 @@
 //! Variable resolution for the Oneil model loader
 
+use std::ops::Deref;
+
 use oneil_ast as ast;
 use oneil_ir as ir;
 
 use crate::{
     BuiltinRef,
     error::VariableResolutionError,
-    util::{
-        context::{
-            ParameterContext, ParameterContextResult, ReferenceContext, ReferenceContextResult,
-        },
-        get_span_from_ast_span,
+    util::context::{
+        ParameterContext, ParameterContextResult, ReferenceContext, ReferenceContextResult,
     },
 };
 
@@ -20,33 +19,27 @@ pub fn resolve_variable(
     builtin_ref: &impl BuiltinRef,
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
-) -> Result<ir::ExprWithSpan, VariableResolutionError> {
-    match variable.node_value() {
+) -> Result<ir::Expr, VariableResolutionError> {
+    match variable.deref() {
         ast::Variable::Identifier(identifier) => {
-            let span = get_span_from_ast_span(variable.node_span());
             let var_identifier = ir::Identifier::new(identifier.as_str());
-            let var_identifier_span = get_span_from_ast_span(identifier.node_span());
 
             match parameter_context.lookup_parameter(&var_identifier) {
                 ParameterContextResult::Found(_parameter) => {
-                    let span = get_span_from_ast_span(variable.node_span());
                     let expr = ir::Expr::parameter_variable(var_identifier);
-                    Ok(ir::WithSpan::new(expr, span))
+                    Ok(expr)
                 }
-                ParameterContextResult::HasError => {
-                    Err(VariableResolutionError::parameter_has_error(
-                        var_identifier,
-                        var_identifier_span,
-                    ))
-                }
+                ParameterContextResult::HasError => Err(
+                    VariableResolutionError::parameter_has_error(var_identifier, identifier.span()),
+                ),
                 ParameterContextResult::NotFound => {
                     if builtin_ref.has_builtin_value(&var_identifier) {
                         let expr = ir::Expr::builtin_variable(var_identifier);
-                        Ok(ir::WithSpan::new(expr, span))
+                        Ok(expr)
                     } else {
                         Err(VariableResolutionError::undefined_parameter(
                             var_identifier,
-                            var_identifier_span,
+                            identifier.span(),
                         ))
                     }
                 }
@@ -57,7 +50,7 @@ pub fn resolve_variable(
             parameter,
         } => {
             let reference_name = ir::ReferenceName::new(reference_model.as_str().to_string());
-            let reference_name_span = get_span_from_ast_span(reference_model.node_span());
+            let reference_name_span = reference_model.span();
 
             let (model, reference_path) = match reference_context.lookup_reference(&reference_name)
             {
@@ -87,7 +80,7 @@ pub fn resolve_variable(
 
             // ensure that the parameter is defined in the reference model
             let var_identifier = ir::Identifier::new(parameter.as_str());
-            let var_identifier_span = get_span_from_ast_span(parameter.node_span());
+            let var_identifier_span = parameter.span();
             if model.get_parameter(&var_identifier).is_none() {
                 return Err(VariableResolutionError::undefined_parameter_in_reference(
                     reference_path.clone(),
@@ -96,9 +89,8 @@ pub fn resolve_variable(
                 ));
             }
 
-            let span = get_span_from_ast_span(variable.node_span());
             let expr = ir::Expr::external_variable(reference_path.clone(), var_identifier);
-            Ok(ir::WithSpan::new(expr, span))
+            Ok(expr)
         }
     }
 }
@@ -116,10 +108,10 @@ mod tests {
 
     macro_rules! assert_var_is_builtin {
         ($variable:expr, $expected_ident:expr $(,)?) => {
-            let variable: ir::ExprWithSpan = $variable;
+            let variable: ir::Expr = $variable;
             let expected_ident: &str = $expected_ident;
 
-            let ir::Expr::Variable(ir::Variable::Builtin(actual_ident)) = variable.value() else {
+            let ir::Expr::Variable(ir::Variable::Builtin(actual_ident)) = variable else {
                 panic!("expected builtin variable, got {variable:?}");
             };
 
@@ -133,10 +125,10 @@ mod tests {
 
     macro_rules! assert_var_is_parameter {
         ($variable:expr, $expected_ident:expr $(,)?) => {
-            let variable: ir::ExprWithSpan = $variable;
+            let variable: ir::Expr = $variable;
             let expected_ident: &str = $expected_ident;
 
-            let ir::Expr::Variable(ir::Variable::Parameter(actual_ident)) = variable.value() else {
+            let ir::Expr::Variable(ir::Variable::Parameter(actual_ident)) = variable else {
                 panic!("expected parameter variable, got {variable:?}");
             };
 
@@ -150,20 +142,20 @@ mod tests {
 
     macro_rules! assert_var_is_external {
         ($variable:expr, $expected_model_path:expr, $expected_ident:expr $(,)?) => {
-            let variable: ir::ExprWithSpan = $variable;
+            let variable: ir::Expr = $variable;
             let expected_model_path: ir::ModelPath = ir::ModelPath::new($expected_model_path);
             let expected_ident: &str = $expected_ident;
 
             let ir::Expr::Variable(ir::Variable::External {
                 model: actual_model_path,
                 ident: actual_ident,
-            }) = variable.value()
+            }) = variable
             else {
                 panic!("expected external variable, got {variable:?}");
             };
 
             assert_eq!(
-                actual_model_path, &expected_model_path,
+                actual_model_path, expected_model_path,
                 "actual model path does not match expected model path"
             );
 
@@ -389,7 +381,7 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         let reference_path = ir::ModelPath::new("test_reference");
-        let reference_name = test_ir::reference_name_with_span("reference");
+        let reference_name = test_ir::reference_name("reference");
         let reference_model = test_ir::ModelBuilder::new()
             .with_literal_number_parameter("parameter", 42.0)
             .build();
@@ -427,7 +419,7 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
 
         let reference_path = ir::ModelPath::new("test_reference");
-        let reference_name = test_ir::reference_name_with_span("reference");
+        let reference_name = test_ir::reference_name("reference");
         let reference_model = test_ir::empty_model();
 
         let reference_context_builder = ReferenceContextBuilder::new().with_reference_context([(
@@ -473,7 +465,7 @@ mod tests {
 
         // create submodel info
         let reference_path = ir::ModelPath::new("test_reference");
-        let reference_name = test_ir::reference_name_with_span("reference");
+        let reference_name = test_ir::reference_name("reference");
         let reference_model = test_ir::empty_model();
 
         let reference_context_builder = ReferenceContextBuilder::new()

@@ -1,7 +1,10 @@
 use std::fmt;
 
-use oneil_ir::{self as ir, IrSpan};
-use oneil_shared::error::{AsOneilError, Context, ErrorLocation};
+use oneil_ir as ir;
+use oneil_shared::{
+    error::{AsOneilError, Context, ErrorLocation},
+    span::Span,
+};
 
 use crate::error::VariableResolutionError;
 
@@ -13,9 +16,9 @@ pub enum TestResolutionError {
         /// The identifier of the duplicate input parameter.
         identifier: ir::Identifier,
         /// The span of the original input parameter declaration.
-        original_span: IrSpan,
+        original_span: Span,
         /// The span of the duplicate input parameter declaration.
-        duplicate_span: IrSpan,
+        duplicate_span: Span,
     },
     /// Error indicating that a variable resolution failed within a test.
     VariableResolution(VariableResolutionError),
@@ -26,8 +29,8 @@ impl TestResolutionError {
     #[must_use]
     pub const fn duplicate_input(
         identifier: ir::Identifier,
-        original_span: IrSpan,
-        duplicate_span: IrSpan,
+        original_span: Span,
+        duplicate_span: Span,
     ) -> Self {
         Self::DuplicateInput {
             identifier,
@@ -69,11 +72,7 @@ impl AsOneilError for TestResolutionError {
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             Self::DuplicateInput { duplicate_span, .. } => {
-                Some(ErrorLocation::from_source_and_span(
-                    source,
-                    duplicate_span.start(),
-                    duplicate_span.length(),
-                ))
+                Some(ErrorLocation::from_source_and_span(source, *duplicate_span))
             }
             Self::VariableResolution(error) => error.error_location(source),
         }
@@ -92,11 +91,7 @@ impl AsOneilError for TestResolutionError {
                 let context = Context::Note("original input found here".to_string());
                 vec![(
                     context,
-                    Some(ErrorLocation::from_source_and_span(
-                        source,
-                        original_span.start(),
-                        original_span.length(),
-                    )),
+                    Some(ErrorLocation::from_source_and_span(source, *original_span)),
                 )]
             }
             Self::VariableResolution(error) => error.context_with_source(source),

@@ -3,15 +3,10 @@
 use std::path::Path;
 
 use oneil_ast as ast;
-use oneil_ir::IrSpan;
 
 pub mod builder;
 pub mod builtin_ref;
 pub mod context;
-
-pub const fn get_span_from_ast_span(ast_span: ast::AstSpan) -> IrSpan {
-    IrSpan::new(ast_span.start(), ast_span.length())
-}
 
 /// Trait for loading and parsing Oneil model files.
 ///

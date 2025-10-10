@@ -3,14 +3,13 @@
 use std::collections::HashMap;
 
 use oneil_ast as ast;
-use oneil_ir::{self as ir, IrSpan};
+use oneil_ir as ir;
 
 use crate::{
     error::ModelImportResolutionError,
     util::{
         builder::ModelImportsBuilder,
         context::{ModelContext, ModelContextResult},
-        get_span_from_ast_span,
     },
 };
 

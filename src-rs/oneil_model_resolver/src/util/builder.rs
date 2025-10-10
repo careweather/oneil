@@ -150,22 +150,18 @@ impl ModelImportsBuilder {
         self.references.get(reference_name)
     }
 
-    pub fn add_submodel(
-        &mut self,
-        submodel_name: ir::SubmodelNameWithSpan,
-        submodel_path: ir::ModelPath,
-    ) {
-        let submodel_ident = submodel_name.value().clone();
+    pub fn add_submodel(&mut self, submodel_name: ir::SubmodelName, submodel_path: ir::ModelPath) {
+        let submodel_ident = submodel_name.clone();
         let submodel_import = ir::SubmodelImport::new(submodel_name, submodel_path);
         self.submodels.insert(submodel_ident, submodel_import);
     }
 
     pub fn add_reference(
         &mut self,
-        reference_name: ir::ReferenceNameWithSpan,
+        reference_name: ir::ReferenceName,
         reference_path: ir::ModelPath,
     ) {
-        let reference_ident = reference_name.value().clone();
+        let reference_ident = reference_name.clone();
         let reference_import = ir::ReferenceImport::new(reference_name, reference_path);
         self.references.insert(reference_ident, reference_import);
     }

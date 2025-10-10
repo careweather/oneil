@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
-use oneil_ir::{self as ir, IrSpan};
-use oneil_shared::error::{AsOneilError, Context, ErrorLocation};
+use oneil_ir as ir;
+use oneil_shared::{
+    error::{AsOneilError, Context, ErrorLocation},
+    span::Span,
+};
 
 /// Represents an error that occurred during Python import validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,16 +12,16 @@ pub enum ImportResolutionError {
     /// A duplicate import was detected.
     DuplicateImport {
         /// The span of the original import declaration.
-        original_span: IrSpan,
+        original_span: Span,
         /// The span of the duplicate import declaration.
-        duplicate_span: IrSpan,
+        duplicate_span: Span,
         /// The Python path of the duplicate import.
         python_path: ir::PythonPath,
     },
     /// A validation error occurred during import resolution.
     FailedValidation {
         /// The span of the import declaration that caused the validation error.
-        ident_span: IrSpan,
+        ident_span: Span,
         /// The Python path of the import that failed validation.
         python_path: ir::PythonPath,
     },
@@ -28,8 +31,8 @@ impl ImportResolutionError {
     /// Creates a new import resolution error indicating that a duplicate import was detected.
     #[must_use]
     pub const fn duplicate_import(
-        original_span: IrSpan,
-        duplicate_span: IrSpan,
+        original_span: Span,
+        duplicate_span: Span,
         python_path: ir::PythonPath,
     ) -> Self {
         Self::DuplicateImport {
@@ -41,7 +44,7 @@ impl ImportResolutionError {
 
     /// Creates a new import resolution error indicating that validation failed for a Python import.
     #[must_use]
-    pub const fn failed_validation(ident_span: IrSpan, python_path: ir::PythonPath) -> Self {
+    pub const fn failed_validation(ident_span: Span, python_path: ir::PythonPath) -> Self {
         Self::FailedValidation {
             ident_span,
             python_path,
@@ -73,15 +76,11 @@ impl AsOneilError for ImportResolutionError {
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             Self::DuplicateImport { duplicate_span, .. } => {
-                let offset = duplicate_span.start();
-                let length = duplicate_span.length();
-                let location = ErrorLocation::from_source_and_span(source, offset, length);
+                let location = ErrorLocation::from_source_and_span(source, *duplicate_span);
                 Some(location)
             }
             Self::FailedValidation { ident_span, .. } => {
-                let offset = ident_span.start();
-                let length = ident_span.length();
-                let location = ErrorLocation::from_source_and_span(source, offset, length);
+                let location = ErrorLocation::from_source_and_span(source, *ident_span);
                 Some(location)
             }
         }
@@ -90,9 +89,7 @@ impl AsOneilError for ImportResolutionError {
     fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
         match self {
             Self::DuplicateImport { original_span, .. } => {
-                let offset = original_span.start();
-                let length = original_span.length();
-                let location = ErrorLocation::from_source_and_span(source, offset, length);
+                let location = ErrorLocation::from_source_and_span(source, *original_span);
                 vec![(
                     Context::Note("original import found here".to_string()),
                     Some(location),

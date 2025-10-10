@@ -1,7 +1,10 @@
 use std::fmt;
 
-use oneil_ir::{self as ir, IrSpan};
-use oneil_shared::error::{AsOneilError, Context, ErrorLocation};
+use oneil_ir as ir;
+use oneil_shared::{
+    error::{AsOneilError, Context, ErrorLocation},
+    span::Span,
+};
 
 /// Represents an error that occurred during submodel resolution.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,7 +14,7 @@ pub enum ModelImportResolutionError {
         /// The path of the model that has errors
         model_path: ir::ModelPath,
         /// The span of where the model is referenced
-        reference_span: IrSpan,
+        reference_span: Span,
     },
     /// The submodel identifier is not defined in the referenced model.
     UndefinedSubmodel {
@@ -20,32 +23,32 @@ pub enum ModelImportResolutionError {
         /// The identifier of the submodel that is undefined
         submodel: ir::SubmodelName,
         /// The span of where the submodel is referenced
-        reference_span: IrSpan,
+        reference_span: Span,
     },
     /// The submodel name is a duplicate.
     DuplicateSubmodel {
         /// The identifier of the duplicate submodel
         submodel: ir::SubmodelName,
         /// The span of where the original submodel is referenced
-        original_span: IrSpan,
+        original_span: Span,
         /// The span of where the duplicate submodel is referenced
-        duplicate_span: IrSpan,
+        duplicate_span: Span,
     },
     /// The reference name is a duplicate.
     DuplicateReference {
         /// The identifier of the duplicate reference
         reference: ir::ReferenceName,
         /// The span of where the original reference is referenced
-        original_span: IrSpan,
+        original_span: Span,
         /// The span of where the duplicate reference is referenced
-        duplicate_span: IrSpan,
+        duplicate_span: Span,
     },
 }
 
 impl ModelImportResolutionError {
     /// Creates a new error indicating that the referenced model has errors.
     #[must_use]
-    pub const fn model_has_error(model_path: ir::ModelPath, reference_span: IrSpan) -> Self {
+    pub const fn model_has_error(model_path: ir::ModelPath, reference_span: Span) -> Self {
         Self::ModelHasError {
             model_path,
             reference_span,
@@ -57,7 +60,7 @@ impl ModelImportResolutionError {
     pub const fn undefined_submodel_in_submodel(
         parent_model_path: ir::ModelPath,
         submodel: ir::SubmodelName,
-        reference_span: IrSpan,
+        reference_span: Span,
     ) -> Self {
         Self::UndefinedSubmodel {
             parent_model_path,
@@ -70,8 +73,8 @@ impl ModelImportResolutionError {
     #[must_use]
     pub const fn duplicate_submodel(
         submodel: ir::SubmodelName,
-        original_span: IrSpan,
-        duplicate_span: IrSpan,
+        original_span: Span,
+        duplicate_span: Span,
     ) -> Self {
         Self::DuplicateSubmodel {
             submodel,
@@ -84,8 +87,8 @@ impl ModelImportResolutionError {
     #[must_use]
     pub const fn duplicate_reference(
         reference: ir::ReferenceName,
-        original_span: IrSpan,
-        duplicate_span: IrSpan,
+        original_span: Span,
+        duplicate_span: Span,
     ) -> Self {
         Self::DuplicateReference {
             reference,
@@ -153,9 +156,7 @@ impl AsOneilError for ModelImportResolutionError {
                 duplicate_span: location_span,
                 ..
             } => {
-                let start = location_span.start();
-                let length = location_span.length();
-                let location = ErrorLocation::from_source_and_span(source, start, length);
+                let location = ErrorLocation::from_source_and_span(source, *location_span);
                 Some(location)
             }
         }
@@ -164,18 +165,14 @@ impl AsOneilError for ModelImportResolutionError {
     fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
         match self {
             Self::DuplicateSubmodel { original_span, .. } => {
-                let start = original_span.start();
-                let length = original_span.length();
-                let location = ErrorLocation::from_source_and_span(source, start, length);
+                let location = ErrorLocation::from_source_and_span(source, *original_span);
                 vec![(
                     Context::Note("submodel is originally defined here".to_string()),
                     Some(location),
                 )]
             }
             Self::DuplicateReference { original_span, .. } => {
-                let start = original_span.start();
-                let length = original_span.length();
-                let location = ErrorLocation::from_source_and_span(source, start, length);
+                let location = ErrorLocation::from_source_and_span(source, *original_span);
                 vec![(
                     Context::Note("reference is originally defined here".to_string()),
                     Some(location),

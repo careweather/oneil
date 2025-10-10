@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use oneil_ast as ast;
-use oneil_ir::{self as ir, IrSpan};
+use oneil_ir as ir;
 
 use crate::{
     BuiltinRef,
@@ -16,7 +16,6 @@ use crate::{
         Stack,
         builder::ParameterBuilder,
         context::{ParameterContext, ReferenceContext},
-        get_span_from_ast_span,
     },
 };
 
@@ -126,7 +125,7 @@ fn get_parameter_internal_dependencies(
         None => dependencies,
     };
 
-    match &parameter.value().node_value() {
+    match &parameter.value() {
         ast::ParameterValue::Simple(expr, _) => get_expr_internal_dependencies(expr, dependencies),
         ast::ParameterValue::Piecewise(piecewise, _) => {
             piecewise.iter().fold(dependencies, |dependencies, part| {
@@ -158,7 +157,7 @@ fn get_expr_internal_dependencies(
             })
         }
 
-        ast::Expr::Variable(variable) => match variable.node_value() {
+        ast::Expr::Variable(variable) => match variable {
             ast::Variable::Identifier(identifier) => {
                 let identifier_span = get_span_from_ast_span(identifier.node_span());
                 let identifier = ir::Identifier::new(identifier.as_str());
@@ -664,7 +663,7 @@ mod tests {
         let expr = test_ast::literal_number_expr_node(42.0);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies
@@ -678,7 +677,7 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies
@@ -700,7 +699,7 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies
@@ -722,7 +721,7 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies
@@ -738,7 +737,7 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies - accessors don't count as internal dependencies
@@ -1126,7 +1125,7 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies
@@ -1153,7 +1152,7 @@ mod tests {
             test_ast::comparison_op_expr_node(op1_node, left_expr, middle_expr, rest_chained);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies
@@ -1175,7 +1174,7 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies - should only contain the variable
@@ -1210,7 +1209,7 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(comp_op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node.node_value(), HashSet::new());
+        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
         let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
 
         // check the dependencies

@@ -5,7 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use oneil_ir::{self as ir, IrSpan};
+use oneil_ir as ir;
+use oneil_shared::span::{SourceLocation, Span};
 
 use crate::{
     error::{ModelImportResolutionError, ParameterResolutionError},
@@ -75,14 +76,12 @@ impl ReferenceContextBuilder {
 
     pub fn with_reference_context(
         mut self,
-        reference_context: impl IntoIterator<
-            Item = (ir::ReferenceNameWithSpan, ir::ModelPath, ir::Model),
-        >,
+        reference_context: impl IntoIterator<Item = (ir::ReferenceName, ir::ModelPath, ir::Model)>,
     ) -> Self {
         let (references, models): (HashMap<_, _>, HashMap<_, _>) = reference_context
             .into_iter()
             .map(|(reference_name_with_span, model_path, model)| {
-                let reference_name = reference_name_with_span.value().clone();
+                let reference_name = reference_name_with_span.clone();
                 let reference_import =
                     ir::ReferenceImport::new(reference_name_with_span, model_path.clone());
 
@@ -102,7 +101,12 @@ impl ReferenceContextBuilder {
         mut self,
         reference_errors: impl IntoIterator<Item = ir::ReferenceName>,
     ) -> Self {
-        let arbitrary_span = IrSpan::new(0, 0);
+        let arbitrary_location = SourceLocation {
+            offset: 0,
+            line: 0,
+            column: 0,
+        };
+        let arbitrary_span = Span::new(arbitrary_location, arbitrary_location);
         let arbitrary_reference = ir::ReferenceName::new("arbitrary_reference".to_string());
         let arbitrary_error = ModelImportResolutionError::duplicate_reference(
             arbitrary_reference,
@@ -155,7 +159,7 @@ impl ParameterContextBuilder {
     ) -> Self {
         let parameter_context = parameter_context
             .into_iter()
-            .map(|parameter| (parameter.identifier().value().clone(), parameter));
+            .map(|parameter| (parameter.identifier().clone(), parameter));
 
         self.parameters.extend(parameter_context);
         self
