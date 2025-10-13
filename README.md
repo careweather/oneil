@@ -42,7 +42,7 @@ To run the Rust version of Oneil locally:
 2. Clone the repository and navigate to the Rust project directory:
 ```sh
 git clone git@github.com/careweather/oneil.git
-cd oneil/rust
+cd oneil
 ```
 
 <!-- TODO: not ready yet
@@ -54,50 +54,7 @@ cargo run -- path/to/your/model.on
 
 <!-- TODO: when ready, add instructions for installation -->
 
-### Development
-
-For development, you can use these Cargo commands:
-
-- Run tests:
-  ```sh
-  cargo test
-  ```
-
-- Check for compilation errors without producing an executable:
-  ```sh
-  cargo check
-  ```
-
-- Format code:
-  ```sh
-  cargo fmt
-  ```
-
-- Run linter:
-  ```sh
-  cargo clippy
-  ```
-
-You can also run the following developer commands built into Oneil:
-- Print the AST that is constructed from an Oneil file:
-  ```sh
-  cargo run -- dev print-ast path/to/model.on
-  ```
-
-- Print the IR that is constructed from an Oneil model
-  ```sh
-  cargo run -- dev print-ir path/to/model.on
-  ```
-
-In addition, you will want to install the
-[`rust-analyzer`](https://open-vsx.org/extension/rust-lang/rust-analyzer)
-VS Code extension in order to help you develop in Rust.
-
-If you are using `rust-analyzer` in VS Code, ensure that you are using the
-`clippy` linter by [updating your
-settings](https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-analyzer/41881)
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details on how to contribute.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details on how to work on Oneil code.
 
 
 ### Model Syntax Updates for Rust Version
