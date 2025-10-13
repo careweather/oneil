@@ -1,27 +1,35 @@
-//! Abstract Syntax Tree (AST) definitions for the Oneil language.
-//!
-//! This module contains the core data structures that represent Oneil programs
-//! in memory after parsing.
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! AST for the Oneil programming language
 
-#![warn(missing_docs)]
+mod debug_info;
+mod declaration;
+mod expression;
+mod model;
+mod naming;
+mod node;
+mod note;
+mod parameter;
+mod span;
+mod test;
+mod unit;
 
-pub mod debug_info;
-pub mod declaration;
-pub mod expression;
-pub mod model;
-pub mod naming;
-pub mod node;
-pub mod note;
-pub mod parameter;
-pub mod span;
-pub mod test;
-pub mod unit;
-
-pub use declaration::Decl;
-pub use expression::Expr;
-pub use model::Model;
-pub use note::Note;
-pub use parameter::Parameter;
-pub use span::Span;
-pub use test::Test;
-pub use unit::UnitExpr;
+pub use debug_info::{TraceLevel, TraceLevelNode};
+pub use declaration::{
+    Decl, DeclNode, Import, ImportNode, ModelInfo, ModelInfoNode, ModelKind, SubmodelList,
+    SubmodelListNode, UseModel, UseModelNode,
+};
+pub use expression::{
+    BinaryOp, BinaryOpNode, ComparisonOp, ComparisonOpNode, Expr, ExprNode, Literal, LiteralNode,
+    UnaryOp, UnaryOpNode, Variable, VariableNode,
+};
+pub use model::{Model, ModelNode, Section, SectionHeader, SectionHeaderNode, SectionNode};
+pub use naming::{Directory, DirectoryNode, Identifier, IdentifierNode, Label, LabelNode};
+pub use node::Node;
+pub use note::{Note, NoteNode};
+pub use parameter::{
+    Limits, LimitsNode, Parameter, ParameterNode, ParameterValue, ParameterValueNode,
+    PerformanceMarker, PerformanceMarkerNode, PiecewisePart, PiecewisePartNode,
+};
+pub use span::{AstSpan, SpanLike};
+pub use test::{Test, TestNode};
+pub use unit::{UnitExponent, UnitExponentNode, UnitExpr, UnitExprNode, UnitOp, UnitOpNode};

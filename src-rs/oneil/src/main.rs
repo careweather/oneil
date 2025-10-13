@@ -1,12 +1,10 @@
-//! Oneil CLI - Command-line interface for the Oneil programming language
-//!
-//! This module provides the main entry point for the Oneil CLI tool, which offers
-//! development utilities for parsing, analyzing, and debugging Oneil source files.
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! CLI for the Oneil programming language
 
 use std::io::{self, Write};
 
 use clap::Parser;
-use oneil_model_loader::FileLoader;
+use oneil_model_resolver::FileLoader;
 
 use crate::{
     builtins::Builtins,
@@ -21,15 +19,6 @@ mod file_parser;
 mod printer;
 
 /// Main entry point for the Oneil CLI application
-///
-/// Parses command-line arguments and executes the appropriate command based on
-/// the user's input. Handles both AST and IR printing operations with error
-/// reporting and partial result display capabilities.
-///
-/// # Returns
-///
-/// Returns `io::Result<()>` indicating success or failure of printing to the
-/// console. All errors are properly formatted and displayed to the user.
 fn main() -> io::Result<()> {
     let cli = CliCommand::parse();
 
@@ -100,14 +89,15 @@ fn main() -> io::Result<()> {
 
                 let builtin_variables = Builtins::new();
 
-                let model_collection = oneil_model_loader::load_model(
+                let model_collection = oneil_model_resolver::load_model(
                     file,
                     &builtin_variables,
                     &file_parser::FileLoader,
                 );
                 match model_collection {
                     Ok(model_collection) => printer.print_ir(&model_collection)?,
-                    Err((model_collection, error_map)) => {
+                    Err(error) => {
+                        let (model_collection, error_map) = *error;
                         let errors = convert_error::loader::convert_map(&error_map);
                         printer.print_errors(&errors)?;
 

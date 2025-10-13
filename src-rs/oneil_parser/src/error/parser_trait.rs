@@ -22,28 +22,14 @@ where
     ///
     /// This method takes a function that converts errors (`nom::Err::Error`) into a new error type,
     /// while preserving unrecoverable errors (`nom::Err::Failure`) by using `From` conversion.
-    ///
-    /// # Arguments
-    ///
-    /// * `convert_error` - A function that converts errors to the new error type
-    ///
-    /// # Type Parameters
-    ///
-    /// * `E2` - The target error type that implements `ParseError<I>` and can be created `From<E>`
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use nom::Parser;
-    /// let parser = identifier.convert_error_to(|e| MyError::from_nom_error(e));
-    /// ```
     fn convert_error_to<E2>(
         mut self,
         convert_error: impl Fn(E) -> E2,
     ) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
-        E2: nom::error::ParseError<I> + From<E>,
+        E: Into<E2>,
+        E2: nom::error::ParseError<I>,
     {
         move |input| {
             self.parse(input).map_err(|e| match e {
@@ -58,28 +44,14 @@ where
     ///
     /// This method takes a function that converts recoverable errors (`nom::Err::Error`) into a new error type,
     /// while preserving unrecoverable errors (`nom::Err::Failure`) by using `From` conversion.
-    ///
-    /// # Arguments
-    ///
-    /// * `convert_error` - A function that converts recoverable errors to the new error type
-    ///
-    /// # Type Parameters
-    ///
-    /// * `E2` - The target error type that implements `ParseError<I>` and can be created `From<E>`
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use nom::Parser;
-    /// let parser = identifier.or_fail_with(ParserError::expect_identifier);
-    /// ```
     fn or_fail_with<E2>(
         mut self,
         convert_error: impl Fn(E) -> E2,
     ) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
-        E2: nom::error::ParseError<I> + From<E>,
+        E: Into<E2>,
+        E2: nom::error::ParseError<I>,
     {
         move |input| {
             self.parse(input).map_err(|e| match e {
@@ -97,7 +69,8 @@ where
     fn convert_errors<E2>(mut self) -> impl Parser<I, Output = O, Error = E2>
     where
         Self: Sized,
-        E2: nom::error::ParseError<I> + From<E>,
+        E: Into<E2>,
+        E2: nom::error::ParseError<I>,
     {
         move |input| {
             self.parse(input).map_err(|e| match e {
@@ -109,11 +82,11 @@ where
     }
 }
 
-/// Implements the ErrorHandlingParser trait for any type that implements Parser.
+/// Implements the `ErrorHandlingParser` trait for any type that implements `Parser`.
 ///
 /// This blanket implementation allows any parser to use the error handling
-/// methods provided by ErrorHandlingParser.
-impl<'a, I, O, E, P> ErrorHandlingParser<I, O, E> for P
+/// methods provided by `ErrorHandlingParser`.
+impl<I, O, E, P> ErrorHandlingParser<I, O, E> for P
 where
     P: Parser<I, Output = O, Error = E>,
     E: ParseError<I>,

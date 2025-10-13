@@ -7,5 +7,11 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+readme = "README.md"
 
 [dependencies]
+
+[lints]
+workspace = true

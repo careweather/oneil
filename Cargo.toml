@@ -9,6 +9,95 @@ authors = ["Brendon Bown <brendon.bown@gmail.com>"]
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/careweather/oneil"
+keywords = ["programming-language", "oneil", "engineering", "specification", "units"]
+categories = ["compilers", "science", "simulation"]
+
+# Lints originally derived from https://medium.com/@carlmkadie/92bb899d47ef
+# 
+# To use the lints in VSCode with rust-analyzer, follow this:
+# https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-analyzer/41881
 
 [workspace.lints.rust]
+# rustc (builtin) lints
+unused_lifetimes = "warn"
 missing_docs = "warn"
+single_use_lifetimes = "warn"
+rust_2018_idioms = { level = "warn", priority = -2 }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    "cfg(coverage)",
+    "cfg(never)",
+] }
+
+[workspace.lints.clippy]
+# Clippy lint groups
+pedantic = { level = "warn", priority = -2 }
+correctness = { level = "warn", priority = -3 }
+style = { level = "warn", priority = -4 }
+complexity = { level = "warn", priority = -5 }
+perf = { level = "warn", priority = -6 }
+
+# Clippy cargo-specific groups
+cargo = { level = "warn", priority = -7 }
+cargo_common_metadata = { level = "warn", priority = -8 }
+
+# individual Clippy lints (nursery)
+branches_sharing_code = "warn"
+collection_is_never_read = "warn"
+derive_partial_eq_without_eq = "warn"
+equatable_if_let = "warn"
+iter_on_empty_collections = "warn"
+iter_on_single_items = "warn"
+iter_with_drain = "warn"
+large_stack_frames = "warn"
+literal_string_with_formatting_args = "warn"
+missing_const_for_fn = "warn"
+needless_collect = "warn"
+needless_pass_by_ref_mut = "warn"
+option_if_let_else = "warn"
+path_buf_push_overwrite = "warn"
+redundant_clone = "warn"
+redundant_pub_crate = "warn"
+single_option_map = "warn"
+suboptimal_flops = "warn"
+too_long_first_doc_paragraph = "warn"
+trait_duplication_in_bounds = "warn"
+type_repetition_in_bounds = "warn"
+unused_peekable = "warn"
+unused_rounding = "warn"
+use_self = "warn"
+useless_let_if_seq = "warn"
+
+# individual Clippy lints (restriction)
+allow_attributes = "warn"
+assertions_on_result_states = "warn"
+clone_on_ref_ptr = "warn"
+dbg_macro = "warn"
+decimal_literal_representation = "warn"
+doc_include_without_cfg = "warn"
+empty_drop = "warn"
+exit = "warn"
+float_cmp_const = "warn"
+if_then_some_else_none = "warn"
+lossy_float_literal = "warn"
+map_with_unused_argument_over_ranges = "warn"
+multiple_inherent_impl = "warn"
+panic_in_result_fn = "warn"
+partial_pub_fields = "warn"
+pathbuf_init_then_push = "warn"
+print_stderr = "warn"
+print_stdout = "warn"
+redundant_test_prefix = "warn"
+renamed_function_params = "warn"
+return_and_then = "warn"
+self_named_module_files = "warn"
+string_add = "warn"
+string_lit_chars_any = "warn"
+tests_outside_test_module = "warn"
+todo = "warn"
+try_err = "warn"
+unnecessary_self_imports = "warn"
+unseparated_literal_suffix = "warn"
+unused_result_ok = "warn"
+unwrap_used = "warn"
+use_debug = "warn"
+wildcard_enum_match_arm = "warn"

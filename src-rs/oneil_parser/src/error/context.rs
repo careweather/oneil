@@ -1,3 +1,8 @@
+#![expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "contexts only apply to a subset of reasons, and that subset is unlikely to change, even if more reasons are added"
+)]
+
 use oneil_error::{Context, ErrorLocation};
 
 use crate::{
@@ -19,9 +24,10 @@ pub fn from_source(
         string_literal_uses_double_quotes(remaining_source),
         unclosed(reason, source),
         invalid_number_literal(reason, source),
+        dot_instead_of_dot_dot(remaining_source),
     ]
     .into_iter()
-    .flatten() // get rid of any None values
+    .flatten()
     .collect()
 }
 
@@ -77,8 +83,7 @@ fn parameter_label_has_invalid_characters(
 
     let line = remaining_source
         .split_once('\n')
-        .map(|(line, _)| line)
-        .unwrap_or(remaining_source);
+        .map_or(remaining_source, |(line, _)| line);
 
     let invalid_char_index = line
         .split_once('=')
@@ -95,25 +100,23 @@ fn parameter_label_has_invalid_characters(
         })
         .map(|index| index + remaining_source_offset);
 
-    match invalid_char_index {
-        Some(index) => {
-            let note_message = "parameter labels must only contain `a-z`, `A-Z`, `0-9`, `_`, `-`, `'`, and whitespace";
+    let Some(index) = invalid_char_index else {
+        return vec![];
+    };
 
-            let invalid_char_note_message = "invalid character found here";
-            let invalid_char_location = ErrorLocation::from_source_and_offset(source, index);
+    let note_message =
+        "parameter labels must only contain `a-z`, `A-Z`, `0-9`, `_`, `-`, `'`, and whitespace";
 
-            vec![
-                (Context::Note(note_message.to_string()), None),
-                (
-                    Context::Note(invalid_char_note_message.to_string()),
-                    Some(invalid_char_location),
-                ),
-            ]
-        }
-        None => {
-            vec![]
-        }
-    }
+    let invalid_char_note_message = "invalid character found here";
+    let invalid_char_location = ErrorLocation::from_source_and_offset(source, index);
+
+    vec![
+        (Context::Note(note_message.to_string()), None),
+        (
+            Context::Note(invalid_char_note_message.to_string()),
+            Some(invalid_char_location),
+        ),
+    ]
 }
 
 fn string_literal_uses_double_quotes(
@@ -149,28 +152,24 @@ fn unclosed(reason: &ParserErrorReason, source: &str) -> Vec<(Context, Option<Er
             _ => vec![],
         },
 
-        ParserErrorReason::TokenError(kind) => match kind {
-            TokenErrorKind::Incomplete(kind) => match kind {
-                TokenIncompleteKind::UnclosedNote {
-                    delimiter_start_offset,
-                    delimiter_length,
-                } => {
-                    let message = "unclosed note found here";
-                    let location = ErrorLocation::from_source_and_span(
-                        source,
-                        *delimiter_start_offset,
-                        *delimiter_length,
-                    );
-                    vec![(Context::Note(message.to_string()), Some(location))]
-                }
-                TokenIncompleteKind::UnclosedString { open_quote_offset } => {
-                    let message = "unclosed string found here";
-                    let location =
-                        ErrorLocation::from_source_and_offset(source, *open_quote_offset);
-                    vec![(Context::Note(message.to_string()), Some(location))]
-                }
-                _ => vec![],
-            },
+        ParserErrorReason::TokenError(TokenErrorKind::Incomplete(kind)) => match kind {
+            TokenIncompleteKind::UnclosedNote {
+                delimiter_start_offset,
+                delimiter_length,
+            } => {
+                let message = "unclosed note found here";
+                let location = ErrorLocation::from_source_and_span(
+                    source,
+                    *delimiter_start_offset,
+                    *delimiter_length,
+                );
+                vec![(Context::Note(message.to_string()), Some(location))]
+            }
+            TokenIncompleteKind::UnclosedString { open_quote_offset } => {
+                let message = "unclosed string found here";
+                let location = ErrorLocation::from_source_and_offset(source, *open_quote_offset);
+                vec![(Context::Note(message.to_string()), Some(location))]
+            }
             _ => vec![],
         },
 
@@ -183,26 +182,32 @@ fn invalid_number_literal(
     source: &str,
 ) -> Vec<(Context, Option<ErrorLocation>)> {
     match reason {
-        ParserErrorReason::TokenError(kind) => match kind {
-            TokenErrorKind::Incomplete(kind) => match kind {
-                TokenIncompleteKind::InvalidDecimalPart {
-                    decimal_point_offset,
-                } => {
-                    let message = "because of `.` here";
-                    let location =
-                        ErrorLocation::from_source_and_offset(source, *decimal_point_offset);
-                    vec![(Context::Note(message.to_string()), Some(location))]
-                }
-                TokenIncompleteKind::InvalidExponentPart { e_offset } => {
-                    let message = "because of `e` here";
-                    let location = ErrorLocation::from_source_and_offset(source, *e_offset);
-                    vec![(Context::Note(message.to_string()), Some(location))]
-                }
-                _ => vec![],
-            },
+        ParserErrorReason::TokenError(TokenErrorKind::Incomplete(kind)) => match kind {
+            TokenIncompleteKind::InvalidDecimalPart {
+                decimal_point_offset,
+            } => {
+                let message = "because of `.` here";
+                let location = ErrorLocation::from_source_and_offset(source, *decimal_point_offset);
+                vec![(Context::Note(message.to_string()), Some(location))]
+            }
+            TokenIncompleteKind::InvalidExponentPart { e_offset } => {
+                let message = "because of `e` here";
+                let location = ErrorLocation::from_source_and_offset(source, *e_offset);
+                vec![(Context::Note(message.to_string()), Some(location))]
+            }
             _ => vec![],
         },
         _ => vec![],
+    }
+}
+
+fn dot_instead_of_dot_dot(remaining_source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
+    let starts_with_dot_dot = remaining_source.starts_with("..");
+    if starts_with_dot_dot {
+        let message = "did you mean `.` instead of `..`?";
+        vec![(Context::Help(message.to_string()), None)]
+    } else {
+        vec![]
     }
 }
 
@@ -232,7 +237,7 @@ mod parsers {
     fn ident(input: &str) -> IResult<&str, ()> {
         let underscore = char('_');
 
-        let (input, _) = alphanumeric.parse(input)?;
+        let (input, ()) = alphanumeric.parse(input)?;
         let (input, _) = many0(underscore.or(alphanumeric)).parse(input)?;
 
         Ok((input, ()))
@@ -245,9 +250,9 @@ mod parsers {
     }
 
     pub fn ident_and_equals(input: &str) -> IResult<&str, ()> {
-        let (input, _) = ident(input)?;
-        let (input, _) = whitespace(input)?;
-        let (input, _) = char('=').parse(input)?;
+        let (input, ()) = ident(input)?;
+        let (input, ()) = whitespace(input)?;
+        let (input, ()) = char('=').parse(input)?;
 
         Ok((input, ()))
     }

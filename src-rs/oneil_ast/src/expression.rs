@@ -1,7 +1,4 @@
 //! Expression constructs for the AST
-//!
-//! This module contains structures for representing expressions in the Oneil language,
-//! including binary operations, unary operations, function calls, variables, and literals.
 
 use crate::{naming::IdentifierNode, node::Node};
 
@@ -11,11 +8,11 @@ pub enum Expr {
     /// Comparison operation with left and right operands
     ComparisonOp {
         /// The left operand
-        left: Box<ExprNode>,
+        left: ExprNode,
         /// The comparison operator
         op: ComparisonOpNode,
         /// The right operand
-        right: Box<ExprNode>,
+        right: ExprNode,
         /// Chained comparison operations (order matters)
         rest_chained: Vec<(ComparisonOpNode, ExprNode)>,
     },
@@ -24,9 +21,9 @@ pub enum Expr {
         /// The binary operator
         op: BinaryOpNode,
         /// The left operand
-        left: Box<ExprNode>,
+        left: ExprNode,
         /// The right operand
-        right: Box<ExprNode>,
+        right: ExprNode,
     },
 
     /// Unary operation with a single operand
@@ -34,7 +31,7 @@ pub enum Expr {
         /// The unary operator
         op: UnaryOpNode,
         /// The operand expression
-        expr: Box<ExprNode>,
+        expr: ExprNode,
     },
 
     /// Function call with arguments
@@ -48,7 +45,7 @@ pub enum Expr {
     /// Parenthesized expression
     Parenthesized {
         /// The expression inside parentheses
-        expr: Box<ExprNode>,
+        expr: ExprNode,
     },
 
     /// Variable reference
@@ -63,7 +60,8 @@ pub type ExprNode = Node<Expr>;
 
 impl Expr {
     /// Creates a comparison operation expression
-    pub fn comparison_op(
+    #[must_use]
+    pub const fn comparison_op(
         op: ComparisonOpNode,
         left: ExprNode,
         right: ExprNode,
@@ -71,54 +69,51 @@ impl Expr {
     ) -> Self {
         Self::ComparisonOp {
             op,
-            left: Box::new(left),
-            right: Box::new(right),
+            left,
+            right,
             rest_chained,
         }
     }
 
     /// Creates a binary operation expression
-    pub fn binary_op(op: BinaryOpNode, left: ExprNode, right: ExprNode) -> Self {
-        Self::BinaryOp {
-            op,
-            left: Box::new(left),
-            right: Box::new(right),
-        }
+    #[must_use]
+    pub const fn binary_op(op: BinaryOpNode, left: ExprNode, right: ExprNode) -> Self {
+        Self::BinaryOp { op, left, right }
     }
 
     /// Creates a unary operation expression
-    pub fn unary_op(op: UnaryOpNode, expr: ExprNode) -> Self {
-        Self::UnaryOp {
-            op,
-            expr: Box::new(expr),
-        }
+    #[must_use]
+    pub const fn unary_op(op: UnaryOpNode, expr: ExprNode) -> Self {
+        Self::UnaryOp { op, expr }
     }
 
     /// Creates a function call expression
-    pub fn function_call(name: IdentifierNode, args: Vec<ExprNode>) -> Self {
+    #[must_use]
+    pub const fn function_call(name: IdentifierNode, args: Vec<ExprNode>) -> Self {
         Self::FunctionCall { name, args }
     }
 
     /// Creates a parenthesized expression
-    pub fn parenthesized(expr: ExprNode) -> Self {
-        Self::Parenthesized {
-            expr: Box::new(expr),
-        }
+    #[must_use]
+    pub const fn parenthesized(expr: ExprNode) -> Self {
+        Self::Parenthesized { expr }
     }
 
     /// Creates a variable reference expression
-    pub fn variable(var: VariableNode) -> Self {
+    #[must_use]
+    pub const fn variable(var: VariableNode) -> Self {
         Self::Variable(var)
     }
 
     /// Creates a literal expression
-    pub fn literal(lit: LiteralNode) -> Self {
+    #[must_use]
+    pub const fn literal(lit: LiteralNode) -> Self {
         Self::Literal(lit)
     }
 }
 
 /// Comparison operators for expressions
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComparisonOp {
     /// Less than comparison (<)
     LessThan,
@@ -139,38 +134,44 @@ pub type ComparisonOpNode = Node<ComparisonOp>;
 
 impl ComparisonOp {
     /// Creates a less than operator
-    pub fn less_than() -> Self {
+    #[must_use]
+    pub const fn less_than() -> Self {
         Self::LessThan
     }
 
     /// Creates a less than or equal operator
-    pub fn less_than_eq() -> Self {
+    #[must_use]
+    pub const fn less_than_eq() -> Self {
         Self::LessThanEq
     }
 
     /// Creates a greater than operator
-    pub fn greater_than() -> Self {
+    #[must_use]
+    pub const fn greater_than() -> Self {
         Self::GreaterThan
     }
 
     /// Creates a greater than or equal operator
-    pub fn greater_than_eq() -> Self {
+    #[must_use]
+    pub const fn greater_than_eq() -> Self {
         Self::GreaterThanEq
     }
 
     /// Creates an equality operator
-    pub fn eq() -> Self {
+    #[must_use]
+    pub const fn eq() -> Self {
         Self::Eq
     }
 
     /// Creates an inequality operator
-    pub fn not_eq() -> Self {
+    #[must_use]
+    pub const fn not_eq() -> Self {
         Self::NotEq
     }
 }
 
 /// Binary operators for expressions
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
     /// Addition operator (+)
     Add,
@@ -201,63 +202,74 @@ pub type BinaryOpNode = Node<BinaryOp>;
 
 impl BinaryOp {
     /// Creates an addition operator
-    pub fn add() -> Self {
+    #[must_use]
+    pub const fn add() -> Self {
         Self::Add
     }
 
     /// Creates a subtraction operator
-    pub fn sub() -> Self {
+    #[must_use]
+    pub const fn sub() -> Self {
         Self::Sub
     }
 
     /// Creates a true subtraction operator
-    pub fn true_sub() -> Self {
+    #[must_use]
+    pub const fn true_sub() -> Self {
         Self::TrueSub
     }
 
     /// Creates a multiplication operator
-    pub fn mul() -> Self {
+    #[must_use]
+    pub const fn mul() -> Self {
         Self::Mul
     }
 
     /// Creates a division operator
-    pub fn div() -> Self {
+    #[must_use]
+    pub const fn div() -> Self {
         Self::Div
     }
 
     /// Creates a true division operator
-    pub fn true_div() -> Self {
+    #[must_use]
+    pub const fn true_div() -> Self {
         Self::TrueDiv
     }
 
     /// Creates a modulo operator
-    pub fn modulo() -> Self {
+    #[must_use]
+    pub const fn modulo() -> Self {
         Self::Mod
     }
 
     /// Creates a power operator
-    pub fn pow() -> Self {
+    #[must_use]
+    pub const fn pow() -> Self {
         Self::Pow
     }
 
     /// Creates a logical AND operator
-    pub fn and() -> Self {
+    #[must_use]
+    pub const fn and() -> Self {
         Self::And
     }
 
     /// Creates a logical OR operator
-    pub fn or() -> Self {
+    #[must_use]
+    pub const fn or() -> Self {
         Self::Or
     }
 
     /// Creates a min/max operator
-    pub fn min_max() -> Self {
+    #[must_use]
+    pub const fn min_max() -> Self {
         Self::MinMax
     }
 }
 
 /// Unary operators for expressions
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     /// Negation operator (-)
     Neg,
@@ -270,27 +282,31 @@ pub type UnaryOpNode = Node<UnaryOp>;
 
 impl UnaryOp {
     /// Creates a negation operator
-    pub fn neg() -> Self {
+    #[must_use]
+    pub const fn neg() -> Self {
         Self::Neg
     }
 
     /// Creates a logical NOT operator
-    pub fn not() -> Self {
+    #[must_use]
+    pub const fn not() -> Self {
         Self::Not
     }
 }
 
 /// Variable references in expressions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Variable {
-    /// Simple identifier reference
+    /// A simple variable
+    ///
+    /// This could reference a parameter in the current model or a built-in variable
     Identifier(IdentifierNode),
-    /// Accessor pattern for nested references (e.g., parent.component)
-    Accessor {
-        /// The parent identifier
-        parent: IdentifierNode,
-        /// The component being accessed
-        component: Box<VariableNode>,
+    /// A parameter in a reference model
+    ModelParameter {
+        /// The reference model
+        reference_model: IdentifierNode,
+        /// The parameter being accessed
+        parameter: IdentifierNode,
     },
 }
 
@@ -299,15 +315,20 @@ pub type VariableNode = Node<Variable>;
 
 impl Variable {
     /// Creates a simple identifier variable reference
-    pub fn identifier(id: IdentifierNode) -> Self {
+    #[must_use]
+    pub const fn identifier(id: IdentifierNode) -> Self {
         Self::Identifier(id)
     }
 
-    /// Creates an accessor variable reference
-    pub fn accessor(parent: IdentifierNode, component: VariableNode) -> Self {
-        Self::Accessor {
-            parent,
-            component: Box::new(component),
+    /// Creates a model parameter variable reference
+    #[must_use]
+    pub const fn model_parameter(
+        reference_model: IdentifierNode,
+        parameter: IdentifierNode,
+    ) -> Self {
+        Self::ModelParameter {
+            reference_model,
+            parameter,
         }
     }
 }
@@ -328,17 +349,20 @@ pub type LiteralNode = Node<Literal>;
 
 impl Literal {
     /// Creates a numeric literal
-    pub fn number(num: f64) -> Self {
+    #[must_use]
+    pub const fn number(num: f64) -> Self {
         Self::Number(num)
     }
 
     /// Creates a string literal
-    pub fn string(str: String) -> Self {
+    #[must_use]
+    pub const fn string(str: String) -> Self {
         Self::String(str)
     }
 
     /// Creates a boolean literal
-    pub fn boolean(bool: bool) -> Self {
+    #[must_use]
+    pub const fn boolean(bool: bool) -> Self {
         Self::Boolean(bool)
     }
 }

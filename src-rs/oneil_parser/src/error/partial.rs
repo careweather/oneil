@@ -1,30 +1,7 @@
 //! Partial result error handling for the Oneil parser
-//!
-//! This module provides error handling types that allow parsing operations to
-//! return partial results even when errors occur. This is particularly useful
-//! for providing better error recovery and more informative error messages
-//! in the Oneil language parser.
-//!
-//! # Key Types
-//!
-//! - [`ErrorsWithPartialResult<T, E>`]: A wrapper that combines a partial result
-//!   with a list of parsing errors
-//! - [`CanBeEmpty`]: A trait for types that can represent an empty state
-//!
-//! # Usage
-//!
-//! This module is primarily used with the `nom` parsing library to provide
-//! error recovery capabilities. When a parser encounters an error, it can
-//! still return any successfully parsed content along with the error
-//! information.
-//!
-//! # Integration with nom
-//!
-//! The `ErrorsWithPartialResult` type implements `nom::error::ParseError`,
-//! allowing it to be used directly with nom parsers for error recovery
-//! scenarios.
 
 use nom::error::ParseError;
+use oneil_ast::Model;
 
 use crate::error::ParserError;
 
@@ -35,19 +12,11 @@ use crate::error::ParserError;
 /// successfully parse some content before encountering an error. The partial
 /// result can be used for debugging, error reporting, or in some cases,
 /// partial evaluation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorsWithPartialResult<T, E> {
     /// The partial result of the parsing operation
-    ///
-    /// This contains whatever content was successfully parsed before
-    /// the error occurred. For types that implement `CanBeEmpty`, this
-    /// will be the empty state when no content was successfully parsed.
     pub partial_result: T,
     /// The list of errors encountered during parsing
-    ///
-    /// This vector contains all parsing errors that occurred during
-    /// the operation. Multiple errors can be collected to provide
-    /// comprehensive error reporting.
     pub errors: Vec<E>,
 }
 
@@ -82,8 +51,6 @@ pub trait CanBeEmpty {
 }
 
 /// Implementation for `Vec<T>` - returns an empty vector
-///
-/// An empty vector represents no successfully parsed items.
 impl<T> CanBeEmpty for Vec<T> {
     fn empty() -> Self {
         Self::new()
@@ -91,29 +58,33 @@ impl<T> CanBeEmpty for Vec<T> {
 }
 
 /// Implementation for `Option<T>` - returns `None`
-///
-/// `None` represents the absence of a successfully parsed value.
 impl<T> CanBeEmpty for Option<T> {
     fn empty() -> Self {
         None
     }
 }
 
-/// Implementation for `Model` - returns an empty model
-///
-/// An empty model represents no successfully parsed model.
-impl CanBeEmpty for oneil_ast::model::Model {
+/// Implementation for `Box<T>` - returns an empty box
+impl<T: CanBeEmpty> CanBeEmpty for Box<T> {
     fn empty() -> Self {
-        oneil_ast::model::Model::new(None, vec![], vec![])
+        Self::new(T::empty())
+    }
+}
+
+/// Implementation for `Model` - returns an empty model
+impl CanBeEmpty for Model {
+    fn empty() -> Self {
+        Self::new(None, vec![], vec![])
     }
 }
 
 impl<T, E> ErrorsWithPartialResult<T, E> {
     /// Creates a new `ErrorsWithPartialResult` with the given partial result
     /// and errors
-    pub fn new(partial_result: T, errors: Vec<E>) -> Self {
+    #[must_use]
+    pub const fn new(partial_result: T, errors: Vec<E>) -> Self {
         Self {
-            partial_result: partial_result,
+            partial_result,
             errors,
         }
     }

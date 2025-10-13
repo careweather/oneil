@@ -47,12 +47,12 @@ struct FileError<'a> {
 }
 
 impl<'a> FileError<'a> {
-    fn new(path: &'a Path, error: &'a IoError) -> Self {
+    const fn new(path: &'a Path, error: &'a IoError) -> Self {
         Self { path, error }
     }
 }
 
-impl<'a> AsOneilError for FileError<'a> {
+impl AsOneilError for FileError<'_> {
     fn message(&self) -> String {
         format!("couldn't read `{}` - {}", self.path.display(), self.error)
     }

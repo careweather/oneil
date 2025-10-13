@@ -14,26 +14,14 @@ use nom::{
 };
 
 use crate::token::{
-    Result, Span,
+    InputSpan, Result,
     error::TokenError,
     keyword,
     util::{Token, token},
 };
 
 /// Parses an identifier span (alphabetic or underscore, then alphanumeric or underscore).
-///
-/// This function is used to parse the span of an identifier, which is used to
-/// create a token.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a span containing the parsed identifier, or an error if the input
-/// is not a valid identifier or is a reserved keyword.
-fn identifier_span(input: Span) -> Result<Span, TokenError> {
+fn identifier_span(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     verify(
         recognize(|input| {
             let (rest, _) = satisfy(|c: char| c.is_alphabetic() || c == '_').parse(input)?;
@@ -41,7 +29,7 @@ fn identifier_span(input: Span) -> Result<Span, TokenError> {
             Ok((rest, ()))
         }),
         // Ensure the identifier is not a reserved keyword
-        |identifier: &Span| !keyword::KEYWORDS.contains(&identifier.fragment()),
+        |identifier: &InputSpan<'_>| !keyword::KEYWORDS.contains(identifier.fragment()),
     )
     .parse(input)
 }
@@ -63,16 +51,7 @@ fn identifier_span(input: Span) -> Result<Span, TokenError> {
 /// - `123abc` (starts with digit)
 /// - `my-var` (contains dash)
 /// - `if` (reserved keyword)
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed identifier, or an error if the input
-/// is not a valid identifier or is a reserved keyword.
-pub fn identifier(input: Span) -> Result<Token, TokenError> {
+pub fn identifier(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(identifier_span, TokenError::expected_identifier).parse(input)
 }
 
@@ -86,16 +65,7 @@ pub fn identifier(input: Span) -> Result<Token, TokenError> {
 /// - Can be followed by any number of alphanumeric characters or underscores
 /// - Cannot be a reserved keyword
 /// - May optionally be terminated by '$' or '%'
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed unit identifier, or an error if the input
-/// is not a valid unit identifier or is a reserved keyword.
-pub fn unit_identifier(input: Span) -> Result<Token, TokenError> {
+pub fn unit_identifier(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     token(
         alt((
             // either an identifier (optionally followed by $ or %)
@@ -136,26 +106,13 @@ pub fn unit_identifier(input: Span) -> Result<Token, TokenError> {
 /// - `_` (single underscore)
 ///
 /// Examples of invalid labels:
-/// - `-foo` (starts with dash)
 /// - `if` (reserved keyword)
 /// - `(section)` (contains parentheses)
 /// - `[test]` (contains brackets)
-/// - `name:` (contains colon)
-/// - `*important` (contains asterisk)
-/// - `$price` (contains dollar sign)
 ///
 /// Note that labels are often followed by a colon as a delimiter, but other
 /// tokens (such as a linebreak) can also be used depending on the context.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a token containing the parsed label, or an error if the input
-/// is not a valid label or is a reserved keyword.
-pub fn label(input: Span) -> Result<Token, TokenError> {
+pub fn label(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     verify(
         token(
             |input| {
@@ -187,22 +144,22 @@ pub fn label(input: Span) -> Result<Token, TokenError> {
 mod tests {
     use super::*;
     use crate::token::error::{ExpectKind, TokenErrorKind};
-    use crate::{Config, Span};
+    use crate::{Config, InputSpan};
 
-    mod identifier_tests {
+    mod identifier {
         use super::*;
 
         #[test]
-        fn test_basic() {
-            let input = Span::new_extra("foo rest", Config::default());
+        fn basic() {
+            let input = InputSpan::new_extra("foo rest", Config::default());
             let (rest, matched) = identifier(input).expect("should parse basic identifier");
             assert_eq!(matched.lexeme(), "foo");
             assert_eq!(rest.fragment(), &"rest");
         }
 
         #[test]
-        fn test_underscore() {
-            let input = Span::new_extra("_foo123 bar", Config::default());
+        fn underscore() {
+            let input = InputSpan::new_extra("_foo123 bar", Config::default());
             let (rest, matched) =
                 identifier(input).expect("should parse identifier with underscore");
             assert_eq!(matched.lexeme(), "_foo123");
@@ -210,8 +167,8 @@ mod tests {
         }
 
         #[test]
-        fn test_only_underscore() {
-            let input = Span::new_extra("_ rest", Config::default());
+        fn only_underscore() {
+            let input = InputSpan::new_extra("_ rest", Config::default());
             let (rest, matched) =
                 identifier(input).expect("should parse single underscore identifier");
             assert_eq!(matched.lexeme(), "_");
@@ -219,32 +176,32 @@ mod tests {
         }
 
         #[test]
-        fn test_camel_case() {
-            let input = Span::new_extra("camelCase rest", Config::default());
+        fn camel_case() {
+            let input = InputSpan::new_extra("camelCase rest", Config::default());
             let (rest, matched) = identifier(input).expect("should parse camelCase identifier");
             assert_eq!(matched.lexeme(), "camelCase");
             assert_eq!(rest.fragment(), &"rest");
         }
 
         #[test]
-        fn test_snake_case() {
-            let input = Span::new_extra("snake_case rest", Config::default());
+        fn snake_case() {
+            let input = InputSpan::new_extra("snake_case rest", Config::default());
             let (rest, matched) = identifier(input).expect("should parse snake_case identifier");
             assert_eq!(matched.lexeme(), "snake_case");
             assert_eq!(rest.fragment(), &"rest");
         }
 
         #[test]
-        fn test_with_numbers() {
-            let input = Span::new_extra("user123 rest", Config::default());
+        fn with_numbers() {
+            let input = InputSpan::new_extra("user123 rest", Config::default());
             let (rest, matched) = identifier(input).expect("should parse identifier with numbers");
             assert_eq!(matched.lexeme(), "user123");
             assert_eq!(rest.fragment(), &"rest");
         }
 
         #[test]
-        fn test_with_trailing_whitespace() {
-            let input = Span::new_extra("foo rest", Config::default());
+        fn with_trailing_whitespace() {
+            let input = InputSpan::new_extra("foo rest", Config::default());
             let (rest, matched) =
                 identifier(input).expect("should parse identifier with trailing whitespace");
             assert_eq!(matched.lexeme(), "foo");
@@ -253,47 +210,50 @@ mod tests {
         }
 
         #[test]
-        fn test_empty_input() {
-            let input = Span::new_extra("", Config::default());
+        fn empty_input() {
+            let input = InputSpan::new_extra("", Config::default());
             let res = identifier(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Identifier)
-                )),
-                _ => panic!("expected TokenError::Expect(Identifier), got {:?}", res),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Identifier), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Identifier)
+            ));
         }
 
         #[test]
-        fn test_starts_with_digit() {
-            let input = Span::new_extra("123abc", Config::default());
+        fn starts_with_digit() {
+            let input = InputSpan::new_extra("123abc", Config::default());
             let res = identifier(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Identifier)
-                )),
-                _ => panic!("expected TokenError::Expect(Identifier), got {:?}", res),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Identifier), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Identifier)
+            ));
         }
 
         #[test]
-        fn test_starts_with_dash() {
-            let input = Span::new_extra("-foo", Config::default());
+        fn starts_with_dash() {
+            let input = InputSpan::new_extra("-foo", Config::default());
             let res = identifier(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Identifier)
-                )),
-                _ => panic!("expected TokenError::Expect(Identifier), got {:?}", res),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Identifier), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Identifier)
+            ));
         }
 
         #[test]
-        fn test_followed_by_dash() {
-            let input = Span::new_extra("foo-bar", Config::default());
+        fn followed_by_dash() {
+            let input = InputSpan::new_extra("foo-bar", Config::default());
             let (rest, matched) =
                 identifier(input).expect("should parse identifier followed by dash");
             assert_eq!(matched.lexeme(), "foo");
@@ -301,8 +261,8 @@ mod tests {
         }
 
         #[test]
-        fn test_followed_by_space() {
-            let input = Span::new_extra("foo bar", Config::default());
+        fn followed_by_space() {
+            let input = InputSpan::new_extra("foo bar", Config::default());
             let (rest, matched) =
                 identifier(input).expect("should parse identifier followed by space");
             assert_eq!(matched.lexeme(), "foo");
@@ -310,8 +270,8 @@ mod tests {
         }
 
         #[test]
-        fn test_followed_by_special_characters() {
-            let input = Span::new_extra("foo@bar", Config::default());
+        fn followed_by_special_characters() {
+            let input = InputSpan::new_extra("foo@bar", Config::default());
             let (rest, matched) =
                 identifier(input).expect("should parse identifier followed by special characters");
             assert_eq!(matched.lexeme(), "foo");
@@ -319,28 +279,26 @@ mod tests {
         }
 
         #[test]
-        fn test_keyword_fails() {
+        fn keyword_fails() {
             for keyword in keyword::KEYWORDS {
-                let input = Span::new_extra(keyword, Config::default());
+                let input = InputSpan::new_extra(keyword, Config::default());
                 let res = identifier(input);
-                match res {
-                    Err(nom::Err::Error(token_error)) => {
-                        assert!(matches!(
-                            token_error.kind,
-                            TokenErrorKind::Expect(ExpectKind::Identifier)
-                        ));
-                    }
-                    _ => panic!(
-                        "expected TokenError::Expect(Identifier) for keyword {:?}, got {:?}",
-                        keyword, res
-                    ),
-                }
+                let Err(nom::Err::Error(token_error)) = res else {
+                    panic!(
+                        "expected TokenError::Expect(Identifier) for keyword {keyword:?}, got {res:?}"
+                    );
+                };
+
+                assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::Expect(ExpectKind::Identifier)
+                ));
             }
         }
 
         #[test]
-        fn test_starts_with_keyword() {
-            let input = Span::new_extra("iffoo", Config::default());
+        fn starts_with_keyword() {
+            let input = InputSpan::new_extra("iffoo", Config::default());
             let (rest, matched) =
                 identifier(input).expect("should parse identifier starting with keyword");
             assert_eq!(matched.lexeme(), "iffoo");
@@ -348,52 +306,52 @@ mod tests {
         }
     }
 
-    mod label_tests {
+    mod label {
         use super::*;
 
         #[test]
-        fn test_basic() {
-            let input = Span::new_extra("foo-bar: rest", Config::default());
+        fn basic() {
+            let input = InputSpan::new_extra("foo-bar: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with dash");
             assert_eq!(matched.lexeme(), "foo-bar");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_with_spaces_and_tabs() {
-            let input = Span::new_extra("foo bar\tbaz: rest", Config::default());
+        fn with_spaces_and_tabs() {
+            let input = InputSpan::new_extra("foo bar\tbaz: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with spaces and tabs");
             assert_eq!(matched.lexeme(), "foo bar\tbaz");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_with_numbers() {
-            let input = Span::new_extra("123Test: rest", Config::default());
+        fn with_numbers() {
+            let input = InputSpan::new_extra("123Test: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with numbers");
             assert_eq!(matched.lexeme(), "123Test");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_only_underscore() {
-            let input = Span::new_extra("_: rest", Config::default());
+        fn only_underscore() {
+            let input = InputSpan::new_extra("_: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with only underscore");
             assert_eq!(matched.lexeme(), "_");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_with_multiple_dashes() {
-            let input = Span::new_extra("foo-bar-baz: rest", Config::default());
+        fn with_multiple_dashes() {
+            let input = InputSpan::new_extra("foo-bar-baz: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with multiple dashes");
             assert_eq!(matched.lexeme(), "foo-bar-baz");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_with_trailing_whitespace() {
-            let input = Span::new_extra("foo : rest", Config::default());
+        fn with_trailing_whitespace() {
+            let input = InputSpan::new_extra("foo : rest", Config::default());
             let (rest, matched) =
                 label(input).expect("should parse label with trailing whitespace");
             assert_eq!(matched.lexeme(), "foo");
@@ -402,8 +360,8 @@ mod tests {
         }
 
         #[test]
-        fn test_with_multiple_spaces() {
-            let input = Span::new_extra("foo bar : rest", Config::default());
+        fn with_multiple_spaces() {
+            let input = InputSpan::new_extra("foo bar : rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with multiple spaces");
             assert_eq!(matched.lexeme(), "foo bar");
             assert_eq!(matched.whitespace(), " ");
@@ -411,58 +369,60 @@ mod tests {
         }
 
         #[test]
-        fn test_with_apostrophe() {
-            let input = Span::new_extra("user's data: rest", Config::default());
+        fn with_apostrophe() {
+            let input = InputSpan::new_extra("user's data: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with apostrophe");
             assert_eq!(matched.lexeme(), "user's data");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_with_multiple_words() {
-            let input = Span::new_extra("section name with spaces: rest", Config::default());
+        fn with_multiple_words() {
+            let input = InputSpan::new_extra("section name with spaces: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with multiple words");
             assert_eq!(matched.lexeme(), "section name with spaces");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_with_mixed_separators() {
-            let input = Span::new_extra("test-case with spaces: rest", Config::default());
+        fn with_mixed_separators() {
+            let input = InputSpan::new_extra("test-case with spaces: rest", Config::default());
             let (rest, matched) = label(input).expect("should parse label with mixed separators");
             assert_eq!(matched.lexeme(), "test-case with spaces");
             assert_eq!(rest.fragment(), &": rest");
         }
 
         #[test]
-        fn test_empty_input() {
-            let input = Span::new_extra("", Config::default());
+        fn empty_input() {
+            let input = InputSpan::new_extra("", Config::default());
             let res = label(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Label)
-                )),
-                _ => panic!("expected TokenError::Expect(Label), got {:?}", res),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Label), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Label)
+            ));
         }
 
         #[test]
-        fn test_invalid_start() {
-            let input = Span::new_extra("*foo", Config::default());
+        fn invalid_start() {
+            let input = InputSpan::new_extra("*foo", Config::default());
             let res = label(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Label)
-                )),
-                _ => panic!("expected TokenError::Expect(Label), got {:?}", res),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Label), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Label)
+            ));
         }
 
         #[test]
-        fn test_followed_by_special_characters() {
-            let input = Span::new_extra("foo=bar", Config::default());
+        fn followed_by_special_characters() {
+            let input = InputSpan::new_extra("foo=bar", Config::default());
             let (rest, matched) =
                 label(input).expect("should parse label followed by special characters");
             assert_eq!(matched.lexeme(), "foo");
@@ -470,45 +430,43 @@ mod tests {
         }
 
         #[test]
-        fn test_followed_by_newline() {
-            let input = Span::new_extra("foo\nbar", Config::default());
+        fn followed_by_newline() {
+            let input = InputSpan::new_extra("foo\nbar", Config::default());
             let (rest, matched) = label(input).expect("should parse label followed by newline");
             assert_eq!(matched.lexeme(), "foo");
             assert_eq!(rest.fragment(), &"\nbar");
         }
 
         #[test]
-        fn test_keyword_fails() {
+        fn keyword_fails() {
             for keyword in keyword::KEYWORDS {
-                let input = Span::new_extra(keyword, Config::default());
+                let input = InputSpan::new_extra(keyword, Config::default());
                 let res = label(input);
-                match res {
-                    Err(nom::Err::Error(token_error)) => {
-                        // The verify function fails with NomError(Verify) when a keyword is provided
-                        assert!(matches!(
-                            token_error.kind,
-                            TokenErrorKind::NomError(nom::error::ErrorKind::Verify)
-                        ));
-                    }
-                    _ => panic!(
-                        "expected TokenError::NomError(Verify) for keyword {:?}, got {:?}",
-                        keyword, res
-                    ),
-                }
+                let Err(nom::Err::Error(token_error)) = res else {
+                    panic!(
+                        "expected TokenError::NomError(Verify) for keyword {keyword:?}, got {res:?}"
+                    );
+                };
+
+                // The verify function fails with NomError(Verify) when a keyword is provided
+                assert!(matches!(
+                    token_error.kind,
+                    TokenErrorKind::NomError(nom::error::ErrorKind::Verify)
+                ));
             }
         }
 
         #[test]
-        fn test_starts_with_keyword() {
-            let input = Span::new_extra("ifelse", Config::default());
+        fn starts_with_keyword() {
+            let input = InputSpan::new_extra("ifelse", Config::default());
             let (rest, matched) = label(input).expect("should parse label starting with keyword");
             assert_eq!(matched.lexeme(), "ifelse");
             assert_eq!(rest.fragment(), &"");
         }
 
         #[test]
-        fn test_contains_keyword_multiple_words() {
-            let input = Span::new_extra("if foo test", Config::default());
+        fn contains_keyword_multiple_words() {
+            let input = InputSpan::new_extra("if foo test", Config::default());
             let (rest, matched) =
                 label(input).expect("should parse label containing keyword and multiple words");
             assert_eq!(matched.lexeme(), "if foo test");
@@ -516,21 +474,22 @@ mod tests {
         }
 
         #[test]
-        fn test_only_whitespace() {
-            let input = Span::new_extra("   ", Config::default());
+        fn only_whitespace() {
+            let input = InputSpan::new_extra("   ", Config::default());
             let res = label(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
-                    token_error.kind,
-                    TokenErrorKind::Expect(ExpectKind::Label)
-                )),
-                _ => panic!("expected TokenError::Expect(Label), got {:?}", res),
-            }
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(Label), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::Label)
+            ));
         }
 
         #[test]
-        fn test_whitespace_after_word() {
-            let input = Span::new_extra("foo   ", Config::default());
+        fn whitespace_after_word() {
+            let input = InputSpan::new_extra("foo   ", Config::default());
             let (rest, matched) =
                 label(input).expect("should parse label with trailing whitespace");
             assert_eq!(matched.lexeme(), "foo");
@@ -539,12 +498,12 @@ mod tests {
         }
     }
 
-    mod unit_identifier_tests {
+    mod unit_identifier {
         use super::*;
 
         #[test]
-        fn test_basic_unit_identifier() {
-            let input = Span::new_extra("kg rest", Config::default());
+        fn basic_unit_identifier() {
+            let input = InputSpan::new_extra("kg rest", Config::default());
             let (rest, matched) =
                 unit_identifier(input).expect("should parse basic unit identifier");
             assert_eq!(matched.lexeme(), "kg");
@@ -552,8 +511,8 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_identifier_with_dollar() {
-            let input = Span::new_extra("k$ rest", Config::default());
+        fn unit_identifier_with_dollar() {
+            let input = InputSpan::new_extra("k$ rest", Config::default());
             let (rest, matched) =
                 unit_identifier(input).expect("should parse unit identifier with dollar");
             assert_eq!(matched.lexeme(), "k$");
@@ -561,8 +520,8 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_identifier_with_percent() {
-            let input = Span::new_extra("% rest", Config::default());
+        fn unit_identifier_with_percent() {
+            let input = InputSpan::new_extra("% rest", Config::default());
             let (rest, matched) =
                 unit_identifier(input).expect("should parse unit identifier with percent");
             assert_eq!(matched.lexeme(), "%");
@@ -570,8 +529,8 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_identifier_underscore() {
-            let input = Span::new_extra("_private_unit rest", Config::default());
+        fn unit_identifier_underscore() {
+            let input = InputSpan::new_extra("_private_unit rest", Config::default());
             let (rest, matched) =
                 unit_identifier(input).expect("should parse unit identifier with underscore");
             assert_eq!(matched.lexeme(), "_private_unit");
@@ -579,8 +538,8 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_identifier_numbers() {
-            let input = Span::new_extra("unit123 rest", Config::default());
+        fn unit_identifier_numbers() {
+            let input = InputSpan::new_extra("unit123 rest", Config::default());
             let (rest, matched) =
                 unit_identifier(input).expect("should parse unit identifier with numbers");
             assert_eq!(matched.lexeme(), "unit123");
@@ -588,8 +547,8 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_identifier_with_dollar_and_numbers() {
-            let input = Span::new_extra("test123$ rest", Config::default());
+        fn unit_identifier_with_dollar_and_numbers() {
+            let input = InputSpan::new_extra("test123$ rest", Config::default());
             let (rest, matched) = unit_identifier(input)
                 .expect("should parse unit identifier with numbers and dollar");
             assert_eq!(matched.lexeme(), "test123$");
@@ -597,42 +556,41 @@ mod tests {
         }
 
         #[test]
-        fn test_unit_identifier_starts_with_digit_fails() {
-            let input = Span::new_extra("123kg", Config::default());
+        fn unit_identifier_starts_with_digit_fails() {
+            let input = InputSpan::new_extra("123kg", Config::default());
             let res = unit_identifier(input);
-            match res {
-                Err(nom::Err::Error(token_error)) => assert!(matches!(
+            let Err(nom::Err::Error(token_error)) = res else {
+                panic!("expected TokenError::Expect(UnitIdentifier), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Expect(ExpectKind::UnitIdentifier)
+            ));
+        }
+
+        #[test]
+        fn unit_identifier_keyword_fails() {
+            for keyword in keyword::KEYWORDS {
+                let input = InputSpan::new_extra(keyword, Config::default());
+                let res = unit_identifier(input);
+                let Err(nom::Err::Error(token_error)) = res else {
+                    panic!(
+                        "expected TokenError::Expect(UnitIdentifier) for keyword {keyword:?}, got {res:?}"
+                    );
+                };
+
+                // The verify function fails with NomError(Verify) when a keyword is provided
+                assert!(matches!(
                     token_error.kind,
                     TokenErrorKind::Expect(ExpectKind::UnitIdentifier)
-                )),
-                _ => panic!("expected TokenError::Expect(UnitIdentifier), got {:?}", res),
+                ));
             }
         }
 
         #[test]
-        fn test_unit_identifier_keyword_fails() {
-            for keyword in keyword::KEYWORDS {
-                let input = Span::new_extra(keyword, Config::default());
-                let res = unit_identifier(input);
-                match res {
-                    Err(nom::Err::Error(token_error)) => {
-                        // The verify function fails with NomError(Verify) when a keyword is provided
-                        assert!(matches!(
-                            token_error.kind,
-                            TokenErrorKind::Expect(ExpectKind::UnitIdentifier)
-                        ));
-                    }
-                    _ => panic!(
-                        "expected TokenError::Expect(UnitIdentifier) for keyword {:?}, got {:?}",
-                        keyword, res
-                    ),
-                }
-            }
-        }
-
-        #[test]
-        fn test_unit_identifier_with_whitespace() {
-            let input = Span::new_extra("kg   ", Config::default());
+        fn unit_identifier_with_whitespace() {
+            let input = InputSpan::new_extra("kg   ", Config::default());
             let (rest, matched) = unit_identifier(input)
                 .expect("should parse unit identifier with trailing whitespace");
             assert_eq!(matched.lexeme(), "kg");

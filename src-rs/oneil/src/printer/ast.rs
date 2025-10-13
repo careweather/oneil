@@ -1,25 +1,20 @@
 //! Abstract Syntax Tree (AST) printing functionality for the Oneil CLI
-//!
-//! This module provides functionality for printing Oneil AST structures in a
-//! hierarchical tree format suitable for debugging and development. It handles
-//! all AST node types including models, declarations, expressions, parameters,
-//! and units.
 
-use oneil_ast::{
-    Decl, Expr, Model,
-    declaration::DeclNode,
-    expression::{ExprNode, Literal, LiteralNode, Variable, VariableNode},
-    model::SectionNode,
-};
+#![expect(
+    clippy::use_debug,
+    reason = "this is a debug function for developers, not for end users"
+)]
+
+use oneil_ast as ast;
 use std::io::{self, Write};
 
 /// Prints the AST in a hierarchical tree format for debugging
-pub fn print(ast: &Model, writer: &mut impl Write) -> io::Result<()> {
+pub fn print(ast: &ast::Model, writer: &mut impl Write) -> io::Result<()> {
     print_model(ast, writer, 0)
 }
 
 /// Prints a model node with its declarations and sections
-fn print_model(model: &Model, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_model(model: &ast::Model, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     writeln!(writer, "{}Model", "  ".repeat(indent))?;
 
     // Print note if present
@@ -56,13 +51,13 @@ fn print_model(model: &Model, writer: &mut impl Write, indent: usize) -> io::Res
 
 /// Prints a declaration node
 fn print_decl(
-    decl: &DeclNode,
+    decl: &ast::DeclNode,
     writer: &mut impl Write,
     indent: usize,
     prefix: &str,
 ) -> io::Result<()> {
     match decl.node_value() {
-        Decl::Import(import) => {
+        ast::Decl::Import(import) => {
             writeln!(
                 writer,
                 "{}{} Import: \"{}\"",
@@ -71,26 +66,26 @@ fn print_decl(
                 import.path().node_value()
             )?;
         }
-        Decl::UseModel(use_model) => {
-            let alias = use_model
-                .alias()
-                .map(|a| format!(" as {}", a.node_value().as_str()))
-                .unwrap_or_default();
+        ast::Decl::UseModel(use_model) => {
+            let alias = use_model.model_info().get_alias();
+
+            let alias = format!(" as {}", alias.as_str());
             writeln!(
                 writer,
                 "{}{} UseModel: \"{}\"{}",
                 "  ".repeat(indent),
                 prefix,
-                use_model.model_name().node_value().as_str(),
+                use_model.model_info().top_component().as_str(),
                 alias
             )?;
 
             // Print subcomponents if any
-            if !use_model.subcomponents().is_empty() {
+            if !use_model.model_info().subcomponents().is_empty() {
                 let subcomps: Vec<String> = use_model
+                    .model_info()
                     .subcomponents()
                     .iter()
-                    .map(|id| id.node_value().as_str().to_string())
+                    .map(|id| id.as_str().to_string())
                     .collect();
                 writeln!(
                     writer,
@@ -100,7 +95,7 @@ fn print_decl(
                 )?;
             }
         }
-        Decl::Parameter(param) => {
+        ast::Decl::Parameter(param) => {
             writeln!(
                 writer,
                 "{}{} Parameter: {}",
@@ -152,7 +147,7 @@ fn print_decl(
                 )?;
             }
         }
-        Decl::Test(test) => {
+        ast::Decl::Test(test) => {
             writeln!(writer, "{}{} Test:", "  ".repeat(indent), prefix)?;
 
             if let Some(trace_level) = test.trace_level() {
@@ -173,7 +168,7 @@ fn print_decl(
 
 /// Prints a section node
 fn print_section(
-    section: &SectionNode,
+    section: &ast::SectionNode,
     writer: &mut impl Write,
     indent: usize,
     prefix: &str,
@@ -209,9 +204,13 @@ fn print_section(
 }
 
 /// Prints an expression node
-fn print_expression(expr: &ExprNode, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_expression(
+    expr: &ast::ExprNode,
+    writer: &mut impl Write,
+    indent: usize,
+) -> io::Result<()> {
     match expr.node_value() {
-        Expr::BinaryOp { op, left, right } => {
+        ast::Expr::BinaryOp { op, left, right } => {
             writeln!(
                 writer,
                 "{}BinaryOp: {:?}",
@@ -221,7 +220,7 @@ fn print_expression(expr: &ExprNode, writer: &mut impl Write, indent: usize) -> 
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
         }
-        Expr::UnaryOp { op, expr } => {
+        ast::Expr::UnaryOp { op, expr } => {
             writeln!(
                 writer,
                 "{}UnaryOp: {:?}",
@@ -230,7 +229,7 @@ fn print_expression(expr: &ExprNode, writer: &mut impl Write, indent: usize) -> 
             )?;
             print_expression(expr, writer, indent + 2)?;
         }
-        Expr::FunctionCall { name, args } => {
+        ast::Expr::FunctionCall { name, args } => {
             writeln!(
                 writer,
                 "{}FunctionCall: \"{}\"",
@@ -250,11 +249,11 @@ fn print_expression(expr: &ExprNode, writer: &mut impl Write, indent: usize) -> 
                 print_expression(arg, writer, indent + 4)?;
             }
         }
-        Expr::Parenthesized { expr } => {
+        ast::Expr::Parenthesized { expr } => {
             writeln!(writer, "{}Parenthesized:", "  ".repeat(indent))?;
             print_expression(expr, writer, indent + 2)?;
         }
-        Expr::ComparisonOp {
+        ast::Expr::ComparisonOp {
             op,
             left,
             right,
@@ -281,10 +280,10 @@ fn print_expression(expr: &ExprNode, writer: &mut impl Write, indent: usize) -> 
                 print_expression(expr, writer, indent + 4)?;
             }
         }
-        Expr::Variable(var) => {
+        ast::Expr::Variable(var) => {
             print_variable(var, writer, indent)?;
         }
-        Expr::Literal(lit) => {
+        ast::Expr::Literal(lit) => {
             print_literal(lit, writer, indent)?;
         }
     }
@@ -292,9 +291,13 @@ fn print_expression(expr: &ExprNode, writer: &mut impl Write, indent: usize) -> 
 }
 
 /// Prints a variable node
-fn print_variable(var: &VariableNode, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_variable(
+    var: &ast::VariableNode,
+    writer: &mut impl Write,
+    indent: usize,
+) -> io::Result<()> {
     match var.node_value() {
-        Variable::Identifier(id) => {
+        ast::Variable::Identifier(id) => {
             writeln!(
                 writer,
                 "{}Variable: \"{}\"",
@@ -302,29 +305,32 @@ fn print_variable(var: &VariableNode, writer: &mut impl Write, indent: usize) ->
                 id.node_value().as_str()
             )?;
         }
-        Variable::Accessor { parent, component } => {
+        ast::Variable::ModelParameter {
+            reference_model,
+            parameter,
+        } => {
             writeln!(
                 writer,
-                "{}Accessor: \"{}\"",
+                "{}ReferenceModelParameter: \"{}.{}\"",
                 "  ".repeat(indent),
-                parent.node_value().as_str()
+                reference_model.as_str(),
+                parameter.as_str()
             )?;
-            print_variable(component, writer, indent + 2)?;
         }
     }
     Ok(())
 }
 
 /// Prints a literal node
-fn print_literal(lit: &LiteralNode, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_literal(lit: &ast::LiteralNode, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     match lit.node_value() {
-        Literal::Number(n) => {
+        ast::Literal::Number(n) => {
             writeln!(writer, "{}Literal: {}", "  ".repeat(indent), n)?;
         }
-        Literal::String(s) => {
+        ast::Literal::String(s) => {
             writeln!(writer, "{}Literal: \"{}\"", "  ".repeat(indent), s)?;
         }
-        Literal::Boolean(b) => {
+        ast::Literal::Boolean(b) => {
             writeln!(writer, "{}Literal: {}", "  ".repeat(indent), b)?;
         }
     }
@@ -333,12 +339,12 @@ fn print_literal(lit: &LiteralNode, writer: &mut impl Write, indent: usize) -> i
 
 /// Prints a parameter value node
 fn print_parameter_value(
-    value: &oneil_ast::parameter::ParameterValueNode,
+    value: &ast::ParameterValueNode,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
     match value.node_value() {
-        oneil_ast::parameter::ParameterValue::Simple(expr, unit) => {
+        ast::ParameterValue::Simple(expr, unit) => {
             writeln!(writer, "{}Simple:", "  ".repeat(indent))?;
             print_expression(expr, writer, indent + 2)?;
             if let Some(unit_expr) = unit {
@@ -346,7 +352,7 @@ fn print_parameter_value(
                 print_unit_expression(unit_expr, writer, indent + 2)?;
             }
         }
-        oneil_ast::parameter::ParameterValue::Piecewise(parts, unit) => {
+        ast::ParameterValue::Piecewise(parts, unit) => {
             writeln!(writer, "{}Piecewise:", "  ".repeat(indent))?;
             for (i, part) in parts.iter().enumerate() {
                 let is_last = i == parts.len() - 1;
@@ -374,19 +380,19 @@ fn print_parameter_value(
 
 /// Prints a limits node
 fn print_limits(
-    limits: &oneil_ast::parameter::LimitsNode,
+    limits: &ast::LimitsNode,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
     match limits.node_value() {
-        oneil_ast::parameter::Limits::Continuous { min, max } => {
+        ast::Limits::Continuous { min, max } => {
             writeln!(writer, "{}Continuous:", "  ".repeat(indent))?;
             writeln!(writer, "{}    ├── Min:", "  ".repeat(indent))?;
             print_expression(min, writer, indent + 4)?;
             writeln!(writer, "{}    └── Max:", "  ".repeat(indent))?;
             print_expression(max, writer, indent + 4)?;
         }
-        oneil_ast::parameter::Limits::Discrete { values } => {
+        ast::Limits::Discrete { values } => {
             writeln!(writer, "{}Discrete:", "  ".repeat(indent))?;
             for (i, value) in values.iter().enumerate() {
                 let is_last = i == values.len() - 1;
@@ -407,12 +413,12 @@ fn print_limits(
 
 /// Prints a unit expression node
 fn print_unit_expression(
-    unit_expr: &oneil_ast::unit::UnitExprNode,
+    unit_expr: &ast::UnitExprNode,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
     match unit_expr.node_value() {
-        oneil_ast::unit::UnitExpr::BinaryOp { op, left, right } => {
+        ast::UnitExpr::BinaryOp { op, left, right } => {
             writeln!(
                 writer,
                 "{}BinaryOp: {:?}",
@@ -422,11 +428,11 @@ fn print_unit_expression(
             print_unit_expression(left, writer, indent + 2)?;
             print_unit_expression(right, writer, indent + 2)?;
         }
-        oneil_ast::unit::UnitExpr::Parenthesized { expr } => {
+        ast::UnitExpr::Parenthesized { expr } => {
             writeln!(writer, "{}Parenthesized:", "  ".repeat(indent))?;
             print_unit_expression(expr, writer, indent + 2)?;
         }
-        oneil_ast::unit::UnitExpr::Unit {
+        ast::UnitExpr::Unit {
             identifier,
             exponent,
         } => {
@@ -445,7 +451,7 @@ fn print_unit_expression(
                 )?;
             }
         }
-        oneil_ast::unit::UnitExpr::UnitOne => {
+        ast::UnitExpr::UnitOne => {
             writeln!(writer, "{}Unit: 1", "  ".repeat(indent))?;
         }
     }

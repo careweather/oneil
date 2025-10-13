@@ -1,29 +1,19 @@
 //! Intermediate Representation (IR) printing functionality for the Oneil CLI
-//!
-//! This module provides functionality for printing Oneil IR structures in a
-//! hierarchical tree format suitable for debugging and development. It handles
-//! all IR node types including model collections, models, parameters, expressions,
-//! and tests.
-//!
-//! The printing format uses a tree-like structure with indentation and special
-//! characters to show the hierarchical relationship between IR nodes:
-//! - `├──` for non-final children
-//! - `└──` for final children
-//! - Indentation to show nesting levels
 
-use std::io::{self, Write};
+#![expect(
+    clippy::use_debug,
+    reason = "this is a debug function for developers, not for end users"
+)]
 
-use oneil_ir::{
-    expr::{Expr, Literal},
-    model::ModelCollection,
-    parameter::{Limits, Parameter, ParameterValue},
-    reference::Identifier,
-    test::Test,
-    unit::CompositeUnit,
+use std::{
+    collections::HashMap,
+    io::{self, Write},
 };
 
+use oneil_ir as ir;
+
 /// Prints the IR in a hierarchical tree format for debugging
-pub fn print(ir: &ModelCollection, writer: &mut impl Write) -> io::Result<()> {
+pub fn print(ir: &ir::ModelCollection, writer: &mut impl Write) -> io::Result<()> {
     writeln!(writer, "ModelCollection")?;
 
     // Print Python imports
@@ -80,8 +70,8 @@ pub fn print(ir: &ModelCollection, writer: &mut impl Write) -> io::Result<()> {
 
 /// Prints a single model with its components
 fn print_model(
-    model_path: &oneil_ir::reference::ModelPath,
-    model: &oneil_ir::model::Model,
+    model_path: &ir::ModelPath,
+    model: &ir::Model,
     writer: &mut impl Write,
     indent: usize,
     prefix: &str,
@@ -109,6 +99,12 @@ fn print_model(
         sections.push(("Parameters", parameters.len()));
     }
 
+    // Collect references
+    let references = model.get_references();
+    if !references.is_empty() {
+        sections.push(("References", references.len()));
+    }
+
     // Collect tests
     let tests = model.get_tests();
     if !tests.is_empty() {
@@ -131,6 +127,7 @@ fn print_model(
         match *section_name {
             "Submodels" => print_submodels(submodels, writer, indent + 2)?,
             "Parameters" => print_parameters(parameters, writer, indent + 2)?,
+            "References" => print_references(references, writer, indent + 2)?,
             "Tests" => print_tests(tests, writer, indent + 2)?,
             _ => {}
         }
@@ -141,14 +138,11 @@ fn print_model(
 
 /// Prints submodels
 fn print_submodels(
-    submodels: &std::collections::HashMap<
-        Identifier,
-        (oneil_ir::reference::ModelPath, oneil_ir::span::Span),
-    >,
+    submodels: &ir::SubmodelMap,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    for (i, (identifier, (model_path, _span))) in submodels.iter().enumerate() {
+    for (i, (identifier, submodel)) in submodels.iter().enumerate() {
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         writeln!(
@@ -157,7 +151,28 @@ fn print_submodels(
             "  ".repeat(indent),
             prefix,
             identifier.as_str(),
-            model_path.as_ref().display()
+            submodel.path().as_ref().display()
+        )?;
+    }
+    Ok(())
+}
+
+/// Prints submodels
+fn print_references(
+    references: &ir::ReferenceMap,
+    writer: &mut impl Write,
+    indent: usize,
+) -> io::Result<()> {
+    for (i, (identifier, reference)) in references.iter().enumerate() {
+        let is_last = i == references.len() - 1;
+        let prefix = if is_last { "└──" } else { "├──" };
+        writeln!(
+            writer,
+            "{}    {}Reference: \"{}\" -> \"{}\"",
+            "  ".repeat(indent),
+            prefix,
+            identifier.as_str(),
+            reference.path().as_ref().display()
         )?;
     }
     Ok(())
@@ -165,7 +180,7 @@ fn print_submodels(
 
 /// Prints parameters
 fn print_parameters(
-    parameters: &oneil_ir::parameter::ParameterCollection,
+    parameters: &ir::ParameterCollection,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
@@ -179,8 +194,8 @@ fn print_parameters(
 
 /// Prints a single parameter
 fn print_parameter(
-    identifier: &Identifier,
-    parameter: &Parameter,
+    identifier: &ir::Identifier,
+    parameter: &ir::Parameter,
     writer: &mut impl Write,
     indent: usize,
     prefix: &str,
@@ -236,12 +251,12 @@ fn print_parameter(
 
 /// Prints a parameter value
 fn print_parameter_value(
-    value: &ParameterValue,
+    value: &ir::ParameterValue,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
     match value {
-        ParameterValue::Simple(expr, unit) => {
+        ir::ParameterValue::Simple(expr, unit) => {
             writeln!(writer, "{}    ├── Type: Simple", "  ".repeat(indent))?;
             writeln!(writer, "{}    ├── Expression:", "  ".repeat(indent))?;
             print_expression(expr, writer, indent + 2)?;
@@ -250,7 +265,7 @@ fn print_parameter_value(
                 print_unit(unit, writer, indent + 2)?;
             }
         }
-        ParameterValue::Piecewise(exprs, unit) => {
+        ir::ParameterValue::Piecewise(exprs, unit) => {
             writeln!(writer, "{}    ├── Type: Piecewise", "  ".repeat(indent))?;
             for (i, piecewise_expr) in exprs.iter().enumerate() {
                 let is_last = i == exprs.len() - 1 && unit.is_none();
@@ -277,19 +292,19 @@ fn print_parameter_value(
 }
 
 /// Prints limits
-fn print_limits(limits: &Limits, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_limits(limits: &ir::Limits, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     match limits {
-        Limits::Default => {
+        ir::Limits::Default => {
             writeln!(writer, "{}    └── Type: Default", "  ".repeat(indent))?;
         }
-        Limits::Continuous { min, max } => {
+        ir::Limits::Continuous { min, max } => {
             writeln!(writer, "{}    ├── Type: Continuous", "  ".repeat(indent))?;
             writeln!(writer, "{}    ├── Min:", "  ".repeat(indent))?;
             print_expression(min, writer, indent + 2)?;
             writeln!(writer, "{}    └── Max:", "  ".repeat(indent))?;
             print_expression(max, writer, indent + 2)?;
         }
-        Limits::Discrete { values } => {
+        ir::Limits::Discrete { values } => {
             writeln!(writer, "{}    ├── Type: Discrete", "  ".repeat(indent))?;
             for (i, value) in values.iter().enumerate() {
                 let is_last = i == values.len() - 1;
@@ -310,12 +325,12 @@ fn print_limits(limits: &Limits, writer: &mut impl Write, indent: usize) -> io::
 
 /// Prints an expression
 fn print_expression(
-    expr: &oneil_ir::expr::ExprWithSpan,
+    expr: &ir::ExprWithSpan,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
     match &**expr {
-        Expr::BinaryOp { op, left, right } => {
+        ir::Expr::BinaryOp { op, left, right } => {
             writeln!(
                 writer,
                 "{}    ├── BinaryOp: {:?}",
@@ -325,7 +340,7 @@ fn print_expression(
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
         }
-        Expr::UnaryOp { op, expr } => {
+        ir::Expr::UnaryOp { op, expr } => {
             writeln!(
                 writer,
                 "{}    ├── UnaryOp: {:?}",
@@ -334,7 +349,7 @@ fn print_expression(
             )?;
             print_expression(expr, writer, indent + 2)?;
         }
-        Expr::FunctionCall { name, args } => {
+        ir::Expr::FunctionCall { name, args } => {
             writeln!(
                 writer,
                 "{}    ├── FunctionCall: {:?}",
@@ -354,13 +369,13 @@ fn print_expression(
                 print_expression(arg, writer, indent + 4)?;
             }
         }
-        Expr::Variable(var) => {
+        ir::Expr::Variable(var) => {
             print_variable(var, writer, indent)?;
         }
-        Expr::Literal { value } => {
+        ir::Expr::Literal { value } => {
             print_literal(value, writer, indent)?;
         }
-        Expr::ComparisonOp {
+        ir::Expr::ComparisonOp {
             op,
             left,
             right,
@@ -392,13 +407,9 @@ fn print_expression(
 }
 
 /// Prints a variable
-fn print_variable(
-    var: &oneil_ir::expr::Variable,
-    writer: &mut impl Write,
-    indent: usize,
-) -> io::Result<()> {
+fn print_variable(var: &ir::Variable, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     match var {
-        oneil_ir::expr::Variable::Builtin(id) => {
+        ir::Variable::Builtin(id) => {
             writeln!(
                 writer,
                 "{}    ├── Builtin Variable: \"{}\"",
@@ -406,7 +417,7 @@ fn print_variable(
                 id.as_str()
             )?;
         }
-        oneil_ir::expr::Variable::Parameter(id) => {
+        ir::Variable::Parameter(id) => {
             writeln!(
                 writer,
                 "{}    ├── Parameter Variable: \"{}\"",
@@ -414,7 +425,7 @@ fn print_variable(
                 id.as_str()
             )?;
         }
-        oneil_ir::expr::Variable::External { model, ident } => {
+        ir::Variable::External { model, ident } => {
             writeln!(
                 writer,
                 "{}    ├── External Variable: \"{}\" from \"{}\"",
@@ -428,15 +439,15 @@ fn print_variable(
 }
 
 /// Prints a literal
-fn print_literal(lit: &Literal, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_literal(lit: &ir::Literal, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     match lit {
-        Literal::Number(n) => {
+        ir::Literal::Number(n) => {
             writeln!(writer, "{}    ├── Literal: {}", "  ".repeat(indent), n)?;
         }
-        Literal::String(s) => {
+        ir::Literal::String(s) => {
             writeln!(writer, "{}    ├── Literal: \"{}\"", "  ".repeat(indent), s)?;
         }
-        Literal::Boolean(b) => {
+        ir::Literal::Boolean(b) => {
             writeln!(writer, "{}    ├── Literal: {}", "  ".repeat(indent), b)?;
         }
     }
@@ -444,14 +455,14 @@ fn print_literal(lit: &Literal, writer: &mut impl Write, indent: usize) -> io::R
 }
 
 /// Prints a unit
-fn print_unit(unit: &CompositeUnit, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_unit(unit: &ir::CompositeUnit, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     writeln!(writer, "{}    └── Unit: {:?}", "  ".repeat(indent), unit)?;
     Ok(())
 }
 
 /// Prints tests
 fn print_tests(
-    tests: &std::collections::HashMap<oneil_ir::test::TestIndex, Test>,
+    tests: &HashMap<ir::TestIndex, ir::Test>,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
@@ -471,7 +482,7 @@ fn print_tests(
 }
 
 /// Prints a single test
-fn print_test(test: &Test, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+fn print_test(test: &ir::Test, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     // Print trace level
     writeln!(
         writer,

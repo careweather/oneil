@@ -1,15 +1,10 @@
 # Contributing to Oneil
 
-Thank you for your interest in contributing to the Oneil programming language! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to the Oneil programming language!
+This document provides guidelines and instructions for contributing to the
+project.
 
-## Documentation
-
-The project's documentation is organized in the `docs/` directory. Please refer to [docs/README.md](docs/README.md) for an overview of the documentation structure, which includes:
-
-- Architecture documentation
-- CLI tool documentation
-- Design decisions
-- Language specifications
+*This document is a work in progress. If you have any suggestions for improvement, feel free to open a pull request!*
 
 ## Development Setup
 
@@ -17,62 +12,64 @@ The project's documentation is organized in the `docs/` directory. Please refer 
 2. Install Rust toolchain (latest stable version)
 3. Run `cargo build` to verify your setup
 
-## Contribution Workflow
+For development, you can use these Cargo commands:
 
-1. Create a new branch for your changes
-2. Make your changes
-3. Add or update tests as needed
-4. Update relevant documentation
-5. Submit a pull request
+- Run tests:
+  ```sh
+  cargo test
+  ```
 
-## Documentation Guidelines
+- Check for compilation errors without producing an executable:
+  ```sh
+  cargo check
+  ```
 
-### Architecture Documentation
-- Document new components in `docs/architecture/`
-- Follow existing patterns for code organization
-- Include diagrams where helpful
+- Format code:
+  ```sh
+  cargo fmt
+  ```
 
-### CLI Documentation
-- Document new commands in `docs/cli/`
-- Follow the established command documentation structure
-- Include usage examples and error cases
+- Run linter:
+  ```sh
+  cargo clippy
+  ```
 
-### Design Decisions
-- Document significant decisions in `docs/decisions/`
-- Use the provided template
-- Include rationale and alternatives considered
+You can also run the following developer commands built into Oneil:
+- Print the AST that is constructed from an Oneil file:
+  ```sh
+  cargo run -- dev print-ast path/to/model.on
+  ```
 
-### Language Specifications
-- Update specifications in `docs/specs/`
-- Use formal notation where appropriate
-- Include examples and edge cases
+- Print the IR that is constructed from an Oneil model
+  ```sh
+  cargo run -- dev print-ir path/to/model.on
+  ```
 
-## Code Style
+In addition, you will want to install the
+[`rust-analyzer`](https://open-vsx.org/extension/rust-lang/rust-analyzer)
+VS Code extension in order to help you develop in Rust.
 
-- Follow Rust's standard formatting guidelines
-- Use `cargo fmt` to format your code
-- Run `cargo clippy` to check for common issues
+If you are using `rust-analyzer` in VS Code, ensure that you are using the
+`clippy` linter by [updating your
+settings](https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-analyzer/41881)
 
-## Testing
+## Test Oneil Files
 
-- Write unit tests for new functionality
-- Ensure all tests pass before submitting
-- Add integration tests for significant features
+Test Oneil files are found in [the `test` directory](./test). These files are mainly used for manual testing and experimentation and are not automatically tested.
 
-## Pull Request Process
+## System Architecture
 
-1. Update documentation as needed
-2. Ensure all tests pass
-3. Update the changelog if necessary
-4. Request review from maintainers
+The architecture of the system is described in [`docs/architecture/README.md`](docs/architecture/README.md). The code itself is found in [`src-rs/`](src-rs/).
 
-## Questions and Discussion
 
-If you have questions or want to discuss potential changes:
-- Open an issue for discussion
-- Join our community channels
-- Reach out to maintainers
+## Coding Standards
 
-## License
+Code should follow the principles laid out in
+[`docs/principles.md`](docs/principles.md).
 
-By contributing to Oneil, you agree that your contributions will be licensed under the project's license. 
+
+## Resources
+
+- [Crafting Interpreters](https://craftinginterpreters.com/) - If you've never
+  worked on a programming language before, this is a great resource for
+  understanding how to build a programming language!

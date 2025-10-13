@@ -1,10 +1,12 @@
 # The Oneil Design Language
 
+<img alt="The Oneil Logo" src="docs/icons/oneil-logo.svg" align="right" width="25%">
+
 Oneil is a design specification language for rapid, comprehensive system modeling.
 
 Traditional approaches to system engineering are too cumbersome for non-system engineers who don't have all day. Oneil makes it easy for everyone to contribute to the central source of system knowledge. With Oneil everyone can think like a system engineer and understand how their design impacts the whole.
 
-Oneil enables specification of a system "model", which is a collection of "parameters", or attributes of the system. The model can be used to evaluate any corresponding design (which is a collection of value assignments for the parameters of the model).
+Oneil enables specification of a system *model*, which is a collection of *parameters*, or attributes of the system. The model can be used to evaluate any corresponding *design* (which is a collection of value assignments for the parameters of the model).
 
 ## Features
 
@@ -31,59 +33,7 @@ Oneil makes it easier than ever to build, debug, explore, and version-control mo
 
 Oneil has only been tested on Linux. Instructions for Oneil assume you are on Linux.
 
-## Python Quickstart
-
-Clone Oneil and install it.
-
-``` { .sh }
-git clone git@github.com/careweather/oneil.git
-oneil/install.sh
-```
-
-<!-- Add this back in when repo is public and test.>
-<!-- Install Oneil using pip (add @\<version-number\> if you need a specific version):
-
-``` { .sh }
-pip install git+ssh://git@github.com/careweather/oneil.git
-``` -->
-
-Once installed, Oneil can be run from the command line in the directory where your design is. This will open the oneil command line interface, which needs a model before it can accept commands:
-
-``` { .sh }
-$ cd path/to/directory/containing/your/model
-$ oneil your-model.on
-Oneil <Version>
-----------------------------------------
-Loading model your-model.on
-----------------------------------------
-Model: your-model
-Design: default
-Parameters: <count>
-Tests: <count> (PASS/FAIL)
-----------------------------------------
-(your-model) >>>
-```
-
-To see all the results of the model:
-
-``` { Oneil CLI }
->>> all
-<param 1>: <min>|<max> <unit>
-<param 2>: <min>|<max> <unit>
-...
-<param n>: <min>|<max> <unit>
-```
-### Development
-
-If you are developing Oneil, you will want to install Oneil in "editable" mode. To do this, use the `-e` flag.
-
-```sh
-oneil/install.sh -e
-```
-
-This will allow you to modify Oneil's python code and run it with `oneil` without having to re-run `oneil/install.sh` for every change.
-
-## Rust Quickstart
+## Quickstart
 
 To run the Rust version of Oneil locally:
 
@@ -92,7 +42,7 @@ To run the Rust version of Oneil locally:
 2. Clone the repository and navigate to the Rust project directory:
 ```sh
 git clone git@github.com/careweather/oneil.git
-cd oneil/rust
+cd oneil
 ```
 
 <!-- TODO: not ready yet
@@ -104,43 +54,14 @@ cargo run -- path/to/your/model.on
 
 <!-- TODO: when ready, add instructions for installation -->
 
-### Development
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details on how to work on Oneil code.
 
-For development, you can use these Cargo commands:
-
-- Run tests:
-  ```sh
-  cargo test
-  ```
-
-- Check for compilation errors without producing an executable:
-  ```sh
-  cargo check
-  ```
-
-- Format code:
-  ```sh
-  cargo fmt
-  ```
-
-- Run linter:
-  ```sh
-  cargo clippy
-  ```
-
-You can also run the following developer commands built into Oneil:
-- Print the AST that is constructed from an Oneil file:
-  ```sh
-  cargo run dev print-ast path/to/model.on
-  ```
-
-In addition, you will want to install the
-[rust-analyzer](https://marketplace.cursorapi.com/items?itemName=rust-lang.rust-analyzer)
-VS Code extension in order to help you develop in Rust.
 
 ### Model Syntax Updates for Rust Version
 
-The Rust version of Oneil has two syntax updates from the Python version.
+**If you were using the Python version of Oneil, you may need to update your models.**
+
+The Rust version of Oneil has syntax updates from the Python version.
 
 1. **Instead of being delimited by indentation, notes are delimited with
    tildes.** For example:
@@ -162,7 +83,7 @@ The Rust version of Oneil has two syntax updates from the Python version.
    note.
    ~~~
    ```
-   
+
    This will need to be updated in any old model code. A script has been written
    in `tools/convert_notes.py` that can do this automatically. It can be used as
    follows:
@@ -176,8 +97,8 @@ The Rust version of Oneil has two syntax updates from the Python version.
    created with the old code. This file can be deleted once it has been verified
    that the conversion worked correctly.
 
-2. Discrete parameter string values are now enclosed in quotes. For example:
-   
+2. **Discrete parameter string values are now enclosed in quotes.** For example:
+
    ```oneil
    # Before
    X[foo, bar, baz]: x = foo
@@ -195,24 +116,27 @@ The Rust version of Oneil has two syntax updates from the Python version.
    This change does not have an automatic fix (yet, at least), and must be done
    by hand.
 
-## Manual Install
+3. **Pointer parameters are no longer necessary.** For example:
 
-Alternatively, if you've cloned Oneil, you can install it using pip. You will need the following packages to run Oneil:
+   ```oneil
+   # Before
+   X: x = 1
+   Y: y => x
 
-* Numpy
-* Beautiful Table
-* Pytexit
-
-Install using the following commands:
-
-``` { .sh }
-pip install path/to/oneil
-pip install numpy beautifultable pytexit 
-```
+   # After
+   X: x = 1
+   Y: y = x
+   ```
 
 ### Toolchain
 
+Oneil has the several tools available for working with Oneil code.
+
+#### Vim Support
+
 Oneil supports syntax highlighting in vim. Oneil is already designed for readability, but syntax highlighting makes it even better.
+
+*This highlighting has not been updated since the updates to the syntax have been released, so it might have some problems highlighting*
 
 If you installed using `install.sh`, then vim should be installed and configured.
 
@@ -235,7 +159,15 @@ If you don't have a `~\.vim` directory, you can just symlink the directory itsel
 ln -s $CAREWEATHER/oneil/vim ~/.vim
 ```
 
-## Parameters
+#### VS Code Support
+
+Oneil has an [extension](https://marketplace.visualstudio.com/items?itemName=careweather.oneil) available in VS Code. This extension is not yet available in VS Code forks such as Cursor, but will be in the future.
+
+## Syntax
+
+Here is a brief overview of the syntax of Oneil.
+
+### Parameters
 
 The oneil language supports definition of a collection of "parameters", with *independent* parameters that have specified values and *dependent* parameters that are functions of other parameters. The syntax for defining a parameter in Oneil is:
 
@@ -251,7 +183,7 @@ Name (Limits): ID = Assignment :Units
 
 Detailed syntax rules for each of these parts is described in the following sections.
 
-## Preamble Syntax
+### Preamble Syntax
 
 At a minimum, the preamble must contain the name of the parameter. The name must be plain text with no special characters except apostrophes. For example:
 
@@ -287,7 +219,7 @@ $ Artificial gravity: ...
 ...
 ```
 
-## Body Syntax
+### Body Syntax
 
 The first element of the body is the ID. It follows the first colon and comes before the equals sign. The ID is a short alternative to the name used for readable equations. It's the key used for a parameter in the model namespace and must be unique within a model file.
 
@@ -303,7 +235,7 @@ Active power: P_a = ...
 
 Oneil names and IDs overcome the classic naming conflict in mathematical computing: long variable names make equations unreadable while short names make variables unidentifiable. Oneil makes it possible specify equations in short form while keeping parameter meaning clear.
 
-### Assignment
+#### Assignment
 
 The parameter assignment can either be a value (independent) or an equation (dependent).
 
@@ -322,29 +254,15 @@ Cylinder radius: r = D/2 : ...
 Artificial gravity: g_a = r*omega**2 : ...
 ```
 
-Use a pointer (`=>`) if the equation for a parameter simply sets it equal to another parameter:
-
-``` { .on }
-Radar amplifier efficiency (0, 1): eta_r => eta_c
-```
-
 Alternate equations for the minimum and maximum case can be given, separated by a pipe.
 
 ``` { .on }
 Power consumption: P_c = eta_c*P_q | eta_c*P_a
 ```
 
-Again, if one of these equations is just another parameter, a pointer must be used:
-
-``` { .on }
-Population: P => N_c | N_c + N_r
-```
-
-Note that pointers cannot be used with discrete variables.
-
 For more details on valid equations, see [here](#extrema-math).
 
-### Units
+#### Units
 
 Units are specified after a second colon with the "^" operator for exponents and a "/" preceeding *each* unit in the denominator. Units must be specified if the parameter has units, but can be left off for unitless parameters.
 
@@ -376,7 +294,7 @@ While [limits](#preamble-syntax) are typically specified in the parameter's unit
 > [!IMPORTANT]
 > Oneil handles nearly all unit conversion in the background, but there is a [major exception with frequencies (Hz) and angular frequencies (rad/s)](#something-funny-is-happening-with-angular-frequencies-and-frequencies).
 
-## Extrema Math
+### Extrema Math
 
 In the backend, Oneil uses parametric extrema math to calculate the extremes of the range of possibilities for a given calculation, as defined in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd). Expressions are limited to the following operators and functions: `+`, `-`, `\*`, `/`, `^`, `==,` `!=`, `<=`, `>=`, `%`, `()`, `min()`, `max()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()`, `sqrt()`, `ln()`, `log()`, `log10()`, `floor()`, `ceiling()`, `extent()`, `range()`, `abs()`, `sign()`, `mid()`, `strip()` (removes units in calculation), and `mnmx()` (an extreme function which gets the extremes of the inputs).
 
@@ -384,7 +302,7 @@ The `min()` and `max()` functions can be used to compare parameters or it can be
 
 Extrema math yields substantially different results for subtraction and division. If the extreme cases are incompatible with a given parameter, you can specify standard math using the `--` and `//` operators.
 
-### Piecewise Equations
+#### Piecewise Equations
 
 Piecewise equations can be used for parameter assignments.
 
@@ -396,9 +314,9 @@ Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'earth_orbital' :km/s
 
 (`m_E`, `m_S`, and `m_G` are the masses of the Earth, Sun, and galactic center)
 
-The conditions for piecewise equations are pythonic, so pythonic comparison operators are used and discrete values that use strings should be given in single quotes. Conditions are evaluated in order, and the first equation corresponding to a true condition is calculated to obtain the value for the parameter.
+Conditions are evaluated in order, and the first equation corresponding to a true condition is calculated to obtain the value for the parameter.
 
-### Breakout Functions
+#### Breakout Functions
 
 For functions not supported by the above equation formats, you can define a python function and link it.
 
@@ -423,33 +341,58 @@ In the Oneil file, give the python function on the right hand of the equation, i
 Temperature: T = temperature(D) :K
 ```
 
-Multiplying a python function by another parameter is not currently supported. Specify the factors as separate parameters and use another parameter to multiply them.
+### References and Submodels
 
-## Submodels
+One of the purposes of Oneil's models is to be able to represent **collections of systems and subsystems**. To this end, Oneil provides two different ways to import a model.
 
-A model can use parameters from a submodel:
+The first way to import a model is as a **reference**. When a model is imported as a reference, all of the *reference model parameters* are made available through the *reference alias*. The *reference alias* is either the alias provided or, if there isn't one, the name of the model.
 
-``` { .on }
-use submodel as s
+```oneil
+# === constants.on ===
+Gravity of Earth: g = 9.8 :m/s^2
+
+
+# === my_model.on ===
+Mass of box: m_b = 5 :kg
+
+# reference with alias
+ref constants as c
+Weight of box: w_b = m_b * g.c :N
+
+# reference without alias
+ref constants
+Weight of box: w_b = m_b * g.constants :N
 ```
 
-The word after use gives the submodel which should match the name of an oneil file with ".on" as the file extension. The symbol after as is used with a "." after parameters from that model to show where they come from. For example:
+The second way to import a model is as a **submodel**. Like with a reference, all of the *submodel parameters* are available through the *submodel alias*. In addition to this, the model is also exported as a *submodel* of the current model. This means that the imported model can be referenced as `model.submodel`.
 
-``` { . on }
-use cylinder as c
+```oneil
+# === radar.on ===
+Radar cost: cost = 1000 :$
 
-Length of day: t_day = omega.c/2*pi :day
+
+# === solar_panel.on ===
+Solar panel cost: cost = 500 :$
+
+
+# === satellite.on ===
+use radar
+use solar_panel as solar
+
+Satellite cost: cost = cost.radar + cost.solar :$
+
+
+# === product.on ===
+use satellite
+ref satellite.radar
+ref satellite.solar_panel as solar
+# ... or using `with` syntax ...
+use satellite with [radar, solar_panel as solar]
 ```
 
-To use a parameter, it's submodel has to be specified directly. For example, if cylinder uses submodel life_support, specifying cylinder does not give access to life_support. Life_support and any of it's submodels must also be specified if parameters from them are needed. Submodel symbols should be as short as possible for readability.
+Note that in the case of a submodel, *the submodel and reference name may be different*. If an alias is provided, it will be used as the reference name, but not as the submodel name. The submodel name will always be the name of the model.
 
-``` { .on }
-use cylinder as c
-from cylinder use life_support as ls
-from cylinder.life_support use oxygen_tank as o
-```
-
-## Designs
+### Designs
 
 A design consists of the values assigned to independent parameters in a model. Oneil model files include a default design, but Oneil makes it easy to overwrite that default with alternative designs. Design files use the same syntax of model files, but only require the body instead of the whole line (no preamble required). Designs let you change a subset of the independent parameters from the default design. For example,
 
@@ -458,12 +401,12 @@ m = 1e6 :kg
 D = 0.5 :km
 omega = 1 :deg/min
 case = clockwise
-L => L.d
+L = L.d
 ```
 
 To use a design, see [the command line interface `design` command](#design). A design parameter overwrites the value of the model parameter while keeping the original metadata. If you want your design to alter a submodel parameter, you'll need to make sure the corresponding model uses that submodel.
 
-## Tests
+### Tests
 
 Models can also specify tests to verify model reasonability and accuracy. Tests use math expressions with comparison operators (`==`, `>`, `<`, `>=`, `<=`, `!=`) to return True or False. Tests can't include unit specifications, so any values with units must be specified separately and used in the test equation. This turns out to be a useful limitation for preventing magic numbers.
 
@@ -472,44 +415,39 @@ Earth gravity: g_E = 9.81 :m/s^2
 
 test : g_E*0.9 <= g_a <= g_E*1.1
 
-    The artificial gravity should be within 10% of Earth's gravity.
+    ~ The artificial gravity should be within 10% of Earth's gravity.
 ```
 
-Say you have a submodel that's only valid in certain larger contexts. You can specify a test in that submodel that requires an input from a parent model to pass:
-
-``` { .on }
-test {delta_g} : g_E - delta_g <= g_a <= g_E + delta_g
-```
-
-In this case, the test is specifying that the submodel needs to be given a value named `delta_g` for verification. In the parent model, these parameters can be passed to the submodel in the `use` statement:
-
-``` { .on }
-use cylinder(delta_g=delta_ghuman) as c
-```
-
-## Notes and Comments
+### Notes and Comments
 
 Oneil defines "notes" and "comments" differently. Notes are comments that you want to show up in reports explaining and justifying the model or design. Comments are "notes to self" that don't show up in any reports. When the model is exported to a report, notes are included, but comments are not.
 
-Oneil recognizes notes as any line that is not blank and begins with whitespace (four spaces or a tab, for example). When a note is found, Oneil will tie it to the most recently-defined parameter or test (above the note in the file). If none are found, Oneil will tie the note to the model itself. On export, notes are processed as LaTeX.
+Oneil recognizes notes as any line that begins with a `~` or any lines that are enclosed by `~~~` on their own line . When a note is found, Oneil will tie it to the most recently-defined parameter or test (above the note in the file). If none are found, Oneil will tie the note to the model itself. On export, notes are processed as LaTeX.
 
 Oneil recognizes any line starting with `#` as a comment.
 
 In the following example, "O'neill cylinder for..." is a note tied to the model while `cylinder radius` has no note and `standard Earth gravity` has "From \href..." as its note. "#TODO..." is ignored as a comment.
 
 ``` { .on }
-    O'neill cylinder for supporting long-term human habitation in deep space.
+    ~ O'neill cylinder for supporting long-term human habitation in deep space.
 
 #TODO: refactor this as a function of the diameter
 Cylinder diameter: d = 0.5 :km
 
 Standard Earth gravity: g_E = 9.81 m/s^2
-
+    ~~~
     From \href{https://en.wikipedia.org/wiki/Gravity_of_Earth}{wikipedia}.
+
+    For more information, see \href{https://example.com/info}{this page}.
+    ~~~
 ```
 
 ## Using the Command line interface
 
+*(WIP)*
+
+<details>
+<summary><em>WIP</em></summary>
 See the [quickstart](#quickstart) for how to start the command line interface (CLI) and load a model. Once a model has been loaded in the CLI, the model can be explored and evaluated using an expression or the CLI functions described in the following sections.
 
 ### Queries and Expressions
@@ -673,9 +611,10 @@ Ideally, if there's a problem with your Oneil code or Python extensions, the One
 
 If you instead see an error missed by Oneil and raised by Python, it's likely an error with the Oneil compiler which is still in development. If that happens, please post the issue in GitHub. The compiler doesn't yet support step by step debugging, so you'll have to use [VSCode for this](#oneil-has-a-bug) for now.
 
+</details>
+
 ## Known Issues and Limitations
 
-* Scientific notation is supported in value assignments, but not limits. It should be supported in expressions, but this hasn't been tested.
 * The Vim syntax highlighter gets *really* slow if you try to paste large amounts of LaTeX in. For now, make sure to paste large blocks of LaTeX using a different text editor or temporarily remove the ".on" file extension while you do.
 * The Vim syntax highlighter breaks for the rest of the file after a LaTeX syntax error in a note. As a result, the rest of the file will be highlighted as a note.
 
@@ -691,29 +630,7 @@ The funny thing about Hz and rad/s is that `1 Hz != 1 rad/s` even though `1 Hz =
 
 ### Oneil has a bug
 
-You can report bugs using the issues section on Github. If you want to try and fix a bug yourself, here are some things that will help:
-
-To edit Oneil, you'll need to clone it and install it with the editable flag (-e), which ensures the pip install tracks your local changes.
-
-``` { .sh }
-git clone git@github.com/careweather/oneil.git
-
-pip install -e oneil
-```
-
-To debug Oneil, you can call the CLI from a python file:
-
-``` { .py }
-import oneil
-
-oneil.main()
-```
-
-You can also give the file off the bat:
-
-``` { .py }
-oneil.main(["", "your-model.on"])
-```
+You can report bugs using the issues section on Github. If you want to try and fix a bug yourself, see [`CONTRIBUTING.md`](CONTRIBUTING.md) for help.
 
 ### TexMaker works, but VS Code doesn't
 
@@ -721,7 +638,9 @@ Try closing all VS Code files and closing VS Code to clear its mystery cache.
 
 ## Contributing
 
-If you're interested in contributing, email [us](mailto:oneil@careweather.com).
+If you've found a bug or would like to request a feature, feel free to [submit an issue](https://github.com/careweather/oneil/issues)!
+
+If you would like to contribute code, read [`CONTRIBUTING.md`](CONTRIBUTING.md), then feel free to [submit a pull request](https://github.com/careweather/oneil/pulls)!
 
 ## About
 

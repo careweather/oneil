@@ -1,59 +1,5 @@
-#![warn(missing_docs)]
-
-//! # Oneil Error
-//!
-//! A unified error handling system for the Oneil programming language.
-//!
-//! This crate provides a standardized way to represent, format, and display errors
-//! throughout the Oneil compiler and toolchain. It includes:
-//!
-//! - **Unified Error Structure**: The `OneilError` type that combines error messages,
-//!   source locations, and contextual information
-//! - **Source Location Tracking**: Precise line and column information for error reporting
-//! - **Rich Context System**: Support for notes, help text, and other contextual information
-//! - **Trait-based Interface**: The `AsOneilError` trait for converting any error type
-//!   into the unified format
-//!
-//! ## Usage
-//!
-//! ```rust
-//! use oneil_error::{OneilError, AsOneilError, Context};
-//! use std::path::PathBuf;
-//!
-//! // Define an error type that implements AsOneilError
-//! struct MyError {
-//!     message: String,
-//!     offset: usize,
-//! }
-//!
-//! impl AsOneilError for MyError {
-//!     fn message(&self) -> String {
-//!         self.message.clone()
-//!     }
-//!     
-//!     fn error_location(&self, source: &str) -> Option<oneil_error::ErrorLocation> {
-//!         if self.offset < source.len() {
-//!             Some(oneil_error::ErrorLocation::from_source_and_offset(source, self.offset))
-//!         } else {
-//!             None
-//!         }
-//!     }
-//!     
-//!     fn context(&self) -> Vec<Context> {
-//!         vec![Context::Help("Try checking your syntax".to_string())]
-//!     }
-//! }
-//!
-//! // Convert to OneilError
-//! let my_error = MyError {
-//!     message: "Unexpected token".to_string(),
-//!     offset: 5,
-//! };
-//!
-//! let source = "let x = 42;";
-//! let path = PathBuf::from("example.on");
-//! let oneil_error = OneilError::from_error_with_source(&my_error, path, source);
-//! ```
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! Errors for the Oneil programming language
 
 mod context;
 mod location;
@@ -70,7 +16,7 @@ pub use traits::AsOneilError;
 /// This struct represents errors in a format suitable for display to users.
 /// It includes the file path where the error occurred, a human-readable message,
 /// and optional source location information for precise error reporting.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OneilError {
     /// The path to the file where the error occurred
     path: PathBuf,
@@ -269,7 +215,8 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the `PathBuf` containing the file path.
-    pub fn path(&self) -> &PathBuf {
+    #[must_use]
+    pub const fn path(&self) -> &PathBuf {
         &self.path
     }
 
@@ -278,6 +225,7 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the error message string.
+    #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -287,7 +235,8 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns an optional reference to the `ErrorLocation` if available.
-    pub fn location(&self) -> Option<&ErrorLocation> {
+    #[must_use]
+    pub const fn location(&self) -> Option<&ErrorLocation> {
         self.location.as_ref()
     }
 
@@ -296,6 +245,7 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the context information.
+    #[must_use]
     pub fn context(&self) -> &[Context] {
         &self.context
     }
@@ -305,6 +255,7 @@ impl OneilError {
     /// # Returns
     ///
     /// Returns a reference to the context information with source location.
+    #[must_use]
     pub fn context_with_source(&self) -> &[(Context, ErrorLocation)] {
         &self.context_with_source
     }

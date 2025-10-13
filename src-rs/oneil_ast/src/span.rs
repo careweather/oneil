@@ -1,22 +1,17 @@
 //! Source location spans for error reporting and debugging
-//!
-//! This module provides the `Span` struct and related functionality for
-//! tracking source code locations in the AST.
 
 /// Represents a span of source code with start, end, and whitespace end positions
-///
-/// Spans are used throughout the AST to provide precise location information
-/// for error reporting, debugging, and other source-aware operations.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Span {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AstSpan {
     start: usize,
     length: usize,
     whitespace_length: usize,
 }
 
-impl Span {
+impl AstSpan {
     /// Creates a new span with the given positions
-    pub fn new(start: usize, length: usize, whitespace_length: usize) -> Self {
+    #[must_use]
+    pub const fn new(start: usize, length: usize, whitespace_length: usize) -> Self {
         Self {
             start,
             length,
@@ -25,34 +20,37 @@ impl Span {
     }
 
     /// Returns the start position of the span
-    pub fn start(&self) -> usize {
+    #[must_use]
+    pub const fn start(&self) -> usize {
         self.start
     }
 
     /// Returns the length of the span
-    pub fn length(&self) -> usize {
+    #[must_use]
+    pub const fn length(&self) -> usize {
         self.length
     }
 
     /// Returns the length of the whitespace after the span
-    pub fn whitespace_length(&self) -> usize {
+    #[must_use]
+    pub const fn whitespace_length(&self) -> usize {
         self.whitespace_length
     }
 
     /// Returns the end position of the span
-    pub fn end(&self) -> usize {
+    #[must_use]
+    pub const fn end(&self) -> usize {
         self.start + self.length
     }
 
     /// Returns the position where whitespace ends after the span
-    pub fn whitespace_end(&self) -> usize {
+    #[must_use]
+    pub const fn whitespace_end(&self) -> usize {
         self.start + self.length + self.whitespace_length
     }
 
     /// Calculates a span from two span-like objects
-    ///
-    /// The resulting span starts at the start of the first object and ends
-    /// at the end of the second object, with whitespace end from the second object.
+    #[must_use]
     pub fn calc_span<T, U>(start_span: &T, end_span: &U) -> Self
     where
         T: SpanLike,
@@ -66,9 +64,6 @@ impl Span {
     }
 
     /// Calculates a span from three span-like objects
-    ///
-    /// The resulting span starts at the start of the first object, ends at the
-    /// end of the second object, and uses the whitespace end from the third object.
     pub fn calc_span_with_whitespace<T, U, V>(
         start_span: &T,
         end_span: &U,
@@ -88,9 +83,6 @@ impl Span {
 }
 
 /// Trait for objects that can provide span information
-///
-/// This trait allows different types to provide their source location
-/// information in a uniform way.
 pub trait SpanLike {
     /// Returns the start position
     fn get_start(&self) -> usize;
@@ -110,7 +102,7 @@ pub trait SpanLike {
     }
 }
 
-impl SpanLike for Span {
+impl SpanLike for AstSpan {
     fn get_start(&self) -> usize {
         self.start
     }
@@ -124,7 +116,7 @@ impl SpanLike for Span {
     }
 }
 
-impl<T> From<&T> for Span
+impl<T> From<&T> for AstSpan
 where
     T: SpanLike,
 {

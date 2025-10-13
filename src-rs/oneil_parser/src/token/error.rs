@@ -1,11 +1,8 @@
 //! Error handling for the token parsing
-//!
-//! See [docs/parser/error-model.md](docs/parser/error-model.md) in the source
-//! code for more information.
 
 use nom::error::ParseError;
 
-use super::Span;
+use super::InputSpan;
 
 // Re-export the ErrorHandlingParser trait from the parent module for
 // convenience
@@ -14,7 +11,7 @@ pub use super::super::error::ErrorHandlingParser;
 /// An error that occurred during token parsing.
 ///
 /// Contains both the type of error and the location where it occurred.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TokenError {
     /// The specific kind of error that occurred
     pub kind: TokenErrorKind,
@@ -23,7 +20,7 @@ pub struct TokenError {
 }
 
 /// The different kinds of errors that can occur during token parsing.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenErrorKind {
     /// Expected a specific token
     Expect(ExpectKind),
@@ -34,7 +31,7 @@ pub enum TokenErrorKind {
 }
 
 /// The different kinds of tokens that could have been expected.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectKind {
     /// Expected an end of line
     EndOfLine,
@@ -59,7 +56,7 @@ pub enum ExpectKind {
 }
 
 /// The different keywords that could have been expected.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectKeyword {
     /// Expected 'and' keyword
     And,
@@ -77,18 +74,22 @@ pub enum ExpectKeyword {
     Not,
     /// Expected 'or' keyword
     Or,
+    /// Expected 'ref' keyword
+    Ref,
+    /// Expected 'section' keyword
+    Section,
     /// Expected 'test' keyword
     Test,
     /// Expected 'true' keyword
     True,
-    /// Expected 'section' keyword
-    Section,
     /// Expected 'use' keyword
     Use,
+    /// Expected 'with' keyword
+    With,
 }
 
 /// The different symbols that could have been expected.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectSymbol {
     /// Expected '!=' symbol
     BangEquals,
@@ -110,6 +111,8 @@ pub enum ExpectSymbol {
     Dollar,
     /// Expected '.' symbol
     Dot,
+    /// Expected '..' symbol
+    DotDot,
     /// Expected '=' symbol
     Equals,
     /// Expected '==' symbol
@@ -145,7 +148,7 @@ pub enum ExpectSymbol {
 }
 
 /// The different kinds of incomplete input that could have been expected
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IncompleteKind {
     /// Unclosed note
     UnclosedNote {
@@ -172,8 +175,8 @@ pub enum IncompleteKind {
 }
 
 impl TokenError {
-    /// Creates a new TokenError
-    fn new(kind: TokenErrorKind, span: Span) -> Self {
+    /// Creates a new `TokenError`
+    fn new(kind: TokenErrorKind, span: InputSpan<'_>) -> Self {
         Self {
             kind,
             offset: span.location_offset(),
@@ -199,63 +202,63 @@ impl TokenError {
         Self { kind, ..self }
     }
 
-    /// Creates a new TokenError instance for an expected end of line
+    /// Creates a new `TokenError` instance for an expected end of line
     pub fn expected_end_of_line(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::EndOfLine))
     }
 
-    /// Creates a new TokenError instance for an expected identifier
+    /// Creates a new `TokenError` instance for an expected identifier
     pub fn expected_identifier(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Identifier))
     }
 
-    /// Creates a new TokenError instance for an expected keyword
+    /// Creates a new `TokenError` instance for an expected keyword
     pub fn expected_keyword(keyword: ExpectKeyword) -> impl Fn(Self) -> Self {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Keyword(keyword)))
     }
 
-    /// Creates a new TokenError instance for an expected label
+    /// Creates a new `TokenError` instance for an expected label
     pub fn expected_label(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Label))
     }
 
-    /// Creates a new TokenError instance for an expected note
+    /// Creates a new `TokenError` instance for an expected note
     pub fn expected_note(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Note))
     }
 
-    /// Creates a new TokenError instance for an expected note from a span
-    pub fn expected_note_from_span(span: Span) -> Self {
+    /// Creates a new `TokenError` instance for an expected note from a span
+    pub fn expected_note_from_span(span: InputSpan<'_>) -> Self {
         Self::new(TokenErrorKind::Expect(ExpectKind::Note), span)
     }
 
-    /// Creates a new TokenError instance for an expected number
+    /// Creates a new `TokenError` instance for an expected number
     pub fn expected_number(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Number))
     }
 
-    /// Creates a new TokenError instance for an expected string
+    /// Creates a new `TokenError` instance for an expected string
     pub fn expected_string(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::String))
     }
 
-    /// Creates a new TokenError instance for an expected symbol
+    /// Creates a new `TokenError` instance for an expected symbol
     pub fn expected_symbol(symbol: ExpectSymbol) -> impl Fn(Self) -> Self {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Symbol(symbol)))
     }
 
-    /// Creates a new TokenError instance for an expected unit identifier
+    /// Creates a new `TokenError` instance for an expected unit identifier
     pub fn expected_unit_identifier(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitIdentifier))
     }
 
-    /// Creates a new TokenError instance for an expected unit one
+    /// Creates a new `TokenError` instance for an expected unit one
     pub fn expected_unit_one(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitOne))
     }
 
-    /// Creates a new TokenError instance for an unclosed note
-    pub fn unclosed_note(delimiter_span: Span) -> impl Fn(Self) -> Self {
+    /// Creates a new `TokenError` instance for an unclosed note
+    pub fn unclosed_note(delimiter_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let delimiter_start_offset = delimiter_span.location_offset();
             let delimiter_length = delimiter_span.len();
@@ -266,8 +269,8 @@ impl TokenError {
         }
     }
 
-    /// Creates a new TokenError instance for an unclosed string
-    pub fn unclosed_string(open_quote_span: Span) -> impl Fn(Self) -> Self {
+    /// Creates a new `TokenError` instance for an unclosed string
+    pub fn unclosed_string(open_quote_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let open_quote_offset = open_quote_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(IncompleteKind::UnclosedString {
@@ -276,8 +279,8 @@ impl TokenError {
         }
     }
 
-    /// Creates a new TokenError instance for an invalid decimal part in a number
-    pub fn invalid_decimal_part(decimal_point_span: Span) -> impl Fn(Self) -> Self {
+    /// Creates a new `TokenError` instance for an invalid decimal part in a number
+    pub fn invalid_decimal_part(decimal_point_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let decimal_point_offset = decimal_point_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(
@@ -288,8 +291,8 @@ impl TokenError {
         }
     }
 
-    /// Creates a new TokenError instance for an invalid exponent part in a number
-    pub fn invalid_exponent_part(e_span: Span) -> impl Fn(Self) -> Self {
+    /// Creates a new `TokenError` instance for an invalid exponent part in a number
+    pub fn invalid_exponent_part(e_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
         move |error: Self| {
             let e_offset = e_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(
@@ -298,38 +301,32 @@ impl TokenError {
         }
     }
 
-    /// Checks if the error is a token error
-    pub fn is_token_error(&self, kind: ExpectKeyword) -> bool {
-        match self.kind {
-            TokenErrorKind::Expect(ExpectKind::Keyword(keyword_kind)) => kind == keyword_kind,
-            _ => false,
-        }
+    /// Checks if the error is a keyword error
+    pub fn is_keyword_error(&self, kind: ExpectKeyword) -> bool {
+        matches!(self.kind, TokenErrorKind::Expect(ExpectKind::Keyword(keyword_kind)) if kind == keyword_kind)
     }
 
     /// Checks if the error is a symbol error
     pub fn is_symbol_error(&self, kind: ExpectSymbol) -> bool {
-        match self.kind {
-            TokenErrorKind::Expect(ExpectKind::Symbol(symbol_kind)) => kind == symbol_kind,
-            _ => false,
-        }
+        matches!(self.kind, TokenErrorKind::Expect(ExpectKind::Symbol(symbol_kind)) if kind == symbol_kind)
     }
 }
 
-impl<'a> ParseError<Span<'a>> for TokenError {
-    fn from_error_kind(input: Span, kind: nom::error::ErrorKind) -> Self {
+impl ParseError<InputSpan<'_>> for TokenError {
+    fn from_error_kind(input: InputSpan<'_>, kind: nom::error::ErrorKind) -> Self {
         Self {
             kind: TokenErrorKind::NomError(kind),
             offset: input.location_offset(),
         }
     }
 
-    fn append(_input: Span, _kind: nom::error::ErrorKind, other: Self) -> Self {
+    fn append(_input: InputSpan<'_>, _kind: nom::error::ErrorKind, other: Self) -> Self {
         other
     }
 }
 
-impl<'a> From<nom::error::Error<Span<'a>>> for TokenError {
-    fn from(e: nom::error::Error<Span<'a>>) -> Self {
+impl<'a> From<nom::error::Error<InputSpan<'a>>> for TokenError {
+    fn from(e: nom::error::Error<InputSpan<'a>>) -> Self {
         Self::from_error_kind(e.input, e.code)
     }
 }

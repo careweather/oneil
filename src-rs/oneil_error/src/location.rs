@@ -1,9 +1,7 @@
 /// Source location information for error reporting
 ///
-/// This struct provides detailed information about where an error occurred
-/// in the source code, including line and column numbers, character offset,
-/// and the source line content. Line and column numbers are 1-indexed.
-#[derive(Debug, Clone, PartialEq)]
+/// Line and column numbers are 1-indexed.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorLocation {
     /// Character offset from the beginning of the source file
     offset: usize,
@@ -19,20 +17,6 @@ pub struct ErrorLocation {
 
 impl ErrorLocation {
     /// Creates a new error location from source content and position information
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - The complete source file content
-    /// * `offset` - Character offset from the beginning of the source
-    /// * `length` - Optional length of the error span
-    ///
-    /// # Panics
-    ///
-    /// Panics if:
-    /// - `offset` is greater than the source length
-    /// - `length` is provided and is 0
-    /// - `length` is provided and `offset + length` exceeds the source length
-    /// - `length` is provided and the span contains newlines
     fn new(source: &str, offset: usize, length: Option<usize>) -> Self {
         // offset must be less than or equal to the length of the source because
         // the offset may be at the very end of the source (after the last
@@ -93,7 +77,11 @@ impl ErrorLocation {
         let line = source[..offset].chars().filter(|c| *c == '\n').count() + 1;
 
         // The line is 1-indexed, so we need to subtract 1 to get the correct line
-        let line_source = source.lines().nth(line - 1).unwrap().to_string();
+        let line_source = source
+            .lines()
+            .nth(line - 1)
+            .expect("line must exist since it was derived from the string")
+            .to_string();
 
         // Replace tabs with 4 spaces
         let line_source = line_source.replace('\t', "    ");
@@ -108,91 +96,44 @@ impl ErrorLocation {
     }
 
     /// Creates a new error location from source content and offset
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - The complete source file content
-    /// * `offset` - Character offset from the beginning of the source
-    ///
-    /// # Returns
-    ///
-    /// Returns a new `ErrorLocation` with the calculated line and column information.
-    ///
-    /// # Panics
-    ///
-    /// Panics if:
-    /// - `offset` is greater than the source length
+    #[must_use]
     pub fn from_source_and_offset(source: &str, offset: usize) -> Self {
         Self::new(source, offset, None)
     }
 
     /// Creates a new error location from source content and span
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - The complete source file content
-    /// * `offset` - Character offset from the beginning of the source
-    /// * `length` - Length of the error span in characters
-    ///
-    /// # Returns
-    ///
-    /// Returns a new `ErrorLocation` with the calculated line, column, and span information.
-    ///
-    /// # Panics
-    ///
-    /// Panics if:
-    /// - `offset` is greater than the source length
-    /// - `length` is 0
-    /// - `offset + length` exceeds the source length
-    /// - the span delineated by `offset` and `length` contains newlines
+    #[must_use]
     pub fn from_source_and_span(source: &str, offset: usize, length: usize) -> Self {
         Self::new(source, offset, Some(length))
     }
 
     /// Returns the character offset from the beginning of the source file
-    ///
-    /// # Returns
-    ///
-    /// Returns the character offset as a `usize`.
-    pub fn offset(&self) -> usize {
+    #[must_use]
+    pub const fn offset(&self) -> usize {
         self.offset
     }
 
     /// Returns the line number where the error occurred (1-indexed)
-    ///
-    /// # Returns
-    ///
-    /// Returns the line number as a `usize`.
-    pub fn line(&self) -> usize {
+    #[must_use]
+    pub const fn line(&self) -> usize {
         self.line
     }
 
     /// Returns the column number where the error occurred (1-indexed)
-    ///
-    /// # Returns
-    ///
-    /// Returns the column number as a `usize`.
-    pub fn column(&self) -> usize {
+    #[must_use]
+    pub const fn column(&self) -> usize {
         self.column
     }
 
     /// Returns the length of the error span in characters
-    ///
-    /// If no length was specified during creation, defaults to 1 character.
-    ///
-    /// # Returns
-    ///
-    /// Returns the span length as a `usize`.
+    #[must_use]
     pub fn length(&self) -> usize {
         // if no length is provided, assume a single character
         self.length.unwrap_or(1)
     }
 
     /// Returns the source line content where the error occurred
-    ///
-    /// # Returns
-    ///
-    /// Returns a reference to the source line string.
+    #[must_use]
     pub fn line_source(&self) -> &str {
         &self.line_source
     }

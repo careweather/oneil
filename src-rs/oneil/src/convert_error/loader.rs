@@ -14,13 +14,13 @@
 
 use std::{fs, path::Path};
 
-use oneil_error::OneilError;
-use oneil_ir::reference::{ModelPath, PythonPath};
-use oneil_model_loader::{
+use oneil_error::{ErrorLocation, OneilError};
+use oneil_ir as ir;
+use oneil_model_resolver::{
     ModelErrorMap,
     error::{
-        CircularDependencyError, ImportResolutionError, LoadError, ParameterResolutionError,
-        ResolutionErrors, SubmodelResolutionError, TestResolutionError, VariableResolutionError,
+        CircularDependencyError, ImportResolutionError, LoadError, ModelImportResolutionError,
+        ParameterResolutionError, ResolutionErrors, TestResolutionError, VariableResolutionError,
     },
 };
 
@@ -72,7 +72,7 @@ pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -
         // appearance within the file
         model_errors.sort_by_key(|error| {
             let location = error.location();
-            location.map(|location| location.offset())
+            location.map(ErrorLocation::offset)
         });
 
         errors.extend(model_errors);
@@ -99,7 +99,7 @@ pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -
 ///
 /// Panics if the Python path and error path do not match, which should never happen
 /// in normal operation.
-fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> OneilError {
+fn convert_import_error(python_path: &ir::PythonPath, error: &DoesNotExistError) -> OneilError {
     assert_eq!(
         python_path.as_ref(),
         error.path(),
@@ -124,7 +124,7 @@ fn convert_import_error(python_path: &PythonPath, error: &DoesNotExistError) -> 
 ///
 /// Returns a new `Error` instance with a message showing the circular dependency chain.
 fn convert_circular_dependency_error(
-    model_path: &ModelPath,
+    model_path: &ir::ModelPath,
     error: &CircularDependencyError,
 ) -> OneilError {
     let path = model_path.as_ref();
@@ -147,7 +147,7 @@ fn convert_circular_dependency_error(
 ///
 /// Returns a vector of `Error` instances for all errors found in the model.
 fn convert_model_errors(
-    model_path: &ModelPath,
+    model_path: &ir::ModelPath,
     errors: &LoadError<LoadingError>,
 ) -> Vec<OneilError> {
     let path = model_path.as_ref();
@@ -189,8 +189,12 @@ fn convert_model_errors(
 /// This function attempts to read the source file to provide location information.
 /// If the file cannot be read, it adds a file reading error and processes the
 /// resolution errors without location information.
+#[expect(
+    clippy::too_many_lines,
+    reason = "this is a repetitive and easy-to-read function"
+)]
 fn convert_resolution_errors(
-    model_path: &ModelPath,
+    model_path: &ir::ModelPath,
     resolution_errors: &ResolutionErrors,
 ) -> Vec<OneilError> {
     let mut errors = Vec::new();
@@ -201,14 +205,14 @@ fn convert_resolution_errors(
     let source = match &source {
         Ok(source) => Some(source.as_str()),
         Err(error) => {
-            let file_error = file::convert(path, &error);
+            let file_error = file::convert(path, error);
             errors.push(file_error);
             None
         }
     };
 
     // convert import errors
-    for (_python_path, import_error) in resolution_errors.get_import_errors() {
+    for import_error in resolution_errors.get_import_errors().values() {
         match import_error {
             ImportResolutionError::FailedValidation { .. } => {
                 // this error is intentionally ignored because it indicates that the
@@ -227,16 +231,15 @@ fn convert_resolution_errors(
     }
 
     // convert submodel resolution errors
-    for (_identifier, submodel_resolution_error) in
-        resolution_errors.get_submodel_resolution_errors()
-    {
+    for submodel_resolution_error in resolution_errors.get_submodel_resolution_errors().values() {
         match submodel_resolution_error {
-            SubmodelResolutionError::ModelHasError { .. } => {
+            ModelImportResolutionError::ModelHasError { .. } => {
                 ignore_error();
             }
 
-            SubmodelResolutionError::UndefinedSubmodel { .. }
-            | SubmodelResolutionError::DuplicateSubmodel { .. } => {
+            ModelImportResolutionError::UndefinedSubmodel { .. }
+            | ModelImportResolutionError::DuplicateSubmodel { .. }
+            | ModelImportResolutionError::DuplicateReference { .. } => {
                 let error = OneilError::from_error_with_optional_source(
                     submodel_resolution_error,
                     path.to_path_buf(),
@@ -247,9 +250,28 @@ fn convert_resolution_errors(
         }
     }
 
+    // convert reference resolution errors
+    for reference_resolution_error in resolution_errors.get_reference_resolution_errors().values() {
+        match reference_resolution_error {
+            ModelImportResolutionError::ModelHasError { .. } => {
+                ignore_error();
+            }
+
+            ModelImportResolutionError::UndefinedSubmodel { .. }
+            | ModelImportResolutionError::DuplicateSubmodel { .. }
+            | ModelImportResolutionError::DuplicateReference { .. } => {
+                let error = OneilError::from_error_with_optional_source(
+                    reference_resolution_error,
+                    path.to_path_buf(),
+                    source,
+                );
+                errors.push(error);
+            }
+        }
+    }
+
     // convert parameter resolution errors
-    for (_identifier, parameter_resolution_errors) in
-        resolution_errors.get_parameter_resolution_errors()
+    for parameter_resolution_errors in resolution_errors.get_parameter_resolution_errors().values()
     {
         for parameter_resolution_error in parameter_resolution_errors {
             match parameter_resolution_error {
@@ -277,7 +299,7 @@ fn convert_resolution_errors(
     }
 
     // convert test resolution errors
-    for (_test_index, test_resolution_errors) in resolution_errors.get_test_resolution_errors() {
+    for test_resolution_errors in resolution_errors.get_test_resolution_errors().values() {
         for test_resolution_error in test_resolution_errors {
             match test_resolution_error {
                 TestResolutionError::DuplicateInput { .. } => {
@@ -335,7 +357,7 @@ fn convert_variable_resolution_error(
 ) -> Option<OneilError> {
     match variable_resolution_error {
         VariableResolutionError::UndefinedParameter { .. }
-        | VariableResolutionError::UndefinedSubmodel { .. } => {
+        | VariableResolutionError::UndefinedReference { .. } => {
             let error = OneilError::from_error_with_optional_source(
                 variable_resolution_error,
                 path.to_path_buf(),
@@ -353,7 +375,7 @@ fn convert_variable_resolution_error(
             // parameter has errors, which will be reported separately.
             None
         }
-        VariableResolutionError::SubmodelResolutionFailed { .. } => {
+        VariableResolutionError::ReferenceResolutionFailed { .. } => {
             // This error is intentionally ignored because it indicates that the
             // submodel resolution failed, which will be reported separately.
             None
@@ -371,4 +393,4 @@ fn convert_variable_resolution_error(
 ///
 /// This function does nothing and is used purely for documentation purposes
 /// to indicate where errors are intentionally ignored.
-pub fn ignore_error() {}
+pub const fn ignore_error() {}

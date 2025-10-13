@@ -1,13 +1,5 @@
 //! Parser for model definitions in an Oneil program.
 //!
-//! This module provides parsing functionality for complete Oneil model definitions.
-//! A model consists of:
-//!
-//! 1. **Optional leading whitespace and newlines** - Ignored during parsing
-//! 2. **Optional note** - A comment starting with `~` at the beginning of the model
-//! 3. **Top-level declarations** - Import, from, use, parameter, and test declarations
-//! 4. **Sections** - Named groups of declarations with the format `section <label>`
-//!
 //! The parser uses error recovery to continue parsing even when individual
 //! declarations or sections fail, allowing multiple syntax errors to be
 //! reported in a single pass.
@@ -20,11 +12,8 @@ use nom::{
     combinator::{eof, opt, value},
 };
 use oneil_ast::{
-    Span as AstSpan,
-    declaration::DeclNode,
-    model::{Model, ModelNode, Section, SectionHeader, SectionHeaderNode, SectionNode},
-    naming::Label,
-    node::Node,
+    AstSpan, DeclNode, Label, Model, ModelNode, Node, Section, SectionHeader, SectionHeaderNode,
+    SectionNode,
 };
 
 use crate::{
@@ -36,22 +25,22 @@ use crate::{
     },
     note::parse as parse_note,
     token::{keyword::section, naming::label, structure::end_of_line},
-    util::{Result, Span},
+    util::{InputSpan, Result},
 };
 
 /// Parses a model definition, consuming the complete input
 ///
 /// This function **fails if the complete input is not consumed**.
 pub fn parse_complete(
-    input: Span,
-) -> Result<ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
+    input: InputSpan<'_>,
+) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
     let (rest, model) = model(input)?;
     let result = eof(rest);
 
     match result {
         Ok((rest, _)) => Ok((rest, model)),
         Err(nom::Err::Error(e)) => Err(nom::Err::Failure(ErrorsWithPartialResult::new(
-            model.take_value(),
+            Box::new(model.take_value()),
             vec![e],
         ))),
         _ => unreachable!(),
@@ -60,37 +49,12 @@ pub fn parse_complete(
 
 /// Parses a complete model definition with error recovery.
 ///
-/// This function parses a model that consists of:
-/// 1. Optional leading whitespace and newlines
-/// 2. Optional note at the beginning
-/// 3. Zero or more top-level declarations
-/// 4. Zero or more sections, each containing declarations
-///
 /// The function uses error recovery to continue parsing even when individual
 /// declarations or sections fail, allowing multiple syntax errors to be
 /// reported in a single pass.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a model node if parsing succeeds, or a partial result with errors
-/// if some parts failed to parse.
-///
-/// # Error Recovery Strategy
-///
-/// When a declaration fails to parse:
-/// 1. The error is recorded
-/// 2. The parser skips to the next line
-/// 3. Parsing continues with the next declaration
-///
-/// When a section fails to parse:
-/// 1. The section header error is recorded
-/// 2. Any declarations within the failed section are moved to the top-level
-/// 3. Parsing continues with the next section
-fn model(input: Span) -> Result<ModelNode, ErrorsWithPartialResult<Model, ParserError>> {
+fn model(
+    input: InputSpan<'_>,
+) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
     let (rest, _) = opt(end_of_line).convert_errors().parse(input)?;
     let (rest, note) = opt(parse_note).convert_errors().parse(rest)?;
     let (rest, mut decls, decl_errors) = parse_decls(rest);
@@ -104,11 +68,11 @@ fn model(input: Span) -> Result<ModelNode, ErrorsWithPartialResult<Model, Parser
     if errors.is_empty() {
         // assume that the model spans the entire file
         let model_span = AstSpan::new(0, input.len(), 0);
-        let model_node = Node::new(model_span, Model::new(note, decls, sections));
+        let model_node = Node::new(&model_span, Model::new(note, decls, sections));
 
         Ok((rest, model_node))
     } else {
-        let model = Model::new(note, decls, sections);
+        let model = Box::new(Model::new(note, decls, sections));
         Err(nom::Err::Failure(ErrorsWithPartialResult::new(
             model, errors,
         )))
@@ -117,43 +81,16 @@ fn model(input: Span) -> Result<ModelNode, ErrorsWithPartialResult<Model, Parser
 
 /// Attempts to parse declarations with error recovery
 ///
-/// This function parses zero or more top-level declarations. If it fails to
-/// parse a declaration, it attempts to recover and continue parsing. This
-/// allows for multiple syntax errors to be found in the model.
-///
-/// # Recovery Strategy
-///
-/// When a declaration fails to parse:
-/// 1. Check if the next token is a section header or end of file
-/// 2. If so, stop parsing declarations and return accumulated results
-/// 3. If not, record the error and skip to the next line
-/// 4. Continue parsing with the next declaration
-///
 /// The function handles consecutive errors by avoiding duplicate error
 /// reporting for lines that might be continuations of previous failed
 /// declarations (e.g., multi-line piecewise functions).
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a tuple containing:
-/// - The remaining unparsed input
-/// - Vector of successfully parsed declaration nodes
-/// - Vector of parsing errors encountered
-///
-/// In addition, because it returns partial results, the results may be used
-/// in order to determine other partial information, such as the associated
-/// units of the declarations that were successfully parsed.
-fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
-    fn parse_decls_recur<'a>(
-        input: Span<'a>,
+fn parse_decls(input: InputSpan<'_>) -> (InputSpan<'_>, Vec<DeclNode>, Vec<ParserError>) {
+    fn parse_decls_recur(
+        input: InputSpan<'_>,
         mut acc_decls: Vec<DeclNode>,
         mut acc_errors: Vec<ParserError>,
         last_was_error: bool,
-    ) -> (Span<'a>, Vec<DeclNode>, Vec<ParserError>) {
+    ) -> (InputSpan<'_>, Vec<DeclNode>, Vec<ParserError>) {
         let result = parse_decl(input);
 
         match result {
@@ -167,7 +104,7 @@ fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
                 // If it is, return the accumulated declarations and errors
                 let end_of_file = value((), take_while(char::is_whitespace).and(eof));
                 let section = value((), section);
-                if let Ok(_) = section.or(end_of_file).parse(input) {
+                if section.or(end_of_file).parse(input).is_ok() {
                     return (input, acc_decls, acc_errors);
                 }
 
@@ -199,30 +136,25 @@ fn parse_decls(input: Span) -> (Span, Vec<DeclNode>, Vec<ParserError>) {
 }
 
 /// Parses the sections of a model with error recovery
-///
-/// This function parses zero or more sections in the model. Each section
-/// consists of a section header followed by declarations. If a section
-/// header fails to parse, any declarations that follow are treated as
-/// top-level declarations.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a tuple containing:
-/// - The remaining unparsed input
-/// - Vector of successfully parsed section nodes
-/// - Vector of declarations that were parsed but couldn't be assigned to a section
-/// - Vector of parsing errors encountered
-fn parse_sections(input: Span) -> (Span, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
-    fn parse_sections_recur<'a>(
-        input: Span<'a>,
+fn parse_sections(
+    input: InputSpan<'_>,
+) -> (
+    InputSpan<'_>,
+    Vec<SectionNode>,
+    Vec<DeclNode>,
+    Vec<ParserError>,
+) {
+    fn parse_sections_recur(
+        input: InputSpan<'_>,
         mut acc_sections: Vec<SectionNode>,
         mut acc_decls: Vec<DeclNode>,
         mut acc_errors: Vec<ParserError>,
-    ) -> (Span<'a>, Vec<SectionNode>, Vec<DeclNode>, Vec<ParserError>) {
+    ) -> (
+        InputSpan<'_>,
+        Vec<SectionNode>,
+        Vec<DeclNode>,
+        Vec<ParserError>,
+    ) {
         let section_result = parse_section(input);
 
         match section_result {
@@ -248,38 +180,12 @@ fn parse_sections(input: Span) -> (Span, Vec<SectionNode>, Vec<DeclNode>, Vec<Pa
     parse_sections_recur(input, vec![], vec![], vec![])
 }
 
-/// Parses a section within a model
-///
-/// A section consists of:
-/// 1. A section header (`section <label>`)
-/// 2. Optional note
-/// 3. Zero or more declarations
-///
-/// If there is no section header, this function returns `None`, indicating that
-/// no section was found.
-///
-/// Otherwise, this function returns a tuple containing the section and the
-/// errors that occurred while parsing the section, if any.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns `None` if no section header is found, or `Some` containing:
-/// - The remaining unparsed input
-/// - Either a successfully parsed section node or a vector of declarations
-/// - Vector of parsing errors encountered
-///
+type SectionResult = StdResult<SectionNode, Vec<DeclNode>>;
 
-fn parse_section(
-    input: Span,
-) -> Option<(
-    Span,
-    StdResult<SectionNode, Vec<DeclNode>>,
-    Vec<ParserError>,
-)> {
+type SectionErrors = Vec<ParserError>;
+
+/// Parses a section within a model
+fn parse_section(input: InputSpan<'_>) -> Option<(InputSpan<'_>, SectionResult, SectionErrors)> {
     let section_header_result = parse_section_header(input);
 
     let (rest, header, mut errors) = match section_header_result {
@@ -314,7 +220,7 @@ fn parse_section(
 
             let span = AstSpan::calc_span(&span_start, &span_end);
 
-            let section_node = Node::new(span, Section::new(header, note, decls));
+            let section_node = Node::new(&span, Section::new(header, note, decls));
 
             Some((rest, Ok(section_node), errors))
         }
@@ -325,40 +231,21 @@ fn parse_section(
 }
 
 /// Parses a section header with its label
-///
-/// A section header has the format: `section label` followed by a newline.
-/// The function parses the `section` keyword, extracts the label identifier,
-/// and ensures the header is properly terminated with a newline.
-///
-/// # Arguments
-///
-/// * `input` - The input span to parse
-///
-/// # Returns
-///
-/// Returns a section header node containing the parsed label, or an error
-/// if the header is malformed.
-///
-/// # Error Conditions
-///
-/// - **Missing label**: When the `section` keyword is followed by whitespace or newline
-/// - **Missing newline**: When the label is not followed by a proper line terminator
-/// - **Invalid label**: When the label contains invalid characters
-fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
+fn parse_section_header(input: InputSpan<'_>) -> Result<'_, SectionHeaderNode, ParserError> {
     let (rest, section_span) = section.convert_errors().parse(input)?;
 
     let (rest, label) = label
         .or_fail_with(ParserError::section_missing_label(&section_span))
         .parse(rest)?;
     let label_value = Label::new(label.lexeme().to_string());
-    let label_node = Node::new(label, label_value);
+    let label_node = Node::new(&label, label_value);
 
     let (rest, end_of_line_token) = end_of_line
         .or_fail_with(ParserError::section_missing_end_of_line(&label))
         .parse(rest)?;
 
     let span = AstSpan::calc_span_with_whitespace(&section_span, &label, &end_of_line_token);
-    let header_node = Node::new(span, SectionHeader::new(label_node));
+    let header_node = Node::new(&span, SectionHeader::new(label_node));
 
     Ok((rest, header_node))
 }
@@ -370,15 +257,7 @@ fn parse_section_header(input: Span) -> Result<SectionHeaderNode, ParserError> {
 /// end of file, then consumes the newline character itself.
 ///
 /// It also optionally skips a note that follows the line break.
-///
-/// # Arguments
-///
-/// * `input` - The input span to skip from
-///
-/// # Returns
-///
-/// Returns the remaining input after skipping to the next line.
-fn skip_to_next_line_with_content(input: Span) -> Span {
+fn skip_to_next_line_with_content(input: InputSpan<'_>) -> InputSpan<'_> {
     let (rest, _) = take_while::<_, _, nom::error::Error<_>>(|c| c != '\n')
         .parse(input)
         .expect("should never fail");
@@ -398,12 +277,12 @@ fn skip_to_next_line_with_content(input: Span) -> Span {
 mod tests {
     use super::*;
     use crate::Config;
-    use oneil_ast::declaration::Decl;
+    use oneil_ast::Decl;
 
     #[test]
-    fn test_empty_model() {
-        let input = Span::new_extra("", Config::default());
-        let (rest, model) = parse_complete(input).unwrap();
+    fn empty_model() {
+        let input = InputSpan::new_extra("", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
         assert!(model.sections().is_empty());
@@ -411,9 +290,9 @@ mod tests {
     }
 
     #[test]
-    fn test_model_with_note() {
-        let input = Span::new_extra("~ This is a note\n", Config::default());
-        let (rest, model) = parse_complete(input).unwrap();
+    fn model_with_note() {
+        let input = InputSpan::new_extra("~ This is a note\n", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse model with note");
         assert!(model.note().is_some());
         assert!(model.decls().is_empty());
         assert!(model.sections().is_empty());
@@ -421,43 +300,66 @@ mod tests {
     }
 
     #[test]
-    fn test_model_with_import() {
-        let input = Span::new_extra("import foo\n", Config::default());
-        let (rest, model) = parse_complete(input).unwrap();
+    fn model_with_import() {
+        let input = InputSpan::new_extra("import foo\n", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse model with import");
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 1);
-        match &model.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), &"foo"),
-            _ => panic!("Expected import declaration"),
-        }
+
+        let Decl::Import(import_node) = &model.decls()[0].node_value() else {
+            panic!("Expected import declaration");
+        };
+        assert_eq!(import_node.path().node_value(), &"foo");
+
         assert!(model.sections().is_empty());
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
-    fn test_model_with_section() {
-        let input = Span::new_extra("section foo\nimport bar\n", Config::default());
-        let (rest, model) = parse_complete(input).unwrap();
+    fn use_without_as() {
+        let input = InputSpan::new_extra("use foo\n", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse model with use declaration");
+        assert!(model.note().is_none());
+        assert_eq!(model.decls().len(), 1);
+
+        let Decl::UseModel(use_model_node) = &model.decls()[0].node_value() else {
+            panic!("Expected use declaration");
+        };
+
+        let use_model_info = use_model_node.model_info();
+        assert_eq!(use_model_info.top_component().as_str(), "foo");
+        assert_eq!(use_model_info.subcomponents().len(), 0);
+        assert_eq!(use_model_info.get_alias().as_str(), "foo");
+
+        assert!(model.sections().is_empty());
+        assert_eq!(rest.fragment(), &"");
+    }
+
+    #[test]
+    fn model_with_section() {
+        let input = InputSpan::new_extra("section foo\nimport bar\n", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse model with section");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
         assert_eq!(model.sections().len(), 1);
         let section = &model.sections()[0];
         assert_eq!(section.header().label().as_str(), "foo");
         assert_eq!(section.decls().len(), 1);
-        match &section.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "bar"),
-            _ => panic!("Expected import declaration"),
-        }
+        let Decl::Import(import_node) = &section.decls()[0].node_value() else {
+            panic!("Expected import declaration");
+        };
+        assert_eq!(import_node.path().node_value(), "bar");
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
-    fn test_model_with_multiple_sections() {
-        let input = Span::new_extra(
+    fn model_with_multiple_sections() {
+        let input = InputSpan::new_extra(
             "section foo\nimport bar\nsection baz\nimport qux\n",
             Config::default(),
         );
-        let (rest, model) = parse_complete(input).unwrap();
+        let (rest, model) =
+            parse_complete(input).expect("should parse model with multiple sections");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
         assert_eq!(model.sections().len(), 2);
@@ -465,26 +367,26 @@ mod tests {
         let section1 = &model.sections()[0];
         assert_eq!(section1.header().label().as_str(), "foo");
         assert_eq!(section1.decls().len(), 1);
-        match &section1.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "bar"),
-            _ => panic!("Expected import declaration"),
-        }
+        let Decl::Import(import_node) = &section1.decls()[0].node_value() else {
+            panic!("Expected import declaration");
+        };
+        assert_eq!(import_node.path().node_value(), "bar");
 
         let section2 = &model.sections()[1];
         assert_eq!(section2.header().label().as_str(), "baz");
         assert_eq!(section2.decls().len(), 1);
-        match &section2.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "qux"),
-            _ => panic!("Expected import declaration"),
-        }
+        let Decl::Import(import_node) = &section2.decls()[0].node_value() else {
+            panic!("Expected import declaration");
+        };
+        assert_eq!(import_node.path().node_value(), "qux");
 
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
-    fn test_parse_complete_empty_model_success() {
-        let input = Span::new_extra("\n", Config::default());
-        let (rest, model) = parse_complete(input).unwrap();
+    fn parse_complete_empty_model_success() {
+        let input = InputSpan::new_extra("\n", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
         assert!(model.sections().is_empty());
@@ -492,32 +394,36 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_complete_with_declarations_success() {
-        let input = Span::new_extra("import foo\nimport bar\n", Config::default());
-        let (rest, model) = parse_complete(input).unwrap();
+    fn parse_complete_with_declarations_success() {
+        let input = InputSpan::new_extra("import foo\nimport bar\n", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse model with declarations");
         assert_eq!(model.decls().len(), 2);
-        match &model.decls()[0].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "foo"),
-            _ => panic!("Expected import declaration"),
-        }
-        match &model.decls()[1].node_value() {
-            Decl::Import(import_node) => assert_eq!(import_node.path().node_value(), "bar"),
-            _ => panic!("Expected import declaration"),
-        }
+        let Decl::Import(import_node) = &model.decls()[0].node_value() else {
+            panic!("Expected import declaration");
+        };
+        assert_eq!(import_node.path().node_value(), "foo");
+        let Decl::Import(import_node) = &model.decls()[1].node_value() else {
+            panic!("Expected import declaration");
+        };
+        assert_eq!(import_node.path().node_value(), "bar");
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
-    fn test_parse_complete_with_remaining_input() {
-        let input = Span::new_extra("import foo\n<rest>", Config::default());
+    #[expect(
+        clippy::assertions_on_result_states,
+        reason = "we don't care about the result, just that it's an error"
+    )]
+    fn parse_complete_with_remaining_input() {
+        let input = InputSpan::new_extra("import foo\n<rest>", Config::default());
         let result = parse_complete(input);
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_parse_empty_model() {
-        let input = Span::new_extra("", Config::default());
-        let (rest, model) = parse_complete(input).unwrap();
+    fn parse_empty_model() {
+        let input = InputSpan::new_extra("", Config::default());
+        let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
         assert!(model.decls().is_empty());
         assert!(model.sections().is_empty());
@@ -525,24 +431,25 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_model_with_parameters() {
-        let input = Span::new_extra(
+    fn parse_model_with_parameters() {
+        let input = InputSpan::new_extra(
             "1st parameter: x = 1\n2nd parameter: y = 2\n",
             Config::default(),
         );
-        let (rest, model) = parse_complete(input).unwrap();
+        let (rest, model) = parse_complete(input).expect("should parse model with parameters");
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 2);
         assert_eq!(rest.fragment(), &"");
     }
 
     #[test]
-    fn test_parse_model_with_section_and_declarations() {
-        let input = Span::new_extra(
+    fn parse_model_with_section_and_declarations() {
+        let input = InputSpan::new_extra(
             "X: x = 1 + 2\nsection My Section\nimport foo\nimport bar\nY: y = 3 * 4",
             Config::default(),
         );
-        let (rest, model) = parse_complete(input).unwrap();
+        let (rest, model) =
+            parse_complete(input).expect("should parse model with section and declarations");
         assert!(model.note().is_none());
         assert_eq!(model.decls().len(), 1);
         assert_eq!(model.sections().len(), 1);
@@ -553,8 +460,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_model_failure_with_partial_result() {
-        let input = Span::new_extra(
+    fn parse_model_failure_with_partial_result() {
+        let input = InputSpan::new_extra(
             "\
             use foo as bar
 
@@ -576,420 +483,336 @@ mod tests {
         let result = parse_complete(input);
         assert!(result.is_err());
 
-        match result {
-            Err(nom::Err::Failure(e)) => {
-                let model = e.partial_result;
-                let errors = e.errors;
+        let Err(nom::Err::Failure(e)) = result else {
+            panic!("Expected error for incomplete input");
+        };
 
-                assert_eq!(model.decls().len(), 1);
-                assert_eq!(model.sections().len(), 1);
-                assert_eq!(model.sections()[0].header().label().as_str(), "My Section");
-                assert_eq!(model.sections()[0].decls().len(), 1);
+        let model = e.partial_result;
+        let errors = e.errors;
 
-                assert_eq!(errors.len(), 4);
-            }
-            _ => panic!("Expected an error with incomplete input"),
+        assert_eq!(model.decls().len(), 1);
+        assert_eq!(model.sections().len(), 1);
+        assert_eq!(model.sections()[0].header().label().as_str(), "My Section");
+        assert_eq!(model.sections()[0].decls().len(), 1);
+
+        assert_eq!(errors.len(), 4);
+    }
+
+    mod general_error {
+        use crate::error::reason::{ExpectKind, ParserErrorReason};
+
+        use super::*;
+
+        #[test]
+        fn parse_complete_with_remaining_input() {
+            let input = InputSpan::new_extra("import foo\nrest", Config::default());
+            let result = parse_complete(input);
+
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for remaining input");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 1);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 11);
+            assert_eq!(
+                errors[0].reason,
+                ParserErrorReason::Expect(ExpectKind::Decl)
+            );
         }
     }
 
-    mod error_tests {
+    mod section_error {
+        use crate::error::reason::{IncompleteKind, ParserErrorReason, SectionKind};
+
         use super::*;
-        use crate::error::reason::{ExpectKind, IncompleteKind, ParserErrorReason, SectionKind};
 
-        mod general_error_tests {
-            use super::*;
+        #[test]
+        fn section_missing_label() {
+            let input = InputSpan::new_extra("section\nimport foo\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for missing section label");
+            };
 
-            #[test]
-            fn test_parse_complete_with_remaining_input() {
-                let input = Span::new_extra("import foo\nrest", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
+            let model = e.partial_result;
+            let errors = e.errors;
 
-                        assert_eq!(model.decls().len(), 1);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 11);
-                        assert_eq!(
-                            errors[0].reason,
-                            ParserErrorReason::Expect(ExpectKind::Decl)
-                        );
-                    }
-                    _ => panic!("Expected error for remaining input"),
-                }
+            assert_eq!(model.decls().len(), 1);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 7);
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Section(SectionKind::MissingLabel),
+                cause,
+            } = errors[0].reason
+            else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+
+            assert_eq!(cause, AstSpan::new(0, 7, 0));
+        }
+
+        #[test]
+        fn section_missing_end_of_line() {
+            let input = InputSpan::new_extra("section foo :\n import foo", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for missing section label, got {result:?}");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 1);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 12);
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Section(SectionKind::MissingEndOfLine),
+                cause,
+            } = errors[0].reason
+            else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+
+            assert_eq!(cause, AstSpan::new(8, 3, 1));
+        }
+
+        #[test]
+        fn section_with_invalid_declaration() {
+            let input = InputSpan::new_extra("section foo\nimport\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for invalid declaration in section");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.sections().len(), 1);
+            assert_eq!(model.sections()[0].decls().len(), 0);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 18);
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Decl(_),
+                cause,
+            } = errors[0].reason
+            else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+
+            assert_eq!(cause, AstSpan::new(12, 6, 0));
+        }
+    }
+
+    mod declaration_error {
+        use crate::error::reason::{IncompleteKind, ParserErrorReason};
+
+        use super::*;
+
+        #[test]
+        fn import_missing_path() {
+            let input = InputSpan::new_extra("import\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for missing import path");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 0);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 6);
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Decl(_),
+                cause,
+            } = errors[0].reason
+            else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+
+            assert_eq!(cause, AstSpan::new(0, 6, 0));
+        }
+
+        #[test]
+        fn parameter_missing_equals() {
+            let input = InputSpan::new_extra("X: x\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for missing equals in parameter");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 0);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 4);
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Parameter(_),
+                cause,
+            } = errors[0].reason
+            else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+
+            assert_eq!(cause, AstSpan::new(3, 1, 0));
+        }
+
+        #[test]
+        fn parameter_missing_value() {
+            let input = InputSpan::new_extra("X: x =\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for missing value in parameter");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 0);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 6);
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Parameter(_),
+                cause,
+            } = errors[0].reason
+            else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+
+            assert_eq!(cause, AstSpan::new(5, 1, 0));
+        }
+
+        #[test]
+        fn missing_colon() {
+            let input = InputSpan::new_extra("test x > 0\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for missing colon in test");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 0);
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].error_offset, 5);
+            let ParserErrorReason::Incomplete {
+                kind: IncompleteKind::Test(_),
+                cause,
+            } = errors[0].reason
+            else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+
+            assert_eq!(cause, AstSpan::new(0, 4, 1));
+        }
+    }
+
+    mod note_error {
+        use crate::error::reason::ParserErrorReason;
+
+        use super::*;
+
+        #[test]
+        fn unterminated_note() {
+            let input =
+                InputSpan::new_extra("~~~\nThis is an unterminated note", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for unterminated note");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 0);
+            assert_eq!(errors.len(), 1);
+            let ParserErrorReason::TokenError(_) = errors[0].reason else {
+                panic!("Unexpected reason {:?}", errors[0].reason);
+            };
+        }
+    }
+
+    mod recovery_error {
+        use crate::error::reason::{IncompleteKind, ParserErrorReason};
+
+        use super::*;
+
+        #[test]
+        fn multiple_declaration_errors() {
+            let input = InputSpan::new_extra("import\nuse\nX: x\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for multiple declaration errors");
+            };
+
+            let model = e.partial_result;
+            let errors = e.errors;
+
+            assert_eq!(model.decls().len(), 0);
+            assert_eq!(errors.len(), 3);
+
+            // All errors should be declaration-related
+            for error in &errors {
+                let ParserErrorReason::Incomplete {
+                    kind: IncompleteKind::Decl(_) | IncompleteKind::Parameter(_),
+                    ..
+                } = error.reason
+                else {
+                    panic!("Expected declaration error, got {:?}", error.reason);
+                };
             }
         }
 
-        mod section_error_tests {
-            use super::*;
+        #[test]
+        fn section_with_multiple_errors() {
+            let input = InputSpan::new_extra("section foo\nimport\nuse\nX: x\n", Config::default());
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for section with multiple errors");
+            };
 
-            #[test]
-            fn test_section_missing_label() {
-                let input = Span::new_extra("section\nimport foo\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
+            let model = e.partial_result;
+            let errors = e.errors;
 
-                        assert_eq!(model.decls().len(), 1);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 7);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Section(SectionKind::MissingLabel),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(0, 7, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing section label"),
-                }
-            }
-
-            #[test]
-            fn test_section_missing_end_of_line() {
-                let input = Span::new_extra("section foo :\n import foo", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 1);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 12);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Section(SectionKind::MissingEndOfLine),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(8, 3, 1));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing section label, got {:?}", result),
-                }
-            }
-
-            #[test]
-            fn test_section_with_invalid_declaration() {
-                let input = Span::new_extra("section foo\nimport\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.sections().len(), 1);
-                        assert_eq!(model.sections()[0].decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 18);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(12, 6, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for invalid declaration in section"),
-                }
-            }
+            assert_eq!(model.sections().len(), 1);
+            assert_eq!(model.sections()[0].decls().len(), 0);
+            assert_eq!(errors.len(), 3);
         }
 
-        mod declaration_error_tests {
-            use super::*;
+        #[test]
+        fn mixed_valid_and_invalid_declarations() {
+            let input = InputSpan::new_extra(
+                "import valid\nimport\nuse foo as bar\nuse invalid.\n",
+                Config::default(),
+            );
+            let result = parse_complete(input);
+            let Err(nom::Err::Failure(e)) = result else {
+                panic!("Expected error for mixed valid and invalid declarations");
+            };
 
-            #[test]
-            fn test_import_missing_path() {
-                let input = Span::new_extra("import\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
+            let model = e.partial_result;
+            let errors = e.errors;
 
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 6);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(0, 6, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing import path"),
-                }
-            }
+            // Should have successfully parsed some declarations
+            assert_eq!(model.decls().len(), 2);
+            assert_eq!(errors.len(), 2);
 
-            #[test]
-            fn test_use_missing_as() {
-                let input = Span::new_extra("use foo\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 7);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(4, 3, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing 'as' in use declaration"),
-                }
-            }
-
-            #[test]
-            fn test_from_missing_use() {
-                let input = Span::new_extra("from foo\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 8);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Decl(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(5, 3, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing 'use' in from declaration"),
-                }
-            }
-
-            #[test]
-            fn test_parameter_missing_equals() {
-                let input = Span::new_extra("X: x\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 4);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Parameter(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(3, 1, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing equals in parameter"),
-                }
-            }
-
-            #[test]
-            fn test_parameter_missing_value() {
-                let input = Span::new_extra("X: x =\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 6);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Parameter(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(5, 1, 0));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing value in parameter"),
-                }
-            }
-
-            #[test]
-            fn test_test_missing_colon() {
-                let input = Span::new_extra("test x > 0\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        assert_eq!(errors[0].error_offset, 5);
-                        match errors[0].reason {
-                            ParserErrorReason::Incomplete {
-                                kind: IncompleteKind::Test(_),
-                                cause,
-                            } => {
-                                assert_eq!(cause, AstSpan::new(0, 4, 1));
-                            }
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for missing colon in test"),
-                }
-            }
-        }
-
-        mod note_error_tests {
-            use super::*;
-
-            #[test]
-            fn test_unterminated_note() {
-                let input = Span::new_extra("~~~\nThis is an unterminated note", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 1);
-                        match errors[0].reason {
-                            ParserErrorReason::TokenError(_) => {}
-                            _ => panic!("Unexpected reason {:?}", errors[0].reason),
-                        }
-                    }
-                    _ => panic!("Expected error for unterminated note"),
-                }
-            }
-        }
-
-        mod recovery_error_tests {
-            use super::*;
-
-            #[test]
-            fn test_multiple_declaration_errors() {
-                let input = Span::new_extra("import\nuse foo\nfrom bar\nX: x\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.decls().len(), 0);
-                        assert_eq!(errors.len(), 4);
-
-                        // All errors should be declaration-related
-                        for error in &errors {
-                            match error.reason {
-                                ParserErrorReason::Incomplete {
-                                    kind: IncompleteKind::Decl(_) | IncompleteKind::Parameter(_),
-                                    ..
-                                } => {}
-                                _ => panic!("Expected declaration error, got {:?}", error.reason),
-                            }
-                        }
-                    }
-                    _ => panic!("Expected error for multiple declaration errors"),
-                }
-            }
-
-            #[test]
-            fn test_section_with_multiple_errors() {
-                let input =
-                    Span::new_extra("section foo\nimport\nuse bar\nX: x\n", Config::default());
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        assert_eq!(model.sections().len(), 1);
-                        assert_eq!(model.sections()[0].decls().len(), 0);
-                        assert_eq!(errors.len(), 3);
-
-                        // Should have three declaration errors
-                        let mut decl_errors = 0;
-                        let mut section_errors = 0;
-
-                        for error in &errors {
-                            match error.reason {
-                                ParserErrorReason::Incomplete {
-                                    kind: IncompleteKind::Decl(_) | IncompleteKind::Parameter(_),
-                                    ..
-                                } => decl_errors += 1,
-                                ParserErrorReason::Incomplete {
-                                    kind: IncompleteKind::Section(_),
-                                    ..
-                                } => section_errors += 1,
-                                _ => panic!("Unexpected error type {:?}", error.reason),
-                            }
-                        }
-
-                        assert_eq!(decl_errors, 3);
-                        assert_eq!(section_errors, 0);
-                    }
-                    _ => panic!("Expected error for section with multiple errors"),
-                }
-            }
-
-            #[test]
-            fn test_mixed_valid_and_invalid_declarations() {
-                let input = Span::new_extra(
-                    "import valid\nimport\nuse foo as bar\nuse invalid\n",
-                    Config::default(),
-                );
-                let result = parse_complete(input);
-                match result {
-                    Err(nom::Err::Failure(e)) => {
-                        let model = e.partial_result;
-                        let errors = e.errors;
-
-                        // Should have successfully parsed some declarations
-                        assert_eq!(model.decls().len(), 2);
-                        assert_eq!(errors.len(), 2);
-
-                        // Check that the valid declarations were parsed
-                        match &model.decls()[0].node_value() {
-                            Decl::Import(import_node) => {
-                                assert_eq!(import_node.path().node_value(), "valid")
-                            }
-                            _ => panic!("Expected import declaration"),
-                        }
-                        match &model.decls()[1].node_value() {
-                            Decl::UseModel(use_node) => {
-                                assert_eq!(use_node.alias().unwrap().node_value().as_str(), "bar");
-                            }
-                            _ => panic!("Expected use model declaration"),
-                        }
-                    }
-                    _ => panic!("Expected error for mixed valid and invalid declarations"),
-                }
-            }
+            // Check that the valid declarations were parsed
+            let Decl::Import(import_node) = &model.decls()[0].node_value() else {
+                panic!("Expected import declaration");
+            };
+            assert_eq!(import_node.path().node_value(), "valid");
+            let Decl::UseModel(use_node) = &model.decls()[1].node_value() else {
+                panic!("Expected use model declaration");
+            };
+            let alias = use_node.model_info().get_alias();
+            assert_eq!(alias.as_str(), "bar");
         }
     }
 }

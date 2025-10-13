@@ -1,12 +1,9 @@
 //! Debug information and trace levels for the AST
-//!
-//! This module contains structures for handling debug information and trace levels
-//! that can be attached to AST nodes for debugging and tracing purposes.
 
 use crate::node::Node;
 
 /// Represents different levels of tracing for debug information
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TraceLevel {
     /// Basic tracing level for general debugging
     Trace,
@@ -19,12 +16,14 @@ pub type TraceLevelNode = Node<TraceLevel>;
 
 impl TraceLevel {
     /// Creates a new trace-level debug marker
-    pub fn trace() -> Self {
+    #[must_use]
+    pub const fn trace() -> Self {
         Self::Trace
     }
 
     /// Creates a new debug-level debug marker
-    pub fn debug() -> Self {
+    #[must_use]
+    pub const fn debug() -> Self {
         Self::Debug
     }
 }
