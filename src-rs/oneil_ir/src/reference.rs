@@ -9,8 +9,8 @@ pub struct Identifier(String);
 impl Identifier {
     /// Creates a new identifier from a string or string-like type.
     #[must_use]
-    pub fn new(identifier: impl AsRef<str>) -> Self {
-        Self(identifier.as_ref().to_string())
+    pub const fn new(identifier: String) -> Self {
+        Self(identifier)
     }
 
     /// Returns the string value of this identifier.
@@ -19,9 +19,6 @@ impl Identifier {
         &self.0
     }
 }
-
-/// An identifier with associated source location information.
-pub type IdentifierWithSpan = Identifier;
 
 /// A path to an Oneil model file.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

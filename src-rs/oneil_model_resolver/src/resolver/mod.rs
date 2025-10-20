@@ -11,8 +11,6 @@
 //! - Test resolution
 //!
 
-use std::ops::Deref;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -179,7 +177,7 @@ fn split_model_ast(
     let mut tests = vec![];
 
     for decl in model_ast.decls() {
-        match decl.deref() {
+        match &**decl {
             ast::Decl::Import(import) => imports.push(import),
             ast::Decl::UseModel(use_model) => use_models.push(use_model),
             ast::Decl::Parameter(parameter) => parameters.push(parameter),
@@ -189,7 +187,7 @@ fn split_model_ast(
 
     for section in model_ast.sections() {
         for decl in section.decls() {
-            match decl.deref() {
+            match &**decl {
                 ast::Decl::Import(import) => imports.push(import),
                 ast::Decl::UseModel(use_model) => use_models.push(use_model),
                 ast::Decl::Parameter(parameter) => parameters.push(parameter),

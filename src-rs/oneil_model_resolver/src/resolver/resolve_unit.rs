@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -19,11 +17,11 @@ fn resolve_unit_recursive(
     is_inverse: bool,
     mut units: Vec<ir::Unit>,
 ) -> Vec<ir::Unit> {
-    match unit.deref() {
+    match &**unit {
         ast::UnitExpr::BinaryOp { op, left, right } => {
             let units = resolve_unit_recursive(left, is_inverse, units);
 
-            match op.deref() {
+            match &**op {
                 ast::UnitOp::Multiply => resolve_unit_recursive(right, is_inverse, units),
                 ast::UnitOp::Divide => resolve_unit_recursive(right, !is_inverse, units),
             }

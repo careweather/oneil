@@ -1,9 +1,10 @@
 //! Parameter resolution model for the Oneil model loader.
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::HashMap, ops::Deref};
 
 use oneil_ast as ast;
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
     BuiltinRef,
@@ -19,21 +20,22 @@ use crate::{
     },
 };
 
-pub type ParameterErrorMap = HashMap<ir::Identifier, Vec<ParameterResolutionError>>;
+pub type ParameterMap = HashMap<ir::ParameterName, ir::Parameter>;
+pub type ParameterErrorMap = HashMap<ir::ParameterName, Vec<ParameterResolutionError>>;
 
 /// Resolves a collection of AST parameters into resolved model parameters.
 pub fn resolve_parameters(
     parameters: Vec<&ast::ParameterNode>,
     builtin_ref: &impl BuiltinRef,
     context: &ReferenceContext<'_, '_>,
-) -> (ir::ParameterCollection, ParameterErrorMap) {
+) -> (ParameterMap, ParameterErrorMap) {
     let mut parameter_builder = ParameterBuilder::new();
 
     let mut parameter_map = HashMap::new();
 
     for parameter in parameters {
-        let ident = ir::Identifier::new(parameter.ident().as_str());
-        let ident_span = get_span_from_ast_span(parameter.ident().node_span());
+        let ident = ir::ParameterName::new(parameter.ident().as_str().to_string());
+        let ident_span = parameter.ident().span();
 
         let maybe_original_parameter = parameter_map.get(&ident);
         if let Some((original_ident_span, _)) = maybe_original_parameter {
@@ -53,7 +55,7 @@ pub fn resolve_parameters(
     // split the parameter map into two maps, one for the spans and one for the
     // AST nodes
     let (parameter_span_map, parameter_ast_map): (
-        HashMap<_, IrSpan>,
+        HashMap<_, Span>,
         HashMap<_, &ast::ParameterNode>,
     ) = parameter_map
         .into_iter()
@@ -64,14 +66,12 @@ pub fn resolve_parameters(
     // that is defined within the current model
     let dependencies = get_all_parameter_internal_dependencies(&parameter_ast_map);
 
-    for (parameter_identifier, parameter_span) in parameter_span_map {
+    for (parameter_identifier, parameter_identifier_span) in parameter_span_map {
         let mut parameter_stack = Stack::new();
 
-        let parameter_identifier_with_span =
-            ir::WithSpan::new(parameter_identifier.clone(), parameter_span);
-
         parameter_builder = resolve_parameter(
-            parameter_identifier_with_span,
+            parameter_identifier,
+            parameter_identifier_span,
             &parameter_ast_map,
             &dependencies,
             &mut parameter_stack,
@@ -86,32 +86,30 @@ pub fn resolve_parameters(
 
 /// Analyzes all parameters to extract their internal dependencies.
 fn get_all_parameter_internal_dependencies<'a>(
-    parameter_map: &'a HashMap<ir::Identifier, &'a ast::ParameterNode>,
-) -> HashMap<&'a ir::Identifier, HashSet<ir::WithSpan<ir::Identifier>>> {
-    let dependencies = HashMap::new();
+    parameter_map: &'a HashMap<ir::ParameterName, &'a ast::ParameterNode>,
+) -> HashMap<&'a ir::ParameterName, HashMap<ir::ParameterName, Span>> {
+    let mut dependencies = HashMap::new();
 
-    parameter_map
-        .keys()
-        .fold(dependencies, |mut dependencies, identifier| {
-            let parameter = parameter_map
-                .get(identifier)
-                .expect("parameter should exist");
+    for identifier in parameter_map.keys() {
+        let parameter = parameter_map
+            .get(identifier)
+            .expect("parameter should exist");
 
-            let param_dependencies = get_parameter_internal_dependencies(parameter);
+        let param_dependencies = get_parameter_internal_dependencies(parameter);
 
-            dependencies.insert(identifier, param_dependencies);
+        dependencies.insert(identifier, param_dependencies);
+    }
 
-            dependencies
-        })
+    dependencies
 }
 
 /// Extracts internal dependencies from a single parameter.
 fn get_parameter_internal_dependencies(
     parameter: &ast::Parameter,
-) -> HashSet<ir::WithSpan<ir::Identifier>> {
-    let dependencies = HashSet::new();
+) -> HashMap<ir::ParameterName, Span> {
+    let dependencies = HashMap::new();
 
-    let limits = parameter.limits().map(ast::Node::node_value);
+    let limits = parameter.limits().map(ast::Node::deref);
     let dependencies = match limits {
         Some(ast::Limits::Continuous { min, max }) => {
             let dependencies = get_expr_internal_dependencies(min, dependencies);
@@ -125,7 +123,7 @@ fn get_parameter_internal_dependencies(
         None => dependencies,
     };
 
-    match &parameter.value() {
+    match parameter.value().deref() {
         ast::ParameterValue::Simple(expr, _) => get_expr_internal_dependencies(expr, dependencies),
         ast::ParameterValue::Piecewise(piecewise, _) => {
             piecewise.iter().fold(dependencies, |dependencies, part| {
@@ -139,8 +137,8 @@ fn get_parameter_internal_dependencies(
 /// Extracts internal dependencies from an expression.
 fn get_expr_internal_dependencies(
     expr: &ast::Expr,
-    mut dependencies: HashSet<ir::WithSpan<ir::Identifier>>,
-) -> HashSet<ir::WithSpan<ir::Identifier>> {
+    mut dependencies: HashMap<ir::ParameterName, Span>,
+) -> HashMap<ir::ParameterName, Span> {
     match expr {
         ast::Expr::BinaryOp { op: _, left, right } => {
             let dependencies = get_expr_internal_dependencies(left, dependencies);
@@ -157,11 +155,11 @@ fn get_expr_internal_dependencies(
             })
         }
 
-        ast::Expr::Variable(variable) => match variable {
-            ast::Variable::Identifier(identifier) => {
-                let identifier_span = get_span_from_ast_span(identifier.node_span());
-                let identifier = ir::Identifier::new(identifier.as_str());
-                dependencies.insert(ir::WithSpan::new(identifier, identifier_span));
+        ast::Expr::Variable(variable) => match &**variable {
+            ast::Variable::Identifier(identifier_node) => {
+                let identifier = ir::ParameterName::new(identifier_node.as_str().to_string());
+                let identifier_span = identifier_node.span();
+                dependencies.insert(identifier, identifier_span);
                 dependencies
             }
 
@@ -195,18 +193,22 @@ fn get_expr_internal_dependencies(
 }
 
 /// Resolves a single parameter with dependency tracking.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "this requires multiple pieces of context to resolve"
+)]
 fn resolve_parameter(
-    parameter_identifier: ir::WithSpan<ir::Identifier>,
-    parameter_ast_map: &HashMap<ir::Identifier, &ast::ParameterNode>,
-    dependencies: &HashMap<&ir::Identifier, HashSet<ir::WithSpan<ir::Identifier>>>,
-    parameter_stack: &mut Stack<ir::Identifier>,
+    parameter_identifier: ir::ParameterName,
+    parameter_identifier_span: Span,
+    // context
+    parameter_ast_map: &HashMap<ir::ParameterName, &ast::ParameterNode>,
+    dependencies: &HashMap<&ir::ParameterName, HashMap<ir::ParameterName, Span>>,
+    parameter_stack: &mut Stack<ir::ParameterName>,
     builtin_ref: &impl BuiltinRef,
     context: &ReferenceContext<'_, '_>,
+    // builder
     mut parameter_builder: ParameterBuilder,
 ) -> ParameterBuilder {
-    let parameter_identifier_span = parameter_identifier.span();
-    let parameter_identifier = parameter_identifier.take_value();
-
     // check that the parameter exists
     if !parameter_ast_map.contains_key(&parameter_identifier) {
         // This is technically a resolution error. However, this error will
@@ -250,9 +252,10 @@ fn resolve_parameter(
     parameter_stack.push(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    for dependency in parameter_dependencies {
+    for (dependency_identifier, dependency_span) in parameter_dependencies {
         parameter_builder = resolve_parameter(
-            dependency.clone(),
+            dependency_identifier.clone(),
+            *dependency_span,
             parameter_ast_map,
             dependencies,
             parameter_stack,
@@ -289,17 +292,11 @@ fn resolve_parameter(
     match error::combine_errors(value, limits) {
         Ok((value, limits)) => {
             // build the parameter
-            let ident_span = get_span_from_ast_span(parameter.ident().node_span());
-            let ident_with_span = ir::WithSpan::new(ident, ident_span);
-
-            let parameter_dependencies = parameter_dependencies
-                .iter()
-                .map(|dependency| dependency.value().clone())
-                .collect();
+            let parameter_dependencies = parameter_dependencies.keys().cloned().collect();
 
             let parameter = ir::Parameter::new(
                 parameter_dependencies,
-                ident_with_span,
+                ident,
                 value,
                 limits,
                 is_performance,
@@ -376,7 +373,7 @@ fn resolve_limits(
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
 ) -> Result<ir::Limits, Vec<ParameterResolutionError>> {
-    match limits.map(ast::Node::node_value) {
+    match limits.map(ast::Node::deref) {
         Some(ast::Limits::Continuous { min, max }) => {
             let min = resolve_expr(min, builtin_ref, reference_context, parameter_context)
                 .map_err(error::convert_errors);
@@ -404,6 +401,8 @@ fn resolve_limits(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use crate::{
         error::VariableResolutionError,
         test::{
@@ -470,10 +469,10 @@ mod tests {
         assert_eq!(resolved_params.len(), 2);
 
         let param_a = resolved_params
-            .get(&ir::Identifier::new("a"))
+            .get(&ir::ParameterName::new("a".to_string()))
             .expect("param a should exist");
         let param_b = resolved_params
-            .get(&ir::Identifier::new("b"))
+            .get(&ir::ParameterName::new("b".to_string()))
             .expect("param b should exist");
 
         assert!(param_a.dependencies().is_empty());
@@ -510,14 +509,18 @@ mod tests {
         assert_eq!(resolved_params.len(), 2);
 
         let param_a = resolved_params
-            .get(&ir::Identifier::new("a"))
+            .get(&ir::ParameterName::new("a".to_string()))
             .expect("param a should exist");
         let param_b = resolved_params
-            .get(&ir::Identifier::new("b"))
+            .get(&ir::ParameterName::new("b".to_string()))
             .expect("param b should exist");
 
         assert!(param_a.dependencies().is_empty());
-        assert!(param_b.dependencies().contains(&ir::Identifier::new("a")));
+        assert!(
+            param_b
+                .dependencies()
+                .contains(&ir::ParameterName::new("a".to_string()))
+        );
     }
 
     #[test]
@@ -546,14 +549,14 @@ mod tests {
         // check the errors
         assert!(!errors.is_empty());
 
-        assert!(errors.contains_key(&ir::Identifier::new("a")));
-        assert!(errors.contains_key(&ir::Identifier::new("b")));
+        assert!(errors.contains_key(&ir::ParameterName::new("a".to_string())));
+        assert!(errors.contains_key(&ir::ParameterName::new("b".to_string())));
 
         let a_errors = errors
-            .get(&ir::Identifier::new("a"))
+            .get(&ir::ParameterName::new("a".to_string()))
             .expect("a errors should exist");
         let b_errors = errors
-            .get(&ir::Identifier::new("b"))
+            .get(&ir::ParameterName::new("b".to_string()))
             .expect("b errors should exist");
 
         // check that both parameters have errors, one is a circular dependency
@@ -574,22 +577,22 @@ mod tests {
             e,
             ParameterResolutionError::VariableResolution(
                 VariableResolutionError::ParameterHasError {
-                    identifier,
+                    parameter_name,
                     reference_span: _,
                 }
             )
-            if identifier == &ir::Identifier::new("b"),
+            if parameter_name.as_str() == "b",
         )));
 
         assert!(b_errors.iter().any(|e| matches!(
             e,
             ParameterResolutionError::VariableResolution(
                 VariableResolutionError::ParameterHasError {
-                    identifier,
+                    parameter_name,
                     reference_span: _,
                 }
             )
-            if identifier == &ir::Identifier::new("a"),
+            if parameter_name.as_str() == "a",
         )));
 
         // check the resolved parameters
@@ -606,10 +609,7 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(ir::WithSpan::take_value)
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert!(dependencies.is_empty());
@@ -625,14 +625,11 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(ir::WithSpan::take_value)
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 1);
-        assert!(dependencies.contains(&ir::Identifier::new("b")));
+        assert!(dependencies.contains(&ir::ParameterName::new("b".to_string())));
     }
 
     #[test]
@@ -646,15 +643,12 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(ir::WithSpan::take_value)
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
-        assert!(dependencies.contains(&ir::Identifier::new("min_val")));
-        assert!(dependencies.contains(&ir::Identifier::new("max_val")));
+        assert!(dependencies.contains(&ir::ParameterName::new("min_val".to_string())));
+        assert!(dependencies.contains(&ir::ParameterName::new("max_val".to_string())));
     }
 
     #[test]
@@ -663,8 +657,8 @@ mod tests {
         let expr = test_ast::literal_number_expr_node(42.0);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies
         assert!(result.is_empty());
@@ -677,12 +671,12 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies
         assert_eq!(result.len(), 1);
-        assert!(result.contains(&ir::Identifier::new("test_var")));
+        assert!(result.contains(&ir::ParameterName::new("test_var".to_string())));
     }
 
     #[test]
@@ -699,13 +693,13 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
-        assert!(result.contains(&ir::Identifier::new("a")));
-        assert!(result.contains(&ir::Identifier::new("b")));
+        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
     }
 
     #[test]
@@ -721,13 +715,13 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
-        assert!(result.contains(&ir::Identifier::new("arg1")));
-        assert!(result.contains(&ir::Identifier::new("arg2")));
+        assert!(result.contains(&ir::ParameterName::new("arg1".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("arg2".to_string())));
     }
 
     #[test]
@@ -737,8 +731,8 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies - accessors don't count as internal dependencies
         assert!(result.is_empty());
@@ -845,12 +839,10 @@ mod tests {
             .with_ident_and_label("a")
             .with_number_value(10.0)
             .build();
-        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
         let param_a2 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
             .with_number_value(20.0)
             .build();
-        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
         let parameters = vec![&param_a1, &param_a2];
 
         // create the context and builtin ref
@@ -865,28 +857,25 @@ mod tests {
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains_key(&ir::Identifier::new("a")));
 
         let a_errors = errors
-            .get(&ir::Identifier::new("a"))
+            .get(&ir::ParameterName::new("a".to_string()))
             .expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
         // check that the error is a duplicate parameter error
         let duplicate_error = &a_errors[0];
-        assert_eq!(
-            duplicate_error,
-            &ParameterResolutionError::DuplicateParameter {
-                identifier: ir::Identifier::new("a"),
-                original_span: param_a1_span,
-                duplicate_span: param_a2_span
-            }
-        );
+
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = duplicate_error
+        else {
+            panic!("duplicate error should be a duplicate parameter error");
+        };
+        assert_eq!(parameter_name.as_str(), "a");
 
         // check the resolved parameters - should have one parameter, the
         //     parameter that is present is left unspecified
         assert_eq!(resolved_params.len(), 1);
-        assert!(resolved_params.contains_key(&ir::Identifier::new("a")));
+        assert!(resolved_params.contains_key(&ir::ParameterName::new("a".to_string())));
     }
 
     #[test]
@@ -896,22 +885,18 @@ mod tests {
             .with_ident_and_label("foo")
             .with_number_value(10.0)
             .build();
-        let param_foo1_span = get_span_from_ast_span(param_foo1.ident().node_span());
         let param_bar1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("bar")
             .with_number_value(20.0)
             .build();
-        let param_bar1_span = get_span_from_ast_span(param_bar1.ident().node_span());
         let param_foo2 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("foo")
             .with_number_value(30.0)
             .build();
-        let param_foo2_span = get_span_from_ast_span(param_foo2.ident().node_span());
         let param_bar2 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("bar")
             .with_number_value(40.0)
             .build();
-        let param_bar2_span = get_span_from_ast_span(param_bar2.ident().node_span());
         let parameters = vec![&param_foo1, &param_bar1, &param_foo2, &param_bar2];
 
         // create the context and builtin ref
@@ -926,44 +911,38 @@ mod tests {
 
         // check the errors - should have two duplicate parameter errors
         assert_eq!(errors.len(), 2);
-        assert!(errors.contains_key(&ir::Identifier::new("foo")));
-        assert!(errors.contains_key(&ir::Identifier::new("bar")));
 
         let foo_errors = errors
-            .get(&ir::Identifier::new("foo"))
+            .get(&ir::ParameterName::new("foo".to_string()))
             .expect("foo errors should exist");
         let bar_errors = errors
-            .get(&ir::Identifier::new("bar"))
+            .get(&ir::ParameterName::new("bar".to_string()))
             .expect("bar errors should exist");
         assert_eq!(foo_errors.len(), 1);
         assert_eq!(bar_errors.len(), 1);
 
         // check that both errors are duplicate parameter errors
         let foo_duplicate_error = &foo_errors[0];
-        assert_eq!(
-            foo_duplicate_error,
-            &ParameterResolutionError::DuplicateParameter {
-                identifier: ir::Identifier::new("foo"),
-                original_span: param_foo1_span,
-                duplicate_span: param_foo2_span
-            }
-        );
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } =
+            foo_duplicate_error
+        else {
+            panic!("foo duplicate error should be a duplicate parameter error");
+        };
+        assert_eq!(parameter_name.as_str(), "foo");
 
         let bar_duplicate_error = &bar_errors[0];
-        assert_eq!(
-            bar_duplicate_error,
-            &ParameterResolutionError::DuplicateParameter {
-                identifier: ir::Identifier::new("bar"),
-                original_span: param_bar1_span,
-                duplicate_span: param_bar2_span
-            }
-        );
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } =
+            bar_duplicate_error
+        else {
+            panic!("bar duplicate error should be a duplicate parameter error");
+        };
+        assert_eq!(parameter_name.as_str(), "bar");
 
         // check the resolved parameters - should have two parameters, the
         //     parameters that are present are left unspecified
         assert_eq!(resolved_params.len(), 2);
-        assert!(resolved_params.contains_key(&ir::Identifier::new("foo")));
-        assert!(resolved_params.contains_key(&ir::Identifier::new("bar")));
+        assert!(resolved_params.contains_key(&ir::ParameterName::new("foo".to_string())));
+        assert!(resolved_params.contains_key(&ir::ParameterName::new("bar".to_string())));
     }
 
     #[test]
@@ -973,7 +952,6 @@ mod tests {
             .with_ident_and_label("a")
             .with_number_value(10.0)
             .build();
-        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
         let param_b = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("b")
             .with_number_value(20.0)
@@ -982,7 +960,6 @@ mod tests {
             .with_ident_and_label("a")
             .with_number_value(30.0)
             .build();
-        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
         let param_c = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("c")
             .with_number_value(40.0)
@@ -1001,29 +978,25 @@ mod tests {
 
         // check the errors - should have one duplicate parameter error
         assert_eq!(errors.len(), 1);
-        assert!(errors.contains_key(&ir::Identifier::new("a")));
 
         let a_errors = errors
-            .get(&ir::Identifier::new("a"))
+            .get(&ir::ParameterName::new("a".to_string()))
             .expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
         // check that the error is a duplicate parameter error
         let duplicate_error = &a_errors[0];
-        assert_eq!(
-            duplicate_error,
-            &ParameterResolutionError::DuplicateParameter {
-                identifier: ir::Identifier::new("a"),
-                original_span: param_a1_span,
-                duplicate_span: param_a2_span
-            }
-        );
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = duplicate_error
+        else {
+            panic!("duplicate error should be a duplicate parameter error");
+        };
+        assert_eq!(parameter_name.as_str(), "a");
 
         // check the resolved parameters
         assert_eq!(resolved_params.len(), 3);
-        assert!(resolved_params.contains_key(&ir::Identifier::new("a")));
-        assert!(resolved_params.contains_key(&ir::Identifier::new("b")));
-        assert!(resolved_params.contains_key(&ir::Identifier::new("c")));
+        assert!(resolved_params.contains_key(&ir::ParameterName::new("a".to_string())));
+        assert!(resolved_params.contains_key(&ir::ParameterName::new("b".to_string())));
+        assert!(resolved_params.contains_key(&ir::ParameterName::new("c".to_string())));
     }
 
     #[test]
@@ -1033,7 +1006,6 @@ mod tests {
             .with_ident_and_label("a")
             .with_number_value(10.0)
             .build();
-        let param_a1_span = get_span_from_ast_span(param_a1.ident().node_span());
         let param_b = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("b")
             .with_dependent_parameter_values(["a"])
@@ -1042,7 +1014,6 @@ mod tests {
             .with_ident_and_label("a")
             .with_number_value(20.0)
             .build();
-        let param_a2_span = get_span_from_ast_span(param_a2.ident().node_span());
         let param_c = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("c")
             .with_dependent_parameter_values(["b"])
@@ -1063,53 +1034,52 @@ mod tests {
         assert_eq!(errors.len(), 3);
 
         // check the a error for "duplicate parameter"
-        assert!(errors.contains_key(&ir::Identifier::new("a")));
         let a_errors = errors
-            .get(&ir::Identifier::new("a"))
+            .get(&ir::ParameterName::new("a".to_string()))
             .expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
         let duplicate_error = &a_errors[0];
-        assert_eq!(
-            duplicate_error,
-            &ParameterResolutionError::DuplicateParameter {
-                identifier: ir::Identifier::new("a"),
-                original_span: param_a1_span,
-                duplicate_span: param_a2_span
-            }
-        );
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = duplicate_error
+        else {
+            panic!("duplicate error should be a duplicate parameter error");
+        };
+        assert_eq!(parameter_name.as_str(), "a");
 
         // check the b error for "parameter has error"
-        assert!(errors.contains_key(&ir::Identifier::new("b")));
+        assert!(errors.contains_key(&ir::ParameterName::new("b".to_string())));
         let b_errors = errors
-            .get(&ir::Identifier::new("b"))
+            .get(&ir::ParameterName::new("b".to_string()))
             .expect("b errors should exist");
         assert_eq!(b_errors.len(), 1);
 
         let parameter_has_error = &b_errors[0];
-        assert!(matches!(
-            parameter_has_error,
-            ParameterResolutionError::VariableResolution(VariableResolutionError::ParameterHasError { identifier, .. })
-            if identifier == &ir::Identifier::new("a"),
-        ));
+        let ParameterResolutionError::VariableResolution(
+            VariableResolutionError::ParameterHasError { parameter_name, .. },
+        ) = parameter_has_error
+        else {
+            panic!("parameter has error should be a parameter has error");
+        };
+        assert_eq!(parameter_name.as_str(), "a");
 
         // check the c error for "parameter has error"
-        assert!(errors.contains_key(&ir::Identifier::new("c")));
         let c_errors = errors
-            .get(&ir::Identifier::new("c"))
+            .get(&ir::ParameterName::new("c".to_string()))
             .expect("c errors should exist");
         assert_eq!(c_errors.len(), 1);
 
         let parameter_has_error = &c_errors[0];
-        assert!(matches!(
-            parameter_has_error,
-            ParameterResolutionError::VariableResolution(VariableResolutionError::ParameterHasError { identifier, .. })
-            if identifier == &ir::Identifier::new("b"),
-        ));
+        let ParameterResolutionError::VariableResolution(
+            VariableResolutionError::ParameterHasError { parameter_name, .. },
+        ) = parameter_has_error
+        else {
+            panic!("parameter has error should be a parameter has error");
+        };
+        assert_eq!(parameter_name.as_str(), "b");
 
         // check the resolved parameters - only the first "a" parameter is resolved
         assert_eq!(resolved_params.len(), 1);
-        assert!(resolved_params.contains_key(&ir::Identifier::new("a")));
+        assert!(resolved_params.contains_key(&ir::ParameterName::new("a".to_string())));
     }
 
     #[test]
@@ -1125,13 +1095,13 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies
         assert_eq!(result.len(), 2);
-        assert!(result.contains(&ir::Identifier::new("a")));
-        assert!(result.contains(&ir::Identifier::new("b")));
+        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
     }
 
     #[test]
@@ -1152,14 +1122,14 @@ mod tests {
             test_ast::comparison_op_expr_node(op1_node, left_expr, middle_expr, rest_chained);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies
         assert_eq!(result.len(), 3);
-        assert!(result.contains(&ir::Identifier::new("a")));
-        assert!(result.contains(&ir::Identifier::new("b")));
-        assert!(result.contains(&ir::Identifier::new("c")));
+        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("c".to_string())));
     }
 
     #[test]
@@ -1174,12 +1144,12 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies - should only contain the variable
         assert_eq!(result.len(), 1);
-        assert!(result.contains(&ir::Identifier::new("x")));
+        assert!(result.contains(&ir::ParameterName::new("x".to_string())));
     }
 
     #[test]
@@ -1209,15 +1179,15 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(comp_op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(expr_node, HashSet::new());
-        let result: HashSet<_> = result.into_iter().map(ir::WithSpan::take_value).collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
+        let result: HashSet<_> = result.into_keys().collect();
 
         // check the dependencies
         assert_eq!(result.len(), 4);
-        assert!(result.contains(&ir::Identifier::new("a")));
-        assert!(result.contains(&ir::Identifier::new("b")));
-        assert!(result.contains(&ir::Identifier::new("c")));
-        assert!(result.contains(&ir::Identifier::new("d")));
+        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("c".to_string())));
+        assert!(result.contains(&ir::ParameterName::new("d".to_string())));
     }
 
     #[test]
@@ -1244,14 +1214,11 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies
-            .into_iter()
-            .map(ir::WithSpan::take_value)
-            .collect();
+        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
-        assert!(dependencies.contains(&ir::Identifier::new("x")));
-        assert!(dependencies.contains(&ir::Identifier::new("threshold")));
+        assert!(dependencies.contains(&ir::ParameterName::new("x".to_string())));
+        assert!(dependencies.contains(&ir::ParameterName::new("threshold".to_string())));
     }
 }

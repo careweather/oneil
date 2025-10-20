@@ -204,6 +204,9 @@ dependencies = [
 [[package]]
 name = "oneil_ir"
 version = "0.15.0"
+dependencies = [
+ "oneil_shared",
+]
 
 [[package]]
 name = "oneil_model_resolver"
@@ -212,7 +215,6 @@ dependencies = [
  "oneil_ast",
  "oneil_ir",
  "oneil_shared",
- "rand",
 ]
 
 [[package]]
@@ -228,6 +230,9 @@ dependencies = [
 [[package]]
 name = "oneil_shared"
 version = "0.15.0"
+dependencies = [
+ "rand",
+]
 
 [[package]]
 name = "ppv-lite86"

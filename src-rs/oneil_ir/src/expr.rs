@@ -1,6 +1,9 @@
 //! Expression system for mathematical and logical operations in Oneil.
 
-use crate::reference::{Identifier, ModelPath};
+use crate::{
+    ParameterName,
+    reference::{Identifier, ModelPath},
+};
 
 /// Abstract syntax tree for mathematical and logical expressions.
 #[derive(Debug, Clone, PartialEq)]
@@ -98,14 +101,17 @@ impl Expr {
 
     /// Creates a parameter variable reference.
     #[must_use]
-    pub const fn parameter_variable(ident: Identifier) -> Self {
-        Self::Variable(Variable::Parameter(ident))
+    pub const fn parameter_variable(parameter_name: ParameterName) -> Self {
+        Self::Variable(Variable::Parameter(parameter_name))
     }
 
     /// Creates an external variable reference.
     #[must_use]
-    pub const fn external_variable(model: ModelPath, ident: Identifier) -> Self {
-        Self::Variable(Variable::External { model, ident })
+    pub const fn external_variable(model: ModelPath, parameter_name: ParameterName) -> Self {
+        Self::Variable(Variable::External {
+            model,
+            parameter_name,
+        })
     }
 
     /// Creates a literal expression.
@@ -237,13 +243,13 @@ pub enum Variable {
     /// Built-in variable
     Builtin(Identifier),
     /// Parameter defined in the current model.
-    Parameter(Identifier),
+    Parameter(ParameterName),
     /// Parameter defined in another model.
     External {
         /// The model where the parameter is defined.
         model: ModelPath,
         /// The identifier of the parameter in that model.
-        ident: Identifier,
+        parameter_name: ParameterName,
     },
 }
 
@@ -256,14 +262,17 @@ impl Variable {
 
     /// Creates a parameter variable reference.
     #[must_use]
-    pub const fn parameter(ident: Identifier) -> Self {
-        Self::Parameter(ident)
+    pub const fn parameter(parameter_name: ParameterName) -> Self {
+        Self::Parameter(parameter_name)
     }
 
     /// Creates an external variable reference.
     #[must_use]
-    pub const fn external(model: ModelPath, ident: Identifier) -> Self {
-        Self::External { model, ident }
+    pub const fn external(model: ModelPath, parameter_name: ParameterName) -> Self {
+        Self::External {
+            model,
+            parameter_name,
+        }
     }
 }
 

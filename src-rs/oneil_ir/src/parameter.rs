@@ -1,46 +1,32 @@
 //! Parameter definitions and management for Oneil model IR.
 
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-};
+use std::collections::HashSet;
 
-use crate::{
-    debug_info::TraceLevel,
-    expr::Expr,
-    reference::{Identifier, IdentifierWithSpan},
-    unit::CompositeUnit,
-};
+use crate::{debug_info::TraceLevel, expr::Expr, unit::CompositeUnit};
 
-/// A collection of parameters that can be managed together.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParameterCollection {
-    parameters: HashMap<Identifier, Parameter>,
-}
+/// A name for a parameter.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ParameterName(String);
 
-impl ParameterCollection {
-    /// Creates a new parameter collection from a mapping of identifiers to parameters.
+impl ParameterName {
+    /// Creates a new parameter name with the given name.
     #[must_use]
-    pub const fn new(parameters: HashMap<Identifier, Parameter>) -> Self {
-        Self { parameters }
+    pub const fn new(name: String) -> Self {
+        Self(name)
     }
 
-    // TODO: add methods for getting performance parameters, evaluation order, etc.
-}
-
-impl Deref for ParameterCollection {
-    type Target = HashMap<Identifier, Parameter>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.parameters
+    /// Returns the parameter name as a string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
 /// Represents a single parameter in an Oneil model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    dependencies: HashSet<Identifier>,
-    ident: IdentifierWithSpan,
+    dependencies: HashSet<ParameterName>,
+    name: ParameterName,
     value: ParameterValue,
     limits: Limits,
     is_performance: bool,
@@ -51,8 +37,8 @@ impl Parameter {
     /// Creates a new parameter with the specified properties.
     #[must_use]
     pub const fn new(
-        dependencies: HashSet<Identifier>,
-        ident: IdentifierWithSpan,
+        dependencies: HashSet<ParameterName>,
+        name: ParameterName,
         value: ParameterValue,
         limits: Limits,
         is_performance: bool,
@@ -60,7 +46,7 @@ impl Parameter {
     ) -> Self {
         Self {
             dependencies,
-            ident,
+            name,
             value,
             limits,
             is_performance,
@@ -70,14 +56,14 @@ impl Parameter {
 
     /// Returns a reference to the set of parameter dependencies.
     #[must_use]
-    pub const fn dependencies(&self) -> &HashSet<Identifier> {
+    pub const fn dependencies(&self) -> &HashSet<ParameterName> {
         &self.dependencies
     }
 
-    /// Returns the identifier of this parameter.
+    /// Returns the name of this parameter.
     #[must_use]
-    pub const fn identifier(&self) -> &IdentifierWithSpan {
-        &self.ident
+    pub const fn name(&self) -> &ParameterName {
+        &self.name
     }
 
     /// Returns the value of this parameter.

@@ -1,7 +1,5 @@
 //! Expression resolution for the Oneil model loader
 
-use std::ops::Deref;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -19,7 +17,7 @@ pub fn resolve_expr(
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
 ) -> Result<ir::Expr, Vec<VariableResolutionError>> {
-    match value.deref() {
+    match &**value {
         ast::Expr::ComparisonOp {
             op,
             left,
@@ -66,10 +64,6 @@ pub fn resolve_expr(
 }
 
 /// Resolves a comparison expression with optional chained comparisons.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the first five arguments are parts of the same piece of data"
-)]
 fn resolve_comparison_expression(
     op: &ast::ComparisonOpNode,
     left: &ast::ExprNode,
@@ -183,7 +177,7 @@ fn resolve_parenthesized_expression(
 
 /// Converts an AST comparison operation to a model comparison operation.
 fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::ComparisonOp {
-    match op.deref() {
+    match &**op {
         ast::ComparisonOp::LessThan => ir::ComparisonOp::LessThan,
         ast::ComparisonOp::LessThanEq => ir::ComparisonOp::LessThanEq,
         ast::ComparisonOp::GreaterThan => ir::ComparisonOp::GreaterThan,
@@ -195,7 +189,7 @@ fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::ComparisonOp {
 
 /// Converts an AST binary operation to a model binary operation.
 fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::BinaryOp {
-    match op.deref() {
+    match &**op {
         ast::BinaryOp::Add => ir::BinaryOp::Add,
         ast::BinaryOp::Sub => ir::BinaryOp::Sub,
         ast::BinaryOp::TrueSub => ir::BinaryOp::TrueSub,
@@ -212,7 +206,7 @@ fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::BinaryOp {
 
 /// Converts an AST unary operation to a model unary operation.
 fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::UnaryOp {
-    match op.deref() {
+    match &**op {
         ast::UnaryOp::Neg => ir::UnaryOp::Neg,
         ast::UnaryOp::Not => ir::UnaryOp::Not,
     }
@@ -223,7 +217,7 @@ fn resolve_function_name(
     name: &ast::IdentifierNode,
     builtin_ref: &impl BuiltinRef,
 ) -> ir::FunctionName {
-    let name = ir::Identifier::new(name.as_str());
+    let name = ir::Identifier::new(name.as_str().to_string());
 
     if builtin_ref.has_builtin_function(&name) {
         ir::FunctionName::builtin(name)
@@ -234,7 +228,7 @@ fn resolve_function_name(
 
 /// Converts an AST literal to a model literal.
 fn resolve_literal(literal: &ast::LiteralNode) -> ir::Literal {
-    match literal.deref() {
+    match &**literal {
         ast::Literal::Number(number) => ir::Literal::number(*number),
         ast::Literal::String(string) => ir::Literal::string(string.clone()),
         ast::Literal::Boolean(boolean) => ir::Literal::boolean(*boolean),
@@ -460,7 +454,10 @@ mod tests {
             panic!("Expected function call, got {result:?}");
         };
 
-        assert_eq!(name, ir::FunctionName::builtin(ir::Identifier::new("foo")));
+        assert_eq!(
+            name,
+            ir::FunctionName::builtin(ir::Identifier::new("foo".to_string()))
+        );
 
         assert_eq!(args.len(), 1);
 
@@ -501,7 +498,7 @@ mod tests {
 
         assert_eq!(
             name,
-            ir::FunctionName::imported(ir::Identifier::new("custom_function"))
+            ir::FunctionName::imported(ir::Identifier::new("custom_function".to_string()))
         );
 
         assert_eq!(args.len(), 1);
@@ -540,7 +537,10 @@ mod tests {
             panic!("Expected variable expression, got {result:?}");
         };
 
-        assert_eq!(variable, ir::Variable::Builtin(ir::Identifier::new("x")));
+        assert_eq!(
+            variable,
+            ir::Variable::Builtin(ir::Identifier::new("x".to_string()))
+        );
     }
 
     #[test]
@@ -556,7 +556,7 @@ mod tests {
         let reference_context = reference_context_builder.build();
 
         let parameter = test_ir::ParameterBuilder::new()
-            .with_ident_str("param")
+            .with_name_str("param")
             .with_simple_number_value(42.0)
             .build();
 
@@ -576,10 +576,11 @@ mod tests {
             panic!("Expected variable expression, got {result:?}");
         };
 
-        assert_eq!(
-            variable,
-            ir::Variable::Parameter(ir::Identifier::new("param"))
-        );
+        let ir::Variable::Parameter(parameter_name) = variable else {
+            panic!("Expected parameter variable, got {variable:?}");
+        };
+
+        assert_eq!(parameter_name.as_str(), "param");
     }
 
     #[test]
@@ -610,14 +611,14 @@ mod tests {
         let error = &errors[0];
         let VariableResolutionError::UndefinedParameter {
             model_path: None,
-            parameter,
+            parameter_name,
             reference_span: _,
         } = error
         else {
             panic!("Expected undefined parameter error, got {error:?}");
         };
 
-        assert_eq!(parameter, &ir::Identifier::new("undefined"));
+        assert_eq!(parameter_name.as_str(), "undefined");
     }
 
     #[test]
@@ -685,7 +686,10 @@ mod tests {
             panic!("Expected function call on right side, got {right:?}");
         };
 
-        assert_eq!(name, ir::FunctionName::imported(ir::Identifier::new("foo")));
+        assert_eq!(
+            name,
+            ir::FunctionName::imported(ir::Identifier::new("foo".to_string()))
+        );
 
         assert_eq!(args.len(), 1);
 
@@ -791,7 +795,8 @@ mod tests {
             let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
-            let expected_func_builtin = ir::FunctionName::builtin(ir::Identifier::new(func_name));
+            let expected_func_builtin =
+                ir::FunctionName::builtin(ir::Identifier::new(func_name.to_string()));
             assert_eq!(result, expected_func_builtin);
         }
     }
@@ -877,19 +882,19 @@ mod tests {
             .filter_map(|e| {
                 if let VariableResolutionError::UndefinedParameter {
                     model_path: None,
-                    parameter,
+                    parameter_name,
                     reference_span: _,
                 } = e
                 {
-                    Some(parameter.clone())
+                    Some(parameter_name.clone())
                 } else {
                     None
                 }
             })
             .collect();
 
-        assert!(error_identifiers.contains(&ir::Identifier::new("undefined1")));
-        assert!(error_identifiers.contains(&ir::Identifier::new("undefined2")));
+        assert!(error_identifiers.contains(&ir::ParameterName::new("undefined1".to_string())));
+        assert!(error_identifiers.contains(&ir::ParameterName::new("undefined2".to_string())));
     }
 
     #[test]
@@ -1067,7 +1072,10 @@ mod tests {
         let ir::Expr::Variable(variable) = *left else {
             panic!("Expected variable expression, got {left:?}");
         };
-        assert_eq!(variable, ir::Variable::Builtin(ir::Identifier::new("x")));
+        assert_eq!(
+            variable,
+            ir::Variable::Builtin(ir::Identifier::new("x".to_string()))
+        );
 
         let ir::Expr::Literal { value } = *right else {
             panic!("Expected literal expression, got {right:?}");
@@ -1128,7 +1136,10 @@ mod tests {
         let ir::Expr::Variable(variable) = *right else {
             panic!("Expected variable expression, got {right:?}");
         };
-        assert_eq!(variable, ir::Variable::Builtin(ir::Identifier::new("x")));
+        assert_eq!(
+            variable,
+            ir::Variable::Builtin(ir::Identifier::new("x".to_string()))
+        );
 
         assert_eq!(rest_chained.len(), 1);
         let (chained_op, chained_expr) = rest_chained.remove(0);
@@ -1171,14 +1182,14 @@ mod tests {
         let error = &errors[0];
         let VariableResolutionError::UndefinedParameter {
             model_path: None,
-            parameter,
+            parameter_name,
             reference_span: _,
         } = error
         else {
             panic!("Expected undefined parameter error, got {error:?}");
         };
 
-        assert_eq!(parameter, &ir::Identifier::new("undefined_left"));
+        assert_eq!(parameter_name.as_str(), "undefined_left");
     }
 
     #[test]
@@ -1211,14 +1222,14 @@ mod tests {
         let error = &errors[0];
         let VariableResolutionError::UndefinedParameter {
             model_path: None,
-            parameter,
+            parameter_name,
             reference_span: _,
         } = error
         else {
             panic!("Expected undefined parameter error, got {error:?}");
         };
 
-        assert_eq!(parameter, &ir::Identifier::new("undefined_right"));
+        assert_eq!(parameter_name.as_str(), "undefined_right");
     }
 
     #[test]
@@ -1255,14 +1266,14 @@ mod tests {
         let error = &errors[0];
         let VariableResolutionError::UndefinedParameter {
             model_path: None,
-            parameter,
+            parameter_name,
             reference_span: _,
         } = error
         else {
             panic!("Expected undefined parameter error, got {error:?}");
         };
 
-        assert_eq!(parameter, &ir::Identifier::new("undefined_chained"));
+        assert_eq!(parameter_name.as_str(), "undefined_chained");
     }
 
     #[test]
@@ -1302,19 +1313,21 @@ mod tests {
             .filter_map(|e| {
                 if let VariableResolutionError::UndefinedParameter {
                     model_path: None,
-                    parameter,
+                    parameter_name,
                     reference_span: _,
                 } = e
                 {
-                    Some(parameter.clone())
+                    Some(parameter_name.clone())
                 } else {
                     None
                 }
             })
             .collect();
 
-        assert!(error_identifiers.contains(&ir::Identifier::new("undefined_left")));
-        assert!(error_identifiers.contains(&ir::Identifier::new("undefined_right")));
-        assert!(error_identifiers.contains(&ir::Identifier::new("undefined_chained")));
+        assert!(error_identifiers.contains(&ir::ParameterName::new("undefined_left".to_string())));
+        assert!(error_identifiers.contains(&ir::ParameterName::new("undefined_right".to_string())));
+        assert!(
+            error_identifiers.contains(&ir::ParameterName::new("undefined_chained".to_string()))
+        );
     }
 }

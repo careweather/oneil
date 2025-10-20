@@ -19,6 +19,10 @@ use crate::{
 pub mod test_ast;
 pub mod test_ir;
 
+pub fn unimportant_span() -> Span {
+    Span::random_span()
+}
+
 pub fn empty_model_collection_builder() -> ModelCollectionBuilder<(), ()> {
     ModelCollectionBuilder::new(HashSet::new())
 }
@@ -80,10 +84,13 @@ impl ReferenceContextBuilder {
     ) -> Self {
         let (references, models): (HashMap<_, _>, HashMap<_, _>) = reference_context
             .into_iter()
-            .map(|(reference_name_with_span, model_path, model)| {
-                let reference_name = reference_name_with_span.clone();
-                let reference_import =
-                    ir::ReferenceImport::new(reference_name_with_span, model_path.clone());
+            .map(|(reference_name, model_path, model)| {
+                let reference_name_span = unimportant_span();
+                let reference_import = ir::ReferenceImport::new(
+                    reference_name.clone(),
+                    reference_name_span,
+                    model_path.clone(),
+                );
 
                 let reference_entry = (reference_name, reference_import);
                 let model_entry = (model_path, model);
@@ -141,8 +148,8 @@ impl ReferenceContextBuilder {
 }
 
 pub struct ParameterContextBuilder {
-    parameters: HashMap<ir::Identifier, ir::Parameter>,
-    parameter_errors: HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+    parameters: HashMap<ir::ParameterName, ir::Parameter>,
+    parameter_errors: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
 }
 
 impl ParameterContextBuilder {
@@ -159,7 +166,7 @@ impl ParameterContextBuilder {
     ) -> Self {
         let parameter_context = parameter_context
             .into_iter()
-            .map(|parameter| (parameter.identifier().clone(), parameter));
+            .map(|parameter| (parameter.name().clone(), parameter));
 
         self.parameters.extend(parameter_context);
         self
@@ -167,12 +174,12 @@ impl ParameterContextBuilder {
 
     pub fn with_parameter_error(
         mut self,
-        parameter_errors: impl IntoIterator<Item = ir::Identifier>,
+        parameter_errors: impl IntoIterator<Item = ir::ParameterName>,
     ) -> Self {
         let parameter_errors = parameter_errors
             .into_iter()
             // the presence of the identifier in the map indicates an error
-            .map(|identifier| (identifier, vec![]));
+            .map(|parameter_name| (parameter_name, vec![]));
 
         self.parameter_errors.extend(parameter_errors);
 

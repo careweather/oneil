@@ -15,6 +15,7 @@ pub use traits::AsOneilError;
 /// This struct represents errors in a format suitable for display to users.
 /// It includes the file path where the error occurred, a human-readable message,
 /// and optional source location information for precise error reporting.
+// TODO: refactor this to use Span/SourceLocation instead of ErrorLocation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OneilError {
     /// The path to the file where the error occurred

@@ -51,6 +51,36 @@ impl Span {
     pub fn from_start_and_end(start: &Self, end: &Self) -> Self {
         Self::new(*start.start(), *end.end())
     }
+
+    /// Generates a random span for testing purposes
+    #[cfg(feature = "random_span")]
+    #[must_use]
+    pub fn random_span() -> Self {
+        use rand::Rng;
+        let mut rng = rand::rng();
+
+        let start_offset = usize::from(rng.random::<u16>());
+        let start_line = usize::from(rng.random::<u16>());
+        let start_column = usize::from(rng.random::<u16>());
+
+        let end_offset = start_offset + usize::from(rng.random::<u16>());
+        let end_line = start_line + usize::from(rng.random::<u16>());
+        let end_column = start_column + usize::from(rng.random::<u16>());
+
+        let start_loc = SourceLocation {
+            offset: start_offset,
+            line: start_line,
+            column: start_column,
+        };
+
+        let end_loc = SourceLocation {
+            offset: end_offset,
+            line: end_line,
+            column: end_column,
+        };
+
+        Self::new(start_loc, end_loc)
+    }
 }
 
 /// A source location

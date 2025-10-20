@@ -6,6 +6,7 @@ mod expr;
 mod model;
 mod model_import;
 mod parameter;
+mod python_import;
 mod reference;
 mod test;
 mod unit;
@@ -13,10 +14,9 @@ mod unit;
 pub use debug_info::TraceLevel;
 pub use expr::{BinaryOp, ComparisonOp, Expr, FunctionName, Literal, UnaryOp, Variable};
 pub use model::{Model, ModelCollection};
-pub use model_import::{
-    ReferenceImport, ReferenceMap, ReferenceName, SubmodelImport, SubmodelMap, SubmodelName,
-};
-pub use parameter::{Limits, Parameter, ParameterCollection, ParameterValue, PiecewiseExpr};
+pub use model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName};
+pub use parameter::{Limits, Parameter, ParameterName, ParameterValue, PiecewiseExpr};
+pub use python_import::PythonImport;
 pub use reference::{Identifier, ModelPath, PythonPath};
 pub use test::{Test, TestIndex};
 pub use unit::{CompositeUnit, Unit};

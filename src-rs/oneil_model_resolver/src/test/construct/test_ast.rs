@@ -7,37 +7,14 @@
 //! If the span is important, it is better to construct the node directly.
 
 use oneil_ast as ast;
-use oneil_shared::span::{SourceLocation, Span};
+use oneil_shared::span::Span;
 
 /// Generates a span for testing purposes
 ///
 /// The span is intentionally random in order to discourage any
 /// use of the spans for testing.
 fn unimportant_span() -> Span {
-    use rand::Rng;
-    let mut rng = rand::rng();
-
-    let start_offset = usize::from(rng.random::<u16>());
-    let start_line = usize::from(rng.random::<u16>());
-    let start_column = usize::from(rng.random::<u16>());
-
-    let end_offset = start_offset + usize::from(rng.random::<u16>());
-    let end_line = start_line + usize::from(rng.random::<u16>());
-    let end_column = start_column + usize::from(rng.random::<u16>());
-
-    let start_loc = SourceLocation {
-        offset: start_offset,
-        line: start_line,
-        column: start_column,
-    };
-
-    let end_loc = SourceLocation {
-        offset: end_offset,
-        line: end_line,
-        column: end_column,
-    };
-
-    Span::new(start_loc, end_loc)
+    Span::random_span()
 }
 
 // SIMPLE CONSTRUCTORS

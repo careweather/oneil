@@ -7,13 +7,13 @@ use crate::{
     FileLoader, error::resolution::ImportResolutionError, util::builder::ModelCollectionBuilder,
 };
 
-type ValidatedImports = HashMap<ir::PythonPath, IrSpan>;
+type ValidatedImports = HashMap<ir::PythonPath, ir::PythonImport>;
 type ImportErrors = HashMap<ir::PythonPath, ImportResolutionError>;
 
 /// Validates a list of Python import declarations for a given model.
 pub fn resolve_python_imports<F>(
     model_path: &ir::ModelPath,
-    builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
+    mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
     imports: Vec<&ast::ImportNode>,
     file_loader: &F,
 ) -> (
@@ -24,46 +24,48 @@ pub fn resolve_python_imports<F>(
 where
     F: FileLoader,
 {
-    // TODO: change this into a for loop
-    imports.into_iter().fold(
-        (HashMap::new(), HashMap::new(), builder),
-        |(mut python_imports, mut import_resolution_errors, mut builder), import| {
-            let python_path = model_path.get_sibling_path(import.path());
-            let python_path = ir::PythonPath::new(python_path);
-            let python_path_span = get_span_from_ast_span(import.path().node_span());
+    let mut python_imports: HashMap<ir::PythonPath, ir::PythonImport> = HashMap::new();
+    let mut import_resolution_errors = HashMap::new();
 
-            // check for duplicate imports
-            let original_import_span = python_imports.get(&python_path);
-            if let Some(original_import_span) = original_import_span {
+    for import in imports {
+        let python_path = model_path.get_sibling_path(import.path().as_str());
+        let python_path = ir::PythonPath::new(python_path);
+        let python_path_span = import.path().span();
+
+        // check for duplicate imports
+        let original_import = python_imports.get(&python_path);
+        if let Some(original_import) = original_import {
+            import_resolution_errors.insert(
+                python_path.clone(),
+                ImportResolutionError::duplicate_import(
+                    *original_import.import_path_span(),
+                    python_path_span,
+                    python_path,
+                ),
+            );
+
+            continue;
+        }
+
+        let result = file_loader.validate_python_import(&python_path);
+        match result {
+            Ok(()) => {
+                python_imports.insert(
+                    python_path.clone(),
+                    ir::PythonImport::new(python_path, python_path_span),
+                );
+            }
+            Err(error) => {
+                builder.add_import_error(python_path.clone(), error);
                 import_resolution_errors.insert(
                     python_path.clone(),
-                    ImportResolutionError::duplicate_import(
-                        *original_import_span,
-                        python_path_span,
-                        python_path,
-                    ),
+                    ImportResolutionError::failed_validation(python_path_span, python_path),
                 );
-
-                return (python_imports, import_resolution_errors, builder);
             }
+        }
+    }
 
-            let result = file_loader.validate_python_import(&python_path);
-            match result {
-                Ok(()) => {
-                    python_imports.insert(python_path, python_path_span);
-                    (python_imports, import_resolution_errors, builder)
-                }
-                Err(error) => {
-                    builder.add_import_error(python_path.clone(), error);
-                    import_resolution_errors.insert(
-                        python_path.clone(),
-                        ImportResolutionError::failed_validation(python_path_span, python_path),
-                    );
-                    (python_imports, import_resolution_errors, builder)
-                }
-            }
-        },
-    )
+    (python_imports, import_resolution_errors, builder)
 }
 
 #[cfg(test)]

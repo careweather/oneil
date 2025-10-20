@@ -1,7 +1,5 @@
 //! Variable resolution for the Oneil model loader
 
-use std::ops::Deref;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -20,9 +18,9 @@ pub fn resolve_variable(
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
 ) -> Result<ir::Expr, VariableResolutionError> {
-    match variable.deref() {
+    match &**variable {
         ast::Variable::Identifier(identifier) => {
-            let var_identifier = ir::Identifier::new(identifier.as_str());
+            let var_identifier = ir::ParameterName::new(identifier.as_str().to_string());
 
             match parameter_context.lookup_parameter(&var_identifier) {
                 ParameterContextResult::Found(_parameter) => {
@@ -33,8 +31,9 @@ pub fn resolve_variable(
                     VariableResolutionError::parameter_has_error(var_identifier, identifier.span()),
                 ),
                 ParameterContextResult::NotFound => {
-                    if builtin_ref.has_builtin_value(&var_identifier) {
-                        let expr = ir::Expr::builtin_variable(var_identifier);
+                    let builtin_identifier = ir::Identifier::new(identifier.as_str().to_string());
+                    if builtin_ref.has_builtin_value(&builtin_identifier) {
+                        let expr = ir::Expr::builtin_variable(builtin_identifier);
                         Ok(expr)
                     } else {
                         Err(VariableResolutionError::undefined_parameter(
@@ -79,7 +78,7 @@ pub fn resolve_variable(
             };
 
             // ensure that the parameter is defined in the reference model
-            let var_identifier = ir::Identifier::new(parameter.as_str());
+            let var_identifier = ir::ParameterName::new(parameter.as_str().to_string());
             let var_identifier_span = parameter.span();
             if model.get_parameter(&var_identifier).is_none() {
                 return Err(VariableResolutionError::undefined_parameter_in_reference(
@@ -141,14 +140,14 @@ mod tests {
     }
 
     macro_rules! assert_var_is_external {
-        ($variable:expr, $expected_model_path:expr, $expected_ident:expr $(,)?) => {
+        ($variable:expr, $expected_model_path:expr, $expected_parameter_name:expr $(,)?) => {
             let variable: ir::Expr = $variable;
             let expected_model_path: ir::ModelPath = ir::ModelPath::new($expected_model_path);
-            let expected_ident: &str = $expected_ident;
+            let expected_parameter_name: &str = $expected_parameter_name;
 
             let ir::Expr::Variable(ir::Variable::External {
                 model: actual_model_path,
-                ident: actual_ident,
+                parameter_name: actual_parameter_name,
             }) = variable
             else {
                 panic!("expected external variable, got {variable:?}");
@@ -160,8 +159,8 @@ mod tests {
             );
 
             assert_eq!(
-                actual_ident.as_str(),
-                expected_ident,
+                actual_parameter_name.as_str(),
+                expected_parameter_name,
                 "actual ident does not match expected ident"
             );
         };
@@ -207,7 +206,7 @@ mod tests {
 
         let parameter_context_builder = ParameterContextBuilder::new().with_parameter_context([
             test_ir::ParameterBuilder::new()
-                .with_ident_str("temperature")
+                .with_name_str("temperature")
                 .with_simple_number_value(42.0)
                 .build(),
         ]);
@@ -251,7 +250,7 @@ mod tests {
         // check the result
         let Err(VariableResolutionError::UndefinedParameter {
             model_path,
-            parameter,
+            parameter_name,
             reference_span: _,
         }) = result
         else {
@@ -259,7 +258,10 @@ mod tests {
         };
 
         assert_eq!(model_path, None);
-        assert_eq!(parameter, ir::Identifier::new("undefined_param"));
+        assert_eq!(
+            parameter_name,
+            ir::ParameterName::new("undefined_param".to_string())
+        );
     }
 
     #[test]
@@ -274,7 +276,7 @@ mod tests {
         let reference_context = reference_context_builder.build();
 
         let parameter_context_builder = ParameterContextBuilder::new()
-            .with_parameter_error([ir::Identifier::new("error_param")]);
+            .with_parameter_error([ir::ParameterName::new("error_param".to_string())]);
         let parameter_context = parameter_context_builder.build();
 
         // resolve the variable
@@ -287,14 +289,17 @@ mod tests {
 
         // check the result
         let Err(VariableResolutionError::ParameterHasError {
-            identifier,
+            parameter_name,
             reference_span: _,
         }) = result
         else {
             panic!("expected parameter has error, got {result:?}");
         };
 
-        assert_eq!(identifier, ir::Identifier::new("error_param"));
+        assert_eq!(
+            parameter_name,
+            ir::ParameterName::new("error_param".to_string())
+        );
     }
 
     #[test]
@@ -443,7 +448,7 @@ mod tests {
         // check the result
         let Err(VariableResolutionError::UndefinedParameter {
             model_path,
-            parameter,
+            parameter_name,
             reference_span: _,
         }) = result
         else {
@@ -451,7 +456,10 @@ mod tests {
         };
 
         assert_eq!(model_path, Some(reference_path));
-        assert_eq!(parameter, ir::Identifier::new("undefined_param"));
+        assert_eq!(
+            parameter_name,
+            ir::ParameterName::new("undefined_param".to_string())
+        );
     }
 
     #[test]
@@ -509,7 +517,7 @@ mod tests {
 
         let parameter_context_builder = ParameterContextBuilder::new().with_parameter_context([
             test_ir::ParameterBuilder::new()
-                .with_ident_str("conflict")
+                .with_name_str("conflict")
                 .with_simple_number_value(42.0)
                 .build(),
         ]);

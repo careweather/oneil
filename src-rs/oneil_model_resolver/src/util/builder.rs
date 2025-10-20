@@ -3,10 +3,14 @@
 use std::collections::{HashMap, HashSet};
 
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
-use crate::error::{
-    CircularDependencyError, LoadError, ModelImportResolutionError, ParameterResolutionError,
-    collection::ModelErrorMap,
+use crate::{
+    error::{
+        CircularDependencyError, LoadError, ModelImportResolutionError, ParameterResolutionError,
+        collection::ModelErrorMap,
+    },
+    util::{ReferenceMap, ReferenceResolutionErrors, SubmodelMap, SubmodelResolutionErrors},
 };
 
 /// A builder for constructing model collections while collecting loading errors.
@@ -150,19 +154,27 @@ impl ModelImportsBuilder {
         self.references.get(reference_name)
     }
 
-    pub fn add_submodel(&mut self, submodel_name: ir::SubmodelName, submodel_path: ir::ModelPath) {
+    pub fn add_submodel(
+        &mut self,
+        submodel_name: ir::SubmodelName,
+        submodel_name_span: Span,
+        submodel_path: ir::ModelPath,
+    ) {
         let submodel_ident = submodel_name.clone();
-        let submodel_import = ir::SubmodelImport::new(submodel_name, submodel_path);
+        let submodel_import =
+            ir::SubmodelImport::new(submodel_name, submodel_name_span, submodel_path);
         self.submodels.insert(submodel_ident, submodel_import);
     }
 
     pub fn add_reference(
         &mut self,
         reference_name: ir::ReferenceName,
+        reference_name_span: Span,
         reference_path: ir::ModelPath,
     ) {
         let reference_ident = reference_name.clone();
-        let reference_import = ir::ReferenceImport::new(reference_name, reference_path);
+        let reference_import =
+            ir::ReferenceImport::new(reference_name, reference_name_span, reference_path);
         self.references.insert(reference_ident, reference_import);
     }
 
@@ -186,14 +198,14 @@ impl ModelImportsBuilder {
     pub fn into_submodels_and_references_and_resolution_errors(
         self,
     ) -> (
-        ir::SubmodelMap,
-        ir::ReferenceMap,
-        HashMap<ir::SubmodelName, ModelImportResolutionError>,
-        HashMap<ir::ReferenceName, ModelImportResolutionError>,
+        SubmodelMap,
+        ReferenceMap,
+        SubmodelResolutionErrors,
+        ReferenceResolutionErrors,
     ) {
         (
-            ir::SubmodelMap::new(self.submodels),
-            ir::ReferenceMap::new(self.references),
+            self.submodels,
+            self.references,
             self.submodel_resolution_errors,
             self.reference_resolution_errors,
         )
@@ -201,9 +213,9 @@ impl ModelImportsBuilder {
 }
 
 pub struct ParameterBuilder {
-    parameters: HashMap<ir::Identifier, ir::Parameter>,
-    parameter_errors: HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
-    visited: HashSet<ir::Identifier>,
+    parameters: HashMap<ir::ParameterName, ir::Parameter>,
+    parameter_errors: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+    visited: HashSet<ir::ParameterName>,
 }
 
 impl ParameterBuilder {
@@ -215,48 +227,45 @@ impl ParameterBuilder {
         }
     }
 
-    pub fn add_parameter(&mut self, identifier: ir::Identifier, parameter: ir::Parameter) {
-        self.parameters.insert(identifier, parameter);
+    pub fn add_parameter(&mut self, parameter_name: ir::ParameterName, parameter: ir::Parameter) {
+        self.parameters.insert(parameter_name, parameter);
     }
 
-    pub const fn get_parameters(&self) -> &HashMap<ir::Identifier, ir::Parameter> {
+    pub const fn get_parameters(&self) -> &HashMap<ir::ParameterName, ir::Parameter> {
         &self.parameters
     }
 
     pub fn add_parameter_error(
         &mut self,
-        identifier: ir::Identifier,
+        parameter_name: ir::ParameterName,
         error: ParameterResolutionError,
     ) {
         self.parameter_errors
-            .entry(identifier)
+            .entry(parameter_name)
             .or_default()
             .push(error);
     }
 
     pub const fn get_parameter_errors(
         &self,
-    ) -> &HashMap<ir::Identifier, Vec<ParameterResolutionError>> {
+    ) -> &HashMap<ir::ParameterName, Vec<ParameterResolutionError>> {
         &self.parameter_errors
     }
 
-    pub fn mark_as_visited(&mut self, identifier: ir::Identifier) {
-        self.visited.insert(identifier);
+    pub fn mark_as_visited(&mut self, parameter_name: ir::ParameterName) {
+        self.visited.insert(parameter_name);
     }
 
-    pub fn has_visited(&self, identifier: &ir::Identifier) -> bool {
-        self.visited.contains(identifier)
+    pub fn has_visited(&self, parameter_name: &ir::ParameterName) -> bool {
+        self.visited.contains(parameter_name)
     }
 
     pub fn into_parameter_collection_and_errors(
         self,
     ) -> (
-        ir::ParameterCollection,
-        HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+        HashMap<ir::ParameterName, ir::Parameter>,
+        HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
     ) {
-        (
-            ir::ParameterCollection::new(self.parameters),
-            self.parameter_errors,
-        )
+        (self.parameters, self.parameter_errors)
     }
 }

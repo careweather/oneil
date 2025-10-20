@@ -210,7 +210,7 @@ mod tests {
 
         let VariableResolutionError::UndefinedParameter {
             model_path,
-            parameter,
+            parameter_name,
             reference_span: _,
         } = error
         else {
@@ -218,7 +218,10 @@ mod tests {
         };
 
         assert_eq!(model_path, &None);
-        assert_eq!(parameter, &ir::Identifier::new("undefined_var"));
+        assert_eq!(
+            parameter_name,
+            &ir::ParameterName::new("undefined_var".to_string())
+        );
 
         // check the resolved tests
         assert!(resolved_tests.is_empty());
@@ -272,7 +275,7 @@ mod tests {
 
         let VariableResolutionError::UndefinedParameter {
             model_path,
-            parameter,
+            parameter_name,
             reference_span: _,
         } = error
         else {
@@ -280,7 +283,10 @@ mod tests {
         };
 
         assert_eq!(model_path, &None);
-        assert_eq!(parameter, &ir::Identifier::new("undefined_var"));
+        assert_eq!(
+            parameter_name,
+            &ir::ParameterName::new("undefined_var".to_string())
+        );
 
         // check the resolved tests
         assert_eq!(resolved_tests.len(), 1);

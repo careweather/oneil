@@ -56,14 +56,14 @@ fn print_decl(
     indent: usize,
     prefix: &str,
 ) -> io::Result<()> {
-    match decl {
+    match &**decl {
         ast::Decl::Import(import) => {
             writeln!(
                 writer,
                 "{}{} Import: \"{}\"",
                 "  ".repeat(indent),
                 prefix,
-                import.path()
+                import.path().as_str()
             )?;
         }
         ast::Decl::UseModel(use_model) => {
@@ -209,24 +209,14 @@ fn print_expression(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match expr {
+    match &**expr {
         ast::Expr::BinaryOp { op, left, right } => {
-            writeln!(
-                writer,
-                "{}BinaryOp: {:?}",
-                "  ".repeat(indent),
-                op
-            )?;
+            writeln!(writer, "{}BinaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
         }
         ast::Expr::UnaryOp { op, expr } => {
-            writeln!(
-                writer,
-                "{}UnaryOp: {:?}",
-                "  ".repeat(indent),
-                op
-            )?;
+            writeln!(writer, "{}UnaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(expr, writer, indent + 2)?;
         }
         ast::Expr::FunctionCall { name, args } => {
@@ -259,12 +249,7 @@ fn print_expression(
             right,
             rest_chained,
         } => {
-            writeln!(
-                writer,
-                "{}ComparisonOp: {:?}",
-                "  ".repeat(indent),
-                op
-            )?;
+            writeln!(writer, "{}ComparisonOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
             for (i, (op, expr)) in rest_chained.iter().enumerate() {
@@ -296,7 +281,7 @@ fn print_variable(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match var {
+    match &**var {
         ast::Variable::Identifier(id) => {
             writeln!(
                 writer,
@@ -323,7 +308,7 @@ fn print_variable(
 
 /// Prints a literal node
 fn print_literal(lit: &ast::LiteralNode, writer: &mut impl Write, indent: usize) -> io::Result<()> {
-    match lit {
+    match &**lit {
         ast::Literal::Number(n) => {
             writeln!(writer, "{}Literal: {}", "  ".repeat(indent), n)?;
         }
@@ -343,7 +328,7 @@ fn print_parameter_value(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match value {
+    match &**value {
         ast::ParameterValue::Simple(expr, unit) => {
             writeln!(writer, "{}Simple:", "  ".repeat(indent))?;
             print_expression(expr, writer, indent + 2)?;
@@ -384,7 +369,7 @@ fn print_limits(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match limits {
+    match &**limits {
         ast::Limits::Continuous { min, max } => {
             writeln!(writer, "{}Continuous:", "  ".repeat(indent))?;
             writeln!(writer, "{}    ├── Min:", "  ".repeat(indent))?;
@@ -417,14 +402,9 @@ fn print_unit_expression(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match unit_expr {
+    match &**unit_expr {
         ast::UnitExpr::BinaryOp { op, left, right } => {
-            writeln!(
-                writer,
-                "{}BinaryOp: {:?}",
-                "  ".repeat(indent),
-                op
-            )?;
+            writeln!(writer, "{}BinaryOp: {:?}", "  ".repeat(indent), op)?;
             print_unit_expression(left, writer, indent + 2)?;
             print_unit_expression(right, writer, indent + 2)?;
         }

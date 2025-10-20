@@ -16,7 +16,7 @@ oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
 
 [dev-dependencies]
-rand = "0.9.2"
+oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
 
 [lints]
 workspace = true
