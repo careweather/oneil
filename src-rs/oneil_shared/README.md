@@ -1,12 +1,22 @@
-# Oneil Error
+# Oneil Shared
+
+This crate provides tools that are used throughout the project, including:
+- [span information](./src/span)
+- [standardized errors](./src/error)
 
 A unified error handling system for the Oneil programming language.
 
 This crate enables components to use their own error types while also defining a unified interface with which to work.
 
-The main feature of this library is the `AsOneilError` trait found in [`traits.rs`](src/traits.rs). Errors should implement this trait in order to be compatible with Oneil CLI error printing.
+## Spans
 
-## Example
+Spans refer to a location in a source file. They store the the offset, line, and column for the beginnig and end of the important text.
+
+## `AsOneilError`
+
+The main feature of the error handling provided by this library is the `AsOneilError` trait found in [`traits.rs`](src/traits.rs). Errors should implement this trait in order to be compatible with Oneil CLI error printing.
+
+### Example
 
 ```rust
 use oneil_error::{OneilError, AsOneilError, Context};
