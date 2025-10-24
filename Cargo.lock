@@ -202,6 +202,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil_eval"
+version = "0.15.0"
+dependencies = [
+ "oneil_ir",
+ "oneil_shared",
+]
+
+[[package]]
 name = "oneil_ir"
 version = "0.15.0"
 dependencies = [
