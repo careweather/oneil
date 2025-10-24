@@ -91,13 +91,20 @@ impl Span {
 /// Note that it is assumed that the offset corresponds to the line and column.
 /// If this assumption is not correct, any code that relies on the line and
 /// column for display purposes will be incorrect.
+// TODO: determine whether it would be worthwile to use utf-8 offset for the
+//       column instead of bytes. If we choose to do so, we will need to do
+//       benchmarks to see if
+//       [`LocatedSpan::get_utf8_column`](https://docs.rs/nom_locate/5.0.0/nom_locate/struct.LocatedSpan.html#method.get_utf8_column)
+//       or
+//       [`LocatedSpan::naive_get_utf8_column`](https://docs.rs/nom_locate/5.0.0/nom_locate/struct.LocatedSpan.html#method.naive_get_utf8_column)
+//       is faster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceLocation {
-    /// The offset from the beginning of the source code (0-indexed)
+    /// The offset (in bytes) from the beginning of the source code (0-indexed)
     pub offset: usize,
     /// The line number (1-indexed)
     pub line: usize,
-    /// The column number (1-indexed)
+    /// The column number (in bytes) (1-indexed)
     pub column: usize,
 }
 
