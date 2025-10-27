@@ -90,8 +90,8 @@ pub fn unit_identifier(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError
 /// They are commonly used for section names, test names, and other human-readable labels.
 ///
 /// Label syntax:
-/// - Must start with any character except: `(`, `)`, `[`, `]`, `:`, space, tab, newline, `*`, `$`
-/// - Can contain any character except: `(`, `)`, `[`, `]`, `:`, newline
+/// - Must start with any character except: `(`, `)`, `[`, `]`, `{`, `#`, `~`, `:`, space, tab, newline, `*`, `$`
+/// - Can contain any character except: `(`, `)`, `[`, `]`, `{`, `#`, `~`, `:`, newline
 /// - Word parts can be separated by spaces and tabs
 /// - Cannot be a reserved keyword
 ///
@@ -117,7 +117,7 @@ pub fn label(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
         token(
             |input| {
                 // First character must be none of the following: ( ) [ ] : \t * $
-                let (rest, _) = none_of("()[]:= \t\n*$").parse(input)?;
+                let (rest, _) = none_of("()[]{#~:= \t\n*$").parse(input)?;
 
                 // Parse zero or more word parts separated by whitespace
                 let (rest, _) = many0(|input| {
@@ -125,7 +125,7 @@ pub fn label(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
                     let (rest, _) = many0(one_of(" \t")).parse(input)?;
 
                     // Consume at least one word character
-                    let (rest, _) = many1(none_of("()[]:= \t\n")).parse(rest)?;
+                    let (rest, _) = many1(none_of("()[]#~:= \t\n")).parse(rest)?;
                     Ok((rest, ()))
                 })
                 .parse(rest)?;

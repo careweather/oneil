@@ -7,7 +7,7 @@
 use std::result::Result as StdResult;
 
 use nom::{
-    Parser as _,
+    Input, Parser as _,
     bytes::complete::take_while,
     combinator::{eof, opt, value},
 };
@@ -172,7 +172,7 @@ fn parse_decls(input: InputSpan<'_>) -> (InputSpan<'_>, Vec<DeclNode>, Vec<Parse
                 // All declarations must be terminated by an end of line, so we
                 // assume that the declaration parsing error is for a declaration
                 // that ends at the end of the line
-                let next_line = skip_to_next_line_with_content(input);
+                let next_line = skip_to_next_line_with_content(input, e.error_offset);
 
                 parse_decls_recur(next_line, acc_decls, acc_errors, true)
             }
@@ -244,7 +244,7 @@ fn parse_section(input: InputSpan<'_>) -> Option<(InputSpan<'_>, SectionResult, 
         }
         Err(nom::Err::Failure(e)) => {
             // There was a problem with the section header, so we keep the error and skip to the next line
-            let rest = skip_to_next_line_with_content(input);
+            let rest = skip_to_next_line_with_content(input, e.error_offset);
             (rest, None, vec![e])
         }
         Err(nom::Err::Incomplete(_needed)) => (input, None, vec![]),
@@ -318,7 +318,17 @@ fn parse_section_header(input: InputSpan<'_>) -> Result<'_, SectionHeaderNode, P
 /// end of file, then consumes the newline character itself.
 ///
 /// It also optionally skips a note that follows the line break.
-fn skip_to_next_line_with_content(input: InputSpan<'_>) -> InputSpan<'_> {
+fn skip_to_next_line_with_content(input: InputSpan<'_>, error_offset: usize) -> InputSpan<'_> {
+    // advance to the error offset
+    let chars_to_skip = error_offset - input.location_offset();
+    let rest = input.take_from(chars_to_skip);
+
+    // first, just try parsing a note
+    if let Ok((rest, _)) = parse_note.parse(rest) {
+        return rest;
+    }
+
+    // otherwise, skip to the next line, then try parsing a note
     let (rest, _) = take_while::<_, _, nom::error::Error<_>>(|c| c != '\n')
         .parse(input)
         .expect("should never fail");
@@ -327,11 +337,10 @@ fn skip_to_next_line_with_content(input: InputSpan<'_>) -> InputSpan<'_> {
         .parse(rest)
         .expect("should always parse either a line break or EOF");
 
-    let (rest, _) = opt(parse_note)
+    opt(parse_note)
         .parse(rest)
-        .expect("should always parse because its optional");
-
-    rest
+        // if the note parsing failed, return the previous `rest`
+        .map_or_else(|_| rest, |(rest, _)| rest)
 }
 
 #[cfg(test)]

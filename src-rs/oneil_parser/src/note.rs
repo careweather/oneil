@@ -44,6 +44,8 @@ fn note(input: InputSpan<'_>) -> Result<'_, NoteNode, ParserError> {
     };
     let note_node = token.into_node_with_value(Note::new(note_content.to_string()));
 
+    // dbg!(&note_content);
+
     Ok((rest, note_node))
 }
 
