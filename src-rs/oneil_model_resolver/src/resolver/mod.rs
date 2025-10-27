@@ -106,6 +106,8 @@ where
         &reference_resolution_errors,
     );
 
+    // dbg!(&model_path, &reference_context);
+
     // resolve parameters
     let (parameters, parameter_resolution_errors) =
         resolve_parameter::resolve_parameters(parameters, builtin_ref, &reference_context);
@@ -717,5 +719,107 @@ mod tests {
         assert_eq!(models.len(), 2);
         assert!(models.contains_key(&ir::ModelPath::new("test")));
         assert!(models.contains_key(&ir::ModelPath::new("submodel")));
+    }
+
+    #[test]
+    fn load_model_with_reference() {
+        // create initial context
+        let model_path = ir::ModelPath::new("test");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_ref = TestBuiltinRef::new();
+        let mut load_stack = Stack::new();
+
+        // create a submodel with a number parameter
+        let reference_node = test_ast::ModelNodeBuilder::new()
+            .with_number_parameter("x", 1.0)
+            .build();
+
+        let model_node = test_ast::ModelNodeBuilder::new()
+            .with_reference("reference")
+            .with_reference_variable_parameter("y", "reference", "x")
+            .build();
+
+        let file_loader =
+            TestFileParser::new([("test.on", model_node), ("reference.on", reference_node)]);
+
+        // load the model
+        let result = load_model(
+            model_path,
+            builder,
+            &builtin_ref,
+            &mut load_stack,
+            &file_loader,
+        );
+
+        // check the errors
+        let errors = result.get_model_errors();
+        assert!(errors.is_empty());
+
+        // check the models
+        let models = result.get_models();
+        assert_eq!(models.len(), 2);
+
+        let main_model = models
+            .get(&ir::ModelPath::new("test"))
+            .expect("main model should be present");
+        let y_parameter = main_model
+            .get_parameter(&ir::ParameterName::new("y".to_string()))
+            .expect("y parameter should be present");
+
+        let ir::ParameterValue::Simple(y_parameter_value, _) = y_parameter.value() else {
+            panic!("y parameter value should be a simple value");
+        };
+
+        let ir::Expr::Variable(variable_expr) = y_parameter_value else {
+            panic!("y parameter value should be a variable expression");
+        };
+
+        let ir::Variable::External {
+            model,
+            parameter_name,
+        } = variable_expr
+        else {
+            panic!("variable expression should be an external variable");
+        };
+
+        assert_eq!(model, &ir::ModelPath::new("reference.on"));
+        assert_eq!(parameter_name.as_str(), "x");
+    }
+
+    #[test]
+    fn load_model_with_submodel_with_error() {
+        // create initial context
+        let model_path = ir::ModelPath::new("test");
+        let initial_models = HashSet::from([model_path.clone()]);
+        let builder = ModelCollectionBuilder::new(initial_models);
+        let builtin_ref = TestBuiltinRef::new();
+        let mut load_stack = Stack::new();
+
+        // create a submodel with a number parameter
+        let submodel_node = test_ast::ModelNodeBuilder::new()
+            .with_submodel("nonexistent")
+            .build();
+
+        let model_node = test_ast::ModelNodeBuilder::new()
+            .with_reference("reference")
+            .with_reference_variable_parameter("y", "reference", "x")
+            .build();
+
+        let file_loader =
+            TestFileParser::new([("test.on", model_node), ("submodel.on", submodel_node)]);
+
+        // load the model
+        let result = load_model(
+            model_path,
+            builder,
+            &builtin_ref,
+            &mut load_stack,
+            &file_loader,
+        );
+
+        // check the errors
+        let errors = result.get_model_errors();
+        assert_eq!(errors.len(), 1);
     }
 }

@@ -233,7 +233,8 @@ fn convert_resolution_errors(
     // convert submodel resolution errors
     for submodel_resolution_error in resolution_errors.get_submodel_resolution_errors().values() {
         match submodel_resolution_error {
-            ModelImportResolutionError::ModelHasError { .. } => {
+            ModelImportResolutionError::ModelHasError { .. }
+            | ModelImportResolutionError::ParentModelHasError { .. } => {
                 ignore_error();
             }
 
@@ -253,7 +254,8 @@ fn convert_resolution_errors(
     // convert reference resolution errors
     for reference_resolution_error in resolution_errors.get_reference_resolution_errors().values() {
         match reference_resolution_error {
-            ModelImportResolutionError::ModelHasError { .. } => {
+            ModelImportResolutionError::ModelHasError { .. }
+            | ModelImportResolutionError::ParentModelHasError { .. } => {
                 ignore_error();
             }
 

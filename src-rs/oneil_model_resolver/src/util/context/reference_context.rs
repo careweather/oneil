@@ -7,6 +7,7 @@ use crate::{
     util::context::lookup::{self, LookupResult},
 };
 
+#[derive(Debug)]
 pub struct ReferenceContext<'model, 'reference> {
     models: &'model HashMap<ir::ModelPath, ir::Model>,
     model_errors: HashSet<&'model ir::ModelPath>,
@@ -65,6 +66,7 @@ impl<'model, 'reference> ReferenceContext<'model, 'reference> {
     }
 }
 
+#[derive(Debug)]
 pub enum ReferenceContextResult<'model, 'reference> {
     Found(&'model ir::Model, &'reference ir::ModelPath),
     ReferenceHasResolutionError,

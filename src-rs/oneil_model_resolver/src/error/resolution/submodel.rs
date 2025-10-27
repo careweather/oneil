@@ -16,6 +16,17 @@ pub enum ModelImportResolutionError {
         /// The span of where the model is referenced
         reference_span: Span,
     },
+    /// Parent model has errors, preventing submodel resolution.
+    ParentModelHasError {
+        /// The identifier of the parent model that has errors
+        parent_model_name: ir::SubmodelName,
+        /// The span of where the parent model is referenced
+        parent_model_name_span: Span,
+        /// The identifier of the submodel that is undefined
+        submodel_name: ir::ReferenceName,
+        /// The span of where the submodel is referenced
+        submodel_name_span: Span,
+    },
     /// The submodel identifier is not defined in the referenced model.
     UndefinedSubmodel {
         /// The path of the model that contains the submodel
@@ -52,6 +63,22 @@ impl ModelImportResolutionError {
         Self::ModelHasError {
             model_path,
             reference_span,
+        }
+    }
+
+    /// Creates a new error indicating that the parent model has errors.
+    #[must_use]
+    pub const fn parent_model_has_error(
+        parent_model_name: ir::SubmodelName,
+        parent_model_name_span: Span,
+        submodel_name: ir::ReferenceName,
+        submodel_name_span: Span,
+    ) -> Self {
+        Self::ParentModelHasError {
+            parent_model_name,
+            parent_model_name_span,
+            submodel_name,
+            submodel_name_span,
         }
     }
 
@@ -108,6 +135,18 @@ impl fmt::Display for ModelImportResolutionError {
                 let path = path.as_ref().display();
                 write!(f, "submodel `{path}` has errors")
             }
+            Self::ParentModelHasError {
+                parent_model_name,
+                submodel_name,
+                ..
+            } => {
+                let submodel_name = submodel_name.as_str();
+                let parent_model_name = parent_model_name.as_str();
+                write!(
+                    f,
+                    "unable to resolve submodel `{submodel_name}` because parent model `{parent_model_name}` has errors"
+                )
+            }
             Self::UndefinedSubmodel {
                 parent_model_path,
                 submodel,
@@ -143,6 +182,10 @@ impl AsOneilError for ModelImportResolutionError {
                 model_path: _,
                 reference_span: location_span,
             }
+            | Self::ParentModelHasError {
+                submodel_name_span: location_span,
+                ..
+            }
             | Self::UndefinedSubmodel {
                 parent_model_path: _,
                 submodel: _,
@@ -164,6 +207,18 @@ impl AsOneilError for ModelImportResolutionError {
 
     fn context_with_source(&self, source: &str) -> Vec<(Context, Option<ErrorLocation>)> {
         match self {
+            Self::ParentModelHasError {
+                parent_model_name,
+                parent_model_name_span,
+                ..
+            } => {
+                let model_name = parent_model_name.as_str();
+                let location = ErrorLocation::from_source_and_span(source, *parent_model_name_span);
+                vec![(
+                    Context::Note(format!("model `{model_name}` failed to resolve")),
+                    Some(location),
+                )]
+            }
             Self::DuplicateSubmodel { original_span, .. } => {
                 let location = ErrorLocation::from_source_and_span(source, *original_span);
                 vec![(

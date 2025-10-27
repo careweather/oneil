@@ -7,6 +7,7 @@ use crate::{
     util::context::lookup::{self, LookupResult},
 };
 
+#[derive(Debug)]
 pub struct ParameterContext<'parameter> {
     parameters: &'parameter HashMap<ir::ParameterName, ir::Parameter>,
     parameter_errors: &'parameter HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
@@ -38,6 +39,7 @@ impl<'parameter> ParameterContext<'parameter> {
     }
 }
 
+#[derive(Debug)]
 pub enum ParameterContextResult<'parameter> {
     Found(&'parameter ir::Parameter),
     HasError,

@@ -241,17 +241,25 @@ impl ModelNodeBuilder {
         }
     }
 
-    pub fn with_submodel(mut self, submodel: &'static str) -> Self {
-        let use_model_name = ast::Identifier::new(submodel.to_string());
-        let use_model_name_node =
-            ast::Node::new(use_model_name, unimportant_span(), unimportant_span());
-        let use_model_info = ast::ModelInfo::new(use_model_name_node, vec![], None);
-        let use_model_info_node =
-            ast::Node::new(use_model_info, unimportant_span(), unimportant_span());
-        let use_model =
-            ast::UseModel::new(vec![], use_model_info_node, None, ast::ModelKind::Submodel);
-        let use_model_node = ast::Node::new(use_model, unimportant_span(), unimportant_span());
-        let decl = ast::Decl::use_model(use_model_node);
+    pub fn with_submodel(self, submodel: &'static str) -> Self {
+        self.with_model_import(submodel, ast::ModelKind::Submodel)
+    }
+
+    pub fn with_reference(self, reference: &'static str) -> Self {
+        self.with_model_import(reference, ast::ModelKind::Reference)
+    }
+
+    fn with_model_import(mut self, name: &'static str, model_kind: ast::ModelKind) -> Self {
+        let model_import_name = ast::Identifier::new(name.to_string());
+        let model_import_name_node =
+            ast::Node::new(model_import_name, unimportant_span(), unimportant_span());
+        let model_import_info = ast::ModelInfo::new(model_import_name_node, vec![], None);
+        let model_import_info_node =
+            ast::Node::new(model_import_info, unimportant_span(), unimportant_span());
+        let model_import = ast::UseModel::new(vec![], model_import_info_node, None, model_kind);
+        let model_import_node =
+            ast::Node::new(model_import, unimportant_span(), unimportant_span());
+        let decl = ast::Decl::use_model(model_import_node);
         let decl_node = ast::Node::new(decl, unimportant_span(), unimportant_span());
 
         self.decls.push(decl_node);
@@ -270,6 +278,33 @@ impl ModelNodeBuilder {
         let section_node = ast::Node::new(section, unimportant_span(), unimportant_span());
 
         self.sections.push(section_node);
+        self
+    }
+
+    pub fn with_number_parameter(mut self, name: &'static str, value: f64) -> Self {
+        let parameter_node = ParameterNodeBuilder::new()
+            .with_ident_and_label(name)
+            .with_number_value(value)
+            .build();
+        let decl = ast::Decl::parameter(parameter_node);
+        let decl_node = ast::Node::new(decl, unimportant_span(), unimportant_span());
+        self.decls.push(decl_node);
+        self
+    }
+
+    pub fn with_reference_variable_parameter(
+        mut self,
+        name: &'static str,
+        reference: &'static str,
+        value: &'static str,
+    ) -> Self {
+        let parameter_node = ParameterNodeBuilder::new()
+            .with_ident_and_label(name)
+            .with_model_parameter_variable_value(reference, value)
+            .build();
+        let decl = ast::Decl::parameter(parameter_node);
+        let decl_node = ast::Node::new(decl, unimportant_span(), unimportant_span());
+        self.decls.push(decl_node);
         self
     }
 
@@ -458,6 +493,19 @@ impl ParameterNodeBuilder {
         let value = ast::ParameterValue::Simple(number_node, None);
         let value_node = ast::Node::new(value, unimportant_span(), unimportant_span());
 
+        self.value = Some(value_node);
+        self
+    }
+
+    pub fn with_model_parameter_variable_value(
+        mut self,
+        reference: &'static str,
+        parameter: &'static str,
+    ) -> Self {
+        let reference_variable_node = model_parameter_variable_node(reference, parameter);
+        let variable_expr_node = variable_expr_node(reference_variable_node);
+        let value = ast::ParameterValue::Simple(variable_expr_node, None);
+        let value_node = ast::Node::new(value, unimportant_span(), unimportant_span());
         self.value = Some(value_node);
         self
     }
