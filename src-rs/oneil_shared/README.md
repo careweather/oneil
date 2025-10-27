@@ -19,7 +19,7 @@ The main feature of the error handling provided by this library is the `AsOneilE
 ### Example
 
 ```rust
-use oneil_error::{OneilError, AsOneilError, Context};
+use oneil_shared::error::{OneilError, AsOneilError, Context, ErrorLocation};
 use std::path::PathBuf;
 
 // Define an error type that implements AsOneilError
@@ -33,9 +33,9 @@ impl AsOneilError for MyError {
         self.message.clone()
     }
 
-    fn error_location(&self, source: &str) -> Option<oneil_error::ErrorLocation> {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         if self.offset < source.len() {
-            Some(oneil_error::ErrorLocation::from_source_and_offset(source, self.offset))
+            Some(ErrorLocation::from_source_and_offset(source, self.offset))
         } else {
             None
         }

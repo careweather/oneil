@@ -48,7 +48,7 @@ impl OneilError {
     /// # Examples
     ///
     /// ```rust
-    /// use oneil_error::{OneilError, AsOneilError, Context};
+    /// use oneil_shared::error::{OneilError, AsOneilError, Context};
     /// use std::path::PathBuf;
     ///
     /// struct SimpleError(String);
@@ -97,7 +97,7 @@ impl OneilError {
     /// # Examples
     ///
     /// ```rust
-    /// use oneil_error::{OneilError, AsOneilError, ErrorLocation};
+    /// use oneil_shared::error::{OneilError, AsOneilError, ErrorLocation};
     /// use std::path::PathBuf;
     ///
     /// struct PositionalError {
@@ -171,7 +171,7 @@ impl OneilError {
     /// # Examples
     ///
     /// ```rust
-    /// use oneil_error::{OneilError, AsOneilError};
+    /// use oneil_shared::error::{OneilError, AsOneilError};
     /// use std::path::PathBuf;
     ///
     /// struct MyError(String);
