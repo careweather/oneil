@@ -820,6 +820,6 @@ mod tests {
 
         // check the errors
         let errors = result.get_model_errors();
-        assert_eq!(errors.len(), 1);
+        assert_eq!(errors.len(), 2);
     }
 }

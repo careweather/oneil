@@ -46,6 +46,7 @@ pub struct Unit {
 impl Unit {
     #[must_use]
     pub const fn new(dimensions: ComplexDimension, magnitude: f64) -> Self {
+        assert!(magnitude > 0.0, "magnitude must be positive");
         Self {
             dimensions,
             magnitude,
@@ -55,5 +56,10 @@ impl Unit {
     #[must_use]
     pub const fn dimensions(&self) -> &ComplexDimension {
         &self.dimensions
+    }
+
+    #[must_use]
+    pub fn magnitude(&self) -> f64 {
+        self.magnitude
     }
 }
