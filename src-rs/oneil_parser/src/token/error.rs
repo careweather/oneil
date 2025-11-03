@@ -1,6 +1,7 @@
 //! Error handling for the token parsing
 
 use nom::error::ParseError;
+use oneil_shared::span::Span;
 
 use super::InputSpan;
 
@@ -152,25 +153,25 @@ pub enum ExpectSymbol {
 pub enum IncompleteKind {
     /// Unclosed note
     UnclosedNote {
-        /// The offset of the note delimiter start
-        delimiter_start_offset: usize,
-        /// The length of the note delimiter
-        delimiter_length: usize,
+        /// The span of the note delimiter
+        delimeter_span: Span,
     },
+    /// Invalid closing delimiter
+    InvalidClosingDelimiter,
     /// Unclosed string
     UnclosedString {
-        /// The offset of the opening quote
-        open_quote_offset: usize,
+        /// The span of the opening quote
+        open_quote_span: Span,
     },
     /// Invalid decimal part in a number
     InvalidDecimalPart {
-        /// The offset of the decimal point
-        decimal_point_offset: usize,
+        /// The span of the decimal point
+        decimal_point_span: Span,
     },
     /// Invalid exponent part in a number
     InvalidExponentPart {
-        /// The offset of the exponent 'e' character
-        e_offset: usize,
+        /// The span of the exponent 'e' character
+        e_span: Span,
     },
 }
 
@@ -184,46 +185,32 @@ impl TokenError {
     }
 
     /// Updates the error kind
-    ///
-    /// This should only be happening if the error is a nom error, so it panics
-    /// if it's not.
-    ///
-    /// This is because if it's any other token error, that likely means that
-    /// the `token` function was used multiple times, meaning that there might
-    /// be whitespace in the middle of the token
-    fn update_kind(self, kind: TokenErrorKind) -> Self {
-        let is_nom_error = matches!(self.kind, TokenErrorKind::NomError(_));
-        assert!(
-            is_nom_error,
-            "Cannot update an error that is not a nom error! (attempting to update the kind {:?})",
-            self.kind
-        );
-
+    const fn update_kind(self, kind: TokenErrorKind) -> Self {
         Self { kind, ..self }
     }
 
     /// Creates a new `TokenError` instance for an expected end of line
-    pub fn expected_end_of_line(error: Self) -> Self {
+    pub const fn expected_end_of_line(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::EndOfLine))
     }
 
     /// Creates a new `TokenError` instance for an expected identifier
-    pub fn expected_identifier(error: Self) -> Self {
+    pub const fn expected_identifier(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Identifier))
     }
 
     /// Creates a new `TokenError` instance for an expected keyword
-    pub fn expected_keyword(keyword: ExpectKeyword) -> impl Fn(Self) -> Self {
+    pub const fn expected_keyword(keyword: ExpectKeyword) -> impl Fn(Self) -> Self {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Keyword(keyword)))
     }
 
     /// Creates a new `TokenError` instance for an expected label
-    pub fn expected_label(error: Self) -> Self {
+    pub const fn expected_label(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Label))
     }
 
     /// Creates a new `TokenError` instance for an expected note
-    pub fn expected_note(error: Self) -> Self {
+    pub const fn expected_note(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Note))
     }
 
@@ -233,70 +220,69 @@ impl TokenError {
     }
 
     /// Creates a new `TokenError` instance for an expected number
-    pub fn expected_number(error: Self) -> Self {
+    pub const fn expected_number(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::Number))
     }
 
     /// Creates a new `TokenError` instance for an expected string
-    pub fn expected_string(error: Self) -> Self {
+    pub const fn expected_string(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::String))
     }
 
     /// Creates a new `TokenError` instance for an expected symbol
-    pub fn expected_symbol(symbol: ExpectSymbol) -> impl Fn(Self) -> Self {
+    pub const fn expected_symbol(symbol: ExpectSymbol) -> impl Fn(Self) -> Self {
         move |error: Self| error.update_kind(TokenErrorKind::Expect(ExpectKind::Symbol(symbol)))
     }
 
     /// Creates a new `TokenError` instance for an expected unit identifier
-    pub fn expected_unit_identifier(error: Self) -> Self {
+    pub const fn expected_unit_identifier(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitIdentifier))
     }
 
     /// Creates a new `TokenError` instance for an expected unit one
-    pub fn expected_unit_one(error: Self) -> Self {
+    pub const fn expected_unit_one(error: Self) -> Self {
         error.update_kind(TokenErrorKind::Expect(ExpectKind::UnitOne))
     }
 
     /// Creates a new `TokenError` instance for an unclosed note
-    pub fn unclosed_note(delimiter_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
+    pub const fn unclosed_note(delimeter_span: Span) -> impl Fn(Self) -> Self {
         move |error: Self| {
-            let delimiter_start_offset = delimiter_span.location_offset();
-            let delimiter_length = delimiter_span.len();
             error.update_kind(TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote {
-                delimiter_start_offset,
-                delimiter_length,
+                delimeter_span,
             }))
         }
     }
 
+    /// Creates a new `TokenError` instance for an invalid closing delimiter
+    pub const fn invalid_closing_delimiter(error: Self) -> Self {
+        error.update_kind(TokenErrorKind::Incomplete(
+            IncompleteKind::InvalidClosingDelimiter,
+        ))
+    }
+
     /// Creates a new `TokenError` instance for an unclosed string
-    pub fn unclosed_string(open_quote_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
+    pub fn unclosed_string(open_quote_span: Span) -> impl Fn(Self) -> Self {
         move |error: Self| {
-            let open_quote_offset = open_quote_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(IncompleteKind::UnclosedString {
-                open_quote_offset,
+                open_quote_span,
             }))
         }
     }
 
     /// Creates a new `TokenError` instance for an invalid decimal part in a number
-    pub fn invalid_decimal_part(decimal_point_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
+    pub fn invalid_decimal_part(decimal_point_span: Span) -> impl Fn(Self) -> Self {
         move |error: Self| {
-            let decimal_point_offset = decimal_point_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(
-                IncompleteKind::InvalidDecimalPart {
-                    decimal_point_offset,
-                },
+                IncompleteKind::InvalidDecimalPart { decimal_point_span },
             ))
         }
     }
 
     /// Creates a new `TokenError` instance for an invalid exponent part in a number
-    pub fn invalid_exponent_part(e_span: InputSpan<'_>) -> impl Fn(Self) -> Self {
+    pub fn invalid_exponent_part(e_span: Span) -> impl Fn(Self) -> Self {
         move |error: Self| {
-            let e_offset = e_span.location_offset();
             error.update_kind(TokenErrorKind::Incomplete(
-                IncompleteKind::InvalidExponentPart { e_offset },
+                IncompleteKind::InvalidExponentPart { e_span },
             ))
         }
     }

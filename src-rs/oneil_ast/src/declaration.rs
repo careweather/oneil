@@ -139,7 +139,7 @@ impl UseModel {
             .iter()
             .map(|d| d.as_str())
             .collect::<Vec<_>>();
-        path.push(self.model.top_component.as_str());
+        path.push(self.model.top_component().as_str());
         path.join("/")
     }
 }

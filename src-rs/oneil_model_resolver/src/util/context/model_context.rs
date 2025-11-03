@@ -4,6 +4,7 @@ use oneil_ir as ir;
 
 use crate::util::context::lookup::{self, LookupResult};
 
+#[derive(Debug)]
 pub struct ModelContext<'model> {
     models: &'model HashMap<ir::ModelPath, ir::Model>,
     model_errors: HashSet<&'model ir::ModelPath>,
@@ -33,6 +34,7 @@ impl<'model> ModelContext<'model> {
     }
 }
 
+#[derive(Debug)]
 pub enum ModelContextResult<'model> {
     Found(&'model ir::Model),
     HasError,

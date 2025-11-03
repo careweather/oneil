@@ -1,16 +1,15 @@
 //! Submodel resolution for the Oneil model loader
 
-use std::collections::HashMap;
-
 use oneil_ast as ast;
-use oneil_ir::{self as ir, IrSpan};
+use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
     error::ModelImportResolutionError,
     util::{
+        ReferenceMap, ReferenceResolutionErrors, SubmodelMap, SubmodelResolutionErrors,
         builder::ModelImportsBuilder,
         context::{ModelContext, ModelContextResult},
-        get_span_from_ast_span,
     },
 };
 
@@ -20,18 +19,20 @@ pub fn resolve_model_imports(
     model_path: &ir::ModelPath,
     context: &ModelContext<'_>,
 ) -> (
-    ir::SubmodelMap,
-    ir::ReferenceMap,
-    HashMap<ir::SubmodelName, ModelImportResolutionError>,
-    HashMap<ir::ReferenceName, ModelImportResolutionError>,
+    SubmodelMap,
+    ReferenceMap,
+    SubmodelResolutionErrors,
+    ReferenceResolutionErrors,
 ) {
     let mut builder = ModelImportsBuilder::new();
 
     for use_model in use_models {
         let import_path = calc_import_path(model_path, use_model);
 
-        let reference_name = get_reference_name(use_model.model_info());
-        let submodel_name = get_submodel_name(use_model.model_info());
+        let (reference_name, reference_name_span) =
+            get_reference_name_and_span(use_model.model_info());
+        let (submodel_name, submodel_name_span) =
+            get_submodel_name_and_span(use_model.model_info());
 
         let is_submodel = use_model.model_kind() == ast::ModelKind::Submodel;
 
@@ -41,9 +42,9 @@ pub fn resolve_model_imports(
                 .get_reference(&reference_name)
                 .map(|original_reference| {
                     ModelImportResolutionError::duplicate_reference(
-                        reference_name.value().clone(),
-                        original_reference.name().span(),
-                        reference_name.span(),
+                        reference_name.clone(),
+                        *original_reference.name_span(),
+                        reference_name_span,
                     )
                 });
 
@@ -52,9 +53,9 @@ pub fn resolve_model_imports(
                 .get_submodel(&submodel_name)
                 .map(|original_submodel| {
                     ModelImportResolutionError::duplicate_submodel(
-                        submodel_name.value().clone(),
-                        original_submodel.name().span(),
-                        submodel_name.span(),
+                        submodel_name.clone(),
+                        *original_submodel.name_span(),
+                        submodel_name_span,
                     )
                 });
 
@@ -63,18 +64,13 @@ pub fn resolve_model_imports(
 
         // handle duplicate references
         if let Some(reference_duplicate_error) = maybe_reference_duplicate_error {
-            builder.add_reference_resolution_error(
-                reference_name.value().clone(),
-                reference_duplicate_error,
-            );
+            builder
+                .add_reference_resolution_error(reference_name.clone(), reference_duplicate_error);
         }
 
         // handle duplicate submodels if the use model is a submodel
         if is_submodel && let Some(submodel_duplicate_error) = maybe_submodel_duplicate_error {
-            builder.add_submodel_resolution_error(
-                submodel_name.value().clone(),
-                submodel_duplicate_error,
-            );
+            builder.add_submodel_resolution_error(submodel_name.clone(), submodel_duplicate_error);
         }
 
         // if there were any duplicates, stop processing this use model
@@ -84,39 +80,34 @@ pub fn resolve_model_imports(
 
         // resolve the path for the use model
         let subcomponents = use_model.model_info().subcomponents();
-        let model_name_span = submodel_name.span();
+        let model_name_span = submodel_name_span;
         let resolved_path =
             resolve_model_path(import_path, model_name_span, subcomponents, context);
 
         // handle the error if there was one
         let resolved_path = match resolved_path {
             Ok(resolved_path) => resolved_path,
-            Err(error) if is_submodel => {
-                builder.add_submodel_resolution_error(submodel_name.take_value(), error.clone());
-
-                // It's currently necessary to add it to the reference
-                // resolution errors because otherwise, variable resolution will
-                // assume that the reference is not defined in the current model,
-                // not that the reference resolution failed
-                // TODO: figure out how to remove this duplication - maybe
-                // submodels point to references, since a reference will always
-                // exist for every submodel?
-                builder.add_reference_resolution_error(reference_name.take_value(), error);
-
-                continue;
-            }
             Err(error) => {
-                builder.add_reference_resolution_error(reference_name.take_value(), error);
+                handle_resolution_error(
+                    *error,
+                    use_model,
+                    reference_name,
+                    submodel_name,
+                    submodel_name_span,
+                    is_submodel,
+                    &mut builder,
+                );
+
                 continue;
             }
         };
 
         // add the reference to the builder
-        builder.add_reference(reference_name, resolved_path.clone());
+        builder.add_reference(reference_name, reference_name_span, resolved_path.clone());
 
         // add the submodel to the builder if it's a submodel
         if is_submodel {
-            builder.add_submodel(submodel_name, resolved_path.clone());
+            builder.add_submodel(submodel_name, submodel_name_span, resolved_path.clone());
         }
 
         let Some(submodel_list) = use_model.submodels() else {
@@ -124,63 +115,72 @@ pub fn resolve_model_imports(
             continue;
         };
 
-        for submodel_info in submodel_list.iter() {
-            // get the subcomponents relative to the main model being imported
-            let mut submodel_subcomponents = submodel_info.subcomponents().to_vec();
-            submodel_subcomponents.insert(0, submodel_info.top_component().clone());
-
-            // get the reference name for the submodel
-            let reference_name = get_reference_name(submodel_info);
-
-            // check for duplicate references
-            let maybe_original_reference = builder.get_reference(&reference_name);
-            if let Some(original_reference) = maybe_original_reference {
-                // if there is a duplicate, add the error and continue
-                let error = ModelImportResolutionError::duplicate_reference(
-                    reference_name.value().clone(),
-                    original_reference.name().span(),
-                    reference_name.span(),
-                );
-
-                builder.add_reference_resolution_error(reference_name.value().clone(), error);
-
-                continue;
-            }
-
-            // resolve the reference path
-            let resolved_reference_path = resolve_model_path(
-                resolved_path.clone(),
-                reference_name.span(),
-                &submodel_subcomponents,
-                context,
-            );
-
-            match resolved_reference_path {
-                Ok(resolved_reference_path) => {
-                    builder.add_reference(reference_name, resolved_reference_path);
-                }
-                Err(error) => {
-                    builder.add_reference_resolution_error(reference_name.take_value(), error);
-                }
-            }
-        }
+        resolve_sumbodels(&resolved_path, submodel_list, context, &mut builder);
     }
 
     builder.into_submodels_and_references_and_resolution_errors()
 }
 
-fn get_submodel_name(model_info: &ast::ModelInfo) -> ir::SubmodelNameWithSpan {
-    let model_name = model_info.get_model_name();
-    let name = ir::SubmodelName::new(model_name.as_str().to_string());
-    let span = get_span_from_ast_span(model_name.node_span());
-    ir::SubmodelNameWithSpan::new(name, span)
+fn resolve_sumbodels(
+    resolved_path: &ir::ModelPath,
+    submodel_list: &oneil_ast::Node<oneil_ast::SubmodelList>,
+    context: &ModelContext<'_>,
+    builder: &mut ModelImportsBuilder,
+) {
+    for submodel_info in submodel_list.iter() {
+        // get the subcomponents relative to the main model being imported
+        let mut submodel_subcomponents = submodel_info.subcomponents().to_vec();
+        submodel_subcomponents.insert(0, submodel_info.top_component().clone());
+
+        // get the reference name for the submodel
+        let (reference_name, reference_name_span) = get_reference_name_and_span(submodel_info);
+
+        // check for duplicate references
+        let maybe_original_reference = builder.get_reference(&reference_name);
+        if let Some(original_reference) = maybe_original_reference {
+            // if there is a duplicate, add the error and continue
+            let error = ModelImportResolutionError::duplicate_reference(
+                reference_name.clone(),
+                *original_reference.name_span(),
+                reference_name_span,
+            );
+
+            builder.add_reference_resolution_error(reference_name.clone(), error);
+
+            continue;
+        }
+
+        // resolve the reference path
+        let resolved_reference_path = resolve_model_path(
+            resolved_path.clone(),
+            reference_name_span,
+            &submodel_subcomponents,
+            context,
+        );
+
+        match resolved_reference_path {
+            Ok(resolved_reference_path) => {
+                builder.add_reference(reference_name, reference_name_span, resolved_reference_path);
+            }
+            Err(error) => {
+                builder.add_reference_resolution_error(reference_name, *error);
+            }
+        }
+    }
 }
 
-fn get_reference_name(model_info: &ast::ModelInfo) -> ir::ReferenceNameWithSpan {
+fn get_submodel_name_and_span(model_info: &ast::ModelInfo) -> (ir::SubmodelName, Span) {
+    let model_name = model_info.get_model_name();
+    let name = ir::SubmodelName::new(model_name.as_str().to_string());
+    let span = model_name.span();
+    (name, span)
+}
+
+fn get_reference_name_and_span(model_info: &ast::ModelInfo) -> (ir::ReferenceName, Span) {
     let model_name = model_info.get_alias();
     let name = ir::ReferenceName::new(model_name.as_str().to_string());
-    let span = get_span_from_ast_span(model_name.node_span());
-    ir::ReferenceNameWithSpan::new(name, span)
+    let span = model_name.span();
+    (name, span)
 }
 
 fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -> ir::ModelPath {
@@ -211,19 +211,19 @@ fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -
 /// will panic, indicating a bug in the model loading process.
 fn resolve_model_path(
     model_path: ir::ModelPath,
-    model_name_span: IrSpan,
+    model_name_span: Span,
     model_subcomponents: &[ast::IdentifierNode],
     context: &ModelContext<'_>,
-) -> Result<ir::ModelPath, ModelImportResolutionError> {
+) -> Result<ir::ModelPath, Box<ModelImportResolutionError>> {
     // if the model that we are trying to resolve has had an error, this
     // operation should fail
     let model = match context.lookup_model(&model_path) {
         ModelContextResult::Found(model) => model,
         ModelContextResult::HasError => {
-            return Err(ModelImportResolutionError::model_has_error(
+            return Err(Box::new(ModelImportResolutionError::model_has_error(
                 model_path,
                 model_name_span,
-            ));
+            )));
         }
         ModelContextResult::NotFound => unreachable!("model should have been visited already"),
     };
@@ -234,7 +234,7 @@ fn resolve_model_path(
     }
 
     let submodel_name = ir::SubmodelName::new(model_subcomponents[0].as_str().to_string());
-    let submodel_name_span = get_span_from_ast_span(model_subcomponents[0].node_span());
+    let submodel_name_span = model_subcomponents[0].span();
     let submodel_path = model
         .get_submodel(&submodel_name)
         .map(ir::SubmodelImport::path)
@@ -257,8 +257,56 @@ fn resolve_model_path(
     )
 }
 
+fn handle_resolution_error(
+    error: ModelImportResolutionError,
+    use_model: &oneil_ast::Node<oneil_ast::UseModel>,
+    reference_name: oneil_ir::ReferenceName,
+    submodel_name: oneil_ir::SubmodelName,
+    submodel_name_span: Span,
+    is_submodel: bool,
+    builder: &mut ModelImportsBuilder,
+) {
+    if is_submodel {
+        builder.add_submodel_resolution_error(submodel_name.clone(), error.clone());
+
+        // It's currently necessary to add submodel errors to the reference
+        // resolution errors because otherwise, variable resolution will
+        // assume that the reference is not defined in the current model,
+        // not that the reference resolution failed
+        // TODO: figure out how to remove this duplication - maybe
+        // submodels point to references, since a reference will always
+        // exist for every submodel?
+    }
+
+    builder.add_reference_resolution_error(reference_name, error);
+
+    let Some(submodel_list) = use_model.submodels() else {
+        // if we don't have any submodels, we're done
+        return;
+    };
+
+    let parent_model_name = submodel_name;
+    let parent_model_name_span = submodel_name_span;
+
+    for submodel_info in submodel_list.iter() {
+        // this is a bit hacky, but it's necessary to avoid getting confusing "undefined reference" errors
+        let (reference_name, reference_name_span) = get_reference_name_and_span(submodel_info);
+
+        let error = ModelImportResolutionError::parent_model_has_error(
+            parent_model_name.clone(),
+            parent_model_name_span,
+            reference_name.clone(),
+            reference_name_span,
+        );
+
+        builder.add_reference_resolution_error(reference_name, error);
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::test::construct::{ModelContextBuilder, test_ast, test_ir};
 
     use super::*;
@@ -270,7 +318,8 @@ mod tests {
     // than some line in an `assert_has_submodels` function
     macro_rules! assert_has_submodels {
         ($actual_submodel_map:expr, $expected_submodels:expr $(,)?) => {
-            let actual_submodel_map: &ir::SubmodelMap = $actual_submodel_map;
+            let actual_submodel_map: &HashMap<ir::SubmodelName, ir::SubmodelImport> =
+                $actual_submodel_map;
             let expected_submodels: Vec<(&'static str, &ir::ModelPath)> =
                 $expected_submodels.into_iter().collect();
 
@@ -307,7 +356,7 @@ mod tests {
     // than some line in an `assert_has_references` function
     macro_rules! assert_has_references {
         ($reference_map:expr, $references:expr $(,)?) => {
-            let reference_map: &ir::ReferenceMap = $reference_map;
+            let reference_map: &HashMap<ir::ReferenceName, ir::ReferenceImport> = $reference_map;
             let references: Vec<(&'static str, &ir::ModelPath)> = $references.into_iter().collect();
 
             // check that the reference map length is the same as the number of references

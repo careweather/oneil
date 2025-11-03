@@ -138,7 +138,7 @@ fn print_model(
 
 /// Prints submodels
 fn print_submodels(
-    submodels: &ir::SubmodelMap,
+    submodels: &HashMap<ir::SubmodelName, ir::SubmodelImport>,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
@@ -159,7 +159,7 @@ fn print_submodels(
 
 /// Prints submodels
 fn print_references(
-    references: &ir::ReferenceMap,
+    references: &HashMap<ir::ReferenceName, ir::ReferenceImport>,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
@@ -180,21 +180,21 @@ fn print_references(
 
 /// Prints parameters
 fn print_parameters(
-    parameters: &ir::ParameterCollection,
+    parameters: &HashMap<ir::ParameterName, ir::Parameter>,
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    for (i, (identifier, parameter)) in parameters.iter().enumerate() {
+    for (i, (parameter_name, parameter)) in parameters.iter().enumerate() {
         let is_last = i == parameters.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        print_parameter(identifier, parameter, writer, indent, prefix)?;
+        print_parameter(parameter_name, parameter, writer, indent, prefix)?;
     }
     Ok(())
 }
 
 /// Prints a single parameter
 fn print_parameter(
-    identifier: &ir::Identifier,
+    parameter_name: &ir::ParameterName,
     parameter: &ir::Parameter,
     writer: &mut impl Write,
     indent: usize,
@@ -205,7 +205,7 @@ fn print_parameter(
         "{}    {}Parameter: \"{}\"",
         "  ".repeat(indent),
         prefix,
-        identifier.as_str()
+        parameter_name.as_str()
     )?;
 
     let indent = indent + 2;
@@ -324,37 +324,27 @@ fn print_limits(limits: &ir::Limits, writer: &mut impl Write, indent: usize) -> 
 }
 
 /// Prints an expression
-fn print_expression(
-    expr: &ir::ExprWithSpan,
-    writer: &mut impl Write,
-    indent: usize,
-) -> io::Result<()> {
-    match &**expr {
+fn print_expression(expr: &ir::Expr, writer: &mut impl Write, indent: usize) -> io::Result<()> {
+    match expr {
         ir::Expr::BinaryOp { op, left, right } => {
-            writeln!(
-                writer,
-                "{}    ├── BinaryOp: {:?}",
-                "  ".repeat(indent),
-                &**op
-            )?;
+            writeln!(writer, "{}    ├── BinaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
         }
         ir::Expr::UnaryOp { op, expr } => {
-            writeln!(
-                writer,
-                "{}    ├── UnaryOp: {:?}",
-                "  ".repeat(indent),
-                &**op
-            )?;
+            writeln!(writer, "{}    ├── UnaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(expr, writer, indent + 2)?;
         }
         ir::Expr::FunctionCall { name, args } => {
+            let name = match name {
+                ir::FunctionName::Builtin(name) | ir::FunctionName::Imported(name) => name.as_str(),
+            };
+
             writeln!(
                 writer,
-                "{}    ├── FunctionCall: {:?}",
+                "{}    ├── FunctionCall: \"{}\"",
                 "  ".repeat(indent),
-                &**name
+                name
             )?;
             for (i, arg) in args.iter().enumerate() {
                 let is_last = i == args.len() - 1;
@@ -385,7 +375,7 @@ fn print_expression(
                 writer,
                 "{}    ├── ComparisonOp: {:?}",
                 "  ".repeat(indent),
-                &**op
+                op
             )?;
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
@@ -397,7 +387,7 @@ fn print_expression(
                     "{}        {}Chained: {:?}",
                     "  ".repeat(indent),
                     prefix,
-                    &**op
+                    op
                 )?;
                 print_expression(expr, writer, indent + 4)?;
             }
@@ -425,12 +415,15 @@ fn print_variable(var: &ir::Variable, writer: &mut impl Write, indent: usize) ->
                 id.as_str()
             )?;
         }
-        ir::Variable::External { model, ident } => {
+        ir::Variable::External {
+            model,
+            parameter_name,
+        } => {
             writeln!(
                 writer,
                 "{}    ├── External Variable: \"{}\" from \"{}\"",
                 "  ".repeat(indent),
-                ident.as_str(),
+                parameter_name.as_str(),
                 model.as_ref().display()
             )?;
         }

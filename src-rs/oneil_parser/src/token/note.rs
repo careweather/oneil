@@ -8,7 +8,7 @@
 use nom::Parser as _;
 use nom::bytes::complete::take_while;
 use nom::character::complete::{char, line_ending, not_line_ending};
-use nom::combinator::{consumed, flat_map, recognize, verify};
+use nom::combinator::{recognize, verify};
 use nom::multi::many0;
 
 use crate::token::{
@@ -17,6 +17,7 @@ use crate::token::{
     structure::end_of_line,
     util::{Token, inline_whitespace},
 };
+use crate::util::span_from;
 
 /// The kind of note that was parsed
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,6 +37,11 @@ fn end_of_line_span(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenErro
 /// Parses a single-line note, which starts with `~` and ends with a newline.
 fn single_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
     let (rest, matched) = recognize((char('~'), not_line_ending)).parse(input)?;
+
+    let lexeme_str = matched.fragment();
+
+    let lexeme_span = span_from(matched, rest);
+
     let (rest, whitespace) = end_of_line_span(rest)?;
 
     if multi_line_note_delimiter(matched).is_ok() {
@@ -43,7 +49,16 @@ fn single_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
         return Err(nom::Err::Error(error));
     }
 
-    Ok((rest, Token::new(matched, whitespace)))
+    let whitespace_span = span_from(whitespace, rest);
+
+    Ok((
+        rest,
+        Token {
+            lexeme_str,
+            lexeme_span,
+            whitespace_span,
+        },
+    ))
 }
 
 /// Parses a multi-line note delimiter (`~~~` with optional surrounding whitespace).
@@ -74,30 +89,37 @@ fn multi_line_note_content(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, To
 ///
 /// If the multi-line note is not closed properly, this parser will fail.
 fn multi_line_note(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
-    flat_map(
-        consumed(|input| {
-            let (rest, delimiter_span) = multi_line_note_delimiter.parse(input)?;
-            let (rest, ()) = (|input| {
-                let (rest, _) = line_ending.parse(input)?;
-                let (rest, _) = multi_line_note_content.parse(rest)?;
-                let (rest, _) = multi_line_note_delimiter.parse(rest)?;
-                Ok((rest, ()))
-            })
-            .or_fail_with(TokenError::unclosed_note(delimiter_span))
-            .parse(rest)?;
-            Ok((rest, delimiter_span))
-        }),
-        |(content, delimiter_span)| {
-            move |input| {
-                let (rest, whitespace) = end_of_line_span
-                    .or_fail_with(TokenError::unclosed_note(delimiter_span))
-                    .parse(input)?;
+    let (rest, content) = recognize(|input| {
+        let (rest, delimiter_input_span) = multi_line_note_delimiter.parse(input)?;
+        let delimiter_span = span_from(delimiter_input_span, rest);
 
-                Ok((rest, Token::new(content, whitespace)))
-            }
+        let (rest, ()) = (|input| {
+            let (rest, _) = line_ending.parse(input)?;
+            let (rest, _) = multi_line_note_content.parse(rest)?;
+            let (rest, _) = multi_line_note_delimiter.parse(rest)?;
+            Ok((rest, ()))
+        })
+        .or_fail_with(TokenError::unclosed_note(delimiter_span))
+        .parse(rest)?;
+        Ok((rest, ()))
+    })
+    .parse(input)?;
+    let lexeme_str = content.fragment();
+    let lexeme_span = span_from(content, rest);
+
+    let (rest, whitespace) = end_of_line_span
+        .or_fail_with(TokenError::invalid_closing_delimiter)
+        .parse(rest)?;
+    let whitespace_span = span_from(whitespace, rest);
+
+    Ok((
+        rest,
+        Token {
+            lexeme_str,
+            lexeme_span,
+            whitespace_span,
         },
-    )
-    .parse(input)
+    ))
 }
 
 /// Parses a note, which can be either a single-line or multi-line note.
@@ -123,7 +145,7 @@ mod tests {
             let input = InputSpan::new_extra("~ this is a note\nrest", Config::default());
             let (rest, (matched, kind)) = note(input).expect("should parse single line note");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ this is a note");
+            assert_eq!(matched.lexeme_str, "~ this is a note");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -133,7 +155,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note at EOF");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note");
+            assert_eq!(matched.lexeme_str, "~ note");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -143,7 +165,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with trailing whitespace");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note with spaces   ");
+            assert_eq!(matched.lexeme_str, "~ note with spaces   ");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -153,7 +175,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with special characters");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note with @#$% symbols");
+            assert_eq!(matched.lexeme_str, "~ note with @#$% symbols");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -163,7 +185,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with numbers");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note with 123 numbers");
+            assert_eq!(matched.lexeme_str, "~ note with 123 numbers");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -173,7 +195,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with tabs");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note\twith\ttabs");
+            assert_eq!(matched.lexeme_str, "~ note\twith\ttabs");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -183,7 +205,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with empty content");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~");
+            assert_eq!(matched.lexeme_str, "~");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -193,7 +215,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with carriage return");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note");
+            assert_eq!(matched.lexeme_str, "~ note");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -231,7 +253,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse only tilde as single line note");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~");
+            assert_eq!(matched.lexeme_str, "~");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -241,7 +263,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse tilde without newline as single line note");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note without newline");
+            assert_eq!(matched.lexeme_str, "~ note without newline");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -266,7 +288,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with unicode");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note with 世界 characters");
+            assert_eq!(matched.lexeme_str, "~ note with 世界 characters");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -276,7 +298,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse single line note with emoji");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~ note with 😀 emoji");
+            assert_eq!(matched.lexeme_str, "~ note with 😀 emoji");
             assert_eq!(rest.fragment(), &"rest");
         }
     }
@@ -292,8 +314,8 @@ mod tests {
             );
             let (rest, (matched, kind)) = note(input).expect("should parse multi-line note");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("This is a multi-line note."));
-            assert!(matched.lexeme().contains("Second line."));
+            assert!(matched.lexeme_str.contains("This is a multi-line note."));
+            assert!(matched.lexeme_str.contains("Second line."));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -303,8 +325,8 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with extra tildes");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("foo"));
-            assert!(matched.lexeme().contains("bar"));
+            assert!(matched.lexeme_str.contains("foo"));
+            assert!(matched.lexeme_str.contains("bar"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -313,8 +335,7 @@ mod tests {
             let input = InputSpan::new_extra("~~~\n~~~\nrest", Config::default());
             let (rest, (matched, kind)) = note(input).expect("should parse empty multi-line note");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert_eq!(matched.lexeme(), "~~~\n~~~");
-            assert_eq!(matched.whitespace(), "\n");
+            assert_eq!(matched.lexeme_str, "~~~\n~~~");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -325,7 +346,7 @@ mod tests {
             let (rest, (matched, kind)) = note(input)
                 .expect("should parse multi-line note with whitespace around delimiters");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("content"));
+            assert!(matched.lexeme_str.contains("content"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -338,10 +359,10 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with multiple lines");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line 1"));
-            assert!(matched.lexeme().contains("Line 2"));
-            assert!(matched.lexeme().contains("Line 3"));
-            assert!(matched.lexeme().contains("Line 4"));
+            assert!(matched.lexeme_str.contains("Line 1"));
+            assert!(matched.lexeme_str.contains("Line 2"));
+            assert!(matched.lexeme_str.contains("Line 3"));
+            assert!(matched.lexeme_str.contains("Line 4"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -352,7 +373,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with special characters");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line with @#$% symbols"));
+            assert!(matched.lexeme_str.contains("Line with @#$% symbols"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -363,7 +384,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with numbers");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line with 123 numbers"));
+            assert!(matched.lexeme_str.contains("Line with 123 numbers"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -373,7 +394,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with tabs");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line\twith\ttabs"));
+            assert!(matched.lexeme_str.contains("Line\twith\ttabs"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -384,7 +405,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with carriage returns");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line with CR"));
+            assert!(matched.lexeme_str.contains("Line with CR"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -397,7 +418,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with unicode");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line with 世界 characters"));
+            assert!(matched.lexeme_str.contains("Line with 世界 characters"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -408,7 +429,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with emoji");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line with 😀 emoji"));
+            assert!(matched.lexeme_str.contains("Line with 😀 emoji"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -421,7 +442,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with tilde in content");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line with ~ tilde in content"));
+            assert!(matched.lexeme_str.contains("Line with ~ tilde in content"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -434,7 +455,11 @@ mod tests {
             let (rest, (matched, kind)) = note(input)
                 .expect("should parse multi-line note with partial delimiter in content");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line with ~~ partial delimiter"));
+            assert!(
+                matched
+                    .lexeme_str
+                    .contains("Line with ~~ partial delimiter")
+            );
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -472,7 +497,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse incomplete delimiter as single line note");
             assert_eq!(kind, NoteKind::SingleLine);
-            assert_eq!(matched.lexeme(), "~~");
+            assert_eq!(matched.lexeme_str, "~~");
             assert_eq!(rest.fragment(), &"content\n~~\nrest");
         }
 
@@ -511,7 +536,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with delimiter in content");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("Line 1"));
+            assert!(matched.lexeme_str.contains("Line 1"));
             assert_eq!(rest.fragment(), &"Line 2\n~~~\nrest");
         }
 
@@ -521,7 +546,7 @@ mod tests {
             let (rest, (matched, kind)) =
                 note(input).expect("should parse multi-line note with mismatched delimiters");
             assert_eq!(kind, NoteKind::MultiLine);
-            assert!(matched.lexeme().contains("content"));
+            assert!(matched.lexeme_str.contains("content"));
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -536,6 +561,20 @@ mod tests {
             assert!(matches!(
                 token_error.kind,
                 TokenErrorKind::Incomplete(IncompleteKind::UnclosedNote { .. })
+            ));
+        }
+
+        #[test]
+        fn with_characters_after_closing_delimiter() {
+            let input = InputSpan::new_extra("~~~\ncontent\n~~~foo", Config::default());
+            let res = note(input);
+            let Err(nom::Err::Failure(token_error)) = res else {
+                panic!("expected TokenError::Incomplete(InvalidClosingDelimiter), got {res:?}");
+            };
+
+            assert!(matches!(
+                token_error.kind,
+                TokenErrorKind::Incomplete(IncompleteKind::InvalidClosingDelimiter)
             ));
         }
     }

@@ -35,7 +35,7 @@ pub struct ResolutionErrors {
     import: HashMap<ir::PythonPath, ImportResolutionError>,
     submodel_resolution: HashMap<ir::SubmodelName, ModelImportResolutionError>,
     reference_resolution: HashMap<ir::ReferenceName, ModelImportResolutionError>,
-    parameter_resolution: HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+    parameter_resolution: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
     test_resolution: HashMap<ir::TestIndex, Vec<TestResolutionError>>,
 }
 
@@ -46,7 +46,7 @@ impl ResolutionErrors {
         import_errors: HashMap<ir::PythonPath, ImportResolutionError>,
         submodel_resolution_errors: HashMap<ir::SubmodelName, ModelImportResolutionError>,
         reference_resolution_errors: HashMap<ir::ReferenceName, ModelImportResolutionError>,
-        parameter_resolution_errors: HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+        parameter_resolution_errors: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
         test_resolution_errors: HashMap<ir::TestIndex, Vec<TestResolutionError>>,
     ) -> Self {
         Self {
@@ -98,7 +98,7 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn get_parameter_resolution_errors(
         &self,
-    ) -> &HashMap<ir::Identifier, Vec<ParameterResolutionError>> {
+    ) -> &HashMap<ir::ParameterName, Vec<ParameterResolutionError>> {
         &self.parameter_resolution
     }
 

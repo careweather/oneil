@@ -56,14 +56,14 @@ fn print_decl(
     indent: usize,
     prefix: &str,
 ) -> io::Result<()> {
-    match decl.node_value() {
+    match &**decl {
         ast::Decl::Import(import) => {
             writeln!(
                 writer,
                 "{}{} Import: \"{}\"",
                 "  ".repeat(indent),
                 prefix,
-                import.path().node_value()
+                import.path().as_str()
             )?;
         }
         ast::Decl::UseModel(use_model) => {
@@ -101,7 +101,7 @@ fn print_decl(
                 "{}{} Parameter: {}",
                 "  ".repeat(indent),
                 prefix,
-                param.ident().node_value().as_str()
+                param.ident().as_str()
             )?;
 
             // Print parameter details
@@ -109,7 +109,7 @@ fn print_decl(
                 writer,
                 "{}    ├── Label: \"{}\"",
                 "  ".repeat(indent),
-                param.label().node_value().as_str()
+                param.label().as_str()
             )?;
 
             // Print parameter value
@@ -133,7 +133,7 @@ fn print_decl(
                     writer,
                     "{}    ├── Trace Level: {:?}",
                     "  ".repeat(indent),
-                    trace_level.node_value()
+                    trace_level
                 )?;
             }
 
@@ -155,7 +155,7 @@ fn print_decl(
                     writer,
                     "{}    ├── Trace Level: {:?}",
                     "  ".repeat(indent),
-                    trace_level.node_value()
+                    trace_level
                 )?;
             }
 
@@ -178,7 +178,7 @@ fn print_section(
         "{}{} Section: \"{}\"",
         "  ".repeat(indent),
         prefix,
-        section.header().label().node_value().as_str()
+        section.header().label().as_str()
     )?;
 
     // Print section note if present
@@ -209,24 +209,14 @@ fn print_expression(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match expr.node_value() {
+    match &**expr {
         ast::Expr::BinaryOp { op, left, right } => {
-            writeln!(
-                writer,
-                "{}BinaryOp: {:?}",
-                "  ".repeat(indent),
-                op.node_value()
-            )?;
+            writeln!(writer, "{}BinaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
         }
         ast::Expr::UnaryOp { op, expr } => {
-            writeln!(
-                writer,
-                "{}UnaryOp: {:?}",
-                "  ".repeat(indent),
-                op.node_value()
-            )?;
+            writeln!(writer, "{}UnaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(expr, writer, indent + 2)?;
         }
         ast::Expr::FunctionCall { name, args } => {
@@ -234,7 +224,7 @@ fn print_expression(
                 writer,
                 "{}FunctionCall: \"{}\"",
                 "  ".repeat(indent),
-                name.node_value().as_str()
+                name.as_str()
             )?;
             for (i, arg) in args.iter().enumerate() {
                 let is_last = i == args.len() - 1;
@@ -259,12 +249,7 @@ fn print_expression(
             right,
             rest_chained,
         } => {
-            writeln!(
-                writer,
-                "{}ComparisonOp: {:?}",
-                "  ".repeat(indent),
-                op.node_value()
-            )?;
+            writeln!(writer, "{}ComparisonOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
             for (i, (op, expr)) in rest_chained.iter().enumerate() {
@@ -275,7 +260,7 @@ fn print_expression(
                     "{}    {}Chained: {:?}",
                     "  ".repeat(indent),
                     prefix,
-                    op.node_value()
+                    op
                 )?;
                 print_expression(expr, writer, indent + 4)?;
             }
@@ -296,13 +281,13 @@ fn print_variable(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match var.node_value() {
+    match &**var {
         ast::Variable::Identifier(id) => {
             writeln!(
                 writer,
                 "{}Variable: \"{}\"",
                 "  ".repeat(indent),
-                id.node_value().as_str()
+                id.as_str()
             )?;
         }
         ast::Variable::ModelParameter {
@@ -323,7 +308,7 @@ fn print_variable(
 
 /// Prints a literal node
 fn print_literal(lit: &ast::LiteralNode, writer: &mut impl Write, indent: usize) -> io::Result<()> {
-    match lit.node_value() {
+    match &**lit {
         ast::Literal::Number(n) => {
             writeln!(writer, "{}Literal: {}", "  ".repeat(indent), n)?;
         }
@@ -343,7 +328,7 @@ fn print_parameter_value(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match value.node_value() {
+    match &**value {
         ast::ParameterValue::Simple(expr, unit) => {
             writeln!(writer, "{}Simple:", "  ".repeat(indent))?;
             print_expression(expr, writer, indent + 2)?;
@@ -384,7 +369,7 @@ fn print_limits(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match limits.node_value() {
+    match &**limits {
         ast::Limits::Continuous { min, max } => {
             writeln!(writer, "{}Continuous:", "  ".repeat(indent))?;
             writeln!(writer, "{}    ├── Min:", "  ".repeat(indent))?;
@@ -417,14 +402,9 @@ fn print_unit_expression(
     writer: &mut impl Write,
     indent: usize,
 ) -> io::Result<()> {
-    match unit_expr.node_value() {
+    match &**unit_expr {
         ast::UnitExpr::BinaryOp { op, left, right } => {
-            writeln!(
-                writer,
-                "{}BinaryOp: {:?}",
-                "  ".repeat(indent),
-                op.node_value()
-            )?;
+            writeln!(writer, "{}BinaryOp: {:?}", "  ".repeat(indent), op)?;
             print_unit_expression(left, writer, indent + 2)?;
             print_unit_expression(right, writer, indent + 2)?;
         }
@@ -440,14 +420,14 @@ fn print_unit_expression(
                 writer,
                 "{}Unit: \"{}\"",
                 "  ".repeat(indent),
-                identifier.node_value().as_str()
+                identifier.as_str()
             )?;
             if let Some(exp) = exponent {
                 writeln!(
                     writer,
                     "{}    └── Exponent: {}",
                     "  ".repeat(indent),
-                    exp.node_value().value()
+                    exp.value()
                 )?;
             }
         }

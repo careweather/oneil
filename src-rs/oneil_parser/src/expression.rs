@@ -8,9 +8,10 @@ use nom::{
 };
 
 use oneil_ast::{
-    AstSpan, BinaryOp, BinaryOpNode, ComparisonOp, Expr, ExprNode, Identifier, Literal, Node,
-    UnaryOp, Variable,
+    BinaryOp, BinaryOpNode, ComparisonOp, Expr, ExprNode, IdentifierNode, Literal, Node, UnaryOp,
+    Variable,
 };
+use oneil_shared::span::Span;
 
 use crate::{
     error::{ErrorHandlingParser, ParserError},
@@ -65,8 +66,11 @@ fn left_associative_binary_op<'a>(
             .fold(first_operand, |acc, (op, expr)| {
                 let left = acc;
                 let right = expr;
-                let span = AstSpan::calc_span(&left, &right);
-                Node::new(&span, Expr::binary_op(op, left, right))
+
+                let span = Span::from_start_and_end(&left.span(), &right.span());
+                let whitespace_span = right.whitespace_span();
+
+                Node::new(Expr::binary_op(op, left, right), span, whitespace_span)
             });
 
         Ok((rest, expr))
@@ -120,7 +124,7 @@ fn expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 /// Parses an OR expression (lowest precedence)
 fn or_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let or = or
-        .map(|token| Node::new(&token, BinaryOp::Or))
+        .map(|token| token.into_node_with_value(BinaryOp::Or))
         .convert_errors();
     left_associative_binary_op(and_expr, or).parse(input)
 }
@@ -128,7 +132,7 @@ fn or_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 /// Parses an AND expression
 fn and_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let and = and
-        .map(|token| Node::new(&token, BinaryOp::And))
+        .map(|token| token.into_node_with_value(BinaryOp::And))
         .convert_errors();
     left_associative_binary_op(not_expr, and).parse(input)
 }
@@ -138,7 +142,7 @@ fn not_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         |input| {
             let (rest, not_op) = not
-                .map(|token| Node::new(&token, UnaryOp::Not))
+                .map(|token| token.into_node_with_value(UnaryOp::Not))
                 .convert_errors()
                 .parse(input)?;
 
@@ -146,9 +150,13 @@ fn not_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
                 .or_fail_with(ParserError::unary_op_missing_operand(&not_op))
                 .parse(rest)?;
 
-            let span = AstSpan::calc_span(&not_op, &expr);
+            let span = Span::from_start_and_end(&not_op.span(), &expr.span());
+            let whitespace_span = expr.whitespace_span();
 
-            Ok((rest, Node::new(&span, Expr::unary_op(not_op, expr))))
+            Ok((
+                rest,
+                Node::new(Expr::unary_op(not_op, expr), span, whitespace_span),
+            ))
         },
         comparison_expr,
     ))
@@ -158,12 +166,12 @@ fn not_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 /// Parses a comparison expression
 fn comparison_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let mut op = alt((
-        less_than_equals.map(|token| Node::new(&token, ComparisonOp::LessThanEq)),
-        greater_than_equals.map(|token| Node::new(&token, ComparisonOp::GreaterThanEq)),
-        less_than.map(|token| Node::new(&token, ComparisonOp::LessThan)),
-        greater_than.map(|token| Node::new(&token, ComparisonOp::GreaterThan)),
-        equals_equals.map(|token| Node::new(&token, ComparisonOp::Eq)),
-        bang_equals.map(|token| Node::new(&token, ComparisonOp::NotEq)),
+        less_than_equals.map(|token| token.into_node_with_value(ComparisonOp::LessThanEq)),
+        greater_than_equals.map(|token| token.into_node_with_value(ComparisonOp::GreaterThanEq)),
+        less_than.map(|token| token.into_node_with_value(ComparisonOp::LessThan)),
+        greater_than.map(|token| token.into_node_with_value(ComparisonOp::GreaterThan)),
+        equals_equals.map(|token| token.into_node_with_value(ComparisonOp::Eq)),
+        bang_equals.map(|token| token.into_node_with_value(ComparisonOp::NotEq)),
     ))
     .convert_errors();
 
@@ -187,10 +195,14 @@ fn comparison_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
         Some((second_op, second_operand)) => {
             let left = first_operand;
             let right = second_operand;
-            let span = AstSpan::calc_span(&left, &right);
+
+            let span = Span::from_start_and_end(&left.span(), &right.span());
+            let whitespace_span = right.whitespace_span();
+
             Node::new(
-                &span,
                 Expr::comparison_op(second_op, left, right, rest_operands.collect()),
+                span,
+                whitespace_span,
             )
         }
         None => first_operand,
@@ -204,7 +216,7 @@ fn minmax_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, first_operand) = additive_expr.parse(input)?;
     let (rest, second_operand) = opt(|input| {
         let (rest, operator) = bar
-            .map(|token| Node::new(&token, BinaryOp::MinMax))
+            .map(|token| token.into_node_with_value(BinaryOp::MinMax))
             .convert_errors()
             .parse(input)?;
 
@@ -222,8 +234,10 @@ fn minmax_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
         Some((op, second_operand)) => {
             let left = first_operand;
             let right = second_operand;
-            let span = AstSpan::calc_span(&left, &right);
-            Node::new(&span, Expr::binary_op(op, left, right))
+            let span = Span::from_start_and_end(&left.span(), &right.span());
+            let whitespace_span = right.whitespace_span();
+
+            Node::new(Expr::binary_op(op, left, right), span, whitespace_span)
         }
         None => first_operand,
     };
@@ -234,9 +248,9 @@ fn minmax_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 /// Parses an additive expression
 fn additive_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
-        plus.map(|token| Node::new(&token, BinaryOp::Add)),
-        minus.map(|token| Node::new(&token, BinaryOp::Sub)),
-        minus_minus.map(|token| Node::new(&token, BinaryOp::TrueSub)),
+        plus.map(|token| token.into_node_with_value(BinaryOp::Add)),
+        minus.map(|token| token.into_node_with_value(BinaryOp::Sub)),
+        minus_minus.map(|token| token.into_node_with_value(BinaryOp::TrueSub)),
     ))
     .convert_errors();
 
@@ -246,10 +260,10 @@ fn additive_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 /// Parses a multiplicative expression
 fn multiplicative_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
-        star.map(|token| Node::new(&token, BinaryOp::Mul)),
-        slash.map(|token| Node::new(&token, BinaryOp::Div)),
-        slash_slash.map(|token| Node::new(&token, BinaryOp::TrueDiv)),
-        percent.map(|token| Node::new(&token, BinaryOp::Mod)),
+        star.map(|token| token.into_node_with_value(BinaryOp::Mul)),
+        slash.map(|token| token.into_node_with_value(BinaryOp::Div)),
+        slash_slash.map(|token| token.into_node_with_value(BinaryOp::TrueDiv)),
+        percent.map(|token| token.into_node_with_value(BinaryOp::Mod)),
     ))
     .convert_errors();
 
@@ -259,7 +273,7 @@ fn multiplicative_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError
 /// Parses an exponential expression (right associative)
 fn exponential_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let mut op = caret
-        .map(|token| Node::new(&token, BinaryOp::Pow))
+        .map(|token| token.into_node_with_value(BinaryOp::Pow))
         .convert_errors();
 
     let (rest, first_operand) = neg_expr.parse(input)?;
@@ -278,8 +292,11 @@ fn exponential_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
         Some((op, second_operand)) => {
             let left = first_operand;
             let right = second_operand;
-            let span = AstSpan::calc_span(&left, &right);
-            Node::new(&span, Expr::binary_op(op, left, right))
+
+            let span = Span::from_start_and_end(&left.span(), &right.span());
+            let whitespace_span = right.whitespace_span();
+
+            Node::new(Expr::binary_op(op, left, right), span, whitespace_span)
         }
         None => first_operand,
     };
@@ -292,7 +309,7 @@ fn neg_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         |input| {
             let (rest, minus_op) = minus
-                .map(|token| Node::new(&token, UnaryOp::Neg))
+                .map(|token| token.into_node_with_value(UnaryOp::Neg))
                 .convert_errors()
                 .parse(input)?;
 
@@ -300,9 +317,13 @@ fn neg_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
                 .or_fail_with(ParserError::unary_op_missing_operand(&minus_op))
                 .parse(rest)?;
 
-            let span = AstSpan::calc_span(&minus_op, &expr);
+            let span = Span::from_start_and_end(&minus_op.span(), &expr.span());
+            let whitespace_span = expr.whitespace_span();
 
-            Ok((rest, Node::new(&span, Expr::unary_op(minus_op, expr))))
+            Ok((
+                rest,
+                Node::new(Expr::unary_op(minus_op, expr), span, whitespace_span),
+            ))
         },
         primary_expr,
     ))
@@ -313,25 +334,25 @@ fn neg_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 fn primary_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     alt((
         map(number.convert_errors(), |n| {
-            let parse_result = n.lexeme().parse::<f64>();
+            let parse_result = n.lexeme_str.parse::<f64>();
             let parse_result = parse_result.expect("all valid numbers should parse correctly");
 
-            let node = Node::new(&n, Literal::number(parse_result));
-            Node::new(&n, Expr::literal(node))
+            let literal_node = n.into_node_with_value(Literal::number(parse_result));
+            literal_node.wrap(Expr::literal)
         }),
         map(string.convert_errors(), |s| {
             // trim quotes from the string
-            let s_contents = s.lexeme()[1..s.lexeme().len() - 1].to_string();
-            let node = Node::new(&s, Literal::string(s_contents));
-            Node::new(&s, Expr::literal(node))
+            let s_contents = s.lexeme_str[1..s.lexeme_str.len() - 1].to_string();
+            let literal_node = s.into_node_with_value(Literal::string(s_contents));
+            literal_node.wrap(Expr::literal)
         }),
         map(true_.convert_errors(), |t| {
-            let node = Node::new(&t, Literal::boolean(true));
-            Node::new(&t, Expr::literal(node))
+            let literal_node = t.into_node_with_value(Literal::boolean(true));
+            literal_node.wrap(Expr::literal)
         }),
         map(false_.convert_errors(), |t| {
-            let node = Node::new(&t, Literal::boolean(false));
-            Node::new(&t, Expr::literal(node))
+            let literal_node = t.into_node_with_value(Literal::boolean(false));
+            literal_node.wrap(Expr::literal)
         }),
         function_call,
         variable,
@@ -343,83 +364,99 @@ fn primary_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
 /// Parses a function call
 fn function_call(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, name) = identifier.convert_errors().parse(input)?;
-    let name_span = AstSpan::from(&name);
-    let name = Node::new(&name_span, Identifier::new(name.lexeme().to_string()));
+    let name_node = IdentifierNode::from(name);
 
-    let (rest, paren_left_span) = paren_left.convert_errors().parse(rest)?;
+    let (rest, paren_left_token) = paren_left.convert_errors().parse(rest)?;
     let (rest, args) = separated_list0(comma.convert_errors(), expr).parse(rest)?;
-    let (rest, paren_right_span) = paren_right
-        .or_fail_with(ParserError::unclosed_paren(&paren_left_span))
+    let (rest, paren_right_token) = paren_right
+        .or_fail_with(ParserError::unclosed_paren(paren_left_token.lexeme_span))
         .parse(rest)?;
 
-    let span = AstSpan::calc_span(&name, &paren_right_span);
+    let span = Span::from_start_and_end(&name_node.span(), &paren_right_token.lexeme_span);
+    let whitespace_span = paren_right_token.whitespace_span;
 
-    Ok((rest, Node::new(&span, Expr::function_call(name, args))))
+    Ok((
+        rest,
+        Node::new(Expr::function_call(name_node, args), span, whitespace_span),
+    ))
 }
 
 /// Parses a variable name
 fn variable(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let (rest, parameter_id) = identifier.convert_errors().parse(input)?;
-    let parameter_id_span = AstSpan::from(&parameter_id);
-    let parameter_id = Node::new(
-        &parameter_id_span,
-        Identifier::new(parameter_id.lexeme().to_string()),
-    );
+    let parameter_id_node = IdentifierNode::from(parameter_id);
 
-    let (rest, reference_model_id) = opt(|input| {
+    let (rest, reference_model_id_node) = opt(|input| {
         let (rest, dot_token) = dot.convert_errors().parse(input)?;
         let (rest, reference_model_id) = identifier
             .or_fail_with(ParserError::expr_variable_missing_reference_model(
-                &dot_token,
+                dot_token.lexeme_span,
             ))
             .parse(rest)?;
-        let id_span = AstSpan::from(&reference_model_id);
-        let id = Node::new(
-            &id_span,
-            Identifier::new(reference_model_id.lexeme().to_string()),
-        );
 
-        Ok((rest, id))
+        let reference_model_id_node = IdentifierNode::from(reference_model_id);
+
+        Ok((rest, reference_model_id_node))
     })
     .parse(rest)?;
 
-    let variable_node = match reference_model_id {
-        Some(reference_model_id) => {
-            let variable_span =
-                AstSpan::calc_span(&parameter_id_span, &reference_model_id.node_span());
-            let variable = Variable::model_parameter(reference_model_id, parameter_id);
-            Node::new(&variable_span, variable)
+    let variable_node = match reference_model_id_node {
+        Some(reference_model_id_node) => {
+            let variable_span = Span::from_start_and_end(
+                &parameter_id_node.span(),
+                &reference_model_id_node.span(),
+            );
+            let variable_whitespace_span = reference_model_id_node.whitespace_span();
+
+            let variable = Variable::model_parameter(reference_model_id_node, parameter_id_node);
+
+            Node::new(variable, variable_span, variable_whitespace_span)
         }
-        None => Node::new(&parameter_id_span, Variable::identifier(parameter_id)),
+        None => parameter_id_node.wrap(Variable::identifier),
     };
 
-    let expr = Node::new(&variable_node.node_span(), Expr::variable(variable_node));
+    let expr = variable_node.wrap(Expr::variable);
 
     Ok((rest, expr))
 }
 
 /// Parses a parenthesized expression
 fn parenthesized_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
-    let (rest, paren_left_span) = paren_left.convert_errors().parse(input)?;
+    let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
 
     let (rest, expr) = expr
-        .or_fail_with(ParserError::expr_paren_missing_expression(&paren_left_span))
+        .or_fail_with(ParserError::expr_paren_missing_expression(
+            paren_left_token.lexeme_span,
+        ))
         .parse(rest)?;
 
-    let (rest, paren_right_span) = paren_right
-        .or_fail_with(ParserError::unclosed_paren(&paren_left_span))
+    let (rest, paren_right_token) = paren_right
+        .or_fail_with(ParserError::unclosed_paren(paren_left_token.lexeme_span))
         .parse(rest)?;
 
     // note: we need to wrap the expr in a parenthesized node in order to keep the spans accurate
     //       otherwise, calculating spans using the parenthesized node as a start or end span
     //       will result in the calculated span ignoring the parens
-    let span = AstSpan::calc_span(&paren_left_span, &paren_right_span);
-    let expr = Node::new(&span, Expr::parenthesized(expr));
+    let span = Span::from_start_and_end(
+        &paren_left_token.lexeme_span,
+        &paren_right_token.lexeme_span,
+    );
+    let whitespace_span = paren_right_token.whitespace_span;
+
+    let expr = Node::new(Expr::parenthesized(expr), span, whitespace_span);
 
     Ok((rest, expr))
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::float_cmp,
+    reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
+)]
+#[expect(
+    clippy::bool_assert_comparison,
+    reason = "testing the contents of AST nodes"
+)]
 mod tests {
     use super::*;
     use crate::Config;
@@ -429,12 +466,15 @@ mod tests {
         let input = InputSpan::new_extra("42", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 2, 0),
-            Expr::literal(Node::new(&AstSpan::new(0, 2, 0), Literal::number(42.0))),
-        );
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
 
-        assert_eq!(expr, expected_expr);
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 42.0);
     }
 
     #[test]
@@ -442,15 +482,15 @@ mod tests {
         let input = InputSpan::new_extra("'hello'", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 7, 0),
-            Expr::literal(Node::new(
-                &AstSpan::new(0, 7, 0),
-                Literal::string("hello".to_string()),
-            )),
-        );
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
 
-        assert_eq!(expr, expected_expr);
+        let Literal::String(value) = value.take_value() else {
+            panic!("expected string");
+        };
+
+        assert_eq!(value, "hello".to_string());
     }
 
     #[test]
@@ -458,12 +498,15 @@ mod tests {
         let input = InputSpan::new_extra("true", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 4, 0),
-            Expr::literal(Node::new(&AstSpan::new(0, 4, 0), Literal::boolean(true))),
-        );
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
 
-        assert_eq!(expr, expected_expr);
+        let Literal::Boolean(value) = value.take_value() else {
+            panic!("expected boolean");
+        };
+
+        assert_eq!(value, true);
     }
 
     #[test]
@@ -471,12 +514,15 @@ mod tests {
         let input = InputSpan::new_extra("false", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 5, 0),
-            Expr::literal(Node::new(&AstSpan::new(0, 5, 0), Literal::boolean(false))),
-        );
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
 
-        assert_eq!(expr, expected_expr);
+        let Literal::Boolean(value) = value.take_value() else {
+            panic!("expected boolean");
+        };
+
+        assert_eq!(value, false);
     }
 
     #[test]
@@ -484,17 +530,15 @@ mod tests {
         let input = InputSpan::new_extra("foo", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_id = Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
+        let Expr::Variable(value) = expr.take_value() else {
+            panic!("expected variable");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 3, 0),
-            Expr::variable(Node::new(
-                &AstSpan::new(0, 3, 0),
-                Variable::identifier(expected_id),
-            )),
-        );
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value.as_str(), "foo");
     }
 
     #[test]
@@ -502,18 +546,20 @@ mod tests {
         let input = InputSpan::new_extra("foo.bar", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_parameter_id =
-            Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
-        let expected_reference_model_id =
-            Node::new(&AstSpan::new(4, 3, 0), Identifier::new("bar".to_string()));
+        let Expr::Variable(value) = expr.take_value() else {
+            panic!("expected variable");
+        };
 
-        let variable = Node::new(
-            &AstSpan::new(0, 7, 0),
-            Variable::model_parameter(expected_reference_model_id, expected_parameter_id),
-        );
+        let Variable::ModelParameter {
+            reference_model,
+            parameter,
+        } = value.take_value()
+        else {
+            panic!("expected model parameter");
+        };
 
-        let expected_expr = Node::new(&AstSpan::new(0, 7, 0), Expr::variable(variable));
-        assert_eq!(expr, expected_expr);
+        assert_eq!(reference_model.as_str(), "bar");
+        assert_eq!(parameter.as_str(), "foo");
     }
 
     #[test]
@@ -521,20 +567,37 @@ mod tests {
         let input = InputSpan::new_extra("foo(1, 2)", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_foo = Node::new(&AstSpan::new(0, 3, 0), Identifier::new("foo".to_string()));
+        let Expr::FunctionCall { name, mut args } = expr.take_value() else {
+            panic!("expected function call");
+        };
 
-        let expected_1 = Node::new(&AstSpan::new(4, 1, 0), Literal::number(1.0));
-        let expected_1 = Node::new(&AstSpan::new(4, 1, 0), Expr::literal(expected_1));
+        assert_eq!(name.as_str(), "foo");
 
-        let expected_2 = Node::new(&AstSpan::new(7, 1, 0), Literal::number(2.0));
-        let expected_2 = Node::new(&AstSpan::new(7, 1, 0), Expr::literal(expected_2));
+        assert_eq!(args.len(), 2);
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 9, 0),
-            Expr::function_call(expected_foo, vec![expected_1, expected_2]),
-        );
+        let arg1 = args.remove(0);
 
-        assert_eq!(expr, expected_expr);
+        let Expr::Literal(value) = arg1.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 1.0);
+
+        let arg2 = args.remove(0);
+
+        let Expr::Literal(value) = arg2.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 2.0);
     }
 
     #[test]
@@ -542,14 +605,21 @@ mod tests {
         let input = InputSpan::new_extra("-42", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_42 = Node::new(&AstSpan::new(1, 2, 0), Literal::number(42.0));
-        let expected_42 = Node::new(&AstSpan::new(1, 2, 0), Expr::literal(expected_42));
+        let Expr::UnaryOp { op, expr } = expr.take_value() else {
+            panic!("expected unary op");
+        };
 
-        let op = Node::new(&AstSpan::new(0, 1, 0), UnaryOp::Neg);
+        assert_eq!(op.take_value(), UnaryOp::Neg);
 
-        let expected_expr = Node::new(&AstSpan::new(0, 3, 0), Expr::unary_op(op, expected_42));
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
 
-        assert_eq!(expr, expected_expr);
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 42.0);
     }
 
     #[test]
@@ -557,20 +627,31 @@ mod tests {
         let input = InputSpan::new_extra("2^3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Expr::literal(expected_2));
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
+        };
 
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Literal::number(3.0));
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Expr::literal(expected_3));
+        assert_eq!(op.take_value(), BinaryOp::Pow);
 
-        let op = Node::new(&AstSpan::new(1, 1, 0), BinaryOp::Pow);
+        let Expr::Literal(value) = left.take_value() else {
+            panic!("expected literal");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 3, 0),
-            Expr::binary_op(op, expected_2, expected_3),
-        );
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value, 2.0);
+
+        let Expr::Literal(value) = right.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 3.0);
     }
 
     #[test]
@@ -578,20 +659,31 @@ mod tests {
         let input = InputSpan::new_extra("2*3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Expr::literal(expected_2));
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
+        };
 
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Literal::number(3.0));
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Expr::literal(expected_3));
+        assert_eq!(op.take_value(), BinaryOp::Mul);
 
-        let op = Node::new(&AstSpan::new(1, 1, 0), BinaryOp::Mul);
+        let Expr::Literal(value) = left.take_value() else {
+            panic!("expected literal");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 3, 0),
-            Expr::binary_op(op, expected_2, expected_3),
-        );
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value, 2.0);
+
+        let Expr::Literal(value) = right.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 3.0);
     }
 
     #[test]
@@ -599,20 +691,31 @@ mod tests {
         let input = InputSpan::new_extra("2+3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Expr::literal(expected_2));
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
+        };
 
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Literal::number(3.0));
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Expr::literal(expected_3));
+        assert_eq!(op.take_value(), BinaryOp::Add);
 
-        let op = Node::new(&AstSpan::new(1, 1, 0), BinaryOp::Add);
+        let Expr::Literal(value) = left.take_value() else {
+            panic!("expected literal");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 3, 0),
-            Expr::binary_op(op, expected_2, expected_3),
-        );
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value, 2.0);
+
+        let Expr::Literal(value) = right.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 3.0);
     }
 
     #[test]
@@ -620,28 +723,31 @@ mod tests {
         let input = InputSpan::new_extra("min_weight | max_weight", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_min = Node::new(
-            &AstSpan::new(0, 10, 1),
-            Identifier::new("min_weight".to_string()),
-        );
-        let expected_min = Node::new(&AstSpan::new(0, 10, 1), Variable::identifier(expected_min));
-        let expected_min = Node::new(&AstSpan::new(0, 10, 1), Expr::variable(expected_min));
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
+        };
 
-        let expected_max = Node::new(
-            &AstSpan::new(13, 10, 0),
-            Identifier::new("max_weight".to_string()),
-        );
-        let expected_max = Node::new(&AstSpan::new(13, 10, 0), Variable::identifier(expected_max));
-        let expected_max = Node::new(&AstSpan::new(13, 10, 0), Expr::variable(expected_max));
+        assert_eq!(op.take_value(), BinaryOp::MinMax);
 
-        let op = Node::new(&AstSpan::new(11, 1, 1), BinaryOp::MinMax);
+        let Expr::Variable(value) = left.take_value() else {
+            panic!("expected variable");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 23, 0),
-            Expr::binary_op(op, expected_min, expected_max),
-        );
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value.as_str(), "min_weight");
+
+        let Expr::Variable(value) = right.take_value() else {
+            panic!("expected variable");
+        };
+
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
+
+        assert_eq!(value.as_str(), "max_weight");
     }
 
     #[test]
@@ -649,20 +755,39 @@ mod tests {
         let input = InputSpan::new_extra("2<3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Literal::number(2.0));
-        let expected_2 = Node::new(&AstSpan::new(0, 1, 0), Expr::literal(expected_2));
+        let Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            rest_chained,
+        } = expr.take_value()
+        else {
+            panic!("expected comparison op");
+        };
 
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Literal::number(3.0));
-        let expected_3 = Node::new(&AstSpan::new(2, 1, 0), Expr::literal(expected_3));
+        assert_eq!(op.take_value(), ComparisonOp::LessThan);
 
-        let op = Node::new(&AstSpan::new(1, 1, 0), ComparisonOp::LessThan);
+        let Expr::Literal(value) = left.take_value() else {
+            panic!("expected literal");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 3, 0),
-            Expr::comparison_op(op, expected_2, expected_3, vec![]),
-        );
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value, 2.0);
+
+        let Expr::Literal(value) = right.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 3.0);
+
+        assert_eq!(rest_chained.len(), 0);
     }
 
     #[test]
@@ -670,14 +795,21 @@ mod tests {
         let input = InputSpan::new_extra("not true", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_true = Node::new(&AstSpan::new(4, 4, 0), Literal::boolean(true));
-        let expected_true = Node::new(&AstSpan::new(4, 4, 0), Expr::literal(expected_true));
+        let Expr::UnaryOp { op, expr } = expr.take_value() else {
+            panic!("expected unary op");
+        };
 
-        let op = Node::new(&AstSpan::new(0, 3, 1), UnaryOp::Not);
+        assert_eq!(op.take_value(), UnaryOp::Not);
 
-        let expected_expr = Node::new(&AstSpan::new(0, 8, 0), Expr::unary_op(op, expected_true));
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
 
-        assert_eq!(expr, expected_expr);
+        let Literal::Boolean(value) = value.take_value() else {
+            panic!("expected boolean");
+        };
+
+        assert_eq!(value, true);
     }
 
     #[test]
@@ -685,20 +817,31 @@ mod tests {
         let input = InputSpan::new_extra("true and false", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_true = Node::new(&AstSpan::new(0, 4, 1), Literal::boolean(true));
-        let expected_true = Node::new(&AstSpan::new(0, 4, 1), Expr::literal(expected_true));
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
+        };
 
-        let expected_false = Node::new(&AstSpan::new(9, 5, 0), Literal::boolean(false));
-        let expected_false = Node::new(&AstSpan::new(9, 5, 0), Expr::literal(expected_false));
+        assert_eq!(op.take_value(), BinaryOp::And);
 
-        let op = Node::new(&AstSpan::new(5, 3, 1), BinaryOp::And);
+        let Expr::Literal(value) = left.take_value() else {
+            panic!("expected literal");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 14, 0),
-            Expr::binary_op(op, expected_true, expected_false),
-        );
+        let Literal::Boolean(value) = value.take_value() else {
+            panic!("expected boolean");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value, true);
+
+        let Expr::Literal(value) = right.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Boolean(value) = value.take_value() else {
+            panic!("expected boolean");
+        };
+
+        assert_eq!(value, false);
     }
 
     #[test]
@@ -706,20 +849,31 @@ mod tests {
         let input = InputSpan::new_extra("true or false", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_true = Node::new(&AstSpan::new(0, 4, 1), Literal::boolean(true));
-        let expected_true = Node::new(&AstSpan::new(0, 4, 1), Expr::literal(expected_true));
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
+        };
 
-        let expected_false = Node::new(&AstSpan::new(8, 5, 0), Literal::boolean(false));
-        let expected_false = Node::new(&AstSpan::new(8, 5, 0), Expr::literal(expected_false));
+        assert_eq!(op.take_value(), BinaryOp::Or);
 
-        let op = Node::new(&AstSpan::new(5, 2, 1), BinaryOp::Or);
+        let Expr::Literal(value) = left.take_value() else {
+            panic!("expected literal");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 13, 0),
-            Expr::binary_op(op, expected_true, expected_false),
-        );
+        let Literal::Boolean(value) = value.take_value() else {
+            panic!("expected boolean");
+        };
 
-        assert_eq!(expr, expected_expr);
+        assert_eq!(value, true);
+
+        let Expr::Literal(value) = right.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Boolean(value) = value.take_value() else {
+            panic!("expected boolean");
+        };
+
+        assert_eq!(value, false);
     }
 
     #[test]
@@ -727,24 +881,53 @@ mod tests {
         let input = InputSpan::new_extra("1 < 2 < 3", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_1 = Node::new(&AstSpan::new(0, 1, 1), Literal::number(1.0));
-        let expected_1 = Node::new(&AstSpan::new(0, 1, 1), Expr::literal(expected_1));
+        let Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            mut rest_chained,
+        } = expr.take_value()
+        else {
+            panic!("expected comparison op");
+        };
 
-        let expected_2 = Node::new(&AstSpan::new(4, 1, 1), Literal::number(2.0));
-        let expected_2 = Node::new(&AstSpan::new(4, 1, 1), Expr::literal(expected_2));
+        assert_eq!(op.take_value(), ComparisonOp::LessThan);
 
-        let expected_3 = Node::new(&AstSpan::new(8, 1, 0), Literal::number(3.0));
-        let expected_3 = Node::new(&AstSpan::new(8, 1, 0), Expr::literal(expected_3));
+        let Expr::Literal(value) = left.take_value() else {
+            panic!("expected literal");
+        };
 
-        let op1 = Node::new(&AstSpan::new(2, 1, 1), ComparisonOp::LessThan);
-        let op2 = Node::new(&AstSpan::new(6, 1, 1), ComparisonOp::LessThan);
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 5, 1),
-            Expr::comparison_op(op1, expected_1, expected_2, vec![(op2, expected_3)]),
-        );
+        assert_eq!(value, 1.0);
 
-        assert_eq!(expr, expected_expr);
+        let Expr::Literal(value) = right.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 2.0);
+
+        assert_eq!(rest_chained.len(), 1);
+
+        let (op, expr) = rest_chained.remove(0);
+
+        assert_eq!(*op, ComparisonOp::LessThan);
+
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
+
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 3.0);
     }
 
     #[test]
@@ -752,55 +935,53 @@ mod tests {
         let input = InputSpan::new_extra("x <= y < z", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_x = Node::new(&AstSpan::new(0, 1, 1), Identifier::new("x".to_string()));
-        let expected_x = Node::new(&AstSpan::new(0, 1, 1), Variable::identifier(expected_x));
-        let expected_x = Node::new(&AstSpan::new(0, 1, 1), Expr::variable(expected_x));
+        let Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            mut rest_chained,
+        } = expr.take_value()
+        else {
+            panic!("expected comparison op");
+        };
 
-        let expected_y = Node::new(&AstSpan::new(5, 1, 1), Identifier::new("y".to_string()));
-        let expected_y = Node::new(&AstSpan::new(5, 1, 1), Variable::identifier(expected_y));
-        let expected_y = Node::new(&AstSpan::new(5, 1, 1), Expr::variable(expected_y));
+        assert_eq!(op.take_value(), ComparisonOp::LessThanEq);
 
-        let expected_z = Node::new(&AstSpan::new(9, 1, 0), Identifier::new("z".to_string()));
-        let expected_z = Node::new(&AstSpan::new(9, 1, 0), Variable::identifier(expected_z));
-        let expected_z = Node::new(&AstSpan::new(9, 1, 0), Expr::variable(expected_z));
+        let Expr::Variable(value) = left.take_value() else {
+            panic!("expected variable");
+        };
 
-        let op1 = Node::new(&AstSpan::new(2, 2, 1), ComparisonOp::LessThanEq);
-        let op2 = Node::new(&AstSpan::new(7, 1, 1), ComparisonOp::LessThan);
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 6, 1),
-            Expr::comparison_op(op1, expected_x, expected_y, vec![(op2, expected_z)]),
-        );
+        assert_eq!(value.as_str(), "x");
 
-        assert_eq!(expr, expected_expr);
-    }
+        let Expr::Variable(value) = right.take_value() else {
+            panic!("expected variable");
+        };
 
-    #[test]
-    fn chained_comparison_expr_three_ops() {
-        let input = InputSpan::new_extra("a >= b == c", Config::default());
-        let (_, expr) = parse(input).expect("parsing should succeed");
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
 
-        let expected_a = Node::new(&AstSpan::new(0, 1, 1), Identifier::new("a".to_string()));
-        let expected_a = Node::new(&AstSpan::new(0, 1, 1), Variable::identifier(expected_a));
-        let expected_a = Node::new(&AstSpan::new(0, 1, 1), Expr::variable(expected_a));
+        assert_eq!(value.as_str(), "y");
 
-        let expected_b = Node::new(&AstSpan::new(5, 1, 1), Identifier::new("b".to_string()));
-        let expected_b = Node::new(&AstSpan::new(5, 1, 1), Variable::identifier(expected_b));
-        let expected_b = Node::new(&AstSpan::new(5, 1, 1), Expr::variable(expected_b));
+        assert_eq!(rest_chained.len(), 1);
 
-        let expected_c = Node::new(&AstSpan::new(10, 1, 0), Identifier::new("c".to_string()));
-        let expected_c = Node::new(&AstSpan::new(10, 1, 0), Variable::identifier(expected_c));
-        let expected_c = Node::new(&AstSpan::new(10, 1, 0), Expr::variable(expected_c));
+        let (op, expr) = rest_chained.remove(0);
 
-        let op1 = Node::new(&AstSpan::new(2, 2, 1), ComparisonOp::GreaterThanEq);
-        let op2 = Node::new(&AstSpan::new(7, 2, 1), ComparisonOp::Eq);
+        assert_eq!(op.take_value(), ComparisonOp::LessThan);
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 6, 1),
-            Expr::comparison_op(op1, expected_a, expected_b, vec![(op2, expected_c)]),
-        );
+        let Expr::Variable(value) = expr.take_value() else {
+            panic!("expected variable");
+        };
 
-        assert_eq!(expr, expected_expr);
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
+
+        assert_eq!(value.as_str(), "z");
     }
 
     #[test]
@@ -810,7 +991,7 @@ mod tests {
 
         // This is a complex expression, so we just verify it parses correctly
         // and has the right structure for a chained comparison
-        assert!(matches!(expr.node_value(), Expr::ComparisonOp { .. }));
+        assert!(matches!(expr.take_value(), Expr::ComparisonOp { .. }));
     }
 
     #[test]
@@ -818,53 +999,55 @@ mod tests {
         let input = InputSpan::new_extra("x != y", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let expected_x = Node::new(&AstSpan::new(0, 1, 1), Identifier::new("x".to_string()));
-        let expected_x = Node::new(&AstSpan::new(0, 1, 1), Variable::identifier(expected_x));
-        let expected_x = Node::new(&AstSpan::new(0, 1, 1), Expr::variable(expected_x));
+        let Expr::ComparisonOp {
+            op,
+            left,
+            right,
+            rest_chained,
+        } = expr.take_value()
+        else {
+            panic!("expected comparison op");
+        };
 
-        let expected_y = Node::new(&AstSpan::new(5, 1, 0), Identifier::new("y".to_string()));
-        let expected_y = Node::new(&AstSpan::new(5, 1, 0), Variable::identifier(expected_y));
-        let expected_y = Node::new(&AstSpan::new(5, 1, 0), Expr::variable(expected_y));
+        assert_eq!(op.take_value(), ComparisonOp::NotEq);
 
-        let op = Node::new(&AstSpan::new(2, 2, 1), ComparisonOp::NotEq);
+        let Expr::Variable(value) = left.take_value() else {
+            panic!("expected variable");
+        };
 
-        let expected_expr = Node::new(
-            &AstSpan::new(0, 6, 0),
-            Expr::comparison_op(op, expected_x, expected_y, vec![]),
-        );
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
 
-        assert_eq!(expr, expected_expr);
-    }
+        assert_eq!(value.as_str(), "x");
 
-    #[test]
-    fn no_comparison_expr() {
-        let input = InputSpan::new_extra("42", Config::default());
-        let (_, expr) = parse(input).expect("parsing should succeed");
+        let Expr::Variable(value) = right.take_value() else {
+            panic!("expected variable");
+        };
 
-        let expected_42 = Node::new(&AstSpan::new(0, 2, 0), Literal::number(42.0));
-        let expected_42 = Node::new(&AstSpan::new(0, 2, 0), Expr::literal(expected_42));
+        let Variable::Identifier(value) = value.take_value() else {
+            panic!("expected identifier");
+        };
 
-        assert_eq!(expr, expected_42);
-    }
+        assert_eq!(value.as_str(), "y");
 
-    #[test]
-    fn complex_expr() {
-        let input = InputSpan::new_extra("-(2 + 3*4^2) < foo(5, 6) and not bar", Config::default());
-        let (_, expr) = parse(input).expect("parsing should succeed");
-        // The exact structure is complex but we just verify it parses
-        assert!(matches!(expr.node_value(), Expr::BinaryOp { .. }));
+        assert_eq!(rest_chained.len(), 0);
     }
 
     #[test]
     fn parse_complete_success() {
         let input = InputSpan::new_extra("42", Config::default());
-        let (rest, expr) = parse_complete(input).expect("parsing should succeed");
+        let (_, expr) = parse_complete(input).expect("parsing should succeed");
 
-        let expected_42 = Node::new(&AstSpan::new(0, 2, 0), Literal::number(42.0));
-        let expected_42 = Node::new(&AstSpan::new(0, 2, 0), Expr::literal(expected_42));
+        let Expr::Literal(value) = expr.take_value() else {
+            panic!("expected literal");
+        };
 
-        assert_eq!(expr, expected_42);
-        assert_eq!(rest.fragment(), &"");
+        let Literal::Number(value) = value.take_value() else {
+            panic!("expected number");
+        };
+
+        assert_eq!(value, 42.0);
     }
 
     #[test]
@@ -955,7 +1138,6 @@ mod tests {
         fn negation_missing_operand() {
             let input = InputSpan::new_extra("-", Config::default());
             let result = parse(input);
-            let expected_minus_span = AstSpan::new(0, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -972,14 +1154,14 @@ mod tests {
             };
 
             assert_eq!(operator, UnaryOp::Neg);
-            assert_eq!(cause, expected_minus_span);
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 1);
         }
 
         #[test]
         fn not_missing_operand() {
             let input = InputSpan::new_extra("not", Config::default());
             let result = parse(input);
-            let expected_not_span = AstSpan::new(0, 3, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -996,7 +1178,8 @@ mod tests {
             };
 
             assert_eq!(operator, UnaryOp::Not);
-            assert_eq!(cause, expected_not_span);
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 3);
         }
     }
 
@@ -1009,7 +1192,6 @@ mod tests {
         fn addition_missing_second_operand() {
             let input = InputSpan::new_extra("1 +", Config::default());
             let result = parse(input);
-            let expected_plus_span = AstSpan::new(2, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1026,14 +1208,14 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::Add);
-            assert_eq!(cause, expected_plus_span);
+            assert_eq!(cause.start().offset, 2);
+            assert_eq!(cause.end().offset, 3);
         }
 
         #[test]
         fn multiplication_missing_second_operand() {
             let input = InputSpan::new_extra("2 *", Config::default());
             let result = parse(input);
-            let expected_star_span = AstSpan::new(2, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1050,14 +1232,14 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::Mul);
-            assert_eq!(cause, expected_star_span);
+            assert_eq!(cause.start().offset, 2);
+            assert_eq!(cause.end().offset, 3);
         }
 
         #[test]
         fn exponentiation_missing_second_operand() {
             let input = InputSpan::new_extra("2 ^", Config::default());
             let result = parse(input);
-            let expected_caret_span = AstSpan::new(2, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1074,14 +1256,14 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::Pow);
-            assert_eq!(cause, expected_caret_span);
+            assert_eq!(cause.start().offset, 2);
+            assert_eq!(cause.end().offset, 3);
         }
 
         #[test]
         fn comparison_missing_second_operand() {
             let input = InputSpan::new_extra("x <", Config::default());
             let result = parse(input);
-            let expected_less_span = AstSpan::new(2, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1098,14 +1280,14 @@ mod tests {
             };
 
             assert_eq!(operator, ComparisonOp::LessThan);
-            assert_eq!(cause, expected_less_span);
+            assert_eq!(cause.start().offset, 2);
+            assert_eq!(cause.end().offset, 3);
         }
 
         #[test]
         fn logical_and_missing_second_operand() {
             let input = InputSpan::new_extra("true and", Config::default());
             let result = parse(input);
-            let expected_and_span = AstSpan::new(5, 3, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1122,14 +1304,14 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::And);
-            assert_eq!(cause, expected_and_span);
+            assert_eq!(cause.start().offset, 5);
+            assert_eq!(cause.end().offset, 8);
         }
 
         #[test]
         fn logical_or_missing_second_operand() {
             let input = InputSpan::new_extra("false or", Config::default());
             let result = parse(input);
-            let expected_or_span = AstSpan::new(6, 2, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1146,14 +1328,14 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::Or);
-            assert_eq!(cause, expected_or_span);
+            assert_eq!(cause.start().offset, 6);
+            assert_eq!(cause.end().offset, 8);
         }
 
         #[test]
         fn minmax_missing_second_operand() {
             let input = InputSpan::new_extra("min_weight |", Config::default());
             let result = parse(input);
-            let expected_bar_span = AstSpan::new(11, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1170,7 +1352,8 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::MinMax);
-            assert_eq!(cause, expected_bar_span);
+            assert_eq!(cause.start().offset, 11);
+            assert_eq!(cause.end().offset, 12);
         }
     }
 
@@ -1183,7 +1366,6 @@ mod tests {
         fn missing_expression_in_parentheses() {
             let input = InputSpan::new_extra("()", Config::default());
             let result = parse(input);
-            let expected_paren_left_span = AstSpan::new(0, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1199,14 +1381,14 @@ mod tests {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(cause, expected_paren_left_span);
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 1);
         }
 
         #[test]
         fn unclosed_parentheses() {
             let input = InputSpan::new_extra("(1 + 2", Config::default());
             let result = parse(input);
-            let expected_paren_left_span = AstSpan::new(0, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1222,14 +1404,14 @@ mod tests {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(cause, expected_paren_left_span);
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 1);
         }
 
         #[test]
         fn nested_unclosed_parentheses() {
             let input = InputSpan::new_extra("((1 + 2)", Config::default());
             let result = parse(input);
-            let expected_paren_left_span = AstSpan::new(0, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1245,7 +1427,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(cause, expected_paren_left_span);
+            assert_eq!(cause.start().offset, 0);
+            assert_eq!(cause.end().offset, 1);
         }
     }
 
@@ -1270,7 +1453,6 @@ mod tests {
         fn missing_closing_paren() {
             let input = InputSpan::new_extra("foo(1, 2", Config::default());
             let result = parse(input);
-            let expected_paren_left_span = AstSpan::new(3, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1286,7 +1468,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(cause, expected_paren_left_span);
+            assert_eq!(cause.start().offset, 3);
+            assert_eq!(cause.end().offset, 4);
         }
 
         #[test]
@@ -1305,7 +1488,6 @@ mod tests {
         fn missing_argument_after_comma() {
             let input = InputSpan::new_extra("foo(1,)", Config::default());
             let result = parse(input);
-            let expected_paren_left_span = AstSpan::new(3, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1321,7 +1503,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(cause, expected_paren_left_span);
+            assert_eq!(cause.start().offset, 3);
+            assert_eq!(cause.end().offset, 4);
         }
     }
 
@@ -1334,7 +1517,6 @@ mod tests {
         fn missing_identifier_after_dot() {
             let input = InputSpan::new_extra("foo.", Config::default());
             let result = parse(input);
-            let expected_dot_span = AstSpan::new(3, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1350,7 +1532,8 @@ mod tests {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(cause, expected_dot_span);
+            assert_eq!(cause.start().offset, 3);
+            assert_eq!(cause.end().offset, 4);
         }
     }
 
@@ -1400,7 +1583,6 @@ mod tests {
         fn chained_binary_ops_missing_operand() {
             let input = InputSpan::new_extra("1 + 2 *", Config::default());
             let result = parse(input);
-            let expected_star_span = AstSpan::new(6, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1417,14 +1599,14 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::Mul);
-            assert_eq!(cause, expected_star_span);
+            assert_eq!(cause.start().offset, 6);
+            assert_eq!(cause.end().offset, 7);
         }
 
         #[test]
         fn complex_expression_missing_operand() {
             let input = InputSpan::new_extra("(1 + 2) * 3 +", Config::default());
             let result = parse(input);
-            let expected_plus_span = AstSpan::new(12, 1, 0);
 
             let Err(nom::Err::Failure(error)) = result else {
                 panic!("Unexpected result {result:?}");
@@ -1441,7 +1623,8 @@ mod tests {
             };
 
             assert_eq!(operator, BinaryOp::Add);
-            assert_eq!(cause, expected_plus_span);
+            assert_eq!(cause.start().offset, 12);
+            assert_eq!(cause.end().offset, 13);
         }
     }
 }

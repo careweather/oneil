@@ -7,15 +7,16 @@ use crate::{
     util::context::lookup::{self, LookupResult},
 };
 
+#[derive(Debug)]
 pub struct ParameterContext<'parameter> {
-    parameters: &'parameter HashMap<ir::Identifier, ir::Parameter>,
-    parameter_errors: &'parameter HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+    parameters: &'parameter HashMap<ir::ParameterName, ir::Parameter>,
+    parameter_errors: &'parameter HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
 }
 
 impl<'parameter> ParameterContext<'parameter> {
     pub const fn new(
-        parameters: &'parameter HashMap<ir::Identifier, ir::Parameter>,
-        parameter_errors: &'parameter HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+        parameters: &'parameter HashMap<ir::ParameterName, ir::Parameter>,
+        parameter_errors: &'parameter HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
     ) -> Self {
         Self {
             parameters,
@@ -26,18 +27,19 @@ impl<'parameter> ParameterContext<'parameter> {
     #[must_use]
     pub fn lookup_parameter(
         &self,
-        parameter_identifier: &ir::Identifier,
+        parameter_name: &ir::ParameterName,
     ) -> ParameterContextResult<'parameter> {
         let lookup_result = lookup::lookup_with(
-            parameter_identifier,
-            |parameter_identifier| self.parameters.get(parameter_identifier),
-            |parameter_identifier| self.parameter_errors.contains_key(parameter_identifier),
+            parameter_name,
+            |parameter_name| self.parameters.get(parameter_name),
+            |parameter_name| self.parameter_errors.contains_key(parameter_name),
         );
 
         ParameterContextResult::from(lookup_result)
     }
 }
 
+#[derive(Debug)]
 pub enum ParameterContextResult<'parameter> {
     Found(&'parameter ir::Parameter),
     HasError,

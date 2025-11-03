@@ -1,7 +1,5 @@
 //! Unit system for dimensional analysis in Oneil.
 
-use crate::span::IrSpan;
-
 /// A composite unit composed of multiple base units.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompositeUnit {
@@ -26,26 +24,14 @@ impl CompositeUnit {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unit {
     name: String,
-    name_span: IrSpan,
     exponent: f64,
-    exponent_span: Option<IrSpan>,
 }
 
 impl Unit {
     /// Creates a new unit with the specified name and exponent.
     #[must_use]
-    pub const fn new(
-        name: String,
-        name_span: IrSpan,
-        exponent: f64,
-        exponent_span: Option<IrSpan>,
-    ) -> Self {
-        Self {
-            name,
-            name_span,
-            exponent,
-            exponent_span,
-        }
+    pub const fn new(name: String, exponent: f64) -> Self {
+        Self { name, exponent }
     }
 
     /// Returns the name of this unit.
@@ -54,21 +40,9 @@ impl Unit {
         &self.name
     }
 
-    /// Returns the source location span for the unit name.
-    #[must_use]
-    pub const fn name_span(&self) -> IrSpan {
-        self.name_span
-    }
-
     /// Returns the exponent of this unit.
     #[must_use]
     pub const fn exponent(&self) -> f64 {
         self.exponent
-    }
-
-    /// Returns the source location span for the unit exponent.
-    #[must_use]
-    pub const fn exponent_span(&self) -> Option<IrSpan> {
-        self.exponent_span
     }
 }

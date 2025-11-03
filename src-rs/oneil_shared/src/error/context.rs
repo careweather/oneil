@@ -7,7 +7,7 @@
 /// # Examples
 ///
 /// ```rust
-/// use oneil_error::Context;
+/// use oneil_shared::error::Context;
 ///
 /// // Adding a note to provide additional context
 /// let note = Context::Note("Variable 'x' was declared here".to_string());
@@ -31,7 +31,7 @@ pub enum Context {
     /// # Examples
     ///
     /// ```rust
-    /// use oneil_error::Context;
+    /// use oneil_shared::error::Context;
     ///
     /// let note = Context::Note("Unclosed parenthesis found here".to_string());
     /// ```
@@ -47,7 +47,7 @@ pub enum Context {
     /// # Examples
     ///
     /// ```rust
-    /// use oneil_error::Context;
+    /// use oneil_shared::error::Context;
     ///
     /// let help = Context::Help("Strings in Oneil use single quotes; try using `'` instead of `\"`".to_string());
     /// ```

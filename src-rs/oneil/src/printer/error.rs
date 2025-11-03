@@ -22,7 +22,7 @@ use std::{
     path::Path,
 };
 
-use oneil_error::{Context, ErrorLocation, OneilError};
+use oneil_shared::error::{Context, ErrorLocation, OneilError};
 
 use crate::printer::ColorChoice;
 

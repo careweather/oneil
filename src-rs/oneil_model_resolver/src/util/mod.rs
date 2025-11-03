@@ -1,17 +1,20 @@
 //! Utility types and traits for the Oneil model loader.
 
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use oneil_ast as ast;
-use oneil_ir::IrSpan;
+use oneil_ir as ir;
+
+use crate::error::ModelImportResolutionError;
 
 pub mod builder;
 pub mod builtin_ref;
 pub mod context;
 
-pub const fn get_span_from_ast_span(ast_span: ast::AstSpan) -> IrSpan {
-    IrSpan::new(ast_span.start(), ast_span.length())
-}
+pub type SubmodelMap = HashMap<ir::SubmodelName, ir::SubmodelImport>;
+pub type ReferenceMap = HashMap<ir::ReferenceName, ir::ReferenceImport>;
+pub type SubmodelResolutionErrors = HashMap<ir::SubmodelName, ModelImportResolutionError>;
+pub type ReferenceResolutionErrors = HashMap<ir::ReferenceName, ModelImportResolutionError>;
 
 /// Trait for loading and parsing Oneil model files.
 ///

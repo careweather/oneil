@@ -1,4 +1,4 @@
-use crate::{Context, ErrorLocation};
+use crate::error::{Context, ErrorLocation};
 
 /// Trait for types that can be converted to Oneil error messages.
 ///

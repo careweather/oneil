@@ -133,7 +133,7 @@ mod tests {
         fn and_keyword() {
             let input = InputSpan::new_extra("and rest", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' keyword");
-            assert_eq!(matched.lexeme(), "and");
+            assert_eq!(matched.lexeme_str, "and");
             assert_eq!(rest.fragment(), &"rest");
         }
 
@@ -141,7 +141,7 @@ mod tests {
         fn as_keyword() {
             let input = InputSpan::new_extra("as foo", Config::default());
             let (rest, matched) = as_(input).expect("should parse 'as' keyword");
-            assert_eq!(matched.lexeme(), "as");
+            assert_eq!(matched.lexeme_str, "as");
             assert_eq!(rest.fragment(), &"foo");
         }
 
@@ -149,7 +149,7 @@ mod tests {
         fn false_keyword() {
             let input = InputSpan::new_extra("false true", Config::default());
             let (rest, matched) = false_(input).expect("should parse 'false' keyword");
-            assert_eq!(matched.lexeme(), "false");
+            assert_eq!(matched.lexeme_str, "false");
             assert_eq!(rest.fragment(), &"true");
         }
 
@@ -157,7 +157,7 @@ mod tests {
         fn if_keyword() {
             let input = InputSpan::new_extra("if baz", Config::default());
             let (rest, matched) = if_(input).expect("should parse 'if' keyword");
-            assert_eq!(matched.lexeme(), "if");
+            assert_eq!(matched.lexeme_str, "if");
             assert_eq!(rest.fragment(), &"baz");
         }
 
@@ -165,7 +165,7 @@ mod tests {
         fn import_keyword() {
             let input = InputSpan::new_extra("import foo", Config::default());
             let (rest, matched) = import(input).expect("should parse 'import' keyword");
-            assert_eq!(matched.lexeme(), "import");
+            assert_eq!(matched.lexeme_str, "import");
             assert_eq!(rest.fragment(), &"foo");
         }
 
@@ -173,7 +173,7 @@ mod tests {
         fn not_keyword() {
             let input = InputSpan::new_extra("not bar", Config::default());
             let (rest, matched) = not(input).expect("should parse 'not' keyword");
-            assert_eq!(matched.lexeme(), "not");
+            assert_eq!(matched.lexeme_str, "not");
             assert_eq!(rest.fragment(), &"bar");
         }
 
@@ -181,7 +181,7 @@ mod tests {
         fn or_keyword() {
             let input = InputSpan::new_extra("or baz", Config::default());
             let (rest, matched) = or(input).expect("should parse 'or' keyword");
-            assert_eq!(matched.lexeme(), "or");
+            assert_eq!(matched.lexeme_str, "or");
             assert_eq!(rest.fragment(), &"baz");
         }
 
@@ -189,7 +189,7 @@ mod tests {
         fn ref_keyword() {
             let input = InputSpan::new_extra("ref foo", Config::default());
             let (rest, matched) = ref_(input).expect("should parse 'ref' keyword");
-            assert_eq!(matched.lexeme(), "ref");
+            assert_eq!(matched.lexeme_str, "ref");
             assert_eq!(rest.fragment(), &"foo");
         }
 
@@ -197,7 +197,7 @@ mod tests {
         fn section_keyword() {
             let input = InputSpan::new_extra("section test", Config::default());
             let (rest, matched) = section(input).expect("should parse 'section' keyword");
-            assert_eq!(matched.lexeme(), "section");
+            assert_eq!(matched.lexeme_str, "section");
             assert_eq!(rest.fragment(), &"test");
         }
 
@@ -206,7 +206,7 @@ mod tests {
         fn test_keyword() {
             let input = InputSpan::new_extra("test use", Config::default());
             let (rest, matched) = test(input).expect("should parse 'test' keyword");
-            assert_eq!(matched.lexeme(), "test");
+            assert_eq!(matched.lexeme_str, "test");
             assert_eq!(rest.fragment(), &"use");
         }
 
@@ -214,7 +214,7 @@ mod tests {
         fn true_keyword() {
             let input = InputSpan::new_extra("true false", Config::default());
             let (rest, matched) = true_(input).expect("should parse 'true' keyword");
-            assert_eq!(matched.lexeme(), "true");
+            assert_eq!(matched.lexeme_str, "true");
             assert_eq!(rest.fragment(), &"false");
         }
 
@@ -222,7 +222,7 @@ mod tests {
         fn use_keyword() {
             let input = InputSpan::new_extra("use foo", Config::default());
             let (rest, matched) = use_(input).expect("should parse 'use' keyword");
-            assert_eq!(matched.lexeme(), "use");
+            assert_eq!(matched.lexeme_str, "use");
             assert_eq!(rest.fragment(), &"foo");
         }
 
@@ -230,7 +230,7 @@ mod tests {
         fn with_keyword() {
             let input = InputSpan::new_extra("with foo", Config::default());
             let (rest, matched) = with(input).expect("should parse 'with' keyword");
-            assert_eq!(matched.lexeme(), "with");
+            assert_eq!(matched.lexeme_str, "with");
             assert_eq!(rest.fragment(), &"foo");
         }
 
@@ -238,7 +238,7 @@ mod tests {
         fn with_trailing_whitespace_keyword() {
             let input = InputSpan::new_extra("and   foo", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' with trailing whitespace");
-            assert_eq!(matched.lexeme(), "and");
+            assert_eq!(matched.lexeme_str, "and");
             assert_eq!(rest.fragment(), &"foo");
         }
 
@@ -246,7 +246,7 @@ mod tests {
         fn at_end_of_file_keyword() {
             let input = InputSpan::new_extra("and", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' at end of file");
-            assert_eq!(matched.lexeme(), "and");
+            assert_eq!(matched.lexeme_str, "and");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -254,7 +254,7 @@ mod tests {
         fn with_punctuation_keyword() {
             let input = InputSpan::new_extra("and,", Config::default());
             let (rest, matched) = and(input).expect("should parse 'and' with comma");
-            assert_eq!(matched.lexeme(), "and");
+            assert_eq!(matched.lexeme_str, "and");
             assert_eq!(rest.fragment(), &",");
         }
 
@@ -262,7 +262,7 @@ mod tests {
         fn with_parentheses_keyword() {
             let input = InputSpan::new_extra("if(", Config::default());
             let (rest, matched) = if_(input).expect("should parse 'if' with opening parenthesis");
-            assert_eq!(matched.lexeme(), "if");
+            assert_eq!(matched.lexeme_str, "if");
             assert_eq!(rest.fragment(), &"(");
         }
 
@@ -285,7 +285,7 @@ mod tests {
         fn with_symbols_keyword() {
             let input = InputSpan::new_extra("not+", Config::default());
             let (rest, matched) = not(input).expect("should parse 'not' with plus symbol");
-            assert_eq!(matched.lexeme(), "not");
+            assert_eq!(matched.lexeme_str, "not");
             assert_eq!(rest.fragment(), &"+");
         }
 
@@ -293,7 +293,7 @@ mod tests {
         fn with_newline_keyword() {
             let input = InputSpan::new_extra("true\n", Config::default());
             let (rest, matched) = true_(input).expect("should parse 'true' with newline");
-            assert_eq!(matched.lexeme(), "true");
+            assert_eq!(matched.lexeme_str, "true");
             assert_eq!(rest.fragment(), &"\n");
         }
 
@@ -301,7 +301,7 @@ mod tests {
         fn with_tab_keyword() {
             let input = InputSpan::new_extra("import\t", Config::default());
             let (rest, matched) = import(input).expect("should parse 'import' with tab");
-            assert_eq!(matched.lexeme(), "import");
+            assert_eq!(matched.lexeme_str, "import");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -310,7 +310,7 @@ mod tests {
             let input = InputSpan::new_extra("section\r", Config::default());
             let (rest, matched) =
                 section(input).expect("should parse 'section' with carriage return");
-            assert_eq!(matched.lexeme(), "section");
+            assert_eq!(matched.lexeme_str, "section");
             assert_eq!(rest.fragment(), &"\r");
         }
     }

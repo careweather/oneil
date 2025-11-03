@@ -22,3 +22,9 @@ impl Note {
         &self.0
     }
 }
+
+impl From<String> for Note {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}

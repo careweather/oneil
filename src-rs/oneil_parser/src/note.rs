@@ -2,7 +2,7 @@
 
 use nom::Parser;
 use nom::combinator::all_consuming;
-use oneil_ast::{Node, Note, NoteNode};
+use oneil_ast::{Note, NoteNode};
 
 use crate::error::{ErrorHandlingParser, ParserError};
 use crate::token::note::{NoteKind, note as note_token};
@@ -38,18 +38,15 @@ fn note(input: InputSpan<'_>) -> Result<'_, NoteNode, ParserError> {
         .convert_error_to(ParserError::expect_note)
         .parse(input)?;
 
-    let note = match kind {
-        NoteKind::SingleLine => {
-            let content = token.lexeme().trim_start_matches('~').trim();
-            Node::new(&token, Note::new(content.to_string()))
-        }
-        NoteKind::MultiLine => {
-            let content = token.lexeme().trim_matches('~').trim();
-            Node::new(&token, Note::new(content.to_string()))
-        }
+    let note_content = match kind {
+        NoteKind::SingleLine => token.lexeme_str.trim_start_matches('~').trim(),
+        NoteKind::MultiLine => token.lexeme_str.trim_matches('~').trim(),
     };
+    let note_node = token.into_node_with_value(Note::new(note_content.to_string()));
 
-    Ok((rest, note))
+    // dbg!(&note_content);
+
+    Ok((rest, note_node))
 }
 
 #[cfg(test)]
@@ -58,14 +55,14 @@ mod tests {
     use crate::Config;
     use crate::error::reason::{ExpectKind, ParserErrorReason};
     use crate::token::error::{IncompleteKind, TokenErrorKind};
-    use oneil_ast::AstSpan;
+    use crate::util::test::assert_node_contains;
 
     #[test]
     fn single_line_note() {
         let input = InputSpan::new_extra("~ This is a note\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse single line note");
-        assert_eq!(note.node_span(), AstSpan::new(0, 16, 1));
-        assert_eq!(note.node_value(), &Note::new("This is a note".to_string()));
+
+        assert_node_contains!(&note, Note::new("This is a note".to_string()), start_offset: 0, end_offset: 16);
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -73,8 +70,7 @@ mod tests {
     fn single_line_note_at_eof() {
         let input = InputSpan::new_extra("~ note", Config::default());
         let (rest, note) = parse(input).expect("should parse single line note at EOF");
-        assert_eq!(note.node_span(), AstSpan::new(0, 6, 0));
-        assert_eq!(note.node_value(), &Note::new("note".to_string()));
+        assert_node_contains!(&note, Note::new("note".to_string()), start_offset: 0, end_offset: 6);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -82,8 +78,7 @@ mod tests {
     fn multi_line_note() {
         let input = InputSpan::new_extra("~~~\nLine 1\nLine 2\n~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse multi-line note");
-        assert_eq!(note.node_span(), AstSpan::new(0, 21, 1));
-        assert_eq!(note.node_value(), &Note::new("Line 1\nLine 2".to_string()));
+        assert_node_contains!(&note, Note::new("Line 1\nLine 2".to_string()), start_offset: 0, end_offset: 21);
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -91,8 +86,7 @@ mod tests {
     fn multi_line_note_extra_tildes() {
         let input = InputSpan::new_extra("~~~~~\nfoo\nbar\n~~~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse multi-line note with extra tildes");
-        assert_eq!(note.node_span(), AstSpan::new(0, 19, 1));
-        assert_eq!(note.node_value(), &Note::new("foo\nbar".to_string()));
+        assert_node_contains!(&note, Note::new("foo\nbar".to_string()), start_offset: 0, end_offset: 19);
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -100,8 +94,7 @@ mod tests {
     fn multi_line_note_empty() {
         let input = InputSpan::new_extra("~~~\n~~~\nrest", Config::default());
         let (rest, note) = parse(input).expect("should parse empty multi-line note");
-        assert_eq!(note.node_span(), AstSpan::new(0, 7, 1));
-        assert_eq!(note.node_value(), &Note::new(String::new()));
+        assert_node_contains!(&note, Note::new(String::new()), start_offset: 0, end_offset: 7);
         assert_eq!(rest.fragment(), &"rest");
     }
 
@@ -123,8 +116,7 @@ mod tests {
     fn parse_complete_single_line_success() {
         let input = InputSpan::new_extra("~ This is a note\n", Config::default());
         let (rest, note) = parse_complete(input).expect("should parse single line note");
-        assert_eq!(note.node_span(), AstSpan::new(0, 16, 1));
-        assert_eq!(note.node_value(), &Note::new("This is a note".to_string()));
+        assert_node_contains!(&note, Note::new("This is a note".to_string()), start_offset: 0, end_offset: 16);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -132,8 +124,7 @@ mod tests {
     fn parse_complete_multi_line_success() {
         let input = InputSpan::new_extra("~~~\nLine 1\nLine 2\n~~~\n", Config::default());
         let (rest, note) = parse_complete(input).expect("should parse multi-line note");
-        assert_eq!(note.node_span(), AstSpan::new(0, 21, 1));
-        assert_eq!(note.node_value(), &Note::new("Line 1\nLine 2".to_string()));
+        assert_node_contains!(&note, Note::new("Line 1\nLine 2".to_string()), start_offset: 0, end_offset: 21);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -227,17 +218,14 @@ mod tests {
 
             assert_eq!(error.error_offset, 12); // error at end of content
             let ParserErrorReason::TokenError(TokenErrorKind::Incomplete(
-                IncompleteKind::UnclosedNote {
-                    delimiter_start_offset,
-                    delimiter_length,
-                },
+                IncompleteKind::UnclosedNote { delimeter_span },
             )) = error.reason
             else {
                 panic!("Unexpected reason {:?}", error.reason);
             };
 
-            assert_eq!(delimiter_start_offset, 0);
-            assert_eq!(delimiter_length, 3);
+            assert_eq!(delimeter_span.start().offset, 0);
+            assert_eq!(delimeter_span.end().offset, 3);
         }
 
         #[test]

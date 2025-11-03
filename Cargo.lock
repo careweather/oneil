@@ -188,32 +188,33 @@ dependencies = [
  "clap",
  "colored",
  "oneil_ast",
- "oneil_error",
  "oneil_ir",
  "oneil_model_resolver",
  "oneil_parser",
+ "oneil_shared",
 ]
 
 [[package]]
 name = "oneil_ast"
 version = "0.15.0"
-
-[[package]]
-name = "oneil_error"
-version = "0.15.0"
+dependencies = [
+ "oneil_shared",
+]
 
 [[package]]
 name = "oneil_ir"
 version = "0.15.0"
+dependencies = [
+ "oneil_shared",
+]
 
 [[package]]
 name = "oneil_model_resolver"
 version = "0.15.0"
 dependencies = [
  "oneil_ast",
- "oneil_error",
  "oneil_ir",
- "rand",
+ "oneil_shared",
 ]
 
 [[package]]
@@ -223,7 +224,14 @@ dependencies = [
  "nom",
  "nom_locate",
  "oneil_ast",
- "oneil_error",
+ "oneil_shared",
+]
+
+[[package]]
+name = "oneil_shared"
+version = "0.15.0"
+dependencies = [
+ "rand",
 ]
 
 [[package]]

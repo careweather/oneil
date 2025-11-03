@@ -3,20 +3,20 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    model_import::{ReferenceMap, SubmodelImport, SubmodelMap, SubmodelName},
-    parameter::{Parameter, ParameterCollection},
-    reference::{Identifier, ModelPath, PythonPath},
-    span::IrSpan,
+    model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
+    parameter::{Parameter, ParameterName},
+    python_import::PythonImport,
+    reference::{ModelPath, PythonPath},
     test::{Test, TestIndex},
 };
 
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
-    python_imports: HashMap<PythonPath, IrSpan>,
-    submodels: SubmodelMap,
-    references: ReferenceMap,
-    parameters: ParameterCollection,
+    python_imports: HashMap<PythonPath, PythonImport>,
+    submodels: HashMap<SubmodelName, SubmodelImport>,
+    references: HashMap<ReferenceName, ReferenceImport>,
+    parameters: HashMap<ParameterName, Parameter>,
     tests: HashMap<TestIndex, Test>,
 }
 
@@ -24,10 +24,10 @@ impl Model {
     /// Creates a new model with the specified components.
     #[must_use]
     pub const fn new(
-        python_imports: HashMap<PythonPath, IrSpan>,
-        submodels: SubmodelMap,
-        references: ReferenceMap,
-        parameters: ParameterCollection,
+        python_imports: HashMap<PythonPath, PythonImport>,
+        submodels: HashMap<SubmodelName, SubmodelImport>,
+        references: HashMap<ReferenceName, ReferenceImport>,
+        parameters: HashMap<ParameterName, Parameter>,
         tests: HashMap<TestIndex, Test>,
     ) -> Self {
         Self {
@@ -41,7 +41,7 @@ impl Model {
 
     /// Returns a reference to the set of Python imports for this model.
     #[must_use]
-    pub const fn get_python_imports(&self) -> &HashMap<PythonPath, IrSpan> {
+    pub const fn get_python_imports(&self) -> &HashMap<PythonPath, PythonImport> {
         &self.python_imports
     }
 
@@ -53,25 +53,25 @@ impl Model {
 
     /// Returns a reference to all submodels in this model.
     #[must_use]
-    pub const fn get_submodels(&self) -> &SubmodelMap {
+    pub const fn get_submodels(&self) -> &HashMap<SubmodelName, SubmodelImport> {
         &self.submodels
     }
 
     /// Looks up a parameter by its identifier.
     #[must_use]
-    pub fn get_parameter(&self, identifier: &Identifier) -> Option<&Parameter> {
+    pub fn get_parameter(&self, identifier: &ParameterName) -> Option<&Parameter> {
         self.parameters.get(identifier)
     }
 
     /// Returns a reference to all parameters in this model.
     #[must_use]
-    pub const fn get_parameters(&self) -> &ParameterCollection {
+    pub const fn get_parameters(&self) -> &HashMap<ParameterName, Parameter> {
         &self.parameters
     }
 
     /// Returns a reference to all references in this model.
     #[must_use]
-    pub const fn get_references(&self) -> &ReferenceMap {
+    pub const fn get_references(&self) -> &HashMap<ReferenceName, ReferenceImport> {
         &self.references
     }
 

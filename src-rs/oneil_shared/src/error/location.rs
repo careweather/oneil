@@ -1,3 +1,5 @@
+use crate::span::Span;
+
 /// Source location information for error reporting
 ///
 /// Line and column numbers are 1-indexed.
@@ -103,8 +105,9 @@ impl ErrorLocation {
 
     /// Creates a new error location from source content and span
     #[must_use]
-    pub fn from_source_and_span(source: &str, offset: usize, length: usize) -> Self {
-        Self::new(source, offset, Some(length))
+    pub fn from_source_and_span(source: &str, span: Span) -> Self {
+        let length = span.end().offset - span.start().offset;
+        Self::new(source, span.start().offset, Some(length))
     }
 
     /// Returns the character offset from the beginning of the source file

@@ -9,7 +9,6 @@ mod naming;
 mod node;
 mod note;
 mod parameter;
-mod span;
 mod test;
 mod unit;
 
@@ -30,6 +29,5 @@ pub use parameter::{
     Limits, LimitsNode, Parameter, ParameterNode, ParameterValue, ParameterValueNode,
     PerformanceMarker, PerformanceMarkerNode, PiecewisePart, PiecewisePartNode,
 };
-pub use span::{AstSpan, SpanLike};
 pub use test::{Test, TestNode};
 pub use unit::{UnitExponent, UnitExponentNode, UnitExpr, UnitExprNode, UnitOp, UnitOpNode};

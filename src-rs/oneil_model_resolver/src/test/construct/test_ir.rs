@@ -1,34 +1,32 @@
 use std::collections::{HashMap, HashSet};
 
-use oneil_ir::{self as ir, IrSpan};
+use oneil_ir as ir;
+use oneil_shared::span::Span;
 
-fn unimportant_span() -> IrSpan {
-    use rand::Rng;
-    let mut rng = rand::rng();
-
-    let start = usize::from(rng.random::<u16>());
-    let length = usize::from(rng.random::<u16>());
-    IrSpan::new(start, length)
+/// Generates a span for testing purposes
+///
+/// The span is intentionally random in order to discourage any
+/// use of the spans for testing.
+fn unimportant_span() -> Span {
+    Span::random_span()
 }
 
 // SIMPLE CONSTRUCTORS
 
-pub fn reference_name_with_span(reference_name: &str) -> ir::ReferenceNameWithSpan {
-    let reference_name = ir::ReferenceName::new(reference_name.to_string());
-    ir::ReferenceNameWithSpan::new(reference_name, unimportant_span())
+pub fn reference_name(reference_name: &str) -> ir::ReferenceName {
+    ir::ReferenceName::new(reference_name.to_string())
 }
 
-pub fn expr_literal_number(value: f64) -> ir::ExprWithSpan {
-    let expr = ir::Expr::literal(ir::Literal::number(value));
-    ir::WithSpan::new(expr, unimportant_span())
+pub fn expr_literal_number(value: f64) -> ir::Expr {
+    ir::Expr::literal(ir::Literal::number(value))
 }
 
 pub fn empty_model() -> ir::Model {
     ir::Model::new(
         HashMap::new(),
-        ir::SubmodelMap::new(HashMap::new()),
-        ir::ReferenceMap::new(HashMap::new()),
-        ir::ParameterCollection::new(HashMap::new()),
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
         HashMap::new(),
     )
 }
@@ -36,10 +34,10 @@ pub fn empty_model() -> ir::Model {
 // BUILDERS
 
 pub struct ModelBuilder {
-    python_imports: HashMap<ir::PythonPath, IrSpan>,
+    python_imports: HashMap<ir::PythonPath, ir::PythonImport>,
     submodels: HashMap<ir::SubmodelName, ir::SubmodelImport>,
     references: HashMap<ir::ReferenceName, ir::ReferenceImport>,
-    parameters: HashMap<ir::Identifier, ir::Parameter>,
+    parameters: HashMap<ir::ParameterName, ir::Parameter>,
     tests: HashMap<ir::TestIndex, ir::Test>,
 }
 
@@ -56,10 +54,11 @@ impl ModelBuilder {
 
     pub fn with_submodel(mut self, submodel_name: &str, submodel_path: &str) -> Self {
         let submodel_name = ir::SubmodelName::new(submodel_name.to_string());
-        let submodel_name_with_span = ir::WithSpan::new(submodel_name.clone(), unimportant_span());
+        let submodel_name_span = unimportant_span();
         let model_path = ir::ModelPath::new(submodel_path);
 
-        let submodel_import = ir::SubmodelImport::new(submodel_name_with_span, model_path);
+        let submodel_import =
+            ir::SubmodelImport::new(submodel_name.clone(), submodel_name_span, model_path);
 
         self.submodels.insert(submodel_name, submodel_import);
         self
@@ -67,33 +66,30 @@ impl ModelBuilder {
 
     pub fn with_literal_number_parameter(mut self, ident: &str, value: f64) -> Self {
         let parameter = ParameterBuilder::new()
-            .with_ident_str(ident)
+            .with_name_str(ident)
             .with_simple_number_value(value)
             .build();
 
         self.parameters
-            .insert(ir::Identifier::new(ident), parameter);
+            .insert(ir::ParameterName::new(ident.to_string()), parameter);
 
         self
     }
 
     pub fn build(self) -> ir::Model {
-        let submodel_map = ir::SubmodelMap::new(self.submodels);
-        let reference_map = ir::ReferenceMap::new(self.references);
-        let parameter_collection = ir::ParameterCollection::new(self.parameters);
         ir::Model::new(
             self.python_imports,
-            submodel_map,
-            reference_map,
-            parameter_collection,
+            self.submodels,
+            self.references,
+            self.parameters,
             self.tests,
         )
     }
 }
 
 pub struct ParameterBuilder {
-    dependencies: HashSet<ir::Identifier>,
-    ident: Option<ir::IdentifierWithSpan>,
+    dependencies: HashSet<ir::ParameterName>,
+    name: Option<ir::ParameterName>,
     value: Option<ir::ParameterValue>,
     limits: Option<ir::Limits>,
     is_performance: bool,
@@ -104,7 +100,7 @@ impl ParameterBuilder {
     pub fn new() -> Self {
         Self {
             dependencies: HashSet::new(),
-            ident: None,
+            name: None,
             value: None,
             limits: None,
             is_performance: false,
@@ -112,10 +108,9 @@ impl ParameterBuilder {
         }
     }
 
-    pub fn with_ident_str(mut self, ident: &str) -> Self {
-        let ident_with_span =
-            ir::IdentifierWithSpan::new(ir::Identifier::new(ident), unimportant_span());
-        self.ident = Some(ident_with_span);
+    pub fn with_name_str(mut self, name: &str) -> Self {
+        let name = ir::ParameterName::new(name.to_string());
+        self.name = Some(name);
 
         self
     }
@@ -129,7 +124,7 @@ impl ParameterBuilder {
     }
 
     pub fn build(self) -> ir::Parameter {
-        let ident = self.ident.expect("ident must be set");
+        let name = self.name.expect("name must be set");
         let value = self.value.expect("value must be set");
         let limits = self.limits.unwrap_or_default();
         let is_performance = self.is_performance;
@@ -137,7 +132,7 @@ impl ParameterBuilder {
 
         ir::Parameter::new(
             self.dependencies,
-            ident,
+            name,
             value,
             limits,
             is_performance,

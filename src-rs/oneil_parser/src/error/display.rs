@@ -195,17 +195,13 @@ impl fmt::Display for TokenErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Incomplete(incomplete_kind) => match incomplete_kind {
-                TokenIncompleteKind::UnclosedNote {
-                    delimiter_start_offset: _,
-                    delimiter_length: _,
-                } => write!(f, "unclosed note"),
-                TokenIncompleteKind::UnclosedString {
-                    open_quote_offset: _,
-                } => write!(f, "unclosed string"),
-                TokenIncompleteKind::InvalidDecimalPart {
-                    decimal_point_offset: _,
-                } => write!(f, "invalid decimal part"),
-                TokenIncompleteKind::InvalidExponentPart { e_offset: _ } => {
+                TokenIncompleteKind::UnclosedNote { .. } => write!(f, "unclosed note"),
+                TokenIncompleteKind::InvalidClosingDelimiter => {
+                    write!(f, "invalid closing delimiter for note")
+                }
+                TokenIncompleteKind::UnclosedString { .. } => write!(f, "unclosed string"),
+                TokenIncompleteKind::InvalidDecimalPart { .. } => write!(f, "invalid decimal part"),
+                TokenIncompleteKind::InvalidExponentPart { .. } => {
                     write!(f, "invalid exponent part")
                 }
             },

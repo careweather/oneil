@@ -6,6 +6,5 @@ This crate defines the intermediate representation used in the Oneil compilation
 
 These structures share much in common with the AST structures. However, there are a few key differences:
 - declarations are grouped by kind rather than ordered by appearance in the source file
-- spans no longer store information about whitespace
 - variables referencing imported models directly store the paths to those models
 - parameter units are normalized into a list of units (TODO: should this be done in the evaluator instead? It seems like a more logical place for it)

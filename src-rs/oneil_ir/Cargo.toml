@@ -12,6 +12,7 @@ keywords.workspace = true
 readme = "README.md"
 
 [dependencies]
+oneil_shared = { path = "../oneil_shared" }
 
 [lints]
 workspace = true

@@ -1,46 +1,32 @@
 //! Parameter definitions and management for Oneil model IR.
 
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-};
+use std::collections::HashSet;
 
-use crate::{
-    debug_info::TraceLevel,
-    expr::ExprWithSpan,
-    reference::{Identifier, IdentifierWithSpan},
-    unit::CompositeUnit,
-};
+use crate::{debug_info::TraceLevel, expr::Expr, unit::CompositeUnit};
 
-/// A collection of parameters that can be managed together.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParameterCollection {
-    parameters: HashMap<Identifier, Parameter>,
-}
+/// A name for a parameter.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ParameterName(String);
 
-impl ParameterCollection {
-    /// Creates a new parameter collection from a mapping of identifiers to parameters.
+impl ParameterName {
+    /// Creates a new parameter name with the given name.
     #[must_use]
-    pub const fn new(parameters: HashMap<Identifier, Parameter>) -> Self {
-        Self { parameters }
+    pub const fn new(name: String) -> Self {
+        Self(name)
     }
 
-    // TODO: add methods for getting performance parameters, evaluation order, etc.
-}
-
-impl Deref for ParameterCollection {
-    type Target = HashMap<Identifier, Parameter>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.parameters
+    /// Returns the parameter name as a string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
 /// Represents a single parameter in an Oneil model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    dependencies: HashSet<Identifier>,
-    ident: IdentifierWithSpan,
+    dependencies: HashSet<ParameterName>,
+    name: ParameterName,
     value: ParameterValue,
     limits: Limits,
     is_performance: bool,
@@ -51,8 +37,8 @@ impl Parameter {
     /// Creates a new parameter with the specified properties.
     #[must_use]
     pub const fn new(
-        dependencies: HashSet<Identifier>,
-        ident: IdentifierWithSpan,
+        dependencies: HashSet<ParameterName>,
+        name: ParameterName,
         value: ParameterValue,
         limits: Limits,
         is_performance: bool,
@@ -60,7 +46,7 @@ impl Parameter {
     ) -> Self {
         Self {
             dependencies,
-            ident,
+            name,
             value,
             limits,
             is_performance,
@@ -70,14 +56,14 @@ impl Parameter {
 
     /// Returns a reference to the set of parameter dependencies.
     #[must_use]
-    pub const fn dependencies(&self) -> &HashSet<Identifier> {
+    pub const fn dependencies(&self) -> &HashSet<ParameterName> {
         &self.dependencies
     }
 
-    /// Returns the identifier of this parameter.
+    /// Returns the name of this parameter.
     #[must_use]
-    pub const fn identifier(&self) -> &IdentifierWithSpan {
-        &self.ident
+    pub const fn name(&self) -> &ParameterName {
+        &self.name
     }
 
     /// Returns the value of this parameter.
@@ -109,7 +95,7 @@ impl Parameter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     /// A simple expression with an optional unit.
-    Simple(ExprWithSpan, Option<CompositeUnit>),
+    Simple(Expr, Option<CompositeUnit>),
     /// A piecewise function with multiple expressions and conditions.
     Piecewise(Vec<PiecewiseExpr>, Option<CompositeUnit>),
 }
@@ -117,7 +103,7 @@ pub enum ParameterValue {
 impl ParameterValue {
     /// Creates a simple parameter value from an expression and optional unit.
     #[must_use]
-    pub const fn simple(expr: ExprWithSpan, unit: Option<CompositeUnit>) -> Self {
+    pub const fn simple(expr: Expr, unit: Option<CompositeUnit>) -> Self {
         Self::Simple(expr, unit)
     }
 
@@ -131,26 +117,26 @@ impl ParameterValue {
 /// A single expression in a piecewise function with its associated condition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PiecewiseExpr {
-    expr: ExprWithSpan,
-    if_expr: ExprWithSpan,
+    expr: Expr,
+    if_expr: Expr,
 }
 
 impl PiecewiseExpr {
     /// Creates a new piecewise expression with a value and condition.
     #[must_use]
-    pub const fn new(expr: ExprWithSpan, if_expr: ExprWithSpan) -> Self {
+    pub const fn new(expr: Expr, if_expr: Expr) -> Self {
         Self { expr, if_expr }
     }
 
     /// Returns the expression value.
     #[must_use]
-    pub const fn expr(&self) -> &ExprWithSpan {
+    pub const fn expr(&self) -> &Expr {
         &self.expr
     }
 
     /// Returns the condition expression.
     #[must_use]
-    pub const fn if_expr(&self) -> &ExprWithSpan {
+    pub const fn if_expr(&self) -> &Expr {
         &self.if_expr
     }
 }
@@ -163,14 +149,14 @@ pub enum Limits {
     /// Continuous range with minimum and maximum values.
     Continuous {
         /// The minimum allowed value expression.
-        min: ExprWithSpan,
+        min: Expr,
         /// The maximum allowed value expression.
-        max: ExprWithSpan,
+        max: Expr,
     },
     /// Discrete set of allowed values.
     Discrete {
         /// Vector of expressions representing allowed values.
-        values: Vec<ExprWithSpan>,
+        values: Vec<Expr>,
     },
 }
 
@@ -183,13 +169,13 @@ impl Limits {
 
     /// Creates continuous limits with minimum and maximum expressions.
     #[must_use]
-    pub const fn continuous(min: ExprWithSpan, max: ExprWithSpan) -> Self {
+    pub const fn continuous(min: Expr, max: Expr) -> Self {
         Self::Continuous { min, max }
     }
 
     /// Creates discrete limits with a set of allowed values.
     #[must_use]
-    pub const fn discrete(values: Vec<ExprWithSpan>) -> Self {
+    pub const fn discrete(values: Vec<Expr>) -> Self {
         Self::Discrete { values }
     }
 }

@@ -1,5 +1,3 @@
-use crate::util::get_span_from_ast_span;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -19,11 +17,11 @@ fn resolve_unit_recursive(
     is_inverse: bool,
     mut units: Vec<ir::Unit>,
 ) -> Vec<ir::Unit> {
-    match unit.node_value() {
+    match &**unit {
         ast::UnitExpr::BinaryOp { op, left, right } => {
             let units = resolve_unit_recursive(left, is_inverse, units);
 
-            match op.node_value() {
+            match &**op {
                 ast::UnitOp::Multiply => resolve_unit_recursive(right, is_inverse, units),
                 ast::UnitOp::Divide => resolve_unit_recursive(right, !is_inverse, units),
             }
@@ -39,17 +37,7 @@ fn resolve_unit_recursive(
                 exponent_value
             };
 
-            let name_span = get_span_from_ast_span(identifier.node_span());
-            let exponent_span = exponent
-                .as_ref()
-                .map(|exp| get_span_from_ast_span(exp.node_span()));
-            let unit = ir::Unit::new(
-                identifier.as_str().to_string(),
-                name_span,
-                exponent_value,
-                // TODO: should this be an Option rather than filling in with an arbitrary span?
-                exponent_span,
-            );
+            let unit = ir::Unit::new(identifier.as_str().to_string(), exponent_value);
             units.push(unit);
             units
         }
