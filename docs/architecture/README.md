@@ -27,11 +27,13 @@ This is the basic structure of the system. Each component is broken into an indi
 
 Other crates include:
 
-- [`oneil_error`](../../src-rs/oneil_error) - contains an abstract error that
-  other errors can be converted to; used for consistent CLI error styling
+- [`oneil_shared`](../../src-rs/oneil_shared) - contains useful abstractions
+  used across the oneil codebase, including an abstract error type and a type
+  for referencing specific locations in a source file
 
 - [`oneil`](../../src-rs/oneil/) - implements the CLI for Oneil
 
 
 For more details about what each crate does, how it operates, patterns used,
 etc., see the crate's `README`.
+

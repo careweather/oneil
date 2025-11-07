@@ -467,10 +467,10 @@ name = "oneil_lsp"
 version = "0.15.0"
 dependencies = [
  "oneil_ast",
- "oneil_error",
  "oneil_ir",
  "oneil_model_resolver",
  "oneil_parser",
+ "oneil_shared",
  "tokio",
  "tower-lsp-server",
 ]
