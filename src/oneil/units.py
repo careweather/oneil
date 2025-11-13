@@ -476,7 +476,7 @@ def _find_derived_unit(base_units, value, pref=None):
                             exponent = get_exponent(index[1] + 1)
                             for k, v in LINEAR_UNITS[unit][0].items():
                                 computed_units[k] -= v * exponent
-                            compound_multiplier *= LINEAR_UNITS[unit][1] ** (-exponent)
+                            compound_multiplier *= LINEAR_UNITS[unit][1] ** exponent
                         else:
                             for k, v in LINEAR_UNITS[unit][0].items():
                                 computed_units[k] -= v
