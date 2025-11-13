@@ -1,0 +1,10 @@
+# This file stores snapshot details for the `get_snapshot.sh` and `test.sh` scripts
+# Use the format "<commit_hash> <file>"
+#
+# To get a commit hash, use the command `git rev-parse short=8 HEAD`
+
+# v0.5.0
+7c306484 radar.on
+
+# v1.0.0
+9113c353 scatterometer.on

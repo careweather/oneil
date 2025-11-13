@@ -179,6 +179,13 @@ LEGACY_UNITS = {
     "dyne": ({"kg": 1, "m": 1, "s": -2}, 1e-5, {"alt": ["dyne"]}),
     "mmHg": ({"kg": 1, "m": -1, "s": -2}, 133.322387415, {"alt": ["mm Hg", "millimeter of mercury"]}),
     "torr": ({"kg": 1, "m": -1, "s": -2}, 133.3224, {"alt": ["torr"]}),
+    "in": ({"m": 1}, 0.0254, {"alt": ["inch", "inches"]}),
+    "ft": ({"m": 1}, 0.3048, {"alt": ["foot", "feet"]}),
+    "yd": ({"m": 1}, 0.9144, {"alt": ["yard", "yards"]}),
+    "mi": ({"m": 1}, 1609.344, {"alt": ["mile", "miles"]}),
+    "nmi": ({"m": 1}, 1852.0, {"alt": ["nautical mile", "nautical miles"]}),
+    "lb": ({"kg": 1}, 0.45359237, {"alt": ["lbs", "pound", "pounds"]}),
+    "mph": ({"m": 1, "s": -1}, 0.44704, {"alt": ["mile per hour", "miles per hour"]}),
 }
 
 if invalid_units(LEGACY_UNITS):
@@ -246,14 +253,47 @@ def parse(unit_str):
     return units, unit_fx
 
 
+def _validate_compound_unit_format(unit_str):
+    """Validate that unit_str does not begin or end with an operator and does not have consecutive operators."""
+    # Check if string starts with an operator
+    if any(unit_str.startswith(op) for op in UNIT_OPERATORS):
+        raise ValueError(f"Unit string cannot start with an operator: {unit_str}")
+    
+    # Check if string ends with an operator
+    if any(unit_str.endswith(op) for op in UNIT_OPERATORS):
+        raise ValueError(f"Unit string cannot end with an operator: {unit_str}")
+    
+    # Check for consecutive operators
+    for i in range(len(unit_str) - 1):
+        if unit_str[i] in UNIT_OPERATORS and unit_str[i+1] in UNIT_OPERATORS:
+            raise ValueError(f"Unit string cannot have consecutive operators: {unit_str}")
+
+
 def _parse_compound_units(unit_str):
+    # Validate unit string format
+    _validate_compound_unit_format(unit_str)
+    
     # Parse the unit string based on operators /, *, ^
     unit_list = [
-        x for x in re.findall("[A-Za-z]+", unit_str) if x not in UNIT_OPERATORS
+        x for x in re.findall("[A-Za-z$%'\"°]+", unit_str) if x not in UNIT_OPERATORS
+    ]
+
+    value_list = [
+        x for x in re.findall("[0-9.]+", unit_str) if x not in UNIT_OPERATORS
     ]
 
     # Find the indices of the above matches
-    indices = [m.span() for m in re.finditer("[A-Za-z]+", unit_str)]
+    unit_indices = [m.span() for m in re.finditer("[A-Za-z$%'\"°]+", unit_str)]
+
+    # Find indices of all numeric values
+    value_indices = [m.span() for m in re.finditer("[0-9.]+", unit_str)]
+
+    # Helper function to get exponent value after the caret symbol
+    def get_exponent(start_pos):
+        for v_idx, v_span in enumerate(value_indices):
+            if v_span[0] == start_pos:
+                return int(value_list[v_idx])
+        raise ValueError(f"Missing exponent after ^ in unit string: {unit_str}")
 
     # Initialize zero unit
     units = {unit: 0 for unit in BASE_UNITS}
@@ -261,23 +301,23 @@ def _parse_compound_units(unit_str):
     multiplier = 1
 
     # Iterate through the indices and unit_list together
-    for index, unit in zip(indices, unit_list):
+    for index, unit in zip(unit_indices, unit_list):
         if unit in BASE_UNITS:
             if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    units[unit] += int(unit_str[index[1] + 1])
+                    units[unit] += get_exponent(index[1] + 1)
                 else:
                     units[unit] += 1
 
             elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    units[unit] -= int(unit_str[index[1] + 1])
+                    units[unit] -= get_exponent(index[1] + 1)
                 else:
                     units[unit] -= 1
         elif unit in LINEAR_UNITS:
             if index[0] == 0 or unit_str[index[0] - 1] == "*":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    exponent = int(unit_str[index[1] + 1])
+                    exponent = get_exponent(index[1] + 1)
                     for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] += value * exponent
                     multiplier *= LINEAR_UNITS[unit][1] ** exponent
@@ -287,7 +327,7 @@ def _parse_compound_units(unit_str):
                     multiplier *= LINEAR_UNITS[unit][1]
             elif unit_str[index[0] - 1] == "/":
                 if index[1] < len(unit_str) and unit_str[index[1]] == "^":
-                    exponent = int(unit_str[index[1] + 1])
+                    exponent = get_exponent(index[1] + 1)
                     for key, value in LINEAR_UNITS[unit][0].items():
                         units[key] -= value * exponent
                     multiplier /= LINEAR_UNITS[unit][1] ** exponent
@@ -363,8 +403,6 @@ def _hr_parts(vals, units, pref=None):
     return hrvals, hrunits
 
 def _find_derived_unit(base_units, value, pref=None):
-    hrval = ""
-    hrunit = ""
 
     # If a unit was specified by the user, use it.
     if pref:
@@ -378,8 +416,85 @@ def _find_derived_unit(base_units, value, pref=None):
                 return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
             else:
                 raise ValueError("Requested units do not match parameter units.")
+        else:
+            # Handle compound units for display
+            # Validate unit string format
+            _validate_compound_unit_format(pref)
             
+            pref = pref
+            
+            # Break down the preferred unit string
+            unit_list = [
+                x for x in re.findall("[A-Za-z$%'\"°]+", pref) if x not in UNIT_OPERATORS
+            ]
+            
+            # Find the indices of the units in the string
+            unit_indices = [m.span() for m in re.finditer("[A-Za-z$%'\"°]+", pref)]
+            
+            # Find indices of all numeric values (for exponents)
+            value_list = [x for x in re.findall("[0-9.]+", pref) if x not in UNIT_OPERATORS]
+            value_indices = [m.span() for m in re.finditer("[0-9.]+", pref)]
+            
+            # Helper function to get exponent value after the caret symbol
+            def get_exponent(start_pos):
+                for v_idx, v_span in enumerate(value_indices):
+                    if v_span[0] == start_pos:
+                        return float(value_list[v_idx])
+                return 1.0  # Default exponent if none found
+            
+            # Initialize calculation variables
+            compound_multiplier = 1.0
+            computed_units = {unit: 0 for unit in BASE_UNITS}
+            
+            # Iterate through the indices and unit_list together
+            for index, unit in zip(unit_indices, unit_list):
+                if unit in BASE_UNITS:
+                    if index[0] == 0 or pref[index[0] - 1] == "*":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            computed_units[unit] += get_exponent(index[1] + 1)
+                        else:
+                            computed_units[unit] += 1
 
+                    elif pref[index[0] - 1] == "/":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            computed_units[unit] -= get_exponent(index[1] + 1)
+                        else:
+                            computed_units[unit] -= 1
+                elif unit in LINEAR_UNITS:
+                    if index[0] == 0 or pref[index[0] - 1] == "*":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            exponent = get_exponent(index[1] + 1)
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] += v * exponent
+                            compound_multiplier /= LINEAR_UNITS[unit][1] ** (exponent)
+                        else:
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] += v
+                            compound_multiplier /= LINEAR_UNITS[unit][1]
+                    elif pref[index[0] - 1] == "/":
+                        if index[1] < len(pref) and pref[index[1]] == "^":
+                            exponent = get_exponent(index[1] + 1)
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] -= v * exponent
+                            compound_multiplier *= LINEAR_UNITS[unit][1] ** exponent
+                        else:
+                            for k, v in LINEAR_UNITS[unit][0].items():
+                                computed_units[k] -= v
+                            compound_multiplier *= LINEAR_UNITS[unit][1]
+                else:
+                    raise ValueError("Invalid unit: " + unit)
+
+            # Strip zero units
+            computed_units = {k: v for k, v in computed_units.items() if v != 0}
+            
+            # Verify the computed units match the base units
+            if computed_units == base_units:
+                return value * compound_multiplier, pref
+            else:
+                raise ValueError(f"Requested compound units '{pref}' do not match parameter units {base_units}.")
+
+    hrval = ""
+    hrunit = ""
     # Search for derived units with matching base and closest matching value.
     # Search includes powers of the collection of base units (up to 10)
     for i in range(1, 11):
@@ -396,7 +511,8 @@ def _find_derived_unit(base_units, value, pref=None):
                     hrunit = k
                 hrval = value / STANDARD_UNITS[hrunit][1]**i
         if hrunit:
-            hrunit += "^" + str(i)
+            if i > 1:
+                hrunit += "^" + str(i)
             break
 
     return hrval, hrunit

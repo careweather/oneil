@@ -46,6 +46,12 @@ Linux:
 oneil/install.sh
 ```
 
+Note: Oneil uses pkg_resources, which is incuded in python for versions less than 3.12, but is depreciated in python 3.12. If running python 3.12 or higher, after running install.sh install the setuptools package
+
+``` {.sh }
+pip install setuptools
+```
+
 Windows:
 ``` { .bat }
 oneil/install.bat
@@ -85,6 +91,16 @@ To see all the results of the model:
 <param n>: <min>|<max> <unit>
 ```
 
+### Development
+
+If you are developing Oneil, you will want to install Oneil in "editable" mode. To do this, use the `-e` flag.
+
+```sh
+oneil/install.sh -e
+```
+
+This will allow you to modify Oneil's python code and run it with `oneil` without having to re-run `oneil/install.sh` for every change.
+
 ## Manual Install
 
 Alternatively, if you've cloned Oneil, you can install it using pip. You will need the following packages to run Oneil:
@@ -92,12 +108,13 @@ Alternatively, if you've cloned Oneil, you can install it using pip. You will ne
 * Numpy
 * Beautiful Table
 * Pytexit
+* setuptools (if running python 3.12 or higher)
 
 Install using the following commands:
 
 ``` { .sh }
 pip install path/to/oneil
-pip install numpy beautifultable pytexit 
+pip install numpy beautifultable pytexit setuptools
 ```
 
 ### Toolchain
