@@ -17,10 +17,17 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
+            # Rust tools
             rustc
             cargo
             clippy
             rustfmt
+            rust-analyzer
+
+            # VSCode extension tools
+            nodejs_20
+            pnpm
+            vsce # "Visual Studio Code Extension Manager"
           ];
         };
 

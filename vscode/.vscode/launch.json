@@ -11,7 +11,11 @@
 			"request": "launch",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}"
-			]
+			],
+			"env": {
+				"ONEIL_PATH": "${workspaceFolder}/../target/debug/oneil"
+			}
 		}
 	]
 }
+

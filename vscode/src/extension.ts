@@ -3,7 +3,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-lan
 
 export async function activate(context: vscode.ExtensionContext) {
     const serverOptions: ServerOptions = {
-        command: "/home/careweather/Projects/oneil/target/release/oneil",
+        command: process.env.ONEIL_PATH ?? "oneil",
         args: ["lsp"],
     }
 
@@ -24,3 +24,4 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() { }
+
