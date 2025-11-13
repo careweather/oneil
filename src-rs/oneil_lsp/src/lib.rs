@@ -6,12 +6,9 @@
 
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::{
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, MarkedString,
-    MessageType, Position, Range, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, Location, MarkedString, MessageType, Position, Range, ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncOptions, TextDocumentSyncSaveOptions
 };
-use tower_lsp_server::{Client, LanguageServer, LspService, Server};
+use tower_lsp_server::{Client, LanguageServer, LspService, Server, UriExt};
 
 #[derive(Debug)]
 struct Backend {
@@ -46,6 +43,7 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     },
                 )),
+                definition_provider: Some(tower_lsp_server::lsp_types::OneOf::Left(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -110,6 +108,60 @@ impl LanguageServer for Backend {
         let params_str = format!("{params:#?}");
         self.client.log_message(MessageType::INFO, params_str).await;
     }
+
+    // text_document_position_params: TextDocumentPositionParams {
+    //     text_document: TextDocumentIdentifier {
+    //         uri: Uri(
+    //             Uri {
+    //                 scheme: Some(
+    //                     "file",
+    //                 ),
+    //                 authority: Some(
+    //                     Authority {
+    //                         userinfo: None,
+    //                         host: Host {
+    //                             text: "",
+    //                             data: RegName(
+    //                                 "",
+    //                             ),
+    //                         },
+    //                         port: None,
+    //                     },
+    //                 ),
+    //                 path: "/home/pgattic/work/oneil/test/unit_error.on",
+    //                 query: None,
+    //                 fragment: None,
+    //             },
+    //         ),
+    //     },
+    //     position: Position {
+    //         line: 4,
+    //         character: 15,
+    //     },
+
+    async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
+        let _position = params.text_document_position_params.position;
+
+        // Look up position in code
+        // Determine meaning of token
+        // Find source
+        // Return source Location
+
+        // NOTE: For the `Position` type, lines and characters are both 0-based, don't include the
+        // last character, and do include the last line
+        if true {
+            let dest_location = Location {
+                uri: tower_lsp_server::lsp_types::Uri::from_file_path("/home/pgattic/work/oneil/test/unit_error.on").expect("SHOOT"),
+                range: Range {
+                    start: Position { line: 0, character: 3 },
+                    end: Position { line: 2, character: 3 }
+                }
+            };
+
+            return Ok(Some(GotoDefinitionResponse::Scalar(dest_location)));
+        }
+        Ok(None)
+    }
 }
 
 #[tokio::main]
@@ -120,3 +172,4 @@ pub async fn run() {
     let (service, socket) = LspService::new(|client| Backend { client });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
+
