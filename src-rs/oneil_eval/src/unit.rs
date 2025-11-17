@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops};
 
 /// The dimension of a base unit
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -59,7 +59,23 @@ impl Unit {
     }
 
     #[must_use]
-    pub fn magnitude(&self) -> f64 {
+    pub const fn magnitude(&self) -> f64 {
         self.magnitude
+    }
+}
+
+impl ops::Mul for Unit {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl ops::Div for Unit {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        todo!()
     }
 }

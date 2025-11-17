@@ -121,8 +121,56 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
                     })
                 }
                 ir::BinaryOp::TrueSub => todo!(),
-                ir::BinaryOp::Mul => todo!(),
-                ir::BinaryOp::Div => todo!(),
+                ir::BinaryOp::Mul => {
+                    let Value::Number {
+                        value: left_value,
+                        unit: left_unit,
+                    } = left_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let Value::Number {
+                        value: right_value,
+                        unit: right_unit,
+                    } = right_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let result_value = left_value * right_value;
+                    let result_unit = left_unit * right_unit;
+
+                    Ok(Value::Number {
+                        value: result_value,
+                        unit: result_unit,
+                    })
+                }
+                ir::BinaryOp::Div => {
+                    let Value::Number {
+                        value: left_value,
+                        unit: left_unit,
+                    } = left_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let Value::Number {
+                        value: right_value,
+                        unit: right_unit,
+                    } = right_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let result_value = left_value / right_value;
+                    let result_unit = left_unit / right_unit;
+
+                    Ok(Value::Number {
+                        value: result_value,
+                        unit: result_unit,
+                    })
+                }
                 ir::BinaryOp::TrueDiv => todo!(),
                 ir::BinaryOp::Mod => todo!(),
                 ir::BinaryOp::Pow => todo!(),
@@ -153,7 +201,7 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
         ir::Expr::Literal { value } => match value {
             ir::Literal::Number(number) => {
                 let unit = Unit::new(ComplexDimension::unitless(), 1.0);
-                let number_value = NumberValue::Scalar(*number);
+                let number_value = NumberValue::new_scalar(*number);
                 Ok(Value::Number {
                     value: number_value,
                     unit,
