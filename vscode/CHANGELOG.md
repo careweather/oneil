@@ -8,6 +8,13 @@
 
 ## Unreleased
 
+## v0.1.1
+
+### Added
+- syntax highlighting for upcoming Oneil updates
+- Oneil icon
+- Oneil file icons
+
 ## v0.1.0
 
 - Initial release
