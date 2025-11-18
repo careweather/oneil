@@ -27,6 +27,23 @@ impl NumberValue {
     pub const fn new_empty() -> Self {
         Self::Interval(Interval::empty())
     }
+
+    pub fn tightest_enclosing_interval(&self, rhs: &Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => {
+                Self::new_interval(f64::min(*lhs, *rhs), f64::max(*lhs, *rhs))
+            }
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).tightest_enclosing_interval(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.tightest_enclosing_interval(&Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => {
+                Self::Interval(lhs.tightest_enclosing_interval(rhs))
+            }
+        }
+    }
 }
 
 impl PartialEq for NumberValue {

@@ -174,9 +174,62 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
                 ir::BinaryOp::TrueDiv => todo!(),
                 ir::BinaryOp::Mod => todo!(),
                 ir::BinaryOp::Pow => todo!(),
-                ir::BinaryOp::And => todo!(),
-                ir::BinaryOp::Or => todo!(),
-                ir::BinaryOp::MinMax => todo!(),
+                ir::BinaryOp::And => {
+                    let Value::Boolean(left_result) = left_result else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+                    let Value::Boolean(right_result) = right_result else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let result_value = left_result && right_result;
+                    Ok(Value::Boolean(result_value))
+                }
+                ir::BinaryOp::Or => {
+                    let Value::Boolean(left_result) = left_result else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+                    let Value::Boolean(right_result) = right_result else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let result_value = left_result || right_result;
+                    Ok(Value::Boolean(result_value))
+                }
+                ir::BinaryOp::MinMax => {
+                    let Value::Number {
+                        value: left_value,
+                        unit: left_unit,
+                    } = left_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+                    let Value::Number {
+                        value: right_value,
+                        unit: right_unit,
+                    } = right_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    // TODO: should we include this check or not?
+                    //       including it means that the left value *must*
+                    //       be less than the right value, which might be
+                    //       hard for the programmer to ensure when it comes
+                    //       to performing the operation on intervals that have
+                    //       gone through many calculations
+                    //
+                    if left_value > right_value {
+                        return Err(vec![EvalError::InvalidInterval]);
+                    }
+
+                    let result_value = left_value.tightest_enclosing_interval(&right_value);
+
+                    Ok(Value::Number {
+                        value: result_value,
+                        unit: left_unit,
+                    })
+                }
             }
         }
         ir::Expr::UnaryOp { op, expr } => {

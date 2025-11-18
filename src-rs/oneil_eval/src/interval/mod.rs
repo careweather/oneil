@@ -49,6 +49,34 @@ impl Interval {
     pub const fn is_valid(&self) -> bool {
         !self.is_empty() && self.min <= self.max
     }
+
+    /// Returns the tightest interval that contains both self and rhs as its subsets.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use oneil_eval::interval::Interval;
+    ///
+    /// let interval1 = Interval::new(1.0, 2.0);
+    /// let interval2 = Interval::new(3.0, 4.0);
+    /// let interval3 = interval1.tightest_enclosing_interval(&interval2);
+    ///
+    /// assert_eq!(interval3, Interval::new(1.0, 4.0));
+    /// ```
+    pub fn tightest_enclosing_interval(&self, rhs: &Self) -> Self {
+        if self.is_empty() {
+            return *rhs;
+        }
+
+        if rhs.is_empty() {
+            return *self;
+        }
+
+        let min = f64::min(self.min, rhs.min);
+        let max = f64::max(self.max, rhs.max);
+
+        Self::new(f64::min(self.min, rhs.min), f64::max(self.max, rhs.max))
+    }
 }
 
 impl From<f64> for Interval {
