@@ -6,6 +6,6 @@
 mod context;
 mod error;
 mod eval_expr;
-mod interval;
+pub mod interval;
 mod unit;
 mod value;

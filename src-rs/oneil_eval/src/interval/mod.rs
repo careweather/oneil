@@ -37,6 +37,7 @@ impl Interval {
         Self { min, max }
     }
 
+    #[must_use]
     pub fn new(min: f64, max: f64) -> Self {
         assert!(!min.is_nan(), "min must not be NaN in ({min}, {max})");
         assert!(!max.is_nan(), "max must not be NaN in ({min}, {max})");
@@ -48,6 +49,7 @@ impl Interval {
         Self { min, max }
     }
 
+    #[must_use]
     pub const fn empty() -> Self {
         Self {
             min: f64::NAN,
@@ -55,22 +57,27 @@ impl Interval {
         }
     }
 
+    #[must_use]
     pub const fn min(&self) -> f64 {
         self.min
     }
 
+    #[must_use]
     pub const fn max(&self) -> f64 {
         self.max
     }
 
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.min.is_nan() && self.max.is_nan()
     }
 
+    #[must_use]
     pub const fn is_valid(&self) -> bool {
-        !self.is_empty() && self.min <= self.max
+        self.is_empty() || self.min <= self.max
     }
 
+    #[must_use]
     pub fn pow(&self, exponent: &Self) -> Self {
         const DOMAIN: Interval = Interval::new_unchecked(0.0, f64::INFINITY);
 
@@ -128,6 +135,7 @@ impl Interval {
         }
     }
 
+    #[must_use]
     pub fn intersection(&self, rhs: &Self) -> Self {
         if self.is_empty() || rhs.is_empty() {
             return Self::empty();
@@ -151,6 +159,7 @@ impl Interval {
     ///
     /// assert_eq!(interval3, Interval::new(1.0, 4.0));
     /// ```
+    #[must_use]
     pub fn tightest_enclosing_interval(&self, rhs: &Self) -> Self {
         if self.is_empty() {
             return *rhs;
@@ -491,5 +500,24 @@ impl ops::Div for Interval {
                 Self::new(min, max)
             }
         }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+use arbitrary::{Result, Unstructured};
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Interval {
+    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
+        let f = u.arbitrary::<f64>()?;
+        let g = u.arbitrary::<f64>()?;
+
+        if f.is_nan() || g.is_nan() {
+            return Ok(Self::empty());
+        }
+
+        let min = f64::min(f, g);
+        let max = f64::max(f, g);
+        Ok(Self::new_unchecked(min, max))
     }
 }

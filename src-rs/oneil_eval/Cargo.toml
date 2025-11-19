@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
+arbitrary = { version = "1.4.2", optional = true }
 
 [dev-dependencies]
 oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
