@@ -173,7 +173,30 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
                 }
                 ir::BinaryOp::TrueDiv => todo!(),
                 ir::BinaryOp::Mod => todo!(),
-                ir::BinaryOp::Pow => todo!(),
+                ir::BinaryOp::Pow => {
+                    let Value::Number {
+                        value: base_value,
+                        unit: base_unit,
+                    } = left_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+                    let Value::Number {
+                        value: exponent_value,
+                        unit: _exponent_unit,
+                    } = right_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let result_value = base_value.pow(&exponent_value);
+                    let result_unit = todo!("figure out how to handle unit power");
+
+                    Ok(Value::Number {
+                        value: result_value,
+                        unit: result_unit,
+                    })
+                }
                 ir::BinaryOp::And => {
                     let Value::Boolean(left_result) = left_result else {
                         unreachable!("this should be caught by the typecheck");
@@ -498,6 +521,7 @@ fn typecheck_binary_op_results(
     right_result: &Value,
 ) -> Option<EvalError> {
     match op {
+        // TODO: fix this typechecking for pow, mul, etc.
         ir::BinaryOp::Add
         | ir::BinaryOp::Sub
         | ir::BinaryOp::TrueSub

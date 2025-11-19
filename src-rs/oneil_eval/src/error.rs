@@ -3,4 +3,5 @@ pub enum EvalError {
     InvalidOperation,
     InvalidType,
     InvalidUnit,
+    IntervalExponentOnBaseWithUnits,
 }

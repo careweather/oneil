@@ -4,10 +4,25 @@ use crate::interval::classification::IntervalClass;
 
 mod classification;
 
+// TODO: maybe add more comparison functions for
+//       intervals into the standard library (
+//       such as `contains` or `overlaps`)
+
 // TODO: add note linking arithmetic operations to
 //       documentation in docs folder
 
 // TODO: write fuzz tests for interval arithmetic
+
+// NOTE: it may be worthwhile to take a look at
+//       IEEE 1788-2015 and IEEE 1788.1-2017. They
+//       contain standards for interval arithmetic,
+//       and it might be a selling point for Oneil
+//       to claim that it is compliant with these
+//       standards.
+//
+//       For now, we are just implementing what is
+//       needed so that we can get to a working
+//       implementation.
 
 #[derive(Debug, Clone, Copy)]
 pub struct Interval {
@@ -16,6 +31,12 @@ pub struct Interval {
 }
 
 impl Interval {
+    /// Creates a new interval without checking the validity of the interval.
+    #[must_use]
+    pub const fn new_unchecked(min: f64, max: f64) -> Self {
+        Self { min, max }
+    }
+
     pub fn new(min: f64, max: f64) -> Self {
         assert!(!min.is_nan(), "min must not be NaN in ({min}, {max})");
         assert!(!max.is_nan(), "max must not be NaN in ({min}, {max})");
@@ -48,6 +69,73 @@ impl Interval {
 
     pub const fn is_valid(&self) -> bool {
         !self.is_empty() && self.min <= self.max
+    }
+
+    pub fn pow(&self, exponent: &Self) -> Self {
+        const DOMAIN: Interval = Interval::new_unchecked(0.0, f64::INFINITY);
+
+        let base = self.intersection(&DOMAIN);
+
+        if base.is_empty() || exponent.is_empty() {
+            return Self::empty();
+        }
+
+        let base_min = base.min;
+        let base_max = base.max;
+        let exp_min = exponent.min;
+        let exp_max = exponent.max;
+
+        if exp_min <= 0.0 {
+            if base_max == 0.0 {
+                Self::empty()
+            } else if base_max < 1.0 {
+                let min = base_max.powf(exp_max);
+                let max = base_min.powf(exp_min);
+                Self::new(min, max)
+            } else if base_min > 1.0 {
+                let min = base_max.powf(exp_min);
+                let max = base_min.powf(exp_max);
+                Self::new(min, max)
+            } else {
+                let min = base_max.powf(exp_min);
+                let max = base_min.powf(exp_min);
+                Self::new(min, max)
+            }
+        } else if exp_min > 0.0 {
+            if base_max < 1.0 {
+                let min = base_min.powf(exp_max);
+                let max = base_max.powf(exp_min);
+                Self::new(min, max)
+            } else if base_min > 1.0 {
+                let min = base_min.powf(exp_min);
+                let max = base_max.powf(exp_max);
+                Self::new(min, max)
+            } else {
+                let min = base_min.powf(exp_max);
+                let max = base_max.powf(exp_max);
+                Self::new(min, max)
+            }
+        } else if base_max == 0.0 {
+            let min = 0.0;
+            let max = 0.0;
+            Self::new(min, max)
+        } else {
+            let min_min = base_min.powf(exp_min);
+            let min_max = base_min.powf(exp_max);
+            let max_min = base_max.powf(exp_min);
+            let max_max = base_max.powf(exp_max);
+            Self::new(f64::min(min_max, max_min), f64::max(min_min, max_max))
+        }
+    }
+
+    pub fn intersection(&self, rhs: &Self) -> Self {
+        if self.is_empty() || rhs.is_empty() {
+            return Self::empty();
+        }
+
+        let min = f64::max(self.min, rhs.min);
+        let max = f64::min(self.max, rhs.max);
+        Self::new(min, max)
     }
 
     /// Returns the tightest interval that contains both self and rhs as its subsets.

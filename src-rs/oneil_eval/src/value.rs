@@ -9,6 +9,9 @@ pub enum Value {
     Number { value: NumberValue, unit: Unit },
 }
 
+// TODO: in number value docs mention that for the outside world,
+//       a number value is essentially an interval. The fact that
+//       it is sometimes stored as a scalar is an implementation detail.
 #[derive(Debug, Clone, Copy)]
 pub enum NumberValue {
     Scalar(f64),
@@ -26,6 +29,34 @@ impl NumberValue {
 
     pub const fn new_empty() -> Self {
         Self::Interval(Interval::empty())
+    }
+
+    pub fn pow(&self, exponent: &Self) -> Self {
+        match (self, exponent) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs.powf(*rhs)),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).pow(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.pow(&Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.pow(rhs)),
+        }
+    }
+
+    pub fn intersection(&self, rhs: &Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(Interval::from(lhs).intersection(&Interval::from(rhs)))
+            }
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).intersection(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.intersection(&Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.intersection(rhs)),
+        }
     }
 
     pub fn tightest_enclosing_interval(&self, rhs: &Self) -> Self {
