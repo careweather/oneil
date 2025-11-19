@@ -19,7 +19,18 @@ In order to modify the syntax highlighting, edit
 `syntaxes/oneil.tmLanguage.json`. For more details, see the [VS Code docs on
 syntax highlighting](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide).
 
-### Publishing the extension
+<!-- TODO: Setup CI workflow for publishing extension, as described at
+https://github.com/EclipseFdn/publish-extensions/blob/master/docs/direct_publish_setup.md#setup-vs-code-extension-publishing-ci-workflow -->
+
+### Publishing the extension for VS Code
 
 For details on how the extension is published, reference [the VS Code
 docs on publishing extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension).
+
+### Publishing the extension for VS Code forks
+
+In order to use the extension on VS Code forks, such as Cursor, it
+needs to be published on the OpenVSX registry. That process is described
+[here](https://github.com/eclipse/openvsx/wiki/Publishing-Extensions).
+You also need to be associated with the `careweather` namespace,
+described [here](https://github.com/eclipse/openvsx/wiki/Namespace-Access).
