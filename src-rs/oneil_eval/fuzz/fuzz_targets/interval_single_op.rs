@@ -8,6 +8,7 @@ use libfuzzer_sys::{arbitrary, fuzz_target};
 enum FuzzData {
     Add { lhs: Interval, rhs: Interval },
     Div { lhs: Interval, rhs: Interval },
+    Intersection { lhs: Interval, rhs: Interval },
     Mul { lhs: Interval, rhs: Interval },
     Neg { val: Interval },
     Pow { base: Interval, exponent: Interval },
@@ -22,6 +23,10 @@ fuzz_target!(|data: FuzzData| {
         }
         FuzzData::Div { lhs, rhs } => {
             let result = lhs / rhs;
+            assert!(result.is_valid());
+        }
+        FuzzData::Intersection { lhs, rhs } => {
+            let result = lhs.intersection(&rhs);
             assert!(result.is_valid());
         }
         FuzzData::Mul { lhs, rhs } => {

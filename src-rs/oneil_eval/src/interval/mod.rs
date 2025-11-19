@@ -50,6 +50,11 @@ impl Interval {
     }
 
     #[must_use]
+    pub const fn zero() -> Self {
+        Self { min: 0.0, max: 0.0 }
+    }
+
+    #[must_use]
     pub const fn empty() -> Self {
         Self {
             min: f64::NAN,
@@ -92,7 +97,7 @@ impl Interval {
         let exp_min = exponent.min;
         let exp_max = exponent.max;
 
-        if exp_min <= 0.0 {
+        if exp_max <= 0.0 {
             if base_max == 0.0 {
                 Self::empty()
             } else if base_max < 1.0 {
@@ -138,6 +143,10 @@ impl Interval {
     #[must_use]
     pub fn intersection(&self, rhs: &Self) -> Self {
         if self.is_empty() || rhs.is_empty() {
+            return Self::empty();
+        }
+
+        if self.min > rhs.max || rhs.min > self.max {
             return Self::empty();
         }
 
@@ -273,7 +282,7 @@ impl ops::Mul for Interval {
                 | IntervalClass::Negative1
                 | IntervalClass::Zero,
                 IntervalClass::Zero,
-            ) => Self::empty(),
+            ) => Self::zero(),
             (
                 IntervalClass::Zero,
                 IntervalClass::Positive1
@@ -281,11 +290,7 @@ impl ops::Mul for Interval {
                 | IntervalClass::Mixed
                 | IntervalClass::Negative0
                 | IntervalClass::Negative1,
-            ) => {
-                let min = 0.0;
-                let max = 0.0;
-                Self::new(min, max)
-            }
+            ) => Self::zero(),
             (
                 IntervalClass::Positive1 | IntervalClass::Positive0,
                 IntervalClass::Positive1 | IntervalClass::Positive0,
@@ -319,7 +324,7 @@ impl ops::Mul for Interval {
             }
             (IntervalClass::Mixed, IntervalClass::Negative1 | IntervalClass::Negative0) => {
                 let min = lhs.max * rhs.min;
-                let max = lhs.min * rhs.max;
+                let max = lhs.min * rhs.min;
                 Self::new(min, max)
             }
             (
@@ -331,8 +336,8 @@ impl ops::Mul for Interval {
                 Self::new(min, max)
             }
             (IntervalClass::Negative1 | IntervalClass::Negative0, IntervalClass::Mixed) => {
-                let min = lhs.min * rhs.min;
-                let max = lhs.min * rhs.max;
+                let min = lhs.min * rhs.max;
+                let max = lhs.min * rhs.min;
                 Self::new(min, max)
             }
             (
