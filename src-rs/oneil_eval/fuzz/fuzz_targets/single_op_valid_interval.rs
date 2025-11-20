@@ -1,5 +1,7 @@
 #![no_main]
 
+// TODO: make multi-op version of this fuzz target
+
 use libfuzzer_sys::{arbitrary, fuzz_target};
 use oneil_eval::interval::Interval;
 
