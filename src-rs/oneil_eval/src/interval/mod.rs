@@ -34,6 +34,8 @@ impl Interval {
     /// Creates a new interval without checking the validity of the interval.
     #[must_use]
     pub const fn new_unchecked(min: f64, max: f64) -> Self {
+        let min = if min == 0.0 { 0.0 } else { min };
+        let max = if max == 0.0 { -0.0 } else { max };
         Self { min, max }
     }
 
@@ -46,20 +48,17 @@ impl Interval {
             "min must be less than or equal to max in ({min}, {max})"
         );
 
-        Self { min, max }
+        Self::new_unchecked(min, max)
     }
 
     #[must_use]
     pub const fn zero() -> Self {
-        Self { min: 0.0, max: 0.0 }
+        Self::new_unchecked(0.0, 0.0)
     }
 
     #[must_use]
     pub const fn empty() -> Self {
-        Self {
-            min: f64::NAN,
-            max: f64::NAN,
-        }
+        Self::new_unchecked(f64::NAN, f64::NAN)
     }
 
     #[must_use]
