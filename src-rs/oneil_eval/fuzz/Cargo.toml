@@ -11,9 +11,20 @@ cargo-fuzz = true
 libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
 oneil_eval = { path = "..", features = ["arbitrary"] }
 
+[lib]
+name = "shared"
+path = "fuzz_targets/shared.rs"
+
 [[bin]]
-name = "interval_single_op"
-path = "fuzz_targets/interval_single_op.rs"
+name = "single_op_inclusion_property"
+path = "fuzz_targets/single_op_inclusion_property.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "single_op_valid_interval"
+path = "fuzz_targets/single_op_valid_interval.rs"
 test = false
 doc = false
 bench = false
