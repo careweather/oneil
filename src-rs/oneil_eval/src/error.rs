@@ -1,5 +1,6 @@
 pub enum EvalError {
-    ExponentHasUnit,
+    HasIntervalExponent,
+    HasExponentWithUnits,
     InvalidInterval,
     InvalidOperation,
     InvalidType,

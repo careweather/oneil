@@ -190,7 +190,15 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
                     };
 
                     let result_value = base_value.pow(&exponent_value);
-                    let result_unit = todo!("figure out how to handle unit power");
+                    let result_unit = match exponent_value {
+                        NumberValue::Scalar(exponent) => base_unit.pow(exponent),
+                        NumberValue::Interval(exponent) if base_unit.dimensions().is_unitless() => {
+                            base_unit
+                        }
+                        NumberValue::Interval(_) => {
+                            unreachable!("this should be caught by the typecheck")
+                        }
+                    };
 
                     Ok(Value::Number {
                         value: result_value,
@@ -552,16 +560,23 @@ fn typecheck_binary_op_results(
         }
         ir::BinaryOp::Pow => match (left_result, right_result) {
             (
-                Value::Number { .. },
+                Value::Number {
+                    unit: base_unit, ..
+                },
                 Value::Number {
                     unit: exponent_unit,
-                    ..
+                    value: exponent_value,
                 },
             ) => {
-                if exponent_unit.dimensions().is_unitless() {
-                    None
-                } else {
-                    Some(EvalError::ExponentHasUnit)
+                // the exponent must be unitless
+                if !exponent_unit.dimensions().is_unitless() {
+                    return Some(EvalError::HasExponentWithUnits);
+                }
+
+                // the exponent cannot be an interval
+                match exponent_value {
+                    NumberValue::Interval(_) => Some(EvalError::HasIntervalExponent),
+                    NumberValue::Scalar(_) => None,
                 }
             }
             _ => Some(EvalError::InvalidType),

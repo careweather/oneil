@@ -66,6 +66,10 @@ impl Unit {
     pub const fn magnitude(&self) -> f64 {
         self.magnitude
     }
+
+    pub fn pow(&self, exponent: f64) -> Self {
+        todo!()
+    }
 }
 
 impl ops::Mul for Unit {
