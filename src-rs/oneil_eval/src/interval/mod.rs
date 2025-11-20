@@ -81,6 +81,10 @@ impl Interval {
         self.is_empty() || self.min <= self.max
     }
 
+    /// Exponentiation of intervals
+    ///
+    /// This is defined based on the implementation in the
+    /// [inari crate](https://docs.rs/inari/latest/src/inari/elementary.rs.html#588)
     #[must_use]
     pub fn pow(&self, exponent: &Self) -> Self {
         const DOMAIN: Interval = Interval::new_unchecked(0.0, f64::INFINITY);
@@ -213,21 +217,42 @@ impl PartialOrd for Interval {
     /// An interval is less than another interval if both the min and max are less
     /// than the other interval. Same goes for greater than and equal to.
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (
-            self.min.partial_cmp(&other.min),
-            self.max.partial_cmp(&other.max),
-        ) {
-            (Some(Ordering::Less), Some(Ordering::Less)) => Some(Ordering::Less),
-            (Some(Ordering::Greater), Some(Ordering::Greater)) => Some(Ordering::Greater),
-            (Some(Ordering::Equal), Some(Ordering::Equal)) => Some(Ordering::Equal),
-            _ => None,
+        // if the min and max are the same, they are equal
+        //
+        //       |--- self ---|
+        //       |--- other --|
+        if self.min == other.min && self.max == other.max {
+            return Some(Ordering::Equal);
         }
+
+        // if the min of self is greater than the max of other, self is greater than other
+        //
+        //                  |--- self ---|
+        // |--- other ---|
+        if self.min.partial_cmp(&other.max) == Some(Ordering::Greater) {
+            return Some(Ordering::Greater);
+        }
+
+        // if the max of self is less than the min of other, self is less than other
+        //
+        // |--- self ---|
+        //                  |--- other ---|
+        if self.max.partial_cmp(&other.min) == Some(Ordering::Less) {
+            return Some(Ordering::Less);
+        }
+
+        // otherwise, there is not a clear ordering
+        None
     }
 }
 
 impl ops::Neg for Interval {
     type Output = Self;
 
+    /// Negation of intervals
+    ///
+    /// This is defined according to the research in the
+    /// [interval arithmetic paper](/docs/research/2025-11-13-interval-arithmetic-paper-review.md).
     fn neg(self) -> Self::Output {
         Self {
             min: -self.max,
@@ -239,6 +264,10 @@ impl ops::Neg for Interval {
 impl ops::Add for Interval {
     type Output = Self;
 
+    /// Addition of intervals
+    ///
+    /// This is defined according to the research in the
+    /// [interval arithmetic paper](/docs/research/2025-11-13-interval-arithmetic-paper-review.md).
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             min: self.min + rhs.min,
@@ -250,6 +279,10 @@ impl ops::Add for Interval {
 impl ops::Sub for Interval {
     type Output = Self;
 
+    /// Subtraction of intervals
+    ///
+    /// This is defined according to the research in the
+    /// [interval arithmetic paper](/docs/research/2025-11-13-interval-arithmetic-paper-review.md).
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
             min: self.min - rhs.max,
@@ -261,6 +294,10 @@ impl ops::Sub for Interval {
 impl ops::Mul for Interval {
     type Output = Self;
 
+    /// Multiplication of intervals
+    ///
+    /// This is defined according to the research in the
+    /// [interval arithmetic paper](/docs/research/2025-11-13-interval-arithmetic-paper-review.md).
     #[expect(
         clippy::match_same_arms,
         reason = "the different cases should remain distinct so that they can easily be checked against the table in the documentation"
@@ -354,6 +391,10 @@ impl ops::Mul for Interval {
 impl ops::Div for Interval {
     type Output = Self;
 
+    /// Division of intervals
+    ///
+    /// This is defined according to the research in the
+    /// [interval arithmetic paper](/docs/research/2025-11-13-interval-arithmetic-paper-review.md).
     #[expect(
         clippy::too_many_lines,
         reason = "the implementation is an implementation of a table, which is long but straightforward"
