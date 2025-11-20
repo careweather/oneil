@@ -525,11 +525,7 @@ fn typecheck_binary_op_results(
         ir::BinaryOp::Add
         | ir::BinaryOp::Sub
         | ir::BinaryOp::TrueSub
-        | ir::BinaryOp::Mul
-        | ir::BinaryOp::Div
-        | ir::BinaryOp::TrueDiv
         | ir::BinaryOp::Mod
-        | ir::BinaryOp::Pow
         | ir::BinaryOp::MinMax => match (left_result, right_result) {
             (
                 Value::Number {
@@ -540,20 +536,38 @@ fn typecheck_binary_op_results(
                 },
             ) => {
                 // TODO: this is checking for f64 equality directly, figure out how to handle f64 comparison
-                if left_unit.dimensions() != right_unit.dimensions() {
-                    Some(EvalError::InvalidUnit)
-                } else {
+                if left_unit.dimensions() == right_unit.dimensions() {
                     None
+                } else {
+                    Some(EvalError::InvalidUnit)
                 }
             }
-            (Value::Number { .. }, _) => Some(EvalError::InvalidType),
-            (_, Value::Number { .. }) => Some(EvalError::InvalidType),
+            _ => Some(EvalError::InvalidType),
+        },
+        ir::BinaryOp::Mul | ir::BinaryOp::Div | ir::BinaryOp::TrueDiv => {
+            match (left_result, right_result) {
+                (Value::Number { .. }, Value::Number { .. }) => None,
+                _ => Some(EvalError::InvalidType),
+            }
+        }
+        ir::BinaryOp::Pow => match (left_result, right_result) {
+            (
+                Value::Number { .. },
+                Value::Number {
+                    unit: exponent_unit,
+                    ..
+                },
+            ) => {
+                if exponent_unit.dimensions().is_unitless() {
+                    None
+                } else {
+                    Some(EvalError::ExponentHasUnit)
+                }
+            }
             _ => Some(EvalError::InvalidType),
         },
         ir::BinaryOp::And | ir::BinaryOp::Or => match (left_result, right_result) {
             (Value::Boolean(_), Value::Boolean(_)) => None,
-            (Value::Boolean(_), _) => Some(EvalError::InvalidType),
-            (_, Value::Boolean(_)) => Some(EvalError::InvalidType),
             _ => Some(EvalError::InvalidType),
         },
     }

@@ -35,6 +35,10 @@ impl ComplexDimension {
     pub fn unitless() -> Self {
         Self(HashMap::new())
     }
+
+    pub fn is_unitless(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
