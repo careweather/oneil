@@ -172,7 +172,30 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
                     })
                 }
                 ir::BinaryOp::TrueDiv => todo!(),
-                ir::BinaryOp::Mod => todo!(),
+                ir::BinaryOp::Mod => {
+                    let Value::Number {
+                        value: left_value,
+                        unit: left_unit,
+                    } = left_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+                    let Value::Number {
+                        value: right_value,
+                        unit: right_unit,
+                    } = right_result
+                    else {
+                        unreachable!("this should be caught by the typecheck");
+                    };
+
+                    let result_value = left_value % right_value;
+                    let result_unit = left_unit;
+
+                    Ok(Value::Number {
+                        value: result_value,
+                        unit: result_unit,
+                    })
+                }
                 ir::BinaryOp::Pow => {
                     let Value::Number {
                         value: base_value,

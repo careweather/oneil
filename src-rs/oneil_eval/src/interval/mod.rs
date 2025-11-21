@@ -548,6 +548,50 @@ impl ops::Div for Interval {
     }
 }
 
+impl ops::Rem<f64> for Interval {
+    type Output = Self;
+
+    /// Modulo an interval
+    ///
+    /// This is defined by Brendon's reasoning and therefore
+    /// may have incorrect behavior
+    fn rem(self, rhs: f64) -> Self::Output {
+        let lhs = self;
+        let rhs = rhs.abs();
+
+        // if the modulus is 0 or undefined, the result
+        // is an empty interval
+        if rhs == 0.0 || rhs.is_nan() {
+            return Self::empty();
+        }
+
+        // if the modulus is infinite, the result is the
+        // same as the original interval
+        if rhs.is_infinite() {
+            return lhs;
+        }
+
+        // if the range of the interval is greater than or equal to the modulus,
+        // the result is the interval (0, modulus) since the interval spans the entire modulus
+        // at least once
+        let range = lhs.max - lhs.min;
+        if range >= rhs {
+            return Self::new(0.0, rhs);
+        }
+
+        let min_mod = lhs.min % rhs;
+        let max_mod = lhs.max % rhs;
+
+        if min_mod > max_mod {
+            // if the min is greater than the max, the result is two intervals
+            // (0, max) and (min, rhs). the tightest enclosing interval is (0, rhs).
+            Self::new(0.0, rhs)
+        } else {
+            Self::new(min_mod, max_mod)
+        }
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 use arbitrary::{Result, Unstructured};
 
