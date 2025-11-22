@@ -10,6 +10,7 @@ enum FuzzData {
     Add { lhs: Interval, rhs: Interval },
     Div { lhs: Interval, rhs: Interval },
     Intersection { lhs: Interval, rhs: Interval },
+    Mod { lhs: Interval, rhs: Interval },
     Mul { lhs: Interval, rhs: Interval },
     Neg { val: Interval },
     Pow { base: Interval, exponent: Interval },
@@ -21,6 +22,7 @@ fuzz_target!(|data: FuzzData| {
         FuzzData::Add { lhs, rhs } => lhs + rhs,
         FuzzData::Div { lhs, rhs } => lhs / rhs,
         FuzzData::Intersection { lhs, rhs } => lhs.intersection(&rhs),
+        FuzzData::Mod { lhs, rhs } => lhs % rhs,
         FuzzData::Mul { lhs, rhs } => lhs * rhs,
         FuzzData::Neg { val } => -val,
         FuzzData::Pow { base, exponent } => base.pow(&exponent),
@@ -29,7 +31,7 @@ fuzz_target!(|data: FuzzData| {
 
     assert!(
         interval_result.is_valid(),
-        "interval result is not valid: ({}, {})",
+        "interval result is not valid: ({:?}, {:?})",
         interval_result.min(),
         interval_result.max()
     );

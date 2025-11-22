@@ -15,6 +15,10 @@ enum FuzzData {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
     },
+    Mod {
+        lhs: IntervalWithValue,
+        rhs: IntervalWithValue,
+    },
     Mul {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
@@ -61,6 +65,11 @@ fuzz_target!(|data: FuzzData| {
 
             (interval_result, value_result)
         }
+        FuzzData::Mod { lhs, rhs } => {
+            let interval_result = lhs.interval % rhs.interval;
+            let value_result = lhs.value % rhs.value;
+            (interval_result, value_result)
+        }
         FuzzData::Mul { lhs, rhs } => {
             let interval_result = lhs.interval * rhs.interval;
             let value_result = lhs.value * rhs.value;
@@ -95,7 +104,7 @@ fuzz_target!(|data: FuzzData| {
 
     assert!(
         interval_result.is_valid(),
-        "interval result is not valid: ({}, {})",
+        "interval result is not valid: ({:?}, {:?})",
         interval_result.min(),
         interval_result.max()
     );
@@ -103,7 +112,7 @@ fuzz_target!(|data: FuzzData| {
     if !interval_result.is_empty() && !value_result.is_nan() {
         assert!(
             value_result <= interval_result.max(),
-            "value result ({}) is greater than the interval max ({}), interval: ({}, {})",
+            "value result ({:?}) is greater than the interval max ({:?}), interval: ({:?}, {:?})",
             value_result,
             interval_result.max(),
             interval_result.min(),
@@ -112,7 +121,7 @@ fuzz_target!(|data: FuzzData| {
 
         assert!(
             value_result >= interval_result.min(),
-            "value result ({}) is less than the interval min ({}), interval: ({}, {})",
+            "value result ({:?}) is less than the interval min ({:?}), interval: ({:?}, {:?})",
             value_result,
             interval_result.min(),
             interval_result.min(),

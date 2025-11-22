@@ -1,5 +1,6 @@
 use crate::interval::Interval;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntervalClass {
     /// An empty interval (represented by both fields as `NaN`)
     Empty,
