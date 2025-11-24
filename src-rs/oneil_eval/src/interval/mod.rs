@@ -11,8 +11,6 @@ mod classification;
 // TODO: add note linking arithmetic operations to
 //       documentation in docs folder
 
-// TODO: write fuzz tests for interval arithmetic
-
 // NOTE: it may be worthwhile to take a look at
 //       IEEE 1788-2015 and IEEE 1788.1-2017. They
 //       contain standards for interval arithmetic,
@@ -39,6 +37,11 @@ impl Interval {
         Self { min, max }
     }
 
+    /// Creates a new interval
+    ///
+    /// # Panics
+    ///
+    /// Panics if the min or max is NaN, or if the min is greater than the max.
     #[must_use]
     pub fn new(min: f64, max: f64) -> Self {
         assert!(!min.is_nan(), "min must not be NaN in ({min:?}, {max:?})");
@@ -221,6 +224,10 @@ impl PartialOrd for Interval {
         //
         //       |--- self ---|
         //       |--- other --|
+        #[expect(
+            clippy::float_cmp,
+            reason = "simplicity - feel free to change this if it causes issues"
+        )]
         if self.min == other.min && self.max == other.max {
             return Some(Ordering::Equal);
         }

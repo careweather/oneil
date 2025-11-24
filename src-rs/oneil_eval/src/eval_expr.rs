@@ -11,10 +11,6 @@ use crate::{
 
 const FLOAT_COMP_DELTA: f64 = 1e-10;
 
-pub fn floats_are_equal(a: f64, b: f64, epsilon: f64) -> bool {
-    (b >= a - epsilon) && (b <= a + epsilon)
-}
-
 #[allow(clippy::too_many_lines)]
 pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<EvalError>> {
     match expr {
@@ -120,7 +116,9 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
                         unit: result_unit,
                     })
                 }
-                ir::BinaryOp::TrueSub => todo!(),
+                ir::BinaryOp::TrueSub => panic!(
+                    "this operation is no longer supported - use regular subtraction instead"
+                ),
                 ir::BinaryOp::Mul => {
                     let Value::Number {
                         value: left_value,
@@ -171,7 +169,9 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
                         unit: result_unit,
                     })
                 }
-                ir::BinaryOp::TrueDiv => todo!(),
+                ir::BinaryOp::TrueDiv => {
+                    panic!("this operation is no longer supported - use regular division instead")
+                }
                 ir::BinaryOp::Mod => {
                     let Value::Number {
                         value: left_value,

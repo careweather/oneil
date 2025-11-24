@@ -32,4 +32,8 @@ impl EvalContext {
     pub fn evaluate_imported_function(&self, identifier: &ir::Identifier, args: &[Value]) -> Value {
         todo!()
     }
+
+    pub fn values_are_close(&self, a: &Value, b: &Value, epsilon: f64) -> bool {
+        todo!()
+    }
 }
