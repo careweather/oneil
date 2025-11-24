@@ -621,6 +621,62 @@ impl ops::Rem for Interval {
     }
 }
 
+impl ops::Rem<f64> for Interval {
+    type Output = Self;
+
+    /// Modulo an interval by a scalar
+    ///
+    /// This is a more specialized version of the modulo operation
+    /// that uses the fact that the modulo is scalar to provide a
+    /// more tight interval.
+    ///
+    /// This is defined by Brendon's reasoning and therefore
+    /// may have incorrect behavior
+    fn rem(self, rhs: f64) -> Self::Output {
+        let lhs = self;
+
+        if rhs.is_nan() {
+            return Self::empty();
+        }
+
+        if rhs == 0.0 {
+            return Self::empty();
+        }
+
+        let rhs = rhs.abs();
+
+        let lhs_distance = lhs.max - lhs.min;
+        let lhs_min_mod = lhs.min % rhs;
+        let lhs_max_mod = lhs.max % rhs;
+
+        match classification::classify(&lhs) {
+            IntervalClass::Empty => Self::empty(),
+            IntervalClass::Zero => Self::zero(),
+            IntervalClass::Positive0 | IntervalClass::Positive1 => {
+                if lhs_distance < rhs && lhs_min_mod <= lhs_max_mod {
+                    Self::new(lhs_min_mod, lhs_max_mod)
+                } else {
+                    Self::new(0.0, rhs)
+                }
+            }
+            IntervalClass::Mixed => {
+                let max = if lhs.max < rhs { lhs.max } else { rhs };
+
+                let min = if lhs.min > -rhs { lhs.min } else { -rhs };
+
+                Self::new(min, max)
+            }
+            IntervalClass::Negative0 | IntervalClass::Negative1 => {
+                if lhs_distance < rhs && lhs_min_mod <= lhs_max_mod {
+                    Self::new(lhs_min_mod, lhs_max_mod)
+                } else {
+                    Self::new(-rhs, 0.0)
+                }
+            }
+        }
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 use arbitrary::{Result, Unstructured};
 

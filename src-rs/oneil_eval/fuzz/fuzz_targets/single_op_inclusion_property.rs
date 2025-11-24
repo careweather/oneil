@@ -19,6 +19,10 @@ enum FuzzData {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
     },
+    ModScalar {
+        lhs: IntervalWithValue,
+        rhs: f64,
+    },
     Mul {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
@@ -68,6 +72,11 @@ fuzz_target!(|data: FuzzData| {
         FuzzData::Mod { lhs, rhs } => {
             let interval_result = lhs.interval % rhs.interval;
             let value_result = lhs.value % rhs.value;
+            (interval_result, value_result)
+        }
+        FuzzData::ModScalar { lhs, rhs } => {
+            let interval_result = lhs.interval % rhs;
+            let value_result = lhs.value % rhs;
             (interval_result, value_result)
         }
         FuzzData::Mul { lhs, rhs } => {

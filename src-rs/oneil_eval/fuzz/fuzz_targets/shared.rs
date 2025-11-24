@@ -1,3 +1,5 @@
+use std::ops;
+
 use libfuzzer_sys::arbitrary::{self, Result, Unstructured};
 use oneil_eval::interval::Interval;
 
@@ -55,5 +57,20 @@ impl<'a> arbitrary::Arbitrary<'a> for IntervalWithValue {
         let value_seed = u.arbitrary::<f64>()?;
         let value = pick_value(&interval, value_seed);
         Ok(IntervalWithValue { interval, value })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NonNanF64(f64);
+
+impl<'a> arbitrary::Arbitrary<'a> for NonNanF64 {
+    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
+        let value = u.arbitrary::<f64>()?;
+
+        if value.is_nan() {
+            return Err(arbitrary::Error::IncorrectFormat);
+        }
+
+        Ok(NonNanF64(value))
     }
 }

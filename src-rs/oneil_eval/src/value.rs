@@ -189,7 +189,7 @@ impl ops::Rem for NumberValue {
         match (self, rhs) {
             (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs % rhs),
             (Self::Scalar(lhs), Self::Interval(rhs)) => Self::Interval(Interval::from(lhs) % rhs),
-            (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs % Interval::from(rhs)),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs % rhs),
             (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs % rhs),
         }
     }
