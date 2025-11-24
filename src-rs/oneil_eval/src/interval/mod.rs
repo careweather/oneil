@@ -567,23 +567,55 @@ impl ops::Rem for Interval {
             f64::max(rhs.min.abs(), rhs.max.abs()),
         );
 
+        let rhs_includes_zero = rhs.min <= 0.0 && rhs.max >= 0.0;
+
         match classification::classify(&lhs) {
             IntervalClass::Empty => Self::empty(),
             IntervalClass::Zero => Self::zero(),
             IntervalClass::Positive0 | IntervalClass::Positive1 => {
-                let min = 0.0;
-                let max = abs_rhs.max;
-                Self::new(min, max)
+                if lhs.max < abs_rhs.min {
+                    if rhs_includes_zero {
+                        let min = 0.0;
+                        let max = lhs.max;
+                        Self::new(min, max)
+                    } else {
+                        lhs
+                    }
+                } else {
+                    let min = 0.0;
+                    let max = abs_rhs.max;
+                    Self::new(min, max)
+                }
             }
             IntervalClass::Mixed => {
-                let min = -abs_rhs.max;
-                let max = abs_rhs.max;
+                let max = if lhs.max < abs_rhs.min {
+                    lhs.max
+                } else {
+                    abs_rhs.max
+                };
+
+                let min = if lhs.min > -abs_rhs.min {
+                    lhs.min
+                } else {
+                    -abs_rhs.max
+                };
+
                 Self::new(min, max)
             }
             IntervalClass::Negative0 | IntervalClass::Negative1 => {
-                let min = -abs_rhs.max;
-                let max = 0.0;
-                Self::new(min, max)
+                if lhs.min > -abs_rhs.min {
+                    if rhs_includes_zero {
+                        let min = lhs.min;
+                        let max = 0.0;
+                        Self::new(min, max)
+                    } else {
+                        lhs
+                    }
+                } else {
+                    let min = -abs_rhs.max;
+                    let max = 0.0;
+                    Self::new(min, max)
+                }
             }
         }
     }
