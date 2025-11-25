@@ -37,6 +37,68 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
     }
 }
 
+struct ComparisonSubexpressionsResult {
+    left_result: Value,
+    rest_results: Vec<(ir::ComparisonOp, Value)>,
+}
+
+fn eval_comparison_subexpressions(
+    left: &ir::Expr,
+    op: ir::ComparisonOp,
+    right: &ir::Expr,
+    rest_chained: &[(ir::ComparisonOp, ir::Expr)],
+    context: &EvalContext,
+) -> Result<ComparisonSubexpressionsResult, Vec<EvalError>> {
+    let left_result = eval_expr(left, context);
+    let rest_results = iter::once((op, right))
+        .chain(
+            rest_chained
+                .iter()
+                // convert from `&(_, _)` to `(&_, &_)`
+                .map(|(op, right_operand)| (*op, right_operand)),
+        )
+        .map(|(op, right_operand)| {
+            eval_expr(right_operand, context).map(|right_result| (op, right_result))
+        });
+
+    let (left_result, rest_results) = match left_result {
+        Err(left_errors) => {
+            // find all evaluation errors that occurred and return them
+            let errors = left_errors
+                .into_iter()
+                .chain(rest_results.filter_map(Result::err).flatten())
+                .collect();
+
+            return Err(errors);
+        }
+
+        Ok(left_result) => {
+            let mut ok_rest_results = vec![];
+            let mut err_rest_results = vec![];
+
+            // check for evaluation errors
+            for result in rest_results {
+                match result {
+                    Ok((op, right_operand)) => ok_rest_results.push((op, right_operand)),
+                    Err(mut errors) => err_rest_results.append(&mut errors),
+                }
+            }
+
+            // if any evaluation errors occurred, return them
+            if !err_rest_results.is_empty() {
+                return Err(err_rest_results);
+            }
+
+            // otherwise, everything was okay
+            (left_result, ok_rest_results)
+        }
+    };
+    Ok(ComparisonSubexpressionsResult {
+        left_result,
+        rest_results,
+    })
+}
+
 fn eval_comparison_chain(
     left_result: Value,
     rest_results: Vec<(ir::ComparisonOp, Value)>,
@@ -107,68 +169,6 @@ fn eval_comparison_chain(
     comparison_result
         .map(|comparison_success| Value::Boolean(comparison_success.result))
         .map_err(|comparison_failure| comparison_failure.errors)
-}
-
-struct ComparisonSubexpressionsResult {
-    left_result: Value,
-    rest_results: Vec<(ir::ComparisonOp, Value)>,
-}
-
-fn eval_comparison_subexpressions(
-    left: &ir::Expr,
-    op: ir::ComparisonOp,
-    right: &ir::Expr,
-    rest_chained: &[(ir::ComparisonOp, ir::Expr)],
-    context: &EvalContext,
-) -> Result<ComparisonSubexpressionsResult, Vec<EvalError>> {
-    let left_result = eval_expr(left, context);
-    let rest_results = iter::once((op, right))
-        .chain(
-            rest_chained
-                .iter()
-                // convert from `&(_, _)` to `(&_, &_)`
-                .map(|(op, right_operand)| (*op, right_operand)),
-        )
-        .map(|(op, right_operand)| {
-            eval_expr(right_operand, context).map(|right_result| (op, right_result))
-        });
-
-    let (left_result, rest_results) = match left_result {
-        Err(left_errors) => {
-            // find all evaluation errors that occurred and return them
-            let errors = left_errors
-                .into_iter()
-                .chain(rest_results.filter_map(Result::err).flatten())
-                .collect();
-
-            return Err(errors);
-        }
-
-        Ok(left_result) => {
-            let mut ok_rest_results = vec![];
-            let mut err_rest_results = vec![];
-
-            // check for evaluation errors
-            for result in rest_results {
-                match result {
-                    Ok((op, right_operand)) => ok_rest_results.push((op, right_operand)),
-                    Err(mut errors) => err_rest_results.append(&mut errors),
-                }
-            }
-
-            // if any evaluation errors occurred, return them
-            if !err_rest_results.is_empty() {
-                return Err(err_rest_results);
-            }
-
-            // otherwise, everything was okay
-            (left_result, ok_rest_results)
-        }
-    };
-    Ok(ComparisonSubexpressionsResult {
-        left_result,
-        rest_results,
-    })
 }
 
 fn eval_comparison_op(lhs: &Value, op: ir::ComparisonOp, rhs: &Value) -> Result<bool, EvalError> {
