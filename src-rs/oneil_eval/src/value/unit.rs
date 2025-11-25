@@ -41,8 +41,63 @@ impl ComplexDimension {
     pub fn is_unitless(&self) -> bool {
         self.0.is_empty()
     }
+
+    #[must_use]
+    pub fn pow(self, exponent: f64) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .map(|(key, value)| (key, value * exponent))
+                .collect(),
+        )
+    }
 }
 
+impl ops::Mul for ComplexDimension {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut result = self.0;
+
+        for (key, value) in rhs.0 {
+            result
+                .entry(key)
+                .and_modify(|v| *v += value)
+                .or_insert(value);
+        }
+
+        Self(
+            result
+                .into_iter()
+                .filter(|(_, value)| *value != 0.0)
+                .collect(),
+        )
+    }
+}
+
+impl ops::Div for ComplexDimension {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        let mut result = self.0;
+
+        for (key, value) in rhs.0 {
+            result
+                .entry(key)
+                .and_modify(|v| *v -= value)
+                .or_insert(-value);
+        }
+
+        Self(
+            result
+                .into_iter()
+                .filter(|(_, value)| *value != 0.0)
+                .collect(),
+        )
+    }
+}
+
+/*
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unit {
     dimensions: ComplexDimension,
@@ -95,3 +150,5 @@ impl ops::Div for Unit {
         todo!()
     }
 }
+
+*/

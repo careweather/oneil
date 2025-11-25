@@ -5,10 +5,9 @@ use oneil_ir as ir;
 use crate::{
     context::EvalContext,
     error::EvalError,
-    value::{ComplexDimension, NumberValue, Unit, Value},
+    value::{Number, Value},
 };
 
-#[allow(clippy::too_many_lines)]
 pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<EvalError>> {
     match expr {
         ir::Expr::ComparisonOp {
@@ -132,16 +131,15 @@ fn eval_comparison_chain(
                     }) => {
                         let result = eval_comparison_op(&lhs, op, &rhs);
 
-                        match result {
-                            Ok(result) => Ok(ComparisonSuccess {
+                        result
+                            .map(|result| ComparisonSuccess {
                                 result,
                                 next_lhs: rhs,
-                            }),
-                            Err(error) => Err(ComparisonFailure {
+                            })
+                            .map_err(|error| ComparisonFailure {
                                 errors: vec![error],
                                 last_successful_lhs: lhs,
-                            }),
-                        }
+                            })
                     }
 
                     Err(ComparisonFailure {
@@ -172,42 +170,16 @@ fn eval_comparison_chain(
 }
 
 fn eval_comparison_op(lhs: &Value, op: ir::ComparisonOp, rhs: &Value) -> Result<bool, EvalError> {
-    match (lhs, rhs) {
-        (Value::Boolean(lhs_bool), Value::Boolean(rhs_bool)) => match op {
-            ir::ComparisonOp::Eq => Ok(lhs_bool == rhs_bool),
-            ir::ComparisonOp::NotEq => Ok(lhs_bool != rhs_bool),
-            ir::ComparisonOp::LessThan
-            | ir::ComparisonOp::LessThanEq
-            | ir::ComparisonOp::GreaterThan
-            | ir::ComparisonOp::GreaterThanEq => Err(EvalError::InvalidOperation),
-        },
+    let result = match op {
+        ir::ComparisonOp::Eq => lhs.checked_eq(rhs),
+        ir::ComparisonOp::NotEq => lhs.checked_ne(rhs),
+        ir::ComparisonOp::LessThan => lhs.checked_lt(rhs),
+        ir::ComparisonOp::LessThanEq => lhs.checked_lte(rhs),
+        ir::ComparisonOp::GreaterThan => lhs.checked_gt(rhs),
+        ir::ComparisonOp::GreaterThanEq => lhs.checked_gte(rhs),
+    };
 
-        (Value::String(lhs_string), Value::String(rhs_string)) => match op {
-            ir::ComparisonOp::Eq => Ok(lhs_string == rhs_string),
-            ir::ComparisonOp::NotEq => Ok(lhs_string != rhs_string),
-            ir::ComparisonOp::LessThan
-            | ir::ComparisonOp::LessThanEq
-            | ir::ComparisonOp::GreaterThan
-            | ir::ComparisonOp::GreaterThanEq => Err(EvalError::InvalidOperation),
-        },
-
-        (Value::Number(lhs), Value::Number(rhs)) => {
-            let lhs_adjusted_number = lhs.value * lhs.unit.magnitude();
-            let rhs_adjusted_number = rhs.value * rhs.unit.magnitude();
-
-            match op {
-                _ if lhs.unit.dimensions() != rhs.unit.dimensions() => Err(EvalError::InvalidUnit),
-                ir::ComparisonOp::Eq => Ok(lhs_adjusted_number == rhs_adjusted_number),
-                ir::ComparisonOp::NotEq => Ok(lhs_adjusted_number != rhs_adjusted_number),
-                ir::ComparisonOp::LessThan => Ok(lhs_adjusted_number < rhs_adjusted_number),
-                ir::ComparisonOp::LessThanEq => Ok(lhs_adjusted_number <= rhs_adjusted_number),
-                ir::ComparisonOp::GreaterThan => Ok(lhs_adjusted_number > rhs_adjusted_number),
-                ir::ComparisonOp::GreaterThanEq => Ok(lhs_adjusted_number >= rhs_adjusted_number),
-            }
-        }
-
-        (lhs, _rhs) => Err(EvalError::InvalidType),
-    }
+    result.map_err(EvalError::ValueError)
 }
 
 struct BinaryOpSubexpressionsResult {
@@ -242,7 +214,21 @@ fn eval_binary_op(
     right_result: Value,
     context: &EvalContext,
 ) -> Result<Value, Vec<EvalError>> {
-    todo!()
+    let result = match op {
+        ir::BinaryOp::Add => left_result.checked_add(right_result),
+        ir::BinaryOp::Sub => left_result.checked_sub(right_result),
+        ir::BinaryOp::TrueSub => todo!("get rid of this operation"),
+        ir::BinaryOp::Mul => left_result.checked_mul(right_result),
+        ir::BinaryOp::Div => left_result.checked_div(right_result),
+        ir::BinaryOp::TrueDiv => todo!("get rid of this operation"),
+        ir::BinaryOp::Mod => left_result.checked_rem(right_result),
+        ir::BinaryOp::Pow => left_result.checked_pow(right_result),
+        ir::BinaryOp::And => left_result.checked_and(right_result),
+        ir::BinaryOp::Or => left_result.checked_or(right_result),
+        ir::BinaryOp::MinMax => left_result.checked_min_max(right_result),
+    };
+
+    result.map_err(|error| vec![EvalError::ValueError(error)])
 }
 
 /*
@@ -571,7 +557,7 @@ fn typecheck_binary_op_results(
         | ir::BinaryOp::MinMax => match (left_result, right_result) {
             (Value::Number(left), Value::Number(right)) => {
                 // TODO: this is checking for f64 equality directly, figure out how to handle f64 comparison
-                if left.unit.dimensions() == right.unit.dimensions() {
+                if left.dimensions == right.dimensions {
                     None
                 } else {
                     Some(EvalError::InvalidUnit)
@@ -588,14 +574,14 @@ fn typecheck_binary_op_results(
         ir::BinaryOp::Pow => match (left_result, right_result) {
             (Value::Number(base), Value::Number(exponent)) => {
                 // the exponent must be unitless
-                if !exponent.unit.dimensions().is_unitless() {
+                if !exponent.dimensions.is_unitless() {
                     return Some(EvalError::HasExponentWithUnits);
                 }
 
                 // the exponent cannot be an interval
                 match exponent.value {
-                    NumberValue::Interval(_) => Some(EvalError::HasIntervalExponent),
-                    NumberValue::Scalar(_) => None,
+                    Number::Interval(_) => Some(EvalError::HasIntervalExponent),
+                    Number::Scalar(_) => None,
                 }
             }
             _ => Some(EvalError::InvalidType),

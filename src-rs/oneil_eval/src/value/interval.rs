@@ -85,10 +85,10 @@ impl Interval {
     /// This is defined based on the implementation in the
     /// [inari crate](https://docs.rs/inari/latest/src/inari/elementary.rs.html#588)
     #[must_use]
-    pub fn pow(&self, exponent: &Self) -> Self {
+    pub fn pow(self, exponent: Self) -> Self {
         const DOMAIN: Interval = Interval::new_unchecked(0.0, f64::INFINITY);
 
-        let base = self.intersection(&DOMAIN);
+        let base = self.intersection(DOMAIN);
 
         if base.is_empty() || exponent.is_empty() {
             return Self::empty();
@@ -143,7 +143,7 @@ impl Interval {
     }
 
     #[must_use]
-    pub fn intersection(&self, rhs: &Self) -> Self {
+    pub fn intersection(self, rhs: Self) -> Self {
         if self.is_empty() || rhs.is_empty() {
             return Self::empty();
         }
@@ -171,13 +171,13 @@ impl Interval {
     /// assert_eq!(interval3, Interval::new(1.0, 4.0));
     /// ```
     #[must_use]
-    pub fn tightest_enclosing_interval(&self, rhs: &Self) -> Self {
+    pub fn tightest_enclosing_interval(self, rhs: Self) -> Self {
         if self.is_empty() {
-            return *rhs;
+            return rhs;
         }
 
         if rhs.is_empty() {
-            return *self;
+            return self;
         }
 
         let min = f64::min(self.min, rhs.min);

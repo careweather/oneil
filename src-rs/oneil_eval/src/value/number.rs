@@ -1,49 +1,98 @@
 use std::{cmp::Ordering, ops};
 
-use crate::value::{Interval, Unit, ValueError};
+use crate::value::{ComplexDimension, Interval, ValueError};
 
-#[derive(Debug, Clone)]
-pub struct Number {
-    pub value: NumberValue,
-    pub unit: Unit,
+#[derive(Debug, Clone, PartialEq)]
+pub struct DimensionalNumber {
+    pub value: Number,
+    pub dimensions: ComplexDimension,
 }
 
-impl Number {
+impl DimensionalNumber {
     pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, ValueError> {
-        if self.unit.dimensions() != rhs.unit.dimensions() {
+        if self.dimensions != rhs.dimensions {
             return Err(ValueError::InvalidUnit);
         }
 
-        let lhs_adjusted_value = self.value * self.unit.magnitude();
-        let rhs_adjusted_value = rhs.value * rhs.unit.magnitude();
-
-        Ok(lhs_adjusted_value.partial_cmp(&rhs_adjusted_value))
+        Ok(self.value.partial_cmp(&rhs.value))
     }
-}
 
-impl PartialEq for Number {
-    fn eq(&self, other: &Self) -> bool {
-        if self.unit.dimensions() != other.unit.dimensions() {
-            return false;
+    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, ValueError> {
+        self.checked_partial_cmp(rhs)
+            .map(|ordering| ordering == Some(Ordering::Equal))
+    }
+
+    pub fn checked_add(self, rhs: Self) -> Result<Self, ValueError> {
+        if self.dimensions != rhs.dimensions {
+            return Err(ValueError::InvalidUnit);
         }
 
-        let lhs_adjusted_value = self.value * self.unit.magnitude();
-        let rhs_adjusted_value = other.value * other.unit.magnitude();
-
-        lhs_adjusted_value == rhs_adjusted_value
+        Ok(Self {
+            value: self.value + rhs.value,
+            dimensions: self.dimensions.clone(),
+        })
     }
-}
 
-impl PartialOrd for Number {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self.unit.dimensions() != other.unit.dimensions() {
-            return None;
+    pub fn checked_sub(self, rhs: Self) -> Result<Self, ValueError> {
+        if self.dimensions != rhs.dimensions {
+            return Err(ValueError::InvalidUnit);
         }
 
-        let lhs_adjusted_value = self.value * self.unit.magnitude();
-        let rhs_adjusted_value = other.value * other.unit.magnitude();
+        Ok(Self {
+            value: self.value - rhs.value,
+            dimensions: self.dimensions.clone(),
+        })
+    }
 
-        lhs_adjusted_value.partial_cmp(&rhs_adjusted_value)
+    pub fn checked_mul(self, rhs: Self) -> Result<Self, ValueError> {
+        Ok(Self {
+            value: self.value * rhs.value,
+            dimensions: self.dimensions * rhs.dimensions,
+        })
+    }
+
+    pub fn checked_div(self, rhs: Self) -> Result<Self, ValueError> {
+        if self.dimensions != rhs.dimensions {
+            return Err(ValueError::InvalidUnit);
+        }
+
+        Ok(Self {
+            value: self.value / rhs.value,
+            dimensions: self.dimensions.clone(),
+        })
+    }
+
+    pub fn checked_rem(self, rhs: Self) -> Result<Self, ValueError> {
+        if self.dimensions != rhs.dimensions {
+            return Err(ValueError::InvalidUnit);
+        }
+
+        Ok(Self {
+            value: self.value % rhs.value,
+            dimensions: self.dimensions.clone(),
+        })
+    }
+
+    pub fn checked_pow(self, rhs: Self) -> Result<Self, ValueError> {
+        if self.dimensions != rhs.dimensions {
+            return Err(ValueError::InvalidUnit);
+        }
+
+        Ok(Self {
+            value: self.value.pow(rhs.value),
+            dimensions: self.dimensions.clone(),
+        })
+    }
+
+    pub fn checked_min_max(self, rhs: Self) -> Result<Self, ValueError> {
+        if self.dimensions != rhs.dimensions {
+            return Err(ValueError::InvalidUnit);
+        }
+
+        Ok(Self {
+            value: self.value.tightest_enclosing_interval(rhs.value),
+            dimensions: self.dimensions.clone(),
+        })
     }
 }
 
@@ -51,12 +100,12 @@ impl PartialOrd for Number {
 //       a number value is essentially an interval. The fact that
 //       it is sometimes stored as a scalar is an implementation detail.
 #[derive(Debug, Clone, Copy)]
-pub enum NumberValue {
+pub enum Number {
     Scalar(f64),
     Interval(Interval),
 }
 
-impl NumberValue {
+impl Number {
     #[must_use]
     pub const fn new_scalar(value: f64) -> Self {
         Self::Scalar(value)
@@ -73,46 +122,48 @@ impl NumberValue {
     }
 
     #[must_use]
-    pub fn pow(&self, exponent: &Self) -> Self {
+    pub fn pow(self, exponent: Self) -> Self {
         match (self, exponent) {
-            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs.powf(*rhs)),
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs.powf(rhs)),
             (Self::Scalar(lhs), Self::Interval(rhs)) => {
                 Self::Interval(Interval::from(lhs).pow(rhs))
             }
             (Self::Interval(lhs), Self::Scalar(rhs)) => {
-                Self::Interval(lhs.pow(&Interval::from(rhs)))
+                Self::Interval(lhs.pow(Interval::from(rhs)))
             }
             (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.pow(rhs)),
         }
     }
 
     #[must_use]
-    pub fn intersection(&self, rhs: &Self) -> Self {
+    pub fn intersection(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Self::Scalar(lhs), Self::Scalar(rhs)) => {
-                Self::Interval(Interval::from(lhs).intersection(&Interval::from(rhs)))
+                Self::Interval(Interval::from(lhs).intersection(Interval::from(rhs)))
             }
             (Self::Scalar(lhs), Self::Interval(rhs)) => {
                 Self::Interval(Interval::from(lhs).intersection(rhs))
             }
             (Self::Interval(lhs), Self::Scalar(rhs)) => {
-                Self::Interval(lhs.intersection(&Interval::from(rhs)))
+                Self::Interval(lhs.intersection(Interval::from(rhs)))
             }
             (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.intersection(rhs)),
         }
     }
 
     #[must_use]
-    pub fn tightest_enclosing_interval(&self, rhs: &Self) -> Self {
+    pub fn tightest_enclosing_interval(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Self::Scalar(lhs), Self::Scalar(rhs)) => {
-                Self::new_interval(f64::min(*lhs, *rhs), f64::max(*lhs, *rhs))
+                let min = f64::min(lhs, rhs);
+                let max = f64::max(lhs, rhs);
+                Self::Interval(Interval::new(min, max))
             }
             (Self::Scalar(lhs), Self::Interval(rhs)) => {
                 Self::Interval(Interval::from(lhs).tightest_enclosing_interval(rhs))
             }
             (Self::Interval(lhs), Self::Scalar(rhs)) => {
-                Self::Interval(lhs.tightest_enclosing_interval(&Interval::from(rhs)))
+                Self::Interval(lhs.tightest_enclosing_interval(Interval::from(rhs)))
             }
             (Self::Interval(lhs), Self::Interval(rhs)) => {
                 Self::Interval(lhs.tightest_enclosing_interval(rhs))
@@ -121,7 +172,7 @@ impl NumberValue {
     }
 }
 
-impl PartialEq for NumberValue {
+impl PartialEq for Number {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs == rhs,
@@ -132,7 +183,7 @@ impl PartialEq for NumberValue {
     }
 }
 
-impl PartialOrd for NumberValue {
+impl PartialOrd for Number {
     /// Partial ordering for number values
     ///
     /// For scalar values, we use the partial ordering of f64.
@@ -152,7 +203,7 @@ impl PartialOrd for NumberValue {
     }
 }
 
-impl ops::Neg for NumberValue {
+impl ops::Neg for Number {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -163,7 +214,7 @@ impl ops::Neg for NumberValue {
     }
 }
 
-impl ops::Add for NumberValue {
+impl ops::Add for Number {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -176,7 +227,7 @@ impl ops::Add for NumberValue {
     }
 }
 
-impl ops::Sub for NumberValue {
+impl ops::Sub for Number {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -189,7 +240,7 @@ impl ops::Sub for NumberValue {
     }
 }
 
-impl ops::Mul for NumberValue {
+impl ops::Mul for Number {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -202,7 +253,7 @@ impl ops::Mul for NumberValue {
     }
 }
 
-impl ops::Mul<f64> for NumberValue {
+impl ops::Mul<f64> for Number {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -213,7 +264,7 @@ impl ops::Mul<f64> for NumberValue {
     }
 }
 
-impl ops::Div for NumberValue {
+impl ops::Div for Number {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
@@ -226,7 +277,7 @@ impl ops::Div for NumberValue {
     }
 }
 
-impl ops::Rem for NumberValue {
+impl ops::Rem for Number {
     type Output = Self;
 
     fn rem(self, rhs: Self) -> Self::Output {
