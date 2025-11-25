@@ -1,9 +1,5 @@
 use std::{cmp::Ordering, ops};
 
-use self::classification::IntervalClass;
-
-mod classification;
-
 // TODO: maybe add more comparison functions for
 //       intervals into the standard library (
 //       such as `contains` or `overlaps`)
@@ -312,8 +308,8 @@ impl ops::Mul for Interval {
     fn mul(self, rhs: Self) -> Self::Output {
         let lhs = self;
 
-        let lhs_class = classification::classify(&lhs);
-        let rhs_class = classification::classify(&rhs);
+        let lhs_class = classify(&lhs);
+        let rhs_class = classify(&rhs);
 
         match (lhs_class, rhs_class) {
             (IntervalClass::Empty, _) | (_, IntervalClass::Empty) => Self::empty(),
@@ -413,8 +409,8 @@ impl ops::Div for Interval {
     fn div(self, rhs: Self) -> Self::Output {
         let lhs = self;
 
-        let lhs_class = classification::classify(&lhs);
-        let rhs_class = classification::classify(&rhs);
+        let lhs_class = classify(&lhs);
+        let rhs_class = classify(&rhs);
 
         match (lhs_class, rhs_class) {
             (IntervalClass::Empty, _) | (_, IntervalClass::Empty) => Self::empty(),
@@ -576,7 +572,7 @@ impl ops::Rem for Interval {
 
         let rhs_includes_zero = rhs.min <= 0.0 && rhs.max >= 0.0;
 
-        match classification::classify(&lhs) {
+        match classify(&lhs) {
             IntervalClass::Empty => Self::empty(),
             IntervalClass::Zero => Self::zero(),
             IntervalClass::Positive0 | IntervalClass::Positive1 => {
@@ -656,7 +652,7 @@ impl ops::Rem<f64> for Interval {
         let lhs_min_mod = lhs.min % rhs;
         let lhs_max_mod = lhs.max % rhs;
 
-        match classification::classify(&lhs) {
+        match classify(&lhs) {
             IntervalClass::Empty => Self::empty(),
             IntervalClass::Zero => Self::zero(),
             IntervalClass::Positive0 | IntervalClass::Positive1 => {
@@ -700,5 +696,43 @@ impl<'a> arbitrary::Arbitrary<'a> for Interval {
         let min = f64::min(f, g);
         let max = f64::max(f, g);
         Ok(Self::new_unchecked(min, max))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IntervalClass {
+    /// An empty interval (represented by both fields as `NaN`)
+    Empty,
+    /// min > 0
+    Positive1,
+    /// min = 0 and max > 0
+    Positive0,
+    /// min = max = 0
+    Zero,
+    /// min < 0 < max
+    Mixed,
+    /// min < 0 and max = 0
+    Negative0,
+    /// max < 0
+    Negative1,
+}
+
+fn classify(interval: &Interval) -> IntervalClass {
+    if interval.is_empty() {
+        IntervalClass::Empty
+    } else if interval.min > 0.0 {
+        IntervalClass::Positive1
+    } else if interval.min == 0.0 && interval.max > 0.0 {
+        IntervalClass::Positive0
+    } else if interval.min == 0.0 && interval.max == 0.0 {
+        IntervalClass::Zero
+    } else if interval.min < 0.0 && interval.max > 0.0 {
+        IntervalClass::Mixed
+    } else if interval.min < 0.0 && interval.max == 0.0 {
+        IntervalClass::Negative0
+    } else if interval.max < 0.0 {
+        IntervalClass::Negative1
+    } else {
+        panic!("invalid interval: ({}, {})", interval.min, interval.max)
     }
 }
