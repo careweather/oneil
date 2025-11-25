@@ -1,6 +1,51 @@
-use std::ops;
+use std::{cmp::Ordering, ops};
 
-use crate::value::Interval;
+use crate::value::{Interval, Unit, ValueError};
+
+#[derive(Debug, Clone)]
+pub struct Number {
+    pub value: NumberValue,
+    pub unit: Unit,
+}
+
+impl Number {
+    pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, ValueError> {
+        if self.unit.dimensions() != rhs.unit.dimensions() {
+            return Err(ValueError::InvalidUnit);
+        }
+
+        let lhs_adjusted_value = self.value * self.unit.magnitude();
+        let rhs_adjusted_value = rhs.value * rhs.unit.magnitude();
+
+        Ok(lhs_adjusted_value.partial_cmp(&rhs_adjusted_value))
+    }
+}
+
+impl PartialEq for Number {
+    fn eq(&self, other: &Self) -> bool {
+        if self.unit.dimensions() != other.unit.dimensions() {
+            return false;
+        }
+
+        let lhs_adjusted_value = self.value * self.unit.magnitude();
+        let rhs_adjusted_value = other.value * other.unit.magnitude();
+
+        lhs_adjusted_value == rhs_adjusted_value
+    }
+}
+
+impl PartialOrd for Number {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.unit.dimensions() != other.unit.dimensions() {
+            return None;
+        }
+
+        let lhs_adjusted_value = self.value * self.unit.magnitude();
+        let rhs_adjusted_value = other.value * other.unit.magnitude();
+
+        lhs_adjusted_value.partial_cmp(&rhs_adjusted_value)
+    }
+}
 
 // TODO: in number value docs mention that for the outside world,
 //       a number value is essentially an interval. The fact that

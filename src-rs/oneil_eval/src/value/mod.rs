@@ -1,11 +1,11 @@
 mod error;
 mod interval;
-mod number_value;
+mod number;
 mod unit;
 
 pub use self::error::ValueError;
 pub use self::interval::Interval;
-pub use self::number_value::NumberValue;
+pub use self::number::{Number, NumberValue};
 pub use self::unit::{ComplexDimension, Unit};
 
 use std::{cmp::Ordering, ops};
@@ -14,11 +14,49 @@ use std::{cmp::Ordering, ops};
 pub enum Value {
     Boolean(bool),
     String(String),
-    Number { value: NumberValue, unit: Unit },
+    Number(Number),
 }
 
 impl Value {
+    // ====== COMPARISON FUNCTIONS ======
     pub fn checked_compare(&self, rhs: &Self) -> Result<Ordering, ValueError> {
+        match (self, rhs) {
+            (Self::Number(lhs), Self::Number(rhs)) => {
+                lhs.partial_cmp(rhs).ok_or(ValueError::InvalidUnit)
+            }
+            (Self::Number { .. }, _) => Err(ValueError::InvalidType),
+            _ => Err(ValueError::InvalidOperation),
+        }
+    }
+
+    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, ValueError> {
+        match (self, rhs) {
+            (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(lhs == rhs),
+            (Self::String(lhs), Self::String(rhs)) => Ok(lhs == rhs),
+            (Self::Number { .. }, Self::Number { .. }) => self
+                .checked_compare(rhs)
+                .map(|ordering| ordering == Ordering::Equal),
+            _ => Err(ValueError::InvalidType),
+        }
+    }
+
+    pub fn checked_ne(&self, rhs: &Self) -> Result<bool, ValueError> {
+        todo!()
+    }
+
+    pub fn checked_lt(&self, rhs: &Self) -> Result<bool, ValueError> {
+        todo!()
+    }
+
+    pub fn checked_lte(&self, rhs: &Self) -> Result<bool, ValueError> {
+        todo!()
+    }
+
+    pub fn checked_gt(&self, rhs: &Self) -> Result<bool, ValueError> {
+        todo!()
+    }
+
+    pub fn checked_gte(&self, rhs: &Self) -> Result<bool, ValueError> {
         todo!()
     }
 }

@@ -191,21 +191,12 @@ fn eval_comparison_op(lhs: &Value, op: ir::ComparisonOp, rhs: &Value) -> Result<
             | ir::ComparisonOp::GreaterThanEq => Err(EvalError::InvalidOperation),
         },
 
-        (
-            Value::Number {
-                value: lhs_number,
-                unit: lhs_unit,
-            },
-            Value::Number {
-                value: rhs_number,
-                unit: rhs_unit,
-            },
-        ) => {
-            let lhs_adjusted_number = *lhs_number * lhs_unit.magnitude();
-            let rhs_adjusted_number = *rhs_number * rhs_unit.magnitude();
+        (Value::Number(lhs), Value::Number(rhs)) => {
+            let lhs_adjusted_number = lhs.value * lhs.unit.magnitude();
+            let rhs_adjusted_number = rhs.value * rhs.unit.magnitude();
 
             match op {
-                _ if lhs_unit.dimensions() != rhs_unit.dimensions() => Err(EvalError::InvalidUnit),
+                _ if lhs.unit.dimensions() != rhs.unit.dimensions() => Err(EvalError::InvalidUnit),
                 ir::ComparisonOp::Eq => Ok(lhs_adjusted_number == rhs_adjusted_number),
                 ir::ComparisonOp::NotEq => Ok(lhs_adjusted_number != rhs_adjusted_number),
                 ir::ComparisonOp::LessThan => Ok(lhs_adjusted_number < rhs_adjusted_number),
@@ -578,16 +569,9 @@ fn typecheck_binary_op_results(
         | ir::BinaryOp::TrueSub
         | ir::BinaryOp::Mod
         | ir::BinaryOp::MinMax => match (left_result, right_result) {
-            (
-                Value::Number {
-                    unit: left_unit, ..
-                },
-                Value::Number {
-                    unit: right_unit, ..
-                },
-            ) => {
+            (Value::Number(left), Value::Number(right)) => {
                 // TODO: this is checking for f64 equality directly, figure out how to handle f64 comparison
-                if left_unit.dimensions() == right_unit.dimensions() {
+                if left.unit.dimensions() == right.unit.dimensions() {
                     None
                 } else {
                     Some(EvalError::InvalidUnit)
@@ -602,22 +586,14 @@ fn typecheck_binary_op_results(
             }
         }
         ir::BinaryOp::Pow => match (left_result, right_result) {
-            (
-                Value::Number {
-                    unit: base_unit, ..
-                },
-                Value::Number {
-                    unit: exponent_unit,
-                    value: exponent_value,
-                },
-            ) => {
+            (Value::Number(base), Value::Number(exponent)) => {
                 // the exponent must be unitless
-                if !exponent_unit.dimensions().is_unitless() {
+                if !exponent.unit.dimensions().is_unitless() {
                     return Some(EvalError::HasExponentWithUnits);
                 }
 
                 // the exponent cannot be an interval
-                match exponent_value {
+                match exponent.value {
                     NumberValue::Interval(_) => Some(EvalError::HasIntervalExponent),
                     NumberValue::Scalar(_) => None,
                 }
