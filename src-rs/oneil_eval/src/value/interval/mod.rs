@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, ops};
 
-use crate::interval::classification::IntervalClass;
+use self::classification::IntervalClass;
 
 mod classification;
 

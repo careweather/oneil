@@ -5,8 +5,7 @@ use oneil_ir as ir;
 use crate::{
     context::EvalContext,
     error::EvalError,
-    unit::{ComplexDimension, Unit},
-    value::{NumberValue, Value},
+    value::{ComplexDimension, NumberValue, Unit, Value},
 };
 
 #[allow(clippy::too_many_lines)]
@@ -255,6 +254,7 @@ fn eval_binary_op(
     todo!()
 }
 
+/*
 #[allow(clippy::too_many_lines)]
 pub fn eval_expr_(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<EvalError>> {
     match expr {
@@ -563,6 +563,8 @@ pub fn eval_expr_(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<E
         },
     }
 }
+
+*/
 
 fn typecheck_binary_op_results(
     op: ir::BinaryOp,

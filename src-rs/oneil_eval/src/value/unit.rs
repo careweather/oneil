@@ -32,10 +32,12 @@ impl ComplexDimension {
         Self(units)
     }
 
+    #[must_use]
     pub fn unitless() -> Self {
         Self(HashMap::new())
     }
 
+    #[must_use]
     pub fn is_unitless(&self) -> bool {
         self.0.is_empty()
     }
@@ -48,6 +50,11 @@ pub struct Unit {
 }
 
 impl Unit {
+    /// Creates a new unit with the given dimensions and magnitude.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the magnitude is zero or negative.
     #[must_use]
     pub const fn new(dimensions: ComplexDimension, magnitude: f64) -> Self {
         assert!(magnitude > 0.0, "magnitude must be positive");
@@ -67,6 +74,7 @@ impl Unit {
         self.magnitude
     }
 
+    #[must_use]
     pub fn pow(&self, exponent: f64) -> Self {
         todo!()
     }

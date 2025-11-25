@@ -1,4 +1,4 @@
-use crate::interval::Interval;
+use crate::value::Interval;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntervalClass {
