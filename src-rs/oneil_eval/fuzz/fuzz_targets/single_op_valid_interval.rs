@@ -3,7 +3,7 @@
 // TODO: make multi-op version of this fuzz target
 
 use libfuzzer_sys::{arbitrary, fuzz_target};
-use oneil_eval::interval::Interval;
+use oneil_eval::value::Interval;
 
 #[derive(Debug, Clone, PartialEq, arbitrary::Arbitrary)]
 enum FuzzData {
@@ -21,11 +21,11 @@ fuzz_target!(|data: FuzzData| {
     let interval_result = match data {
         FuzzData::Add { lhs, rhs } => lhs + rhs,
         FuzzData::Div { lhs, rhs } => lhs / rhs,
-        FuzzData::Intersection { lhs, rhs } => lhs.intersection(&rhs),
+        FuzzData::Intersection { lhs, rhs } => lhs.intersection(rhs),
         FuzzData::Mod { lhs, rhs } => lhs % rhs,
         FuzzData::Mul { lhs, rhs } => lhs * rhs,
         FuzzData::Neg { val } => -val,
-        FuzzData::Pow { base, exponent } => base.pow(&exponent),
+        FuzzData::Pow { base, exponent } => base.pow(exponent),
         FuzzData::Sub { lhs, rhs } => lhs - rhs,
     };
 

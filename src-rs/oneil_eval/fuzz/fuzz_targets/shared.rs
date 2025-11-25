@@ -1,7 +1,5 @@
-use std::ops;
-
 use libfuzzer_sys::arbitrary::{self, Result, Unstructured};
-use oneil_eval::interval::Interval;
+use oneil_eval::value::Interval;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntervalWithValue {
