@@ -114,10 +114,13 @@ impl DimensionalNumber {
             return Err(ValueError::HasExponentWithUnits);
         }
 
-        Ok(Self {
-            value: self.value.pow(rhs.value),
-            dimensions: self.dimensions,
-        })
+        match rhs.value {
+            Number::Scalar(exponent) => Ok(Self {
+                value: self.value.pow(rhs.value),
+                dimensions: self.dimensions.pow(exponent),
+            }),
+            Number::Interval(_) => Err(ValueError::HasIntervalExponent),
+        }
     }
 
     /// Returns the tightest enclosing interval of two dimensional numbers.
