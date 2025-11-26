@@ -82,6 +82,10 @@ impl ops::Div for ComplexDimension {
         let mut result = self.0;
 
         for (key, value) in rhs.0 {
+            #[expect(
+                clippy::suspicious_arithmetic_impl,
+                reason = "division is defined as subtraction of the exponent"
+            )]
             result
                 .entry(key)
                 .and_modify(|v| *v -= value)

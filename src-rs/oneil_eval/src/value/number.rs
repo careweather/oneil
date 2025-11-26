@@ -37,7 +37,7 @@ impl DimensionalNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_add(self, rhs: Self) -> Result<Self, ValueError> {
+    pub fn checked_add(self, rhs: &Self) -> Result<Self, ValueError> {
         if self.dimensions != rhs.dimensions {
             return Err(ValueError::InvalidUnit);
         }
@@ -53,7 +53,7 @@ impl DimensionalNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_sub(self, rhs: Self) -> Result<Self, ValueError> {
+    pub fn checked_sub(self, rhs: &Self) -> Result<Self, ValueError> {
         if self.dimensions != rhs.dimensions {
             return Err(ValueError::InvalidUnit);
         }
@@ -82,13 +82,9 @@ impl DimensionalNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_div(self, rhs: Self) -> Result<Self, ValueError> {
-        if self.dimensions != rhs.dimensions {
-            return Err(ValueError::InvalidUnit);
-        }
-
         Ok(Self {
             value: self.value / rhs.value,
-            dimensions: self.dimensions,
+            dimensions: self.dimensions / rhs.dimensions,
         })
     }
 
@@ -97,7 +93,7 @@ impl DimensionalNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_rem(self, rhs: Self) -> Result<Self, ValueError> {
+    pub fn checked_rem(self, rhs: &Self) -> Result<Self, ValueError> {
         if self.dimensions != rhs.dimensions {
             return Err(ValueError::InvalidUnit);
         }
@@ -113,9 +109,9 @@ impl DimensionalNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_pow(self, rhs: Self) -> Result<Self, ValueError> {
-        if self.dimensions != rhs.dimensions {
-            return Err(ValueError::InvalidUnit);
+    pub fn checked_pow(self, rhs: &Self) -> Result<Self, ValueError> {
+        if !self.dimensions.is_unitless() {
+            return Err(ValueError::HasExponentWithUnits);
         }
 
         Ok(Self {
@@ -129,7 +125,7 @@ impl DimensionalNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_min_max(self, rhs: Self) -> Result<Self, ValueError> {
+    pub fn checked_min_max(self, rhs: &Self) -> Result<Self, ValueError> {
         if self.dimensions != rhs.dimensions {
             return Err(ValueError::InvalidUnit);
         }

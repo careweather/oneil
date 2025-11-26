@@ -5,7 +5,7 @@ use crate::value::Value;
 pub struct EvalContext {}
 
 impl EvalContext {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 

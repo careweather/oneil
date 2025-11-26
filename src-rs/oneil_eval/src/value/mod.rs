@@ -131,7 +131,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_add(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
-            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_add(rhs).map(Self::Number),
+            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_add(&rhs).map(Self::Number),
             (Self::Number(_), _) => Err(ValueError::InvalidType),
             _ => Err(ValueError::InvalidOperation),
         }
@@ -146,7 +146,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_sub(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
-            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_sub(rhs).map(Self::Number),
+            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_sub(&rhs).map(Self::Number),
             (Self::Number(_), _) => Err(ValueError::InvalidType),
             _ => Err(ValueError::InvalidOperation),
         }
@@ -191,7 +191,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_rem(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
-            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_rem(rhs).map(Self::Number),
+            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_rem(&rhs).map(Self::Number),
             (Self::Number(_), _) => Err(ValueError::InvalidType),
             _ => Err(ValueError::InvalidOperation),
         }
@@ -206,7 +206,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_pow(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
-            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_pow(rhs).map(Self::Number),
+            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_pow(&rhs).map(Self::Number),
             (Self::Number(_), _) => Err(ValueError::InvalidType),
             _ => Err(ValueError::InvalidOperation),
         }
@@ -251,7 +251,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_min_max(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
-            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_min_max(rhs).map(Self::Number),
+            (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_min_max(&rhs).map(Self::Number),
             (Self::Number(_), _) => Err(ValueError::InvalidType),
             _ => Err(ValueError::InvalidOperation),
         }
