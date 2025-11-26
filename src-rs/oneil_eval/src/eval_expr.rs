@@ -29,7 +29,10 @@ pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<Ev
             } = eval_binary_op_subexpressions(left, right, context)?;
             eval_binary_op(left_result, *op, right_result, context)
         }
-        ir::Expr::UnaryOp { op, expr } => todo!(),
+        ir::Expr::UnaryOp { op, expr } => {
+            let expr_result = eval_expr(expr, context)?;
+            eval_unary_op(*op, expr_result, context)
+        }
         ir::Expr::FunctionCall { name, args } => todo!(),
         ir::Expr::Variable(variable) => todo!(),
         ir::Expr::Literal { value } => todo!(),
@@ -226,6 +229,19 @@ fn eval_binary_op(
         ir::BinaryOp::And => left_result.checked_and(right_result),
         ir::BinaryOp::Or => left_result.checked_or(right_result),
         ir::BinaryOp::MinMax => left_result.checked_min_max(right_result),
+    };
+
+    result.map_err(|error| vec![EvalError::ValueError(error)])
+}
+
+fn eval_unary_op(
+    op: ir::UnaryOp,
+    expr_result: Value,
+    context: &EvalContext,
+) -> Result<Value, Vec<EvalError>> {
+    let result = match op {
+        ir::UnaryOp::Neg => expr_result.checked_neg(),
+        ir::UnaryOp::Not => expr_result.checked_not(),
     };
 
     result.map_err(|error| vec![EvalError::ValueError(error)])

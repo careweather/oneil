@@ -138,6 +138,14 @@ impl DimensionalNumber {
             dimensions: self.dimensions,
         })
     }
+
+    /// Negates a number value.
+    pub fn checked_neg(self) -> Self {
+        Self {
+            value: -self.value,
+            dimensions: self.dimensions,
+        }
+    }
 }
 
 // TODO: in number value docs mention that for the outside world,

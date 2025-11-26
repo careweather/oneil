@@ -256,4 +256,28 @@ impl Value {
             _ => Err(ValueError::InvalidOperation),
         }
     }
+
+    /// Negates a number value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidOperation` if the value is not a number.
+    pub fn checked_neg(self) -> Result<Self, ValueError> {
+        match self {
+            Self::Number(number) => Ok(Self::Number(number.checked_neg())),
+            _ => Err(ValueError::InvalidOperation),
+        }
+    }
+
+    /// Performs logical NOT on a boolean value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidOperation` if the value is not a boolean.
+    pub fn checked_not(self) -> Result<Self, ValueError> {
+        match self {
+            Self::Boolean(boolean) => Ok(Self::Boolean(!boolean)),
+            _ => Err(ValueError::InvalidOperation),
+        }
+    }
 }
