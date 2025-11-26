@@ -1,6 +1,6 @@
 use oneil_ir as ir;
 
-use crate::value::Value;
+use crate::{error::EvalError, value::Value};
 
 pub struct EvalContext {}
 
@@ -9,11 +9,17 @@ impl EvalContext {
         Self {}
     }
 
-    pub fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
+    pub fn lookup_builtin_variable(
+        &self,
+        identifier: &ir::Identifier,
+    ) -> Result<Value, Vec<EvalError>> {
         todo!()
     }
 
-    pub fn lookup_parameter(&self, parameter_name: &ir::ParameterName) -> Value {
+    pub fn lookup_parameter(
+        &self,
+        parameter_name: &ir::ParameterName,
+    ) -> Result<Value, Vec<EvalError>> {
         todo!()
     }
 
@@ -21,15 +27,24 @@ impl EvalContext {
         &self,
         model: &ir::ModelPath,
         parameter_name: &ir::ParameterName,
-    ) -> Value {
+    ) -> Result<Value, Vec<EvalError>> {
         todo!()
     }
 
-    pub fn evaluate_builtin_function(&self, identifier: &ir::Identifier, args: &[Value]) -> Value {
+    // TODO: figure out what error this should actually be
+    pub fn evaluate_builtin_function(
+        &self,
+        identifier: &ir::Identifier,
+        args: Vec<Value>,
+    ) -> Result<Value, Vec<EvalError>> {
         todo!()
     }
 
-    pub fn evaluate_imported_function(&self, identifier: &ir::Identifier, args: &[Value]) -> Value {
+    pub fn evaluate_imported_function(
+        &self,
+        identifier: &ir::Identifier,
+        args: Vec<Value>,
+    ) -> Result<Value, Vec<EvalError>> {
         todo!()
     }
 

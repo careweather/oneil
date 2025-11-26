@@ -9,6 +9,12 @@ pub struct DimensionalNumber {
 }
 
 impl DimensionalNumber {
+    #[must_use]
+    /// Creates a new dimensional number.
+    pub const fn new(value: Number, dimensions: ComplexDimension) -> Self {
+        Self { value, dimensions }
+    }
+
     /// Compares two dimensional numbers for ordering.
     ///
     /// # Errors

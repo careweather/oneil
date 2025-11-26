@@ -10,6 +10,8 @@ pub use self::unit::ComplexDimension;
 
 use std::cmp::Ordering;
 
+// TODO: document the layers of a value
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Boolean(bool),
