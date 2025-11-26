@@ -18,6 +18,11 @@ pub enum Value {
 }
 
 impl Value {
+    /// Checks if two values are equal.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the values have incompatible types.
     pub fn checked_eq(&self, rhs: &Self) -> Result<bool, ValueError> {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(lhs == rhs),
@@ -29,6 +34,11 @@ impl Value {
         }
     }
 
+    /// Checks if two values are not equal.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the values have incompatible types.
     pub fn checked_ne(&self, rhs: &Self) -> Result<bool, ValueError> {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(lhs != rhs),
@@ -40,6 +50,13 @@ impl Value {
         }
     }
 
+    /// Checks if the left value is less than the right value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_lt(&self, rhs: &Self) -> Result<bool, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs
@@ -50,6 +67,13 @@ impl Value {
         }
     }
 
+    /// Checks if the left value is less than or equal to the right value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_lte(&self, rhs: &Self) -> Result<bool, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => {
@@ -62,6 +86,13 @@ impl Value {
         }
     }
 
+    /// Checks if the left value is greater than the right value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_gt(&self, rhs: &Self) -> Result<bool, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs
@@ -72,6 +103,13 @@ impl Value {
         }
     }
 
+    /// Checks if the left value is greater than or equal to the right value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_gte(&self, rhs: &Self) -> Result<bool, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => {
@@ -84,6 +122,13 @@ impl Value {
         }
     }
 
+    /// Adds two values.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_add(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_add(rhs).map(Self::Number),
@@ -92,6 +137,13 @@ impl Value {
         }
     }
 
+    /// Subtracts the right value from the left value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_sub(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_sub(rhs).map(Self::Number),
@@ -100,6 +152,13 @@ impl Value {
         }
     }
 
+    /// Multiplies two values.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_mul(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_mul(rhs).map(Self::Number),
@@ -108,6 +167,13 @@ impl Value {
         }
     }
 
+    /// Divides the left value by the right value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_div(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_div(rhs).map(Self::Number),
@@ -116,6 +182,13 @@ impl Value {
         }
     }
 
+    /// Computes the remainder of dividing the left value by the right value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_rem(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_rem(rhs).map(Self::Number),
@@ -124,6 +197,13 @@ impl Value {
         }
     }
 
+    /// Raises the left value to the power of the right value.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_pow(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_pow(rhs).map(Self::Number),
@@ -132,6 +212,13 @@ impl Value {
         }
     }
 
+    /// Performs logical AND on two boolean values.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a boolean.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a boolean.
     pub fn checked_and(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(Self::Boolean(lhs && rhs)),
@@ -140,6 +227,13 @@ impl Value {
         }
     }
 
+    /// Performs logical OR on two boolean values.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a boolean.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a boolean.
     pub fn checked_or(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(Self::Boolean(lhs || rhs)),
@@ -148,6 +242,13 @@ impl Value {
         }
     }
 
+    /// Computes the minimum and maximum of two values as an interval.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_min_max(self, rhs: Self) -> Result<Self, ValueError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_min_max(rhs).map(Self::Number),
