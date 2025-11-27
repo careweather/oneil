@@ -5,8 +5,8 @@ mod unit;
 
 pub use self::error::ValueError;
 pub use self::interval::Interval;
-pub use self::number::{DimensionalNumber, Number};
-pub use self::unit::ComplexDimension;
+pub use self::number::{MeasuredNumber, Number};
+pub use self::unit::{SizedUnit, Unit};
 
 use std::cmp::Ordering;
 
@@ -16,7 +16,7 @@ use std::cmp::Ordering;
 pub enum Value {
     Boolean(bool),
     String(String),
-    Number(DimensionalNumber),
+    Number(MeasuredNumber),
 }
 
 impl Value {

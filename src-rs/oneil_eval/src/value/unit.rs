@@ -24,9 +24,9 @@ pub enum Dimension {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ComplexDimension(HashMap<Dimension, f64>);
+pub struct Unit(HashMap<Dimension, f64>);
 
-impl ComplexDimension {
+impl Unit {
     #[must_use]
     pub const fn new(units: HashMap<Dimension, f64>) -> Self {
         Self(units)
@@ -53,7 +53,7 @@ impl ComplexDimension {
     }
 }
 
-impl ops::Mul for ComplexDimension {
+impl ops::Mul for Unit {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -75,7 +75,7 @@ impl ops::Mul for ComplexDimension {
     }
 }
 
-impl ops::Div for ComplexDimension {
+impl ops::Div for Unit {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
@@ -98,5 +98,50 @@ impl ops::Div for ComplexDimension {
                 .filter(|(_, value)| *value != 0.0)
                 .collect(),
         )
+    }
+}
+
+pub struct SizedUnit {
+    pub magnitude: f64,
+    pub unit: Unit,
+}
+
+impl SizedUnit {
+    #[must_use]
+    pub fn unitless() -> Self {
+        Self {
+            magnitude: 1.0,
+            unit: Unit::unitless(),
+        }
+    }
+
+    #[must_use]
+    pub fn pow(self, exponent: f64) -> Self {
+        Self {
+            magnitude: self.magnitude.powf(exponent),
+            unit: self.unit.pow(exponent),
+        }
+    }
+}
+
+impl ops::Mul for SizedUnit {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self {
+            magnitude: self.magnitude * rhs.magnitude,
+            unit: self.unit * rhs.unit,
+        }
+    }
+}
+
+impl ops::Div for SizedUnit {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self {
+            magnitude: self.magnitude / rhs.magnitude,
+            unit: self.unit / rhs.unit,
+        }
     }
 }

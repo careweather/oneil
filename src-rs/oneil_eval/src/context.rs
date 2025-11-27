@@ -1,6 +1,11 @@
+use std::collections::HashMap;
+
 use oneil_ir as ir;
 
-use crate::{error::EvalError, value::Value};
+use crate::{
+    error::EvalError,
+    value::{SizedUnit, Value},
+};
 
 pub struct EvalContext {}
 
@@ -48,7 +53,15 @@ impl EvalContext {
         todo!()
     }
 
-    pub fn values_are_close(&self, a: &Value, b: &Value, epsilon: f64) -> bool {
+    pub fn values_are_close(&self, a: &Value, b: &Value) -> bool {
+        todo!()
+    }
+
+    pub fn lookup_unit(&self, name: &str) -> Option<SizedUnit> {
+        todo!()
+    }
+
+    pub fn available_prefixes(&self) -> HashMap<String, f64> {
         todo!()
     }
 }

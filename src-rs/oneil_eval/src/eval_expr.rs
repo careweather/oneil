@@ -5,7 +5,7 @@ use oneil_ir as ir;
 use crate::{
     context::EvalContext,
     error::EvalError,
-    value::{ComplexDimension, DimensionalNumber, Number, Value},
+    value::{MeasuredNumber, Number, Unit, Value},
 };
 
 pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<EvalError>> {
@@ -308,8 +308,8 @@ fn eval_literal(value: &ir::Literal, context: &EvalContext) -> Value {
         ir::Literal::String(string) => Value::String(string.clone()),
         ir::Literal::Number(number) => {
             let number = Number::Scalar(*number);
-            let unit = ComplexDimension::unitless();
-            Value::Number(DimensionalNumber::new(number, unit))
+            let unit = Unit::unitless();
+            Value::Number(MeasuredNumber::new(number, unit))
         }
     }
 }
