@@ -267,7 +267,7 @@ impl Value {
     pub fn checked_neg(self) -> Result<Self, ValueError> {
         match self {
             Self::Number(number) => Ok(Self::Number(number.checked_neg())),
-            _ => Err(ValueError::InvalidOperation),
+            Self::Boolean(_) | Self::String(_) => Err(ValueError::InvalidOperation),
         }
     }
 
@@ -279,7 +279,7 @@ impl Value {
     pub fn checked_not(self) -> Result<Self, ValueError> {
         match self {
             Self::Boolean(boolean) => Ok(Self::Boolean(!boolean)),
-            _ => Err(ValueError::InvalidOperation),
+            Self::String(_) | Self::Number(_) => Err(ValueError::InvalidOperation),
         }
     }
 }

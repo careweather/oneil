@@ -9,6 +9,15 @@ use crate::{
     value::{MeasuredNumber, Number, SizedUnit, Value},
 };
 
+/// Evaluates a parameter and returns the resulting value.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The parameter value is invalid.
+/// - The parameter value does not match the given unit, if there is one.
+/// - The parameter value is outside the limits.
+/// - The parameter unit does not match the limit.
 pub fn eval_parameter(
     parameter: &ir::Parameter,
     context: &EvalContext,

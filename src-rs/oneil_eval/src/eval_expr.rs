@@ -8,6 +8,11 @@ use crate::{
     value::{MeasuredNumber, Number, Unit, Value},
 };
 
+/// Evaluates an expression and returns the resulting value.
+///
+/// # Errors
+///
+/// Returns an error if the expression is invalid.
 pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<EvalError>> {
     match expr {
         ir::Expr::ComparisonOp {

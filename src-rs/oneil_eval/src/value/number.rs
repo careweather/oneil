@@ -146,6 +146,7 @@ impl MeasuredNumber {
     }
 
     /// Negates a number value.
+    #[must_use]
     pub fn checked_neg(self) -> Self {
         Self {
             value: -self.value,

@@ -4,6 +4,11 @@ use crate::{context::EvalContext, error::EvalError, value::SizedUnit};
 
 // TODO: figure out display units. for now, we just
 //       discard the magnitude and return the dimensions
+/// Evaluates a composite unit and returns the resulting sized unit.
+///
+/// # Errors
+///
+/// Returns an error if the unit is not found.
 pub fn eval_unit(
     unit: &ir::CompositeUnit,
     context: &EvalContext,
