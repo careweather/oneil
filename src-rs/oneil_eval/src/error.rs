@@ -9,4 +9,13 @@ pub enum EvalError {
     NoPiecewiseBranchMatch,
     BooleanCannotHaveUnit,
     StringCannotHaveUnit,
+    InvalidContinuousLimitMinType,
+    InvalidContinuousLimitMaxType,
+    LimitCannotBeBoolean,
+    DuplicateStringLimit,
+    ExpectedStringLimit,
+    ExpectedNumberLimit,
+    DiscreteLimitUnitMismatch,
+    ParameterValueOutsideLimits,
+    ParameterUnitDoesNotMatchLimit,
 }
