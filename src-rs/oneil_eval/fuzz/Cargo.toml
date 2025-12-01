@@ -28,3 +28,10 @@ path = "fuzz_targets/single_op_valid_interval.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "contains_is_valid"
+path = "fuzz_targets/contains_is_valid.rs"
+test = false
+doc = false
+bench = false

@@ -228,6 +228,16 @@ impl Number {
             }
         }
     }
+
+    #[must_use]
+    pub fn inside(self, rhs: Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs == rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => lhs >= rhs.min() && lhs <= rhs.max(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.min() == rhs && lhs.max() == rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => rhs.contains(lhs),
+        }
+    }
 }
 
 impl PartialEq for Number {

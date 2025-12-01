@@ -185,6 +185,19 @@ impl Interval {
 
         Self::new(f64::min(self.min, rhs.min), f64::max(self.max, rhs.max))
     }
+
+    #[must_use]
+    pub fn contains(self, rhs: Self) -> bool {
+        if rhs.is_empty() {
+            return true;
+        }
+
+        if self.is_empty() {
+            return false;
+        }
+
+        self.min <= rhs.min && self.max >= rhs.max
+    }
 }
 
 impl From<f64> for Interval {
