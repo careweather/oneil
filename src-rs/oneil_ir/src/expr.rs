@@ -1,5 +1,7 @@
 //! Expression system for mathematical and logical operations in Oneil.
 
+use oneil_shared::span::Span;
+
 use crate::{
     ParameterName,
     reference::{Identifier, ModelPath},
@@ -10,6 +12,8 @@ use crate::{
 pub enum Expr {
     /// Comparison operation with left and right operands, supporting chaining.
     ComparisonOp {
+        /// Span of the entire comparison expression.
+        span: Span,
         /// The comparison operator to apply.
         op: ComparisonOp,
         /// The left-hand operand.
@@ -21,6 +25,8 @@ pub enum Expr {
     },
     /// Binary operation combining two expressions with an operator.
     BinaryOp {
+        /// Span of the expression.
+        span: Span,
         /// The binary operator to apply.
         op: BinaryOp,
         /// The left-hand operand.
@@ -30,6 +36,8 @@ pub enum Expr {
     },
     /// Unary operation applied to a single expression.
     UnaryOp {
+        /// Span of the expression.
+        span: Span,
         /// The unary operator to apply.
         op: UnaryOp,
         /// The operand expression.
@@ -37,15 +45,26 @@ pub enum Expr {
     },
     /// Function call with a name and argument list.
     FunctionCall {
+        /// Span of the entire call expression.
+        span: Span,
+        /// Span of the function name itself.
+        name_span: Span,
         /// The name of the function to call.
         name: FunctionName,
         /// The arguments to pass to the function.
         args: Vec<Expr>,
     },
     /// Variable reference (local, parameter, or external).
-    Variable(Variable),
+    Variable {
+        /// Span of the entire variable expression.
+        span: Span,
+        /// The resolved variable.
+        variable: Variable,
+    },
     /// Constant literal value.
     Literal {
+        /// Span of the literal.
+        span: Span,
         /// The literal value.
         value: Literal,
     },
@@ -55,12 +74,14 @@ impl Expr {
     /// Creates a comparison operation expression.
     #[must_use]
     pub fn comparison_op(
+        span: Span,
         op: ComparisonOp,
         left: Self,
         right: Self,
         rest_chained: Vec<(ComparisonOp, Self)>,
     ) -> Self {
         Self::ComparisonOp {
+            span,
             op,
             left: Box::new(left),
             right: Box::new(right),
@@ -70,8 +91,9 @@ impl Expr {
 
     /// Creates a binary operation expression.
     #[must_use]
-    pub fn binary_op(op: BinaryOp, left: Self, right: Self) -> Self {
+    pub fn binary_op(span: Span, op: BinaryOp, left: Self, right: Self) -> Self {
         Self::BinaryOp {
+            span,
             op,
             left: Box::new(left),
             right: Box::new(right),
@@ -80,8 +102,9 @@ impl Expr {
 
     /// Creates a unary operation expression.
     #[must_use]
-    pub fn unary_op(op: UnaryOp, expr: Self) -> Self {
+    pub fn unary_op(span: Span, op: UnaryOp, expr: Self) -> Self {
         Self::UnaryOp {
+            span,
             op,
             expr: Box::new(expr),
         }
@@ -89,35 +112,83 @@ impl Expr {
 
     /// Creates a function call expression.
     #[must_use]
-    pub const fn function_call(name: FunctionName, args: Vec<Self>) -> Self {
-        Self::FunctionCall { name, args }
+    pub const fn function_call(
+        span: Span,
+        name_span: Span,
+        name: FunctionName,
+        args: Vec<Self>,
+    ) -> Self {
+        Self::FunctionCall {
+            span,
+            name_span,
+            name,
+            args,
+        }
     }
 
     /// Creates a built-in variable reference.
     #[must_use]
-    pub const fn builtin_variable(ident: Identifier) -> Self {
-        Self::Variable(Variable::Builtin(ident))
+    pub const fn builtin_variable(span: Span, ident_span: Span, ident: Identifier) -> Self {
+        Self::Variable {
+            span,
+            variable: Variable::builtin(ident, ident_span),
+        }
     }
 
     /// Creates a parameter variable reference.
     #[must_use]
-    pub const fn parameter_variable(parameter_name: ParameterName) -> Self {
-        Self::Variable(Variable::Parameter(parameter_name))
+    pub const fn parameter_variable(
+        span: Span,
+        parameter_span: Span,
+        parameter_name: ParameterName,
+    ) -> Self {
+        Self::Variable {
+            span,
+            variable: Variable::parameter(parameter_name, parameter_span),
+        }
     }
 
     /// Creates an external variable reference.
     #[must_use]
-    pub const fn external_variable(model: ModelPath, parameter_name: ParameterName) -> Self {
-        Self::Variable(Variable::External {
-            model,
-            parameter_name,
-        })
+    pub const fn external_variable(
+        span: Span,
+        model: ModelPath,
+        model_span: Span,
+        parameter_name: ParameterName,
+        parameter_span: Span,
+    ) -> Self {
+        Self::Variable {
+            span,
+            variable: Variable::external(model, model_span, parameter_name, parameter_span),
+        }
     }
 
     /// Creates a literal expression.
     #[must_use]
-    pub const fn literal(value: Literal) -> Self {
-        Self::Literal { value }
+    pub const fn literal(span: Span, value: Literal) -> Self {
+        Self::Literal { span, value }
+    }
+
+    /// Returns the span of this expression.
+    #[must_use]
+    pub const fn span(&self) -> Span {
+        match self {
+            Self::ComparisonOp { span, .. }
+            | Self::BinaryOp { span, .. }
+            | Self::UnaryOp { span, .. }
+            | Self::FunctionCall { span, .. }
+            | Self::Variable { span, .. }
+            | Self::Literal { span, .. } => *span,
+        }
+    }
+
+    /// Returns the span of the function name if this is a function call.
+    #[must_use]
+    pub const fn function_name_span(&self) -> Option<Span> {
+        match self {
+            Self::FunctionCall { name_span, .. } => Some(*name_span),
+            _ => None,
+        }
     }
 }
 
@@ -241,37 +312,80 @@ impl FunctionName {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Variable {
     /// Built-in variable
-    Builtin(Identifier),
+    Builtin {
+        /// The identifier of the builtin.
+        ident: Identifier,
+        /// Span of the builtin identifier.
+        ident_span: Span,
+    },
     /// Parameter defined in the current model.
-    Parameter(ParameterName),
+    Parameter {
+        /// The parameter name.
+        parameter_name: ParameterName,
+        /// Span of the parameter identifier.
+        parameter_span: Span,
+    },
     /// Parameter defined in another model.
     External {
         /// The model where the parameter is defined.
         model: ModelPath,
+        /// Span of the referenced model identifier.
+        model_span: Span,
         /// The identifier of the parameter in that model.
         parameter_name: ParameterName,
+        /// Span of the parameter identifier.
+        parameter_span: Span,
     },
 }
 
 impl Variable {
     /// Creates a built-in variable reference.
     #[must_use]
-    pub const fn builtin(ident: Identifier) -> Self {
-        Self::Builtin(ident)
+    pub const fn builtin(ident: Identifier, ident_span: Span) -> Self {
+        Self::Builtin { ident, ident_span }
     }
 
     /// Creates a parameter variable reference.
     #[must_use]
-    pub const fn parameter(parameter_name: ParameterName) -> Self {
-        Self::Parameter(parameter_name)
+    pub const fn parameter(parameter_name: ParameterName, parameter_span: Span) -> Self {
+        Self::Parameter {
+            parameter_name,
+            parameter_span,
+        }
     }
 
     /// Creates an external variable reference.
     #[must_use]
-    pub const fn external(model: ModelPath, parameter_name: ParameterName) -> Self {
+    pub const fn external(
+        model: ModelPath,
+        model_span: Span,
+        parameter_name: ParameterName,
+        parameter_span: Span,
+    ) -> Self {
         Self::External {
             model,
+            model_span,
             parameter_name,
+            parameter_span,
+        }
+    }
+
+    /// Returns the span of the referenced parameter identifier.
+    #[must_use]
+    pub const fn parameter_span(&self) -> Span {
+        match self {
+            Self::Builtin { ident_span, .. } => *ident_span,
+            Self::Parameter { parameter_span, .. } => *parameter_span,
+            Self::External { parameter_span, .. } => *parameter_span,
+        }
+    }
+
+    /// Returns the span of the referenced model identifier, if any.
+    #[must_use]
+    pub const fn model_span(&self) -> Option<Span> {
+        match self {
+            Self::External { model_span, .. } => Some(*model_span),
+            _ => None,
         }
     }
 }

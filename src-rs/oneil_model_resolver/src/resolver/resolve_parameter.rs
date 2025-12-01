@@ -297,6 +297,8 @@ fn resolve_parameter(
             let parameter = ir::Parameter::new(
                 parameter_dependencies,
                 ident,
+                parameter_identifier_span,
+                parameter.span(),
                 value,
                 limits,
                 is_performance,

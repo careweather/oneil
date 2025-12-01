@@ -771,13 +771,18 @@ mod tests {
             panic!("y parameter value should be a simple value");
         };
 
-        let ir::Expr::Variable(variable_expr) = y_parameter_value else {
+        let ir::Expr::Variable {
+            span: _,
+            variable: variable_expr,
+        } = y_parameter_value
+        else {
             panic!("y parameter value should be a variable expression");
         };
 
         let ir::Variable::External {
             model,
             parameter_name,
+            ..
         } = variable_expr
         else {
             panic!("variable expression should be an external variable");
@@ -823,4 +828,3 @@ mod tests {
         assert_eq!(errors.len(), 2);
     }
 }
-
