@@ -21,24 +21,34 @@ pub fn resolve_variable(
     match &**variable {
         ast::Variable::Identifier(identifier) => {
             let var_identifier = ir::ParameterName::new(identifier.as_str().to_string());
+            let variable_span = variable.span();
+            let identifier_span = identifier.span();
 
             match parameter_context.lookup_parameter(&var_identifier) {
                 ParameterContextResult::Found(_parameter) => {
-                    let expr = ir::Expr::parameter_variable(var_identifier);
+                    let expr = ir::Expr::parameter_variable(
+                        variable_span,
+                        identifier_span,
+                        var_identifier,
+                    );
                     Ok(expr)
                 }
                 ParameterContextResult::HasError => Err(
-                    VariableResolutionError::parameter_has_error(var_identifier, identifier.span()),
+                    VariableResolutionError::parameter_has_error(var_identifier, identifier_span),
                 ),
                 ParameterContextResult::NotFound => {
                     let builtin_identifier = ir::Identifier::new(identifier.as_str().to_string());
                     if builtin_ref.has_builtin_value(&builtin_identifier) {
-                        let expr = ir::Expr::builtin_variable(builtin_identifier);
+                        let expr = ir::Expr::builtin_variable(
+                            variable_span,
+                            identifier_span,
+                            builtin_identifier,
+                        );
                         Ok(expr)
                     } else {
                         Err(VariableResolutionError::undefined_parameter(
                             var_identifier,
-                            identifier.span(),
+                            identifier_span,
                         ))
                     }
                 }
@@ -50,6 +60,7 @@ pub fn resolve_variable(
         } => {
             let reference_name = ir::ReferenceName::new(reference_model.as_str().to_string());
             let reference_name_span = reference_model.span();
+            let variable_span = variable.span();
 
             let (model, reference_path) = match reference_context.lookup_reference(&reference_name)
             {
@@ -88,7 +99,13 @@ pub fn resolve_variable(
                 ));
             }
 
-            let expr = ir::Expr::external_variable(reference_path.clone(), var_identifier);
+            let expr = ir::Expr::external_variable(
+                variable_span,
+                reference_path.clone(),
+                reference_name_span,
+                var_identifier,
+                var_identifier_span,
+            );
             Ok(expr)
         }
     }
@@ -110,7 +127,14 @@ mod tests {
             let variable: ir::Expr = $variable;
             let expected_ident: &str = $expected_ident;
 
-            let ir::Expr::Variable(ir::Variable::Builtin(actual_ident)) = variable else {
+            let ir::Expr::Variable {
+                span: _,
+                variable: ir::Variable::Builtin {
+                    ident: actual_ident,
+                    ..
+                },
+            } = variable
+            else {
                 panic!("expected builtin variable, got {variable:?}");
             };
 
@@ -127,7 +151,14 @@ mod tests {
             let variable: ir::Expr = $variable;
             let expected_ident: &str = $expected_ident;
 
-            let ir::Expr::Variable(ir::Variable::Parameter(actual_ident)) = variable else {
+            let ir::Expr::Variable {
+                span: _,
+                variable: ir::Variable::Parameter {
+                    parameter_name: actual_ident,
+                    ..
+                },
+            } = variable
+            else {
                 panic!("expected parameter variable, got {variable:?}");
             };
 
@@ -145,10 +176,15 @@ mod tests {
             let expected_model_path: ir::ModelPath = ir::ModelPath::new($expected_model_path);
             let expected_parameter_name: &str = $expected_parameter_name;
 
-            let ir::Expr::Variable(ir::Variable::External {
-                model: actual_model_path,
-                parameter_name: actual_parameter_name,
-            }) = variable
+            let ir::Expr::Variable {
+                span: _,
+                variable:
+                    ir::Variable::External {
+                        model: actual_model_path,
+                        parameter_name: actual_parameter_name,
+                        ..
+                    },
+            } = variable
             else {
                 panic!("expected external variable, got {variable:?}");
             };

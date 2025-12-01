@@ -326,16 +326,26 @@ fn print_limits(limits: &ir::Limits, writer: &mut impl Write, indent: usize) -> 
 /// Prints an expression
 fn print_expression(expr: &ir::Expr, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     match expr {
-        ir::Expr::BinaryOp { op, left, right } => {
+        ir::Expr::BinaryOp {
+            span: _,
+            op,
+            left,
+            right,
+        } => {
             writeln!(writer, "{}    ├── BinaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(left, writer, indent + 2)?;
             print_expression(right, writer, indent + 2)?;
         }
-        ir::Expr::UnaryOp { op, expr } => {
+        ir::Expr::UnaryOp { span: _, op, expr } => {
             writeln!(writer, "{}    ├── UnaryOp: {:?}", "  ".repeat(indent), op)?;
             print_expression(expr, writer, indent + 2)?;
         }
-        ir::Expr::FunctionCall { name, args } => {
+        ir::Expr::FunctionCall {
+            span: _,
+            name_span: _,
+            name,
+            args,
+        } => {
             let name = match name {
                 ir::FunctionName::Builtin(name) | ir::FunctionName::Imported(name) => name.as_str(),
             };
@@ -359,13 +369,14 @@ fn print_expression(expr: &ir::Expr, writer: &mut impl Write, indent: usize) -> 
                 print_expression(arg, writer, indent + 4)?;
             }
         }
-        ir::Expr::Variable(var) => {
-            print_variable(var, writer, indent)?;
+        ir::Expr::Variable { span: _, variable } => {
+            print_variable(variable, writer, indent)?;
         }
-        ir::Expr::Literal { value } => {
+        ir::Expr::Literal { span: _, value } => {
             print_literal(value, writer, indent)?;
         }
         ir::Expr::ComparisonOp {
+            span: _,
             op,
             left,
             right,
@@ -399,25 +410,28 @@ fn print_expression(expr: &ir::Expr, writer: &mut impl Write, indent: usize) -> 
 /// Prints a variable
 fn print_variable(var: &ir::Variable, writer: &mut impl Write, indent: usize) -> io::Result<()> {
     match var {
-        ir::Variable::Builtin(id) => {
+        ir::Variable::Builtin { ident, .. } => {
             writeln!(
                 writer,
                 "{}    ├── Builtin Variable: \"{}\"",
                 "  ".repeat(indent),
-                id.as_str()
+                ident.as_str()
             )?;
         }
-        ir::Variable::Parameter(id) => {
+        ir::Variable::Parameter {
+            parameter_name, ..
+        } => {
             writeln!(
                 writer,
                 "{}    ├── Parameter Variable: \"{}\"",
                 "  ".repeat(indent),
-                id.as_str()
+                parameter_name.as_str()
             )?;
         }
         ir::Variable::External {
             model,
             parameter_name,
+            ..
         } => {
             writeln!(
                 writer,
