@@ -64,4 +64,44 @@ impl EvalContext {
     pub fn available_prefixes(&self) -> HashMap<String, f64> {
         todo!()
     }
+
+    pub fn load_python_import(&mut self, python_path: &ir::PythonPath) {
+        todo!()
+    }
+
+    pub fn activate_model(&mut self, model_path: &ir::ModelPath) {
+        todo!()
+    }
+
+    pub fn activate_python_imports(
+        &mut self,
+        python_imports: &HashMap<ir::PythonPath, ir::PythonImport>,
+    ) {
+        todo!()
+    }
+
+    pub fn add_parameter_result(
+        &mut self,
+        parameter_name: ir::ParameterName,
+        value: Result<Value, Vec<EvalError>>,
+    ) {
+        todo!()
+    }
+
+    pub fn add_submodel(&mut self, submodel_name: &str, submodel_import: &ir::ModelPath) {
+        todo!()
+    }
+
+    pub fn activate_references(
+        &mut self,
+        references: &HashMap<ir::ReferenceName, ir::ReferenceImport>,
+    ) {
+        todo!()
+    }
+}
+
+impl Default for EvalContext {
+    fn default() -> Self {
+        Self {}
+    }
 }

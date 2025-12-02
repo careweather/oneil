@@ -6,6 +6,8 @@
 mod context;
 mod error;
 mod eval_expr;
+mod eval_model;
+mod eval_model_collection;
 mod eval_parameter;
 mod eval_unit;
 pub mod value;
