@@ -1,31 +1,78 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
 
 use oneil_ir as ir;
 
 use crate::{
+    builtin::BuiltinFunction,
+    builtin::BuiltinMap,
     error::EvalError,
     value::{SizedUnit, Value},
 };
 
-pub struct EvalContext {}
+#[derive(Debug, Clone)]
+pub struct Model {
+    parameters: HashMap<String, Result<Value, Vec<EvalError>>>,
+    submodels: HashMap<String, PathBuf>,
+}
 
-impl EvalContext {
-    pub const fn new() -> Self {
-        Self {}
+impl Model {
+    pub fn new() -> Self {
+        Self {
+            parameters: HashMap::new(),
+            submodels: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EvalContext<F: BuiltinFunction> {
+    models: HashMap<PathBuf, Model>,
+    current_model: Option<PathBuf>,
+    active_python_imports: HashSet<PathBuf>,
+    active_references: HashSet<PathBuf>,
+    builtin_values: HashMap<String, Value>,
+    builtin_functions: HashMap<String, F>,
+    unit_map: HashMap<String, SizedUnit>,
+    prefixes: HashMap<String, f64>,
+}
+
+impl<F: BuiltinFunction> EvalContext<F> {
+    pub fn new(builtins: &impl BuiltinMap<F>) -> Self {
+        Self {
+            models: HashMap::new(),
+            current_model: None,
+            active_python_imports: HashSet::new(),
+            active_references: HashSet::new(),
+            builtin_values: builtins.builtin_values(),
+            builtin_functions: builtins.builtin_functions(),
+            unit_map: builtins.builtin_units(),
+            prefixes: builtins.builtin_prefixes(),
+        }
     }
 
     pub fn lookup_builtin_variable(
         &self,
         identifier: &ir::Identifier,
     ) -> Result<Value, Vec<EvalError>> {
-        todo!()
+        Ok(self
+            .builtin_values
+            .get(identifier.as_str())
+            .expect("builtin value should be defined")
+            .clone())
     }
 
     pub fn lookup_parameter(
         &self,
         parameter_name: &ir::ParameterName,
     ) -> Result<Value, Vec<EvalError>> {
-        todo!()
+        let Some(current_model) = self.current_model.as_ref() else {
+            panic!("current model should be set when looking up a parameter");
+        };
+
+        self.lookup_model_parameter_internal(&current_model, parameter_name)
     }
 
     pub fn lookup_model_parameter(
@@ -33,7 +80,24 @@ impl EvalContext {
         model: &ir::ModelPath,
         parameter_name: &ir::ParameterName,
     ) -> Result<Value, Vec<EvalError>> {
-        todo!()
+        self.lookup_model_parameter_internal(model.as_ref(), parameter_name)
+    }
+
+    fn lookup_model_parameter_internal(
+        &self,
+        model_path: &Path,
+        parameter_name: &ir::ParameterName,
+    ) -> Result<Value, Vec<EvalError>> {
+        let model = self
+            .models
+            .get(model_path)
+            .expect("current model should be created when set");
+
+        model
+            .parameters
+            .get(parameter_name.as_str())
+            .expect("parameter should be defined")
+            .clone()
     }
 
     // TODO: figure out what error this should actually be
@@ -42,7 +106,10 @@ impl EvalContext {
         identifier: &ir::Identifier,
         args: Vec<Value>,
     ) -> Result<Value, Vec<EvalError>> {
-        todo!()
+        self.builtin_functions
+            .get(identifier.as_str())
+            .expect("builtin function should be defined")
+            .call(args)
     }
 
     pub fn evaluate_imported_function(
@@ -53,55 +120,73 @@ impl EvalContext {
         todo!()
     }
 
-    pub fn values_are_close(&self, a: &Value, b: &Value) -> bool {
-        todo!()
-    }
-
     pub fn lookup_unit(&self, name: &str) -> Option<SizedUnit> {
-        todo!()
+        self.unit_map.get(name).cloned()
     }
 
-    pub fn available_prefixes(&self) -> HashMap<String, f64> {
-        todo!()
+    pub fn available_prefixes(&self) -> &HashMap<String, f64> {
+        &self.prefixes
     }
 
     pub fn load_python_import(&mut self, python_path: &ir::PythonPath) {
         todo!()
     }
 
-    pub fn activate_model(&mut self, model_path: &ir::ModelPath) {
-        todo!()
+    pub fn set_active_model(&mut self, model_path: PathBuf) {
+        self.models
+            .entry(model_path.clone())
+            .or_insert_with(Model::new);
+
+        self.current_model = Some(model_path);
     }
 
-    pub fn activate_python_imports(
-        &mut self,
-        python_imports: &HashMap<ir::PythonPath, ir::PythonImport>,
-    ) {
-        todo!()
+    pub fn clear_active_model(&mut self) {
+        self.current_model = None;
+    }
+
+    pub fn clear_active_python_imports(&mut self) {
+        self.active_python_imports.clear();
+    }
+
+    pub fn activate_python_import(&mut self, python_import: PathBuf) {
+        self.active_python_imports.insert(python_import);
     }
 
     pub fn add_parameter_result(
         &mut self,
-        parameter_name: ir::ParameterName,
-        value: Result<Value, Vec<EvalError>>,
+        parameter_name: String,
+        result: Result<Value, Vec<EvalError>>,
     ) {
-        todo!()
+        // TODO: Maybe use type state pattern to enforce this?
+        let Some(current_model) = self.current_model.as_ref() else {
+            panic!("current model should be set when adding a parameter result");
+        };
+
+        let model = self
+            .models
+            .get_mut(current_model)
+            .expect("current model should be created when set");
+
+        model.parameters.insert(parameter_name, result);
     }
 
     pub fn add_submodel(&mut self, submodel_name: &str, submodel_import: &ir::ModelPath) {
-        todo!()
+        let Some(current_model) = self.current_model.as_ref() else {
+            panic!("current model should be set when adding a submodel");
+        };
+
+        let model = self
+            .models
+            .get_mut(current_model)
+            .expect("current model should be created when set");
+
+        model.submodels.insert(
+            submodel_name.to_string(),
+            submodel_import.as_ref().to_path_buf(),
+        );
     }
 
-    pub fn activate_references(
-        &mut self,
-        references: &HashMap<ir::ReferenceName, ir::ReferenceImport>,
-    ) {
-        todo!()
-    }
-}
-
-impl Default for EvalContext {
-    fn default() -> Self {
-        Self {}
+    pub fn activate_reference(&mut self, reference: PathBuf) {
+        self.active_references.insert(reference);
     }
 }

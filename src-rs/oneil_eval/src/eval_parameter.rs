@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use oneil_ir as ir;
 
 use crate::{
+    builtin::BuiltinFunction,
     context::EvalContext,
     error::EvalError,
     eval_expr, eval_unit,
@@ -18,9 +19,9 @@ use crate::{
 /// - The parameter value does not match the given unit, if there is one.
 /// - The parameter value is outside the limits.
 /// - The parameter unit does not match the limit.
-pub fn eval_parameter(
+pub fn eval_parameter<F: BuiltinFunction>(
     parameter: &ir::Parameter,
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     // TODO: this is about where we would use `trace_level`, but I'm not yet sure
     //       how to handle it.
@@ -144,9 +145,9 @@ pub fn eval_parameter(
     Ok(value)
 }
 
-fn get_piecewise_result(
+fn get_piecewise_result<F: BuiltinFunction>(
     piecewise: &[ir::PiecewiseExpr],
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     // evaluate each of the conditions and their bodies
     // TODO: this is slow, but we do it so that every branch is
@@ -213,7 +214,10 @@ pub enum Limits {
     clippy::panic_in_result_fn,
     reason = "enforcing an invariant that should always hold"
 )]
-fn eval_limits(limits: &ir::Limits, context: &EvalContext) -> Result<Limits, Vec<EvalError>> {
+fn eval_limits<F: BuiltinFunction>(
+    limits: &ir::Limits,
+    context: &EvalContext<F>,
+) -> Result<Limits, Vec<EvalError>> {
     match limits {
         ir::Limits::Default => Ok(Limits::AnyStringOrBooleanOrPositiveNumber),
         ir::Limits::Continuous { min, max } => {

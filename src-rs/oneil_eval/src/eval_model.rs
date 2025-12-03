@@ -2,15 +2,33 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ir as ir;
 
-use crate::{context::EvalContext, eval_parameter};
+use crate::{builtin::BuiltinFunction, context::EvalContext, eval_parameter};
 
-pub fn eval_model(model: &ir::Model, mut context: EvalContext) -> EvalContext {
+pub fn eval_model<F: BuiltinFunction>(
+    model_path: &ir::ModelPath,
+    model: &ir::Model,
+    mut context: EvalContext<F>,
+) -> EvalContext<F> {
+    // Set the current model
+    let model_path = model_path.as_ref().to_path_buf();
+    context.set_active_model(model_path);
+
+    // Bring Python imports into scope
     let python_imports = model.get_python_imports();
+    context.clear_active_python_imports();
+    for python_import in python_imports.values() {
+        let path = python_import.import_path().as_ref().to_path_buf();
+        context.activate_python_import(path);
+    }
+
+    // Bring references into scope
     let references = model.get_references();
+    for reference in references.values() {
+        let path = reference.path().as_ref().to_path_buf();
+        context.activate_reference(path);
+    }
 
-    context.activate_python_imports(python_imports);
-    context.activate_references(references);
-
+    // Add submodels to the current model
     let submodels = model.get_submodels();
     for (submodel_name, submodel_import) in submodels {
         context.add_submodel(submodel_name.as_str(), submodel_import.path());
@@ -25,8 +43,10 @@ pub fn eval_model(model: &ir::Model, mut context: EvalContext) -> EvalContext {
             .expect("parameter should exist because it comes from the keys of the parameters map");
 
         let value = eval_parameter(parameter, &context);
-        context.add_parameter_result(parameter_name, value);
+        context.add_parameter_result(parameter_name.as_str().to_string(), value);
     }
+
+    context.clear_active_model();
 
     context
 }
@@ -69,7 +89,10 @@ fn get_parameter_dependencies(
             continue;
         }
 
-        let dependency_parameter = parameters.get(dependency).expect("dependency should exist");
+        let Some(dependency_parameter) = parameters.get(dependency) else {
+            // dependency is a builtin parameter, so we don't need to visit it
+            continue;
+        };
 
         (evaluation_order, visited) = get_parameter_dependencies(
             dependency,

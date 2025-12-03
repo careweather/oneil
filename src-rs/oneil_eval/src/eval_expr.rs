@@ -3,6 +3,7 @@ use std::iter;
 use oneil_ir as ir;
 
 use crate::{
+    builtin::BuiltinFunction,
     context::EvalContext,
     error::EvalError,
     value::{MeasuredNumber, Number, Unit, Value},
@@ -13,7 +14,10 @@ use crate::{
 /// # Errors
 ///
 /// Returns an error if the expression is invalid.
-pub fn eval_expr(expr: &ir::Expr, context: &EvalContext) -> Result<Value, Vec<EvalError>> {
+pub fn eval_expr<F: BuiltinFunction>(
+    expr: &ir::Expr,
+    context: &EvalContext<F>,
+) -> Result<Value, Vec<EvalError>> {
     match expr {
         ir::Expr::ComparisonOp {
             left,
@@ -55,12 +59,12 @@ struct ComparisonSubexpressionsResult {
     rest_results: Vec<(ir::ComparisonOp, Value)>,
 }
 
-fn eval_comparison_subexpressions(
+fn eval_comparison_subexpressions<F: BuiltinFunction>(
     left: &ir::Expr,
     op: ir::ComparisonOp,
     right: &ir::Expr,
     rest_chained: &[(ir::ComparisonOp, ir::Expr)],
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<ComparisonSubexpressionsResult, Vec<EvalError>> {
     let left_result = eval_expr(left, context);
     let rest_results = iter::once((op, right))
@@ -112,10 +116,10 @@ fn eval_comparison_subexpressions(
     })
 }
 
-fn eval_comparison_chain(
+fn eval_comparison_chain<F: BuiltinFunction>(
     left_result: Value,
     rest_results: Vec<(ir::ComparisonOp, Value)>,
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     // structs only used internally in this function
     struct ComparisonSuccess {
@@ -201,10 +205,10 @@ struct BinaryOpSubexpressionsResult {
     right_result: Value,
 }
 
-fn eval_binary_op_subexpressions(
+fn eval_binary_op_subexpressions<F: BuiltinFunction>(
     left: &ir::Expr,
     right: &ir::Expr,
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<BinaryOpSubexpressionsResult, Vec<EvalError>> {
     let left_result = eval_expr(left, context);
     let right_result = eval_expr(right, context);
@@ -222,11 +226,11 @@ fn eval_binary_op_subexpressions(
     }
 }
 
-fn eval_binary_op(
+fn eval_binary_op<F: BuiltinFunction>(
     left_result: Value,
     op: ir::BinaryOp,
     right_result: Value,
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     let result = match op {
         ir::BinaryOp::Add => left_result.checked_add(right_result),
@@ -245,10 +249,10 @@ fn eval_binary_op(
     result.map_err(|error| vec![EvalError::ValueError(error)])
 }
 
-fn eval_unary_op(
+fn eval_unary_op<F: BuiltinFunction>(
     op: ir::UnaryOp,
     expr_result: Value,
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     let result = match op {
         ir::UnaryOp::Neg => expr_result.checked_neg(),
@@ -258,9 +262,9 @@ fn eval_unary_op(
     result.map_err(|error| vec![EvalError::ValueError(error)])
 }
 
-fn eval_function_call_args(
+fn eval_function_call_args<F: BuiltinFunction>(
     args: &[ir::Expr],
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<Vec<Value>, Vec<EvalError>> {
     let args_results = args.iter().map(|arg| eval_expr(arg, context));
 
@@ -281,10 +285,10 @@ fn eval_function_call_args(
     Ok(args)
 }
 
-fn eval_function_call(
+fn eval_function_call<F: BuiltinFunction>(
     name: &ir::FunctionName,
     args: Vec<Value>,
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     match name {
         ir::FunctionName::Builtin(fn_identifier) => {
@@ -296,7 +300,10 @@ fn eval_function_call(
     }
 }
 
-fn eval_variable(variable: &ir::Variable, context: &EvalContext) -> Result<Value, Vec<EvalError>> {
+fn eval_variable<F: BuiltinFunction>(
+    variable: &ir::Variable,
+    context: &EvalContext<F>,
+) -> Result<Value, Vec<EvalError>> {
     match variable {
         ir::Variable::Builtin(identifier) => context.lookup_builtin_variable(identifier),
         ir::Variable::Parameter(parameter_name) => context.lookup_parameter(parameter_name),
@@ -307,7 +314,7 @@ fn eval_variable(variable: &ir::Variable, context: &EvalContext) -> Result<Value
     }
 }
 
-fn eval_literal(value: &ir::Literal, context: &EvalContext) -> Value {
+fn eval_literal<F: BuiltinFunction>(value: &ir::Literal, context: &EvalContext<F>) -> Value {
     match value {
         ir::Literal::Boolean(boolean) => Value::Boolean(*boolean),
         ir::Literal::String(string) => Value::String(string.clone()),

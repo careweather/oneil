@@ -6,7 +6,7 @@ mod unit;
 pub use self::error::ValueError;
 pub use self::interval::Interval;
 pub use self::number::{MeasuredNumber, Number};
-pub use self::unit::{SizedUnit, Unit};
+pub use self::unit::{Dimension, SizedUnit, Unit};
 
 use std::cmp::Ordering;
 

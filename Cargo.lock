@@ -246,6 +246,7 @@ dependencies = [
  "clap",
  "colored",
  "oneil_ast",
+ "oneil_eval",
  "oneil_ir",
  "oneil_model_resolver",
  "oneil_parser",

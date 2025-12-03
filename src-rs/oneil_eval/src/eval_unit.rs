@@ -1,6 +1,6 @@
 use oneil_ir as ir;
 
-use crate::{context::EvalContext, error::EvalError, value::SizedUnit};
+use crate::{builtin::BuiltinFunction, context::EvalContext, error::EvalError, value::SizedUnit};
 
 // TODO: figure out display units. for now, we just
 //       discard the magnitude and return the dimensions
@@ -9,9 +9,9 @@ use crate::{context::EvalContext, error::EvalError, value::SizedUnit};
 /// # Errors
 ///
 /// Returns an error if the unit is not found.
-pub fn eval_unit(
+pub fn eval_unit<F: BuiltinFunction>(
     unit: &ir::CompositeUnit,
-    context: &EvalContext,
+    context: &EvalContext<F>,
 ) -> Result<SizedUnit, Vec<EvalError>> {
     let units = unit
         .units()
@@ -39,7 +39,10 @@ pub fn eval_unit(
     }
 }
 
-fn eval_unit_component(unit: &ir::Unit, context: &EvalContext) -> Result<SizedUnit, EvalError> {
+fn eval_unit_component<F: BuiltinFunction>(
+    unit: &ir::Unit,
+    context: &EvalContext<F>,
+) -> Result<SizedUnit, EvalError> {
     let name = unit.name();
     let exponent = unit.exponent();
 
@@ -52,7 +55,7 @@ fn eval_unit_component(unit: &ir::Unit, context: &EvalContext) -> Result<SizedUn
     // then check if it's a unit with a prefix
     for (prefix, prefix_magnitude) in context.available_prefixes() {
         // check if the prefix matches the unit
-        let Some(stripped_name) = name.strip_prefix(&prefix) else {
+        let Some(stripped_name) = name.strip_prefix(prefix) else {
             continue;
         };
 

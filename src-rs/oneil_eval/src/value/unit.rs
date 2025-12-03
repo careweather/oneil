@@ -101,6 +101,7 @@ impl ops::Div for Unit {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct SizedUnit {
     pub magnitude: f64,
     pub unit: Unit,
