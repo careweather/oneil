@@ -95,7 +95,29 @@ pub mod std {
         [("pi", std::f64::consts::PI), ("e", std::f64::consts::E)];
 
     type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
-    pub const BUILTIN_FUNCTIONS: [(&str, BuiltinFunction); 2] = [("min", min), ("max", max)];
+    pub const BUILTIN_FUNCTIONS: [(&str, BuiltinFunction); 21] = [
+        ("min", min),
+        ("max", max),
+        ("sin", sin),
+        ("cos", cos),
+        ("tan", tan),
+        ("asin", asin),
+        ("acos", acos),
+        ("atan", atan),
+        ("sqrt", sqrt),
+        ("ln", ln),
+        ("log", log),
+        ("log10", log10),
+        ("floor", floor),
+        ("ceiling", ceiling),
+        ("extent", extent),
+        ("range", range),
+        ("abs", abs),
+        ("sign", sign),
+        ("mid", mid),
+        ("strip", strip),
+        ("mnmx", mnmx),
+    ];
 
     pub fn builtin_units() -> HashMap<&'static str, SizedUnit> {
         HashMap::from([
@@ -236,25 +258,117 @@ pub mod std {
         )
     }
 
-    // "min"
-    // "max"
-    // "sin"
-    // "cos"
-    // "tan"
-    // "asin"
-    // "acos"
-    // "atan"
-    // "sqrt"
-    // "ln"
-    // "log"
-    // "log10"
-    // "floor"
-    // "ceiling"
-    // "extent"
-    // "range"
-    // "abs"
-    // "sign"
-    // "mid"
-    // "strip"
-    // "mnmx"
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn sin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn cos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn tan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn asin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn acos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn atan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn sqrt(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn ln(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn log(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn log10(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn floor(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn ceiling(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn extent(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn range(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn abs(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn sign(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn mid(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn strip(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    fn mnmx(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
 }
