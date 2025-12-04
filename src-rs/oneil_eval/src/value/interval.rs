@@ -1,5 +1,7 @@
 use std::{cmp::Ordering, ops};
 
+use crate::value::util::is_close;
+
 // TODO: maybe add more comparison functions for
 //       intervals into the standard library (
 //       such as `contains` or `overlaps`)
@@ -233,11 +235,7 @@ impl PartialOrd for Interval {
         //
         //       |--- self ---|
         //       |--- other --|
-        #[expect(
-            clippy::float_cmp,
-            reason = "simplicity - feel free to change this if it causes issues"
-        )]
-        if self.min == other.min && self.max == other.max {
+        if is_close(self.min, other.min) && is_close(self.max, other.max) {
             return Some(Ordering::Equal);
         }
 

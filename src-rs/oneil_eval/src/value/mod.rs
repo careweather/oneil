@@ -2,6 +2,7 @@ mod error;
 mod interval;
 mod number;
 mod unit;
+pub mod util;
 
 pub use self::error::ValueError;
 pub use self::interval::Interval;
@@ -42,14 +43,7 @@ impl Value {
     ///
     /// Returns `ValueError::InvalidType` if the values have incompatible types.
     pub fn checked_ne(&self, rhs: &Self) -> Result<bool, ValueError> {
-        match (self, rhs) {
-            (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(lhs != rhs),
-            (Self::String(lhs), Self::String(rhs)) => Ok(lhs != rhs),
-            (Self::Number(lhs), Self::Number(rhs)) => lhs
-                .checked_partial_cmp(rhs)
-                .map(|ordering| ordering != Some(Ordering::Equal)),
-            _ => Err(ValueError::InvalidType),
-        }
+        self.checked_eq(rhs).map(|eq| !eq)
     }
 
     /// Checks if the left value is less than the right value.

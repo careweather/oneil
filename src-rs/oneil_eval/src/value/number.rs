@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, ops};
 
-use crate::value::{Interval, Unit, ValueError};
+use crate::value::{Interval, Unit, ValueError, util::is_close};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeasuredNumber {
@@ -249,9 +249,11 @@ impl Number {
     #[must_use]
     pub fn inside(self, rhs: Self) -> bool {
         match (self, rhs) {
-            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs == rhs,
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => is_close(lhs, rhs),
             (Self::Scalar(lhs), Self::Interval(rhs)) => lhs >= rhs.min() && lhs <= rhs.max(),
-            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.min() == rhs && lhs.max() == rhs,
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                is_close(lhs.min(), rhs) && is_close(lhs.max(), rhs)
+            }
             (Self::Interval(lhs), Self::Interval(rhs)) => rhs.contains(lhs),
         }
     }
@@ -260,9 +262,13 @@ impl Number {
 impl PartialEq for Number {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs == rhs,
-            (Self::Scalar(lhs), Self::Interval(rhs)) => lhs == &rhs.min() && lhs == &rhs.max(),
-            (Self::Interval(lhs), Self::Scalar(rhs)) => &lhs.min() == rhs && &lhs.max() == rhs,
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => is_close(*lhs, *rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                is_close(*lhs, rhs.min()) && is_close(*lhs, rhs.max())
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                is_close(lhs.min(), *rhs) && is_close(lhs.max(), *rhs)
+            }
             (Self::Interval(lhs), Self::Interval(rhs)) => lhs == rhs,
         }
     }

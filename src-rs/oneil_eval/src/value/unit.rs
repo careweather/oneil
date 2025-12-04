@@ -1,5 +1,7 @@
 use std::{collections::HashMap, ops};
 
+use crate::value::util::is_close;
+
 /// The dimension of a base unit
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Dimension {
@@ -23,7 +25,7 @@ pub enum Dimension {
     LuminousIntensity,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Unit(HashMap<Dimension, f64>);
 
 impl Unit {
@@ -50,6 +52,19 @@ impl Unit {
                 .map(|(key, value)| (key, value * exponent))
                 .collect(),
         )
+    }
+}
+
+impl PartialEq for Unit {
+    fn eq(&self, other: &Self) -> bool {
+        if self.0.len() != other.0.len() {
+            return false;
+        }
+
+        self.0.iter().all(|(dimension, value)| {
+            let other_value = other.0.get(dimension);
+            other_value.is_some_and(|other_value| is_close(*other_value, *value))
+        })
     }
 }
 

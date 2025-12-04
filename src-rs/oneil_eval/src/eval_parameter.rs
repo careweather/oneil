@@ -121,7 +121,6 @@ pub fn eval_parameter<F: BuiltinFunction>(
                         return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
                     }
 
-                    dbg!(&number.value, &limit_value.value);
                     if number.value.inside(limit_value.value) {
                         is_inside_limits = true;
                         break;
