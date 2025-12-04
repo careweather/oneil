@@ -65,7 +65,7 @@ fn get_evaluation_order(
             continue;
         }
 
-        (evaluation_order, visited) = get_parameter_dependencies(
+        (evaluation_order, visited) = process_parameter_dependencies(
             parameter_name,
             parameter,
             visited,
@@ -80,7 +80,7 @@ fn get_evaluation_order(
     evaluation_order
 }
 
-fn get_parameter_dependencies(
+fn process_parameter_dependencies(
     parameter_name: &ir::ParameterName,
     parameter: &ir::Parameter,
     mut visited: HashSet<ir::ParameterName>,
@@ -93,11 +93,11 @@ fn get_parameter_dependencies(
         }
 
         let Some(dependency_parameter) = parameters.get(dependency) else {
-            // dependency is a builtin parameter, so we don't need to visit it
+            // dependency is a builtin value, so we don't need to visit it
             continue;
         };
 
-        (evaluation_order, visited) = get_parameter_dependencies(
+        (evaluation_order, visited) = process_parameter_dependencies(
             dependency,
             dependency_parameter,
             visited,

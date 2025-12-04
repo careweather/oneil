@@ -47,13 +47,13 @@ fn get_evaluation_order(models: &HashMap<ir::ModelPath, ir::Model>) -> Vec<ir::M
         }
 
         (evaluation_order, visited) =
-            get_model_dependencies(model_path, model, visited, evaluation_order, models);
+            process_model_dependencies(model_path, model, visited, evaluation_order, models);
     }
 
     evaluation_order
 }
 
-fn get_model_dependencies(
+fn process_model_dependencies(
     model_path: &ir::ModelPath,
     model: &ir::Model,
     mut visited: HashSet<ir::ModelPath>,
@@ -70,7 +70,7 @@ fn get_model_dependencies(
             .get(reference_model_path)
             .expect("reference model should exist because it was checked before");
 
-        (evaluation_order, visited) = get_model_dependencies(
+        (evaluation_order, visited) = process_model_dependencies(
             reference_model_path,
             reference_model,
             visited,
