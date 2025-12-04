@@ -39,110 +39,11 @@ pub fn eval_parameter<F: BuiltinFunction>(
     };
 
     // typecheck the value
-    let value = match value {
-        Value::Boolean(_) => {
-            if unit_ir.is_some() {
-                return Err(vec![EvalError::BooleanCannotHaveUnit]);
-            }
-
-            value
-        }
-        Value::String(_) => {
-            if unit_ir.is_some() {
-                return Err(vec![EvalError::StringCannotHaveUnit]);
-            }
-
-            value
-        }
-        Value::Number(number) => {
-            // evaluate the unit if it exists,
-            // otherwise use the unitless unit
-            let sized_unit = unit_ir
-                .as_ref()
-                .map(|unit| eval_unit(unit, context))
-                .transpose()?
-                .unwrap_or(SizedUnit::unitless());
-
-            // if the value is unitless, assign it the given unit
-            // otherwise, typecheck the value's unit against the given unit
-            if number.unit.is_unitless() {
-                let number_value = number.value * sized_unit.magnitude;
-                let number_unit = sized_unit.unit;
-
-                let number = MeasuredNumber {
-                    value: number_value,
-                    unit: number_unit,
-                };
-
-                Value::Number(number)
-            } else {
-                // TODO: is there anything that we need to do about the magnitude here?
-                //       or is that only for displaying the value?
-                if number.unit == sized_unit.unit {
-                    Value::Number(number)
-                } else {
-                    return Err(vec![EvalError::ParameterUnitMismatch]);
-                }
-            }
-        }
-    };
+    let value = typecheck_expr_value(value, unit_ir.as_ref(), context)?;
 
     // check that the value is within the provided limits
     let limits = eval_limits(parameter.limits(), context)?;
-
-    // TODO: spend more time reasoning about this. Because the limits may
-    //       contain intervals, we need to consider how those intervals
-    //       interact with the value.
-    match limits {
-        Limits::AnyStringOrBooleanOrPositiveNumber => match &value {
-            Value::Number(number) if number.value.min() < 0.0 => {
-                return Err(vec![EvalError::ParameterValueOutsideLimits]);
-            }
-            Value::Boolean(_) | Value::String(_) | Value::Number(_) => (),
-        },
-        Limits::NumberRange { min, max } => {
-            if let Value::Number(number) = &value {
-                if number.unit != min.unit || number.unit != max.unit {
-                    return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-                }
-
-                if number.value.min() < min.value.min() || number.value.max() > max.value.max() {
-                    return Err(vec![EvalError::ParameterValueOutsideLimits]);
-                }
-            } else {
-                return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-            }
-        }
-        Limits::NumberDiscrete { values } => {
-            if let Value::Number(number) = &value {
-                let mut is_inside_limits = false;
-                for limit_value in values {
-                    if number.unit != limit_value.unit {
-                        return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-                    }
-
-                    if number.value.inside(limit_value.value) {
-                        is_inside_limits = true;
-                        break;
-                    }
-                }
-                if !is_inside_limits {
-                    return Err(vec![EvalError::ParameterValueOutsideLimits]);
-                }
-            } else {
-                return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-            }
-        }
-        Limits::StringDiscrete { values } => match &value {
-            Value::String(string) if !values.contains(string) => {
-                return Err(vec![EvalError::ParameterValueOutsideLimits]);
-            }
-            Value::String(_) => (),
-            Value::Boolean(_) | Value::Number(_) => {
-                return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-            }
-        },
-    }
+    verify_value_is_within_limits(&value, limits)?;
 
     Ok(value)
 }
@@ -194,6 +95,60 @@ fn get_piecewise_result<F: BuiltinFunction>(
         Ok(result)
     } else {
         Err(vec![EvalError::NoPiecewiseBranchMatch])
+    }
+}
+
+fn typecheck_expr_value<F: BuiltinFunction>(
+    value: Value,
+    unit_ir: Option<&ir::CompositeUnit>,
+    context: &EvalContext<F>,
+) -> Result<Value, Vec<EvalError>> {
+    match value {
+        Value::Boolean(_) => {
+            if unit_ir.is_some() {
+                Err(vec![EvalError::BooleanCannotHaveUnit])
+            } else {
+                Ok(value)
+            }
+        }
+        Value::String(_) => {
+            if unit_ir.is_some() {
+                Err(vec![EvalError::StringCannotHaveUnit])
+            } else {
+                Ok(value)
+            }
+        }
+        Value::Number(number) => {
+            // evaluate the unit if it exists,
+            // otherwise use the unitless unit
+            let sized_unit = unit_ir
+                .as_ref()
+                .map(|unit| eval_unit(unit, context))
+                .transpose()?
+                .unwrap_or(SizedUnit::unitless());
+
+            // if the value is unitless, assign it the given unit
+            // otherwise, typecheck the value's unit against the given unit
+            if number.unit.is_unitless() {
+                let number_value = number.value * sized_unit.magnitude;
+                let number_unit = sized_unit.unit;
+
+                let number = MeasuredNumber {
+                    value: number_value,
+                    unit: number_unit,
+                };
+
+                Ok(Value::Number(number))
+            } else {
+                // TODO: is there anything that we need to do about the magnitude here?
+                //       or is that only for displaying the value?
+                if number.unit == sized_unit.unit {
+                    Ok(Value::Number(number))
+                } else {
+                    Err(vec![EvalError::ParameterUnitMismatch])
+                }
+            }
+        }
     }
 }
 
@@ -328,5 +283,63 @@ fn eval_limits<F: BuiltinFunction>(
                 Value::Boolean(_) => Err(vec![EvalError::LimitCannotBeBoolean]),
             }
         }
+    }
+}
+
+fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Vec<EvalError>> {
+    match limits {
+        Limits::AnyStringOrBooleanOrPositiveNumber => match value {
+            Value::Number(number) if number.value.min() < 0.0 => {
+                Err(vec![EvalError::ParameterValueOutsideLimits])
+            }
+            Value::Boolean(_) | Value::String(_) | Value::Number(_) => Ok(()),
+        },
+        Limits::NumberRange { min, max } => {
+            if let Value::Number(number) = value {
+                if number.unit != min.unit || number.unit != max.unit {
+                    Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+                } else if number.value.min() < min.value.min()
+                    || number.value.max() > max.value.max()
+                {
+                    Err(vec![EvalError::ParameterValueOutsideLimits])
+                } else {
+                    Ok(())
+                }
+            } else {
+                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+            }
+        }
+        Limits::NumberDiscrete { values } => {
+            if let Value::Number(number) = value {
+                let mut is_inside_limits = false;
+                for limit_value in values {
+                    if number.unit != limit_value.unit {
+                        return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
+                    }
+
+                    if number.value.inside(limit_value.value) {
+                        is_inside_limits = true;
+                        break;
+                    }
+                }
+
+                if is_inside_limits {
+                    Ok(())
+                } else {
+                    Err(vec![EvalError::ParameterValueOutsideLimits])
+                }
+            } else {
+                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+            }
+        }
+        Limits::StringDiscrete { values } => match value {
+            Value::String(string) if !values.contains(string) => {
+                Err(vec![EvalError::ParameterValueOutsideLimits])
+            }
+            Value::String(_) => Ok(()),
+            Value::Boolean(_) | Value::Number(_) => {
+                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+            }
+        },
     }
 }
