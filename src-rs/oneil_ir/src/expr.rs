@@ -128,14 +128,10 @@ pub enum BinaryOp {
     Add,
     /// Subtraction: `a - b`
     Sub,
-    /// True subtraction: `a -- b`
-    TrueSub,
     /// Multiplication: `a * b`
     Mul,
     /// Division: `a / b`
     Div,
-    /// True division: `a // b`
-    TrueDiv,
     /// Modulo: `a % b`
     Mod,
     /// Exponentiation: `a ^ b`

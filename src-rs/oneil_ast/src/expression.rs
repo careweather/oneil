@@ -177,14 +177,10 @@ pub enum BinaryOp {
     Add,
     /// Subtraction operator (-)
     Sub,
-    /// True subtraction operator (--)
-    TrueSub,
     /// Multiplication operator (*)
     Mul,
     /// Division operator (/)
     Div,
-    /// True division operator (//)
-    TrueDiv,
     /// Modulo operator (%)
     Mod,
     /// Power operator (**)
@@ -213,12 +209,6 @@ impl BinaryOp {
         Self::Sub
     }
 
-    /// Creates a true subtraction operator
-    #[must_use]
-    pub const fn true_sub() -> Self {
-        Self::TrueSub
-    }
-
     /// Creates a multiplication operator
     #[must_use]
     pub const fn mul() -> Self {
@@ -229,12 +219,6 @@ impl BinaryOp {
     #[must_use]
     pub const fn div() -> Self {
         Self::Div
-    }
-
-    /// Creates a true division operator
-    #[must_use]
-    pub const fn true_div() -> Self {
-        Self::TrueDiv
     }
 
     /// Creates a modulo operator
