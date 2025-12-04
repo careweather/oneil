@@ -38,6 +38,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
         }
     };
 
+    // typecheck the value
     let value = match value {
         Value::Boolean(_) => {
             if unit_ir.is_some() {
@@ -86,6 +87,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
         }
     };
 
+    // check that the value is within the provided limits
     let limits = eval_limits(parameter.limits(), context)?;
 
     // TODO: spend more time reasoning about this. Because the limits may
@@ -93,7 +95,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
     //       interact with the value.
     match limits {
         Limits::AnyStringOrBooleanOrPositiveNumber => match &value {
-            Value::Number(number) if number.value < Number::Scalar(0.0) => {
+            Value::Number(number) if number.value.min() < 0.0 => {
                 return Err(vec![EvalError::ParameterValueOutsideLimits]);
             }
             Value::Boolean(_) | Value::String(_) | Value::Number(_) => (),
@@ -104,7 +106,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
                     return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
                 }
 
-                if number.value < min.value || number.value > max.value {
+                if number.value.min() < min.value.min() || number.value.max() > max.value.max() {
                     return Err(vec![EvalError::ParameterValueOutsideLimits]);
                 }
             } else {
@@ -119,6 +121,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
                         return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
                     }
 
+                    dbg!(&number.value, &limit_value.value);
                     if number.value.inside(limit_value.value) {
                         is_inside_limits = true;
                         break;

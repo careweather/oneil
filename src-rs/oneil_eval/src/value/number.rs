@@ -181,6 +181,22 @@ impl Number {
     }
 
     #[must_use]
+    pub const fn min(&self) -> f64 {
+        match self {
+            Self::Scalar(value) => *value,
+            Self::Interval(interval) => interval.min(),
+        }
+    }
+
+    #[must_use]
+    pub const fn max(&self) -> f64 {
+        match self {
+            Self::Scalar(value) => *value,
+            Self::Interval(interval) => interval.max(),
+        }
+    }
+
+    #[must_use]
     pub fn pow(self, exponent: Self) -> Self {
         match (self, exponent) {
             (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs.powf(rhs)),
