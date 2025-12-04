@@ -6,7 +6,6 @@ use crate::{
     builtin::{BuiltinFunction, BuiltinMap},
     context::EvalContext,
     eval_model::eval_model,
-    value::SizedUnit,
 };
 
 pub fn eval_model_collection<F: BuiltinFunction>(
