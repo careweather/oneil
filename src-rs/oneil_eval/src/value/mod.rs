@@ -1,12 +1,14 @@
 mod error;
 mod interval;
 mod number;
+mod type_;
 mod unit;
 pub mod util;
 
-pub use self::error::ValueError;
+pub use self::error::{TypeError, ValueError};
 pub use self::interval::Interval;
 pub use self::number::{MeasuredNumber, Number};
+pub use self::type_::{NumberType, ValueType};
 pub use self::unit::{Dimension, SizedUnit, Unit};
 
 use std::cmp::Ordering;
@@ -274,6 +276,19 @@ impl Value {
         match self {
             Self::Boolean(boolean) => Ok(Self::Boolean(!boolean)),
             Self::String(_) | Self::Number(_) => Err(ValueError::InvalidOperation),
+        }
+    }
+
+    /// Returns the type of the value.
+    #[must_use]
+    pub fn type_(&self) -> ValueType {
+        match self {
+            Self::Boolean(_) => ValueType::Boolean,
+            Self::String(_) => ValueType::String,
+            Self::Number(number) => ValueType::Number {
+                unit: number.unit.clone(),
+                number_type: number.value.type_(),
+            },
         }
     }
 }

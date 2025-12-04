@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, ops};
 
-use crate::value::{Interval, Unit, ValueError, util::is_close};
+use crate::value::{Interval, NumberType, Unit, ValueError, util::is_close};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeasuredNumber {
@@ -178,6 +178,14 @@ impl Number {
     #[must_use]
     pub const fn new_empty() -> Self {
         Self::Interval(Interval::empty())
+    }
+
+    #[must_use]
+    pub const fn type_(&self) -> NumberType {
+        match self {
+            Self::Scalar(_) => NumberType::Scalar,
+            Self::Interval(_) => NumberType::Interval,
+        }
     }
 
     #[must_use]
