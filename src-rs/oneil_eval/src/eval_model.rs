@@ -4,6 +4,8 @@ use oneil_ir as ir;
 
 use crate::{builtin::BuiltinFunction, context::EvalContext, eval_parameter};
 
+#[expect(clippy::missing_panics_doc, reason = "the panic should never happen")]
+#[must_use]
 pub fn eval_model<F: BuiltinFunction>(
     model_path: &ir::ModelPath,
     model: &ir::Model,
@@ -34,6 +36,7 @@ pub fn eval_model<F: BuiltinFunction>(
         context.add_submodel(submodel_name.as_str(), submodel_import.path());
     }
 
+    // Evaluate parameters
     let parameters = model.get_parameters();
     let evaluation_order = get_evaluation_order(parameters);
 

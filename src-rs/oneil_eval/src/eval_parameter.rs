@@ -7,7 +7,7 @@ use crate::{
     context::EvalContext,
     error::EvalError,
     eval_expr, eval_unit,
-    value::{MeasuredNumber, Number, SizedUnit, Value},
+    value::{MeasuredNumber, SizedUnit, Value},
 };
 
 /// Evaluates a parameter and returns the resulting value.

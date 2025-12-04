@@ -1,7 +1,8 @@
 use crate::value::ValueError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvalError {
+    UndefinedBuiltinValue,
     ValueError(ValueError),
     InvalidArgumentCount,
     ParameterUnitMismatch,
@@ -22,5 +23,6 @@ pub enum EvalError {
     DiscreteLimitUnitMismatch,
     ParameterValueOutsideLimits,
     ParameterUnitDoesNotMatchLimit,
+    Unsupported,
     NoNonEmptyValue,
 }

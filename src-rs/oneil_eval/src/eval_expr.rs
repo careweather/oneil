@@ -305,7 +305,7 @@ fn eval_variable<F: BuiltinFunction>(
     context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     match variable {
-        ir::Variable::Builtin(identifier) => context.lookup_builtin_variable(identifier),
+        ir::Variable::Builtin(identifier) => Ok(context.lookup_builtin_variable(identifier)),
         ir::Variable::Parameter(parameter_name) => context.lookup_parameter(parameter_name),
         ir::Variable::External {
             model,
