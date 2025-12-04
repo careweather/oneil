@@ -10,35 +10,35 @@ use oneil_model_resolver::BuiltinRef;
 // TODO: later, this will hold the actual values/functions that are built into the language
 //       right now, it just holds the names of the builtins
 pub struct Builtins<F: BuiltinFunction> {
-    builtin_values: HashMap<&'static str, f64>,
-    builtin_functions: HashMap<&'static str, F>,
-    builtin_units: HashMap<&'static str, SizedUnit>,
-    builtin_prefixes: HashMap<&'static str, f64>,
+    values: HashMap<&'static str, f64>,
+    functions: HashMap<&'static str, F>,
+    units: HashMap<&'static str, SizedUnit>,
+    prefixes: HashMap<&'static str, f64>,
 }
 
 impl<F: BuiltinFunction> Builtins<F> {
     pub fn new(
-        builtin_values: impl IntoIterator<Item = (&'static str, f64)>,
-        builtin_functions: impl IntoIterator<Item = (&'static str, F)>,
-        builtin_units: impl IntoIterator<Item = (&'static str, SizedUnit)>,
-        builtin_prefixes: impl IntoIterator<Item = (&'static str, f64)>,
+        values: impl IntoIterator<Item = (&'static str, f64)>,
+        functions: impl IntoIterator<Item = (&'static str, F)>,
+        units: impl IntoIterator<Item = (&'static str, SizedUnit)>,
+        prefixes: impl IntoIterator<Item = (&'static str, f64)>,
     ) -> Self {
         Self {
-            builtin_values: builtin_values.into_iter().collect(),
-            builtin_functions: builtin_functions.into_iter().collect(),
-            builtin_units: builtin_units.into_iter().collect(),
-            builtin_prefixes: builtin_prefixes.into_iter().collect(),
+            values: values.into_iter().collect(),
+            functions: functions.into_iter().collect(),
+            units: units.into_iter().collect(),
+            prefixes: prefixes.into_iter().collect(),
         }
     }
 }
 
 impl<F: BuiltinFunction> BuiltinRef for Builtins<F> {
     fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool {
-        self.builtin_values.contains_key(identifier.as_str())
+        self.values.contains_key(identifier.as_str())
     }
 
     fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
-        self.builtin_functions.contains_key(identifier.as_str())
+        self.functions.contains_key(identifier.as_str())
         // matches!(
         //     identifier.as_str(),
         // )
@@ -47,7 +47,7 @@ impl<F: BuiltinFunction> BuiltinRef for Builtins<F> {
 
 impl<F: BuiltinFunction + Clone> BuiltinMap<F> for Builtins<F> {
     fn builtin_values(&self) -> HashMap<String, Value> {
-        self.builtin_values
+        self.values
             .iter()
             .map(|(name, value)| {
                 (
@@ -62,21 +62,21 @@ impl<F: BuiltinFunction + Clone> BuiltinMap<F> for Builtins<F> {
     }
 
     fn builtin_functions(&self) -> HashMap<String, F> {
-        self.builtin_functions
+        self.functions
             .iter()
             .map(|(name, function)| ((*name).to_string(), function.clone()))
             .collect()
     }
 
     fn builtin_units(&self) -> HashMap<String, SizedUnit> {
-        self.builtin_units
+        self.units
             .iter()
             .map(|(name, unit)| ((*name).to_string(), unit.clone()))
             .collect()
     }
 
     fn builtin_prefixes(&self) -> HashMap<String, f64> {
-        self.builtin_prefixes
+        self.prefixes
             .iter()
             .map(|(name, magnitude)| ((*name).to_string(), *magnitude))
             .collect()
