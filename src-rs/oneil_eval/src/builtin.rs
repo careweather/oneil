@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     error::EvalError,
-    value::{SizedUnit, Value},
+    value::{SizedUnit, Value, ValueType},
 };
 
 pub trait BuiltinMap<F: BuiltinFunction> {
@@ -19,10 +19,10 @@ pub trait BuiltinFunction {
     ///
     /// Returns an error if the builtin function fails to evaluate.
     fn call(&self, args: Vec<Value>) -> Result<Value, Vec<EvalError>>;
-}
 
-impl<F: Fn(Vec<Value>) -> Result<Value, Vec<EvalError>>> BuiltinFunction for F {
-    fn call(&self, args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        self(args)
-    }
+    /// Returns the type of the arguments of the builtin function.
+    fn argument_types(&self) -> Vec<ValueType>;
+
+    /// Returns the type of the builtin function.
+    fn return_type(&self) -> ValueType;
 }
