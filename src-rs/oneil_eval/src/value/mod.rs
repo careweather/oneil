@@ -5,7 +5,7 @@ mod type_;
 mod unit;
 pub mod util;
 
-pub use self::error::{TypeError, ValueError};
+pub use self::error::ValueError;
 pub use self::interval::Interval;
 pub use self::number::{MeasuredNumber, Number};
 pub use self::type_::{NumberType, ValueType};
