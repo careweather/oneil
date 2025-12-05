@@ -53,9 +53,6 @@ fn get_piecewise_result<F: BuiltinFunction>(
     context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     // evaluate each of the conditions and their bodies
-    // TODO: this is slow, but we do it so that every branch is
-    //       "typechecked". is there a better way to do this? Do we
-    //       need to do better?
     let results = piecewise.iter().map(|piecewise_expr| {
         let if_result = eval_expr(piecewise_expr.if_expr(), context)?;
         let branch_result = eval_expr(piecewise_expr.expr(), context)?;
