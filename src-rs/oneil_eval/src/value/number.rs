@@ -115,15 +115,15 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_pow(self, rhs: &Self) -> Result<Self, ValueError> {
-        if !self.unit.is_unitless() {
+    pub fn checked_pow(self, exponent: &Self) -> Result<Self, ValueError> {
+        if !exponent.unit.is_unitless() {
             return Err(ValueError::HasExponentWithUnits);
         }
 
-        match rhs.value {
-            Number::Scalar(exponent) => Ok(Self {
-                value: self.value.pow(rhs.value),
-                unit: self.unit.pow(exponent),
+        match exponent.value {
+            Number::Scalar(exponent_value) => Ok(Self {
+                value: self.value.pow(Number::Scalar(exponent_value)),
+                unit: self.unit.pow(exponent_value),
             }),
             Number::Interval(_) => Err(ValueError::HasIntervalExponent),
         }
