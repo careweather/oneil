@@ -2,7 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use oneil_ir as ir;
 
-use crate::{builtin::BuiltinFunction, context::EvalContext, eval_parameter};
+use crate::{
+    EvalError, builtin::BuiltinFunction, context::EvalContext, eval_expr, eval_parameter,
+    value::Value,
+};
 
 #[expect(clippy::missing_panics_doc, reason = "the panic should never happen")]
 #[must_use]
@@ -47,6 +50,13 @@ pub fn eval_model<F: BuiltinFunction>(
 
         let value = eval_parameter(parameter, &context);
         context.add_parameter_result(parameter_name.as_str().to_string(), value);
+    }
+
+    // Evaluate tests
+    let tests = model.get_tests();
+    for test in tests.values() {
+        let value = eval_test(test, &context);
+        context.add_test_result(value);
     }
 
     context.clear_active_model();
@@ -110,4 +120,11 @@ fn process_parameter_dependencies(
     visited.insert(parameter_name.clone());
 
     (evaluation_order, visited)
+}
+
+fn eval_test<F: BuiltinFunction>(
+    test: &ir::Test,
+    context: &EvalContext<F>,
+) -> Result<Value, Vec<EvalError>> {
+    eval_expr(test.test_expr(), context)
 }

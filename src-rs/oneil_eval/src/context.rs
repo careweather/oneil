@@ -16,6 +16,7 @@ use crate::{
 pub struct Model {
     parameters: HashMap<String, Result<Value, Vec<EvalError>>>,
     submodels: HashMap<String, PathBuf>,
+    tests: Vec<Result<Value, Vec<EvalError>>>,
 }
 
 impl Model {
@@ -23,6 +24,7 @@ impl Model {
         Self {
             parameters: HashMap::new(),
             submodels: HashMap::new(),
+            tests: Vec::new(),
         }
     }
 }
@@ -194,6 +196,19 @@ impl<F: BuiltinFunction> EvalContext<F> {
             submodel_name.to_string(),
             submodel_import.as_ref().to_path_buf(),
         );
+    }
+
+    pub fn add_test_result(&mut self, test_result: Result<Value, Vec<EvalError>>) {
+        let Some(current_model) = self.current_model.as_ref() else {
+            panic!("current model should be set when adding a test result");
+        };
+
+        let model = self
+            .models
+            .get_mut(current_model)
+            .expect("current model should be created when set");
+
+        model.tests.push(test_result);
     }
 
     pub fn activate_reference(&mut self, reference: PathBuf) {
