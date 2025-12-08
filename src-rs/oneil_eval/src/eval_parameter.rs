@@ -7,7 +7,7 @@ use crate::{
     context::EvalContext,
     error::EvalError,
     eval_expr, eval_unit,
-    value::{MeasuredNumber, SizedUnit, Value},
+    value::{MeasuredNumber, Number, SizedUnit, Unit, Value},
 };
 
 /// Evaluates a parameter and returns the resulting value.
@@ -153,11 +153,13 @@ fn typecheck_expr_value<F: BuiltinFunction>(
 pub enum Limits {
     AnyStringOrBooleanOrPositiveNumber,
     NumberRange {
-        min: MeasuredNumber,
-        max: MeasuredNumber,
+        min: Number,
+        max: Number,
+        unit: Unit,
     },
     NumberDiscrete {
-        values: Vec<MeasuredNumber>,
+        values: Vec<Number>,
+        unit: Unit,
     },
     StringDiscrete {
         values: HashSet<String>,
@@ -190,7 +192,17 @@ fn eval_limits<F: BuiltinFunction>(
             });
 
             match (min, max) {
-                (Ok(min), Ok(max)) => Ok(Limits::NumberRange { min, max }),
+                (Ok(min), Ok(max)) => {
+                    if min.unit != max.unit {
+                        return Err(vec![EvalError::InvalidUnit]);
+                    }
+
+                    Ok(Limits::NumberRange {
+                        min: min.value,
+                        max: max.value,
+                        unit: min.unit,
+                    })
+                }
                 (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
                 (Err(errors), Err(errors2)) => {
                     let mut errors = errors;
@@ -204,6 +216,7 @@ fn eval_limits<F: BuiltinFunction>(
 
             let mut errors = Vec::new();
             let mut results = Vec::new();
+
             for value in values {
                 match value {
                     Ok(value) => results.push(value),
@@ -253,12 +266,13 @@ fn eval_limits<F: BuiltinFunction>(
                 Value::Number(first_value) => {
                     let mut errors = Vec::new();
                     let mut numbers = Vec::new();
+                    let limit_unit = first_value.unit;
 
                     for result in results {
                         match result {
                             Value::Number(number_result) => {
-                                if number_result.unit == first_value.unit {
-                                    numbers.push(number_result);
+                                if number_result.unit == limit_unit {
+                                    numbers.push(number_result.value);
                                 } else {
                                     errors.push(EvalError::DiscreteLimitUnitMismatch);
                                 }
@@ -269,10 +283,13 @@ fn eval_limits<F: BuiltinFunction>(
                         }
                     }
 
-                    numbers.insert(0, first_value);
+                    numbers.insert(0, first_value.value);
 
                     if errors.is_empty() {
-                        Ok(Limits::NumberDiscrete { values: numbers })
+                        Ok(Limits::NumberDiscrete {
+                            values: numbers,
+                            unit: limit_unit,
+                        })
                     } else {
                         Err(errors)
                     }
@@ -291,13 +308,11 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
             }
             Value::Boolean(_) | Value::String(_) | Value::Number(_) => Ok(()),
         },
-        Limits::NumberRange { min, max } => {
+        Limits::NumberRange { min, max, unit } => {
             if let Value::Number(number) = value {
-                if number.unit != min.unit || number.unit != max.unit {
+                if number.unit != unit {
                     Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
-                } else if number.value.min() < min.value.min()
-                    || number.value.max() > max.value.max()
-                {
+                } else if number.value.min() < min.min() || number.value.max() > max.max() {
                     Err(vec![EvalError::ParameterValueOutsideLimits])
                 } else {
                     Ok(())
@@ -306,15 +321,15 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
                 Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
             }
         }
-        Limits::NumberDiscrete { values } => {
+        Limits::NumberDiscrete { values, unit } => {
             if let Value::Number(number) = value {
+                if number.unit != unit && !unit.is_unitless() {
+                    return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
+                }
+
                 let mut is_inside_limits = false;
                 for limit_value in values {
-                    if number.unit != limit_value.unit {
-                        return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-                    }
-
-                    if number.value.inside(limit_value.value) {
+                    if number.value.inside(limit_value) {
                         is_inside_limits = true;
                         break;
                     }
