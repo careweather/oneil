@@ -105,6 +105,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .get(parameter_name.as_str())
             .expect("parameter should be defined")
             .clone()
+            .map_err(|_errors| vec![EvalError::ParameterHasError])
     }
 
     // TODO: figure out what error this should actually be

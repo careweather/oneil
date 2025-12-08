@@ -2,6 +2,7 @@ use crate::value::ValueError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvalError {
+    ParameterHasError,
     UndefinedBuiltinValue,
     ValueError(ValueError),
     InvalidArgumentCount,
