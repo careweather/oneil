@@ -11,6 +11,7 @@ mod eval_model;
 mod eval_model_collection;
 mod eval_parameter;
 mod eval_unit;
+mod result;
 pub mod value;
 
 pub use error::EvalError;
