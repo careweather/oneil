@@ -24,6 +24,7 @@ pub fn eval_expr<F: BuiltinFunction>(
             op,
             right,
             rest_chained,
+            span,
         } => {
             let ComparisonSubexpressionsResult {
                 left_result,
@@ -31,23 +32,33 @@ pub fn eval_expr<F: BuiltinFunction>(
             } = eval_comparison_subexpressions(left, *op, right, rest_chained, context)?;
             eval_comparison_chain(left_result, rest_results, context)
         }
-        ir::Expr::BinaryOp { op, left, right } => {
+        ir::Expr::BinaryOp {
+            op,
+            left,
+            right,
+            span,
+        } => {
             let BinaryOpSubexpressionsResult {
                 left_result,
                 right_result,
             } = eval_binary_op_subexpressions(left, right, context)?;
             eval_binary_op(left_result, *op, right_result, context)
         }
-        ir::Expr::UnaryOp { op, expr } => {
+        ir::Expr::UnaryOp { op, expr, span } => {
             let expr_result = eval_expr(expr, context)?;
             eval_unary_op(*op, expr_result, context)
         }
-        ir::Expr::FunctionCall { name, args } => {
+        ir::Expr::FunctionCall {
+            name,
+            args,
+            span,
+            name_span,
+        } => {
             let args_results = eval_function_call_args(args, context)?;
             eval_function_call(name, args_results, context)
         }
-        ir::Expr::Variable(variable) => eval_variable(variable, context),
-        ir::Expr::Literal { value } => {
+        ir::Expr::Variable { variable, span } => eval_variable(variable, context),
+        ir::Expr::Literal { value, span } => {
             let literal_result = eval_literal(value, context);
             Ok(literal_result)
         }
@@ -303,11 +314,16 @@ fn eval_variable<F: BuiltinFunction>(
     context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     match variable {
-        ir::Variable::Builtin(identifier) => Ok(context.lookup_builtin_variable(identifier)),
-        ir::Variable::Parameter(parameter_name) => context.lookup_parameter(parameter_name),
+        ir::Variable::Builtin { ident, ident_span } => Ok(context.lookup_builtin_variable(ident)),
+        ir::Variable::Parameter {
+            parameter_name,
+            parameter_span,
+        } => context.lookup_parameter(parameter_name),
         ir::Variable::External {
             model,
             parameter_name,
+            model_span,
+            parameter_span,
         } => context.lookup_model_parameter(model, parameter_name),
     }
 }
