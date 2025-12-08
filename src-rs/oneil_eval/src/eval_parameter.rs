@@ -166,137 +166,144 @@ pub enum Limits {
     },
 }
 
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "enforcing an invariant that should always hold"
-)]
 fn eval_limits<F: BuiltinFunction>(
     limits: &ir::Limits,
     context: &EvalContext<F>,
 ) -> Result<Limits, Vec<EvalError>> {
     match limits {
         ir::Limits::Default => Ok(Limits::AnyStringOrBooleanOrPositiveNumber),
-        ir::Limits::Continuous { min, max } => {
-            let min = eval_expr(min, context).and_then(|value| match value {
-                Value::Number(number) => Ok(number),
-                Value::Boolean(_) | Value::String(_) => {
-                    Err(vec![EvalError::InvalidContinuousLimitMinType])
-                }
-            });
+        ir::Limits::Continuous { min, max } => eval_continuous_limits(min, max, context),
+        ir::Limits::Discrete { values } => eval_discrete_limits(values, context),
+    }
+}
 
-            let max = eval_expr(max, context).and_then(|value| match value {
-                Value::Number(number) => Ok(number),
-                Value::Boolean(_) | Value::String(_) => {
-                    Err(vec![EvalError::InvalidContinuousLimitMaxType])
-                }
-            });
+fn eval_continuous_limits<F: BuiltinFunction>(
+    min: &oneil_ir::Expr,
+    max: &oneil_ir::Expr,
+    context: &EvalContext<F>,
+) -> Result<Limits, Vec<EvalError>> {
+    let min = eval_expr(min, context).and_then(|value| match value {
+        Value::Number(number) => Ok(number),
+        Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidContinuousLimitMinType]),
+    });
 
-            match (min, max) {
-                (Ok(min), Ok(max)) => {
-                    if min.unit != max.unit {
-                        return Err(vec![EvalError::InvalidUnit]);
-                    }
+    let max = eval_expr(max, context).and_then(|value| match value {
+        Value::Number(number) => Ok(number),
+        Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidContinuousLimitMaxType]),
+    });
 
-                    Ok(Limits::NumberRange {
-                        min: min.value,
-                        max: max.value,
-                        unit: min.unit,
-                    })
-                }
-                (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
-                (Err(errors), Err(errors2)) => {
-                    let mut errors = errors;
-                    errors.extend(errors2);
-                    Err(errors)
-                }
+    match (min, max) {
+        (Ok(min), Ok(max)) => {
+            if min.unit != max.unit {
+                return Err(vec![EvalError::InvalidUnit]);
             }
-        }
-        ir::Limits::Discrete { values } => {
-            let values = values.iter().map(|value| eval_expr(value, context));
 
+            Ok(Limits::NumberRange {
+                min: min.value,
+                max: max.value,
+                unit: min.unit,
+            })
+        }
+        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
+        (Err(errors), Err(errors2)) => {
+            let mut errors = errors;
+            errors.extend(errors2);
+            Err(errors)
+        }
+    }
+}
+
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "enforcing an invariant that should always hold"
+)]
+fn eval_discrete_limits<F: BuiltinFunction>(
+    values: &[ir::Expr],
+    context: &EvalContext<F>,
+) -> Result<Limits, Vec<EvalError>> {
+    let values = values.iter().map(|value| eval_expr(value, context));
+
+    let mut errors = Vec::new();
+    let mut results = Vec::new();
+
+    for value in values {
+        match value {
+            Ok(value) => results.push(value),
+            Err(e) => errors.extend(e),
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    assert!(
+        !results.is_empty(),
+        "must have at least one discrete limit value"
+    );
+
+    let first_value = results.remove(0);
+
+    match first_value {
+        Value::String(first_value) => {
             let mut errors = Vec::new();
-            let mut results = Vec::new();
+            let mut strings = HashSet::new();
 
-            for value in values {
-                match value {
-                    Ok(value) => results.push(value),
-                    Err(e) => errors.extend(e),
+            strings.insert(first_value);
+
+            for result in results {
+                match result {
+                    Value::String(string) => {
+                        if strings.contains(&string) {
+                            errors.push(EvalError::DuplicateStringLimit);
+                        } else {
+                            strings.insert(string);
+                        }
+                    }
+                    Value::Number(_) | Value::Boolean(_) => {
+                        errors.push(EvalError::ExpectedStringLimit);
+                    }
                 }
             }
 
-            if !errors.is_empty() {
-                return Err(errors);
-            }
-
-            assert!(
-                !results.is_empty(),
-                "must have at least one discrete limit value"
-            );
-
-            let first_value = results.remove(0);
-
-            match first_value {
-                Value::String(first_value) => {
-                    let mut errors = Vec::new();
-                    let mut strings = HashSet::new();
-
-                    strings.insert(first_value);
-
-                    for result in results {
-                        match result {
-                            Value::String(string) => {
-                                if strings.contains(&string) {
-                                    errors.push(EvalError::DuplicateStringLimit);
-                                } else {
-                                    strings.insert(string);
-                                }
-                            }
-                            Value::Number(_) | Value::Boolean(_) => {
-                                errors.push(EvalError::ExpectedStringLimit);
-                            }
-                        }
-                    }
-
-                    if errors.is_empty() {
-                        Ok(Limits::StringDiscrete { values: strings })
-                    } else {
-                        Err(errors)
-                    }
-                }
-                Value::Number(first_value) => {
-                    let mut errors = Vec::new();
-                    let mut numbers = Vec::new();
-                    let limit_unit = first_value.unit;
-
-                    for result in results {
-                        match result {
-                            Value::Number(number_result) => {
-                                if number_result.unit == limit_unit {
-                                    numbers.push(number_result.value);
-                                } else {
-                                    errors.push(EvalError::DiscreteLimitUnitMismatch);
-                                }
-                            }
-                            Value::Boolean(_) | Value::String(_) => {
-                                errors.push(EvalError::ExpectedNumberLimit);
-                            }
-                        }
-                    }
-
-                    numbers.insert(0, first_value.value);
-
-                    if errors.is_empty() {
-                        Ok(Limits::NumberDiscrete {
-                            values: numbers,
-                            unit: limit_unit,
-                        })
-                    } else {
-                        Err(errors)
-                    }
-                }
-                Value::Boolean(_) => Err(vec![EvalError::LimitCannotBeBoolean]),
+            if errors.is_empty() {
+                Ok(Limits::StringDiscrete { values: strings })
+            } else {
+                Err(errors)
             }
         }
+        Value::Number(first_value) => {
+            let mut errors = Vec::new();
+            let mut numbers = Vec::new();
+            let limit_unit = first_value.unit;
+
+            for result in results {
+                match result {
+                    Value::Number(number_result) => {
+                        if number_result.unit == limit_unit {
+                            numbers.push(number_result.value);
+                        } else {
+                            errors.push(EvalError::DiscreteLimitUnitMismatch);
+                        }
+                    }
+                    Value::Boolean(_) | Value::String(_) => {
+                        errors.push(EvalError::ExpectedNumberLimit);
+                    }
+                }
+            }
+
+            numbers.insert(0, first_value.value);
+
+            if errors.is_empty() {
+                Ok(Limits::NumberDiscrete {
+                    values: numbers,
+                    unit: limit_unit,
+                })
+            } else {
+                Err(errors)
+            }
+        }
+        Value::Boolean(_) => Err(vec![EvalError::LimitCannotBeBoolean]),
     }
 }
 
@@ -323,6 +330,8 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
         }
         Limits::NumberDiscrete { values, unit } => {
             if let Value::Number(number) = value {
+                // the number must have the same unit as the limit unit,
+                // unless the limit unit is unitless
                 if number.unit != unit && !unit.is_unitless() {
                     return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
                 }
