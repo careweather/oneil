@@ -121,6 +121,14 @@ pub mod std {
 
     pub fn builtin_units() -> HashMap<&'static str, SizedUnit> {
         HashMap::from([
+            // the kilogram is the base unit of mass, so the gram is 1e-3 of a kilogram
+            (
+                "g",
+                SizedUnit {
+                    magnitude: 1e-3,
+                    unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
+                },
+            ),
             (
                 "m",
                 SizedUnit {
@@ -135,10 +143,73 @@ pub mod std {
                     unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
                 },
             ),
+            (
+                "K",
+                SizedUnit {
+                    magnitude: 1.0,
+                    unit: Unit::new(HashMap::from([(Dimension::Temperature, 1.0)])),
+                },
+            ),
+            (
+                "A",
+                SizedUnit {
+                    magnitude: 1.0,
+                    unit: Unit::new(HashMap::from([(Dimension::Current, 1.0)])),
+                },
+            ),
+            (
+                "b",
+                SizedUnit {
+                    magnitude: 1.0,
+                    unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
+                },
+            ),
+            (
+                "$",
+                SizedUnit {
+                    magnitude: 1.0,
+                    unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+                },
+            ),
+            (
+                "mol",
+                SizedUnit {
+                    magnitude: 1.0,
+                    unit: Unit::new(HashMap::from([(Dimension::Substance, 1.0)])),
+                },
+            ),
+            (
+                "cd",
+                SizedUnit {
+                    magnitude: 1.0,
+                    unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+                },
+            ),
         ])
     }
 
-    pub const BUILTIN_PREFIXES: [(&str, f64); 1] = [("k", 1000.0)];
+    pub const BUILTIN_PREFIXES: [(&str, f64); 20] = [
+        ("q", 1e-30), // quecto
+        ("r", 1e-27), // ronto
+        ("y", 1e-24), // yocto
+        ("z", 1e-21), // zepto
+        ("a", 1e-18), // atto
+        ("f", 1e-15), // femto
+        ("p", 1e-12), // pico
+        ("n", 1e-9),  // nano
+        ("u", 1e-6),  // micro
+        ("m", 1e-3),  // milli
+        ("k", 1e3),   // kilo
+        ("M", 1e6),   // mega
+        ("G", 1e9),   // giga
+        ("T", 1e12),  // tera
+        ("P", 1e15),  // peta
+        ("E", 1e18),  // exa
+        ("Z", 1e21),  // zetta
+        ("Y", 1e24),  // yotta
+        ("R", 1e27),  // ronna
+        ("Q", 1e30),  // quetta
+    ];
 
     fn min(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
