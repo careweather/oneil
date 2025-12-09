@@ -7,7 +7,7 @@ use crate::{
     context::EvalContext,
     error::EvalError,
     eval_expr, eval_unit,
-    value::{MeasuredNumber, Number, SizedUnit, Unit, Value},
+    value::{MeasuredNumber, Number, SizedUnit, Unit, Value, ValueType},
 };
 
 /// Evaluates a parameter and returns the resulting value.
@@ -22,7 +22,7 @@ use crate::{
 pub fn eval_parameter<F: BuiltinFunction>(
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
-) -> Result<(Value, bool), Vec<EvalError>> {
+) -> Result<(Value, TypecheckInfo), Vec<EvalError>> {
     // TODO: this is about where we would use `trace_level`, but I'm not yet sure
     //       how to handle it.
 
@@ -39,13 +39,16 @@ pub fn eval_parameter<F: BuiltinFunction>(
     };
 
     // typecheck the value
-    let (value, is_db) = typecheck_expr_value(value, unit_ir.as_ref(), context)?;
+    let typecheck_info = typecheck_expr_value(value.type_(), unit_ir.as_ref(), context)?;
+
+    // transform the value based on the typecheck info
+    let value = transform_value(value, &typecheck_info);
 
     // check that the value is within the provided limits
     let limits = eval_limits(parameter.limits(), context)?;
     verify_value_is_within_limits(&value, limits)?;
 
-    Ok((value, is_db))
+    Ok((value, typecheck_info))
 }
 
 fn get_piecewise_result<F: BuiltinFunction>(
@@ -95,6 +98,12 @@ fn get_piecewise_result<F: BuiltinFunction>(
     }
 }
 
+pub enum TypecheckInfo {
+    String,
+    Boolean,
+    Number { sized_unit: SizedUnit, is_db: bool },
+}
+
 /// Typechecks the value of an expression against a unit.
 ///
 /// If the parameter has a unit and the value is unitless,
@@ -103,26 +112,26 @@ fn get_piecewise_result<F: BuiltinFunction>(
 /// In addition, if the value is a unitless number and the unit is a dB unit,
 /// the value is converted from a logarithmic unit to a linear unit.
 fn typecheck_expr_value<F: BuiltinFunction>(
-    value: Value,
+    type_: ValueType,
     unit_ir: Option<&ir::CompositeUnit>,
     context: &EvalContext<F>,
-) -> Result<(Value, bool), Vec<EvalError>> {
-    match value {
-        Value::Boolean(_) => {
+) -> Result<TypecheckInfo, Vec<EvalError>> {
+    match type_ {
+        ValueType::Boolean => {
             if unit_ir.is_some() {
                 Err(vec![EvalError::BooleanCannotHaveUnit])
             } else {
-                Ok((value, false))
+                Ok(TypecheckInfo::Boolean)
             }
         }
-        Value::String(_) => {
+        ValueType::String => {
             if unit_ir.is_some() {
                 Err(vec![EvalError::StringCannotHaveUnit])
             } else {
-                Ok((value, false))
+                Ok(TypecheckInfo::String)
             }
         }
-        Value::Number(number) => {
+        ValueType::Number { unit, number_type } => {
             // evaluate the unit if it exists,
             // otherwise use the unitless unit
             let (sized_unit, is_db) = unit_ir
@@ -133,12 +142,27 @@ fn typecheck_expr_value<F: BuiltinFunction>(
 
             // if the value is unitless, assign it the given unit
             // otherwise, typecheck the value's unit against the given unit
-            if number.unit.is_unitless() {
+            if unit.is_unitless() || unit == sized_unit.unit {
+                Ok(TypecheckInfo::Number { sized_unit, is_db })
+            } else {
+                Err(vec![EvalError::ParameterUnitMismatch])
+            }
+        }
+    }
+}
+
+fn transform_value(value: Value, typecheck_info: &TypecheckInfo) -> Value {
+    match (typecheck_info, value) {
+        (TypecheckInfo::String, value @ Value::String(_))
+        | (TypecheckInfo::Boolean, value @ Value::Boolean(_)) => value,
+        (TypecheckInfo::Number { sized_unit, is_db }, Value::Number(number))
+            if number.unit.is_unitless() =>
+        {
                 let number_value = number.value * sized_unit.magnitude;
-                let number_unit = sized_unit.unit;
+            let number_unit = sized_unit.unit.clone();
 
                 // handle dB units
-                let number_value = if is_db {
+            let number_value = if *is_db {
                     Number::Scalar(10.0).pow(number_value / Number::Scalar(10.0))
                 } else {
                     number_value
@@ -149,17 +173,12 @@ fn typecheck_expr_value<F: BuiltinFunction>(
                     unit: number_unit,
                 };
 
-                Ok((Value::Number(number), is_db))
-            } else {
-                // TODO: is there anything that we need to do about the magnitude here?
-                //       or is that only for displaying the value?
-                if number.unit == sized_unit.unit {
-                    Ok((Value::Number(number), is_db))
-                } else {
-                    Err(vec![EvalError::ParameterUnitMismatch])
-                }
-            }
+            Value::Number(number)
         }
+        (TypecheckInfo::Number { sized_unit, is_db }, value @ Value::Number(_)) => value,
+        (_, value) => unreachable!(
+            "this shouldn't happen because the result of typechecking should always match the value's type"
+        ),
     }
 }
 
