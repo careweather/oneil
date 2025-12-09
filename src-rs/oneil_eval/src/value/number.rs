@@ -135,13 +135,21 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_min_max(self, rhs: &Self) -> Result<Self, ValueError> {
-        if self.unit != rhs.unit {
+        // check that the units match (or are unitless)
+        if !self.unit.is_unitless() && !rhs.unit.is_unitless() && self.unit != rhs.unit {
             return Err(ValueError::InvalidUnit);
         }
 
+        // if the left unit is unitless, use the right unit, otherwise use the left unit
+        let unit = if self.unit.is_unitless() {
+            rhs.unit.clone()
+        } else {
+            self.unit
+        };
+
         Ok(Self {
             value: self.value.tightest_enclosing_interval(rhs.value),
-            unit: self.unit,
+            unit,
         })
     }
 
