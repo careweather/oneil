@@ -46,6 +46,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
 
     // check that the value is within the provided limits
     let limits = eval_limits(parameter.limits(), context)?;
+    let limits = transform_limits(limits, &typecheck_info);
     verify_value_is_within_limits(&value, limits)?;
 
     Ok((value, typecheck_info))
@@ -98,6 +99,7 @@ fn get_piecewise_result<F: BuiltinFunction>(
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypecheckInfo {
     String,
     Boolean,
@@ -158,20 +160,20 @@ fn transform_value(value: Value, typecheck_info: &TypecheckInfo) -> Value {
         (TypecheckInfo::Number { sized_unit, is_db }, Value::Number(number))
             if number.unit.is_unitless() =>
         {
-                let number_value = number.value * sized_unit.magnitude;
+            let number_value = number.value * sized_unit.magnitude;
             let number_unit = sized_unit.unit.clone();
 
-                // handle dB units
+            // handle dB units
             let number_value = if *is_db {
-                    Number::Scalar(10.0).pow(number_value / Number::Scalar(10.0))
-                } else {
-                    number_value
-                };
+                db_to_linear(number_value)
+            } else {
+                number_value
+            };
 
-                let number = MeasuredNumber {
-                    value: number_value,
-                    unit: number_unit,
-                };
+            let number = MeasuredNumber {
+                value: number_value,
+                unit: number_unit,
+            };
 
             Value::Number(number)
         }
@@ -340,7 +342,61 @@ fn eval_discrete_limits<F: BuiltinFunction>(
     }
 }
 
+fn transform_limits(limits: Limits, typecheck_info: &TypecheckInfo) -> Limits {
+    match (limits, typecheck_info) {
+        (Limits::NumberRange { min, max, unit }, TypecheckInfo::Number { sized_unit, is_db })
+            if unit.is_unitless() =>
+        {
+            let min = min * Number::Scalar(sized_unit.magnitude);
+            let max = max * Number::Scalar(sized_unit.magnitude);
+            let unit = sized_unit.unit.clone();
+
+            // handle dB units
+            let min = if *is_db { db_to_linear(min) } else { min };
+            let max = if *is_db { db_to_linear(max) } else { max };
+
+            Limits::NumberRange { min, max, unit }
+        }
+
+        (Limits::NumberDiscrete { values, unit }, TypecheckInfo::Number { sized_unit, is_db })
+            if unit.is_unitless() =>
+        {
+            let values = values
+                .into_iter()
+                .map(|value| value * Number::Scalar(sized_unit.magnitude))
+                .map(|value| if *is_db { db_to_linear(value) } else { value })
+                .collect();
+
+            let unit = sized_unit.unit.clone();
+            Limits::NumberDiscrete { values, unit }
+        }
+
+        (
+            Limits::AnyStringOrBooleanOrPositiveNumber,
+            TypecheckInfo::Number { sized_unit, is_db },
+        ) if *is_db => {
+            Limits::NumberRange {
+                min: Number::Scalar(1.0), // 0 db == 1
+                max: Number::Scalar(f64::INFINITY),
+                unit: sized_unit.unit.clone(),
+            }
+        }
+
+        (
+            limits @ (Limits::NumberRange { .. } | Limits::NumberDiscrete { .. }),
+            TypecheckInfo::Number { .. },
+        )
+        | (limits @ Limits::StringDiscrete { .. }, TypecheckInfo::String)
+        | (limits @ Limits::AnyStringOrBooleanOrPositiveNumber, _) => limits,
+
+        (_, _) => {
+            unreachable!("this shouldn't happen because typechecking should have already occurred")
+        }
+    }
+}
+
 fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Vec<EvalError>> {
+    let (original_value, original_limits) = (value, limits.clone());
     match limits {
         Limits::AnyStringOrBooleanOrPositiveNumber => match value {
             Value::Number(number) if number.value.min() < 0.0 => {
@@ -350,7 +406,7 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
         },
         Limits::NumberRange { min, max, unit } => {
             if let Value::Number(number) = value {
-                if number.unit != unit {
+                if !unit.is_unitless() && number.unit != unit {
                     Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
                 } else if number.value.min() < min.min() || number.value.max() > max.max() {
                     Err(vec![EvalError::ParameterValueOutsideLimits])
@@ -365,7 +421,7 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
             if let Value::Number(number) = value {
                 // the number must have the same unit as the limit unit,
                 // unless the limit unit is unitless
-                if number.unit != unit && !unit.is_unitless() {
+                if !unit.is_unitless() && number.unit != unit {
                     return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
                 }
 
@@ -396,4 +452,8 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
             }
         },
     }
+}
+
+fn db_to_linear(value: Number) -> Number {
+    Number::Scalar(10.0).pow(value / Number::Scalar(10.0))
 }
