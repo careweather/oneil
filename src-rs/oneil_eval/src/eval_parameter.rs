@@ -22,7 +22,7 @@ use crate::{
 pub fn eval_parameter<F: BuiltinFunction>(
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
-) -> Result<Value, Vec<EvalError>> {
+) -> Result<(Value, bool), Vec<EvalError>> {
     // TODO: this is about where we would use `trace_level`, but I'm not yet sure
     //       how to handle it.
 
@@ -39,13 +39,13 @@ pub fn eval_parameter<F: BuiltinFunction>(
     };
 
     // typecheck the value
-    let value = typecheck_expr_value(value, unit_ir.as_ref(), context)?;
+    let (value, is_db) = typecheck_expr_value(value, unit_ir.as_ref(), context)?;
 
     // check that the value is within the provided limits
     let limits = eval_limits(parameter.limits(), context)?;
     verify_value_is_within_limits(&value, limits)?;
 
-    Ok(value)
+    Ok((value, is_db))
 }
 
 fn get_piecewise_result<F: BuiltinFunction>(
@@ -95,34 +95,41 @@ fn get_piecewise_result<F: BuiltinFunction>(
     }
 }
 
+/// Typechecks the value of an expression against a unit.
+///
+/// If the parameter has a unit and the value is unitless,
+/// the value is multiplied by the unit's magnitude.
+///
+/// In addition, if the value is a unitless number and the unit is a dB unit,
+/// the value is converted from a logarithmic unit to a linear unit.
 fn typecheck_expr_value<F: BuiltinFunction>(
     value: Value,
     unit_ir: Option<&ir::CompositeUnit>,
     context: &EvalContext<F>,
-) -> Result<Value, Vec<EvalError>> {
+) -> Result<(Value, bool), Vec<EvalError>> {
     match value {
         Value::Boolean(_) => {
             if unit_ir.is_some() {
                 Err(vec![EvalError::BooleanCannotHaveUnit])
             } else {
-                Ok(value)
+                Ok((value, false))
             }
         }
         Value::String(_) => {
             if unit_ir.is_some() {
                 Err(vec![EvalError::StringCannotHaveUnit])
             } else {
-                Ok(value)
+                Ok((value, false))
             }
         }
         Value::Number(number) => {
             // evaluate the unit if it exists,
             // otherwise use the unitless unit
-            let sized_unit = unit_ir
+            let (sized_unit, is_db) = unit_ir
                 .as_ref()
                 .map(|unit| eval_unit(unit, context))
                 .transpose()?
-                .unwrap_or(SizedUnit::unitless());
+                .unwrap_or((SizedUnit::unitless(), false));
 
             // if the value is unitless, assign it the given unit
             // otherwise, typecheck the value's unit against the given unit
@@ -130,17 +137,24 @@ fn typecheck_expr_value<F: BuiltinFunction>(
                 let number_value = number.value * sized_unit.magnitude;
                 let number_unit = sized_unit.unit;
 
+                // handle dB units
+                let number_value = if is_db {
+                    Number::Scalar(10.0).pow(number_value / Number::Scalar(10.0))
+                } else {
+                    number_value
+                };
+
                 let number = MeasuredNumber {
                     value: number_value,
                     unit: number_unit,
                 };
 
-                Ok(Value::Number(number))
+                Ok((Value::Number(number), is_db))
             } else {
                 // TODO: is there anything that we need to do about the magnitude here?
                 //       or is that only for displaying the value?
                 if number.unit == sized_unit.unit {
-                    Ok(Value::Number(number))
+                    Ok((Value::Number(number), is_db))
                 } else {
                     Err(vec![EvalError::ParameterUnitMismatch])
                 }

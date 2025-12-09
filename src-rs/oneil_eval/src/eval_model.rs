@@ -49,7 +49,11 @@ pub fn eval_model<F: BuiltinFunction>(
             .expect("parameter should exist because it comes from the keys of the parameters map");
 
         let value = eval_parameter(parameter, &context);
-        context.add_parameter_result(parameter_name.as_str().to_string(), value);
+        context.add_parameter_result(
+            parameter_name.as_str().to_string(),
+            // TODO: for now, we just discard the is_db flag, but we need to handle it eventually
+            value.map(|(value, _)| value),
+        );
     }
 
     // Evaluate tests

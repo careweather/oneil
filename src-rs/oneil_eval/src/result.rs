@@ -24,6 +24,7 @@ pub struct Parameter {
     label: String,
     value: Value,
     unit: Unit,
+    is_db: bool,
     is_performance: bool,
     trace: bool,
     dependency_results: HashMap<String, Value>,
