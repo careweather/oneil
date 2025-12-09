@@ -133,7 +133,10 @@ fn typecheck_expr_value<F: BuiltinFunction>(
                 Ok(TypecheckInfo::String)
             }
         }
-        ValueType::Number { unit, number_type } => {
+        ValueType::Number {
+            unit,
+            number_type: _,
+        } => {
             // evaluate the unit if it exists,
             // otherwise use the unitless unit
             let (sized_unit, is_db) = unit_ir
@@ -155,8 +158,6 @@ fn typecheck_expr_value<F: BuiltinFunction>(
 
 fn transform_value(value: Value, typecheck_info: &TypecheckInfo) -> Value {
     match (typecheck_info, value) {
-        (TypecheckInfo::String, value @ Value::String(_))
-        | (TypecheckInfo::Boolean, value @ Value::Boolean(_)) => value,
         (TypecheckInfo::Number { sized_unit, is_db }, Value::Number(number))
             if number.unit.is_unitless() =>
         {
@@ -177,8 +178,10 @@ fn transform_value(value: Value, typecheck_info: &TypecheckInfo) -> Value {
 
             Value::Number(number)
         }
-        (TypecheckInfo::Number { sized_unit, is_db }, value @ Value::Number(_)) => value,
-        (_, value) => unreachable!(
+        (TypecheckInfo::String, value @ Value::String(_))
+        | (TypecheckInfo::Boolean, value @ Value::Boolean(_))
+        | (TypecheckInfo::Number { .. }, value @ Value::Number(_)) => value,
+        (_, _) => unreachable!(
             "this shouldn't happen because the result of typechecking should always match the value's type"
         ),
     }
@@ -396,7 +399,6 @@ fn transform_limits(limits: Limits, typecheck_info: &TypecheckInfo) -> Limits {
 }
 
 fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Vec<EvalError>> {
-    let (original_value, original_limits) = (value, limits.clone());
     match limits {
         Limits::AnyStringOrBooleanOrPositiveNumber => match value {
             Value::Number(number) if number.value.min() < 0.0 => {

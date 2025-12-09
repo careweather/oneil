@@ -24,42 +24,42 @@ pub fn eval_expr<F: BuiltinFunction>(
             op,
             right,
             rest_chained,
-            span,
+            span: _,
         } => {
             let ComparisonSubexpressionsResult {
                 left_result,
                 rest_results,
             } = eval_comparison_subexpressions(left, *op, right, rest_chained, context)?;
-            eval_comparison_chain(left_result, rest_results, context)
+            eval_comparison_chain(left_result, rest_results)
         }
         ir::Expr::BinaryOp {
             op,
             left,
             right,
-            span,
+            span: _,
         } => {
             let BinaryOpSubexpressionsResult {
                 left_result,
                 right_result,
             } = eval_binary_op_subexpressions(left, right, context)?;
-            eval_binary_op(left_result, *op, right_result, context)
+            eval_binary_op(left_result, *op, right_result)
         }
-        ir::Expr::UnaryOp { op, expr, span } => {
+        ir::Expr::UnaryOp { op, expr, span: _ } => {
             let expr_result = eval_expr(expr, context)?;
-            eval_unary_op(*op, expr_result, context)
+            eval_unary_op(*op, expr_result)
         }
         ir::Expr::FunctionCall {
             name,
             args,
-            span,
-            name_span,
+            span: _,
+            name_span: _,
         } => {
             let args_results = eval_function_call_args(args, context)?;
             eval_function_call(name, args_results, context)
         }
-        ir::Expr::Variable { variable, span } => eval_variable(variable, context),
-        ir::Expr::Literal { value, span } => {
-            let literal_result = eval_literal(value, context);
+        ir::Expr::Variable { variable, span: _ } => eval_variable(variable, context),
+        ir::Expr::Literal { value, span: _ } => {
+            let literal_result = eval_literal(value);
             Ok(literal_result)
         }
     }
@@ -127,10 +127,9 @@ fn eval_comparison_subexpressions<F: BuiltinFunction>(
     })
 }
 
-fn eval_comparison_chain<F: BuiltinFunction>(
+fn eval_comparison_chain(
     left_result: Value,
     rest_results: Vec<(ir::ComparisonOp, Value)>,
-    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     // structs only used internally in this function
     struct ComparisonSuccess {
@@ -158,11 +157,11 @@ fn eval_comparison_chain<F: BuiltinFunction>(
                         next_lhs: lhs,
                         result,
                     }) => {
-                        let result = eval_comparison_op(&lhs, op, &rhs);
+                        let comparison_result = eval_comparison_op(&lhs, op, &rhs);
 
-                        result
-                            .map(|result| ComparisonSuccess {
-                                result,
+                        comparison_result
+                            .map(|comparison_result| ComparisonSuccess {
+                                result: result && comparison_result,
                                 next_lhs: rhs,
                             })
                             .map_err(|error| ComparisonFailure {
@@ -237,11 +236,10 @@ fn eval_binary_op_subexpressions<F: BuiltinFunction>(
     }
 }
 
-fn eval_binary_op<F: BuiltinFunction>(
+fn eval_binary_op(
     left_result: Value,
     op: ir::BinaryOp,
     right_result: Value,
-    context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     let result = match op {
         ir::BinaryOp::Add => left_result.checked_add(right_result),
@@ -258,11 +256,7 @@ fn eval_binary_op<F: BuiltinFunction>(
     result.map_err(|error| vec![EvalError::ValueError(error)])
 }
 
-fn eval_unary_op<F: BuiltinFunction>(
-    op: ir::UnaryOp,
-    expr_result: Value,
-    context: &EvalContext<F>,
-) -> Result<Value, Vec<EvalError>> {
+fn eval_unary_op(op: ir::UnaryOp, expr_result: Value) -> Result<Value, Vec<EvalError>> {
     let result = match op {
         ir::UnaryOp::Neg => expr_result.checked_neg(),
         ir::UnaryOp::Not => expr_result.checked_not(),
@@ -314,21 +308,24 @@ fn eval_variable<F: BuiltinFunction>(
     context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     match variable {
-        ir::Variable::Builtin { ident, ident_span } => Ok(context.lookup_builtin_variable(ident)),
+        ir::Variable::Builtin {
+            ident,
+            ident_span: _,
+        } => Ok(context.lookup_builtin_variable(ident)),
         ir::Variable::Parameter {
             parameter_name,
-            parameter_span,
+            parameter_span: _,
         } => context.lookup_parameter(parameter_name),
         ir::Variable::External {
             model,
             parameter_name,
-            model_span,
-            parameter_span,
+            model_span: _,
+            parameter_span: _,
         } => context.lookup_model_parameter(model, parameter_name),
     }
 }
 
-fn eval_literal<F: BuiltinFunction>(value: &ir::Literal, context: &EvalContext<F>) -> Value {
+fn eval_literal(value: &ir::Literal) -> Value {
     match value {
         ir::Literal::Boolean(boolean) => Value::Boolean(*boolean),
         ir::Literal::String(string) => Value::String(string.clone()),

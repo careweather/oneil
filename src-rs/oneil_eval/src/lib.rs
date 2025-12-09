@@ -1,8 +1,3 @@
-// TODO: remove these allow statements
-#![allow(missing_docs)]
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 pub mod builtin;
 mod context;
 mod error;

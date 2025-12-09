@@ -127,7 +127,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         identifier: &ir::Identifier,
         args: Vec<Value>,
     ) -> Result<Value, Vec<EvalError>> {
-        let _ = (self, args);
+        let _ = (self, identifier, args);
         Err(vec![EvalError::Unsupported])
     }
 
