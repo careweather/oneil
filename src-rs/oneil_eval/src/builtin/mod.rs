@@ -1,14 +1,18 @@
-use std::collections::HashMap;
+use ::std::{collections::HashMap, rc::Rc};
 
 use crate::{
     error::EvalError,
     value::{SizedUnit, Value},
 };
 
+pub mod std;
+
 pub trait BuiltinMap<F: BuiltinFunction> {
     fn builtin_values(&self) -> HashMap<String, Value>;
     fn builtin_functions(&self) -> HashMap<String, F>;
-    fn builtin_units(&self) -> HashMap<String, SizedUnit>;
+    // The units are stored as Rc<SizedUnit> so that multiple names
+    // can point to the same unit (eg. "in", "inch", "inches")
+    fn builtin_units(&self) -> HashMap<String, Rc<SizedUnit>>;
     fn builtin_prefixes(&self) -> HashMap<String, f64>;
 }
 

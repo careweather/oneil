@@ -7,6 +7,7 @@ use std::{
 };
 
 use clap::Parser;
+use oneil_eval::builtin::std as oneil_std;
 use oneil_model_resolver::FileLoader;
 
 use crate::{
@@ -99,10 +100,10 @@ fn handle_dev_command(command: DevCommand) -> io::Result<()> {
             );
 
             let builtin_variables = Builtins::new(
-                builtins::std::BUILTIN_VALUES,
-                builtins::std::BUILTIN_FUNCTIONS,
-                builtins::std::builtin_units(),
-                builtins::std::BUILTIN_PREFIXES,
+                oneil_std::BUILTIN_VALUES,
+                oneil_std::BUILTIN_FUNCTIONS,
+                oneil_std::builtin_units(),
+                oneil_std::BUILTIN_PREFIXES,
             );
 
             let model_collection = oneil_model_resolver::load_model(
@@ -141,10 +142,10 @@ fn handle_eval_command(file: PathBuf, print_debug: bool, no_colors: bool) -> io:
     );
 
     let builtins = Builtins::new(
-        builtins::std::BUILTIN_VALUES,
-        builtins::std::BUILTIN_FUNCTIONS,
-        builtins::std::builtin_units(),
-        builtins::std::BUILTIN_PREFIXES,
+        oneil_std::BUILTIN_VALUES,
+        oneil_std::BUILTIN_FUNCTIONS,
+        oneil_std::builtin_units(),
+        oneil_std::BUILTIN_PREFIXES,
     );
 
     let model_collection =

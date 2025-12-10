@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use oneil_ir as ir;
@@ -39,7 +40,7 @@ pub struct EvalContext<F: BuiltinFunction> {
     active_references: HashSet<PathBuf>,
     builtin_values: HashMap<String, Value>,
     builtin_functions: HashMap<String, F>,
-    unit_map: HashMap<String, SizedUnit>,
+    unit_map: HashMap<String, Rc<SizedUnit>>,
     prefixes: HashMap<String, f64>,
 }
 
@@ -132,7 +133,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     }
 
     pub fn lookup_unit(&self, name: &str) -> Option<SizedUnit> {
-        self.unit_map.get(name).cloned()
+        self.unit_map.get(name).map(|unit| unit.as_ref().clone())
     }
 
     pub const fn available_prefixes(&self) -> &HashMap<String, f64> {
