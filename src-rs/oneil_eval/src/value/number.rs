@@ -263,14 +263,14 @@ impl Number {
     }
 
     #[must_use]
-    pub fn inside(self, rhs: Self) -> bool {
+    pub fn contains(self, rhs: Self) -> bool {
         match (self, rhs) {
             (Self::Scalar(lhs), Self::Scalar(rhs)) => is_close(lhs, rhs),
-            (Self::Scalar(lhs), Self::Interval(rhs)) => lhs >= rhs.min() && lhs <= rhs.max(),
-            (Self::Interval(lhs), Self::Scalar(rhs)) => {
-                is_close(lhs.min(), rhs) && is_close(lhs.max(), rhs)
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                is_close(lhs, rhs.min()) && is_close(lhs, rhs.max())
             }
-            (Self::Interval(lhs), Self::Interval(rhs)) => rhs.contains(lhs),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => rhs >= lhs.min() && rhs <= lhs.max(),
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.contains(rhs),
         }
     }
 }

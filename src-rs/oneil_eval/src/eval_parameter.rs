@@ -427,13 +427,9 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
                     return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
                 }
 
-                let mut is_inside_limits = false;
-                for limit_value in values {
-                    if number.value.inside(limit_value) {
-                        is_inside_limits = true;
-                        break;
-                    }
-                }
+                let is_inside_limits = values
+                    .iter()
+                    .any(|limit_value| limit_value.contains(number.value));
 
                 if is_inside_limits {
                     Ok(())
