@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, ops};
 
-use crate::value::{Interval, NumberType, Unit, ValueError, util::is_close};
+use crate::value::{EvalError, Interval, NumberType, Unit, util::is_close};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeasuredNumber {
@@ -20,9 +20,9 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the units don't match.
-    pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, ValueError> {
+    pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, EvalError> {
         if self.unit != rhs.unit {
-            return Err(ValueError::InvalidUnit);
+            return Err(EvalError::InvalidUnit);
         }
 
         Ok(self.value.partial_cmp(&rhs.value))
@@ -33,7 +33,7 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, ValueError> {
+    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, EvalError> {
         self.checked_partial_cmp(rhs)
             .map(|ordering| ordering == Some(Ordering::Equal))
     }
@@ -43,9 +43,9 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_add(self, rhs: &Self) -> Result<Self, ValueError> {
+    pub fn checked_add(self, rhs: &Self) -> Result<Self, EvalError> {
         if self.unit != rhs.unit {
-            return Err(ValueError::InvalidUnit);
+            return Err(EvalError::InvalidUnit);
         }
 
         Ok(Self {
@@ -59,9 +59,9 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_sub(self, rhs: &Self) -> Result<Self, ValueError> {
+    pub fn checked_sub(self, rhs: &Self) -> Result<Self, EvalError> {
         if self.unit != rhs.unit {
-            return Err(ValueError::InvalidUnit);
+            return Err(EvalError::InvalidUnit);
         }
 
         Ok(Self {
@@ -75,7 +75,7 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// This function never returns an error.
-    pub fn checked_mul(self, rhs: Self) -> Result<Self, ValueError> {
+    pub fn checked_mul(self, rhs: Self) -> Result<Self, EvalError> {
         Ok(Self {
             value: self.value * rhs.value,
             unit: self.unit * rhs.unit,
@@ -87,7 +87,7 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_div(self, rhs: Self) -> Result<Self, ValueError> {
+    pub fn checked_div(self, rhs: Self) -> Result<Self, EvalError> {
         Ok(Self {
             value: self.value / rhs.value,
             unit: self.unit / rhs.unit,
@@ -99,9 +99,9 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_rem(self, rhs: &Self) -> Result<Self, ValueError> {
+    pub fn checked_rem(self, rhs: &Self) -> Result<Self, EvalError> {
         if self.unit != rhs.unit {
-            return Err(ValueError::InvalidUnit);
+            return Err(EvalError::InvalidUnit);
         }
 
         Ok(Self {
@@ -115,9 +115,9 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_pow(self, exponent: &Self) -> Result<Self, ValueError> {
+    pub fn checked_pow(self, exponent: &Self) -> Result<Self, EvalError> {
         if !exponent.unit.is_unitless() {
-            return Err(ValueError::HasExponentWithUnits);
+            return Err(EvalError::HasExponentWithUnits);
         }
 
         match exponent.value {
@@ -125,7 +125,7 @@ impl MeasuredNumber {
                 value: self.value.pow(Number::Scalar(exponent_value)),
                 unit: self.unit.pow(exponent_value),
             }),
-            Number::Interval(_) => Err(ValueError::HasIntervalExponent),
+            Number::Interval(_) => Err(EvalError::HasIntervalExponent),
         }
     }
 
@@ -134,10 +134,10 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_min_max(self, rhs: &Self) -> Result<Self, ValueError> {
+    pub fn checked_min_max(self, rhs: &Self) -> Result<Self, EvalError> {
         // check that the units match (or are unitless)
         if !self.unit.is_unitless() && !rhs.unit.is_unitless() && self.unit != rhs.unit {
-            return Err(ValueError::InvalidUnit);
+            return Err(EvalError::InvalidUnit);
         }
 
         // if the left unit is unitless, use the right unit, otherwise use the left unit

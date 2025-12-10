@@ -198,16 +198,14 @@ fn eval_comparison_chain(
 }
 
 fn eval_comparison_op(lhs: &Value, op: ir::ComparisonOp, rhs: &Value) -> Result<bool, EvalError> {
-    let result = match op {
+    match op {
         ir::ComparisonOp::Eq => lhs.checked_eq(rhs),
         ir::ComparisonOp::NotEq => lhs.checked_ne(rhs),
         ir::ComparisonOp::LessThan => lhs.checked_lt(rhs),
         ir::ComparisonOp::LessThanEq => lhs.checked_lte(rhs),
         ir::ComparisonOp::GreaterThan => lhs.checked_gt(rhs),
         ir::ComparisonOp::GreaterThanEq => lhs.checked_gte(rhs),
-    };
-
-    result.map_err(EvalError::ValueError)
+    }
 }
 
 struct BinaryOpSubexpressionsResult {
@@ -253,7 +251,7 @@ fn eval_binary_op(
         ir::BinaryOp::MinMax => left_result.checked_min_max(right_result),
     };
 
-    result.map_err(|error| vec![EvalError::ValueError(error)])
+    result.map_err(|error| vec![error])
 }
 
 fn eval_unary_op(op: ir::UnaryOp, expr_result: Value) -> Result<Value, Vec<EvalError>> {
@@ -262,7 +260,7 @@ fn eval_unary_op(op: ir::UnaryOp, expr_result: Value) -> Result<Value, Vec<EvalE
         ir::UnaryOp::Not => expr_result.checked_not(),
     };
 
-    result.map_err(|error| vec![EvalError::ValueError(error)])
+    result.map_err(|error| vec![error])
 }
 
 fn eval_function_call_args<F: BuiltinFunction>(

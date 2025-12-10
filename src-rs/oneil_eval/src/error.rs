@@ -1,14 +1,14 @@
-use crate::value::ValueError;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvalError {
+    InvalidUnit,
+    HasExponentWithUnits,
+    HasIntervalExponent,
+    InvalidOperation,
+    InvalidType,
     ParameterHasError,
     UndefinedBuiltinValue,
-    ValueError(ValueError),
     InvalidArgumentCount,
     ParameterUnitMismatch,
-    InvalidType,
-    InvalidUnit,
     UnknownUnit,
     InvalidIfExpressionType,
     MultiplePiecewiseBranchesMatch,
