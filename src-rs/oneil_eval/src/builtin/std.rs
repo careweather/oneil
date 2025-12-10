@@ -1,13 +1,40 @@
+//! The standard builtin values, functions, units, and prefixes
+//! that come with Oneil.
+
 use ::std::{collections::HashMap, rc::Rc};
 
 use crate::{
     EvalError,
-    value::{Dimension, MeasuredNumber, Number, SizedUnit, Unit, Value},
+    value::{Dimension, SizedUnit, Unit, Value},
 };
 
+/// The builtin values that come with Oneil:
+/// - `pi` - the mathematical constant π
+/// - `e` - the mathematical constant e
 pub const BUILTIN_VALUES: [(&str, f64); 2] =
     [("pi", std::f64::consts::PI), ("e", std::f64::consts::E)];
 
+/// The builtin unit prefixes that come with Oneil:
+/// - `q` - quecto
+/// - `r` - ronto
+/// - `y` - yocto
+/// - `z` - zepto
+/// - `a` - atto
+/// - `f` - femto
+/// - `p` - pico
+/// - `n` - nano
+/// - `u` - micro
+/// - `m` - milli
+/// - `k` - kilo
+/// - `M` - mega
+/// - `G` - giga
+/// - `T` - tera
+/// - `P` - peta
+/// - `E` - exa
+/// - `Z` - zetta
+/// - `Y` - yotta
+/// - `R` - ronna
+/// - `Q` - quetta
 pub const BUILTIN_PREFIXES: [(&str, f64); 20] = [
     ("q", 1e-30), // quecto
     ("r", 1e-27), // ronto
@@ -31,8 +58,82 @@ pub const BUILTIN_PREFIXES: [(&str, f64); 20] = [
     ("Q", 1e30),  // quetta
 ];
 
+/// The builtin units that come with Oneil.
+///
+/// Base units:
+/// - `g` - gram
+/// - `m` - meter
+/// - `s` - second
+/// - `K` - Kelvin
+/// - `A` - Ampere
+/// - `b` - bit
+/// - `$` - dollar
+/// - `mol` - mole
+/// - `cd` - candela
+///
+/// Derived units:
+/// - `V` - Volt
+/// - `W` - Watt
+/// - `Hz` - Hertz
+/// - `J` - Joule
+/// - `Wh` - Watt-hour
+/// - `Ah` - Amp-hour
+/// - `T` - Tesla
+/// - `Ohm` - Ohm
+/// - `N` - Newton
+/// - `Gs` - Gauss
+/// - `lm` - lumen
+/// - `lx` - lux
+/// - `bps` - bits per second
+/// - `B` - byte
+/// - `Pa` - Pascal
+///
+/// Legacy units:
+/// - `mil` - millennium
+/// - `cen` - century
+/// - `dec` - decade
+/// - `yr` - year
+/// - `mon` - month
+/// - `week` - week
+/// - `day` - day
+/// - `hr` - hour
+/// - `min` - minute
+/// - `rpm` - revolutions per minute
+/// - `k$` - thousand dollars
+/// - `M$` - million dollars
+/// - `B$` - billion dollars
+/// - `T$` - trillion dollars
+/// - `g_E` - Earth gravity
+/// - `cm` - centimeter
+/// - `psi` - pound per square inch
+/// - `kpsi` - kilopound per square inch
+/// - `atm` - atmosphere
+/// - `bar` - bar
+/// - `Ba` - barye
+/// - `dyne` - dyne
+/// - `mmHg` - millimeter of mercury
+/// - `torr` - torr
+/// - `in` - inch
+/// - `ft` - foot
+/// - `yd` - yard
+/// - `mi` - mile
+/// - `nmi` - nautical mile
+/// - `lb` - pound
+/// - `mph` - mile per hour
+///
+/// Dimensionless units:
+/// - `rev` - revolution
+/// - `cyc` - cycle
+/// - `rad` - radian
+/// - `deg` - degree
+/// - `%` - percent
+/// - `ppm` - part per million
+/// - `ppb` - part per billion
+/// - `arcmin` - arcminute
+/// - `arcsec` - arcsecond
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
+#[must_use]
 pub fn builtin_units() -> HashMap<&'static str, Rc<SizedUnit>> {
     let units = [
         // === BASE UNITS ===
@@ -255,21 +356,21 @@ pub fn builtin_units() -> HashMap<&'static str, Rc<SizedUnit>> {
         ),
         // === LEGACY UNITS ===
         (
-            ["mil.", "millennium", "millennia"].as_ref(),
+            ["mil", "millennium", "millennia"].as_ref(),
             SizedUnit {
                 magnitude: 3.1556952e10,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
             },
         ),
         (
-            ["cen.", "century", "centuries"].as_ref(),
+            ["cen", "century", "centuries"].as_ref(),
             SizedUnit {
                 magnitude: 3.1556952e9,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
             },
         ),
         (
-            ["dec.", "decade", "decades"].as_ref(),
+            ["dec", "decade", "decades"].as_ref(),
             SizedUnit {
                 magnitude: 3.1556952e8,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
@@ -584,289 +685,322 @@ pub fn builtin_units() -> HashMap<&'static str, Rc<SizedUnit>> {
 
 type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
 
+/// The builtin functions that come with Oneil:
+/// - `min` - minimum
+/// - `max` - maximum
+/// - `sin` - sine
+/// - `cos` - cosine
+/// - `tan` - tangent
+/// - `asin` - arcsine
+/// - `acos` - arccosine
+/// - `atan` - arctangent
+/// - `sqrt` - square root
+/// - `ln` - natural logarithm
+/// - `log` - logarithm
+/// - `log10` - base 10 logarithm
+/// - `floor` - floor
+/// - `ceiling` - ceiling
+/// - `extent` - extent
+/// - `range` - range
+/// - `abs` - absolute value
+/// - `sign` - sign
+/// - `mid` - midpoint
+/// - `strip` - strip units
+/// - `mnmx` - minimum and maximum
+///
+/// Note that some of these functions are not yet implemented and
+/// will return an `EvalError::Unsupported` error when called. However,
+/// we plan to implement them in the future.
 pub const BUILTIN_FUNCTIONS: [(&str, BuiltinFunction); 21] = [
-    ("min", min),
-    ("max", max),
-    ("sin", sin),
-    ("cos", cos),
-    ("tan", tan),
-    ("asin", asin),
-    ("acos", acos),
-    ("atan", atan),
-    ("sqrt", sqrt),
-    ("ln", ln),
-    ("log", log),
-    ("log10", log10),
-    ("floor", floor),
-    ("ceiling", ceiling),
-    ("extent", extent),
-    ("range", range),
-    ("abs", abs),
-    ("sign", sign),
-    ("mid", mid),
-    ("strip", strip),
-    ("mnmx", mnmx),
+    ("min", fns::min),
+    ("max", fns::max),
+    ("sin", fns::sin),
+    ("cos", fns::cos),
+    ("tan", fns::tan),
+    ("asin", fns::asin),
+    ("acos", fns::acos),
+    ("atan", fns::atan),
+    ("sqrt", fns::sqrt),
+    ("ln", fns::ln),
+    ("log", fns::log),
+    ("log10", fns::log10),
+    ("floor", fns::floor),
+    ("ceiling", fns::ceiling),
+    ("extent", fns::extent),
+    ("range", fns::range),
+    ("abs", fns::abs),
+    ("sign", fns::sign),
+    ("mid", fns::mid),
+    ("strip", fns::strip),
+    ("mnmx", fns::mnmx),
 ];
 
-fn min(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    if args.is_empty() {
-        return Err(vec![EvalError::InvalidArgumentCount]);
-    }
-
-    let mut numbers = Vec::new();
-    let mut errors = Vec::new();
-
-    let mut unit = None;
-
-    for arg in args {
-        match arg {
-            Value::Number(number) => {
-                if let Some(ref unit) = unit {
-                    if &number.unit != unit {
-                        errors.push(EvalError::InvalidUnit);
-                        continue;
-                    }
-                } else {
-                    unit = Some(number.unit.clone());
-                }
-
-                numbers.push(number);
-            }
-            Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType),
-        }
-    }
-
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-
-    let unit =
-        unit.expect("there should be at least one number, and that number should have a unit");
-
-    let number_values = numbers.into_iter().filter_map(|number| match number.value {
-        Number::Scalar(value) => Some(value),
-        Number::Interval(interval) => {
-            if interval.is_empty() {
-                None
-            } else {
-                Some(interval.min())
-            }
-        }
-    });
-
-    let min = number_values.reduce(f64::min);
-
-    min.map_or_else(
-        || Err(vec![EvalError::NoNonEmptyValue]),
-        |min| {
-            Ok(Value::Number(MeasuredNumber::new(
-                Number::Scalar(min),
-                unit,
-            )))
-        },
-    )
-}
-
-fn max(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    if args.is_empty() {
-        return Err(vec![EvalError::InvalidArgumentCount]);
-    }
-
-    let mut numbers = Vec::new();
-    let mut errors = Vec::new();
-
-    let mut unit = None;
-
-    for arg in args {
-        match arg {
-            Value::Number(number) => {
-                if let Some(ref unit) = unit {
-                    if &number.unit != unit {
-                        errors.push(EvalError::InvalidUnit);
-                        continue;
-                    }
-                } else {
-                    unit = Some(number.unit.clone());
-                }
-
-                numbers.push(number);
-            }
-            Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType),
-        }
-    }
-
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-
-    let unit =
-        unit.expect("there should be at least one number, and that number should have a unit");
-
-    let number_values = numbers.into_iter().filter_map(|number| match number.value {
-        Number::Scalar(value) => Some(value),
-        Number::Interval(interval) => {
-            if interval.is_empty() {
-                None
-            } else {
-                Some(interval.max())
-            }
-        }
-    });
-
-    let max = number_values.reduce(f64::max);
-
-    max.map_or_else(
-        || Err(vec![EvalError::NoNonEmptyValue]),
-        |max| {
-            Ok(Value::Number(MeasuredNumber::new(
-                Number::Scalar(max),
-                unit,
-            )))
-        },
-    )
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn sin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn cos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn tan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn asin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn acos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn atan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-fn sqrt(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    if args.len() != 1 {
-        return Err(vec![EvalError::InvalidArgumentCount]);
-    }
-
-    let mut args = args.into_iter();
-
-    let arg = args.next().expect("there should be one argument");
-
-    arg.checked_pow(Value::from(0.5))
-        .map_err(|error| vec![error])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn ln(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn log(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn log10(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn floor(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn ceiling(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn extent(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
-
-fn range(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    if args.len() != 1 {
-        return Err(vec![EvalError::InvalidArgumentCount]);
-    }
-
-    let mut args = args.into_iter();
-
-    let arg = args.next().expect("there should be one argument");
-
-    let Value::Number(number) = arg else {
-        return Err(vec![EvalError::InvalidType]);
+mod fns {
+    use crate::{
+        EvalError,
+        value::{MeasuredNumber, Number, Value},
     };
 
-    let range = number.value.max() - number.value.min();
+    pub fn min(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        if args.is_empty() {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
 
-    Ok(Value::Number(MeasuredNumber::new(
-        Number::Scalar(range),
-        number.unit,
-    )))
-}
+        let mut numbers = Vec::new();
+        let mut errors = Vec::new();
 
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn abs(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
+        let mut unit = None;
 
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn sign(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
+        for arg in args {
+            match arg {
+                Value::Number(number) => {
+                    if let Some(ref unit) = unit {
+                        if &number.unit != unit {
+                            errors.push(EvalError::InvalidUnit);
+                            continue;
+                        }
+                    } else {
+                        unit = Some(number.unit.clone());
+                    }
 
-fn mid(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    if args.len() != 2 {
-        return Err(vec![EvalError::InvalidArgumentCount]);
+                    numbers.push(number);
+                }
+                Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        let unit =
+            unit.expect("there should be at least one number, and that number should have a unit");
+
+        let number_values = numbers.into_iter().filter_map(|number| match number.value {
+            Number::Scalar(value) => Some(value),
+            Number::Interval(interval) => {
+                if interval.is_empty() {
+                    None
+                } else {
+                    Some(interval.min())
+                }
+            }
+        });
+
+        let min = number_values.reduce(f64::min);
+
+        min.map_or_else(
+            || Err(vec![EvalError::NoNonEmptyValue]),
+            |min| {
+                Ok(Value::Number(MeasuredNumber::new(
+                    Number::Scalar(min),
+                    unit,
+                )))
+            },
+        )
     }
 
-    let mut args = args.into_iter();
+    pub fn max(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        if args.is_empty() {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
 
-    let left = args.next().expect("there should be two arguments");
-    let right = args.next().expect("there should be two arguments");
+        let mut numbers = Vec::new();
+        let mut errors = Vec::new();
 
-    left.checked_add(right)
-        .and_then(|value| value.checked_div(Value::from(2.0)))
-        .map_err(|error| vec![error])
-}
+        let mut unit = None;
 
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn strip(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
-}
+        for arg in args {
+            match arg {
+                Value::Number(number) => {
+                    if let Some(ref unit) = unit {
+                        if &number.unit != unit {
+                            errors.push(EvalError::InvalidUnit);
+                            continue;
+                        }
+                    } else {
+                        unit = Some(number.unit.clone());
+                    }
 
-#[expect(unused_variables, reason = "not implemented")]
-#[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-fn mnmx(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-    Err(vec![EvalError::Unsupported])
+                    numbers.push(number);
+                }
+                Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        let unit =
+            unit.expect("there should be at least one number, and that number should have a unit");
+
+        let number_values = numbers.into_iter().filter_map(|number| match number.value {
+            Number::Scalar(value) => Some(value),
+            Number::Interval(interval) => {
+                if interval.is_empty() {
+                    None
+                } else {
+                    Some(interval.max())
+                }
+            }
+        });
+
+        let max = number_values.reduce(f64::max);
+
+        max.map_or_else(
+            || Err(vec![EvalError::NoNonEmptyValue]),
+            |max| {
+                Ok(Value::Number(MeasuredNumber::new(
+                    Number::Scalar(max),
+                    unit,
+                )))
+            },
+        )
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn sin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn cos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn tan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn asin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn acos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn atan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    pub fn sqrt(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
+
+        let mut args = args.into_iter();
+
+        let arg = args.next().expect("there should be one argument");
+
+        arg.checked_pow(Value::from(0.5))
+            .map_err(|error| vec![error])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn ln(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn log(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn log10(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn floor(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn ceiling(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn extent(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    pub fn range(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
+
+        let mut args = args.into_iter();
+
+        let arg = args.next().expect("there should be one argument");
+
+        let Value::Number(number) = arg else {
+            return Err(vec![EvalError::InvalidType]);
+        };
+
+        let range = number.value.max() - number.value.min();
+
+        Ok(Value::Number(MeasuredNumber::new(
+            Number::Scalar(range),
+            number.unit,
+        )))
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn abs(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn sign(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    pub fn mid(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        if args.len() != 2 {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
+
+        let mut args = args.into_iter();
+
+        let left = args.next().expect("there should be two arguments");
+        let right = args.next().expect("there should be two arguments");
+
+        left.checked_add(right)
+            .and_then(|value| value.checked_div(Value::from(2.0)))
+            .map_err(|error| vec![error])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn strip(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
+
+    #[expect(unused_variables, reason = "not implemented")]
+    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    pub fn mnmx(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported])
+    }
 }
