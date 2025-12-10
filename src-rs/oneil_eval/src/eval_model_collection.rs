@@ -8,6 +8,7 @@ use crate::{
     eval_model::eval_model,
 };
 
+/// Evaluates a model collection and returns the context with the results of the models.
 pub fn eval_model_collection<F: BuiltinFunction>(
     model_collection: &ir::ModelCollection,
     builtins: &impl BuiltinMap<F>,
@@ -60,7 +61,7 @@ fn process_model_dependencies(
     mut evaluation_order: Vec<ir::ModelPath>,
     models: &HashMap<ir::ModelPath, ir::Model>,
 ) -> (Vec<ir::ModelPath>, HashSet<ir::ModelPath>) {
-    for (reference_name, reference_import) in model.get_references() {
+    for reference_import in model.get_references().values() {
         let reference_model_path = reference_import.path();
         if visited.contains(reference_model_path) {
             continue;

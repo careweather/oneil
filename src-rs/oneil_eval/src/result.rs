@@ -1,3 +1,5 @@
+#![expect(dead_code, reason = "this module is for the next task")]
+
 use std::{collections::HashMap, path::PathBuf};
 
 use oneil_shared::span::Span;

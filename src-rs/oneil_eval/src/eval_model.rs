@@ -7,7 +7,11 @@ use crate::{
     value::Value,
 };
 
-#[expect(clippy::missing_panics_doc, reason = "the panic should never happen")]
+/// Evaluates a model and returns the context with the results of the model.
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "the panic is only caused by breaking an internal invariant"
+)]
 #[must_use]
 pub fn eval_model<F: BuiltinFunction>(
     model_path: &ir::ModelPath,

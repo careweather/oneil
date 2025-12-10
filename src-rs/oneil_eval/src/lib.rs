@@ -1,3 +1,6 @@
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
+//! Evaluator for the Oneil programming language
+
 pub mod builtin;
 mod context;
 mod error;

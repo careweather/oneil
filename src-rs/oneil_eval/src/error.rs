@@ -1,3 +1,4 @@
+#![expect(missing_docs, reason = "this enum will be reworked in the next task")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvalError {
     InvalidUnit,
