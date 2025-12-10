@@ -1,3 +1,7 @@
+//! Utility functions for the value module
+//!
+//! Right now, this module only contains the `is_close` function.
+
 const TOLERANCE: f64 = 1e-10;
 
 /// Checks if two floating point numbers are close to each other.

@@ -20,6 +20,15 @@ use crate::value::util::is_close;
 //       needed so that we can get to a working
 //       implementation.
 
+/// An interval of numbers
+///
+/// An interval is mathematically defined as a
+/// closed and connected set of numbers.
+///
+/// In other words, an interval has a minimum
+/// and maximum value, and all numbers between
+/// the minimum and maximum value are considered
+/// to be part of the interval.
 #[derive(Debug, Clone, Copy)]
 pub struct Interval {
     min: f64,
@@ -39,7 +48,9 @@ impl Interval {
     ///
     /// # Panics
     ///
-    /// Panics if the min or max is NaN, or if the min is greater than the max.
+    /// Panics if the min or max is NaN, or if the min
+    /// is greater than the max. To create an
+    /// empty interval, use `Interval::empty()`.
     #[must_use]
     pub fn new(min: f64, max: f64) -> Self {
         assert!(!min.is_nan(), "min must not be NaN in ({min:?}, {max:?})");
@@ -52,31 +63,40 @@ impl Interval {
         Self::new_unchecked(min, max)
     }
 
+    /// Creates a new interval with a minimum and maximum of 0.0
     #[must_use]
     pub const fn zero() -> Self {
         Self::new_unchecked(0.0, 0.0)
     }
 
+    /// Creates a new empty interval
     #[must_use]
     pub const fn empty() -> Self {
         Self::new_unchecked(f64::NAN, f64::NAN)
     }
 
+    /// Returns the minimum value of the interval
     #[must_use]
     pub const fn min(&self) -> f64 {
         self.min
     }
 
+    /// Returns the maximum value of the interval
     #[must_use]
     pub const fn max(&self) -> f64 {
         self.max
     }
 
+    /// Returns true if the interval is empty
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.min.is_nan() && self.max.is_nan()
     }
 
+    /// Returns true if the interval is valid
+    ///
+    /// An interval is valid if it is empty or
+    /// the minimum is less than or equal to the maximum.
     #[must_use]
     pub const fn is_valid(&self) -> bool {
         self.is_empty() || self.min <= self.max
@@ -144,6 +164,18 @@ impl Interval {
         }
     }
 
+    /// Returns the intersection of two intervals
+    ///
+    /// If either interval is empty or the intervals
+    /// do not overlap, the result is an empty interval.
+    ///
+    /// Example
+    ///
+    /// ```text
+    /// |------- a -------|
+    ///        |-------- b --------|
+    ///        |- result -|
+    /// ```
     #[must_use]
     pub fn intersection(self, rhs: Self) -> Self {
         if self.is_empty() || rhs.is_empty() {
@@ -185,9 +217,14 @@ impl Interval {
         let min = f64::min(self.min, rhs.min);
         let max = f64::max(self.max, rhs.max);
 
-        Self::new(f64::min(self.min, rhs.min), f64::max(self.max, rhs.max))
+        Self::new(min, max)
     }
 
+    /// Returns true if `self` contains `rhs`.
+    ///
+    /// If `rhs` is empty, then `self` is considered to contain `rhs`.
+    ///
+    /// If `self` is empty, then `self` cannot contain `rhs`.
     #[must_use]
     pub fn contains(self, rhs: Self) -> bool {
         if rhs.is_empty() {
@@ -203,12 +240,14 @@ impl Interval {
 }
 
 impl From<f64> for Interval {
+    /// Converts an `f64` to an interval with the same value for the minimum and maximum.
     fn from(value: f64) -> Self {
         Self::new(value, value)
     }
 }
 
 impl From<&f64> for Interval {
+    /// Converts a `&f64` to an interval with the same value for the minimum and maximum.
     fn from(value: &f64) -> Self {
         Self::from(*value)
     }

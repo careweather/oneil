@@ -1,3 +1,9 @@
+//! Oneil values and their related types
+//!
+//! For a more detailed overview of how values
+//! are represented, see the `README.md` for
+//! this crate.
+
 mod interval;
 mod number;
 mod type_;

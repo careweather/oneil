@@ -2,9 +2,12 @@ use std::{cmp::Ordering, ops};
 
 use crate::value::{EvalError, Interval, NumberType, Unit, util::is_close};
 
+/// A number with a unit
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeasuredNumber {
+    /// The value of the measured number.
     pub value: Number,
+    /// The unit of the measured number.
     pub unit: Unit,
 }
 
@@ -163,31 +166,37 @@ impl MeasuredNumber {
     }
 }
 
-// TODO: in number value docs mention that for the outside world,
-//       a number value is essentially an interval. The fact that
-//       it is sometimes stored as a scalar is an implementation detail.
+/// A number value in Oneil.
+///
+/// A number value is either a scalar or an interval.
 #[derive(Debug, Clone, Copy)]
 pub enum Number {
+    /// A scalar number value.
     Scalar(f64),
+    /// An interval number value.
     Interval(Interval),
 }
 
 impl Number {
+    /// Creates a new scalar number value.
     #[must_use]
     pub const fn new_scalar(value: f64) -> Self {
         Self::Scalar(value)
     }
 
+    /// Creates a new interval number value.
     #[must_use]
     pub fn new_interval(min: f64, max: f64) -> Self {
         Self::Interval(Interval::new(min, max))
     }
 
+    /// Creates a new empty interval number value.
     #[must_use]
     pub const fn new_empty() -> Self {
         Self::Interval(Interval::empty())
     }
 
+    /// Returns the type of the number value.
     #[must_use]
     pub const fn type_(&self) -> NumberType {
         match self {
@@ -196,6 +205,9 @@ impl Number {
         }
     }
 
+    /// Returns the minimum value of the number value.
+    ///
+    /// For scalar values, this is simply the value itself.
     #[must_use]
     pub const fn min(&self) -> f64 {
         match self {
@@ -204,6 +216,9 @@ impl Number {
         }
     }
 
+    /// Returns the maximum value of the number value.
+    ///
+    /// For scalar values, this is simply the value itself.
     #[must_use]
     pub const fn max(&self) -> f64 {
         match self {
@@ -212,6 +227,7 @@ impl Number {
         }
     }
 
+    /// Raises a number value to the power of another.
     #[must_use]
     pub fn pow(self, exponent: Self) -> Self {
         match (self, exponent) {
@@ -226,6 +242,13 @@ impl Number {
         }
     }
 
+    /// Returns the intersection of two number values.
+    ///
+    /// This operation converts both number values to intervals
+    /// (if they are not already) and then returns the
+    /// intersection of the two intervals.
+    ///
+    /// This operation always returns an interval number value.
     #[must_use]
     pub fn intersection(self, rhs: Self) -> Self {
         match (self, rhs) {
@@ -242,6 +265,23 @@ impl Number {
         }
     }
 
+    /// Returns the smallest interval that contains both number values.
+    ///
+    /// For example:
+    ///
+    /// ```text
+    /// |--- a ---|
+    ///        |--- b ---|
+    /// |---- result ----|
+    /// ```
+    ///
+    /// ```text
+    ///              |--- a ---|
+    /// |--- b ---|
+    /// |------- result -------|
+    /// ```
+    ///
+    /// This operation always returns an interval number value.
     #[must_use]
     pub fn tightest_enclosing_interval(self, rhs: Self) -> Self {
         match (self, rhs) {
@@ -262,6 +302,11 @@ impl Number {
         }
     }
 
+    /// Checks if `self` contains another number value.
+    ///
+    /// If `self` is a scalar, then the other value must be equal to `self`.
+    ///
+    /// If `self` is an interval, then the other value must be contained in `self`.
     #[must_use]
     pub fn contains(self, rhs: Self) -> bool {
         match (self, rhs) {

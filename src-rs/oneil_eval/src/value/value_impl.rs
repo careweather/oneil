@@ -7,10 +7,21 @@ use crate::{
 
 // TODO: document the layers of a value
 
+/// Represents a value in Oneil
+///
+/// A value is one of:
+/// - a boolean
+/// - a string
+/// - a number
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    /// A boolean value
     Boolean(bool),
+    /// A string value
     String(String),
+    /// A number value
+    ///
+    /// A number value is a measured number, which is a number with a unit
     Number(MeasuredNumber),
 }
 
@@ -286,28 +297,28 @@ impl Value {
 }
 
 impl From<f64> for Value {
-    /// Converts an f64 to a unitless number value.
+    /// Converts an `f64` to a unitless number value.
     fn from(value: f64) -> Self {
         Self::Number(MeasuredNumber::new(Number::Scalar(value), Unit::unitless()))
     }
 }
 
 impl From<bool> for Value {
-    /// Converts a bool to a boolean value.
+    /// Converts a `bool` to a boolean value.
     fn from(value: bool) -> Self {
         Self::Boolean(value)
     }
 }
 
 impl From<&str> for Value {
-    /// Converts a &str to a string value.
+    /// Converts a `&str` to a string value.
     fn from(value: &str) -> Self {
         Self::String(value.to_string())
     }
 }
 
 impl From<String> for Value {
-    /// Converts a String to a string value.
+    /// Converts a `String` to a string value.
     fn from(value: String) -> Self {
         Self::String(value)
     }
