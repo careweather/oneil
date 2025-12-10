@@ -849,10 +849,17 @@ pub mod std {
         Err(vec![EvalError::Unsupported])
     }
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     fn sqrt(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
+
+        let mut args = args.into_iter();
+
+        let arg = args.next().expect("there should be one argument");
+
+        arg.checked_pow(Value::from(0.5))
+            .map_err(|error| vec![error])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
@@ -891,10 +898,25 @@ pub mod std {
         Err(vec![EvalError::Unsupported])
     }
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     fn range(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
+
+        let mut args = args.into_iter();
+
+        let arg = args.next().expect("there should be one argument");
+
+        let Value::Number(number) = arg else {
+            return Err(vec![EvalError::InvalidType]);
+        };
+
+        let range = number.value.max() - number.value.min();
+
+        Ok(Value::Number(MeasuredNumber::new(
+            Number::Scalar(range),
+            number.unit,
+        )))
     }
 
     #[expect(unused_variables, reason = "not implemented")]
@@ -909,10 +931,19 @@ pub mod std {
         Err(vec![EvalError::Unsupported])
     }
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     fn mid(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+        if args.len() != 2 {
+            return Err(vec![EvalError::InvalidArgumentCount]);
+        }
+
+        let mut args = args.into_iter();
+
+        let left = args.next().expect("there should be two arguments");
+        let right = args.next().expect("there should be two arguments");
+
+        left.checked_add(right)
+            .and_then(|value| value.checked_div(Value::from(2.0)))
+            .map_err(|error| vec![error])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
