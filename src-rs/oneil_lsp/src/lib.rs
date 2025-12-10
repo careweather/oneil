@@ -4,15 +4,27 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 
+use std::sync::Arc;
+
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::{
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, Location, MarkedString, MessageType, Position, Range, ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncOptions, TextDocumentSyncSaveOptions
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents,
+    HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams,
+    Location, MarkedString, MessageType, Position, PositionEncodingKind, Range, ServerCapabilities,
+    ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions,
 };
 use tower_lsp_server::{Client, LanguageServer, LspService, Server, UriExt};
+
+mod doc_store;
+
+use doc_store::DocumentStore;
 
 #[derive(Debug)]
 struct Backend {
     client: Client,
+    docs: Arc<DocumentStore>,
 }
 
 impl LanguageServer for Backend {
@@ -34,15 +46,17 @@ impl LanguageServer for Backend {
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
-                // position_encoding: Some(PositionEncodingKind::UTF8),
+                // VS Code currently expects UTF-16 unless explicitly configured, so advertise UTF-16.
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 text_document_sync: Some(TextDocumentSyncCapability::Options(
                     TextDocumentSyncOptions {
+                        change: Some(TextDocumentSyncKind::INCREMENTAL),
                         save: Some(TextDocumentSyncSaveOptions::Supported(true)),
                         open_close: Some(true),
                         ..Default::default()
                     },
                 )),
+                position_encoding: Some(PositionEncodingKind::UTF16),
                 definition_provider: Some(tower_lsp_server::lsp_types::OneOf::Left(true)),
                 ..Default::default()
             },
@@ -100,6 +114,26 @@ impl LanguageServer for Backend {
 
         let params_str = format!("{params:#?}");
         self.client.log_message(MessageType::INFO, params_str).await;
+
+        self.docs.open(params.text_document).await;
+    }
+
+    async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        let result = self
+            .docs
+            .apply_changes(params.text_document, params.content_changes)
+            .await;
+
+        if let Err(error) = result {
+            let _ = self
+                .client
+                .log_message(MessageType::ERROR, format!("did_change error: {error}"))
+                .await;
+        }
+    }
+
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        self.docs.close(params.text_document).await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
@@ -139,7 +173,10 @@ impl LanguageServer for Backend {
     //         character: 15,
     //     },
 
-    async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
         let _position = params.text_document_position_params.position;
 
         // Look up position in code
@@ -151,11 +188,20 @@ impl LanguageServer for Backend {
         // last character, and do include the last line
         if true {
             let dest_location = Location {
-                uri: tower_lsp_server::lsp_types::Uri::from_file_path("/home/pgattic/work/oneil/test/unit_error.on").expect("SHOOT"),
+                uri: tower_lsp_server::lsp_types::Uri::from_file_path(
+                    "/home/pgattic/work/oneil/test/unit_error.on",
+                )
+                .expect("SHOOT"),
                 range: Range {
-                    start: Position { line: 0, character: 3 },
-                    end: Position { line: 2, character: 3 }
-                }
+                    start: Position {
+                        line: 0,
+                        character: 3,
+                    },
+                    end: Position {
+                        line: 2,
+                        character: 3,
+                    },
+                },
             };
 
             return Ok(Some(GotoDefinitionResponse::Scalar(dest_location)));
@@ -169,7 +215,10 @@ pub async fn run() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let (service, socket) = LspService::new(|client| Backend { client });
+    let docs = Arc::new(DocumentStore::new());
+    let (service, socket) = LspService::new(|client| Backend {
+        client,
+        docs: docs.clone(),
+    });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
-
