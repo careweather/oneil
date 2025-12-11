@@ -22,13 +22,14 @@ This is the basic structure of the system. Each component is broken into an indi
 - [`oneil_ir`](../../src-rs/oneil_ir/) - contains data structures for the Oneil
   IR
 
-- [`oneil_evaluator`](#) - (WIP) contains the code for evaluating the IR
+- [`oneil_evaluator`](../../src-rs/oneil_eval/) - contains the code for evaluating the IR
 
 
 Other crates include:
 
-- [`oneil_error`](../../src-rs/oneil_error) - contains an abstract error that
-  other errors can be converted to; used for consistent CLI error styling
+- [`oneil_shared`](../../src-rs/oneil_shared/) - contains an abstract error that
+  other errors can be converted to; used for consistent CLI error styling. Also
+  contains `Span` data structure
 
 - [`oneil`](../../src-rs/oneil/) - implements the CLI for Oneil
 

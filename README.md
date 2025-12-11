@@ -300,7 +300,34 @@ In the backend, Oneil uses parametric extrema math to calculate the extremes of 
 
 The `min()` and `max()` functions can be used to compare parameters or it can be used on a single Parameter to access the minimum or maximum value of the Parameter's value range.
 
-Extrema math yields substantially different results for subtraction and division. If the extreme cases are incompatible with a given parameter, you can specify standard math using the `--` and `//` operators.
+**NOTE: currently, only some of these functions are supported, although there are plans to support all of them in the future.**
+
+| Function         | Description | Supported |
+|------------------|-------------|-----------|
+| `min(a)`         | If `a` is an interval, return the minimum value of the interval. Otherwise, return the value of `a`| ✓ |
+| `min(a, b, ...)` | Find the minimum value of the given values. If a value is an interval, the minimum value of the interval is used | ✓ |
+| `max(a)`         | If `a` is an interval, return the maximum value of the interval. Otherwise, return the value of `a`| ✓ |
+| `max(a, b, ...)` | Find the maximum value of the given values. If a value is an interval, the maximum value of the interval is used | ✓ |
+| `mid(a, b)`      | Find the midpoint between the | × |
+| `range(a)`       | Return the width of an interval (max−min) | ✓ |
+| `sqrt(a)`        | Calculate the square root | ✓ |
+| `sin(a)`         | Calculate the sine | × |
+| `cos(a)`         | Calculate the cosine | × |
+| `tan(a)`         | Calculate the tangent | × |
+| `asin(a)`        | Calculate the arcsine | × |
+| `acos(a)`        | Calculate the arccosine | × |
+| `atan(a)`        | Calculate the arctangent | × |
+| `ln(a)`          | Natural logarithm | × |
+| `log(a)`         | Base 10 logarithm | × |
+| `log10(a)`       | Base 10 logarithm (alias for `log(a)`) | × |
+| `floor(a)`       | Round down to nearest integer | × |
+| `ceiling(a)`     | Round up to nearest integer | × |
+| `extent(a)`      | TODO: not sure what this does | × |
+| `abs(a)`         | Absolute value | × |
+| `sign(a)`        | Sign of value (−1, 0, 1) | × |
+| `strip(a)`       | Remove units from calculation | × |
+| `mnmx(...)`      | Gets the minimum and maximum of the list of values | × |
+
 
 #### Piecewise Equations
 
@@ -317,6 +344,8 @@ Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'earth_orbital' :km/s
 Conditions are evaluated in order, and the first equation corresponding to a true condition is calculated to obtain the value for the parameter.
 
 #### Breakout Functions
+
+**NOTE: this is currently unsupported**
 
 For functions not supported by the above equation formats, you can define a python function and link it.
 
