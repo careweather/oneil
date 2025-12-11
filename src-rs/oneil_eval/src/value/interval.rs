@@ -196,11 +196,11 @@ impl Interval {
     /// # Examples
     ///
     /// ```
-    /// use oneil_eval::interval::Interval;
+    /// use oneil_eval::value::Interval;
     ///
     /// let interval1 = Interval::new(1.0, 2.0);
     /// let interval2 = Interval::new(3.0, 4.0);
-    /// let interval3 = interval1.tightest_enclosing_interval(&interval2);
+    /// let interval3 = interval1.tightest_enclosing_interval(interval2);
     ///
     /// assert_eq!(interval3, Interval::new(1.0, 4.0));
     /// ```
