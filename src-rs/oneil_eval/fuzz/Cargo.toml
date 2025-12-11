@@ -13,7 +13,7 @@ oneil_eval = { path = "..", features = ["arbitrary"] }
 
 [lib]
 name = "shared"
-path = "fuzz_targets/shared.rs"
+path = "shared/lib.rs"
 
 [[bin]]
 name = "single_op_inclusion_property"
