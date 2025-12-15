@@ -100,10 +100,10 @@ fn handle_dev_command(command: DevCommand) -> io::Result<()> {
             );
 
             let builtin_variables = Builtins::new(
-                oneil_std::BUILTIN_VALUES,
-                oneil_std::BUILTIN_FUNCTIONS,
+                oneil_std::builtin_values(),
+                oneil_std::builtin_functions(),
                 oneil_std::builtin_units(),
-                oneil_std::BUILTIN_PREFIXES,
+                oneil_std::builtin_prefixes(),
             );
 
             let model_collection = oneil_model_resolver::load_model(
@@ -142,10 +142,10 @@ fn handle_eval_command(file: PathBuf, print_debug: bool, no_colors: bool) -> io:
     );
 
     let builtins = Builtins::new(
-        oneil_std::BUILTIN_VALUES,
-        oneil_std::BUILTIN_FUNCTIONS,
+        oneil_std::builtin_values(),
+        oneil_std::builtin_functions(),
         oneil_std::builtin_units(),
-        oneil_std::BUILTIN_PREFIXES,
+        oneil_std::builtin_prefixes(),
     );
 
     let model_collection =
@@ -160,7 +160,7 @@ fn handle_eval_command(file: PathBuf, print_debug: bool, no_colors: bool) -> io:
         }
     };
 
-    let eval_result = oneil_eval::eval_model_collection(&model_collection, &builtins);
+    let eval_result = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
 
     println!("{eval_result:?}");
 

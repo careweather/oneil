@@ -5,14 +5,31 @@ use ::std::{collections::HashMap, rc::Rc};
 
 use crate::{
     EvalError,
-    value::{Dimension, SizedUnit, Unit, Value},
+    value::{Dimension, MeasuredNumber, Number, SizedUnit, Unit, Value},
 };
 
 /// The builtin values that come with Oneil:
 /// - `pi` - the mathematical constant π
 /// - `e` - the mathematical constant e
-pub const BUILTIN_VALUES: [(&str, f64); 2] =
-    [("pi", std::f64::consts::PI), ("e", std::f64::consts::E)];
+#[must_use]
+pub fn builtin_values() -> HashMap<String, Value> {
+    HashMap::from([
+        (
+            "pi".to_string(),
+            Value::Number(MeasuredNumber::new(
+                Number::Scalar(std::f64::consts::PI),
+                Unit::unitless(),
+            )),
+        ),
+        (
+            "e".to_string(),
+            Value::Number(MeasuredNumber::new(
+                Number::Scalar(std::f64::consts::E),
+                Unit::unitless(),
+            )),
+        ),
+    ])
+}
 
 /// The builtin unit prefixes that come with Oneil:
 /// - `q` - quecto
@@ -35,28 +52,34 @@ pub const BUILTIN_VALUES: [(&str, f64); 2] =
 /// - `Y` - yotta
 /// - `R` - ronna
 /// - `Q` - quetta
-pub const BUILTIN_PREFIXES: [(&str, f64); 20] = [
-    ("q", 1e-30), // quecto
-    ("r", 1e-27), // ronto
-    ("y", 1e-24), // yocto
-    ("z", 1e-21), // zepto
-    ("a", 1e-18), // atto
-    ("f", 1e-15), // femto
-    ("p", 1e-12), // pico
-    ("n", 1e-9),  // nano
-    ("u", 1e-6),  // micro
-    ("m", 1e-3),  // milli
-    ("k", 1e3),   // kilo
-    ("M", 1e6),   // mega
-    ("G", 1e9),   // giga
-    ("T", 1e12),  // tera
-    ("P", 1e15),  // peta
-    ("E", 1e18),  // exa
-    ("Z", 1e21),  // zetta
-    ("Y", 1e24),  // yotta
-    ("R", 1e27),  // ronna
-    ("Q", 1e30),  // quetta
-];
+#[must_use]
+pub fn builtin_prefixes() -> HashMap<String, f64> {
+    HashMap::from(
+        [
+            ("q", 1e-30), // quecto
+            ("r", 1e-27), // ronto
+            ("y", 1e-24), // yocto
+            ("z", 1e-21), // zepto
+            ("a", 1e-18), // atto
+            ("f", 1e-15), // femto
+            ("p", 1e-12), // pico
+            ("n", 1e-9),  // nano
+            ("u", 1e-6),  // micro
+            ("m", 1e-3),  // milli
+            ("k", 1e3),   // kilo
+            ("M", 1e6),   // mega
+            ("G", 1e9),   // giga
+            ("T", 1e12),  // tera
+            ("P", 1e15),  // peta
+            ("E", 1e18),  // exa
+            ("Z", 1e21),  // zetta
+            ("Y", 1e24),  // yotta
+            ("R", 1e27),  // ronna
+            ("Q", 1e30),  // quetta
+        ]
+        .map(|(k, v)| (k.to_string(), v)),
+    )
+}
 
 /// The builtin units that come with Oneil.
 ///
@@ -134,7 +157,7 @@ pub const BUILTIN_PREFIXES: [(&str, f64); 20] = [
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
 #[must_use]
-pub fn builtin_units() -> HashMap<&'static str, Rc<SizedUnit>> {
+pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
     let units = [
         // === BASE UNITS ===
         (
@@ -678,7 +701,9 @@ pub fn builtin_units() -> HashMap<&'static str, Rc<SizedUnit>> {
         .into_iter()
         .flat_map(|(names, unit)| {
             let unit = Rc::new(unit);
-            names.iter().map(move |name| (*name, Rc::clone(&unit)))
+            names
+                .iter()
+                .map(move |name| ((*name).to_string(), Rc::clone(&unit)))
         })
         .collect()
 }
@@ -711,29 +736,35 @@ type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
 /// Note that some of these functions are not yet implemented and
 /// will return an `EvalError::Unsupported` error when called. However,
 /// we plan to implement them in the future.
-pub const BUILTIN_FUNCTIONS: [(&str, BuiltinFunction); 21] = [
-    ("min", fns::min),
-    ("max", fns::max),
-    ("sin", fns::sin),
-    ("cos", fns::cos),
-    ("tan", fns::tan),
-    ("asin", fns::asin),
-    ("acos", fns::acos),
-    ("atan", fns::atan),
-    ("sqrt", fns::sqrt),
-    ("ln", fns::ln),
-    ("log", fns::log),
-    ("log10", fns::log10),
-    ("floor", fns::floor),
-    ("ceiling", fns::ceiling),
-    ("extent", fns::extent),
-    ("range", fns::range),
-    ("abs", fns::abs),
-    ("sign", fns::sign),
-    ("mid", fns::mid),
-    ("strip", fns::strip),
-    ("mnmx", fns::mnmx),
-];
+#[must_use]
+pub fn builtin_functions() -> HashMap<String, BuiltinFunction> {
+    HashMap::from(
+        [
+            ("min", fns::min as BuiltinFunction),
+            ("max", fns::max as BuiltinFunction),
+            ("sin", fns::sin as BuiltinFunction),
+            ("cos", fns::cos as BuiltinFunction),
+            ("tan", fns::tan as BuiltinFunction),
+            ("asin", fns::asin as BuiltinFunction),
+            ("acos", fns::acos as BuiltinFunction),
+            ("atan", fns::atan as BuiltinFunction),
+            ("sqrt", fns::sqrt as BuiltinFunction),
+            ("ln", fns::ln as BuiltinFunction),
+            ("log", fns::log as BuiltinFunction),
+            ("log10", fns::log10 as BuiltinFunction),
+            ("floor", fns::floor as BuiltinFunction),
+            ("ceiling", fns::ceiling as BuiltinFunction),
+            ("extent", fns::extent as BuiltinFunction),
+            ("range", fns::range as BuiltinFunction),
+            ("abs", fns::abs as BuiltinFunction),
+            ("sign", fns::sign as BuiltinFunction),
+            ("mid", fns::mid as BuiltinFunction),
+            ("strip", fns::strip as BuiltinFunction),
+            ("mnmx", fns::mnmx as BuiltinFunction),
+        ]
+        .map(|(k, v)| (k.to_string(), v)),
+    )
+}
 
 mod fns {
     use crate::{

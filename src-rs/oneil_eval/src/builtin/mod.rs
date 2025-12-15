@@ -12,28 +12,35 @@ pub mod std;
 
 /// Represents a map of builtin values, functions, units, and prefixes.
 ///
-/// The basic way to implement this is to create a struct that
-/// holds each of the maps as fields.
-///
 /// For the standard maps that come with Oneil, see the `std` module.
-pub trait BuiltinMap<F: BuiltinFunction> {
-    /// Returns a map of builtin values.
-    fn builtin_values(&self) -> HashMap<String, Value>;
+#[derive(Debug, Clone)]
+pub struct BuiltinMap<F: BuiltinFunction> {
+    /// A map of builtin values
+    pub values: HashMap<String, Value>,
+    /// A map of builtin functions
+    pub functions: HashMap<String, F>,
+    /// A map of builtin units
+    pub units: HashMap<String, Rc<SizedUnit>>,
+    /// A map of builtin unit prefixes
+    pub prefixes: HashMap<String, f64>,
+}
 
-    /// Returns a map of builtin functions.
-    ///
-    /// For more details about the function type, see
-    /// the `BuiltinFunction` trait.
-    fn builtin_functions(&self) -> HashMap<String, F>;
-
-    /// Returns a map of builtin units.
-    ///
-    /// The units are stored as `Rc<SizedUnit>` so that multiple names
-    /// can point to the same unit (eg. "in", "inch", "inches").
-    fn builtin_units(&self) -> HashMap<String, Rc<SizedUnit>>;
-
-    /// Returns a map of builtin unit prefixes.
-    fn builtin_prefixes(&self) -> HashMap<String, f64>;
+impl<F: BuiltinFunction> BuiltinMap<F> {
+    /// Creates a new builtin map.
+    #[must_use]
+    pub const fn new(
+        values: HashMap<String, Value>,
+        functions: HashMap<String, F>,
+        units: HashMap<String, Rc<SizedUnit>>,
+        prefixes: HashMap<String, f64>,
+    ) -> Self {
+        Self {
+            values,
+            functions,
+            units,
+            prefixes,
+        }
+    }
 }
 
 /// Represents a builtin function.

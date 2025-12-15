@@ -9,9 +9,10 @@ use crate::{
 };
 
 /// Evaluates a model collection and returns the context with the results of the models.
+#[must_use]
 pub fn eval_model_collection<F: BuiltinFunction>(
     model_collection: &ir::ModelCollection,
-    builtins: &impl BuiltinMap<F>,
+    builtins: BuiltinMap<F>,
 ) -> EvalContext<F> {
     eval_model_collection_with_context(model_collection, EvalContext::new(builtins))
 }

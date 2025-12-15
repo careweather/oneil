@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 use oneil_ir as ir;
@@ -38,24 +37,18 @@ pub struct EvalContext<F: BuiltinFunction> {
     current_model: Option<PathBuf>,
     active_python_imports: HashSet<PathBuf>,
     active_references: HashSet<PathBuf>,
-    builtin_values: HashMap<String, Value>,
-    builtin_functions: HashMap<String, F>,
-    unit_map: HashMap<String, Rc<SizedUnit>>,
-    prefixes: HashMap<String, f64>,
+    builtins: BuiltinMap<F>,
 }
 
 impl<F: BuiltinFunction> EvalContext<F> {
-    pub fn new(builtins: &impl BuiltinMap<F>) -> Self {
+    pub fn new(builtins: BuiltinMap<F>) -> Self {
         Self {
             models: HashMap::new(),
             python_imports: HashMap::new(),
             current_model: None,
             active_python_imports: HashSet::new(),
             active_references: HashSet::new(),
-            builtin_values: builtins.builtin_values(),
-            builtin_functions: builtins.builtin_functions(),
-            unit_map: builtins.builtin_units(),
-            prefixes: builtins.builtin_prefixes(),
+            builtins,
         }
     }
 
@@ -67,7 +60,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// If it is, then there is a bug either in the model resolver when it resolves builtin variables
     /// or in the builtin map when it defines the builtin values.
     pub fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
-        self.builtin_values
+        self.builtins
+            .values
             .get(identifier.as_str())
             .expect("builtin value should be defined")
             .clone()
@@ -117,7 +111,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
         identifier: &ir::Identifier,
         args: Vec<Value>,
     ) -> Result<Value, Vec<EvalError>> {
-        self.builtin_functions
+        self.builtins
+            .functions
             .get(identifier.as_str())
             .expect("builtin function should be defined")
             .call(args)
@@ -133,11 +128,14 @@ impl<F: BuiltinFunction> EvalContext<F> {
     }
 
     pub fn lookup_unit(&self, name: &str) -> Option<SizedUnit> {
-        self.unit_map.get(name).map(|unit| unit.as_ref().clone())
+        self.builtins
+            .units
+            .get(name)
+            .map(|unit| unit.as_ref().clone())
     }
 
     pub const fn available_prefixes(&self) -> &HashMap<String, f64> {
-        &self.prefixes
+        &self.builtins.prefixes
     }
 
     pub fn load_python_import(&mut self, python_path: PathBuf) {
