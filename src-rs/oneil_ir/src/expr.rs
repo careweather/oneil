@@ -199,10 +199,14 @@ pub enum BinaryOp {
     Add,
     /// Subtraction: `a - b`
     Sub,
+    /// Escaped subtraction: `a -- b`
+    EscapedSub,
     /// Multiplication: `a * b`
     Mul,
     /// Division: `a / b`
     Div,
+    /// Escaped division: `a // b`
+    EscapedDiv,
     /// Modulo: `a % b`
     Mod,
     /// Exponentiation: `a ^ b`

@@ -102,6 +102,34 @@ impl Interval {
         self.is_empty() || self.min <= self.max
     }
 
+    /// Subtracts two intervals. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it subtracts the minimum
+    /// from the minimum and the maximum from the maximum.
+    #[must_use]
+    pub fn escaped_sub(self, rhs: Self) -> Self {
+        let value_a = self.min - rhs.min;
+        let value_b = self.max - rhs.max;
+
+        let min = f64::min(value_a, value_b);
+        let max = f64::max(value_a, value_b);
+
+        Self { min, max }
+    }
+
+    /// Divides two intervals. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it divides the minimum
+    /// by the minimum and the maximum by the maximum.
+    #[must_use]
+    pub fn escaped_div(self, rhs: Self) -> Self {
+        let value_a = self.min / rhs.min;
+        let value_b = self.max / rhs.max;
+
+        let min = f64::min(value_a, value_b);
+        let max = f64::max(value_a, value_b);
+
+        Self { min, max }
+    }
+
     /// Exponentiation of intervals
     ///
     /// This is defined based on the implementation in the

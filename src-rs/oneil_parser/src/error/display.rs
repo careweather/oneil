@@ -93,8 +93,10 @@ impl fmt::Display for ExprKind {
                 let operator_str = match operator {
                     BinaryOp::Add => "+",
                     BinaryOp::Sub => "-",
+                    BinaryOp::EscapedSub => "--",
                     BinaryOp::Mul => "*",
                     BinaryOp::Div => "/",
+                    BinaryOp::EscapedDiv => "//",
                     BinaryOp::Mod => "%",
                     BinaryOp::Pow => "^",
                     BinaryOp::And => "&&",

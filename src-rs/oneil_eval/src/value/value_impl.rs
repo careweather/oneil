@@ -153,6 +153,25 @@ impl Value {
         }
     }
 
+    /// Subtracts the right value from the left value. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it subtracts the minimum
+    /// from the minimum and the maximum from the maximum.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
+    pub fn checked_escaped_sub(self, rhs: Self) -> Result<Self, EvalError> {
+        match (self, rhs) {
+            (Self::Number(lhs), Self::Number(rhs)) => {
+                lhs.checked_escaped_sub(&rhs).map(Self::Number)
+            }
+            (Self::Number(_), _) => Err(EvalError::InvalidType),
+            _ => Err(EvalError::InvalidOperation),
+        }
+    }
+
     /// Multiplies two values.
     ///
     /// # Errors
@@ -178,6 +197,25 @@ impl Value {
     pub fn checked_div(self, rhs: Self) -> Result<Self, EvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => lhs.checked_div(rhs).map(Self::Number),
+            (Self::Number(_), _) => Err(EvalError::InvalidType),
+            _ => Err(EvalError::InvalidOperation),
+        }
+    }
+
+    /// Divides the left value by the right value. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it divides the minimum
+    /// by the minimum and the maximum by the maximum.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ValueError::InvalidType` if the right operand is not a number.
+    ///
+    /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
+    pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, EvalError> {
+        match (self, rhs) {
+            (Self::Number(lhs), Self::Number(rhs)) => {
+                lhs.checked_escaped_div(&rhs).map(Self::Number)
+            }
             (Self::Number(_), _) => Err(EvalError::InvalidType),
             _ => Err(EvalError::InvalidOperation),
         }

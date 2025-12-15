@@ -21,8 +21,8 @@ use crate::{
         naming::identifier,
         symbol::{
             bang_equals, bar, caret, comma, dot, equals_equals, greater_than, greater_than_equals,
-            less_than, less_than_equals, minus, paren_left, paren_right, percent, plus, slash,
-            star,
+            less_than, less_than_equals, minus, minus_minus, paren_left, paren_right, percent,
+            plus, slash, slash_slash, star,
         },
     },
     util::{InputSpan, Parser, Result},
@@ -250,6 +250,7 @@ fn additive_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
         plus.map(|token| token.into_node_with_value(BinaryOp::Add)),
         minus.map(|token| token.into_node_with_value(BinaryOp::Sub)),
+        minus_minus.map(|token| token.into_node_with_value(BinaryOp::EscapedSub)),
     ))
     .convert_errors();
 
@@ -261,6 +262,7 @@ fn multiplicative_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError
     let op = alt((
         star.map(|token| token.into_node_with_value(BinaryOp::Mul)),
         slash.map(|token| token.into_node_with_value(BinaryOp::Div)),
+        slash_slash.map(|token| token.into_node_with_value(BinaryOp::EscapedDiv)),
         percent.map(|token| token.into_node_with_value(BinaryOp::Mod)),
     ))
     .convert_errors();

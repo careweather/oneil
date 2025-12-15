@@ -73,6 +73,24 @@ impl MeasuredNumber {
         })
     }
 
+    /// Subtracts two dimensional numbers. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it subtracts the minimum
+    /// from the minimum and the maximum from the maximum.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_escaped_sub(self, rhs: &Self) -> Result<Self, EvalError> {
+        if self.unit != rhs.unit {
+            return Err(EvalError::InvalidUnit);
+        }
+
+        Ok(Self {
+            value: self.value.escaped_sub(rhs.value),
+            unit: self.unit,
+        })
+    }
+
     /// Multiplies two dimensional numbers.
     ///
     /// # Errors
@@ -94,6 +112,24 @@ impl MeasuredNumber {
         Ok(Self {
             value: self.value / rhs.value,
             unit: self.unit / rhs.unit,
+        })
+    }
+
+    /// Divides two dimensional numbers. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it divides the minimum
+    /// by the minimum and the maximum by the maximum.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_escaped_div(self, rhs: &Self) -> Result<Self, EvalError> {
+        if self.unit != rhs.unit {
+            return Err(EvalError::InvalidUnit);
+        }
+
+        Ok(Self {
+            value: self.value.escaped_div(rhs.value),
+            unit: self.unit,
         })
     }
 
@@ -224,6 +260,40 @@ impl Number {
         match self {
             Self::Scalar(value) => *value,
             Self::Interval(interval) => interval.max(),
+        }
+    }
+
+    /// Subtracts two number values. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it subtracts the minimum
+    /// from the minimum and the maximum from the maximum.
+    #[must_use]
+    pub fn escaped_sub(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs - rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).escaped_sub(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.escaped_sub(Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.escaped_sub(rhs)),
+        }
+    }
+
+    /// Divides two number values. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it divides the minimum
+    /// by the minimum and the maximum by the maximum.
+    #[must_use]
+    pub fn escaped_div(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs / rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).escaped_div(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.escaped_div(Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.escaped_div(rhs)),
         }
     }
 

@@ -242,8 +242,10 @@ fn eval_binary_op(
     let result = match op {
         ir::BinaryOp::Add => left_result.checked_add(right_result),
         ir::BinaryOp::Sub => left_result.checked_sub(right_result),
+        ir::BinaryOp::EscapedSub => left_result.checked_escaped_sub(right_result),
         ir::BinaryOp::Mul => left_result.checked_mul(right_result),
         ir::BinaryOp::Div => left_result.checked_div(right_result),
+        ir::BinaryOp::EscapedDiv => left_result.checked_escaped_div(right_result),
         ir::BinaryOp::Mod => left_result.checked_rem(right_result),
         ir::BinaryOp::Pow => left_result.checked_pow(right_result),
         ir::BinaryOp::And => left_result.checked_and(right_result),
