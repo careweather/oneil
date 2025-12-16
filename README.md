@@ -368,10 +368,6 @@ Z: z = x - y
 # => 10 | 10
 ```
 
-If we were to replace `x` and `y` with values within the intervals,
-`x = 10` and `y = 5`, we'd find that `x - y` evaluates to `5`, which is outside
-the interval `10 | 10`.
-
 Instead, subtraction is implemented as `min(i1) - max(i2) | max(i1) - min(i2)`.
 
 ```oneil
@@ -402,7 +398,8 @@ This is known as the
 
 However, the arithmetic may *overapproximate* an interval. For example, we would
 expect `a - a` to always be equal to `0`, no matter what `a` is. Therefore, if
-`a` is an interval, we would expect `a - a` to produce the interval `0 | 0`.
+`a` is an interval, we would expect `a - a` to produce an interval with `0` as
+both the minimum and maximum value, `0 | 0`.
 
 If we take `a` as `0 | 1`, however, `a - a` would produce the interval `-1 | 1`.
 While this answer is technically correct (`0 | 0` is contained within `-1 | 1`),
@@ -412,13 +409,14 @@ This problem is known as the
 [dependency problem](https://en.wikipedia.org/wiki/Interval_arithmetic#Dependency_problem).
 
 If more precision is needed (such as in geometry, where relationships such as `a - a = 0`
-are important), Oneil provides a way to "escape" interval arithmetic using `min(i)` and
+are important), you can "escape" interval arithmetic using `min(i)` and
 `max(i)` functions, which get the minimum and maximum values of an interval. This allows
 users to operate on scalar values until they are ready to return to interval arithmetic
 using the bar operator. For example, instead of `a - a`, a user could use
 `min(a) - min(a) | max(a) - max(a)` in order to get a more precise result.
 
-In addition, Oneil provides `--` and `//` operators for ease of use.
+To simplify this escape, Oneil provides the `--` and `//` operators,
+which behave as follows:
 
 | Operator | Equivalent To                        |
 |----------|--------------------------------------|
