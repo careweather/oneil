@@ -76,7 +76,7 @@ AdditiveExpr = [ AdditiveExpr, AdditiveOp, ], MultiplicativeExpr ;
 AdditiveOp = "+" | "-" | "--" ;
 MultiplicativeExpr = [ MultiplicativeExpr, MultiplicativeOp, ], ExponentialExpr ;
 MultiplicativeOp = "*" | "/" | "//" | "%" ;
-ExponentialExpr = NegExpr, [ "^", , ExponentialExpr ] ;  (* right associative *)
+ExponentialExpr = NegExpr, [ "^", ExponentialExpr ] ;  (* right associative *)
 NegExpr = ( "-", NegExpr ) | PrimaryExpr ;
 PrimaryExpr = NumberLiteral | StringLiteral | BooleanLiteral | Identifier [ ".", Identifier ] | FunctionCall | ( "(", Expr, ")" ) ;
 
