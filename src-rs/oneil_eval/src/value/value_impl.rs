@@ -214,7 +214,7 @@ impl Value {
     pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, EvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => {
-                lhs.checked_escaped_div(&rhs).map(Self::Number)
+                lhs.checked_escaped_div(rhs).map(Self::Number)
             }
             (Self::Number(_), _) => Err(EvalError::InvalidType),
             _ => Err(EvalError::InvalidOperation),

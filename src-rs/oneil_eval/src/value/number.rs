@@ -122,14 +122,10 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_escaped_div(self, rhs: &Self) -> Result<Self, EvalError> {
-        if self.unit != rhs.unit {
-            return Err(EvalError::InvalidUnit);
-        }
-
+    pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, EvalError> {
         Ok(Self {
             value: self.value.escaped_div(rhs.value),
-            unit: self.unit,
+            unit: self.unit / rhs.unit,
         })
     }
 
