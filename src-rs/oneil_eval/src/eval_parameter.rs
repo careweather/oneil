@@ -455,3 +455,1281 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
 fn db_to_linear(value: Number) -> Number {
     Number::Scalar(10.0).pow(value / Number::Scalar(10.0))
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        assert_is_close, assert_units_eq,
+        builtin::{self},
+        value::Dimension,
+    };
+
+    use super::*;
+
+    #[test]
+    fn eval_no_unit() {
+        // setup parameter and context
+        let parameter = helper::build_simple_parameter("x", 1.0, []);
+        let context = helper::create_eval_context([]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        assert_is_close!(1.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_with_unit_m() {
+        // setup parameter and context
+        let parameter = helper::build_simple_parameter("x", 1.0, [("m", 1.0)]);
+        let context = helper::create_eval_context([]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        assert_is_close!(1.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_with_unit_km() {
+        // setup parameter and context
+        let parameter = helper::build_simple_parameter("x", 1.0, [("km", 1.0)]);
+        let context = helper::create_eval_context([]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // 1.0 km = 1000.0 m
+        assert_is_close!(1000.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1000.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_with_unit_km_per_hr() {
+        // setup parameter and context
+        let parameter = helper::build_simple_parameter("x", 1.0, [("km", 1.0), ("hr", -1.0)]);
+        let context = helper::create_eval_context([]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // 1.0 km/hr = 1000.0 m / 3600.0 s = 0.277777... m/s
+        assert_is_close!(1000.0 / 3600.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1000.0 / 3600.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_with_unit_db() {
+        // setup parameter and context
+        let parameter = helper::build_simple_parameter("x", 1.0, [("dB", 1.0)]);
+        let context = helper::create_eval_context([]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // 1.0 dB = 10^(1.0/10.0) = 10^0.1 = 1.258925...
+        assert_is_close!(10.0_f64.powf(0.1), value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(is_db);
+    }
+
+    #[test]
+    fn eval_with_unit_dbw() {
+        // setup parameter and context
+        let parameter = helper::build_simple_parameter("x", 1.0, [("dBW", 1.0)]);
+        let context = helper::create_eval_context([]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [
+            (Dimension::Mass, 1.0),
+            (Dimension::Distance, 2.0),
+            (Dimension::Time, -3.0),
+        ];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // 1.0 dBW = 10^(1.0/10.0) = 10^0.1 = 1.258925...
+        assert_is_close!(10.0_f64.powf(0.1), value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(is_db);
+    }
+
+    #[test]
+    fn eval_add_parameters_with_different_units() {
+        // setup context with x = 1.0 m and y = 1.0 km
+        let context = helper::create_eval_context([
+            ("x", 1.0, vec![("m", 1.0)]),
+            ("y", 1.0, vec![("km", 1.0)]),
+        ]);
+
+        // setup parameter z = x + y with unit km
+        let parameter = helper::build_add_parameter("z", "x", "y", [("km", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // x + y = 1.0 m + 1000.0 m = 1001.0 m
+        // The value is stored in base units (meters)
+        assert_is_close!(1001.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1000.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_add_parameters_kg_m_per_s2_and_n() {
+        // setup context with x = 1.0 kg*m/s^2 and y = 1.0 N
+        let context = helper::create_eval_context([
+            ("x", 1.0, vec![("kg", 1.0), ("m", 1.0), ("s", -2.0)]),
+            ("y", 1.0, vec![("N", 1.0)]),
+        ]);
+
+        // setup parameter z = x + y with unit N
+        let parameter = helper::build_add_parameter("z", "x", "y", [("N", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [
+            (Dimension::Mass, 1.0),
+            (Dimension::Distance, 1.0),
+            (Dimension::Time, -2.0),
+        ];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // x + y = 1.0 N + 1.0 N = 2.0 N
+        // The value is stored in base units
+        assert_is_close!(2.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_add_parameters_dbw_and_w() {
+        // setup context with x = 1.0 dBW and y = 1.0 W
+        let context = helper::create_eval_context([
+            ("x", 1.0, vec![("dBW", 1.0)]),
+            ("y", 1.0, vec![("W", 1.0)]),
+        ]);
+
+        // setup parameter z = x + y with unit W
+        let parameter = helper::build_add_parameter("z", "x", "y", [("W", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [
+            (Dimension::Mass, 1.0),
+            (Dimension::Distance, 2.0),
+            (Dimension::Time, -3.0),
+        ];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // x = 1.0 dBW = 10^(1.0/10.0) = 10^0.1 = 1.258925... W
+        // y = 1.0 W
+        // x + y = 1.258925... W + 1.0 W = 2.258925... W
+        assert_is_close!(10.0_f64.powf(0.1) + 1.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_exponent_parameter_w_squared() {
+        // setup context with x = 1.0 W
+        let context = helper::create_eval_context([("x", 1.0, vec![("W", 1.0)])]);
+
+        // setup parameter y = x^2 with unit W^2
+        let parameter = helper::build_exponent_parameter("y", "x", 2.0, [("W", 2.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [
+            (Dimension::Mass, 2.0),
+            (Dimension::Distance, 4.0),
+            (Dimension::Time, -6.0),
+        ];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // y = x^2 = (1.0 W)^2 = 1.0 W^2
+        assert_is_close!(1.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_mul_function() {
+        // setup context with x = 3.0 m and y = 2.0 m
+        let context = helper::create_eval_context([
+            ("x", 3.0, vec![("m", 1.0)]),
+            ("y", 2.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = x * y with unit m^2
+        let parameter = helper::build_mul_parameter("z", "x", "y", [("m", 2.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 2.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = x * y = 3.0 m * 2.0 m = 6.0 m^2
+        assert_is_close!(6.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_div_function() {
+        // setup context with x = 6.0 m^2 and y = 2.0 m
+        let context = helper::create_eval_context([
+            ("x", 6.0, vec![("m", 2.0)]),
+            ("y", 2.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = x / y with unit m
+        let parameter = helper::build_div_parameter("z", "x", "y", [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = x / y = 6.0 m^2 / 2.0 m = 3.0 m
+        assert_is_close!(3.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_mod_function() {
+        // setup context with x = 7.0 m and y = 3.0 m
+        let context = helper::create_eval_context([
+            ("x", 7.0, vec![("m", 1.0)]),
+            ("y", 3.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = x % y with unit m
+        let parameter = helper::build_mod_parameter("z", "x", "y", [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = x % y = 7.0 m % 3.0 m = 1.0 m
+        assert_is_close!(1.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_sqrt_function() {
+        // setup context with x = 4.0 m^2
+        let context = helper::create_eval_context([("x", 4.0, vec![("m", 2.0)])]);
+
+        // setup parameter y = sqrt(x) with unit m
+        let parameter = helper::build_function_call_parameter("y", "sqrt", ["x"], [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // y = sqrt(x) = sqrt(4.0 m^2) = 2.0 m
+        assert_is_close!(2.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_min_function() {
+        // setup context with x = 3.0 m and y = 5.0 m
+        let context = helper::create_eval_context([
+            ("x", 3.0, vec![("m", 1.0)]),
+            ("y", 5.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = min(x, y) with unit m
+        let parameter = helper::build_function_call_parameter("z", "min", ["x", "y"], [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = min(x, y) = min(3.0 m, 5.0 m) = 3.0 m
+        assert_is_close!(3.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_min_function_with_interval() {
+        // setup context
+        let mut context = helper::create_eval_context([]);
+
+        // add x as an interval parameter [2.0, 4.0] m
+        let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
+        let (x_value, _) = eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        context.add_parameter_result("x".to_string(), Ok(x_value));
+
+        // setup parameter z = min(x) with unit m
+        let parameter = helper::build_function_call_parameter("z", "min", ["x"], [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // x = [2.0, 4.0] m
+        // min(x) = min(2.0, 4.0) = 2.0 m
+        assert_is_close!(2.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_max_function() {
+        // setup context with x = 3.0 m and y = 5.0 m
+        let context = helper::create_eval_context([
+            ("x", 3.0, vec![("m", 1.0)]),
+            ("y", 5.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = max(x, y) with unit m
+        let parameter = helper::build_function_call_parameter("z", "max", ["x", "y"], [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = max(x, y) = max(3.0 m, 5.0 m) = 5.0 m
+        assert_is_close!(5.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_max_function_with_interval() {
+        // setup context
+        let mut context = helper::create_eval_context([]);
+
+        // add x as an interval parameter [2.0, 4.0] m
+        let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
+        let (x_value, _) = eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        context.add_parameter_result("x".to_string(), Ok(x_value));
+
+        // setup parameter z = max(x) with unit m
+        let parameter = helper::build_function_call_parameter("z", "max", ["x"], [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // x = [2.0, 4.0] m
+        // max(x) = max(2.0, 4.0) = 4.0 m
+        assert_is_close!(4.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_range_function() {
+        // setup context
+        let mut context = helper::create_eval_context([]);
+
+        // add x as an interval parameter [2.0, 4.0] m
+        let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
+        let (x_value, _) = eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        context.add_parameter_result("x".to_string(), Ok(x_value));
+
+        // setup parameter z = range(x) with unit m
+        let parameter = helper::build_function_call_parameter("z", "range", ["x"], [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // x = [2.0, 4.0] m
+        // range(x) = max(2.0, 4.0) - min(2.0, 4.0) = 4.0 - 2.0 = 2.0 m
+        assert_is_close!(2.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_mid_function() {
+        // setup context with x = 2.0 m and y = 4.0 m
+        let context = helper::create_eval_context([
+            ("x", 2.0, vec![("m", 1.0)]),
+            ("y", 4.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = mid(x, y) with unit m
+        let parameter = helper::build_function_call_parameter("z", "mid", ["x", "y"], [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = mid(x, y) = (x + y) / 2 = (2.0 m + 4.0 m) / 2 = 3.0 m
+        assert_is_close!(3.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    mod helper {
+        use super::*;
+
+        use std::path::PathBuf;
+
+        use crate::builtin::BuiltinMap;
+
+        use crate::context::EvalContext;
+
+        use crate::error::EvalError;
+
+        use crate::value::Value;
+
+        use std::collections::HashSet;
+
+        use oneil_shared::span::SourceLocation;
+
+        use oneil_shared::span::Span;
+
+        /// Returns a dummy span for use in test parameters.
+        ///
+        /// This function creates a span with all fields set to zero.
+        /// It is not intended to be directly tested, but rather used
+        /// as a placeholder when constructing IR nodes for testing.
+        fn random_span() -> Span {
+            let start = SourceLocation {
+                offset: 0,
+                line: 0,
+                column: 0,
+            };
+            let end = SourceLocation {
+                offset: 0,
+                line: 0,
+                column: 0,
+            };
+            Span::new(start, end)
+        }
+
+        /// Builds a simple parameter with a literal numeric value.
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value` - The numeric value of the parameter
+        /// * `units` - An iterator of unit names and their exponents (e.g., `[("m", 1.0), ("s", -1.0)]` for m/s)
+        ///
+        /// # Returns
+        ///
+        /// A parameter with a literal number expression and the specified units.
+        pub fn build_simple_parameter(
+            name: &str,
+            value: f64,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr = ir::Expr::Literal {
+                span: random_span(),
+                value: ir::Literal::Number(value),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with an interval value (min-max expression).
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value_a` - The minimum value of the interval
+        /// * `value_b` - The maximum value of the interval
+        /// * `units` - An iterator of unit names and their exponents
+        ///
+        /// # Returns
+        ///
+        /// A parameter with a min-max binary operation that creates an interval value.
+        pub fn build_interval_parameter(
+            name: &str,
+            value_a: f64,
+            value_b: f64,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_a = ir::Expr::Literal {
+                span: random_span(),
+                value: ir::Literal::Number(value_a),
+            };
+
+            let expr_b = ir::Expr::Literal {
+                span: random_span(),
+                value: ir::Literal::Number(value_b),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::MinMax,
+                left: Box::new(expr_a),
+                right: Box::new(expr_b),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with an addition expression.
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value_a` - The name of the first parameter to add
+        /// * `value_b` - The name of the second parameter to add
+        /// * `units` - An iterator of unit names and their exponents
+        ///
+        /// # Returns
+        ///
+        /// A parameter with an addition binary operation: `value_a + value_b`.
+        pub fn build_add_parameter(
+            name: &str,
+            value_a: &str,
+            value_b: &str,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_a = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_a.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr_b = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_b.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::Add,
+                left: Box::new(expr_a),
+                right: Box::new(expr_b),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with a multiplication expression.
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value_a` - The name of the first parameter to multiply
+        /// * `value_b` - The name of the second parameter to multiply
+        /// * `units` - An iterator of unit names and their exponents
+        ///
+        /// # Returns
+        ///
+        /// A parameter with a multiplication binary operation: `value_a * value_b`.
+        pub fn build_mul_parameter(
+            name: &str,
+            value_a: &str,
+            value_b: &str,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_a = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_a.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr_b = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_b.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::Mul,
+                left: Box::new(expr_a),
+                right: Box::new(expr_b),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with a division expression.
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value_a` - The name of the dividend parameter
+        /// * `value_b` - The name of the divisor parameter
+        /// * `units` - An iterator of unit names and their exponents
+        ///
+        /// # Returns
+        ///
+        /// A parameter with a division binary operation: `value_a / value_b`.
+        pub fn build_div_parameter(
+            name: &str,
+            value_a: &str,
+            value_b: &str,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_a = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_a.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr_b = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_b.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::Div,
+                left: Box::new(expr_a),
+                right: Box::new(expr_b),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with a modulo expression.
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value_a` - The name of the dividend parameter
+        /// * `value_b` - The name of the divisor parameter
+        /// * `units` - An iterator of unit names and their exponents
+        ///
+        /// # Returns
+        ///
+        /// A parameter with a modulo binary operation: `value_a % value_b`.
+        pub fn build_mod_parameter(
+            name: &str,
+            value_a: &str,
+            value_b: &str,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_a = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_a.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr_b = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_b.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::Mod,
+                left: Box::new(expr_a),
+                right: Box::new(expr_b),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with an exponentiation expression.
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `base` - The name of the base parameter
+        /// * `exponent` - The exponent value (a literal number)
+        /// * `units` - An iterator of unit names and their exponents
+        ///
+        /// # Returns
+        ///
+        /// A parameter with an exponentiation binary operation: `base ^ exponent`.
+        pub fn build_exponent_parameter(
+            name: &str,
+            base: &str,
+            exponent: f64,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_base = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(base.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr_exponent = ir::Expr::Literal {
+                span: random_span(),
+                value: ir::Literal::Number(exponent),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::Pow,
+                left: Box::new(expr_base),
+                right: Box::new(expr_exponent),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with a builtin function call expression.
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `function` - The name of the builtin function to call
+        /// * `args` - An iterator of parameter names to pass as arguments
+        /// * `units` - An iterator of unit names and their exponents
+        ///
+        /// # Returns
+        ///
+        /// A parameter with a function call expression: `function(arg1, arg2, ...)`.
+        pub fn build_function_call_parameter(
+            name: &str,
+            function: &str,
+            args: impl IntoIterator<Item = &'static str>,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let args = args
+                .into_iter()
+                .map(|arg| ir::Expr::Variable {
+                    span: random_span(),
+                    variable: ir::Variable::parameter(
+                        ir::ParameterName::new(arg.to_string()),
+                        random_span(),
+                    ),
+                })
+                .collect();
+
+            let expr = ir::Expr::FunctionCall {
+                span: random_span(),
+                name_span: random_span(),
+                name: ir::FunctionName::Builtin(ir::Identifier::new(function.to_string())),
+                args,
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Type alias for builtin functions used in tests.
+        pub type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
+
+        /// Creates an evaluation context with pre-defined parameters.
+        ///
+        /// # Arguments
+        ///
+        /// * `previous_parameters` - An iterator of tuples containing:
+        ///   - Parameter name
+        ///   - Parameter value (a literal number)
+        ///   - Units as a vector of tuples (unit name, exponent)
+        ///
+        /// # Returns
+        ///
+        /// An evaluation context with the standard builtin values, functions, units, and prefixes,
+        /// and with the specified parameters already evaluated and added to the context.
+        pub fn create_eval_context(
+            previous_parameters: impl IntoIterator<Item = (&'static str, f64, Vec<(&'static str, f64)>)>,
+        ) -> EvalContext<BuiltinFunction> {
+            let mut context = EvalContext::new(BuiltinMap::new(
+                builtin::std::builtin_values(),
+                builtin::std::builtin_functions(),
+                builtin::std::builtin_units(),
+                builtin::std::builtin_prefixes(),
+            ));
+
+            let model_path = PathBuf::from("test");
+            context.set_active_model(model_path);
+
+            for (name, value, units) in previous_parameters {
+                let parameter = build_simple_parameter(name, value, units);
+                let (parameter_value, _) =
+                    eval_parameter(&parameter, &context).expect("eval should succeed");
+                context.add_parameter_result(name.to_string(), Ok(parameter_value));
+            }
+
+            context
+        }
+    }
+}
