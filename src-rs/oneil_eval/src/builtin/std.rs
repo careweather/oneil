@@ -977,24 +977,35 @@ mod fns {
     }
 
     pub fn range(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        if args.len() != 1 {
-            return Err(vec![EvalError::InvalidArgumentCount]);
+        match args.len() {
+            1 => {
+                let mut args = args.into_iter();
+
+                let arg = args.next().expect("there should be one argument");
+
+                let Value::Number(number) = arg else {
+                    return Err(vec![EvalError::InvalidType]);
+                };
+
+                let Number::Interval(interval) = number.value else {
+                    return Err(vec![EvalError::InvalidType]);
+                };
+
+                Ok(Value::Number(MeasuredNumber::new(
+                    Number::Scalar(interval.max() - interval.min()),
+                    number.unit,
+                )))
+            }
+            2 => {
+                let mut args = args.into_iter();
+
+                let left = args.next().expect("there should be two arguments");
+                let right = args.next().expect("there should be two arguments");
+
+                left.checked_sub(right).map_err(|error| vec![error])
+            }
+            _ => Err(vec![EvalError::InvalidArgumentCount]),
         }
-
-        let mut args = args.into_iter();
-
-        let arg = args.next().expect("there should be one argument");
-
-        let Value::Number(number) = arg else {
-            return Err(vec![EvalError::InvalidType]);
-        };
-
-        let range = number.value.max() - number.value.min();
-
-        Ok(Value::Number(MeasuredNumber::new(
-            Number::Scalar(range),
-            number.unit,
-        )))
     }
 
     #[expect(unused_variables, reason = "not implemented")]
@@ -1010,18 +1021,39 @@ mod fns {
     }
 
     pub fn mid(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        if args.len() != 2 {
-            return Err(vec![EvalError::InvalidArgumentCount]);
+        match args.len() {
+            1 => {
+                let mut args = args.into_iter();
+
+                let arg = args.next().expect("there should be one argument");
+
+                let Value::Number(number) = arg else {
+                    return Err(vec![EvalError::InvalidType]);
+                };
+
+                let Number::Interval(interval) = number.value else {
+                    return Err(vec![EvalError::InvalidType]);
+                };
+
+                let mid = f64::midpoint(interval.min(), interval.max());
+
+                Ok(Value::Number(MeasuredNumber::new(
+                    Number::Scalar(mid),
+                    number.unit,
+                )))
+            }
+            2 => {
+                let mut args = args.into_iter();
+
+                let left = args.next().expect("there should be two arguments");
+                let right = args.next().expect("there should be two arguments");
+
+                left.checked_add(right)
+                    .and_then(|value| value.checked_div(Value::from(2.0)))
+                    .map_err(|error| vec![error])
+            }
+            _ => Err(vec![EvalError::InvalidArgumentCount]),
         }
-
-        let mut args = args.into_iter();
-
-        let left = args.next().expect("there should be two arguments");
-        let right = args.next().expect("there should be two arguments");
-
-        left.checked_add(right)
-            .and_then(|value| value.checked_div(Value::from(2.0)))
-            .map_err(|error| vec![error])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
