@@ -24,7 +24,7 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the units don't match.
     pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, EvalError> {
-        if self.unit != rhs.unit {
+        if self.unit != rhs.unit && !self.unit.is_unitless() && !rhs.unit.is_unitless() {
             return Err(EvalError::InvalidUnit);
         }
 
