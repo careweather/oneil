@@ -101,35 +101,13 @@ mod test {
 
     use crate::{
         assert_is_close, assert_units_eq,
-        builtin::{self, BuiltinMap},
-        value::{Dimension, Value},
+        builtin::{self, BuiltinMap, std::StdBuiltinFunction},
+        value::Dimension,
     };
 
     use super::*;
 
-    // macro_rules! assert_is_close {
-    //     ($expected:expr, $actual:expr) => {
-    //         let expected: f64 = $expected;
-    //         let actual: f64 = $actual;
-    //         assert!(
-    //             is_close(expected, actual),
-    //             "expected: {}, actual: {}",
-    //             expected,
-    //             actual
-    //         );
-    //     };
-    // }
-
-    // macro_rules! assert_units_eq {
-    //     ($expected_unit_list:expr, $actual_unit:expr) => {
-    //         let expected: Unit = Unit::new(HashMap::from($expected_unit_list));
-    //         let actual: Unit = $actual_unit;
-    //         assert_eq!(expected, actual);
-    //     };
-    // }
-
-    type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
-    fn create_eval_context() -> EvalContext<BuiltinFunction> {
+    fn create_eval_context() -> EvalContext<StdBuiltinFunction> {
         let builtins = BuiltinMap::new(
             builtin::std::builtin_values(),
             builtin::std::builtin_functions(),

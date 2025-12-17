@@ -1304,11 +1304,8 @@ mod tests {
 
         use crate::builtin::BuiltinMap;
 
+        use crate::builtin::std::StdBuiltinFunction;
         use crate::context::EvalContext;
-
-        use crate::error::EvalError;
-
-        use crate::value::Value;
 
         use std::collections::HashSet;
 
@@ -1897,9 +1894,6 @@ mod tests {
             )
         }
 
-        /// Type alias for builtin functions used in tests.
-        pub type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
-
         /// Creates an evaluation context with pre-defined parameters.
         ///
         /// # Arguments
@@ -1915,7 +1909,7 @@ mod tests {
         /// and with the specified parameters already evaluated and added to the context.
         pub fn create_eval_context(
             previous_parameters: impl IntoIterator<Item = (&'static str, f64, Vec<(&'static str, f64)>)>,
-        ) -> EvalContext<BuiltinFunction> {
+        ) -> EvalContext<StdBuiltinFunction> {
             let mut context = EvalContext::new(BuiltinMap::new(
                 builtin::std::builtin_values(),
                 builtin::std::builtin_functions(),

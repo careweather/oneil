@@ -708,7 +708,8 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
         .collect()
 }
 
-type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
+/// Type alias for standard builtin function type
+pub type StdBuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
 
 /// The builtin functions that come with Oneil:
 /// - `min` - minimum
@@ -737,30 +738,30 @@ type BuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
 /// will return an `EvalError::Unsupported` error when called. However,
 /// we plan to implement them in the future.
 #[must_use]
-pub fn builtin_functions() -> HashMap<String, BuiltinFunction> {
+pub fn builtin_functions() -> HashMap<String, StdBuiltinFunction> {
     HashMap::from(
         [
-            ("min", fns::min as BuiltinFunction),
-            ("max", fns::max as BuiltinFunction),
-            ("sin", fns::sin as BuiltinFunction),
-            ("cos", fns::cos as BuiltinFunction),
-            ("tan", fns::tan as BuiltinFunction),
-            ("asin", fns::asin as BuiltinFunction),
-            ("acos", fns::acos as BuiltinFunction),
-            ("atan", fns::atan as BuiltinFunction),
-            ("sqrt", fns::sqrt as BuiltinFunction),
-            ("ln", fns::ln as BuiltinFunction),
-            ("log", fns::log as BuiltinFunction),
-            ("log10", fns::log10 as BuiltinFunction),
-            ("floor", fns::floor as BuiltinFunction),
-            ("ceiling", fns::ceiling as BuiltinFunction),
-            ("extent", fns::extent as BuiltinFunction),
-            ("range", fns::range as BuiltinFunction),
-            ("abs", fns::abs as BuiltinFunction),
-            ("sign", fns::sign as BuiltinFunction),
-            ("mid", fns::mid as BuiltinFunction),
-            ("strip", fns::strip as BuiltinFunction),
-            ("mnmx", fns::mnmx as BuiltinFunction),
+            ("min", fns::min as StdBuiltinFunction),
+            ("max", fns::max as StdBuiltinFunction),
+            ("sin", fns::sin as StdBuiltinFunction),
+            ("cos", fns::cos as StdBuiltinFunction),
+            ("tan", fns::tan as StdBuiltinFunction),
+            ("asin", fns::asin as StdBuiltinFunction),
+            ("acos", fns::acos as StdBuiltinFunction),
+            ("atan", fns::atan as StdBuiltinFunction),
+            ("sqrt", fns::sqrt as StdBuiltinFunction),
+            ("ln", fns::ln as StdBuiltinFunction),
+            ("log", fns::log as StdBuiltinFunction),
+            ("log10", fns::log10 as StdBuiltinFunction),
+            ("floor", fns::floor as StdBuiltinFunction),
+            ("ceiling", fns::ceiling as StdBuiltinFunction),
+            ("extent", fns::extent as StdBuiltinFunction),
+            ("range", fns::range as StdBuiltinFunction),
+            ("abs", fns::abs as StdBuiltinFunction),
+            ("sign", fns::sign as StdBuiltinFunction),
+            ("mid", fns::mid as StdBuiltinFunction),
+            ("strip", fns::strip as StdBuiltinFunction),
+            ("mnmx", fns::mnmx as StdBuiltinFunction),
         ]
         .map(|(k, v)| (k.to_string(), v)),
     )
