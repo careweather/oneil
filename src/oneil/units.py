@@ -123,6 +123,8 @@ It converts SI units and legacy units to base units for all calculation, only co
 # SI units are those derived units for which the SI prefixes are commonly used.
 SI_UNITS = {
     "V": ({"kg": 1, "m": 2, "s": -3, "A": -1}, 1, {"alt": ["Volt"]}),
+    "F": ({"kg": -1, "m": -2, "s": 4, "A": 2}, 1, {"alt": ["Farad"]}),
+    "C": ({"A": 1, "s": 1}, 1, {"alt": ["Coulomb"]}),
     "W": ({"kg": 1, "m": 2, "s": -3}, 1, {"alt": ["Watt"]}),
     "Hz": ({"s": -1}, 6.283185307179586, {"alt": [("Hertz", "Hertz")], "SI min": 1}),
     "g": ({"kg": 1}, 0.001, {"alt": ["gram"]}),
