@@ -250,7 +250,7 @@ fn additive_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     let op = alt((
         plus.map(|token| token.into_node_with_value(BinaryOp::Add)),
         minus.map(|token| token.into_node_with_value(BinaryOp::Sub)),
-        minus_minus.map(|token| token.into_node_with_value(BinaryOp::TrueSub)),
+        minus_minus.map(|token| token.into_node_with_value(BinaryOp::EscapedSub)),
     ))
     .convert_errors();
 
@@ -262,7 +262,7 @@ fn multiplicative_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError
     let op = alt((
         star.map(|token| token.into_node_with_value(BinaryOp::Mul)),
         slash.map(|token| token.into_node_with_value(BinaryOp::Div)),
-        slash_slash.map(|token| token.into_node_with_value(BinaryOp::TrueDiv)),
+        slash_slash.map(|token| token.into_node_with_value(BinaryOp::EscapedDiv)),
         percent.map(|token| token.into_node_with_value(BinaryOp::Mod)),
     ))
     .convert_errors();

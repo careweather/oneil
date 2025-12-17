@@ -1,5 +1,7 @@
 //! Testing for Oneil model IR.
 
+use oneil_shared::span::Span;
+
 use crate::{debug_info::TraceLevel, expr::Expr};
 
 /// An index for identifying tests.
@@ -17,6 +19,7 @@ impl TestIndex {
 /// A test within a model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
+    span: Span,
     trace_level: TraceLevel,
     test_expr: Expr,
 }
@@ -24,11 +27,18 @@ pub struct Test {
 impl Test {
     /// Creates a new test with the specified properties.
     #[must_use]
-    pub const fn new(trace_level: TraceLevel, test_expr: Expr) -> Self {
+    pub const fn new(span: Span, trace_level: TraceLevel, test_expr: Expr) -> Self {
         Self {
+            span,
             trace_level,
             test_expr,
         }
+    }
+
+    /// Returns the span of the entire test definition.
+    #[must_use]
+    pub const fn span(&self) -> Span {
+        self.span
     }
 
     /// Returns the trace level for this test.

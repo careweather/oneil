@@ -18,7 +18,8 @@ pub fn reference_name(reference_name: &str) -> ir::ReferenceName {
 }
 
 pub fn expr_literal_number(value: f64) -> ir::Expr {
-    ir::Expr::literal(ir::Literal::number(value))
+    let span = unimportant_span();
+    ir::Expr::literal(span, ir::Literal::number(value))
 }
 
 pub fn empty_model() -> ir::Model {
@@ -90,6 +91,8 @@ impl ModelBuilder {
 pub struct ParameterBuilder {
     dependencies: HashSet<ir::ParameterName>,
     name: Option<ir::ParameterName>,
+    name_span: Option<Span>,
+    span: Option<Span>,
     value: Option<ir::ParameterValue>,
     limits: Option<ir::Limits>,
     is_performance: bool,
@@ -101,6 +104,8 @@ impl ParameterBuilder {
         Self {
             dependencies: HashSet::new(),
             name: None,
+            name_span: None,
+            span: None,
             value: None,
             limits: None,
             is_performance: false,
@@ -111,6 +116,9 @@ impl ParameterBuilder {
     pub fn with_name_str(mut self, name: &str) -> Self {
         let name = ir::ParameterName::new(name.to_string());
         self.name = Some(name);
+        let span = unimportant_span();
+        self.name_span = Some(span);
+        self.span = Some(span);
 
         self
     }
@@ -125,6 +133,8 @@ impl ParameterBuilder {
 
     pub fn build(self) -> ir::Parameter {
         let name = self.name.expect("name must be set");
+        let name_span = self.name_span.unwrap_or_else(unimportant_span);
+        let span = self.span.unwrap_or_else(unimportant_span);
         let value = self.value.expect("value must be set");
         let limits = self.limits.unwrap_or_default();
         let is_performance = self.is_performance;
@@ -133,6 +143,8 @@ impl ParameterBuilder {
         ir::Parameter::new(
             self.dependencies,
             name,
+            name_span,
+            span,
             value,
             limits,
             is_performance,

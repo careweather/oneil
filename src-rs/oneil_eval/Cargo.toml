@@ -1,0 +1,22 @@
+[package]
+name = "oneil_eval"
+description = "The evaluator for Oneil"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+oneil_shared = { path = "../oneil_shared" }
+oneil_ir = { path = "../oneil_ir" }
+arbitrary = { version = "1.4.2", optional = true }
+
+[dev-dependencies]
+oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
+
+[lints]
+workspace = true

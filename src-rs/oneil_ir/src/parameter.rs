@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use oneil_shared::span::Span;
+
 use crate::{debug_info::TraceLevel, expr::Expr, unit::CompositeUnit};
 
 /// A name for a parameter.
@@ -27,6 +29,8 @@ impl ParameterName {
 pub struct Parameter {
     dependencies: HashSet<ParameterName>,
     name: ParameterName,
+    name_span: Span,
+    span: Span,
     value: ParameterValue,
     limits: Limits,
     is_performance: bool,
@@ -39,6 +43,8 @@ impl Parameter {
     pub const fn new(
         dependencies: HashSet<ParameterName>,
         name: ParameterName,
+        name_span: Span,
+        span: Span,
         value: ParameterValue,
         limits: Limits,
         is_performance: bool,
@@ -47,6 +53,8 @@ impl Parameter {
         Self {
             dependencies,
             name,
+            name_span,
+            span,
             value,
             limits,
             is_performance,
@@ -64,6 +72,18 @@ impl Parameter {
     #[must_use]
     pub const fn name(&self) -> &ParameterName {
         &self.name
+    }
+
+    /// Returns the span of this parameter's identifier.
+    #[must_use]
+    pub const fn name_span(&self) -> Span {
+        self.name_span
+    }
+
+    /// Returns the span covering the entire parameter definition.
+    #[must_use]
+    pub const fn span(&self) -> Span {
+        self.span
     }
 
     /// Returns the value of this parameter.

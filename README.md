@@ -294,13 +294,183 @@ While [limits](#preamble-syntax) are typically specified in the parameter's unit
 > [!IMPORTANT]
 > Oneil handles nearly all unit conversion in the background, but there is a [major exception with frequencies (Hz) and angular frequencies (rad/s)](#something-funny-is-happening-with-angular-frequencies-and-frequencies).
 
-### Extrema Math
+### Arithmetic
 
-In the backend, Oneil uses parametric extrema math to calculate the extremes of the range of possibilities for a given calculation, as defined in Chapter 3 of [Concepts for Rapid-refresh, Global Ocean Surface Wind Measurement Evaluated Using Full-system Parametric Extrema Modeling](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=10166&context=etd). Expressions are limited to the following operators and functions: `+`, `-`, `\*`, `/`, `^`, `==,` `!=`, `<=`, `>=`, `%`, `()`, `min()`, `max()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()`, `sqrt()`, `ln()`, `log()`, `log10()`, `floor()`, `ceiling()`, `extent()`, `range()`, `abs()`, `sign()`, `mid()`, `strip()` (removes units in calculation), and `mnmx()` (an extreme function which gets the extremes of the inputs).
+In Oneil, all number values are 64-bit floating-point values. Thus, `1`, `-0.2`,
+`3.0e14`, and `-inf` are all valid values. Regular arithmetic operations are available,
+including:
 
-The `min()` and `max()` functions can be used to compare parameters or it can be used on a single Parameter to access the minimum or maximum value of the Parameter's value range.
+- `a + b` - addition
+- `a - b` - subtraction
+- `a \* b` - multiplication
+- `a / b` - division
+- `a % b` - modulo
+- `a ^ b` - exponent
+- `(a)` - grouping
 
-Extrema math yields substantially different results for subtraction and division. If the extreme cases are incompatible with a given parameter, you can specify standard math using the `--` and `//` operators.
+In addition, numbers can be compared with comparison operators:
+
+- `a == b` - equals
+- `a != b` - not equal
+- `a < b` - less than
+- `a <= b` - less than or equal
+- `a > b` - greater than
+- `a >= b` - greater than or equal
+
+In addition, builtin functions are provided, as described later.
+
+
+### Interval Arithmetic
+
+In addition to standard "scalar" values, Oneil supports "interval" values.
+Interval values are a values with a *minimum* and a *maximum* value, and
+can be created using the bar operator, `|`.
+
+```oneil
+# an interval from 0 to 5
+My interval: i = 0 | 5
+```
+
+Intervals can also be combined with the bar operator. This creates
+the smallest interval that covers both intervals. In other words,
+it creates an interval with the lesser minimum and the greater
+maximum.
+
+```oneil
+Interval 1: i1 = 0 | 2
+Interval 2: i2 = 4 | 6
+Combined: c = i1 | i2
+# => min(0, 4) | max(2, 6)
+# => 0 | 6
+```
+
+
+#### Arithmetic Operators
+
+The same operators that are defined for scalar values are also
+defined for interval values: `+`, `-`, `\*`, `/`, `%`, and `^`.
+
+However, interval arithmetic behaves slightly differently than one
+might inspect, since intervals represent a *range* of values,
+rather than an individual value.
+
+One example of this is that when evaluating subtraction, one might initially
+expect to subtract the min from the min and the max and the max:
+`i1 - i2 == min(i1) - min(i2) | max(i1) - max(i2)`. However, this produces
+incorrect results. For example,
+
+```oneil
+X: x = 10 | 15
+Y: y = 0 | 5
+Z: z = x - y
+# => (10 | 15) - (0 | 5)
+# => 10 - 0 | 15 - 5
+# => 10 | 10
+```
+
+Instead, subtraction is implemented as `min(i1) - max(i2) | max(i1) - min(i2)`.
+
+```oneil
+X: x = 10 | 15
+Y: y = 0 | 5
+Z: z = x - y
+# => (10 | 15) - (0 | 5)
+# => 10 - 5 | 15 - 0
+# => 5 | 15
+```
+
+All arithmetic operators produce arithmetically correct results. For more details,
+on their implementation, refer to the
+[paper review](docs/research/2025-11-13-interval-arithmetic-paper-review.md) or
+the implementation code.
+
+<!-- TODO: figure out the best way to make these details accessible -->
+
+
+#### Escaping the interval arithmetic implementation
+
+Oneil's implementation of interval arithmetic intends to be arithmetically correct.
+That is to say, if you were to replace every interval in an expression with a value
+within that interval and then evaluated the expression, the resulting value would
+be contained within the interval produced by evaluating the initial expression.
+This is known as the
+[inclusion property](docs/research/2025-11-13-interval-arithmetic-paper-review.md#inclusion-property).
+
+However, the arithmetic may *overapproximate* an interval. For example, we would
+expect `a - a` to always be equal to `0`, no matter what `a` is. Therefore, if
+`a` is an interval, we would expect `a - a` to produce an interval with `0` as
+both the minimum and maximum value, `0 | 0`.
+
+If we take `a` as `0 | 1`, however, `a - a` would produce the interval `-1 | 1`.
+While this answer is technically correct (`0 | 0` is contained within `-1 | 1`),
+it isn't as precise as we would expect.
+
+This problem is known as the
+[dependency problem](https://en.wikipedia.org/wiki/Interval_arithmetic#Dependency_problem).
+
+If more precision is needed (such as in geometry, where relationships such as `a - a = 0`
+are important), you can "escape" interval arithmetic using `min(i)` and
+`max(i)` functions, which get the minimum and maximum values of an interval. This allows
+users to operate on scalar values until they are ready to return to interval arithmetic
+using the bar operator. For example, instead of `a - a`, a user could use
+`min(a) - min(a) | max(a) - max(a)` in order to get a more precise result.
+
+To simplify this escape, Oneil provides the `--` and `//` operators,
+which behave as follows:
+
+| Operator | Equivalent To                        |
+|----------|--------------------------------------|
+| `a -- b` | `min(a) - min(b) \| max(a) - max(b)` |
+| `a // b` | `min(a) / min(b) \| max(a) / max(b)` |
+
+
+#### Comparison
+
+Intervals can also be compared with each other using the comparison operators,
+which are implemented as defined below.
+
+| Operator | Equivalent To                           | Description                                                           |
+|----------|-----------------------------------------|-----------------------------------------------------------------------|
+| `a == b` | `min(a) == min(b) and max(a) == max(b)` | The min and the max are the same                                      |
+| `a != b` | `min(a) != min(b) or max(a) != max(b)`  | The min or the max is not the same                                    |
+| `a < b`  | `max(a) < min(b)`                       | The max value of `a` is less than the min value of `b`                |
+| `a <= b` | `max(a) <= min(b)`                      | The max value of `a` is less than or equal to the min value of `b`    |
+| `a > b`  | `min(a) > max(b)`                       | The min value of `a` is greater than the max value of `b`             |
+| `a >= b` | `min(a) >= max(b)`                      | The min value of `a` is greater than or equal to the max value of `b` |
+
+
+### Builtin Functions
+
+Oneil has the following builtin functions.
+
+**NOTE: currently, only some of these functions are supported, although there are plans to support all of them in the future.**
+
+| Function         | Description | Supported |
+|------------------|-------------|-----------|
+| `min(a)`         | If `a` is an interval, return the minimum value of the interval. Otherwise, return the value of `a`| ✓ |
+| `min(a, b, ...)` | Find the minimum value of the given values. If a value is an interval, the minimum value of the interval is used | ✓ |
+| `max(a)`         | If `a` is an interval, return the maximum value of the interval. Otherwise, return the value of `a`| ✓ |
+| `max(a, b, ...)` | Find the maximum value of the given values. If a value is an interval, the maximum value of the interval is used | ✓ |
+| `mid(a, b)`      | Find the midpoint between the | × |
+| `range(a)`       | Return the width of an interval (max−min) | ✓ |
+| `sqrt(a)`        | Calculate the square root | ✓ |
+| `sin(a)`         | Calculate the sine | × |
+| `cos(a)`         | Calculate the cosine | × |
+| `tan(a)`         | Calculate the tangent | × |
+| `asin(a)`        | Calculate the arcsine | × |
+| `acos(a)`        | Calculate the arccosine | × |
+| `atan(a)`        | Calculate the arctangent | × |
+| `ln(a)`          | Natural logarithm | × |
+| `log(a)`         | Base 10 logarithm | × |
+| `log10(a)`       | Base 10 logarithm (alias for `log(a)`) | × |
+| `floor(a)`       | Round down to nearest integer | × |
+| `ceiling(a)`     | Round up to nearest integer | × |
+| `extent(a)`      | TODO: not sure what this does | × |
+| `abs(a)`         | Absolute value | × |
+| `sign(a)`        | Sign of value (−1, 0, 1) | × |
+| `strip(a)`       | Remove units from calculation | × |
+| `mnmx(...)`      | Gets the minimum and maximum of the list of values | × |
+
 
 #### Piecewise Equations
 
@@ -317,6 +487,8 @@ Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'earth_orbital' :km/s
 Conditions are evaluated in order, and the first equation corresponding to a true condition is calculated to obtain the value for the parameter.
 
 #### Breakout Functions
+
+**NOTE: this is currently unsupported**
 
 For functions not supported by the above equation formats, you can define a python function and link it.
 

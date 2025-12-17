@@ -20,13 +20,30 @@ pub enum Commands {
     Dev {
         /// The specific development command to execute
         #[command(subcommand)]
-        command: DevCommands,
+        command: DevCommand,
+    },
+    /// Evaluate a Oneil model
+    Eval {
+        /// Path to the Oneil model file to evaluate
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+
+        /// Print the output in debug format
+        #[arg(long)]
+        print_debug: bool,
+
+        /// Disable colors in the output
+        ///
+        /// When enabled, suppresses colored output for better compatibility with
+        /// terminals that don't support ANSI color codes or for redirecting to files.
+        #[arg(long)]
+        no_colors: bool,
     },
 }
 
 /// Development-specific commands for the Oneil CLI
 #[derive(Subcommand)]
-pub enum DevCommands {
+pub enum DevCommand {
     /// Print the Abstract Syntax Tree (AST) of a Oneil source file
     PrintAst {
         /// Path to the Oneil source file(s) to parse and display

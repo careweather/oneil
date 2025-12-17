@@ -24,6 +24,7 @@ pub fn resolve_tests(
 ) {
     let tests = tests.into_iter().enumerate().map(|(test_index, test)| {
         let test_index = ir::TestIndex::new(test_index);
+        let test_span = test.span();
 
         let trace_level = resolve_trace_level(test.trace_level());
 
@@ -35,7 +36,7 @@ pub fn resolve_tests(
         )
         .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
-        Ok((test_index, ir::Test::new(trace_level, test_expr)))
+        Ok((test_index, ir::Test::new(test_span, trace_level, test_expr)))
     });
 
     error::split_ok_and_errors(tests)
