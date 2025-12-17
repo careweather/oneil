@@ -908,6 +908,86 @@ mod tests {
     }
 
     #[test]
+    fn eval_escaped_div_function() {
+        // setup context with x = 6.0 m and y = 2.0 m
+        let context = helper::create_eval_context([
+            ("x", 6.0, vec![("m", 1.0)]),
+            ("y", 2.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = x // y with unit m
+        // Escaped division requires matching units
+        let parameter = helper::build_escaped_div_parameter("z", "x", "y", []);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = x // y = 6.0 m // 2.0 m = 3.0
+        // For scalars, escaped division behaves the same as regular division
+        assert_is_close!(3.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
+    fn eval_escaped_sub_function() {
+        // setup context with x = 6.0 m and y = 2.0 m
+        let context = helper::create_eval_context([
+            ("x", 6.0, vec![("m", 1.0)]),
+            ("y", 2.0, vec![("m", 1.0)]),
+        ]);
+
+        // setup parameter z = x -- y with unit m
+        // Escaped subtraction requires matching units
+        let parameter = helper::build_escaped_sub_parameter("z", "x", "y", [("m", 1.0)]);
+        let (parameter_value, typecheck_info) =
+            eval_parameter(&parameter, &context).expect("eval should succeed");
+
+        let expected_units = [(Dimension::Distance, 1.0)];
+
+        // check the parameter value
+        let Value::Number(number) = parameter_value else {
+            panic!("expected number");
+        };
+
+        let Number::Scalar(value) = number.value else {
+            panic!("expected scalar");
+        };
+
+        // z = x -- y = 6.0 m -- 2.0 m = 4.0 m
+        // For scalars, escaped subtraction behaves the same as regular subtraction
+        assert_is_close!(4.0, value);
+        assert_units_eq!(expected_units, number.unit);
+
+        // check the typecheck info
+        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+            panic!("expected number typecheck info");
+        };
+
+        assert_units_eq!(expected_units, sized_unit.unit);
+        assert_is_close!(1.0, sized_unit.magnitude);
+        assert!(!is_db);
+    }
+
+    #[test]
     fn eval_mod_function() {
         // setup context with x = 7.0 m and y = 3.0 m
         let context = helper::create_eval_context([
@@ -1502,6 +1582,130 @@ mod tests {
             let expr = ir::Expr::BinaryOp {
                 span: random_span(),
                 op: ir::BinaryOp::Div,
+                left: Box::new(expr_a),
+                right: Box::new(expr_b),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with an escaped division expression.
+        ///
+        /// Escaped division (`//`) requires matching units and uses non-standard
+        /// interval arithmetic (divides min by min and max by max for intervals).
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value_a` - The name of the dividend parameter
+        /// * `value_b` - The name of the divisor parameter
+        /// * `units` - An iterator of unit names and their exponents (must match the units of both operands)
+        ///
+        /// # Returns
+        ///
+        /// A parameter with an escaped division binary operation: `value_a // value_b`.
+        pub fn build_escaped_div_parameter(
+            name: &str,
+            value_a: &str,
+            value_b: &str,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_a = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_a.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr_b = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_b.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::EscapedDiv,
+                left: Box::new(expr_a),
+                right: Box::new(expr_b),
+            };
+
+            let units = units
+                .into_iter()
+                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .collect();
+            let units = ir::CompositeUnit::new(units);
+
+            ir::Parameter::new(
+                HashSet::new(),
+                ir::ParameterName::new(name.to_string()),
+                random_span(),
+                random_span(),
+                ir::ParameterValue::simple(expr, Some(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+            )
+        }
+
+        /// Builds a parameter with an escaped subtraction expression.
+        ///
+        /// Escaped subtraction (`--`) requires matching units and uses non-standard
+        /// interval arithmetic (subtracts min from min and max from max for intervals).
+        ///
+        /// # Arguments
+        ///
+        /// * `name` - The name of the parameter
+        /// * `value_a` - The name of the minuend parameter
+        /// * `value_b` - The name of the subtrahend parameter
+        /// * `units` - An iterator of unit names and their exponents (must match the units of both operands)
+        ///
+        /// # Returns
+        ///
+        /// A parameter with an escaped subtraction binary operation: `value_a -- value_b`.
+        pub fn build_escaped_sub_parameter(
+            name: &str,
+            value_a: &str,
+            value_b: &str,
+            units: impl IntoIterator<Item = (&'static str, f64)>,
+        ) -> ir::Parameter {
+            let expr_a = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_a.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr_b = ir::Expr::Variable {
+                span: random_span(),
+                variable: ir::Variable::parameter(
+                    ir::ParameterName::new(value_b.to_string()),
+                    random_span(),
+                ),
+            };
+
+            let expr = ir::Expr::BinaryOp {
+                span: random_span(),
+                op: ir::BinaryOp::EscapedSub,
                 left: Box::new(expr_a),
                 right: Box::new(expr_b),
             };
