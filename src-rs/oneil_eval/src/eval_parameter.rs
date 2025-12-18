@@ -103,7 +103,7 @@ fn get_piecewise_result<F: BuiltinFunction>(
 pub enum TypecheckInfo {
     String,
     Boolean,
-    Number { sized_unit: SizedUnit, is_db: bool },
+    Number { sized_unit: SizedUnit },
 }
 
 /// Typechecks the value of an expression against a unit.
@@ -139,16 +139,16 @@ fn typecheck_expr_value<F: BuiltinFunction>(
         } => {
             // evaluate the unit if it exists,
             // otherwise use the unitless unit
-            let (sized_unit, is_db) = unit_ir
+            let sized_unit = unit_ir
                 .as_ref()
                 .map(|unit| eval_unit(unit, context))
                 .transpose()?
-                .unwrap_or((SizedUnit::unitless(), false));
+                .unwrap_or(SizedUnit::unitless());
 
             // if the value is unitless, assign it the given unit
             // otherwise, typecheck the value's unit against the given unit
             if unit.is_unitless() || unit == sized_unit.unit {
-                Ok(TypecheckInfo::Number { sized_unit, is_db })
+                Ok(TypecheckInfo::Number { sized_unit })
             } else {
                 Err(vec![EvalError::ParameterUnitMismatch])
             }
@@ -158,14 +158,14 @@ fn typecheck_expr_value<F: BuiltinFunction>(
 
 fn transform_value(value: Value, typecheck_info: &TypecheckInfo) -> Value {
     match (typecheck_info, value) {
-        (TypecheckInfo::Number { sized_unit, is_db }, Value::Number(number))
+        (TypecheckInfo::Number { sized_unit }, Value::Number(number))
             if number.unit.is_unitless() =>
         {
             let number_value = number.value * sized_unit.magnitude;
             let number_unit = sized_unit.unit.clone();
 
             // handle dB units
-            let number_value = if *is_db {
+            let number_value = if sized_unit.is_db {
                 db_to_linear(number_value)
             } else {
                 number_value
@@ -347,7 +347,7 @@ fn eval_discrete_limits<F: BuiltinFunction>(
 
 fn transform_limits(limits: Limits, typecheck_info: &TypecheckInfo) -> Limits {
     match (limits, typecheck_info) {
-        (Limits::NumberRange { min, max, unit }, TypecheckInfo::Number { sized_unit, is_db })
+        (Limits::NumberRange { min, max, unit }, TypecheckInfo::Number { sized_unit })
             if unit.is_unitless() =>
         {
             let min = min * Number::Scalar(sized_unit.magnitude);
@@ -355,29 +355,42 @@ fn transform_limits(limits: Limits, typecheck_info: &TypecheckInfo) -> Limits {
             let unit = sized_unit.unit.clone();
 
             // handle dB units
-            let min = if *is_db { db_to_linear(min) } else { min };
-            let max = if *is_db { db_to_linear(max) } else { max };
+            let min = if sized_unit.is_db {
+                db_to_linear(min)
+            } else {
+                min
+            };
+            let max = if sized_unit.is_db {
+                db_to_linear(max)
+            } else {
+                max
+            };
 
             Limits::NumberRange { min, max, unit }
         }
 
-        (Limits::NumberDiscrete { values, unit }, TypecheckInfo::Number { sized_unit, is_db })
+        (Limits::NumberDiscrete { values, unit }, TypecheckInfo::Number { sized_unit })
             if unit.is_unitless() =>
         {
             let values = values
                 .into_iter()
                 .map(|value| value * Number::Scalar(sized_unit.magnitude))
-                .map(|value| if *is_db { db_to_linear(value) } else { value })
+                .map(|value| {
+                    if sized_unit.is_db {
+                        db_to_linear(value)
+                    } else {
+                        value
+                    }
+                })
                 .collect();
 
             let unit = sized_unit.unit.clone();
             Limits::NumberDiscrete { values, unit }
         }
 
-        (
-            Limits::AnyStringOrBooleanOrPositiveNumber,
-            TypecheckInfo::Number { sized_unit, is_db },
-        ) if *is_db => {
+        (Limits::AnyStringOrBooleanOrPositiveNumber, TypecheckInfo::Number { sized_unit })
+            if sized_unit.is_db =>
+        {
             Limits::NumberRange {
                 min: Number::Scalar(1.0), // 0 db == 1
                 max: Number::Scalar(f64::INFINITY),
@@ -489,13 +502,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -521,13 +534,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -554,13 +567,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1000.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -587,13 +600,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1000.0 / 3600.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -620,13 +633,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(is_db);
+        assert!(sized_unit.is_db);
     }
 
     #[test]
@@ -657,13 +670,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(is_db);
+        assert!(sized_unit.is_db);
     }
 
     #[test]
@@ -696,13 +709,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1000.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -739,13 +752,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -783,13 +796,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -822,13 +835,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -860,13 +873,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -898,13 +911,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -938,13 +951,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -978,13 +991,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1016,13 +1029,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1051,13 +1064,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1089,13 +1102,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1105,8 +1118,10 @@ mod tests {
 
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
-        let (x_value, _) = eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        context.add_parameter_result("x".to_string(), Ok(x_value));
+        let (x_value, typecheck_info) =
+            eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        let parameter_result = helper::build_parameter_result("x", x_value, typecheck_info);
+        context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = min(x) with unit m
         let parameter = helper::build_function_call_parameter("z", "min", ["x"], [("m", 1.0)]);
@@ -1130,13 +1145,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1168,13 +1183,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1184,8 +1199,10 @@ mod tests {
 
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
-        let (x_value, _) = eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        context.add_parameter_result("x".to_string(), Ok(x_value));
+        let (x_value, typecheck_info) =
+            eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        let parameter_result = helper::build_parameter_result("x", x_value, typecheck_info);
+        context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = max(x) with unit m
         let parameter = helper::build_function_call_parameter("z", "max", ["x"], [("m", 1.0)]);
@@ -1209,13 +1226,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1225,8 +1242,10 @@ mod tests {
 
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
-        let (x_value, _) = eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        context.add_parameter_result("x".to_string(), Ok(x_value));
+        let (x_value, typecheck_info) =
+            eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        let parameter_result = helper::build_parameter_result("x", x_value, typecheck_info);
+        context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = range(x) with unit m
         let parameter = helper::build_function_call_parameter("z", "range", ["x"], [("m", 1.0)]);
@@ -1250,13 +1269,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -1288,13 +1307,13 @@ mod tests {
         assert_units_eq!(expected_units, number.unit);
 
         // check the typecheck info
-        let TypecheckInfo::Number { sized_unit, is_db } = typecheck_info else {
+        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
             panic!("expected number typecheck info");
         };
 
         assert_units_eq!(expected_units, sized_unit.unit);
         assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!is_db);
+        assert!(!sized_unit.is_db);
     }
 
     mod helper {
@@ -1306,6 +1325,7 @@ mod tests {
 
         use crate::builtin::std::StdBuiltinFunction;
         use crate::context::EvalContext;
+        use crate::result;
 
         use std::collections::HashSet;
 
@@ -1922,12 +1942,35 @@ mod tests {
 
             for (name, value, units) in previous_parameters {
                 let parameter = build_simple_parameter(name, value, units);
-                let (parameter_value, _) =
+                let (parameter_value, typecheck_info) =
                     eval_parameter(&parameter, &context).expect("eval should succeed");
-                context.add_parameter_result(name.to_string(), Ok(parameter_value));
+                let parameter_result =
+                    build_parameter_result(name, parameter_value, typecheck_info);
+                context.add_parameter_result(name.to_string(), Ok(parameter_result));
             }
 
             context
+        }
+
+        pub fn build_parameter_result(
+            name: &str,
+            value: Value,
+            typecheck_info: TypecheckInfo,
+        ) -> result::Parameter {
+            let unit = match typecheck_info {
+                TypecheckInfo::Number { sized_unit } => Some(sized_unit),
+                TypecheckInfo::String | TypecheckInfo::Boolean => None,
+            };
+
+            result::Parameter {
+                value,
+                ident: name.to_string(),
+                label: name.to_string(),
+                unit,
+                is_performance: false,
+                trace: result::TraceLevel::None,
+                dependencies: HashSet::new(),
+            }
         }
     }
 }
