@@ -147,6 +147,8 @@ pub struct SizedUnit {
     pub magnitude: f64,
     /// The unit of the sized unit.
     pub unit: Unit,
+    /// Whether the sized unit is a dB unit.
+    pub is_db: bool,
 }
 
 impl SizedUnit {
@@ -156,6 +158,7 @@ impl SizedUnit {
         Self {
             magnitude: 1.0,
             unit: Unit::unitless(),
+            is_db: false,
         }
     }
 
@@ -165,7 +168,14 @@ impl SizedUnit {
         Self {
             magnitude: self.magnitude.powf(exponent),
             unit: self.unit.pow(exponent),
+            is_db: self.is_db,
         }
+    }
+
+    /// Sets the is_db flag of the sized unit.
+    #[must_use]
+    pub fn set_is_db(self, is_db: bool) -> Self {
+        Self { is_db, ..self }
     }
 }
 
@@ -179,6 +189,7 @@ impl ops::Mul for SizedUnit {
         Self {
             magnitude: self.magnitude * rhs.magnitude,
             unit: self.unit * rhs.unit,
+            is_db: self.is_db || rhs.is_db,
         }
     }
 }
@@ -193,6 +204,7 @@ impl ops::Div for SizedUnit {
         Self {
             magnitude: self.magnitude / rhs.magnitude,
             unit: self.unit / rhs.unit,
+            is_db: self.is_db || rhs.is_db,
         }
     }
 }

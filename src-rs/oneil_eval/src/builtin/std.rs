@@ -166,6 +166,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                 // the kilogram is the base unit of mass, so the gram is 1e-3 of a kilogram
                 magnitude: 1e-3,
                 unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -173,6 +174,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -180,6 +182,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -187,6 +190,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::Temperature, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -194,6 +198,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::Current, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -201,6 +206,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -208,6 +214,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -215,6 +222,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::Substance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -222,6 +230,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+                is_db: false,
             },
         ),
         // === DERIVED UNITS ===
@@ -235,6 +244,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -1.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -246,6 +256,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -253,6 +264,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 2.0 * std::f64::consts::PI,
                 unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -264,6 +276,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -275,6 +288,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -285,6 +299,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Current, 1.0),
                     (Dimension::Time, 1.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -296,6 +311,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Time, -2.0),
                     (Dimension::Current, -1.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -308,6 +324,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -319,6 +336,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, 1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -330,6 +348,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Time, -2.0),
                     (Dimension::Current, -1.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -337,6 +356,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -347,6 +367,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::LuminousIntensity, 1.0),
                     (Dimension::Distance, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -357,6 +378,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Information, 1.0),
                     (Dimension::Time, -1.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -364,6 +386,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 8.0,
                 unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -375,6 +398,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, -1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         // === LEGACY UNITS ===
@@ -383,6 +407,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 3.1556952e10,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -390,6 +415,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 3.1556952e9,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -397,6 +423,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 3.1556952e8,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -404,6 +431,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 3.1556952e7,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -411,6 +439,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 2.629746e6,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -418,6 +447,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 6.048e5,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -425,6 +455,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 8.64e4,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -432,6 +463,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 3600.0,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -439,6 +471,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 60.0,
                 unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -446,6 +479,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.10471975511965977,
                 unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -453,6 +487,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1000.0,
                 unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -460,6 +495,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1e6,
                 unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -467,6 +503,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1e9,
                 unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -474,6 +511,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1e12,
                 unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -484,6 +522,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Mass, 1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -498,6 +537,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.01,
                 unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -509,6 +549,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, -1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -520,6 +561,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, -1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -531,6 +573,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, -1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -542,6 +585,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, -1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -553,6 +597,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, 1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -564,6 +609,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, -1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -575,6 +621,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, -1.0),
                     (Dimension::Time, -2.0),
                 ])),
+                is_db: false,
             },
         ),
         (
@@ -582,6 +629,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.0254,
                 unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -589,6 +637,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.3048,
                 unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -596,6 +645,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.9144,
                 unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -603,6 +653,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1609.344,
                 unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -610,6 +661,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1852.0,
                 unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -617,6 +669,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.45359237,
                 unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
+                is_db: false,
             },
         ),
         (
@@ -627,6 +680,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                     (Dimension::Distance, 1.0),
                     (Dimension::Time, -1.0),
                 ])),
+                is_db: false,
             },
         ),
         // === DIMENSIONLESS UNITS ===
@@ -636,6 +690,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                 // a revolution is 2π radians
                 magnitude: 2.0 * std::f64::consts::PI,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -644,6 +699,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
                 // a cycle is 2π radians
                 magnitude: 2.0 * std::f64::consts::PI,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -651,6 +707,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1.0,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -658,6 +715,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.017453292519943295,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -665,6 +723,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.01,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -672,6 +731,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1e-6,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -679,6 +739,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 1e-9,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -686,6 +747,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 0.0002908882086657216,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
         (
@@ -693,6 +755,7 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
             SizedUnit {
                 magnitude: 4.84813681109536e-06,
                 unit: Unit::new(HashMap::from([])),
+                is_db: false,
             },
         ),
     ];
