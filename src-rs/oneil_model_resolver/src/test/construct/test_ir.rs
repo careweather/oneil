@@ -135,6 +135,7 @@ impl ParameterBuilder {
         let name = self.name.expect("name must be set");
         let name_span = self.name_span.unwrap_or_else(unimportant_span);
         let span = self.span.unwrap_or_else(unimportant_span);
+        let label = ir::Label::new(name.as_str().to_string());
         let value = self.value.expect("value must be set");
         let limits = self.limits.unwrap_or_default();
         let is_performance = self.is_performance;
@@ -145,6 +146,7 @@ impl ParameterBuilder {
             name,
             name_span,
             span,
+            label,
             value,
             limits,
             is_performance,

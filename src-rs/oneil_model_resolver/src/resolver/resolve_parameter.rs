@@ -267,6 +267,8 @@ fn resolve_parameter(
 
     let ident = parameter_identifier.clone();
 
+    let label = ir::Label::new(parameter.label().as_str().to_string());
+
     let value =
         resolve_parameter_value(parameter.value(), builtin_ref, context, &parameter_context);
 
@@ -286,6 +288,7 @@ fn resolve_parameter(
                 ident,
                 parameter_identifier_span,
                 parameter.span(),
+                label,
                 value,
                 limits,
                 is_performance,
