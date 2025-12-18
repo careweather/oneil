@@ -315,13 +315,13 @@ fn eval_variable<F: BuiltinFunction>(
         ir::Variable::Parameter {
             parameter_name,
             parameter_span: _,
-        } => context.lookup_parameter(parameter_name),
+        } => context.lookup_parameter_value(parameter_name),
         ir::Variable::External {
             model,
             parameter_name,
             model_span: _,
             parameter_span: _,
-        } => context.lookup_model_parameter(model, parameter_name),
+        } => context.lookup_model_parameter_value(model, parameter_name),
     }
 }
 
