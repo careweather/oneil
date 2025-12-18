@@ -1,4 +1,6 @@
 #![expect(missing_docs, reason = "this enum will be reworked in the next task")]
+
+use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvalError {
     InvalidUnit,
@@ -27,4 +29,11 @@ pub enum EvalError {
     ParameterUnitDoesNotMatchLimit,
     Unsupported,
     NoNonEmptyValue,
+    ModelNotFound,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelError {
+    pub model_path: PathBuf,
+    pub error: EvalError,
 }

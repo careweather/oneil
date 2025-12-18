@@ -1,7 +1,7 @@
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 //! CLI for the Oneil programming language
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use anstream::{ColorChoice, eprintln, println};
 use clap::Parser;
@@ -34,7 +34,7 @@ fn main() {
             file,
             print_debug,
             no_colors,
-        } => handle_eval_command(file, print_debug, no_colors),
+        } => handle_eval_command(&file, print_debug, no_colors),
     }
 }
 
@@ -116,7 +116,7 @@ fn handle_dev_command(command: DevCommand) {
     }
 }
 
-fn handle_eval_command(file: PathBuf, print_debug: bool, no_colors: bool) {
+fn handle_eval_command(file: &Path, print_debug: bool, no_colors: bool) {
     set_color_choice(no_colors);
 
     let builtins = Builtins::new(
@@ -127,7 +127,7 @@ fn handle_eval_command(file: PathBuf, print_debug: bool, no_colors: bool) {
     );
 
     let model_collection =
-        oneil_model_resolver::load_model(file, &builtins, &file_parser::FileLoader);
+        oneil_model_resolver::load_model(&file, &builtins, &file_parser::FileLoader);
     let model_collection = match model_collection {
         Ok(model_collection) => model_collection,
         Err(error) => {
@@ -141,9 +141,10 @@ fn handle_eval_command(file: PathBuf, print_debug: bool, no_colors: bool) {
         }
     };
 
-    let eval_result = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
+    let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
 
-    println!("{eval_result:?}");
+    let model = eval_context.get_model_result(&file);
+    println!("{model:?}");
 }
 
 fn set_color_choice(no_colors: bool) {

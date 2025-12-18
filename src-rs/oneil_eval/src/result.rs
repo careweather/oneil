@@ -1,5 +1,3 @@
-#![expect(dead_code, reason = "this module is for the next task")]
-
 use std::{collections::HashMap, path::PathBuf};
 
 use oneil_shared::span::Span;
@@ -8,26 +6,26 @@ use crate::value::{Unit, Value};
 
 #[derive(Debug, Clone)]
 pub struct Model {
-    path: PathBuf,
-    submodels: HashMap<String, Model>,
-    parameters: HashMap<String, Parameter>,
-    tests: HashMap<String, Test>,
+    pub path: PathBuf,
+    pub submodels: HashMap<String, Model>,
+    pub parameters: HashMap<String, Parameter>,
+    pub tests: HashMap<String, Test>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Test {
-    expr_span: Span,
-    value: Value,
+    pub expr_span: Span,
+    pub value: Value,
 }
 
 #[derive(Debug, Clone)]
 pub struct Parameter {
-    ident: String,
-    label: String,
-    value: Value,
-    unit: Unit,
-    is_db: bool,
-    is_performance: bool,
-    trace: bool,
-    dependency_results: HashMap<String, Value>,
+    pub ident: String,
+    pub label: String,
+    pub value: Value,
+    pub unit: Unit,
+    pub is_db: bool,
+    pub is_performance: bool,
+    pub trace: bool,
+    pub dependency_results: HashMap<String, Value>,
 }
