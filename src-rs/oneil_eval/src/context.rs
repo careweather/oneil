@@ -6,9 +6,9 @@ use std::{
 use oneil_ir as ir;
 
 use crate::{
-    builtin::BuiltinFunction,
-    builtin::BuiltinMap,
-    error::EvalError,
+    builtin::{BuiltinFunction, BuiltinMap},
+    error::{EvalError, ModelError},
+    result,
     value::{SizedUnit, Value},
 };
 
@@ -212,5 +212,100 @@ impl<F: BuiltinFunction> EvalContext<F> {
 
     pub fn activate_reference(&mut self, reference: PathBuf) {
         self.active_references.insert(reference);
+    }
+
+    pub fn get_model_result(&self, model_path: &Path) -> Result<result::Model, Vec<ModelError>> {
+        // get the model
+        let model = self.models.get(model_path).ok_or_else(|| {
+            vec![ModelError {
+                model_path: model_path.to_path_buf(),
+                error: EvalError::ModelNotFound,
+            }]
+        })?;
+
+        // get the submodels
+        let (submodels, submodel_errors) = model
+            .submodels
+            .iter()
+            .map(|(name, submodel_path)| {
+                let submodel_result = self.get_model_result(submodel_path);
+                submodel_result.map(|submodel_result| (name.clone(), submodel_result))
+            })
+            .fold(
+                (HashMap::new(), Vec::new()),
+                |(mut submodels, mut submodel_errors), result| match result {
+                    Ok((name, submodel_result)) => {
+                        submodels.insert(name, submodel_result);
+                        (submodels, submodel_errors)
+                    }
+                    Err(error) => {
+                        submodel_errors.extend(error);
+                        (submodels, submodel_errors)
+                    }
+                },
+            );
+
+        // get the parameters
+        let (parameters, parameter_errors) = model
+            .parameters
+            .iter()
+            .map(|(name, parameter_result)| {
+                parameter_result
+                    .clone()
+                    .map(|parameter_result| (name.clone(), parameter_result))
+            })
+            .fold(
+                (HashMap::new(), Vec::new()),
+                |(mut parameters, mut parameter_errors), result| match result {
+                    Ok((name, parameter_result)) => {
+                        parameters.insert(name, parameter_result);
+                        (parameters, parameter_errors)
+                    }
+                    Err(errors) => {
+                        let errors = errors.into_iter().map(|error| ModelError {
+                            model_path: model_path.to_path_buf(),
+                            error,
+                        });
+
+                        parameter_errors.extend(errors);
+                        (parameters, parameter_errors)
+                    }
+                },
+            );
+
+        // get the tests
+        let (tests, test_errors) = model.tests.iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut tests, mut test_errors), test_result| match test_result.clone() {
+                Ok(test_result) => {
+                    tests.push(test_result);
+                    (tests, test_errors)
+                }
+                Err(errors) => {
+                    let errors = errors.into_iter().map(|error| ModelError {
+                        model_path: model_path.to_path_buf(),
+                        error,
+                    });
+
+                    test_errors.extend(errors);
+                    (tests, test_errors)
+                }
+            },
+        );
+
+        let errors = [submodel_errors, parameter_errors, test_errors].concat();
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        let model_result = result::Model {
+            path: model_path.to_path_buf(),
+            submodels,
+            parameters: todo!(),
+            tests: todo!(),
+        };
+
+        Ok(model_result)
     }
 }
