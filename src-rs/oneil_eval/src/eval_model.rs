@@ -3,7 +3,12 @@ use std::collections::{HashMap, HashSet};
 use oneil_ir as ir;
 
 use crate::{
-    EvalError, builtin::BuiltinFunction, context::EvalContext, eval_expr, eval_parameter,
+    EvalError,
+    builtin::BuiltinFunction,
+    context::EvalContext,
+    eval_expr,
+    eval_parameter::{self, TypecheckInfo},
+    result,
     value::Value,
 };
 
@@ -52,22 +57,10 @@ pub fn eval_model<F: BuiltinFunction>(
             .get(&parameter_name)
             .expect("parameter should exist because it comes from the keys of the parameters map");
 
-        let value = eval_parameter(parameter, &context);
+        let value = eval_parameter::eval_parameter(parameter, &context);
 
-        let parameter_result = value.map(
-            |(value, _)| todo!(), /* result::Parameter {
-                                      value,
-                                      unit: parameter.unit(),
-                                      is_db: parameter.is_db(),
-                                      is_performance: parameter.is_performance(),
-                                      trace: parameter.trace(),
-                                      dependency_results: parameter
-                                          .dependencies()
-                                          .iter()
-                                          .map(|dependency| (dependency.as_str().to_string(), value))
-                                          .collect(),
-                                  } */
-        );
+        let parameter_result = value
+            .map(|(value, typecheck_info)| parameter_result_from(value, typecheck_info, parameter));
 
         context.add_parameter_result(parameter_name.as_str().to_string(), parameter_result);
     }
@@ -76,18 +69,49 @@ pub fn eval_model<F: BuiltinFunction>(
     let tests = model.get_tests();
     for test in tests.values() {
         let value = eval_test(test, &context);
-        let test_result = value.map(
-            |value| todo!(), /* result::Test {
-                                 value,
-                                 expr_span: test.span(),
-                             } */
-        );
+        let test_result = value.map(|value| result::Test {
+            value,
+            expr_span: test.span(),
+        });
         context.add_test_result(test_result);
     }
 
     context.clear_active_model();
 
     context
+}
+
+fn parameter_result_from(
+    value: Value,
+    typecheck_info: TypecheckInfo,
+    parameter: &ir::Parameter,
+) -> result::Parameter {
+    let unit = match typecheck_info {
+        TypecheckInfo::Number { sized_unit } => Some(sized_unit),
+        TypecheckInfo::String | TypecheckInfo::Boolean => None,
+    };
+
+    let trace = match parameter.trace_level() {
+        ir::TraceLevel::None => result::TraceLevel::None,
+        ir::TraceLevel::Trace => result::TraceLevel::Trace,
+        ir::TraceLevel::Debug => result::TraceLevel::Debug,
+    };
+
+    let dependencies = parameter
+        .dependencies()
+        .iter()
+        .map(|dependency| dependency.as_str().to_string())
+        .collect();
+
+    result::Parameter {
+        ident: parameter.name().as_str().to_string(),
+        label: parameter.label().as_str().to_string(),
+        value,
+        unit,
+        is_performance: parameter.is_performance(),
+        trace,
+        dependencies,
+    }
 }
 
 fn get_evaluation_order(
