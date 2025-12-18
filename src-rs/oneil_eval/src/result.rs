@@ -1,15 +1,18 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use oneil_shared::span::Span;
 
-use crate::value::{Unit, Value};
+use crate::value::{SizedUnit, Value};
 
 #[derive(Debug, Clone)]
 pub struct Model {
     pub path: PathBuf,
     pub submodels: HashMap<String, Model>,
     pub parameters: HashMap<String, Parameter>,
-    pub tests: HashMap<String, Test>,
+    pub tests: Vec<Test>,
 }
 
 #[derive(Debug, Clone)]
@@ -23,9 +26,15 @@ pub struct Parameter {
     pub ident: String,
     pub label: String,
     pub value: Value,
-    pub unit: Unit,
-    pub is_db: bool,
+    pub unit: Option<SizedUnit>,
     pub is_performance: bool,
-    pub trace: bool,
-    pub dependency_results: HashMap<String, Value>,
+    pub trace: TraceLevel,
+    pub dependencies: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TraceLevel {
+    None,
+    Trace,
+    Debug,
 }

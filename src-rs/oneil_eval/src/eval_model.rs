@@ -53,18 +53,36 @@ pub fn eval_model<F: BuiltinFunction>(
             .expect("parameter should exist because it comes from the keys of the parameters map");
 
         let value = eval_parameter(parameter, &context);
-        context.add_parameter_result(
-            parameter_name.as_str().to_string(),
-            // TODO: for now, we just discard the is_db flag, but we need to handle it eventually
-            value.map(|(value, _)| value),
+
+        let parameter_result = value.map(
+            |(value, _)| todo!(), /* result::Parameter {
+                                      value,
+                                      unit: parameter.unit(),
+                                      is_db: parameter.is_db(),
+                                      is_performance: parameter.is_performance(),
+                                      trace: parameter.trace(),
+                                      dependency_results: parameter
+                                          .dependencies()
+                                          .iter()
+                                          .map(|dependency| (dependency.as_str().to_string(), value))
+                                          .collect(),
+                                  } */
         );
+
+        context.add_parameter_result(parameter_name.as_str().to_string(), parameter_result);
     }
 
     // Evaluate tests
     let tests = model.get_tests();
     for test in tests.values() {
         let value = eval_test(test, &context);
-        context.add_test_result(value);
+        let test_result = value.map(
+            |value| todo!(), /* result::Test {
+                                 value,
+                                 expr_span: test.span(),
+                             } */
+        );
+        context.add_test_result(test_result);
     }
 
     context.clear_active_model();

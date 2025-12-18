@@ -14,9 +14,9 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Model {
-    parameters: HashMap<String, Result<Value, Vec<EvalError>>>,
+    parameters: HashMap<String, Result<result::Parameter, Vec<EvalError>>>,
     submodels: HashMap<String, PathBuf>,
-    tests: Vec<Result<Value, Vec<EvalError>>>,
+    tests: Vec<Result<result::Test, Vec<EvalError>>>,
 }
 
 impl Model {
@@ -67,7 +67,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .clone()
     }
 
-    pub fn lookup_parameter(
+    pub fn lookup_parameter_value(
         &self,
         parameter_name: &ir::ParameterName,
     ) -> Result<Value, Vec<EvalError>> {
@@ -76,18 +76,18 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .as_ref()
             .expect("current model should be set when looking up a parameter");
 
-        self.lookup_model_parameter_internal(current_model, parameter_name)
+        self.lookup_model_parameter_value_internal(current_model, parameter_name)
     }
 
-    pub fn lookup_model_parameter(
+    pub fn lookup_model_parameter_value(
         &self,
         model: &ir::ModelPath,
         parameter_name: &ir::ParameterName,
     ) -> Result<Value, Vec<EvalError>> {
-        self.lookup_model_parameter_internal(model.as_ref(), parameter_name)
+        self.lookup_model_parameter_value_internal(model.as_ref(), parameter_name)
     }
 
-    fn lookup_model_parameter_internal(
+    fn lookup_model_parameter_value_internal(
         &self,
         model_path: &Path,
         parameter_name: &ir::ParameterName,
@@ -102,6 +102,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .get(parameter_name.as_str())
             .expect("parameter should be defined")
             .clone()
+            .map(|parameter| parameter.value)
             .map_err(|_errors| vec![EvalError::ParameterHasError])
     }
 
@@ -166,7 +167,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     pub fn add_parameter_result(
         &mut self,
         parameter_name: String,
-        result: Result<Value, Vec<EvalError>>,
+        result: Result<result::Parameter, Vec<EvalError>>,
     ) {
         // TODO: Maybe use type state pattern to enforce this?
         let Some(current_model) = self.current_model.as_ref() else {
@@ -197,7 +198,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         );
     }
 
-    pub fn add_test_result(&mut self, test_result: Result<Value, Vec<EvalError>>) {
+    pub fn add_test_result(&mut self, test_result: Result<result::Test, Vec<EvalError>>) {
         let Some(current_model) = self.current_model.as_ref() else {
             panic!("current model should be set when adding a test result");
         };
@@ -302,8 +303,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
         let model_result = result::Model {
             path: model_path.to_path_buf(),
             submodels,
-            parameters: todo!(),
-            tests: todo!(),
+            parameters,
+            tests,
         };
 
         Ok(model_result)
