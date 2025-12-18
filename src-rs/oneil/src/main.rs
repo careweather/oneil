@@ -19,6 +19,7 @@ mod convert_error;
 mod print_ast;
 mod print_error;
 mod print_ir;
+mod print_model_result;
 mod stylesheet;
 
 /// Main entry point for the Oneil CLI application
@@ -127,7 +128,7 @@ fn handle_eval_command(file: &Path, print_debug: bool, no_colors: bool) {
     );
 
     let model_collection =
-        oneil_model_resolver::load_model(&file, &builtins, &file_parser::FileLoader);
+        oneil_model_resolver::load_model(file, &builtins, &file_parser::FileLoader);
     let model_collection = match model_collection {
         Ok(model_collection) => model_collection,
         Err(error) => {
@@ -143,8 +144,20 @@ fn handle_eval_command(file: &Path, print_debug: bool, no_colors: bool) {
 
     let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
 
-    let model = eval_context.get_model_result(&file);
-    println!("{model:?}");
+    let model_result = eval_context.get_model_result(file);
+
+    match model_result {
+        Ok(model_result) => {
+            print_model_result::print(&model_result, print_debug);
+        }
+        Err(errors) => {
+            for error in errors {
+                let error = todo!("convert error to OneilError");
+                print_error::print(&error, print_debug);
+                eprintln!();
+            }
+        }
+    }
 }
 
 fn set_color_choice(no_colors: bool) {
