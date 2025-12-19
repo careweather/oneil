@@ -1,6 +1,9 @@
 use std::{cmp::Ordering, ops};
 
-use crate::value::{EvalError, Interval, NumberType, Unit, util::is_close};
+use crate::value::{
+    EvalError, Interval, NumberType, SizedUnit, Unit,
+    util::{db_to_linear, is_close, linear_to_db},
+};
 
 /// A number with a unit
 #[derive(Debug, Clone, PartialEq)]
@@ -194,6 +197,60 @@ impl MeasuredNumber {
         Self {
             value: -self.value,
             unit: self.unit,
+        }
+    }
+}
+
+/// A number with a unit and a magnitude
+///
+/// Note that this does not have any mathematical operations defined on it,
+/// and is only used for end-user purposes.
+///
+/// To perform mathematical operations on the value,
+/// first convert it to a `MeasuredNumber` using `MeasuredNumber::from`
+#[derive(Debug, Clone, PartialEq)]
+pub struct SizedMeasuredNumber {
+    /// The value of the measured number.
+    pub value: Number,
+    /// The unit of the measured number.
+    pub sized_unit: SizedUnit,
+}
+
+impl SizedMeasuredNumber {
+    /// Creates a new sized measured number.
+    #[must_use]
+    pub const fn new(value: Number, sized_unit: SizedUnit) -> Self {
+        Self { value, sized_unit }
+    }
+
+    /// Converts a measured number to a sized measured number
+    #[must_use]
+    pub fn from_measured_number(measured_number: MeasuredNumber, sized_unit: SizedUnit) -> Self {
+        debug_assert_eq!(measured_number.unit, sized_unit.unit, "units must match");
+
+        let value = measured_number.value / Number::Scalar(sized_unit.magnitude);
+        let value = if sized_unit.is_db {
+            linear_to_db(value)
+        } else {
+            value
+        };
+
+        Self { value, sized_unit }
+    }
+}
+
+impl From<SizedMeasuredNumber> for MeasuredNumber {
+    fn from(sized_measured_number: SizedMeasuredNumber) -> Self {
+        let value = sized_measured_number.value * sized_measured_number.sized_unit.magnitude;
+        let value = if sized_measured_number.sized_unit.is_db {
+            db_to_linear(value)
+        } else {
+            value
+        };
+
+        Self {
+            value,
+            unit: sized_measured_number.sized_unit.unit,
         }
     }
 }
