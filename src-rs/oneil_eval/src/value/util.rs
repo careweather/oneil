@@ -1,6 +1,6 @@
 //! Utility functions for the value module
-//!
-//! Right now, this module only contains the `is_close` function.
+
+use crate::value::Number;
 
 const TOLERANCE: f64 = 1e-10;
 
@@ -38,4 +38,12 @@ pub const fn is_close(a: f64, b: f64) -> bool {
     let absolute_tolerance = TOLERANCE;
 
     difference <= relative_tolerance || difference <= absolute_tolerance
+}
+
+pub fn db_to_linear(value: Number) -> Number {
+    Number::Scalar(10.0).pow(value / Number::Scalar(10.0))
+}
+
+pub fn linear_to_db(value: Number) -> Number {
+    todo!()
 }
