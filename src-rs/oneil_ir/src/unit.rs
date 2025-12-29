@@ -4,13 +4,17 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompositeUnit {
     units: Vec<Unit>,
+    display_unit: DisplayCompositeUnit,
 }
 
 impl CompositeUnit {
     /// Creates a new composite unit from a vector of individual units.
     #[must_use]
-    pub const fn new(units: Vec<Unit>) -> Self {
-        Self { units }
+    pub const fn new(units: Vec<Unit>, display_unit: DisplayCompositeUnit) -> Self {
+        Self {
+            units,
+            display_unit,
+        }
     }
 
     /// Returns a reference to the units in this composite unit.
@@ -45,4 +49,23 @@ impl Unit {
     pub const fn exponent(&self) -> f64 {
         self.exponent
     }
+}
+
+/// A unit used for displaying the unit to
+/// the user.
+///
+/// This retains multiplication and division and
+/// the original exponent, rather than converting
+/// it to a list of units that are multiplied
+/// together.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DisplayCompositeUnit {
+    /// Multiplied units
+    Multiply(Box<DisplayCompositeUnit>, Box<DisplayCompositeUnit>),
+    /// Divided units
+    Divide(Box<DisplayCompositeUnit>, Box<DisplayCompositeUnit>),
+    /// A single unit
+    BaseUnit(Unit),
+    /// Unitless `1`
+    Unitless,
 }
