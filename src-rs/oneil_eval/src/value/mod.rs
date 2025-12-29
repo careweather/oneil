@@ -16,5 +16,5 @@ use crate::EvalError;
 pub use self::interval::Interval;
 pub use self::number::{MeasuredNumber, Number, SizedMeasuredNumber};
 pub use self::type_::{NumberType, ValueType};
-pub use self::unit::{Dimension, SizedUnit, Unit};
+pub use self::unit::{Dimension, DisplayUnit, SizedUnit, Unit};
 pub use self::value_impl::Value;

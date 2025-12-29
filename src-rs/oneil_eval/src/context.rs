@@ -129,10 +129,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     }
 
     pub fn lookup_unit(&self, name: &str) -> Option<SizedUnit> {
-        self.builtins
-            .units
-            .get(name)
-            .map(|unit| unit.as_ref().clone())
+        self.builtins.units.get(name).cloned()
     }
 
     pub const fn available_prefixes(&self) -> &HashMap<String, f64> {

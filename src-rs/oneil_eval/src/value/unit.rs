@@ -149,6 +149,8 @@ pub struct SizedUnit {
     pub unit: Unit,
     /// Whether the sized unit is a dB unit.
     pub is_db: bool,
+    /// The display unit of the sized unit.
+    pub display_unit: Option<DisplayUnit>,
 }
 
 impl SizedUnit {
@@ -159,6 +161,7 @@ impl SizedUnit {
             magnitude: 1.0,
             unit: Unit::unitless(),
             is_db: false,
+            display_unit: None,
         }
     }
 
@@ -169,6 +172,9 @@ impl SizedUnit {
             magnitude: self.magnitude.powf(exponent),
             unit: self.unit.pow(exponent),
             is_db: self.is_db,
+            display_unit: self
+                .display_unit
+                .map(|display_unit| display_unit.pow(exponent)),
         }
     }
 
@@ -190,6 +196,14 @@ impl ops::Mul for SizedUnit {
             magnitude: self.magnitude * rhs.magnitude,
             unit: self.unit * rhs.unit,
             is_db: self.is_db || rhs.is_db,
+            display_unit: self
+                .display_unit
+                .and_then(|display_unit| {
+                    rhs.display_unit
+                        .clone()
+                        .map(|rhs_display_unit| display_unit * rhs_display_unit)
+                })
+                .or(rhs.display_unit),
         }
     }
 }
@@ -205,6 +219,71 @@ impl ops::Div for SizedUnit {
             magnitude: self.magnitude / rhs.magnitude,
             unit: self.unit / rhs.unit,
             is_db: self.is_db || rhs.is_db,
+            display_unit: self
+                .display_unit
+                .and_then(|display_unit| {
+                    rhs.display_unit
+                        .clone()
+                        .map(|rhs_display_unit| display_unit / rhs_display_unit)
+                })
+                .or_else(|| {
+                    rhs.display_unit.map(|rhs_display_unit| {
+                        DisplayUnit::Divide(
+                            Box::new(DisplayUnit::Unitless),
+                            Box::new(rhs_display_unit),
+                        )
+                    })
+                }),
         }
+    }
+}
+
+/// A unit used for displaying the unit to the user
+#[derive(Debug, Clone, PartialEq)]
+pub enum DisplayUnit {
+    /// Unitless `1`
+    Unitless,
+    /// A single unit
+    Unit(String, Option<f64>),
+    /// A multiplied unit
+    Multiply(Box<DisplayUnit>, Box<DisplayUnit>),
+    /// A divided unit
+    Divide(Box<DisplayUnit>, Box<DisplayUnit>),
+}
+
+impl DisplayUnit {
+    /// Raises the display unit to the power of the given exponent.
+    #[must_use]
+    pub fn pow(self, pow_exponent: f64) -> Self {
+        match self {
+            Self::Unitless => Self::Unitless,
+            Self::Unit(name, exponent) => {
+                Self::Unit(name, Some(exponent.unwrap_or(1.0) * pow_exponent))
+            }
+            Self::Multiply(left, right) => Self::Multiply(
+                Box::new(left.pow(pow_exponent)),
+                Box::new(right.pow(pow_exponent)),
+            ),
+            Self::Divide(left, right) => Self::Divide(
+                Box::new(left.pow(pow_exponent)),
+                Box::new(right.pow(pow_exponent)),
+            ),
+        }
+    }
+}
+
+impl ops::Mul for DisplayUnit {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self::Multiply(Box::new(self), Box::new(rhs))
+    }
+}
+
+impl ops::Div for DisplayUnit {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self::Divide(Box::new(self), Box::new(rhs))
     }
 }

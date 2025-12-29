@@ -4,7 +4,7 @@ use crate::{
     builtin::BuiltinFunction,
     context::EvalContext,
     error::EvalError,
-    value::{SizedUnit, Unit},
+    value::{DisplayUnit, SizedUnit, Unit},
 };
 
 // TODO: figure out display units. for now, we just
@@ -38,7 +38,15 @@ pub fn eval_unit<F: BuiltinFunction>(
     }
 
     if errors.is_empty() {
-        Ok(result)
+        // evaluate the display unit based on the IR
+        let display_unit = eval_display_unit(unit.display_unit());
+
+        let unit = SizedUnit {
+            display_unit: Some(display_unit),
+            ..result
+        };
+
+        Ok(unit)
     } else {
         Err(errors)
     }
@@ -48,12 +56,12 @@ fn eval_unit_component<F: BuiltinFunction>(
     unit: &ir::Unit,
     context: &EvalContext<F>,
 ) -> Result<SizedUnit, EvalError> {
-    let name = unit.name();
+    let full_name = unit.name();
     let exponent = unit.exponent();
 
-    let (name, is_db) = name
+    let (name, is_db) = full_name
         .strip_prefix("dB")
-        .map_or((name, false), |stripped_name| (stripped_name, true));
+        .map_or((full_name, false), |stripped_name| (stripped_name, true));
 
     // handle dB units with no other unit
     if is_db && name.is_empty() {
@@ -61,6 +69,7 @@ fn eval_unit_component<F: BuiltinFunction>(
             magnitude: 1.0,
             unit: Unit::unitless(),
             is_db,
+            display_unit: Some(DisplayUnit::Unit(full_name.to_string(), None)),
         });
     }
 
@@ -84,6 +93,7 @@ fn eval_unit_component<F: BuiltinFunction>(
                 magnitude: unit.magnitude * prefix_magnitude,
                 unit: unit.unit,
                 is_db,
+                display_unit: unit.display_unit,
             };
             return Ok(unit.pow(exponent));
         }
@@ -91,6 +101,27 @@ fn eval_unit_component<F: BuiltinFunction>(
 
     // if we get here, the unit is not found
     Err(EvalError::UnknownUnit)
+}
+
+fn eval_display_unit(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
+    match unit {
+        ir::DisplayCompositeUnit::BaseUnit(unit) => {
+            let name = unit.name();
+            let exponent = unit.exponent();
+            DisplayUnit::Unit(name.to_string(), Some(exponent))
+        }
+        ir::DisplayCompositeUnit::Unitless => DisplayUnit::Unitless,
+        ir::DisplayCompositeUnit::Multiply(left, right) => {
+            let left = eval_display_unit(left);
+            let right = eval_display_unit(right);
+            left * right
+        }
+        ir::DisplayCompositeUnit::Divide(left, right) => {
+            let left = eval_display_unit(left);
+            let right = eval_display_unit(right);
+            left / right
+        }
+    }
 }
 
 #[cfg(test)]
@@ -115,6 +146,11 @@ mod test {
         EvalContext::new(builtins)
     }
 
+    /// Returns a display unit that isn't intended to be tested.
+    fn unimportant_display_unit() -> ir::DisplayCompositeUnit {
+        ir::DisplayCompositeUnit::BaseUnit(ir::Unit::new("unimportant".to_string(), 1.0))
+    }
+
     fn ir_composite_unit(
         unit_list: impl IntoIterator<Item = (&'static str, f64)>,
     ) -> ir::CompositeUnit {
@@ -122,7 +158,7 @@ mod test {
             .into_iter()
             .map(|(name, exponent)| ir::Unit::new(name.to_string(), exponent))
             .collect::<Vec<_>>();
-        ir::CompositeUnit::new(unit_vec)
+        ir::CompositeUnit::new(unit_vec, unimportant_display_unit())
     }
 
     mod unit_eval {
