@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops};
+use std::{collections::HashMap, fmt, ops};
 
 use crate::value::util::is_close;
 
@@ -285,5 +285,28 @@ impl ops::Div for DisplayUnit {
 
     fn div(self, rhs: Self) -> Self::Output {
         Self::Divide(Box::new(self), Box::new(rhs))
+    }
+}
+
+impl fmt::Display for DisplayUnit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unitless => write!(f, "1")?,
+            Self::Unit(name, exponent) => {
+                write!(f, "{name}")?;
+                if let Some(exponent) = exponent
+                    && !is_close(*exponent, 1.0)
+                {
+                    write!(f, "^{exponent}")?;
+                }
+            }
+            Self::Multiply(left, right) => write!(f, "{left}*{right}")?,
+            Self::Divide(left, right) => match **right {
+                Self::Multiply(_, _) | Self::Divide(_, _) => write!(f, "{left}/({right})")?,
+                Self::Unitless | Self::Unit(_, _) => write!(f, "{left}/{right}")?,
+            },
+        }
+
+        Ok(())
     }
 }
