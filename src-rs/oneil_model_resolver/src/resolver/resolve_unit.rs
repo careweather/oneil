@@ -9,7 +9,8 @@ use oneil_ir as ir;
 /// by recursively traversing the expression tree.
 pub fn resolve_unit(unit: &ast::UnitExprNode) -> ir::CompositeUnit {
     let units = resolve_unit_recursive(unit, false, Vec::new());
-    ir::CompositeUnit::new(units)
+    let display_unit = resolve_display_unit(unit);
+    ir::CompositeUnit::new(units, display_unit)
 }
 
 fn resolve_unit_recursive(
@@ -46,6 +47,32 @@ fn resolve_unit_recursive(
     }
 }
 
+fn resolve_display_unit(unit: &ast::UnitExprNode) -> ir::DisplayCompositeUnit {
+    match &**unit {
+        ast::UnitExpr::BinaryOp { op, left, right } => match &**op {
+            ast::UnitOp::Multiply => ir::DisplayCompositeUnit::Multiply(
+                Box::new(resolve_display_unit(left)),
+                Box::new(resolve_display_unit(right)),
+            ),
+            ast::UnitOp::Divide => ir::DisplayCompositeUnit::Divide(
+                Box::new(resolve_display_unit(left)),
+                Box::new(resolve_display_unit(right)),
+            ),
+        },
+        ast::UnitExpr::Unit {
+            identifier,
+            exponent,
+        } => {
+            let display_unit = ir::Unit::new(
+                identifier.as_str().to_string(),
+                exponent.as_ref().map_or(1.0, |e| e.value()),
+            );
+            ir::DisplayCompositeUnit::BaseUnit(display_unit)
+        }
+        ast::UnitExpr::UnitOne => ir::DisplayCompositeUnit::Unitless,
+        ast::UnitExpr::Parenthesized { expr } => resolve_display_unit(expr),
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::test::construct::test_ast;
