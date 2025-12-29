@@ -1,7 +1,7 @@
 //! Functionality for Oneil's builtin values, functions, units,
 //! and unit prefixes
 
-use ::std::{collections::HashMap, sync::Arc};
+use ::std::collections::HashMap;
 
 use crate::{
     error::EvalError,
@@ -20,7 +20,7 @@ pub struct BuiltinMap<F: BuiltinFunction> {
     /// A map of builtin functions
     pub functions: HashMap<String, F>,
     /// A map of builtin units
-    pub units: HashMap<String, Arc<SizedUnit>>,
+    pub units: HashMap<String, SizedUnit>,
     /// A map of builtin unit prefixes
     pub prefixes: HashMap<String, f64>,
 }
@@ -31,7 +31,7 @@ impl<F: BuiltinFunction> BuiltinMap<F> {
     pub const fn new(
         values: HashMap<String, Value>,
         functions: HashMap<String, F>,
-        units: HashMap<String, Arc<SizedUnit>>,
+        units: HashMap<String, SizedUnit>,
         prefixes: HashMap<String, f64>,
     ) -> Self {
         Self {

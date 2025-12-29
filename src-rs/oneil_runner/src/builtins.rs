@@ -5,7 +5,6 @@
 //! methods to check for the existence of builtin values and functions.
 
 use ::std::collections::HashMap;
-use std::sync::Arc;
 
 use oneil_eval::{
     builtin::{BuiltinFunction, BuiltinMap},
@@ -30,7 +29,7 @@ impl<F: BuiltinFunction> Builtins<F> {
     pub const fn new(
         values: HashMap<String, Value>,
         functions: HashMap<String, F>,
-        units: HashMap<String, Arc<SizedUnit>>,
+        units: HashMap<String, SizedUnit>,
         prefixes: HashMap<String, f64>,
     ) -> Self {
         Self {

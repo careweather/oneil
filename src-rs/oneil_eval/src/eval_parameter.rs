@@ -1329,6 +1329,7 @@ mod tests {
 
         use std::collections::HashSet;
 
+        use oneil_ir::DisplayCompositeUnit;
         use oneil_shared::span::SourceLocation;
 
         use oneil_shared::span::Span;
@@ -1350,6 +1351,11 @@ mod tests {
                 column: 0,
             };
             Span::new(start, end)
+        }
+
+        /// Returns a display composite unit that isn't intended to be tested.
+        fn unimportant_display_composite_unit() -> DisplayCompositeUnit {
+            DisplayCompositeUnit::BaseUnit(ir::Unit::new("unimportant".to_string(), 1.0))
         }
 
         /// Builds a simple parameter with a literal numeric value.
@@ -1377,7 +1383,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1431,7 +1437,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1491,7 +1497,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1551,7 +1557,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1611,7 +1617,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1674,7 +1680,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1737,7 +1743,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1797,7 +1803,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1854,7 +1860,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1909,7 +1915,7 @@ mod tests {
                 .into_iter()
                 .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
                 .collect();
-            let units = ir::CompositeUnit::new(units);
+            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
 
             ir::Parameter::new(
                 HashSet::new(),

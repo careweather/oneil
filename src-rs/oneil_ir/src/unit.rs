@@ -22,6 +22,12 @@ impl CompositeUnit {
     pub fn units(&self) -> &[Unit] {
         &self.units
     }
+
+    /// Returns a reference to the display unit of this composite unit.
+    #[must_use]
+    pub fn display_unit(&self) -> &DisplayCompositeUnit {
+        &self.display_unit
+    }
 }
 
 /// A single unit with a name and exponent.

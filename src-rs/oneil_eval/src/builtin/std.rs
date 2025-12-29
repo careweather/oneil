@@ -2,11 +2,10 @@
 //! that come with Oneil.
 
 use ::std::collections::HashMap;
-use std::sync::Arc;
 
 use crate::{
     EvalError,
-    value::{Dimension, MeasuredNumber, Number, SizedUnit, Unit, Value},
+    value::{Dimension, DisplayUnit, MeasuredNumber, Number, SizedUnit, Unit, Value},
 };
 
 /// The builtin values that come with Oneil:
@@ -158,376 +157,308 @@ pub fn builtin_prefixes() -> HashMap<String, f64> {
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
 #[must_use]
-pub fn builtin_units() -> HashMap<String, Arc<SizedUnit>> {
-    let units = [
+pub fn builtin_units() -> HashMap<String, SizedUnit> {
+    /// Information about a builtin unit.
+    ///
+    /// This is only used in this function to avoid code duplication.
+    struct UnitInfo {
+        names: &'static [&'static str],
+        magnitude: f64,
+        unit: Unit,
+        is_db: bool,
+    }
+
+    let units = vec![
         // === BASE UNITS ===
-        (
-            ["g", "gram", "grams"].as_ref(),
-            SizedUnit {
-                // the kilogram is the base unit of mass, so the gram is 1e-3 of a kilogram
-                magnitude: 1e-3,
-                unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["m", "meter", "meters", "metre", "metres"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["s", "second", "seconds", "sec", "secs"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["K", "Kelvin"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::Temperature, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["A", "Ampere", "Amp"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::Current, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["b", "bit", "bits"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["$", "dollar", "dollars"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["mol", "mole", "moles"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::Substance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["cd", "candela"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
-                is_db: false,
-            },
-        ),
+        UnitInfo {
+            // the kilogram is the base unit of mass, so the gram is 1e-3 of a kilogram
+            names: ["g", "gram", "grams"].as_ref(),
+            magnitude: 1e-3,
+            unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["m", "meter", "meters", "metre", "metres"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["s", "second", "seconds", "sec", "secs"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["K", "Kelvin"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::Temperature, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["A", "Ampere", "Amp"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::Current, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["b", "bit", "bits"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["$", "dollar", "dollars"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["mol", "mole", "moles"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::Substance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["cd", "candela"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            is_db: false,
+        },
         // === DERIVED UNITS ===
-        (
-            ["V", "Volt", "Volts"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 2.0),
-                    (Dimension::Time, -3.0),
-                    (Dimension::Current, -1.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["W", "Watt", "Watts"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 2.0),
-                    (Dimension::Time, -3.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["Hz", "Hertz"].as_ref(),
-            SizedUnit {
-                magnitude: 2.0 * std::f64::consts::PI,
-                unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["J", "Joule", "Joules"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 2.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["Wh", "Watt-hour", "Watt-hours"].as_ref(),
-            SizedUnit {
-                magnitude: 3600.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 2.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["Ah", "Amp-hour", "Amp-hours"].as_ref(),
-            SizedUnit {
-                magnitude: 3600.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Current, 1.0),
-                    (Dimension::Time, 1.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["T", "Tesla", "Teslas"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Time, -2.0),
-                    (Dimension::Current, -1.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["Ohm", "Ohms"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 2.0),
-                    (Dimension::Time, -3.0),
-                    (Dimension::Current, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["N", "Newton", "Newtons"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["Gs", "Gauss"].as_ref(),
-            SizedUnit {
-                magnitude: 0.0001,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Time, -2.0),
-                    (Dimension::Current, -1.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["lm", "Lumen", "Lumens"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["lx", "Lux", "Luxes"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::LuminousIntensity, 1.0),
-                    (Dimension::Distance, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["bps" /* bits per second */].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Information, 1.0),
-                    (Dimension::Time, -1.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["B", "byte", "bytes"].as_ref(),
-            SizedUnit {
-                magnitude: 8.0,
-                unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["Pa", "Pascal", "Pascals"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, -1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
+        UnitInfo {
+            names: ["V", "Volt", "Volts"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 2.0),
+                (Dimension::Time, -3.0),
+                (Dimension::Current, -1.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["W", "Watt", "Watts"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 2.0),
+                (Dimension::Time, -3.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["Hz", "Hertz"].as_ref(),
+            magnitude: 2.0 * std::f64::consts::PI,
+            unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["J", "Joule", "Joules"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 2.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["Wh", "Watt-hour", "Watt-hours"].as_ref(),
+            magnitude: 3600.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 2.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["Ah", "Amp-hour", "Amp-hours"].as_ref(),
+            magnitude: 3600.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Current, 1.0),
+                (Dimension::Time, 1.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["T", "Tesla", "Teslas"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Time, -2.0),
+                (Dimension::Current, -1.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["Ohm", "Ohms"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 2.0),
+                (Dimension::Time, -3.0),
+                (Dimension::Current, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["N", "Newton", "Newtons"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["Gs", "Gauss"].as_ref(),
+            magnitude: 0.0001,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Time, -2.0),
+                (Dimension::Current, -1.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["lm", "Lumen", "Lumens"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["lx", "Lux", "Luxes"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::LuminousIntensity, 1.0),
+                (Dimension::Distance, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["bps" /* bits per second */].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Information, 1.0),
+                (Dimension::Time, -1.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["B", "byte", "bytes"].as_ref(),
+            magnitude: 8.0,
+            unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["Pa", "Pascal", "Pascals"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, -1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
         // === LEGACY UNITS ===
-        (
-            ["mil", "millennium", "millennia"].as_ref(),
-            SizedUnit {
-                magnitude: 3.1556952e10,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["cen", "century", "centuries"].as_ref(),
-            SizedUnit {
-                magnitude: 3.1556952e9,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["dec", "decade", "decades"].as_ref(),
-            SizedUnit {
-                magnitude: 3.1556952e8,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["yr", "year", "years"].as_ref(),
-            SizedUnit {
-                magnitude: 3.1556952e7,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["mon", "month", "months"].as_ref(),
-            SizedUnit {
-                magnitude: 2.629746e6,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["week", "weeks"].as_ref(),
-            SizedUnit {
-                magnitude: 6.048e5,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["day", "days"].as_ref(),
-            SizedUnit {
-                magnitude: 8.64e4,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["hr", "hour", "hours"].as_ref(),
-            SizedUnit {
-                magnitude: 3600.0,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["min", "minute", "minutes"].as_ref(),
-            SizedUnit {
-                magnitude: 60.0,
-                unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["rpm" /* revolutions per minute */].as_ref(),
-            SizedUnit {
-                magnitude: 0.10471975511965977,
-                unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["k$" /* thousand dollars */].as_ref(),
-            SizedUnit {
-                magnitude: 1000.0,
-                unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["M$" /* million dollars */].as_ref(),
-            SizedUnit {
-                magnitude: 1e6,
-                unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["B$" /* billion dollars */].as_ref(),
-            SizedUnit {
-                magnitude: 1e9,
-                unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["T$" /* trillion dollars */].as_ref(),
-            SizedUnit {
-                magnitude: 1e12,
-                unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["g_E" /* Earth gravity */].as_ref(),
-            SizedUnit {
-                magnitude: 9.81,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            [
+        UnitInfo {
+            names: ["mil", "millennium", "millennia"].as_ref(),
+            magnitude: 3.1556952e10,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["cen", "century", "centuries"].as_ref(),
+            magnitude: 3.1556952e9,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["dec", "decade", "decades"].as_ref(),
+            magnitude: 3.1556952e8,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["yr", "year", "years"].as_ref(),
+            magnitude: 3.1556952e7,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["mon", "month", "months"].as_ref(),
+            magnitude: 2.629746e6,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["week", "weeks"].as_ref(),
+            magnitude: 6.048e5,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["day", "days"].as_ref(),
+            magnitude: 8.64e4,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["hr", "hour", "hours"].as_ref(),
+            magnitude: 3600.0,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["min", "minute", "minutes"].as_ref(),
+            magnitude: 60.0,
+            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["rpm" /* revolutions per minute */].as_ref(),
+            magnitude: 0.10471975511965977,
+            unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["k$" /* thousand dollars */].as_ref(),
+            magnitude: 1000.0,
+            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["M$" /* million dollars */].as_ref(),
+            magnitude: 1e6,
+            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["B$" /* billion dollars */].as_ref(),
+            magnitude: 1e9,
+            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["T$" /* trillion dollars */].as_ref(),
+            magnitude: 1e12,
+            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["g_E" /* Earth gravity */].as_ref(),
+            magnitude: 9.81,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: [
                 "cm",
                 "centimeter",
                 "centimeters",
@@ -535,240 +466,203 @@ pub fn builtin_units() -> HashMap<String, Arc<SizedUnit>> {
                 "centimetres",
             ]
             .as_ref(),
-            SizedUnit {
-                magnitude: 0.01,
-                unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["psi" /* pounds per square inch */].as_ref(),
-            SizedUnit {
-                magnitude: 6894.757293168361,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, -1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["atm", "atmosphere", "atmospheres"].as_ref(),
-            SizedUnit {
-                magnitude: 101325.0,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, -1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["bar", "bars"].as_ref(),
-            SizedUnit {
-                magnitude: 1e5,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, -1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["Ba", "barye", "baryes"].as_ref(),
-            SizedUnit {
-                magnitude: 0.1,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, -1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["dyne", "dynes"].as_ref(),
-            SizedUnit {
-                magnitude: 1e-5,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["mmHg" /* millimeter of mercury */].as_ref(),
-            SizedUnit {
-                magnitude: 133.322387415,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, -1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["torr", "torrs"].as_ref(),
-            SizedUnit {
-                magnitude: 133.3224,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, -1.0),
-                    (Dimension::Time, -2.0),
-                ])),
-                is_db: false,
-            },
-        ),
-        (
-            ["in", "inch", "inches"].as_ref(),
-            SizedUnit {
-                magnitude: 0.0254,
-                unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["ft", "foot", "feet"].as_ref(),
-            SizedUnit {
-                magnitude: 0.3048,
-                unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["yd", "yard", "yards"].as_ref(),
-            SizedUnit {
-                magnitude: 0.9144,
-                unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["mi", "mile", "miles"].as_ref(),
-            SizedUnit {
-                magnitude: 1609.344,
-                unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["nmi" /* nautical mile */].as_ref(),
-            SizedUnit {
-                magnitude: 1852.0,
-                unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["lb", "lbs", "pound", "pounds"].as_ref(),
-            SizedUnit {
-                magnitude: 0.45359237,
-                unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
-                is_db: false,
-            },
-        ),
-        (
-            ["mph" /* mile per hour */].as_ref(),
-            SizedUnit {
-                magnitude: 0.44704,
-                unit: Unit::new(HashMap::from([
-                    (Dimension::Distance, 1.0),
-                    (Dimension::Time, -1.0),
-                ])),
-                is_db: false,
-            },
-        ),
+            magnitude: 0.01,
+            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["psi" /* pounds per square inch */].as_ref(),
+            magnitude: 6894.757293168361,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, -1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["atm", "atmosphere", "atmospheres"].as_ref(),
+            magnitude: 101325.0,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, -1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["bar", "bars"].as_ref(),
+            magnitude: 1e5,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, -1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["Ba", "barye", "baryes"].as_ref(),
+            magnitude: 0.1,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, -1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["dyne", "dynes"].as_ref(),
+            magnitude: 1e-5,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["mmHg" /* millimeter of mercury */].as_ref(),
+            magnitude: 133.322387415,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, -1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["torr", "torrs"].as_ref(),
+            magnitude: 133.3224,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, -1.0),
+                (Dimension::Time, -2.0),
+            ])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["in", "inch", "inches"].as_ref(),
+            magnitude: 0.0254,
+            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["ft", "foot", "feet"].as_ref(),
+            magnitude: 0.3048,
+            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["yd", "yard", "yards"].as_ref(),
+            magnitude: 0.9144,
+            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["mi", "mile", "miles"].as_ref(),
+            magnitude: 1609.344,
+            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["nmi" /* nautical mile */].as_ref(),
+            magnitude: 1852.0,
+            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["lb", "lbs", "pound", "pounds"].as_ref(),
+            magnitude: 0.45359237,
+            unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["mph" /* mile per hour */].as_ref(),
+            magnitude: 0.44704,
+            unit: Unit::new(HashMap::from([
+                (Dimension::Distance, 1.0),
+                (Dimension::Time, -1.0),
+            ])),
+            is_db: false,
+        },
         // === DIMENSIONLESS UNITS ===
-        (
-            ["rev", "revolution", "revolutions", "rotation", "rotations"].as_ref(),
-            SizedUnit {
-                // a revolution is 2π radians
-                magnitude: 2.0 * std::f64::consts::PI,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["cyc", "cycle", "cycles"].as_ref(),
-            SizedUnit {
-                // a cycle is 2π radians
-                magnitude: 2.0 * std::f64::consts::PI,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["rad", "radian", "radians"].as_ref(),
-            SizedUnit {
-                magnitude: 1.0,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["deg", "degree", "degrees"].as_ref(),
-            SizedUnit {
-                magnitude: 0.017453292519943295,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["%", "percent"].as_ref(),
-            SizedUnit {
-                magnitude: 0.01,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["ppm" /* part per million */].as_ref(),
-            SizedUnit {
-                magnitude: 1e-6,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["ppb" /* part per billion */].as_ref(),
-            SizedUnit {
-                magnitude: 1e-9,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["arcmin", "arcminute", "arcminutes"].as_ref(),
-            SizedUnit {
-                magnitude: 0.0002908882086657216,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
-        (
-            ["arcsec", "arcsecond", "arcseconds"].as_ref(),
-            SizedUnit {
-                magnitude: 4.84813681109536e-06,
-                unit: Unit::new(HashMap::from([])),
-                is_db: false,
-            },
-        ),
+        UnitInfo {
+            names: ["rev", "revolution", "revolutions", "rotation", "rotations"].as_ref(),
+            magnitude: 2.0 * std::f64::consts::PI,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["cyc", "cycle", "cycles"].as_ref(),
+            magnitude: 2.0 * std::f64::consts::PI,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["rad", "radian", "radians"].as_ref(),
+            magnitude: 1.0,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["deg", "degree", "degrees"].as_ref(),
+            magnitude: 0.017453292519943295,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["%", "percent"].as_ref(),
+            magnitude: 0.01,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["ppm" /* part per million */].as_ref(),
+            magnitude: 1e-6,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["ppb" /* part per billion */].as_ref(),
+            magnitude: 1e-9,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["arcmin", "arcminute", "arcminutes"].as_ref(),
+            magnitude: 0.0002908882086657216,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
+        UnitInfo {
+            names: ["arcsec", "arcsecond", "arcseconds"].as_ref(),
+            magnitude: 4.84813681109536e-06,
+            unit: Unit::new(HashMap::from([])),
+            is_db: false,
+        },
     ];
 
     units
         .into_iter()
-        .flat_map(|(names, unit)| {
-            let unit = Arc::new(unit);
-            names
-                .iter()
-                .map(move |name| ((*name).to_string(), Arc::clone(&unit)))
-        })
+        .flat_map(
+            |UnitInfo {
+                 names,
+                 magnitude,
+                 unit,
+                 is_db,
+             }| {
+                names.iter().map(move |name| {
+                    let display_unit = DisplayUnit::Unit((*name).to_string(), None);
+                    let unit = SizedUnit {
+                        magnitude,
+                        unit: unit.clone(),
+                        is_db,
+                        display_unit: Some(display_unit),
+                    };
+                    ((*name).to_string(), unit)
+                })
+            },
+        )
         .collect()
 }
 
