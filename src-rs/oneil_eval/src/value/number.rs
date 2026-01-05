@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, ops};
 
 use crate::value::{
-    DisplayUnit, EvalError, Interval, NumberType, Unit,
+    EvalError, Interval, NumberType, Unit,
     util::{db_to_linear, is_close, linear_to_db},
 };
 
@@ -81,8 +81,8 @@ impl MeasuredNumber {
         debug_assert!(
             !self.unit.dimensionally_eq(&unit),
             "old unit {} is not dimensionally equivalent to new unit {}",
-            self.unit.display_unit.unwrap_or(DisplayUnit::Unitless),
-            unit.display_unit.unwrap_or(DisplayUnit::Unitless),
+            self.unit.display_unit,
+            unit.display_unit,
         );
 
         Self { unit, ..self }

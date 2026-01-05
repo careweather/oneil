@@ -650,10 +650,10 @@ pub fn builtin_units() -> HashMap<String, Unit> {
                         dimension_map: dimensions.clone(),
                         magnitude,
                         is_db,
-                        display_unit: Some(DisplayUnit::Unit {
+                        display_unit: DisplayUnit::Unit {
                             name: (*name).to_string(),
                             exponent: 1.0,
-                        }),
+                        },
                     };
                     ((*name).to_string(), unit)
                 })
