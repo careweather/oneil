@@ -6,16 +6,19 @@ use oneil_eval::{
 
 use crate::stylesheet;
 
-pub fn print(model_result: &result::Model, print_debug: bool) {
+pub struct ModelPrintConfig {}
+
+pub fn print(model_result: &result::Model, print_debug: bool, model_config: &ModelPrintConfig) {
     if print_debug {
         println!("{model_result:?}");
         return;
     }
 
     for parameter in model_result.parameters.values() {
-        // TODO: print only "performance" parameters
+        if parameter.is_performance {
         print_parameter(parameter);
     }
+}
 }
 
 fn print_parameter(parameter: &result::Parameter) {
