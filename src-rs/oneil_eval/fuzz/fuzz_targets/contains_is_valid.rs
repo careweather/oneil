@@ -10,7 +10,7 @@ pub struct FuzzData {
 }
 
 fuzz_target!(|data: FuzzData| {
-    let interval1_contains_interval2 = data.interval1.contains(data.interval2);
+    let interval1_contains_interval2 = data.interval1.contains(&data.interval2);
     let interval_intersection = data.interval1.intersection(data.interval2);
     let interval_intersection_is_interval2 = interval_intersection == data.interval2;
     assert!(

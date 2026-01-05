@@ -11,7 +11,7 @@ use std::{
 
 use oneil_shared::span::Span;
 
-use crate::value::{Unit, Value};
+use crate::value::Value;
 
 /// The result of evaluating a model.
 ///

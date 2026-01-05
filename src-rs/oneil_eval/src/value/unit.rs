@@ -98,6 +98,9 @@ impl Unit {
     /// `km != m` because the magnitudes are different.
     ///
     /// This includes dimensions, magnitude, and `is_db`.
+    ///
+    /// NOTE: I wasn't sure exactly how to name this function,
+    ///       this is the best name I could come up with.
     #[must_use]
     pub fn numerically_eq(&self, other: &Self) -> bool {
         self.magnitude == other.magnitude

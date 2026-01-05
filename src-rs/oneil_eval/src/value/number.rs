@@ -79,10 +79,12 @@ impl MeasuredNumber {
     #[must_use]
     pub fn with_unit(self, unit: Unit) -> Self {
         debug_assert!(
-            !self.unit.dimensionally_eq(&unit),
-            "old unit {} is not dimensionally equivalent to new unit {}",
+            self.unit.dimensionally_eq(&unit),
+            "old unit {} is not dimensionally equivalent to new unit {}\nold unit dimensions: {:?}\nnew unit dimensions: {:?}",
             self.unit.display_unit,
             unit.display_unit,
+            self.unit.dimension_map,
+            unit.dimension_map,
         );
 
         Self { unit, ..self }
