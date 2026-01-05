@@ -76,11 +76,6 @@ pub fn eval_model<F: BuiltinFunction>(
 }
 
 fn parameter_result_from(value: Value, parameter: &ir::Parameter) -> result::Parameter {
-    let unit = match &value {
-        Value::MeasuredNumber(number) => Some(number.unit().clone()),
-        Value::String(_) | Value::Boolean(_) | Value::Number(_) => None,
-    };
-
     let trace = match parameter.trace_level() {
         ir::TraceLevel::None => result::TraceLevel::None,
         ir::TraceLevel::Trace => result::TraceLevel::Trace,
@@ -97,7 +92,6 @@ fn parameter_result_from(value: Value, parameter: &ir::Parameter) -> result::Par
         ident: parameter.name().as_str().to_string(),
         label: parameter.label().as_str().to_string(),
         value,
-        unit,
         is_performance: parameter.is_performance(),
         trace,
         dependencies,

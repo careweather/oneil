@@ -70,11 +70,6 @@ pub struct Parameter {
     pub label: String,
     /// The evaluated value of the parameter.
     pub value: Value,
-    /// The unit associated with the parameter, if any.
-    ///
-    /// This is `Some` for parameters with measured numbers and `None` for
-    /// parameters with strings, booleans, or dimensionless numbers.
-    pub unit: Option<Unit>,
     /// Whether this parameter is marked as a performance parameter.
     ///
     /// Performance parameters are typically displayed in output and represent
