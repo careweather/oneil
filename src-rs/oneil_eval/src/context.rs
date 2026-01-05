@@ -9,7 +9,7 @@ use crate::{
     builtin::{BuiltinFunction, BuiltinMap},
     error::{EvalError, ModelError},
     result,
-    value::{SizedUnit, Value},
+    value::{Unit, Value},
 };
 
 #[derive(Debug, Clone)]
@@ -128,7 +128,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         Err(vec![EvalError::Unsupported])
     }
 
-    pub fn lookup_unit(&self, name: &str) -> Option<SizedUnit> {
+    pub fn lookup_unit(&self, name: &str) -> Option<Unit> {
         self.builtins.units.get(name).cloned()
     }
 

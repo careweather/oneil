@@ -5,7 +5,7 @@ use ::std::collections::HashMap;
 
 use crate::{
     error::EvalError,
-    value::{SizedUnit, Value},
+    value::{Unit, Value},
 };
 
 pub mod std;
@@ -20,7 +20,7 @@ pub struct BuiltinMap<F: BuiltinFunction> {
     /// A map of builtin functions
     pub functions: HashMap<String, F>,
     /// A map of builtin units
-    pub units: HashMap<String, SizedUnit>,
+    pub units: HashMap<String, Unit>,
     /// A map of builtin unit prefixes
     pub prefixes: HashMap<String, f64>,
 }
@@ -31,7 +31,7 @@ impl<F: BuiltinFunction> BuiltinMap<F> {
     pub const fn new(
         values: HashMap<String, Value>,
         functions: HashMap<String, F>,
-        units: HashMap<String, SizedUnit>,
+        units: HashMap<String, Unit>,
         prefixes: HashMap<String, f64>,
     ) -> Self {
         Self {

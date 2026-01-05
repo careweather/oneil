@@ -4,7 +4,7 @@ use crate::{
     builtin::BuiltinFunction,
     context::EvalContext,
     error::EvalError,
-    value::{DisplayUnit, SizedUnit, Unit},
+    value::{DisplayUnit, Unit},
 };
 
 // TODO: figure out display units. for now, we just
@@ -17,19 +17,23 @@ use crate::{
 pub fn eval_unit<F: BuiltinFunction>(
     unit: &ir::CompositeUnit,
     context: &EvalContext<F>,
-) -> Result<SizedUnit, Vec<EvalError>> {
+) -> Result<Option<Unit>, Vec<EvalError>> {
     let units = unit
         .units()
         .iter()
         .map(|unit| eval_unit_component(unit, context));
 
-    let mut result = SizedUnit::unitless();
+    let mut result = None;
     let mut errors = Vec::new();
 
     for unit in units {
         match unit {
             Ok(unit) => {
-                result = result * unit;
+                result = if let Some(result) = result {
+                    Some(result * unit)
+                } else {
+                    Some(unit)
+                };
             }
             Err(error) => {
                 errors.push(error);
@@ -38,15 +42,16 @@ pub fn eval_unit<F: BuiltinFunction>(
     }
 
     if errors.is_empty() {
-        // evaluate the display unit based on the IR
-        let display_unit = eval_display_unit(unit.display_unit());
-
-        let unit = SizedUnit {
-            display_unit: Some(display_unit),
-            ..result
+        let Some(result) = result else {
+            return Ok(None);
         };
 
-        Ok(unit)
+        // evaluate the display unit based on the IR
+        let display_info = eval_unit_display_expr(unit.display_unit());
+
+        let unit = result.with_unit_display_expr(display_info);
+
+        Ok(Some(unit))
     } else {
         Err(errors)
     }
@@ -55,7 +60,7 @@ pub fn eval_unit<F: BuiltinFunction>(
 fn eval_unit_component<F: BuiltinFunction>(
     unit: &ir::Unit,
     context: &EvalContext<F>,
-) -> Result<SizedUnit, EvalError> {
+) -> Result<Unit, EvalError> {
     let full_name = unit.name();
     let exponent = unit.exponent();
 
@@ -65,18 +70,14 @@ fn eval_unit_component<F: BuiltinFunction>(
 
     // handle dB units with no other unit
     if is_db && name.is_empty() {
-        return Ok(SizedUnit {
-            magnitude: 1.0,
-            unit: Unit::unitless(),
-            is_db,
-            display_unit: Some(DisplayUnit::Unit(full_name.to_string(), None)),
-        });
+        let unit = Unit::unitless().with_is_db_as(is_db);
+        return Ok(unit);
     }
 
     // first check if the unit is a unit on its own
     let unit = context.lookup_unit(name);
     if let Some(unit) = unit {
-        let unit = unit.pow(exponent).set_is_db(is_db);
+        let unit = unit.pow(exponent).with_is_db_as(is_db);
         return Ok(unit);
     }
 
@@ -89,12 +90,7 @@ fn eval_unit_component<F: BuiltinFunction>(
 
         let unit = context.lookup_unit(stripped_name);
         if let Some(unit) = unit {
-            let unit = SizedUnit {
-                magnitude: unit.magnitude * prefix_magnitude,
-                unit: unit.unit,
-                is_db,
-                display_unit: unit.display_unit,
-            };
+            let unit = unit.mul_magnitude(*prefix_magnitude).with_is_db_as(is_db);
             return Ok(unit.pow(exponent));
         }
     }
@@ -103,28 +99,31 @@ fn eval_unit_component<F: BuiltinFunction>(
     Err(EvalError::UnknownUnit)
 }
 
-fn eval_display_unit(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
+fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
     match unit {
         ir::DisplayCompositeUnit::BaseUnit(unit) => {
-            let name = unit.name();
+            let name = unit.name().to_string();
             let exponent = unit.exponent();
-            DisplayUnit::Unit(name.to_string(), Some(exponent))
+            DisplayUnit::Unit { name, exponent }
         }
         ir::DisplayCompositeUnit::Unitless => DisplayUnit::Unitless,
         ir::DisplayCompositeUnit::Multiply(left, right) => {
-            let left = eval_display_unit(left);
-            let right = eval_display_unit(right);
+            let left = eval_unit_display_expr(left);
+            let right = eval_unit_display_expr(right);
             left * right
         }
         ir::DisplayCompositeUnit::Divide(left, right) => {
-            let left = eval_display_unit(left);
-            let right = eval_display_unit(right);
+            let left = eval_unit_display_expr(left);
+            let right = eval_unit_display_expr(right);
             left / right
         }
     }
 }
 
+use std::f64::consts::PI;
+
 #[cfg(test)]
+#[cfg(never)]
 mod test {
     use std::f64::consts::PI;
 

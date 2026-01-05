@@ -5,7 +5,7 @@ use ::std::collections::HashMap;
 
 use crate::{
     EvalError,
-    value::{Dimension, DisplayUnit, MeasuredNumber, Number, SizedUnit, Unit, Value},
+    value::{Dimension, DimensionMap, DisplayUnit, Number, Unit, Value},
 };
 
 /// The builtin values that come with Oneil:
@@ -16,17 +16,11 @@ pub fn builtin_values() -> HashMap<String, Value> {
     HashMap::from([
         (
             "pi".to_string(),
-            Value::Number(MeasuredNumber::new(
-                Number::Scalar(std::f64::consts::PI),
-                Unit::unitless(),
-            )),
+            Value::Number(Number::Scalar(std::f64::consts::PI)),
         ),
         (
             "e".to_string(),
-            Value::Number(MeasuredNumber::new(
-                Number::Scalar(std::f64::consts::E),
-                Unit::unitless(),
-            )),
+            Value::Number(Number::Scalar(std::f64::consts::E)),
         ),
     ])
 }
@@ -157,14 +151,14 @@ pub fn builtin_prefixes() -> HashMap<String, f64> {
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
 #[must_use]
-pub fn builtin_units() -> HashMap<String, SizedUnit> {
+pub fn builtin_units() -> HashMap<String, Unit> {
     /// Information about a builtin unit.
     ///
     /// This is only used in this function to avoid code duplication.
     struct UnitInfo {
         names: &'static [&'static str],
         magnitude: f64,
-        unit: Unit,
+        dimensions: DimensionMap,
         is_db: bool,
     }
 
@@ -174,62 +168,62 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
             // the kilogram is the base unit of mass, so the gram is 1e-3 of a kilogram
             names: ["g", "gram", "grams"].as_ref(),
             magnitude: 1e-3,
-            unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["m", "meter", "meters", "metre", "metres"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["s", "second", "seconds", "sec", "secs"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["K", "Kelvin"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::Temperature, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Temperature, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["A", "Ampere", "Amp"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::Current, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Current, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["b", "bit", "bits"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["$", "dollar", "dollars"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mol", "mole", "moles"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::Substance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Substance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["cd", "candela"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
         },
         // === DERIVED UNITS ===
         UnitInfo {
             names: ["V", "Volt", "Volts"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -240,7 +234,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["W", "Watt", "Watts"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -250,13 +244,13 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["Hz", "Hertz"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["J", "Joule", "Joules"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -2.0),
@@ -266,7 +260,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["Wh", "Watt-hour", "Watt-hours"].as_ref(),
             magnitude: 3600.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -2.0),
@@ -276,7 +270,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["Ah", "Amp-hour", "Amp-hours"].as_ref(),
             magnitude: 3600.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Current, 1.0),
                 (Dimension::Time, 1.0),
             ])),
@@ -285,7 +279,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["T", "Tesla", "Teslas"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
                 (Dimension::Current, -1.0),
@@ -295,7 +289,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["Ohm", "Ohms"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -306,7 +300,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["N", "Newton", "Newtons"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -2.0),
@@ -316,7 +310,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["Gs", "Gauss"].as_ref(),
             magnitude: 0.0001,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
                 (Dimension::Current, -1.0),
@@ -326,13 +320,13 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["lm", "Lumen", "Lumens"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["lx", "Lux", "Luxes"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::LuminousIntensity, 1.0),
                 (Dimension::Distance, -2.0),
             ])),
@@ -341,7 +335,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["bps" /* bits per second */].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Information, 1.0),
                 (Dimension::Time, -1.0),
             ])),
@@ -350,13 +344,13 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["B", "byte", "bytes"].as_ref(),
             magnitude: 8.0,
-            unit: Unit::new(HashMap::from([(Dimension::Information, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["Pa", "Pascal", "Pascals"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -367,91 +361,91 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["mil", "millennium", "millennia"].as_ref(),
             magnitude: 3.1556952e10,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["cen", "century", "centuries"].as_ref(),
             magnitude: 3.1556952e9,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["dec", "decade", "decades"].as_ref(),
             magnitude: 3.1556952e8,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["yr", "year", "years"].as_ref(),
             magnitude: 3.1556952e7,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mon", "month", "months"].as_ref(),
             magnitude: 2.629746e6,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["week", "weeks"].as_ref(),
             magnitude: 6.048e5,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["day", "days"].as_ref(),
             magnitude: 8.64e4,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["hr", "hour", "hours"].as_ref(),
             magnitude: 3600.0,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["min", "minute", "minutes"].as_ref(),
             magnitude: 60.0,
-            unit: Unit::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["rpm" /* revolutions per minute */].as_ref(),
             magnitude: 0.10471975511965977,
-            unit: Unit::new(HashMap::from([(Dimension::Time, -1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["k$" /* thousand dollars */].as_ref(),
             magnitude: 1000.0,
-            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["M$" /* million dollars */].as_ref(),
             magnitude: 1e6,
-            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["B$" /* billion dollars */].as_ref(),
             magnitude: 1e9,
-            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["T$" /* trillion dollars */].as_ref(),
             magnitude: 1e12,
-            unit: Unit::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["g_E" /* Earth gravity */].as_ref(),
             magnitude: 9.81,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
             ])),
@@ -467,13 +461,13 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
             ]
             .as_ref(),
             magnitude: 0.01,
-            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["psi" /* pounds per square inch */].as_ref(),
             magnitude: 6894.757293168361,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -483,7 +477,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["atm", "atmosphere", "atmospheres"].as_ref(),
             magnitude: 101325.0,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -493,7 +487,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["bar", "bars"].as_ref(),
             magnitude: 1e5,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -503,7 +497,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["Ba", "barye", "baryes"].as_ref(),
             magnitude: 0.1,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -513,7 +507,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["dyne", "dynes"].as_ref(),
             magnitude: 1e-5,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -2.0),
@@ -523,7 +517,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["mmHg" /* millimeter of mercury */].as_ref(),
             magnitude: 133.322387415,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -533,7 +527,7 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["torr", "torrs"].as_ref(),
             magnitude: 133.3224,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -543,43 +537,43 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["in", "inch", "inches"].as_ref(),
             magnitude: 0.0254,
-            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["ft", "foot", "feet"].as_ref(),
             magnitude: 0.3048,
-            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["yd", "yard", "yards"].as_ref(),
             magnitude: 0.9144,
-            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mi", "mile", "miles"].as_ref(),
             magnitude: 1609.344,
-            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["nmi" /* nautical mile */].as_ref(),
             magnitude: 1852.0,
-            unit: Unit::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["lb", "lbs", "pound", "pounds"].as_ref(),
             magnitude: 0.45359237,
-            unit: Unit::new(HashMap::from([(Dimension::Mass, 1.0)])),
+            dimensions: DimensionMap::new(HashMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mph" /* mile per hour */].as_ref(),
             magnitude: 0.44704,
-            unit: Unit::new(HashMap::from([
+            dimensions: DimensionMap::new(HashMap::from([
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -1.0),
             ])),
@@ -589,55 +583,55 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
         UnitInfo {
             names: ["rev", "revolution", "revolutions", "rotation", "rotations"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["cyc", "cycle", "cycles"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["rad", "radian", "radians"].as_ref(),
             magnitude: 1.0,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["deg", "degree", "degrees"].as_ref(),
             magnitude: 0.017453292519943295,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["%", "percent"].as_ref(),
             magnitude: 0.01,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["ppm" /* part per million */].as_ref(),
             magnitude: 1e-6,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["ppb" /* part per billion */].as_ref(),
             magnitude: 1e-9,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["arcmin", "arcminute", "arcminutes"].as_ref(),
             magnitude: 0.0002908882086657216,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["arcsec", "arcsecond", "arcseconds"].as_ref(),
             magnitude: 4.84813681109536e-06,
-            unit: Unit::new(HashMap::from([])),
+            dimensions: DimensionMap::new(HashMap::from([])),
             is_db: false,
         },
     ];
@@ -648,16 +642,18 @@ pub fn builtin_units() -> HashMap<String, SizedUnit> {
             |UnitInfo {
                  names,
                  magnitude,
-                 unit,
+                 dimensions,
                  is_db,
              }| {
                 names.iter().map(move |name| {
-                    let display_unit = DisplayUnit::Unit((*name).to_string(), None);
-                    let unit = SizedUnit {
+                    let unit = Unit {
+                        dimension_map: dimensions.clone(),
                         magnitude,
-                        unit: unit.clone(),
                         is_db,
-                        display_unit: Some(display_unit),
+                        display_unit: Some(DisplayUnit::Unit {
+                            name: (*name).to_string(),
+                            exponent: 1.0,
+                        }),
                     };
                     ((*name).to_string(), unit)
                 })
@@ -728,125 +724,124 @@ pub fn builtin_functions() -> HashMap<String, StdBuiltinFunction> {
 mod fns {
     use crate::{
         EvalError,
-        value::{MeasuredNumber, Number, Value},
+        value::{
+            MeasuredNumber, Number, Value,
+            util::{HomogeneousNumberList, extract_homogeneous_numbers_list},
+        },
     };
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the function signature needs to match the `StdBuiltinFunction` trait"
+    )]
     pub fn min(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
             return Err(vec![EvalError::InvalidArgumentCount]);
         }
 
-        let mut numbers = Vec::new();
-        let mut errors = Vec::new();
+        let number_list = extract_homogeneous_numbers_list(&args)?;
 
-        let mut unit = None;
-
-        for arg in args {
-            match arg {
-                Value::Number(number) => {
-                    if let Some(ref unit) = unit {
-                        if &number.unit != unit {
-                            errors.push(EvalError::InvalidUnit);
-                            continue;
+        match number_list {
+            HomogeneousNumberList::Numbers(numbers) => {
+                let min = numbers
+                    .into_iter()
+                    .filter_map(|number| match number {
+                        Number::Scalar(value) => Some(*value),
+                        Number::Interval(interval) => {
+                            if interval.is_empty() {
+                                None
+                            } else {
+                                Some(interval.min())
+                            }
                         }
-                    } else {
-                        unit = Some(number.unit.clone());
-                    }
+                    })
+                    .reduce(f64::min)
+                    .expect("there should be at least one number");
 
-                    numbers.push(number);
-                }
-                Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType),
+                Ok(Value::Number(Number::Scalar(min)))
+            }
+            HomogeneousNumberList::MeasuredNumbers(numbers) => {
+                let min = numbers
+                    .into_iter()
+                    .filter_map(|number| match number.normalized_value().as_number() {
+                        Number::Scalar(_) => Some(number.min()),
+                        Number::Interval(interval) => {
+                            if interval.is_empty() {
+                                None
+                            } else {
+                                Some(number.min())
+                            }
+                        }
+                    })
+                    .reduce(|a, b| {
+                        if a.normalized_value() < b.normalized_value() {
+                            a
+                        } else {
+                            b
+                        }
+                    })
+                    .expect("there should be at least one number");
+
+                Ok(Value::MeasuredNumber(min))
             }
         }
-
-        if !errors.is_empty() {
-            return Err(errors);
-        }
-
-        let unit =
-            unit.expect("there should be at least one number, and that number should have a unit");
-
-        let number_values = numbers.into_iter().filter_map(|number| match number.value {
-            Number::Scalar(value) => Some(value),
-            Number::Interval(interval) => {
-                if interval.is_empty() {
-                    None
-                } else {
-                    Some(interval.min())
-                }
-            }
-        });
-
-        let min = number_values.reduce(f64::min);
-
-        min.map_or_else(
-            || Err(vec![EvalError::NoNonEmptyValue]),
-            |min| {
-                Ok(Value::Number(MeasuredNumber::new(
-                    Number::Scalar(min),
-                    unit,
-                )))
-            },
-        )
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "the function signature needs to match the `StdBuiltinFunction` trait"
+    )]
     pub fn max(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
             return Err(vec![EvalError::InvalidArgumentCount]);
         }
 
-        let mut numbers = Vec::new();
-        let mut errors = Vec::new();
+        let number_list = extract_homogeneous_numbers_list(&args)?;
 
-        let mut unit = None;
-
-        for arg in args {
-            match arg {
-                Value::Number(number) => {
-                    if let Some(ref unit) = unit {
-                        if &number.unit != unit {
-                            errors.push(EvalError::InvalidUnit);
-                            continue;
+        match number_list {
+            HomogeneousNumberList::Numbers(numbers) => {
+                let max = numbers
+                    .into_iter()
+                    .filter_map(|number| match number {
+                        Number::Scalar(value) => Some(*value),
+                        Number::Interval(interval) => {
+                            if interval.is_empty() {
+                                None
+                            } else {
+                                Some(interval.max())
+                            }
                         }
-                    } else {
-                        unit = Some(number.unit.clone());
-                    }
+                    })
+                    .reduce(f64::max)
+                    .expect("there should be at least one number");
 
-                    numbers.push(number);
-                }
-                Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType),
+                Ok(Value::Number(Number::Scalar(max)))
+            }
+            HomogeneousNumberList::MeasuredNumbers(numbers) => {
+                let max = numbers
+                    .into_iter()
+                    .filter_map(|number| match number.normalized_value().as_number() {
+                        Number::Scalar(_) => Some(number.max()),
+                        Number::Interval(interval) => {
+                            if interval.is_empty() {
+                                None
+                            } else {
+                                Some(number.max())
+                            }
+                        }
+                    })
+                    .reduce(|a, b| {
+                        if a.normalized_value() > b.normalized_value() {
+                            a
+                        } else {
+                            b
+                        }
+                    })
+                    .expect("there should be at least one number");
+
+                Ok(Value::MeasuredNumber(max))
             }
         }
-
-        if !errors.is_empty() {
-            return Err(errors);
-        }
-
-        let unit =
-            unit.expect("there should be at least one number, and that number should have a unit");
-
-        let number_values = numbers.into_iter().filter_map(|number| match number.value {
-            Number::Scalar(value) => Some(value),
-            Number::Interval(interval) => {
-                if interval.is_empty() {
-                    None
-                } else {
-                    Some(interval.max())
-                }
-            }
-        });
-
-        let max = number_values.reduce(f64::max);
-
-        max.map_or_else(
-            || Err(vec![EvalError::NoNonEmptyValue]),
-            |max| {
-                Ok(Value::Number(MeasuredNumber::new(
-                    Number::Scalar(max),
-                    unit,
-                )))
-            },
-        )
     }
 
     #[expect(unused_variables, reason = "not implemented")]
@@ -941,18 +936,29 @@ mod fns {
 
                 let arg = args.next().expect("there should be one argument");
 
-                let Value::Number(number) = arg else {
+                let (number_value, unit) = match arg {
+                    Value::MeasuredNumber(number) => {
+                        let (number_value, unit) = number.into_number_and_unit();
+                        (number_value, Some(unit))
+                    }
+                    Value::Number(number) => (number, None),
+                    Value::Boolean(_) | Value::String(_) => {
+                        return Err(vec![EvalError::InvalidType]);
+                    }
+                };
+
+                let Number::Interval(interval) = number_value else {
                     return Err(vec![EvalError::InvalidType]);
                 };
 
-                let Number::Interval(interval) = number.value else {
-                    return Err(vec![EvalError::InvalidType]);
-                };
+                let result = interval.max() - interval.min();
 
-                Ok(Value::Number(MeasuredNumber::new(
-                    Number::Scalar(interval.max() - interval.min()),
-                    number.unit,
-                )))
+                unit.map_or(Ok(Value::Number(Number::Scalar(result))), |unit| {
+                    Ok(Value::MeasuredNumber(MeasuredNumber::from_number_and_unit(
+                        Number::Scalar(result),
+                        unit,
+                    )))
+                })
             }
             2 => {
                 let mut args = args.into_iter();
@@ -985,20 +991,29 @@ mod fns {
 
                 let arg = args.next().expect("there should be one argument");
 
-                let Value::Number(number) = arg else {
-                    return Err(vec![EvalError::InvalidType]);
+                let (number_value, unit) = match arg {
+                    Value::MeasuredNumber(number) => {
+                        let (number_value, unit) = number.into_number_and_unit();
+                        (number_value, Some(unit))
+                    }
+                    Value::Number(number) => (number, None),
+                    Value::Boolean(_) | Value::String(_) => {
+                        return Err(vec![EvalError::InvalidType]);
+                    }
                 };
 
-                let Number::Interval(interval) = number.value else {
+                let Number::Interval(interval) = number_value else {
                     return Err(vec![EvalError::InvalidType]);
                 };
 
                 let mid = f64::midpoint(interval.min(), interval.max());
 
-                Ok(Value::Number(MeasuredNumber::new(
-                    Number::Scalar(mid),
-                    number.unit,
-                )))
+                unit.map_or(Ok(Value::Number(Number::Scalar(mid))), |unit| {
+                    Ok(Value::MeasuredNumber(MeasuredNumber::from_number_and_unit(
+                        Number::Scalar(mid),
+                        unit,
+                    )))
+                })
             }
             2 => {
                 let mut args = args.into_iter();

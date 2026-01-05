@@ -14,7 +14,7 @@ mod value_impl;
 use crate::EvalError;
 
 pub use self::interval::Interval;
-pub use self::number::{MeasuredNumber, Number, SizedMeasuredNumber};
+pub use self::number::{MeasuredNumber, Number};
 pub use self::type_::{NumberType, ValueType};
-pub use self::unit::{Dimension, DisplayUnit, SizedUnit, Unit};
+pub use self::unit::{Dimension, DimensionMap, DisplayUnit, Unit};
 pub use self::value_impl::Value;

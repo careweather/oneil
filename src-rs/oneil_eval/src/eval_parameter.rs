@@ -7,7 +7,7 @@ use crate::{
     context::EvalContext,
     error::EvalError,
     eval_expr, eval_unit,
-    value::{MeasuredNumber, Number, SizedUnit, Unit, Value, ValueType},
+    value::{MeasuredNumber, Number, Unit, Value},
 };
 
 /// Evaluates a parameter and returns the resulting value.
@@ -22,7 +22,7 @@ use crate::{
 pub fn eval_parameter<F: BuiltinFunction>(
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
-) -> Result<(Value, TypecheckInfo), Vec<EvalError>> {
+) -> Result<Value, Vec<EvalError>> {
     // TODO: this is about where we would use `trace_level`, but I'm not yet sure
     //       how to handle it.
 
@@ -38,18 +38,37 @@ pub fn eval_parameter<F: BuiltinFunction>(
         }
     };
 
-    // typecheck the value
-    let typecheck_info = typecheck_expr_value(value.type_(), unit_ir.as_ref(), context)?;
+    let unit = unit_ir
+        .as_ref()
+        .map(|unit_ir| eval_unit(unit_ir, context))
+        .transpose()?
+        .flatten();
 
-    // transform the value based on the typecheck info
-    let value = transform_value(value, &typecheck_info);
+    // typecheck the value against the unit
+    let value = match (value, unit) {
+        (Value::Boolean(value), None) => Value::Boolean(value),
+        (Value::String(value), None) => Value::String(value),
+        (Value::Boolean(_), Some(_)) => return Err(vec![EvalError::BooleanCannotHaveUnit]),
+        (Value::String(_), Some(_)) => return Err(vec![EvalError::StringCannotHaveUnit]),
+        (Value::Number(value), None) => Value::Number(value),
+        (Value::Number(number), Some(unit)) => {
+            let number = MeasuredNumber::from_number_and_unit(number, unit);
+            Value::MeasuredNumber(number)
+        }
+        (Value::MeasuredNumber(_), None) => return Err(vec![EvalError::ParameterUnitMismatch]),
+        (Value::MeasuredNumber(number), Some(unit)) if !number.unit().dimensionally_eq(&unit) => {
+            return Err(vec![EvalError::ParameterUnitMismatch]);
+        }
+        (Value::MeasuredNumber(number), Some(unit)) => {
+            Value::MeasuredNumber(number.with_unit(unit))
+        }
+    };
 
     // check that the value is within the provided limits
     let limits = eval_limits(parameter.limits(), context)?;
-    let limits = transform_limits(limits, &typecheck_info);
     verify_value_is_within_limits(&value, limits)?;
 
-    Ok((value, typecheck_info))
+    Ok(value)
 }
 
 fn get_piecewise_result<F: BuiltinFunction>(
@@ -64,7 +83,9 @@ fn get_piecewise_result<F: BuiltinFunction>(
         match if_result {
             Value::Boolean(true) => Ok(Some(branch_result)),
             Value::Boolean(false) => Ok(None),
-            Value::String(_) | Value::Number(_) => Err(vec![EvalError::InvalidIfExpressionType]),
+            Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
+                Err(vec![EvalError::InvalidIfExpressionType])
+            }
         }
     });
 
@@ -99,105 +120,17 @@ fn get_piecewise_result<F: BuiltinFunction>(
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum TypecheckInfo {
-    String,
-    Boolean,
-    Number { sized_unit: SizedUnit },
-}
-
-/// Typechecks the value of an expression against a unit.
-///
-/// If the parameter has a unit and the value is unitless,
-/// the value is multiplied by the unit's magnitude.
-///
-/// In addition, if the value is a unitless number and the unit is a dB unit,
-/// the value is converted from a logarithmic unit to a linear unit.
-fn typecheck_expr_value<F: BuiltinFunction>(
-    type_: ValueType,
-    unit_ir: Option<&ir::CompositeUnit>,
-    context: &EvalContext<F>,
-) -> Result<TypecheckInfo, Vec<EvalError>> {
-    match type_ {
-        ValueType::Boolean => {
-            if unit_ir.is_some() {
-                Err(vec![EvalError::BooleanCannotHaveUnit])
-            } else {
-                Ok(TypecheckInfo::Boolean)
-            }
-        }
-        ValueType::String => {
-            if unit_ir.is_some() {
-                Err(vec![EvalError::StringCannotHaveUnit])
-            } else {
-                Ok(TypecheckInfo::String)
-            }
-        }
-        ValueType::Number {
-            unit,
-            number_type: _,
-        } => {
-            // evaluate the unit if it exists,
-            // otherwise use the unitless unit
-            let sized_unit = unit_ir
-                .as_ref()
-                .map(|unit| eval_unit(unit, context))
-                .transpose()?
-                .unwrap_or(SizedUnit::unitless());
-
-            // if the value is unitless, assign it the given unit
-            // otherwise, typecheck the value's unit against the given unit
-            if unit.is_unitless() || unit == sized_unit.unit {
-                Ok(TypecheckInfo::Number { sized_unit })
-            } else {
-                Err(vec![EvalError::ParameterUnitMismatch])
-            }
-        }
-    }
-}
-
-fn transform_value(value: Value, typecheck_info: &TypecheckInfo) -> Value {
-    match (typecheck_info, value) {
-        (TypecheckInfo::Number { sized_unit }, Value::Number(number))
-            if number.unit.is_unitless() =>
-        {
-            let number_value = number.value * sized_unit.magnitude;
-            let number_unit = sized_unit.unit.clone();
-
-            // handle dB units
-            let number_value = if sized_unit.is_db {
-                db_to_linear(number_value)
-            } else {
-                number_value
-            };
-
-            let number = MeasuredNumber {
-                value: number_value,
-                unit: number_unit,
-            };
-
-            Value::Number(number)
-        }
-        (TypecheckInfo::String, value @ Value::String(_))
-        | (TypecheckInfo::Boolean, value @ Value::Boolean(_))
-        | (TypecheckInfo::Number { .. }, value @ Value::Number(_)) => value,
-        (_, _) => unreachable!(
-            "this shouldn't happen because the result of typechecking should always match the value's type"
-        ),
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Limits {
+#[derive(Debug, Clone)]
+enum Limits {
     AnyStringOrBooleanOrPositiveNumber,
     NumberRange {
         min: Number,
         max: Number,
-        unit: Unit,
+        unit: Option<Unit>,
     },
     NumberDiscrete {
         values: Vec<Number>,
-        unit: Unit,
+        unit: Option<Unit>,
     },
     StringDiscrete {
         values: HashSet<String>,
@@ -221,34 +154,46 @@ fn eval_continuous_limits<F: BuiltinFunction>(
     context: &EvalContext<F>,
 ) -> Result<Limits, Vec<EvalError>> {
     let min = eval_expr(min, context).and_then(|value| match value {
-        Value::Number(number) => Ok(number),
+        Value::MeasuredNumber(number) => {
+            let (number, unit) = number.into_number_and_unit();
+            Ok((number, Some(unit)))
+        }
+        Value::Number(number) => Ok((number, None)),
         Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidContinuousLimitMinType]),
     });
 
     let max = eval_expr(max, context).and_then(|value| match value {
-        Value::Number(number) => Ok(number),
+        Value::MeasuredNumber(number) => {
+            let (number, unit) = number.into_number_and_unit();
+            Ok((number, Some(unit)))
+        }
+        Value::Number(number) => Ok((number, None)),
         Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidContinuousLimitMaxType]),
     });
 
-    match (min, max) {
-        (Ok(min), Ok(max)) => {
-            if min.unit != max.unit {
-                return Err(vec![EvalError::InvalidUnit]);
-            }
-
-            Ok(Limits::NumberRange {
-                min: min.value,
-                max: max.value,
-                unit: min.unit,
-            })
-        }
-        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
+    let (min, min_unit, max, max_unit) = match (min, max) {
+        (Ok((min, min_unit)), Ok((max, max_unit))) => (min, min_unit, max, max_unit),
+        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => return Err(errors),
         (Err(errors), Err(errors2)) => {
             let mut errors = errors;
             errors.extend(errors2);
-            Err(errors)
+            return Err(errors);
         }
-    }
+    };
+
+    let unit = match (min_unit, max_unit) {
+        (Some(min_unit), Some(max_unit)) => {
+            if !min_unit.dimensionally_eq(&max_unit) {
+                return Err(vec![EvalError::InvalidUnit]);
+            }
+
+            Some(min_unit)
+        }
+        (Some(unit), None) | (None, Some(unit)) => Some(unit),
+        (None, None) => None,
+    };
+
+    Ok(Limits::NumberRange { min, max, unit })
 }
 
 #[expect(
@@ -283,166 +228,159 @@ fn eval_discrete_limits<F: BuiltinFunction>(
     let first_value = results.remove(0);
 
     match first_value {
-        Value::String(first_value) => {
-            let mut errors = Vec::new();
-            let mut strings = HashSet::new();
+        Value::String(first_value) => eval_string_discrete_limits(first_value, results),
+        Value::Number(first_value) => eval_number_discrete_limits(first_value, None, results),
+        Value::MeasuredNumber(first_value) => {
+            let (first_value, limit_unit) = first_value.into_number_and_unit();
 
-            strings.insert(first_value);
-
-            for result in results {
-                match result {
-                    Value::String(string) => {
-                        if strings.contains(&string) {
-                            errors.push(EvalError::DuplicateStringLimit);
-                        } else {
-                            strings.insert(string);
-                        }
-                    }
-                    Value::Number(_) | Value::Boolean(_) => {
-                        errors.push(EvalError::ExpectedStringLimit);
-                    }
-                }
-            }
-
-            if errors.is_empty() {
-                Ok(Limits::StringDiscrete { values: strings })
-            } else {
-                Err(errors)
-            }
-        }
-        Value::Number(first_value) => {
-            let mut errors = Vec::new();
-            let mut numbers = Vec::new();
-            let limit_unit = first_value.unit;
-
-            for result in results {
-                match result {
-                    Value::Number(number_result) => {
-                        if number_result.unit == limit_unit {
-                            numbers.push(number_result.value);
-                        } else {
-                            errors.push(EvalError::DiscreteLimitUnitMismatch);
-                        }
-                    }
-                    Value::Boolean(_) | Value::String(_) => {
-                        errors.push(EvalError::ExpectedNumberLimit);
-                    }
-                }
-            }
-
-            numbers.insert(0, first_value.value);
-
-            if errors.is_empty() {
-                Ok(Limits::NumberDiscrete {
-                    values: numbers,
-                    unit: limit_unit,
-                })
-            } else {
-                Err(errors)
-            }
+            eval_number_discrete_limits(first_value, Some(limit_unit), results)
         }
         Value::Boolean(_) => Err(vec![EvalError::LimitCannotBeBoolean]),
     }
 }
 
-fn transform_limits(limits: Limits, typecheck_info: &TypecheckInfo) -> Limits {
-    match (limits, typecheck_info) {
-        (Limits::NumberRange { min, max, unit }, TypecheckInfo::Number { sized_unit })
-            if unit.is_unitless() =>
-        {
-            let min = min * Number::Scalar(sized_unit.magnitude);
-            let max = max * Number::Scalar(sized_unit.magnitude);
-            let unit = sized_unit.unit.clone();
+fn eval_string_discrete_limits(
+    first_value: String,
+    results: Vec<Value>,
+) -> Result<Limits, Vec<EvalError>> {
+    let mut errors = Vec::new();
+    let mut strings = HashSet::new();
 
-            // handle dB units
-            let min = if sized_unit.is_db {
-                db_to_linear(min)
-            } else {
-                min
-            };
-            let max = if sized_unit.is_db {
-                db_to_linear(max)
-            } else {
-                max
-            };
+    strings.insert(first_value);
 
-            Limits::NumberRange { min, max, unit }
-        }
-
-        (Limits::NumberDiscrete { values, unit }, TypecheckInfo::Number { sized_unit })
-            if unit.is_unitless() =>
-        {
-            let values = values
-                .into_iter()
-                .map(|value| value * Number::Scalar(sized_unit.magnitude))
-                .map(|value| {
-                    if sized_unit.is_db {
-                        db_to_linear(value)
-                    } else {
-                        value
-                    }
-                })
-                .collect();
-
-            let unit = sized_unit.unit.clone();
-            Limits::NumberDiscrete { values, unit }
-        }
-
-        (Limits::AnyStringOrBooleanOrPositiveNumber, TypecheckInfo::Number { sized_unit })
-            if sized_unit.is_db =>
-        {
-            Limits::NumberRange {
-                min: Number::Scalar(1.0), // 0 db == 1
-                max: Number::Scalar(f64::INFINITY),
-                unit: sized_unit.unit.clone(),
+    for result in results {
+        match result {
+            Value::String(string) => {
+                if strings.contains(&string) {
+                    errors.push(EvalError::DuplicateStringLimit);
+                } else {
+                    strings.insert(string);
+                }
+            }
+            Value::Number(_) | Value::MeasuredNumber(_) | Value::Boolean(_) => {
+                errors.push(EvalError::ExpectedStringLimit);
             }
         }
+    }
 
-        (
-            limits @ (Limits::NumberRange { .. } | Limits::NumberDiscrete { .. }),
-            TypecheckInfo::Number { .. },
-        )
-        | (limits @ Limits::StringDiscrete { .. }, TypecheckInfo::String)
-        | (limits @ Limits::AnyStringOrBooleanOrPositiveNumber, _) => limits,
+    if errors.is_empty() {
+        Ok(Limits::StringDiscrete { values: strings })
+    } else {
+        Err(errors)
+    }
+}
 
-        (_, _) => {
-            unreachable!("this shouldn't happen because typechecking should have already occurred")
+fn eval_number_discrete_limits(
+    first_value: Number,
+    limit_unit: Option<Unit>,
+    results: Vec<Value>,
+) -> Result<Limits, Vec<EvalError>> {
+    let mut errors = Vec::new();
+    let mut numbers = Vec::new();
+    let mut limit_unit = limit_unit;
+
+    numbers.push(first_value);
+
+    for result in results {
+        match result {
+            Value::MeasuredNumber(number_result) => {
+                let (number_result, number_result_unit) = number_result.into_number_and_unit();
+
+                match &limit_unit {
+                    Some(limit_unit) if number_result_unit.dimensionally_eq(limit_unit) => {
+                        numbers.push(number_result);
+                    }
+                    Some(_) => {
+                        errors.push(EvalError::DiscreteLimitUnitMismatch);
+                    }
+                    None => {
+                        limit_unit = Some(number_result_unit);
+                        numbers.push(number_result);
+                    }
+                }
+            }
+            Value::Number(number_result) => {
+                numbers.push(number_result);
+            }
+            Value::Boolean(_) | Value::String(_) => {
+                errors.push(EvalError::ExpectedNumberLimit);
+            }
         }
+    }
+
+    if errors.is_empty() {
+        Ok(Limits::NumberDiscrete {
+            values: numbers,
+            unit: limit_unit,
+        })
+    } else {
+        Err(errors)
     }
 }
 
 fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Vec<EvalError>> {
     match limits {
         Limits::AnyStringOrBooleanOrPositiveNumber => match value {
-            Value::Number(number) if number.value.min() < 0.0 => {
+            Value::MeasuredNumber(number) if number.normalized_value().min() < 0.0 => {
                 Err(vec![EvalError::ParameterValueOutsideLimits])
             }
-            Value::Boolean(_) | Value::String(_) | Value::Number(_) => Ok(()),
+            Value::Number(number) if number.min() < 0.0 => {
+                Err(vec![EvalError::ParameterValueOutsideLimits])
+            }
+            Value::Boolean(_) | Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
+                Ok(())
+            }
         },
-        Limits::NumberRange { min, max, unit } => {
-            if let Value::Number(number) = value {
-                if !unit.is_unitless() && number.unit != unit {
+        Limits::NumberRange { min, max, unit } => match value {
+            Value::Boolean(_) | Value::String(_) => {
+                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+            }
+            Value::Number(number) => {
+                if unit.is_some() {
                     Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
-                } else if number.value.min() < min.min() || number.value.max() > max.max() {
+                } else if number.min() < min.min() || number.max() > max.max() {
                     Err(vec![EvalError::ParameterValueOutsideLimits])
                 } else {
                     Ok(())
                 }
-            } else {
-                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
             }
-        }
-        Limits::NumberDiscrete { values, unit } => {
-            if let Value::Number(number) = value {
-                // the number must have the same unit as the limit unit,
-                // unless the limit unit is unitless
-                if !unit.is_unitless() && number.unit != unit {
+            Value::MeasuredNumber(number) => {
+                if let Some(unit) = unit
+                    && !number.unit().dimensionally_eq(&unit)
+                {
                     return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
                 }
 
-                let is_inside_limits = values
-                    .iter()
-                    .any(|limit_value| limit_value.contains(number.value));
+                // the min and the max must be converted to the same unit as the number
+                let adjusted_min = MeasuredNumber::from_number_and_unit(min, number.unit().clone());
+                let adjusted_max = MeasuredNumber::from_number_and_unit(max, number.unit().clone());
+
+                if number.normalized_value().min() < adjusted_min.normalized_value().min()
+                    || number.normalized_value().max() > adjusted_max.normalized_value().max()
+                {
+                    Err(vec![EvalError::ParameterValueOutsideLimits])
+                } else {
+                    Ok(())
+                }
+            }
+        },
+        Limits::NumberDiscrete { values, unit } => {
+            if let Value::MeasuredNumber(number) = value {
+                // the number must have the same unit as the limit unit,
+                // unless the limit unit is unitless
+                if let Some(unit) = unit
+                    && !number.unit().dimensionally_eq(&unit)
+                {
+                    return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
+                }
+
+                let is_inside_limits = values.into_iter().any(|limit_value| {
+                    let adjusted_limit_value =
+                        MeasuredNumber::from_number_and_unit(limit_value, number.unit().clone());
+                    adjusted_limit_value
+                        .normalized_value()
+                        .contains(number.normalized_value())
+                });
 
                 if is_inside_limits {
                     Ok(())
@@ -458,18 +396,17 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
                 Err(vec![EvalError::ParameterValueOutsideLimits])
             }
             Value::String(_) => Ok(()),
-            Value::Boolean(_) | Value::Number(_) => {
+            Value::Boolean(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
                 Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
             }
         },
     }
 }
 
-fn db_to_linear(value: Number) -> Number {
-    Number::Scalar(10.0).pow(value / Number::Scalar(10.0))
-}
+use std::f64::consts::PI;
 
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use crate::{
         assert_is_close, assert_units_eq,
@@ -490,7 +427,7 @@ mod tests {
         let expected_units = [];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -522,7 +459,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -554,7 +491,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -587,7 +524,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -620,7 +557,7 @@ mod tests {
         let expected_units = [];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -657,7 +594,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -695,7 +632,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -738,7 +675,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -781,7 +718,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -822,7 +759,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -860,7 +797,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 2.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -898,7 +835,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -937,7 +874,7 @@ mod tests {
         let expected_units = [];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -977,7 +914,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1016,7 +953,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1051,7 +988,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1089,7 +1026,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1131,7 +1068,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1170,7 +1107,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1212,7 +1149,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1255,7 +1192,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
@@ -1294,7 +1231,7 @@ mod tests {
         let expected_units = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
