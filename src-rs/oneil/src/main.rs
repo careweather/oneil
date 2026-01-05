@@ -10,6 +10,7 @@ use oneil_model_resolver::FileLoader;
 use oneil_runner::{
     builtins::Builtins,
     file_parser::{self, LoadingError},
+    print_model_result::ModelPrintConfig,
 };
 
 use crate::command::{CliCommand, Commands, DevCommand};
@@ -148,7 +149,7 @@ fn handle_eval_command(file: &Path, print_debug: bool, no_colors: bool) {
 
     match model_result {
         Ok(model_result) => {
-            print_model_result::print(&model_result, print_debug);
+            print_model_result::print(&model_result, print_debug, &ModelPrintConfig {});
         }
         Err(errors) => {
             for error in errors {
