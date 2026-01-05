@@ -15,6 +15,15 @@ enum FuzzData {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
     },
+    Ln {
+        val: IntervalWithValue,
+    },
+    Log10 {
+        val: IntervalWithValue,
+    },
+    Log2 {
+        val: IntervalWithValue,
+    },
     Mod {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
@@ -36,6 +45,9 @@ enum FuzzData {
     //     base: IntervalWithValue,
     //     exponent: IntervalWithValue,
     // },
+    Sqrt {
+        val: IntervalWithValue,
+    },
     Sub {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
@@ -67,6 +79,21 @@ fuzz_target!(|data: FuzzData| {
                 return;
             }
 
+            (interval_result, value_result)
+        }
+        FuzzData::Ln { val } => {
+            let interval_result = val.interval.ln();
+            let value_result = val.value.ln();
+            (interval_result, value_result)
+        }
+        FuzzData::Log10 { val } => {
+            let interval_result = val.interval.log10();
+            let value_result = val.value.log10();
+            (interval_result, value_result)
+        }
+        FuzzData::Log2 { val } => {
+            let interval_result = val.interval.log2();
+            let value_result = val.value.log2();
             (interval_result, value_result)
         }
         FuzzData::Mod { lhs, rhs } => {
@@ -104,6 +131,11 @@ fuzz_target!(|data: FuzzData| {
         //     }
         //     (interval_result, value_result)
         // }
+        FuzzData::Sqrt { val } => {
+            let interval_result = val.interval.sqrt();
+            let value_result = val.value.sqrt();
+            (interval_result, value_result)
+        }
         FuzzData::Sub { lhs, rhs } => {
             let interval_result = lhs.interval - rhs.interval;
             let value_result = lhs.value - rhs.value;

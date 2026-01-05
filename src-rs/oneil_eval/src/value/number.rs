@@ -318,6 +318,42 @@ impl MeasuredNumber {
             unit: self.unit.clone(),
         }
     }
+
+    /// Returns the square root of the measured number.
+    #[must_use]
+    pub fn sqrt(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.sqrt(),
+            unit: self.unit.pow(0.5),
+        }
+    }
+
+    /// Returns the natural logarithm of the measured number.
+    #[must_use]
+    pub fn ln(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.ln(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the base 10 logarithm of the measured number.
+    #[must_use]
+    pub fn log10(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.log10(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the base 2 logarithm of the measured number.
+    #[must_use]
+    pub fn log2(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.log2(),
+            unit: self.unit,
+        }
+    }
 }
 
 impl PartialEq for MeasuredNumber {
@@ -585,6 +621,30 @@ impl NormalizedNumber {
     #[must_use]
     pub const fn as_number(&self) -> &Number {
         &self.0
+    }
+
+    /// Returns the square root of the normalized number.
+    #[must_use]
+    pub fn sqrt(self) -> Self {
+        Self(self.0.sqrt())
+    }
+
+    /// Returns the natural logarithm of the normalized number.
+    #[must_use]
+    pub fn ln(self) -> Self {
+        Self(self.0.ln())
+    }
+
+    /// Returns the base 10 logarithm of the normalized number.
+    #[must_use]
+    pub fn log10(self) -> Self {
+        Self(self.0.log10())
+    }
+
+    /// Returns the base 2 logarithm of the normalized number.
+    #[must_use]
+    pub fn log2(self) -> Self {
+        Self(self.0.log2())
     }
 }
 
@@ -930,6 +990,42 @@ impl Number {
             }
             (Self::Interval(lhs), Self::Scalar(rhs)) => *rhs >= lhs.min() && *rhs <= lhs.max(),
             (Self::Interval(lhs), Self::Interval(rhs)) => lhs.contains(rhs),
+        }
+    }
+
+    /// Returns the square root of the number value.
+    #[must_use]
+    pub fn sqrt(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.sqrt()),
+            Self::Interval(interval) => Self::Interval(interval.sqrt()),
+        }
+    }
+
+    /// Returns the natural logarithm of the number value.
+    #[must_use]
+    pub fn ln(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.ln()),
+            Self::Interval(interval) => Self::Interval(interval.ln()),
+        }
+    }
+
+    /// Returns the base 10 logarithm of the number value.
+    #[must_use]
+    pub fn log10(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.log10()),
+            Self::Interval(interval) => Self::Interval(interval.log10()),
+        }
+    }
+
+    /// Returns the base 2 logarithm of the number value.
+    #[must_use]
+    pub fn log2(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.log2()),
+            Self::Interval(interval) => Self::Interval(interval.log2()),
         }
     }
 }
