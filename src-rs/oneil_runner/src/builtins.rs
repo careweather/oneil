@@ -8,7 +8,7 @@ use ::std::collections::HashMap;
 
 use oneil_eval::{
     builtin::{BuiltinFunction, BuiltinMap},
-    value::{SizedUnit, Value},
+    value::{Unit, Value},
 };
 use oneil_ir as ir;
 use oneil_model_resolver::BuiltinRef;
@@ -29,7 +29,7 @@ impl<F: BuiltinFunction> Builtins<F> {
     pub const fn new(
         values: HashMap<String, Value>,
         functions: HashMap<String, F>,
-        units: HashMap<String, SizedUnit>,
+        units: HashMap<String, Unit>,
         prefixes: HashMap<String, f64>,
     ) -> Self {
         Self {
