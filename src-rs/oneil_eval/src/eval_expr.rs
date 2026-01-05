@@ -6,7 +6,7 @@ use crate::{
     builtin::BuiltinFunction,
     context::EvalContext,
     error::EvalError,
-    value::{MeasuredNumber, Number, Unit, Value},
+    value::{Number, Value},
 };
 
 /// Evaluates an expression and returns the resulting value.
@@ -331,8 +331,7 @@ fn eval_literal(value: &ir::Literal) -> Value {
         ir::Literal::String(string) => Value::String(string.clone()),
         ir::Literal::Number(number) => {
             let number = Number::Scalar(*number);
-            let unit = Unit::unitless();
-            Value::Number(MeasuredNumber::new(number, unit))
+            Value::Number(number)
         }
     }
 }

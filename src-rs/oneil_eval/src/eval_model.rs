@@ -3,12 +3,7 @@ use std::collections::{HashMap, HashSet};
 use oneil_ir as ir;
 
 use crate::{
-    EvalError,
-    builtin::BuiltinFunction,
-    context::EvalContext,
-    eval_expr,
-    eval_parameter::{self, TypecheckInfo},
-    result,
+    EvalError, builtin::BuiltinFunction, context::EvalContext, eval_expr, eval_parameter, result,
     value::Value,
 };
 
@@ -59,8 +54,7 @@ pub fn eval_model<F: BuiltinFunction>(
 
         let value = eval_parameter::eval_parameter(parameter, &context);
 
-        let parameter_result = value
-            .map(|(value, typecheck_info)| parameter_result_from(value, typecheck_info, parameter));
+        let parameter_result = value.map(|value| parameter_result_from(value, parameter));
 
         context.add_parameter_result(parameter_name.as_str().to_string(), parameter_result);
     }
@@ -81,14 +75,10 @@ pub fn eval_model<F: BuiltinFunction>(
     context
 }
 
-fn parameter_result_from(
-    value: Value,
-    typecheck_info: TypecheckInfo,
-    parameter: &ir::Parameter,
-) -> result::Parameter {
-    let unit = match typecheck_info {
-        TypecheckInfo::Number { sized_unit } => Some(sized_unit),
-        TypecheckInfo::String | TypecheckInfo::Boolean => None,
+fn parameter_result_from(value: Value, parameter: &ir::Parameter) -> result::Parameter {
+    let unit = match &value {
+        Value::MeasuredNumber(number) => Some(number.unit().clone()),
+        Value::String(_) | Value::Boolean(_) | Value::Number(_) => None,
     };
 
     let trace = match parameter.trace_level() {

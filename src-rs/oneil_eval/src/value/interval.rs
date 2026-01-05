@@ -254,7 +254,7 @@ impl Interval {
     ///
     /// If `self` is empty, then `self` cannot contain `rhs`.
     #[must_use]
-    pub fn contains(self, rhs: Self) -> bool {
+    pub fn contains(&self, rhs: &Self) -> bool {
         if rhs.is_empty() {
             return true;
         }
