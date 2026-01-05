@@ -19,7 +19,7 @@ pub struct Unit {
     /// Whether the unit is a decibel unit
     pub is_db: bool,
     /// The display information for the unit
-    pub display_unit: Option<DisplayUnit>,
+    pub display_unit: DisplayUnit,
 }
 
 impl Unit {
@@ -30,7 +30,7 @@ impl Unit {
             dimension_map: DimensionMap::unitless(),
             magnitude: 1.0,
             is_db: false,
-            display_unit: None,
+            display_unit: DisplayUnit::Unitless,
         }
     }
 
@@ -50,7 +50,7 @@ impl Unit {
     #[must_use]
     pub fn with_unit_display_expr(self, display_expr: DisplayUnit) -> Self {
         Self {
-            display_unit: Some(display_expr),
+            display_unit: display_expr,
             ..self
         }
     }
@@ -71,7 +71,7 @@ impl Unit {
             dimension_map: self.dimension_map.pow(exponent),
             magnitude: self.magnitude.powf(exponent),
             is_db: self.is_db,
-            display_unit: self.display_unit.map(|expr| expr.pow(exponent)),
+            display_unit: self.display_unit.pow(exponent),
         }
     }
 
@@ -110,18 +110,11 @@ impl ops::Mul for Unit {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let display_expr = match (self.display_unit, rhs.display_unit) {
-            (Some(expr), Some(rhs_expr)) => Some(expr.mul(rhs_expr)),
-            (Some(expr), None) => Some(expr),
-            (None, Some(rhs_expr)) => Some(rhs_expr),
-            (None, None) => None,
-        };
-
         Self {
             dimension_map: self.dimension_map * rhs.dimension_map,
             magnitude: self.magnitude * rhs.magnitude,
             is_db: self.is_db || rhs.is_db,
-            display_unit: display_expr,
+            display_unit: self.display_unit * rhs.display_unit,
         }
     }
 }
@@ -130,18 +123,11 @@ impl ops::Div for Unit {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        let display_expr = match (self.display_unit, rhs.display_unit) {
-            (Some(expr), Some(rhs_expr)) => Some(expr.div(rhs_expr)),
-            (Some(expr), None) => Some(expr),
-            (None, Some(rhs_expr)) => Some(rhs_expr),
-            (None, None) => None,
-        };
-
         Self {
             dimension_map: self.dimension_map / rhs.dimension_map,
             magnitude: self.magnitude / rhs.magnitude,
             is_db: self.is_db || rhs.is_db,
-            display_unit: display_expr,
+            display_unit: self.display_unit / rhs.display_unit,
         }
     }
 }

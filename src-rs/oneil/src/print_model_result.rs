@@ -37,7 +37,7 @@ fn print_value(value: &Value) {
         Value::Boolean(boolean) => print!("{}", boolean),
         Value::Number(number) => print_number_value(number),
         Value::MeasuredNumber(number) => {
-            let (number, unit) = number.into_number_and_unit();
+            let (number, unit) = number.clone().into_number_and_unit();
             print_number_value(&number);
             print_number_unit(&unit);
         }
@@ -52,10 +52,6 @@ fn print_number_value(value: &value::Number) {
 }
 
 fn print_number_unit(unit: &value::Unit) {
-    if let Some(display_unit) = &unit.display_unit {
-        let styled_display_unit = stylesheet::PARAMETER_UNIT.style(display_unit.to_string());
-        print!(" :{styled_display_unit}");
-    } else {
-        print!("");
-    }
+    let styled_display_unit = stylesheet::PARAMETER_UNIT.style(unit.display_unit.to_string());
+    print!(" :{styled_display_unit}");
 }
