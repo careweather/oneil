@@ -120,15 +120,12 @@ fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
     }
 }
 
-use std::f64::consts::PI;
-
 #[cfg(test)]
-#[cfg(never)]
 mod test {
     use std::f64::consts::PI;
 
     use crate::{
-        assert_is_close, assert_units_eq,
+        assert_is_close, assert_units_dimensionally_eq,
         builtin::{self, BuiltinMap, std::StdBuiltinFunction},
         value::Dimension,
     };
@@ -174,12 +171,9 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
 
-            // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!([], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert!(unit.is_none(), "unit should be unitless");
         }
 
         #[test]
@@ -192,12 +186,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
-            // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            // check unit
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -210,12 +207,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(0.001, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(0.001, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -228,12 +228,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(0.001_f64.powi(2), sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, 2.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(0.001_f64.powi(2), unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, 2.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -246,12 +249,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!([], sized_unit.unit);
-            assert!(sized_unit.is_db);
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!([], unit);
+            assert!(unit.is_db);
         }
 
         #[test]
@@ -264,19 +270,22 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0)
                 ],
-                sized_unit.unit
+                unit
             );
-            assert!(sized_unit.is_db);
+            assert!(unit.is_db);
         }
 
         #[test]
@@ -289,7 +298,10 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // dBW: Mass, Distance^2, Time^-3
@@ -297,12 +309,9 @@ mod test {
             // Hz^-1: Time^1 (since Hz has Time^-1)
             // Result: Mass, Time^-2
             // Magnitude: 1 / (2π) because Hz has magnitude 2π, so Hz^-1 contributes 1/(2π)
-            assert_is_close!(1.0 / (2.0 * PI), sized_unit.magnitude);
-            assert_units_eq!(
-                [(Dimension::Mass, 1.0), (Dimension::Time, -2.0)],
-                sized_unit.unit
-            );
-            assert!(sized_unit.is_db);
+            assert_is_close!(1.0 / (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Mass, 1.0), (Dimension::Time, -2.0)], unit);
+            assert!(unit.is_db);
         }
 
         #[test]
@@ -315,12 +324,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1000.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Distance, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1000.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Distance, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -333,12 +345,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1000.0_f64.powi(2), sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Distance, 2.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1000.0_f64.powi(2), unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Distance, 2.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -351,13 +366,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // Hz has magnitude 2π, so GHz = 1e9 * 2π
-            assert_is_close!(1e9 * (2.0 * PI), sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, -1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1e9 * (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -370,13 +388,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // Hz has magnitude 2π, so kHz = 1e3 * 2π
-            assert_is_close!(1e3 * (2.0 * PI), sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, -1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1e3 * (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -389,13 +410,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // Hz has magnitude 2π, so MHz = 1e6 * 2π
-            assert_is_close!(1e6 * (2.0 * PI), sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, -1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1e6 * (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -408,12 +432,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1e-6, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1e-6, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -426,20 +453,23 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -1.0)
                 ],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -452,20 +482,23 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(0.001, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(0.001, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -1.0)
                 ],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -478,20 +511,23 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -2.0)
                 ],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -504,19 +540,22 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0)
                 ],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -529,15 +568,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
-                [(Dimension::Mass, 1.0), (Dimension::Time, -3.0)],
-                sized_unit.unit
-            );
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Mass, 1.0), (Dimension::Time, -3.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -550,12 +589,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Temperature, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Temperature, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -568,12 +610,15 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Current, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Current, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -586,16 +631,19 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // mAh = 0.001 A * 3600 s = 3.6 A*s
-            assert_is_close!(3.6, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(3.6, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [(Dimension::Current, 1.0), (Dimension::Time, 1.0)],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -608,19 +656,22 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -2.0)
                 ],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -633,13 +684,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // hr = 3600 s
-            assert_is_close!(3600.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(3600.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -652,13 +706,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // min = 60 s
-            assert_is_close!(60.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(60.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -671,13 +728,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // rpm has magnitude 2π/60 (radians per second)
-            assert_is_close!(2.0 * PI / 60.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Time, -1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(2.0 * PI / 60.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -690,13 +750,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // deg is dimensionless with magnitude π/180 (conversion to radians)
-            assert_is_close!(PI / 180.0, sized_unit.magnitude);
-            assert_units_eq!([], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(PI / 180.0, unit.magnitude);
+            assert_units_dimensionally_eq!([], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -709,13 +772,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // % is dimensionless with magnitude 0.01
-            assert_is_close!(0.01, sized_unit.magnitude);
-            assert_units_eq!([], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(0.01, unit.magnitude);
+            assert_units_dimensionally_eq!([], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -728,16 +794,19 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // Mbps = 1e6 * bps, and bps has Information*Time^-1 dimension
-            assert_is_close!(1e6, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1e6, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [(Dimension::Information, 1.0), (Dimension::Time, -1.0)],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -750,13 +819,16 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // B has magnitude 8 (bits), so kB = 1000 * 8 = 8000 bits
-            assert_is_close!(8000.0, sized_unit.magnitude);
-            assert_units_eq!([(Dimension::Information, 1.0)], sized_unit.unit);
-            assert!(!sized_unit.is_db);
+            assert_is_close!(8000.0, unit.magnitude);
+            assert_units_dimensionally_eq!([(Dimension::Information, 1.0)], unit);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -770,21 +842,24 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
             // kg is the base unit (magnitude 1), not g
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [
                     (Dimension::Distance, 2.0),
                     (Dimension::Mass, 1.0),
                     (Dimension::Time, -2.0),
                     (Dimension::Temperature, -1.0)
                 ],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -797,15 +872,18 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
 
         #[test]
@@ -818,15 +896,18 @@ mod test {
             let result = eval_unit(&unit, &context);
 
             // unwrap result
-            let sized_unit = result.expect("should be able to eval unit");
+            let unit = result.expect("should be able to eval unit");
+            let Some(unit) = unit else {
+                panic!("unit should be some");
+            };
 
             // check sized unit
-            assert_is_close!(1.0, sized_unit.magnitude);
-            assert_units_eq!(
+            assert_is_close!(1.0, unit.magnitude);
+            assert_units_dimensionally_eq!(
                 [(Dimension::Distance, 1.0), (Dimension::Time, -2.0)],
-                sized_unit.unit
+                unit
             );
-            assert!(!sized_unit.is_db);
+            assert!(!unit.is_db);
         }
     }
 
@@ -842,16 +923,20 @@ mod test {
 
             // evaluate newton unit
             let result = eval_unit(&newton_unit, &context);
-            let newton_sized_unit = result.expect("should be able to eval unit");
+            let newton_unit = result.expect("should be able to eval unit");
+            let Some(newton_unit) = newton_unit else {
+                panic!("newton unit should be some");
+            };
 
             // evaluate kg_m_s_2 unit
             let result = eval_unit(&kg_m_s_2_unit, &context);
-            let kg_m_s_2_sized_unit = result.expect("should be able to eval unit");
+            let kg_m_s_2_unit = result.expect("should be able to eval unit");
+            let Some(kg_m_s_2_unit) = kg_m_s_2_unit else {
+                panic!("kg_m_s_2 unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(newton_sized_unit, kg_m_s_2_sized_unit);
-            assert!(!newton_sized_unit.is_db);
-            assert!(!kg_m_s_2_sized_unit.is_db);
+            assert!(newton_unit.numerically_eq(&kg_m_s_2_unit));
         }
 
         #[test]
@@ -863,16 +948,20 @@ mod test {
 
             // evaluate joule unit
             let result = eval_unit(&joule_unit, &context);
-            let joule_sized_unit = result.expect("should be able to eval unit");
+            let joule_unit = result.expect("should be able to eval unit");
+            let Some(joule_unit) = joule_unit else {
+                panic!("joule unit should be some");
+            };
 
             // evaluate newton_meter unit
             let result = eval_unit(&newton_meter_unit, &context);
-            let newton_meter_sized_unit = result.expect("should be able to eval unit");
+            let newton_meter_unit = result.expect("should be able to eval unit");
+            let Some(newton_meter_unit) = newton_meter_unit else {
+                panic!("newton_meter unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(joule_sized_unit, newton_meter_sized_unit);
-            assert!(!joule_sized_unit.is_db);
-            assert!(!newton_meter_sized_unit.is_db);
+            assert!(joule_unit.numerically_eq(&newton_meter_unit));
         }
 
         #[test]
@@ -884,16 +973,20 @@ mod test {
 
             // evaluate joule unit
             let result = eval_unit(&joule_unit, &context);
-            let joule_sized_unit = result.expect("should be able to eval unit");
+            let joule_unit = result.expect("should be able to eval unit");
+            let Some(joule_unit) = joule_unit else {
+                panic!("joule unit should be some");
+            };
 
             // evaluate kg_m2_s2 unit
             let result = eval_unit(&kg_m2_s2_unit, &context);
-            let kg_m2_s2_sized_unit = result.expect("should be able to eval unit");
+            let kg_m2_s2_unit = result.expect("should be able to eval unit");
+            let Some(kg_m2_s2_unit) = kg_m2_s2_unit else {
+                panic!("kg_m2_s2 unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(joule_sized_unit, kg_m2_s2_sized_unit);
-            assert!(!joule_sized_unit.is_db);
-            assert!(!kg_m2_s2_sized_unit.is_db);
+            assert!(joule_unit.numerically_eq(&kg_m2_s2_unit));
         }
 
         #[test]
@@ -905,16 +998,20 @@ mod test {
 
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
-            let watt_sized_unit = result.expect("should be able to eval unit");
+            let watt_unit = result.expect("should be able to eval unit");
+            let Some(watt_unit) = watt_unit else {
+                panic!("watt unit should be some");
+            };
 
             // evaluate joule_per_second unit
             let result = eval_unit(&joule_per_second_unit, &context);
-            let joule_per_second_sized_unit = result.expect("should be able to eval unit");
+            let joule_per_second_unit = result.expect("should be able to eval unit");
+            let Some(joule_per_second_unit) = joule_per_second_unit else {
+                panic!("joule_per_second unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(watt_sized_unit, joule_per_second_sized_unit);
-            assert!(!watt_sized_unit.is_db);
-            assert!(!joule_per_second_sized_unit.is_db);
+            assert!(watt_unit.numerically_eq(&joule_per_second_unit));
         }
 
         #[test]
@@ -927,16 +1024,20 @@ mod test {
 
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
-            let watt_sized_unit = result.expect("should be able to eval unit");
+            let watt_unit = result.expect("should be able to eval unit");
+            let Some(watt_unit) = watt_unit else {
+                panic!("watt unit should be some");
+            };
 
             // evaluate newton_meter_per_second unit
             let result = eval_unit(&newton_meter_per_second_unit, &context);
-            let newton_meter_per_second_sized_unit = result.expect("should be able to eval unit");
+            let newton_meter_per_second_unit = result.expect("should be able to eval unit");
+            let Some(newton_meter_per_second_unit) = newton_meter_per_second_unit else {
+                panic!("newton_meter_per_second unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(watt_sized_unit, newton_meter_per_second_sized_unit);
-            assert!(!watt_sized_unit.is_db);
-            assert!(!newton_meter_per_second_sized_unit.is_db);
+            assert!(watt_unit.numerically_eq(&newton_meter_per_second_unit));
         }
 
         #[test]
@@ -948,16 +1049,20 @@ mod test {
 
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
-            let watt_sized_unit = result.expect("should be able to eval unit");
+            let watt_unit = result.expect("should be able to eval unit");
+            let Some(watt_unit) = watt_unit else {
+                panic!("watt unit should be some");
+            };
 
             // evaluate kg_m2_s3 unit
             let result = eval_unit(&kg_m2_s3_unit, &context);
-            let kg_m2_s3_sized_unit = result.expect("should be able to eval unit");
+            let kg_m2_s3_unit = result.expect("should be able to eval unit");
+            let Some(kg_m2_s3_unit) = kg_m2_s3_unit else {
+                panic!("kg_m2_s3 unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(watt_sized_unit, kg_m2_s3_sized_unit);
-            assert!(!watt_sized_unit.is_db);
-            assert!(!kg_m2_s3_sized_unit.is_db);
+            assert!(watt_unit.numerically_eq(&kg_m2_s3_unit));
         }
 
         #[test]
@@ -969,16 +1074,20 @@ mod test {
 
             // evaluate volt unit
             let result = eval_unit(&volt_unit, &context);
-            let volt_sized_unit = result.expect("should be able to eval unit");
+            let volt_unit = result.expect("should be able to eval unit");
+            let Some(volt_unit) = volt_unit else {
+                panic!("volt unit should be some");
+            };
 
             // evaluate watt_per_ampere unit
             let result = eval_unit(&watt_per_ampere_unit, &context);
-            let watt_per_ampere_sized_unit = result.expect("should be able to eval unit");
+            let watt_per_ampere_unit = result.expect("should be able to eval unit");
+            let Some(watt_per_ampere_unit) = watt_per_ampere_unit else {
+                panic!("watt_per_ampere unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(volt_sized_unit, watt_per_ampere_sized_unit);
-            assert!(!volt_sized_unit.is_db);
-            assert!(!watt_per_ampere_sized_unit.is_db);
+            assert!(volt_unit.numerically_eq(&watt_per_ampere_unit));
         }
 
         #[test]
@@ -991,16 +1100,20 @@ mod test {
 
             // evaluate volt unit
             let result = eval_unit(&volt_unit, &context);
-            let volt_sized_unit = result.expect("should be able to eval unit");
+            let volt_unit = result.expect("should be able to eval unit");
+            let Some(volt_unit) = volt_unit else {
+                panic!("volt unit should be some");
+            };
 
             // evaluate kg_m2_s3_a unit
             let result = eval_unit(&kg_m2_s3_a_unit, &context);
-            let kg_m2_s3_a_sized_unit = result.expect("should be able to eval unit");
+            let kg_m2_s3_a_unit = result.expect("should be able to eval unit");
+            let Some(kg_m2_s3_a_unit) = kg_m2_s3_a_unit else {
+                panic!("kg_m2_s3_a unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(volt_sized_unit, kg_m2_s3_a_sized_unit);
-            assert!(!volt_sized_unit.is_db);
-            assert!(!kg_m2_s3_a_sized_unit.is_db);
+            assert!(volt_unit.numerically_eq(&kg_m2_s3_a_unit));
         }
 
         #[test]
@@ -1012,16 +1125,20 @@ mod test {
 
             // evaluate ohm unit
             let result = eval_unit(&ohm_unit, &context);
-            let ohm_sized_unit = result.expect("should be able to eval unit");
+            let ohm_unit = result.expect("should be able to eval unit");
+            let Some(ohm_unit) = ohm_unit else {
+                panic!("ohm unit should be some");
+            };
 
             // evaluate volt_per_ampere unit
             let result = eval_unit(&volt_per_ampere_unit, &context);
-            let volt_per_ampere_sized_unit = result.expect("should be able to eval unit");
+            let volt_per_ampere_unit = result.expect("should be able to eval unit");
+            let Some(volt_per_ampere_unit) = volt_per_ampere_unit else {
+                panic!("volt_per_ampere unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(ohm_sized_unit, volt_per_ampere_sized_unit);
-            assert!(!ohm_sized_unit.is_db);
-            assert!(!volt_per_ampere_sized_unit.is_db);
+            assert!(ohm_unit.numerically_eq(&volt_per_ampere_unit));
         }
 
         #[test]
@@ -1034,16 +1151,20 @@ mod test {
 
             // evaluate ohm unit
             let result = eval_unit(&ohm_unit, &context);
-            let ohm_sized_unit = result.expect("should be able to eval unit");
+            let ohm_unit = result.expect("should be able to eval unit");
+            let Some(ohm_unit) = ohm_unit else {
+                panic!("ohm unit should be some");
+            };
 
             // evaluate kg_m2_s3_a2 unit
             let result = eval_unit(&kg_m2_s3_a2_unit, &context);
-            let kg_m2_s3_a2_sized_unit = result.expect("should be able to eval unit");
+            let kg_m2_s3_a2_unit = result.expect("should be able to eval unit");
+            let Some(kg_m2_s3_a2_unit) = kg_m2_s3_a2_unit else {
+                panic!("kg_m2_s3_a2 unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(ohm_sized_unit, kg_m2_s3_a2_sized_unit);
-            assert!(!ohm_sized_unit.is_db);
-            assert!(!kg_m2_s3_a2_sized_unit.is_db);
+            assert!(ohm_unit.numerically_eq(&kg_m2_s3_a2_unit));
         }
 
         #[test]
@@ -1055,16 +1176,20 @@ mod test {
 
             // evaluate pascal unit
             let result = eval_unit(&pascal_unit, &context);
-            let pascal_sized_unit = result.expect("should be able to eval unit");
+            let pascal_unit = result.expect("should be able to eval unit");
+            let Some(pascal_unit) = pascal_unit else {
+                panic!("pascal unit should be some");
+            };
 
             // evaluate newton_per_square_meter unit
             let result = eval_unit(&newton_per_square_meter_unit, &context);
-            let newton_per_square_meter_sized_unit = result.expect("should be able to eval unit");
+            let newton_per_square_meter_unit = result.expect("should be able to eval unit");
+            let Some(newton_per_square_meter_unit) = newton_per_square_meter_unit else {
+                panic!("newton_per_square_meter unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(pascal_sized_unit, newton_per_square_meter_sized_unit);
-            assert!(!pascal_sized_unit.is_db);
-            assert!(!newton_per_square_meter_sized_unit.is_db);
+            assert!(pascal_unit.numerically_eq(&newton_per_square_meter_unit));
         }
 
         #[test]
@@ -1076,16 +1201,20 @@ mod test {
 
             // evaluate pascal unit
             let result = eval_unit(&pascal_unit, &context);
-            let pascal_sized_unit = result.expect("should be able to eval unit");
+            let pascal_unit = result.expect("should be able to eval unit");
+            let Some(pascal_unit) = pascal_unit else {
+                panic!("pascal unit should be some");
+            };
 
             // evaluate kg_m_s2 unit
             let result = eval_unit(&kg_m_s2_unit, &context);
-            let kg_m_s2_sized_unit = result.expect("should be able to eval unit");
+            let kg_m_s2_unit = result.expect("should be able to eval unit");
+            let Some(kg_m_s2_unit) = kg_m_s2_unit else {
+                panic!("kg_m_s2 unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(pascal_sized_unit, kg_m_s2_sized_unit);
-            assert!(!pascal_sized_unit.is_db);
-            assert!(!kg_m_s2_sized_unit.is_db);
+            assert!(pascal_unit.numerically_eq(&kg_m_s2_unit));
         }
 
         #[test]
@@ -1098,16 +1227,20 @@ mod test {
 
             // evaluate watt_hour unit
             let result = eval_unit(&watt_hour_unit, &context);
-            let watt_hour_sized_unit = result.expect("should be able to eval unit");
+            let watt_hour_unit = result.expect("should be able to eval unit");
+            let Some(watt_hour_unit) = watt_hour_unit else {
+                panic!("watt_hour unit should be some");
+            };
 
             // evaluate watt_times_hour unit
             let result = eval_unit(&watt_times_hour_unit, &context);
-            let watt_times_hour_sized_unit = result.expect("should be able to eval unit");
+            let watt_times_hour_unit = result.expect("should be able to eval unit");
+            let Some(watt_times_hour_unit) = watt_times_hour_unit else {
+                panic!("watt_times_hour unit should be some");
+            };
 
             // check if units are equal (magnitude and dimensions)
-            assert_eq!(watt_hour_sized_unit, watt_times_hour_sized_unit);
-            assert!(!watt_hour_sized_unit.is_db);
-            assert!(!watt_times_hour_sized_unit.is_db);
+            assert!(watt_hour_unit.numerically_eq(&watt_times_hour_unit));
         }
 
         #[test]
@@ -1120,16 +1253,20 @@ mod test {
 
             // evaluate amp_hour unit
             let result = eval_unit(&amp_hour_unit, &context);
-            let amp_hour_sized_unit = result.expect("should be able to eval unit");
+            let amp_hour_unit = result.expect("should be able to eval unit");
+            let Some(amp_hour_unit) = amp_hour_unit else {
+                panic!("amp_hour unit should be some");
+            };
 
             // evaluate ampere_times_hour unit
             let result = eval_unit(&ampere_times_hour_unit, &context);
-            let ampere_times_hour_sized_unit = result.expect("should be able to eval unit");
+            let ampere_times_hour_unit = result.expect("should be able to eval unit");
+            let Some(ampere_times_hour_unit) = ampere_times_hour_unit else {
+                panic!("ampere_times_hour unit should be some");
+            };
 
             // check if units are equal (magnitude and dimensions)
-            assert_eq!(amp_hour_sized_unit, ampere_times_hour_sized_unit);
-            assert!(!amp_hour_sized_unit.is_db);
-            assert!(!ampere_times_hour_sized_unit.is_db);
+            assert!(amp_hour_unit.numerically_eq(&ampere_times_hour_unit));
         }
 
         #[test]
@@ -1141,16 +1278,20 @@ mod test {
 
             // evaluate tesla unit
             let result = eval_unit(&tesla_unit, &context);
-            let tesla_sized_unit = result.expect("should be able to eval unit");
+            let tesla_unit = result.expect("should be able to eval unit");
+            let Some(tesla_unit) = tesla_unit else {
+                panic!("tesla unit should be some");
+            };
 
             // evaluate kg_s2_a unit
             let result = eval_unit(&kg_s2_a_unit, &context);
-            let kg_s2_a_sized_unit = result.expect("should be able to eval unit");
+            let kg_s2_a_unit = result.expect("should be able to eval unit");
+            let Some(kg_s2_a_unit) = kg_s2_a_unit else {
+                panic!("kg_s2_a unit should be some");
+            };
 
             // check if units are equal
-            assert_eq!(tesla_sized_unit, kg_s2_a_sized_unit);
-            assert!(!tesla_sized_unit.is_db);
-            assert!(!kg_s2_a_sized_unit.is_db);
+            assert!(tesla_unit.numerically_eq(&kg_s2_a_unit));
         }
 
         #[test]
@@ -1163,20 +1304,23 @@ mod test {
 
             // evaluate hertz unit
             let result = eval_unit(&hertz_unit, &context);
-            let hertz_sized_unit = result.expect("should be able to eval unit");
+            let hertz_unit = result.expect("should be able to eval unit");
+            let Some(hertz_unit) = hertz_unit else {
+                panic!("hertz unit should be some");
+            };
 
             // evaluate per_second unit
             let result = eval_unit(&per_second_unit, &context);
-            let per_second_sized_unit = result.expect("should be able to eval unit");
+            let per_second_unit = result.expect("should be able to eval unit");
+            let Some(per_second_unit) = per_second_unit else {
+                panic!("per_second unit should be some");
+            };
 
             // check dimensions are equal and magnitudes have the correct relationship
-            assert_is_close!(
-                per_second_sized_unit.magnitude,
-                hertz_sized_unit.magnitude / (2.0 * PI)
-            );
-            assert_eq!(hertz_sized_unit.unit, per_second_sized_unit.unit);
-            assert!(!hertz_sized_unit.is_db);
-            assert!(!per_second_sized_unit.is_db);
+            assert_is_close!(per_second_unit.magnitude, hertz_unit.magnitude / (2.0 * PI));
+            assert!(hertz_unit.dimensionally_eq(&per_second_unit));
+            assert!(!hertz_unit.is_db);
+            assert!(!per_second_unit.is_db);
         }
     }
 }

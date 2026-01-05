@@ -55,6 +55,11 @@ pub fn eval_parameter<F: BuiltinFunction>(
             let number = MeasuredNumber::from_number_and_unit(number, unit);
             Value::MeasuredNumber(number)
         }
+        (Value::MeasuredNumber(number), None) if number.unit().is_unitless() => {
+            // if the unit is unitless, then we can just return the measured number
+            // even if there is no explicit unit
+            Value::MeasuredNumber(number)
+        }
         (Value::MeasuredNumber(_), None) => return Err(vec![EvalError::ParameterUnitMismatch]),
         (Value::MeasuredNumber(number), Some(unit)) if !number.unit().dimensionally_eq(&unit) => {
             return Err(vec![EvalError::ParameterUnitMismatch]);
@@ -403,13 +408,10 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
     }
 }
 
-use std::f64::consts::PI;
-
 #[cfg(test)]
-#[cfg(never)]
 mod tests {
     use crate::{
-        assert_is_close, assert_units_eq,
+        assert_is_close, assert_units_dimensionally_eq,
         builtin::{self},
         value::Dimension,
     };
@@ -421,31 +423,19 @@ mod tests {
         // setup parameter and context
         let parameter = helper::build_simple_parameter("x", 1.0, []);
         let context = helper::create_eval_context([]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
-
-        let expected_units = [];
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::Number(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let Number::Scalar(value) = number else {
             panic!("expected scalar");
         };
 
+        // check the value
         assert_is_close!(1.0, value);
-        assert_units_eq!(expected_units, number.unit);
-
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
     }
 
     #[test]
@@ -453,31 +443,29 @@ mod tests {
         // setup parameter and context
         let parameter = helper::build_simple_parameter("x", 1.0, [("m", 1.0)]);
         let context = helper::create_eval_context([]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
+        // check the value
         assert_is_close!(1.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -485,32 +473,29 @@ mod tests {
         // setup parameter and context
         let parameter = helper::build_simple_parameter("x", 1.0, [("km", 1.0)]);
         let context = helper::create_eval_context([]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
+        // check the value
         // 1.0 km = 1000.0 m
         assert_is_close!(1000.0, value);
-        assert_units_eq!(expected_units, number.unit);
-
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1000.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1000.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -518,32 +503,30 @@ mod tests {
         // setup parameter and context
         let parameter = helper::build_simple_parameter("x", 1.0, [("km", 1.0), ("hr", -1.0)]);
         let context = helper::create_eval_context([]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
+        // check the value
         // 1.0 km/hr = 1000.0 m / 3600.0 s = 0.277777... m/s
         assert_is_close!(1000.0 / 3600.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1000.0 / 3600.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1000.0 / 3600.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -551,32 +534,30 @@ mod tests {
         // setup parameter and context
         let parameter = helper::build_simple_parameter("x", 1.0, [("dB", 1.0)]);
         let context = helper::create_eval_context([]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [];
+        let expected_dimensions = [];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
+        // check the value
         // 1.0 dB = 10^(1.0/10.0) = 10^0.1 = 1.258925...
         assert_is_close!(10.0_f64.powf(0.1), value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(unit.is_db);
     }
 
     #[test]
@@ -584,10 +565,9 @@ mod tests {
         // setup parameter and context
         let parameter = helper::build_simple_parameter("x", 1.0, [("dBW", 1.0)]);
         let context = helper::create_eval_context([]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [
+        let expected_dimensions = [
             (Dimension::Mass, 1.0),
             (Dimension::Distance, 2.0),
             (Dimension::Time, -3.0),
@@ -598,22 +578,20 @@ mod tests {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // 1.0 dBW = 10^(1.0/10.0) = 10^0.1 = 1.258925...
         assert_is_close!(10.0_f64.powf(0.1), value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(unit.is_db);
     }
 
     #[test]
@@ -626,33 +604,30 @@ mod tests {
 
         // setup parameter z = x + y with unit km
         let parameter = helper::build_add_parameter("z", "x", "y", [("km", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // x + y = 1.0 m + 1000.0 m = 1001.0 m
         // The value is stored in base units (meters)
         assert_is_close!(1001.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1000.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1000.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -665,10 +640,9 @@ mod tests {
 
         // setup parameter z = x + y with unit N
         let parameter = helper::build_add_parameter("z", "x", "y", [("N", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [
+        let expected_dimensions = [
             (Dimension::Mass, 1.0),
             (Dimension::Distance, 1.0),
             (Dimension::Time, -2.0),
@@ -679,23 +653,21 @@ mod tests {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // x + y = 1.0 N + 1.0 N = 2.0 N
         // The value is stored in base units
         assert_is_close!(2.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -708,10 +680,9 @@ mod tests {
 
         // setup parameter z = x + y with unit W
         let parameter = helper::build_add_parameter("z", "x", "y", [("W", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [
+        let expected_dimensions = [
             (Dimension::Mass, 1.0),
             (Dimension::Distance, 2.0),
             (Dimension::Time, -3.0),
@@ -722,7 +693,10 @@ mod tests {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
@@ -730,16 +704,11 @@ mod tests {
         // y = 1.0 W
         // x + y = 1.258925... W + 1.0 W = 2.258925... W
         assert_is_close!(10.0_f64.powf(0.1) + 1.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -749,10 +718,9 @@ mod tests {
 
         // setup parameter y = x^2 with unit W^2
         let parameter = helper::build_exponent_parameter("y", "x", 2.0, [("W", 2.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [
+        let expected_dimensions = [
             (Dimension::Mass, 2.0),
             (Dimension::Distance, 4.0),
             (Dimension::Time, -6.0),
@@ -763,22 +731,20 @@ mod tests {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // y = x^2 = (1.0 W)^2 = 1.0 W^2
         assert_is_close!(1.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -791,32 +757,29 @@ mod tests {
 
         // setup parameter z = x * y with unit m^2
         let parameter = helper::build_mul_parameter("z", "x", "y", [("m", 2.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 2.0)];
+        let expected_dimensions = [(Dimension::Distance, 2.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = x * y = 3.0 m * 2.0 m = 6.0 m^2
         assert_is_close!(6.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -829,32 +792,29 @@ mod tests {
 
         // setup parameter z = x / y with unit m
         let parameter = helper::build_div_parameter("z", "x", "y", [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = x / y = 6.0 m^2 / 2.0 m = 3.0 m
         assert_is_close!(3.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -868,33 +828,30 @@ mod tests {
         // setup parameter z = x // y with unit m
         // Escaped division requires matching units
         let parameter = helper::build_escaped_div_parameter("z", "x", "y", []);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [];
+        let expected_dimensions = [];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = x // y = 6.0 m // 2.0 m = 3.0
         // For scalars, escaped division behaves the same as regular division
         assert_is_close!(3.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -908,33 +865,30 @@ mod tests {
         // setup parameter z = x -- y with unit m
         // Escaped subtraction requires matching units
         let parameter = helper::build_escaped_sub_parameter("z", "x", "y", [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = x -- y = 6.0 m -- 2.0 m = 4.0 m
         // For scalars, escaped subtraction behaves the same as regular subtraction
         assert_is_close!(4.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -947,32 +901,29 @@ mod tests {
 
         // setup parameter z = x % y with unit m
         let parameter = helper::build_mod_parameter("z", "x", "y", [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = x % y = 7.0 m % 3.0 m = 1.0 m
         assert_is_close!(1.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -982,32 +933,29 @@ mod tests {
 
         // setup parameter y = sqrt(x) with unit m
         let parameter = helper::build_function_call_parameter("y", "sqrt", ["x"], [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // y = sqrt(x) = sqrt(4.0 m^2) = 2.0 m
         assert_is_close!(2.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -1020,32 +968,29 @@ mod tests {
 
         // setup parameter z = min(x, y) with unit m
         let parameter = helper::build_function_call_parameter("z", "min", ["x", "y"], [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = min(x, y) = min(3.0 m, 5.0 m) = 3.0 m
         assert_is_close!(3.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -1055,40 +1000,36 @@ mod tests {
 
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
-        let (x_value, typecheck_info) =
-            eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        let parameter_result = helper::build_parameter_result("x", x_value, typecheck_info);
+        let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        let parameter_result = helper::build_parameter_result("x", x_value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = min(x) with unit m
         let parameter = helper::build_function_call_parameter("z", "min", ["x"], [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // x = [2.0, 4.0] m
         // min(x) = min(2.0, 4.0) = 2.0 m
         assert_is_close!(2.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -1101,32 +1042,29 @@ mod tests {
 
         // setup parameter z = max(x, y) with unit m
         let parameter = helper::build_function_call_parameter("z", "max", ["x", "y"], [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = max(x, y) = max(3.0 m, 5.0 m) = 5.0 m
         assert_is_close!(5.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -1136,40 +1074,36 @@ mod tests {
 
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
-        let (x_value, typecheck_info) =
-            eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        let parameter_result = helper::build_parameter_result("x", x_value, typecheck_info);
+        let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        let parameter_result = helper::build_parameter_result("x", x_value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = max(x) with unit m
         let parameter = helper::build_function_call_parameter("z", "max", ["x"], [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // x = [2.0, 4.0] m
         // max(x) = max(2.0, 4.0) = 4.0 m
         assert_is_close!(4.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -1179,40 +1113,36 @@ mod tests {
 
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
-        let (x_value, typecheck_info) =
-            eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        let parameter_result = helper::build_parameter_result("x", x_value, typecheck_info);
+        let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
+        let parameter_result = helper::build_parameter_result("x", x_value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = range(x) with unit m
         let parameter = helper::build_function_call_parameter("z", "range", ["x"], [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // x = [2.0, 4.0] m
         // range(x) = max(2.0, 4.0) - min(2.0, 4.0) = 4.0 - 2.0 = 2.0 m
         assert_is_close!(2.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     #[test]
@@ -1225,32 +1155,29 @@ mod tests {
 
         // setup parameter z = mid(x, y) with unit m
         let parameter = helper::build_function_call_parameter("z", "mid", ["x", "y"], [("m", 1.0)]);
-        let (parameter_value, typecheck_info) =
-            eval_parameter(&parameter, &context).expect("eval should succeed");
+        let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
-        let expected_units = [(Dimension::Distance, 1.0)];
+        let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
         let Value::MeasuredNumber(number) = parameter_value else {
             panic!("expected number");
         };
 
-        let Number::Scalar(value) = number.value else {
+        let normalized_value = number.normalized_value();
+        let unit = number.unit();
+
+        let Number::Scalar(value) = *normalized_value.as_number() else {
             panic!("expected scalar");
         };
 
         // z = mid(x, y) = (x + y) / 2 = (2.0 m + 4.0 m) / 2 = 3.0 m
         assert_is_close!(3.0, value);
-        assert_units_eq!(expected_units, number.unit);
 
-        // check the typecheck info
-        let TypecheckInfo::Number { sized_unit } = typecheck_info else {
-            panic!("expected number typecheck info");
-        };
-
-        assert_units_eq!(expected_units, sized_unit.unit);
-        assert_is_close!(1.0, sized_unit.magnitude);
-        assert!(!sized_unit.is_db);
+        // check the unit
+        assert_units_dimensionally_eq!(expected_dimensions, unit);
+        assert_is_close!(1.0, unit.magnitude);
+        assert!(!unit.is_db);
     }
 
     mod helper {
@@ -1895,31 +1822,20 @@ mod tests {
 
             for (name, value, units) in previous_parameters {
                 let parameter = build_simple_parameter(name, value, units);
-                let (parameter_value, typecheck_info) =
+                let parameter_value =
                     eval_parameter(&parameter, &context).expect("eval should succeed");
-                let parameter_result =
-                    build_parameter_result(name, parameter_value, typecheck_info);
+                let parameter_result = build_parameter_result(name, parameter_value);
                 context.add_parameter_result(name.to_string(), Ok(parameter_result));
             }
 
             context
         }
 
-        pub fn build_parameter_result(
-            name: &str,
-            value: Value,
-            typecheck_info: TypecheckInfo,
-        ) -> result::Parameter {
-            let unit = match typecheck_info {
-                TypecheckInfo::Number { sized_unit } => Some(sized_unit),
-                TypecheckInfo::String | TypecheckInfo::Boolean => None,
-            };
-
+        pub fn build_parameter_result(name: &str, value: Value) -> result::Parameter {
             result::Parameter {
                 value,
                 ident: name.to_string(),
                 label: name.to_string(),
-                unit,
                 is_performance: false,
                 trace: result::TraceLevel::None,
                 dependencies: HashSet::new(),
