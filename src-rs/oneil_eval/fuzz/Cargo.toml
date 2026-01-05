@@ -35,3 +35,10 @@ path = "fuzz_targets/contains_is_valid.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "linear_db_conversion"
+path = "fuzz_targets/linear_db_conversion.rs"
+test = false
+doc = false
+bench = false
