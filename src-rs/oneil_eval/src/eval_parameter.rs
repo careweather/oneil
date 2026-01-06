@@ -34,7 +34,10 @@ pub fn eval_parameter<F: BuiltinFunction>(
             (value, expr_span, unit)
         }
         ir::ParameterValue::Piecewise(piecewise, unit) => {
-            let (value, expr_span) = get_piecewise_result(piecewise, context)?;
+            let param_ident = parameter.name().as_str();
+            let param_ident_span = parameter.name_span();
+            let (value, expr_span) =
+                get_piecewise_result(piecewise, param_ident, param_ident_span, context)?;
             (value, expr_span, unit)
         }
     };
@@ -91,51 +94,76 @@ pub fn eval_parameter<F: BuiltinFunction>(
 
 fn get_piecewise_result<'a, F: BuiltinFunction>(
     piecewise: &'a [ir::PiecewiseExpr],
+    param_ident: &str,
+    param_ident_span: Span,
     context: &EvalContext<F>,
 ) -> Result<(Value, &'a Span), Vec<EvalError>> {
     // evaluate each of the conditions and their bodies
     let results = piecewise.iter().map(|piecewise_expr| {
-        let (if_result, expr_span) = eval_expr(piecewise_expr.if_expr(), context)?;
-        let (branch_result, expr_span) = eval_expr(piecewise_expr.expr(), context)?;
+        let (if_result, if_expr_span) = eval_expr(piecewise_expr.if_expr(), context)?;
+        let (branch_result, branch_expr_span) = eval_expr(piecewise_expr.expr(), context)?;
 
         match if_result {
-            Value::Boolean(true) => Ok(Some((branch_result, expr_span))),
+            Value::Boolean(true) => Ok(Some((branch_result, branch_expr_span, if_expr_span))),
             Value::Boolean(false) => Ok(None),
             Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
-                Err(vec![EvalError::InvalidIfExpressionType])
+                Err(vec![EvalError::InvalidIfExpressionType {
+                    expr_span: *if_expr_span,
+                    found_type: if_result.type_(),
+                }])
             }
         }
     });
 
     // find the branch that matches the condition
     // as well as any errors that occurred
-    let mut result = None;
+    let mut matching_branches = Vec::new();
     let mut errors = Vec::new();
 
     for branch_result in results {
         match branch_result {
             Ok(maybe_branch_result) => {
-                let Some((branch_result, expr_span)) = maybe_branch_result else {
+                let Some((branch_result, branch_expr_span, if_expr_span)) = maybe_branch_result
+                else {
                     continue;
                 };
 
-                if result.is_some() {
-                    errors.push(EvalError::MultiplePiecewiseBranchesMatch);
-                }
-
-                result = Some((branch_result, expr_span));
+                matching_branches.push((branch_result, branch_expr_span, if_expr_span));
             }
             Err(e) => errors.extend(e),
         }
     }
 
+    // first, check if any errors occurred
     if !errors.is_empty() {
-        Err(errors)
-    } else if let Some(result) = result {
-        Ok(result)
-    } else {
-        Err(vec![EvalError::NoPiecewiseBranchMatch])
+        return Err(errors);
     }
+
+    // then, check if there are multiple matching branches
+    if matching_branches.len() > 1 {
+        let matching_branche_spans = matching_branches
+            .into_iter()
+            .map(|(_, _, if_expr_span)| *if_expr_span)
+            .collect();
+
+        return Err(vec![EvalError::MultiplePiecewiseBranchesMatch {
+            param_ident: param_ident.to_string(),
+            param_ident_span,
+            matching_branche_spans,
+        }]);
+    }
+
+    // finally, return the matching branch result and expression span
+    // or an error if there are no matching branches
+    let Some((matching_branch_result, matching_branch_expr_span, _)) = matching_branches.pop()
+    else {
+        return Err(vec![EvalError::NoPiecewiseBranchMatch {
+            param_ident: param_ident.to_string(),
+            param_ident_span,
+        }]);
+    };
+
+    Ok((matching_branch_result, matching_branch_expr_span))
 }
 
 #[derive(Debug, Clone)]

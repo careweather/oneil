@@ -7,13 +7,15 @@ use oneil_shared::{
     span::Span,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use crate::value::ValueType;
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModelError {
     pub model_path: PathBuf,
     pub error: EvalError,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
     InvalidUnit,
     HasExponentWithUnits,
@@ -25,11 +27,27 @@ pub enum EvalError {
     InvalidArgumentCount,
     ParameterUnitMismatch,
     UnknownUnit,
-    InvalidIfExpressionType,
-    MultiplePiecewiseBranchesMatch,
-    NoPiecewiseBranchMatch,
-    BooleanCannotHaveUnit { expr_span: Span, unit_span: Span },
-    StringCannotHaveUnit { expr_span: Span, unit_span: Span },
+    InvalidIfExpressionType {
+        expr_span: Span,
+        found_type: ValueType,
+    },
+    MultiplePiecewiseBranchesMatch {
+        param_ident: String,
+        param_ident_span: Span,
+        matching_branche_spans: Vec<Span>,
+    },
+    NoPiecewiseBranchMatch {
+        param_ident: String,
+        param_ident_span: Span,
+    },
+    BooleanCannotHaveUnit {
+        expr_span: Span,
+        unit_span: Span,
+    },
+    StringCannotHaveUnit {
+        expr_span: Span,
+        unit_span: Span,
+    },
     InvalidContinuousLimitMinType,
     InvalidContinuousLimitMaxType,
     LimitCannotBeBoolean,
@@ -55,9 +73,24 @@ impl AsOneilError for EvalError {
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit => todo!(),
-            Self::InvalidIfExpressionType => todo!(),
-            Self::MultiplePiecewiseBranchesMatch => todo!(),
-            Self::NoPiecewiseBranchMatch => todo!(),
+            Self::InvalidIfExpressionType {
+                expr_span: _,
+                found_type,
+            } => {
+                format!("expected a boolean value, but found a {found_type} value")
+            }
+            Self::MultiplePiecewiseBranchesMatch {
+                param_ident,
+                param_ident_span: _,
+                matching_branche_spans,
+            } => format!(
+                "parameter `{param_ident}` has {} matching piecewise branches",
+                matching_branche_spans.len()
+            ),
+            Self::NoPiecewiseBranchMatch {
+                param_ident,
+                param_ident_span: _,
+            } => format!("parameter `{param_ident}` does not have a matching piecewise branch"),
             Self::BooleanCannotHaveUnit {
                 expr_span: _,
                 unit_span: _,
@@ -91,17 +124,27 @@ impl AsOneilError for EvalError {
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit => todo!(),
-            Self::InvalidIfExpressionType => todo!(),
-            Self::MultiplePiecewiseBranchesMatch => todo!(),
-            Self::NoPiecewiseBranchMatch => todo!(),
+            Self::InvalidIfExpressionType {
+                expr_span: location_span,
+                found_type: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::MultiplePiecewiseBranchesMatch {
+                param_ident: _,
+                param_ident_span: location_span,
+                matching_branche_spans: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::NoPiecewiseBranchMatch {
+                param_ident: _,
+                param_ident_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::BooleanCannotHaveUnit {
-                expr_span,
-                unit_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *unit_span)),
+                expr_span: _,
+                unit_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::StringCannotHaveUnit {
-                expr_span,
-                unit_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *unit_span)),
+                expr_span: _,
+                unit_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::InvalidContinuousLimitMinType => todo!(),
             Self::InvalidContinuousLimitMaxType => todo!(),
             Self::LimitCannotBeBoolean => todo!(),
@@ -127,16 +170,32 @@ impl AsOneilError for EvalError {
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit => todo!(),
-            Self::InvalidIfExpressionType => todo!(),
-            Self::MultiplePiecewiseBranchesMatch => todo!(),
-            Self::NoPiecewiseBranchMatch => todo!(),
+            Self::InvalidIfExpressionType {
+                expr_span: _,
+                found_type: _,
+            } => {
+                vec![ErrorContext::Note(
+                    "piecewise conditions must evaluate to a boolean value".to_string(),
+                )]
+            }
+            Self::MultiplePiecewiseBranchesMatch {
+                param_ident: _,
+                param_ident_span: _,
+                matching_branche_spans: _,
+            } => Vec::new(),
+            Self::NoPiecewiseBranchMatch {
+                param_ident: _,
+                param_ident_span: _,
+            } => vec![ErrorContext::Note(
+                "none of the piecewise branches evaluate to `true`".to_string(),
+            )],
             Self::BooleanCannotHaveUnit {
-                expr_span,
-                unit_span,
+                expr_span: _,
+                unit_span: _,
             } => Vec::new(),
             Self::StringCannotHaveUnit {
-                expr_span,
-                unit_span,
+                expr_span: _,
+                unit_span: _,
             } => Vec::new(),
             Self::InvalidContinuousLimitMinType => todo!(),
             Self::InvalidContinuousLimitMaxType => todo!(),
@@ -169,19 +228,37 @@ impl AsOneilError for EvalError {
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit => todo!(),
-            Self::InvalidIfExpressionType => todo!(),
-            Self::MultiplePiecewiseBranchesMatch => todo!(),
-            Self::NoPiecewiseBranchMatch => todo!(),
+            Self::InvalidIfExpressionType {
+                expr_span: _,
+                found_type: _,
+            } => Vec::new(),
+            Self::MultiplePiecewiseBranchesMatch {
+                param_ident: _,
+                param_ident_span: _,
+                matching_branche_spans,
+            } => matching_branche_spans
+                .iter()
+                .map(|branch_span| {
+                    (
+                        ErrorContext::Note("this condition evaluates to `true`".to_string()),
+                        Some(ErrorLocation::from_source_and_span(source, *branch_span)),
+                    )
+                })
+                .collect(),
+            Self::NoPiecewiseBranchMatch {
+                param_ident: _,
+                param_ident_span: _,
+            } => Vec::new(),
             Self::BooleanCannotHaveUnit {
                 expr_span,
-                unit_span,
+                unit_span: _,
             } => vec![(
                 ErrorContext::Note("this expression evaluates to a boolean value".to_string()),
                 Some(ErrorLocation::from_source_and_span(source, *expr_span)),
             )],
             Self::StringCannotHaveUnit {
                 expr_span,
-                unit_span,
+                unit_span: _,
             } => vec![(
                 ErrorContext::Note("this expression evaluates to a string value".to_string()),
                 Some(ErrorLocation::from_source_and_span(source, *expr_span)),
