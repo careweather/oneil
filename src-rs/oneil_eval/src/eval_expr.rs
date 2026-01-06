@@ -1,6 +1,7 @@
 use std::iter;
 
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
     builtin::BuiltinFunction,
@@ -14,53 +15,55 @@ use crate::{
 /// # Errors
 ///
 /// Returns an error if the expression is invalid.
-pub fn eval_expr<F: BuiltinFunction>(
-    expr: &ir::Expr,
+pub fn eval_expr<'a, F: BuiltinFunction>(
+    expr: &'a ir::Expr,
     context: &EvalContext<F>,
-) -> Result<Value, Vec<EvalError>> {
+) -> Result<(Value, &'a Span), Vec<EvalError>> {
     match expr {
         ir::Expr::ComparisonOp {
             left,
             op,
             right,
             rest_chained,
-            span: _,
+            span,
         } => {
             let ComparisonSubexpressionsResult {
                 left_result,
                 rest_results,
             } = eval_comparison_subexpressions(left, *op, right, rest_chained, context)?;
-            eval_comparison_chain(left_result, rest_results)
+            eval_comparison_chain(left_result, rest_results).map(|result| (result, span))
         }
         ir::Expr::BinaryOp {
             op,
             left,
             right,
-            span: _,
+            span,
         } => {
             let BinaryOpSubexpressionsResult {
                 left_result,
                 right_result,
             } = eval_binary_op_subexpressions(left, right, context)?;
-            eval_binary_op(left_result, *op, right_result)
+            eval_binary_op(left_result, *op, right_result).map(|result| (result, span))
         }
-        ir::Expr::UnaryOp { op, expr, span: _ } => {
-            let expr_result = eval_expr(expr, context)?;
-            eval_unary_op(*op, expr_result)
+        ir::Expr::UnaryOp { op, expr, span } => {
+            let (expr_result, expr_result_span) = eval_expr(expr, context)?;
+            eval_unary_op(*op, expr_result).map(|result| (result, span))
         }
         ir::Expr::FunctionCall {
             name,
             args,
-            span: _,
+            span,
             name_span: _,
         } => {
             let args_results = eval_function_call_args(args, context)?;
-            eval_function_call(name, args_results, context)
+            eval_function_call(name, args_results, context).map(|result| (result, span))
         }
-        ir::Expr::Variable { variable, span: _ } => eval_variable(variable, context),
-        ir::Expr::Literal { value, span: _ } => {
+        ir::Expr::Variable { variable, span } => {
+            eval_variable(variable, context).map(|result| (result, span))
+        }
+        ir::Expr::Literal { value, span } => {
             let literal_result = eval_literal(value);
-            Ok(literal_result)
+            Ok((literal_result, span))
         }
     }
 }
@@ -86,7 +89,8 @@ fn eval_comparison_subexpressions<F: BuiltinFunction>(
                 .map(|(op, right_operand)| (*op, right_operand)),
         )
         .map(|(op, right_operand)| {
-            eval_expr(right_operand, context).map(|right_result| (op, right_result))
+            eval_expr(right_operand, context)
+                .map(|(right_result, right_result_span)| (op, right_result))
         });
 
     let (left_result, rest_results) = match left_result {
@@ -100,7 +104,7 @@ fn eval_comparison_subexpressions<F: BuiltinFunction>(
             return Err(errors);
         }
 
-        Ok(left_result) => {
+        Ok((left_result, left_result_span)) => {
             let mut ok_rest_results = vec![];
             let mut err_rest_results = vec![];
 
@@ -222,10 +226,12 @@ fn eval_binary_op_subexpressions<F: BuiltinFunction>(
     let right_result = eval_expr(right, context);
 
     match (left_result, right_result) {
-        (Ok(left_result), Ok(right_result)) => Ok(BinaryOpSubexpressionsResult {
-            left_result,
-            right_result,
-        }),
+        (Ok((left_result, left_result_span)), Ok((right_result, right_result_span))) => {
+            Ok(BinaryOpSubexpressionsResult {
+                left_result,
+                right_result,
+            })
+        }
         (Err(left_errors), Ok(_)) => Err(left_errors),
         (Ok(_), Err(right_errors)) => Err(right_errors),
         (Err(left_errors), Err(right_errors)) => {
@@ -276,7 +282,7 @@ fn eval_function_call_args<F: BuiltinFunction>(
 
     for result in args_results {
         match result {
-            Ok(value) => args.push(value),
+            Ok((value, value_span)) => args.push(value),
             Err(arg_errors) => errors.extend(arg_errors),
         }
     }

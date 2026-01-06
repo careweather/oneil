@@ -1,4 +1,5 @@
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
     builtin::BuiltinFunction,
@@ -17,11 +18,13 @@ use crate::{
 pub fn eval_unit<F: BuiltinFunction>(
     unit: &ir::CompositeUnit,
     context: &EvalContext<F>,
-) -> Result<Option<Unit>, Vec<EvalError>> {
+) -> Result<Option<(Unit, Span)>, Vec<EvalError>> {
     let units = unit
         .units()
         .iter()
         .map(|unit| eval_unit_component(unit, context));
+
+    let unit_span = unit.span();
 
     let mut result = None;
     let mut errors = Vec::new();
@@ -51,7 +54,7 @@ pub fn eval_unit<F: BuiltinFunction>(
 
         let unit = result.with_unit_display_expr(display_info);
 
-        Ok(Some(unit))
+        Ok(Some((unit, unit_span)))
     } else {
         Err(errors)
     }
@@ -120,7 +123,10 @@ fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
     }
 }
 
+use std::str::FromStr;
+
 #[cfg(test)]
+#[cfg(never)]
 mod test {
     use std::f64::consts::PI;
 

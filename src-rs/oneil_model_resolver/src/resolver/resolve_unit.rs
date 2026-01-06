@@ -10,7 +10,7 @@ use oneil_ir as ir;
 pub fn resolve_unit(unit: &ast::UnitExprNode) -> ir::CompositeUnit {
     let units = resolve_unit_recursive(unit, false, Vec::new());
     let display_unit = resolve_display_unit(unit);
-    ir::CompositeUnit::new(units, display_unit)
+    ir::CompositeUnit::new(units, display_unit, unit.span())
 }
 
 fn resolve_unit_recursive(

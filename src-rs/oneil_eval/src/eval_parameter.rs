@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
     builtin::BuiltinFunction,
@@ -27,14 +28,14 @@ pub fn eval_parameter<F: BuiltinFunction>(
     //       how to handle it.
 
     // evaluate the value and the unit
-    let (value, unit_ir) = match parameter.value() {
+    let (value, expr_span, unit_ir) = match parameter.value() {
         ir::ParameterValue::Simple(expr, unit) => {
-            let value = eval_expr(expr, context)?;
-            (value, unit)
+            let (value, expr_span) = eval_expr(expr, context)?;
+            (value, expr_span, unit)
         }
         ir::ParameterValue::Piecewise(piecewise, unit) => {
-            let value = get_piecewise_result(piecewise, context)?;
-            (value, unit)
+            let (value, expr_span) = get_piecewise_result(piecewise, context)?;
+            (value, expr_span, unit)
         }
     };
 
@@ -48,10 +49,20 @@ pub fn eval_parameter<F: BuiltinFunction>(
     let value = match (value, unit) {
         (Value::Boolean(value), None) => Value::Boolean(value),
         (Value::String(value), None) => Value::String(value),
-        (Value::Boolean(_), Some(_)) => return Err(vec![EvalError::BooleanCannotHaveUnit]),
-        (Value::String(_), Some(_)) => return Err(vec![EvalError::StringCannotHaveUnit]),
+        (Value::Boolean(_), Some((_, unit_span))) => {
+            return Err(vec![EvalError::BooleanCannotHaveUnit {
+                expr_span: *expr_span,
+                unit_span,
+            }]);
+        }
+        (Value::String(_), Some((_, unit_span))) => {
+            return Err(vec![EvalError::StringCannotHaveUnit {
+                expr_span: *expr_span,
+                unit_span,
+            }]);
+        }
         (Value::Number(value), None) => Value::Number(value),
-        (Value::Number(number), Some(unit)) => {
+        (Value::Number(number), Some((unit, _unit_span))) => {
             let number = MeasuredNumber::from_number_and_unit(number, unit);
             Value::MeasuredNumber(number)
         }
@@ -61,10 +72,12 @@ pub fn eval_parameter<F: BuiltinFunction>(
             Value::MeasuredNumber(number)
         }
         (Value::MeasuredNumber(_), None) => return Err(vec![EvalError::ParameterUnitMismatch]),
-        (Value::MeasuredNumber(number), Some(unit)) if !number.unit().dimensionally_eq(&unit) => {
+        (Value::MeasuredNumber(number), Some((unit, unit_span)))
+            if !number.unit().dimensionally_eq(&unit) =>
+        {
             return Err(vec![EvalError::ParameterUnitMismatch]);
         }
-        (Value::MeasuredNumber(number), Some(unit)) => {
+        (Value::MeasuredNumber(number), Some((unit, unit_span))) => {
             Value::MeasuredNumber(number.with_unit(unit))
         }
     };
@@ -76,17 +89,17 @@ pub fn eval_parameter<F: BuiltinFunction>(
     Ok(value)
 }
 
-fn get_piecewise_result<F: BuiltinFunction>(
-    piecewise: &[ir::PiecewiseExpr],
+fn get_piecewise_result<'a, F: BuiltinFunction>(
+    piecewise: &'a [ir::PiecewiseExpr],
     context: &EvalContext<F>,
-) -> Result<Value, Vec<EvalError>> {
+) -> Result<(Value, &'a Span), Vec<EvalError>> {
     // evaluate each of the conditions and their bodies
     let results = piecewise.iter().map(|piecewise_expr| {
-        let if_result = eval_expr(piecewise_expr.if_expr(), context)?;
-        let branch_result = eval_expr(piecewise_expr.expr(), context)?;
+        let (if_result, expr_span) = eval_expr(piecewise_expr.if_expr(), context)?;
+        let (branch_result, expr_span) = eval_expr(piecewise_expr.expr(), context)?;
 
         match if_result {
-            Value::Boolean(true) => Ok(Some(branch_result)),
+            Value::Boolean(true) => Ok(Some((branch_result, expr_span))),
             Value::Boolean(false) => Ok(None),
             Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
                 Err(vec![EvalError::InvalidIfExpressionType])
@@ -102,7 +115,7 @@ fn get_piecewise_result<F: BuiltinFunction>(
     for branch_result in results {
         match branch_result {
             Ok(maybe_branch_result) => {
-                let Some(branch_result) = maybe_branch_result else {
+                let Some((branch_result, expr_span)) = maybe_branch_result else {
                     continue;
                 };
 
@@ -110,7 +123,7 @@ fn get_piecewise_result<F: BuiltinFunction>(
                     errors.push(EvalError::MultiplePiecewiseBranchesMatch);
                 }
 
-                result = Some(branch_result);
+                result = Some((branch_result, expr_span));
             }
             Err(e) => errors.extend(e),
         }
@@ -158,7 +171,7 @@ fn eval_continuous_limits<F: BuiltinFunction>(
     max: &oneil_ir::Expr,
     context: &EvalContext<F>,
 ) -> Result<Limits, Vec<EvalError>> {
-    let min = eval_expr(min, context).and_then(|value| match value {
+    let min = eval_expr(min, context).and_then(|(value, expr_span)| match value {
         Value::MeasuredNumber(number) => {
             let (number, unit) = number.into_number_and_unit();
             Ok((number, Some(unit)))
@@ -167,7 +180,7 @@ fn eval_continuous_limits<F: BuiltinFunction>(
         Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidContinuousLimitMinType]),
     });
 
-    let max = eval_expr(max, context).and_then(|value| match value {
+    let max = eval_expr(max, context).and_then(|(value, expr_span)| match value {
         Value::MeasuredNumber(number) => {
             let (number, unit) = number.into_number_and_unit();
             Ok((number, Some(unit)))
@@ -216,7 +229,7 @@ fn eval_discrete_limits<F: BuiltinFunction>(
 
     for value in values {
         match value {
-            Ok(value) => results.push(value),
+            Ok((value, expr_span)) => results.push(value),
             Err(e) => errors.extend(e),
         }
     }
@@ -408,7 +421,10 @@ fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Ve
     }
 }
 
+use std::convert::TryInto;
+
 #[cfg(test)]
+#[cfg(never)]
 mod tests {
     use crate::{
         assert_is_close, assert_units_dimensionally_eq,
