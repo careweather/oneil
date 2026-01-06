@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::value::Unit;
 
 /// The type of a value
@@ -47,6 +49,29 @@ impl PartialEq for ValueType {
                 },
             ) => lhs_number_type == rhs_number_type && lhs_unit.dimensionally_eq(rhs_unit),
             (_, _) => false,
+        }
+    }
+}
+
+impl fmt::Display for ValueType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Boolean => write!(f, "boolean"),
+            Self::String => write!(f, "string"),
+            Self::Number {
+                number_type: NumberType::Scalar,
+            } => write!(f, "scalar"),
+            Self::Number {
+                number_type: NumberType::Interval,
+            } => write!(f, "interval"),
+            Self::MeasuredNumber {
+                unit,
+                number_type: NumberType::Scalar,
+            } => write!(f, "scalar<{unit}>"),
+            Self::MeasuredNumber {
+                unit,
+                number_type: NumberType::Interval,
+            } => write!(f, "interval<{unit}>"),
         }
     }
 }

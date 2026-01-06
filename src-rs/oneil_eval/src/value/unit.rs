@@ -135,6 +135,11 @@ impl ops::Div for Unit {
     }
 }
 
+impl fmt::Display for Unit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_unit)
+    }
+}
 /// The dimension of a base unit
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Dimension {
