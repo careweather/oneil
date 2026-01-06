@@ -41,7 +41,6 @@ pub enum EvalError {
     ParameterUnitDoesNotMatchLimit,
     Unsupported,
     NoNonEmptyValue,
-    ModelNotFound,
 }
 
 impl AsOneilError for EvalError {
@@ -79,7 +78,6 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
             Self::NoNonEmptyValue => todo!(),
-            Self::ModelNotFound => todo!(),
         }
     }
 
@@ -117,7 +115,6 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
             Self::NoNonEmptyValue => todo!(),
-            Self::ModelNotFound => todo!(),
         }
     }
 
@@ -155,7 +152,6 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
             Self::NoNonEmptyValue => todo!(),
-            Self::ModelNotFound => todo!(),
         }
     }
 
@@ -205,7 +201,6 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
             Self::NoNonEmptyValue => todo!(),
-            Self::ModelNotFound => todo!(),
         }
     }
 }
