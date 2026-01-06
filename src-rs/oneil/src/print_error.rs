@@ -73,7 +73,8 @@ fn get_help_message_line(message: &str) -> String {
 fn get_message_line(kind: &str, kind_color: Style, message: &str) -> String {
     // <kind>: <message>
     let kind_str = kind_color.style(kind);
-    let message_line = format!("{kind_str}: {message}");
+    let rest = format!(": {message}").bold().to_string();
+    let message_line = format!("{kind_str}{rest}");
 
     message_line.bold().to_string()
 }
