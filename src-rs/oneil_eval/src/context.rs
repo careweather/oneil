@@ -212,14 +212,20 @@ impl<F: BuiltinFunction> EvalContext<F> {
         self.active_references.insert(reference);
     }
 
+    /// Gets the result of a model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the model is not found.
+    #[expect(
+        clippy::panic_in_result_fn,
+        reason = "the panic is used to enforce an invariant that should never be violated"
+    )]
     pub fn get_model_result(&self, model_path: &Path) -> Result<result::Model, Vec<ModelError>> {
         // get the model
-        let model = self.models.get(model_path).ok_or_else(|| {
-            vec![ModelError {
-                model_path: model_path.to_path_buf(),
-                error: EvalError::ModelNotFound,
-            }]
-        })?;
+        let Some(model) = self.models.get(model_path) else {
+            panic!("model should have been created during evaluation");
+        };
 
         // get the submodels
         let (submodels, submodel_errors) = model
