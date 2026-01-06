@@ -40,7 +40,6 @@ pub enum EvalError {
     ParameterValueOutsideLimits,
     ParameterUnitDoesNotMatchLimit,
     Unsupported,
-    NoNonEmptyValue,
 }
 
 impl AsOneilError for EvalError {
@@ -77,7 +76,6 @@ impl AsOneilError for EvalError {
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
-            Self::NoNonEmptyValue => todo!(),
         }
     }
 
@@ -114,7 +112,6 @@ impl AsOneilError for EvalError {
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
-            Self::NoNonEmptyValue => todo!(),
         }
     }
 
@@ -151,7 +148,6 @@ impl AsOneilError for EvalError {
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
-            Self::NoNonEmptyValue => todo!(),
         }
     }
 
@@ -200,7 +196,6 @@ impl AsOneilError for EvalError {
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
-            Self::NoNonEmptyValue => todo!(),
         }
     }
 }
