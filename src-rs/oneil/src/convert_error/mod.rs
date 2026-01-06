@@ -10,6 +10,7 @@
 //! - `parser`: Parser error conversion
 //! - `loader`: Model loader error conversion
 
+pub mod eval;
 pub mod file;
 pub mod loader;
 pub mod parser;

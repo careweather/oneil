@@ -1,32 +1,42 @@
 //! Unit system for dimensional analysis in Oneil.
 
+use oneil_shared::span::Span;
+
 /// A composite unit composed of multiple base units.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompositeUnit {
     units: Vec<Unit>,
     display_unit: DisplayCompositeUnit,
+    span: Span,
 }
 
 impl CompositeUnit {
     /// Creates a new composite unit from a vector of individual units.
     #[must_use]
-    pub const fn new(units: Vec<Unit>, display_unit: DisplayCompositeUnit) -> Self {
+    pub const fn new(units: Vec<Unit>, display_unit: DisplayCompositeUnit, span: Span) -> Self {
         Self {
             units,
             display_unit,
+            span,
         }
     }
 
     /// Returns a reference to the units in this composite unit.
     #[must_use]
-    pub fn units(&self) -> &[Unit] {
-        &self.units
+    pub const fn units(&self) -> &[Unit] {
+        self.units.as_slice()
     }
 
     /// Returns a reference to the display unit of this composite unit.
     #[must_use]
-    pub fn display_unit(&self) -> &DisplayCompositeUnit {
+    pub const fn display_unit(&self) -> &DisplayCompositeUnit {
         &self.display_unit
+    }
+
+    /// Returns the span of this composite unit.
+    #[must_use]
+    pub const fn span(&self) -> Span {
+        self.span
     }
 }
 
@@ -46,8 +56,8 @@ impl Unit {
 
     /// Returns the name of this unit.
     #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub const fn name(&self) -> &str {
+        self.name.as_str()
     }
 
     /// Returns the exponent of this unit.

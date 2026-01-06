@@ -12,7 +12,7 @@ mod eval_unit;
 pub mod result;
 pub mod value;
 
-pub use error::EvalError;
+pub use error::{EvalError, ModelError};
 pub use eval_expr::eval_expr;
 pub use eval_model::eval_model;
 pub use eval_model_collection::eval_model_collection;

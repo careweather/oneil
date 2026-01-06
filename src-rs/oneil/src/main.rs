@@ -153,7 +153,7 @@ fn handle_eval_command(file: &Path, print_debug: bool, no_colors: bool) {
         }
         Err(errors) => {
             for error in errors {
-                let error = todo!("convert error to OneilError");
+                let error = convert_error::eval::convert(&error);
                 print_error::print(&error, print_debug);
                 eprintln!();
             }
