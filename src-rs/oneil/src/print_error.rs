@@ -42,7 +42,7 @@ fn error_to_string(error: &OneilError) -> String {
     let empty_line = String::new();
     let maybe_source_line = error
         .location()
-        .map(|location| get_source_lines(location, error.context()));
+        .map(|location| get_source_lines(location, error.context(), stylesheet::ERROR_COLOR));
     let context_with_source_lines =
         get_context_with_source_lines(error.path(), error.context_with_source());
 
@@ -94,7 +94,11 @@ fn get_location_line(path: &Path, location: Option<&ErrorLocation>) -> String {
 }
 
 /// Formats the source code snippet with error highlighting
-fn get_source_lines(location: &ErrorLocation, context: &[Context]) -> String {
+fn get_source_lines(
+    location: &ErrorLocation,
+    context: &[Context],
+    code_highlight_color: Style,
+) -> String {
     // source line (if available)
     //   |
     // 1 | use foo bar
@@ -119,8 +123,8 @@ fn get_source_lines(location: &ErrorLocation, context: &[Context]) -> String {
     let pointer_indent_width = column - 1;
     let pointer_indent = " ".repeat(pointer_indent_width);
 
-    let pointer = stylesheet::ERROR_COLOR.bold().style("^");
-    let pointer_rest = stylesheet::ERROR_COLOR.bold().style("-".repeat(length - 1));
+    let pointer = code_highlight_color.bold().style("^");
+    let pointer_rest = code_highlight_color.bold().style("-".repeat(length - 1));
 
     let blank_line = format!("{margin} {bar} ");
     let source_line = format!("{line_label} {bar} {line_source}");
@@ -154,13 +158,13 @@ fn get_context_with_source_lines(
     contexts
         .iter()
         .map(|(context, location)| {
-            let context_message = match context {
-                Context::Note(message) => get_note_message_line(message),
-                Context::Help(message) => get_help_message_line(message),
+            let (context_message, context_color) = match context {
+                Context::Note(message) => (get_note_message_line(message), stylesheet::NOTE_COLOR),
+                Context::Help(message) => (get_help_message_line(message), stylesheet::HELP_COLOR),
             };
 
             let location_line = get_location_line(path, Some(location));
-            let source_lines = get_source_lines(location, &[]);
+            let source_lines = get_source_lines(location, &[], context_color);
             let empty_line = String::new();
             let mut lines = vec![context_message, location_line];
             lines.push(source_lines);
