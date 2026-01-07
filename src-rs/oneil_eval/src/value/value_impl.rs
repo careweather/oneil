@@ -453,7 +453,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Boolean(boolean) => write!(f, "<{boolean}>"),
-            Self::String(string) => write!(f, "<'{string}'>"),
+            Self::String(string) => write!(f, "'{string}'"),
             Self::Number(number) => write!(f, "<{number}>"),
             Self::MeasuredNumber(number) => {
                 let (number, unit) = number.clone().into_number_and_unit();
