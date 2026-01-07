@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -284,7 +284,9 @@ fn eval_discrete_limits<F: BuiltinFunction>(
     let (first_value, first_expr_span) = results.remove(0);
 
     match first_value {
-        Value::String(first_value) => eval_string_discrete_limits(first_value, results),
+        Value::String(first_value) => {
+            eval_string_discrete_limits(first_value, first_expr_span, results)
+        }
         Value::Number(first_value) => eval_number_discrete_limits(first_value, None, results),
         Value::MeasuredNumber(first_value) => {
             let (first_value, limit_unit) = first_value.into_number_and_unit();
@@ -299,29 +301,38 @@ fn eval_discrete_limits<F: BuiltinFunction>(
 
 fn eval_string_discrete_limits(
     first_value: String,
+    first_expr_span: &Span,
     results: Vec<(Value, &Span)>,
 ) -> Result<Limits, Vec<EvalError>> {
     let mut errors = Vec::new();
-    let mut strings = HashSet::new();
+    let mut strings = HashMap::new();
 
-    strings.insert(first_value);
+    strings.insert(first_value, *first_expr_span);
 
     for (value, expr_span) in results {
         match value {
             Value::String(string) => {
-                if strings.contains(&string) {
-                    errors.push(EvalError::DuplicateStringLimit);
+                if let Some(original_expr_span) = strings.get(&string) {
+                    errors.push(EvalError::DuplicateStringLimit {
+                        expr_span: *expr_span,
+                        original_expr_span: *original_expr_span,
+                        string_value: string,
+                    });
                 } else {
-                    strings.insert(string);
+                    strings.insert(string, *expr_span);
                 }
             }
             Value::Number(_) | Value::MeasuredNumber(_) | Value::Boolean(_) => {
-                errors.push(EvalError::ExpectedStringLimit);
+                errors.push(EvalError::ExpectedStringLimit {
+                    expr_span: *expr_span,
+                    found_type: value.type_(),
+                });
             }
         }
     }
 
     if errors.is_empty() {
+        let strings = strings.into_keys().collect();
         Ok(Limits::StringDiscrete { values: strings })
     } else {
         Err(errors)
@@ -361,7 +372,10 @@ fn eval_number_discrete_limits(
                 numbers.push(number_result);
             }
             Value::Boolean(_) | Value::String(_) => {
-                errors.push(EvalError::ExpectedNumberLimit);
+                errors.push(EvalError::ExpectedNumberLimit {
+                    expr_span: *expr_span,
+                    found_type: value.type_(),
+                });
             }
         }
     }
