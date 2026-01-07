@@ -26,7 +26,10 @@ pub enum EvalError {
     UndefinedBuiltinValue,
     InvalidArgumentCount,
     ParameterUnitMismatch,
-    UnknownUnit,
+    UnknownUnit {
+        unit_name: String,
+        unit_name_span: Span,
+    },
     InvalidIfExpressionType {
         expr_span: Span,
         found_type: ValueType,
@@ -72,7 +75,10 @@ impl AsOneilError for EvalError {
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
-            Self::UnknownUnit => todo!(),
+            Self::UnknownUnit {
+                unit_name,
+                unit_name_span: _,
+            } => format!("unknown unit `{unit_name}`"),
             Self::InvalidIfExpressionType {
                 expr_span: _,
                 found_type,
@@ -123,7 +129,10 @@ impl AsOneilError for EvalError {
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
-            Self::UnknownUnit => todo!(),
+            Self::UnknownUnit {
+                unit_name: _,
+                unit_name_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::InvalidIfExpressionType {
                 expr_span: location_span,
                 found_type: _,
@@ -169,7 +178,10 @@ impl AsOneilError for EvalError {
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
-            Self::UnknownUnit => todo!(),
+            Self::UnknownUnit {
+                unit_name: _,
+                unit_name_span: _,
+            } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
                 found_type: _,
@@ -227,7 +239,10 @@ impl AsOneilError for EvalError {
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
-            Self::UnknownUnit => todo!(),
+            Self::UnknownUnit {
+                unit_name: _,
+                unit_name_span: _,
+            } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
                 found_type: _,
