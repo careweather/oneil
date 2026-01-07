@@ -197,7 +197,7 @@ impl AsOneilError for EvalError {
                 min_expr_span: _,
                 min_value,
             } => {
-                format!("parameter value {param_value} is below the limit {min_value}")
+                format!("parameter value {param_value} is below the limit")
             }
             Self::ParameterValueAboveContinuousLimits {
                 param_expr_span: _,
@@ -205,7 +205,7 @@ impl AsOneilError for EvalError {
                 max_expr_span: _,
                 max_value,
             } => {
-                format!("parameter value {param_value} is above the limit {max_value}")
+                format!("parameter value {param_value} is above the limit")
             }
             Self::ParameterValueNotInDiscreteLimits {
                 param_expr_span: _,
@@ -548,7 +548,7 @@ impl AsOneilError for EvalError {
                     .join(", ");
                 vec![(
                     ErrorContext::Note(format!(
-                        "the limit values for this parameter are [{limit_values:?}]"
+                        "the limit values for this parameter are [{limit_values}]"
                     )),
                     Some(ErrorLocation::from_source_and_span(
                         source,

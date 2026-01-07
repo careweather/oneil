@@ -504,12 +504,19 @@ fn verify_value_is_within_number_range(
         Value::Number(number) => {
             if unit.is_some() {
                 Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
-            } else if number.min() < min.min() || number.max() > max.max() {
+            } else if number.min() < min.min() {
                 Err(vec![EvalError::ParameterValueBelowContinuousLimits {
                     param_expr_span: *param_expr_span,
                     param_value: value.clone(),
                     min_expr_span,
                     min_value: Value::Number(min),
+                }])
+            } else if number.max() > max.max() {
+                Err(vec![EvalError::ParameterValueAboveContinuousLimits {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    max_expr_span,
+                    max_value: Value::Number(max),
                 }])
             } else {
                 Ok(())
