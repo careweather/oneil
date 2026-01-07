@@ -22,7 +22,10 @@ pub enum EvalError {
     HasIntervalExponent,
     InvalidOperation,
     InvalidType,
-    ParameterHasError,
+    ParameterHasError {
+        parameter_name: String,
+        parameter_name_span: Span,
+    },
     UndefinedBuiltinValue,
     InvalidArgumentCount,
     ParameterUnitMismatch,
@@ -89,7 +92,12 @@ impl AsOneilError for EvalError {
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
-            Self::ParameterHasError => todo!(),
+            Self::ParameterHasError {
+                parameter_name,
+                parameter_name_span: _,
+            } => {
+                format!("parameter `{parameter_name}` has errors")
+            }
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
@@ -169,7 +177,10 @@ impl AsOneilError for EvalError {
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
-            Self::ParameterHasError => todo!(),
+            Self::ParameterHasError {
+                parameter_name: _,
+                parameter_name_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
@@ -236,7 +247,10 @@ impl AsOneilError for EvalError {
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
-            Self::ParameterHasError => todo!(),
+            Self::ParameterHasError {
+                parameter_name: _,
+                parameter_name_span: _,
+            } => Vec::new(),
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),
@@ -321,7 +335,10 @@ impl AsOneilError for EvalError {
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
-            Self::ParameterHasError => todo!(),
+            Self::ParameterHasError {
+                parameter_name: _,
+                parameter_name_span: _,
+            } => Vec::new(),
             Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount => todo!(),
             Self::ParameterUnitMismatch => todo!(),

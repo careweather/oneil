@@ -320,14 +320,14 @@ fn eval_variable<F: BuiltinFunction>(
         } => Ok(context.lookup_builtin_variable(ident)),
         ir::Variable::Parameter {
             parameter_name,
-            parameter_span: _,
-        } => context.lookup_parameter_value(parameter_name),
+            parameter_span,
+        } => context.lookup_parameter_value(parameter_name, *parameter_span),
         ir::Variable::External {
             model,
             parameter_name,
             model_span: _,
-            parameter_span: _,
-        } => context.lookup_model_parameter_value(model, parameter_name),
+            parameter_span,
+        } => context.lookup_model_parameter_value(model, parameter_name, *parameter_span),
     }
 }
 
