@@ -109,7 +109,7 @@ fn get_piecewise_result<'a, F: BuiltinFunction>(
             Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
                 Err(vec![EvalError::InvalidIfExpressionType {
                     expr_span: *if_expr_span,
-                    found_type: if_result.type_(),
+                    found_value: if_result,
                 }])
             }
         }
@@ -208,7 +208,7 @@ fn eval_continuous_limits<F: BuiltinFunction>(
         Value::Boolean(_) | Value::String(_) => {
             Err(vec![EvalError::InvalidContinuousLimitMinType {
                 expr_span: *expr_span,
-                found_type: value.type_(),
+                found_value: value,
             }])
         }
     });
@@ -222,7 +222,7 @@ fn eval_continuous_limits<F: BuiltinFunction>(
         Value::Boolean(_) | Value::String(_) => {
             Err(vec![EvalError::InvalidContinuousLimitMaxType {
                 expr_span: *expr_span,
-                found_type: value.type_(),
+                found_value: value,
             }])
         }
     });
@@ -325,7 +325,7 @@ fn eval_string_discrete_limits(
             Value::Number(_) | Value::MeasuredNumber(_) | Value::Boolean(_) => {
                 errors.push(EvalError::ExpectedStringLimit {
                     expr_span: *expr_span,
-                    found_type: value.type_(),
+                    found_value: value,
                 });
             }
         }
@@ -374,7 +374,7 @@ fn eval_number_discrete_limits(
             Value::Boolean(_) | Value::String(_) => {
                 errors.push(EvalError::ExpectedNumberLimit {
                     expr_span: *expr_span,
-                    found_type: value.type_(),
+                    found_value: value,
                 });
             }
         }

@@ -7,7 +7,7 @@ use oneil_shared::{
     span::Span,
 };
 
-use crate::value::ValueType;
+use crate::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelError {
@@ -32,7 +32,7 @@ pub enum EvalError {
     },
     InvalidIfExpressionType {
         expr_span: Span,
-        found_type: ValueType,
+        found_value: Value,
     },
     MultiplePiecewiseBranchesMatch {
         param_ident: String,
@@ -53,11 +53,11 @@ pub enum EvalError {
     },
     InvalidContinuousLimitMinType {
         expr_span: Span,
-        found_type: ValueType,
+        found_value: Value,
     },
     InvalidContinuousLimitMaxType {
         expr_span: Span,
-        found_type: ValueType,
+        found_value: Value,
     },
     BooleanCannotBeDiscreteLimitValue {
         expr_span: Span,
@@ -69,11 +69,11 @@ pub enum EvalError {
     },
     ExpectedStringLimit {
         expr_span: Span,
-        found_type: ValueType,
+        found_value: Value,
     },
     ExpectedNumberLimit {
         expr_span: Span,
-        found_type: ValueType,
+        found_value: Value,
     },
     DiscreteLimitUnitMismatch,
     ParameterValueOutsideLimits,
@@ -99,9 +99,12 @@ impl AsOneilError for EvalError {
             } => format!("unknown unit `{unit_name}`"),
             Self::InvalidIfExpressionType {
                 expr_span: _,
-                found_type,
+                found_value,
             } => {
-                format!("expected a boolean value, but found a {found_type} value")
+                let found_value_type = found_value.type_();
+                format!(
+                    "expected a boolean value, but found {found_value} (type: {found_value_type})"
+                )
             }
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident,
@@ -125,12 +128,22 @@ impl AsOneilError for EvalError {
             } => "string value cannot have a unit".to_string(),
             Self::InvalidContinuousLimitMinType {
                 expr_span: _,
-                found_type,
-            } => format!("expected a number value, but found a {found_type} value"),
+                found_value,
+            } => {
+                let found_value_type = found_value.type_();
+                format!(
+                    "expected a number value, but found {found_value} (type: {found_value_type})"
+                )
+            }
             Self::InvalidContinuousLimitMaxType {
                 expr_span: _,
-                found_type,
-            } => format!("expected a number value, but found a {found_type} value"),
+                found_value,
+            } => {
+                let found_value_type = found_value.type_();
+                format!(
+                    "expected a number value, but found {found_value} (type: {found_value_type})"
+                )
+            }
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => {
                 "discrete limit cannot contain a boolean value".to_string()
             }
@@ -141,15 +154,21 @@ impl AsOneilError for EvalError {
             } => format!("duplicate string value '{string_value}' in discrete limit"),
             Self::ExpectedStringLimit {
                 expr_span: _,
-                found_type,
+                found_value,
             } => {
-                format!("expected a string value, but found a {found_type} value")
+                let found_value_type = found_value.type_();
+                format!(
+                    "expected a string value, but found {found_value} (type: {found_value_type})"
+                )
             }
             Self::ExpectedNumberLimit {
                 expr_span: _,
-                found_type,
+                found_value,
             } => {
-                format!("expected a number value, but found a {found_type} value")
+                let found_value_type = found_value.type_();
+                format!(
+                    "expected a number value, but found {found_value} (type: {found_value_type})"
+                )
             }
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
@@ -175,7 +194,7 @@ impl AsOneilError for EvalError {
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::InvalidIfExpressionType {
                 expr_span: location_span,
-                found_type: _,
+                found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident: _,
@@ -196,11 +215,11 @@ impl AsOneilError for EvalError {
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::InvalidContinuousLimitMinType {
                 expr_span: location_span,
-                found_type: _,
+                found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::InvalidContinuousLimitMaxType {
                 expr_span: location_span,
-                found_type: _,
+                found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::BooleanCannotBeDiscreteLimitValue {
                 expr_span: location_span,
@@ -212,11 +231,11 @@ impl AsOneilError for EvalError {
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ExpectedStringLimit {
                 expr_span: location_span,
-                found_type: _,
+                found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ExpectedNumberLimit {
                 expr_span: location_span,
-                found_type: _,
+                found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
@@ -242,7 +261,7 @@ impl AsOneilError for EvalError {
             } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => {
                 vec![ErrorContext::Note(
                     "piecewise conditions must evaluate to a boolean value".to_string(),
@@ -269,13 +288,13 @@ impl AsOneilError for EvalError {
             } => Vec::new(),
             Self::InvalidContinuousLimitMinType {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => vec![ErrorContext::Note(
                 "continuous limit minimum must evaluate to a number value".to_string(),
             )],
             Self::InvalidContinuousLimitMaxType {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => vec![ErrorContext::Note(
                 "continuous limit maximum must evaluate to a number value".to_string(),
             )],
@@ -291,11 +310,11 @@ impl AsOneilError for EvalError {
             )],
             Self::ExpectedStringLimit {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => Vec::new(),
             Self::ExpectedNumberLimit {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => Vec::new(),
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
@@ -327,7 +346,7 @@ impl AsOneilError for EvalError {
             } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => Vec::new(),
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident: _,
@@ -362,11 +381,11 @@ impl AsOneilError for EvalError {
             )],
             Self::InvalidContinuousLimitMinType {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => Vec::new(),
             Self::InvalidContinuousLimitMaxType {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => Vec::new(),
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => Vec::new(),
             Self::DuplicateStringLimit {
@@ -382,11 +401,11 @@ impl AsOneilError for EvalError {
             )],
             Self::ExpectedStringLimit {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => Vec::new(),
             Self::ExpectedNumberLimit {
                 expr_span: _,
-                found_type: _,
+                found_value: _,
             } => Vec::new(),
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
