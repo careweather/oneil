@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, fmt};
 
 use crate::{
     EvalError,
@@ -446,5 +446,19 @@ impl From<String> for Value {
     /// Converts a `String` to a string value.
     fn from(value: String) -> Self {
         Self::String(value)
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Boolean(boolean) => write!(f, "<{boolean}>"),
+            Self::String(string) => write!(f, "<'{string}'>"),
+            Self::Number(number) => write!(f, "<{number}>"),
+            Self::MeasuredNumber(number) => {
+                let (number, unit) = number.clone().into_number_and_unit();
+                write!(f, "<{number} {unit}>")
+            }
+        }
     }
 }

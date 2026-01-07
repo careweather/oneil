@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, ops};
+use std::{cmp::Ordering, fmt, ops};
 
 use crate::value::{
     EvalError, Interval, NumberType, Unit,
@@ -1159,6 +1159,15 @@ impl ops::Rem for Number {
             (Self::Scalar(lhs), Self::Interval(rhs)) => Self::Interval(Interval::from(lhs) % rhs),
             (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs % rhs), // use the specialized version of the modulo operation
             (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs % rhs),
+        }
+    }
+}
+
+impl fmt::Display for Number {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Scalar(value) => write!(f, "{value}"),
+            Self::Interval(interval) => write!(f, "{} | {}", interval.min(), interval.max()),
         }
     }
 }
