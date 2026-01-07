@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -182,7 +182,8 @@ enum Limits {
         limit_expr_span: Span,
     },
     StringDiscrete {
-        values: HashSet<String>,
+        // This is assumed to be small enough that a vector isn't a performance issue
+        values: Vec<String>,
         limit_expr_span: Span,
     },
 }
@@ -317,41 +318,51 @@ fn eval_discrete_limits<F: BuiltinFunction>(
     }
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "passing by ref makes the types more complex for the rest of the function"
+)]
 fn eval_string_discrete_limits(
     first_value: String,
     first_expr_span: &Span,
     results: Vec<(Value, &Span)>,
     limit_expr_span: &Span,
 ) -> Result<Limits, Vec<EvalError>> {
+    let mut seen_strings = HashMap::new();
     let mut errors = Vec::new();
-    let mut strings = HashMap::new();
 
-    strings.insert(first_value, *first_expr_span);
+    // this is a vector of strings since for errors,
+    // we want to retain the order of the strings in the limit
+    let mut string_values = Vec::new();
 
-    for (value, expr_span) in results {
+    string_values.push(&first_value);
+    seen_strings.insert(&first_value, *first_expr_span);
+
+    for (value, expr_span) in &results {
         match value {
             Value::String(string) => {
-                if let Some(original_expr_span) = strings.get(&string) {
+                if let Some(original_expr_span) = seen_strings.get(string) {
                     errors.push(EvalError::DuplicateStringLimit {
-                        expr_span: *expr_span,
+                        expr_span: **expr_span,
                         original_expr_span: *original_expr_span,
-                        string_value: string,
+                        string_value: string.clone(),
                     });
                 } else {
-                    strings.insert(string, *expr_span);
+                    string_values.push(string);
+                    seen_strings.insert(string, **expr_span);
                 }
             }
             Value::Number(_) | Value::MeasuredNumber(_) | Value::Boolean(_) => {
                 errors.push(EvalError::ExpectedStringLimit {
-                    expr_span: *expr_span,
-                    found_value: value,
+                    expr_span: **expr_span,
+                    found_value: value.clone(),
                 });
             }
         }
     }
 
     if errors.is_empty() {
-        let strings = strings.into_keys().collect();
+        let strings = string_values.into_iter().cloned().collect();
         Ok(Limits::StringDiscrete {
             values: strings,
             limit_expr_span: *limit_expr_span,
@@ -596,7 +607,7 @@ fn verify_value_is_within_number_discrete_limit(
 fn verify_value_is_within_string_discrete_limit(
     value: &Value,
     param_expr_span: &Span,
-    values: HashSet<String>,
+    values: Vec<String>,
     limit_expr_span: Span,
 ) -> Result<(), Vec<EvalError>> {
     match value {
