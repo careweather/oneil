@@ -205,7 +205,12 @@ fn eval_continuous_limits<F: BuiltinFunction>(
             Ok((number, Some(unit)))
         }
         Value::Number(number) => Ok((number, None)),
-        Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidContinuousLimitMinType]),
+        Value::Boolean(_) | Value::String(_) => {
+            Err(vec![EvalError::InvalidContinuousLimitMinType {
+                expr_span: *expr_span,
+                found_type: value.type_(),
+            }])
+        }
     });
 
     let max = eval_expr(max, context).and_then(|(value, expr_span)| match value {
@@ -214,7 +219,12 @@ fn eval_continuous_limits<F: BuiltinFunction>(
             Ok((number, Some(unit)))
         }
         Value::Number(number) => Ok((number, None)),
-        Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidContinuousLimitMaxType]),
+        Value::Boolean(_) | Value::String(_) => {
+            Err(vec![EvalError::InvalidContinuousLimitMaxType {
+                expr_span: *expr_span,
+                found_type: value.type_(),
+            }])
+        }
     });
 
     let (min, min_unit, max, max_unit) = match (min, max) {

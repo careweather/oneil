@@ -51,8 +51,14 @@ pub enum EvalError {
         expr_span: Span,
         unit_span: Span,
     },
-    InvalidContinuousLimitMinType,
-    InvalidContinuousLimitMaxType,
+    InvalidContinuousLimitMinType {
+        expr_span: Span,
+        found_type: ValueType,
+    },
+    InvalidContinuousLimitMaxType {
+        expr_span: Span,
+        found_type: ValueType,
+    },
     LimitCannotBeBoolean,
     DuplicateStringLimit,
     ExpectedStringLimit,
@@ -105,8 +111,14 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 unit_span: _,
             } => "string value cannot have a unit".to_string(),
-            Self::InvalidContinuousLimitMinType => todo!(),
-            Self::InvalidContinuousLimitMaxType => todo!(),
+            Self::InvalidContinuousLimitMinType {
+                expr_span: _,
+                found_type,
+            } => format!("expected a number value, but found a {found_type} value"),
+            Self::InvalidContinuousLimitMaxType {
+                expr_span: _,
+                found_type,
+            } => format!("expected a number value, but found a {found_type} value"),
             Self::LimitCannotBeBoolean => todo!(),
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
@@ -154,8 +166,14 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 unit_span: location_span,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidContinuousLimitMinType => todo!(),
-            Self::InvalidContinuousLimitMaxType => todo!(),
+            Self::InvalidContinuousLimitMinType {
+                expr_span: location_span,
+                found_type: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::InvalidContinuousLimitMaxType {
+                expr_span: location_span,
+                found_type: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::LimitCannotBeBoolean => todo!(),
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
@@ -209,8 +227,18 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 unit_span: _,
             } => Vec::new(),
-            Self::InvalidContinuousLimitMinType => todo!(),
-            Self::InvalidContinuousLimitMaxType => todo!(),
+            Self::InvalidContinuousLimitMinType {
+                expr_span: _,
+                found_type: _,
+            } => vec![ErrorContext::Note(
+                "continuous limit minimum must evaluate to a number value".to_string(),
+            )],
+            Self::InvalidContinuousLimitMaxType {
+                expr_span: _,
+                found_type: _,
+            } => vec![ErrorContext::Note(
+                "continuous limit maximum must evaluate to a number value".to_string(),
+            )],
             Self::LimitCannotBeBoolean => todo!(),
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
@@ -278,8 +306,14 @@ impl AsOneilError for EvalError {
                 ErrorContext::Note("this expression evaluates to a string value".to_string()),
                 Some(ErrorLocation::from_source_and_span(source, *expr_span)),
             )],
-            Self::InvalidContinuousLimitMinType => todo!(),
-            Self::InvalidContinuousLimitMaxType => todo!(),
+            Self::InvalidContinuousLimitMinType {
+                expr_span: _,
+                found_type: _,
+            } => Vec::new(),
+            Self::InvalidContinuousLimitMaxType {
+                expr_span: _,
+                found_type: _,
+            } => Vec::new(),
             Self::LimitCannotBeBoolean => todo!(),
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
