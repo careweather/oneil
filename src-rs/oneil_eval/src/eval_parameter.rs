@@ -267,7 +267,7 @@ fn eval_discrete_limits<F: BuiltinFunction>(
 
     for value in values {
         match value {
-            Ok((value, expr_span)) => results.push(value),
+            Ok((value, expr_span)) => results.push((value, expr_span)),
             Err(e) => errors.extend(e),
         }
     }
@@ -281,7 +281,7 @@ fn eval_discrete_limits<F: BuiltinFunction>(
         "must have at least one discrete limit value"
     );
 
-    let first_value = results.remove(0);
+    let (first_value, first_expr_span) = results.remove(0);
 
     match first_value {
         Value::String(first_value) => eval_string_discrete_limits(first_value, results),
@@ -291,21 +291,23 @@ fn eval_discrete_limits<F: BuiltinFunction>(
 
             eval_number_discrete_limits(first_value, Some(limit_unit), results)
         }
-        Value::Boolean(_) => Err(vec![EvalError::LimitCannotBeBoolean]),
+        Value::Boolean(_) => Err(vec![EvalError::BooleanCannotBeDiscreteLimitValue {
+            expr_span: *first_expr_span,
+        }]),
     }
 }
 
 fn eval_string_discrete_limits(
     first_value: String,
-    results: Vec<Value>,
+    results: Vec<(Value, &Span)>,
 ) -> Result<Limits, Vec<EvalError>> {
     let mut errors = Vec::new();
     let mut strings = HashSet::new();
 
     strings.insert(first_value);
 
-    for result in results {
-        match result {
+    for (value, expr_span) in results {
+        match value {
             Value::String(string) => {
                 if strings.contains(&string) {
                     errors.push(EvalError::DuplicateStringLimit);
@@ -329,7 +331,7 @@ fn eval_string_discrete_limits(
 fn eval_number_discrete_limits(
     first_value: Number,
     limit_unit: Option<Unit>,
-    results: Vec<Value>,
+    results: Vec<(Value, &Span)>,
 ) -> Result<Limits, Vec<EvalError>> {
     let mut errors = Vec::new();
     let mut numbers = Vec::new();
@@ -337,8 +339,8 @@ fn eval_number_discrete_limits(
 
     numbers.push(first_value);
 
-    for result in results {
-        match result {
+    for (value, expr_span) in results {
+        match value {
             Value::MeasuredNumber(number_result) => {
                 let (number_result, number_result_unit) = number_result.into_number_and_unit();
 
