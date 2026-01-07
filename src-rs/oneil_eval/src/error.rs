@@ -101,10 +101,7 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_value,
             } => {
-                let found_value_type = found_value.type_();
-                format!(
-                    "expected a boolean value, but found {found_value} (type: {found_value_type})"
-                )
+                format!("expected a boolean value, but found {found_value}")
             }
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident,
@@ -130,19 +127,13 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_value,
             } => {
-                let found_value_type = found_value.type_();
-                format!(
-                    "expected a number value, but found {found_value} (type: {found_value_type})"
-                )
+                format!("expected a number value, but found {found_value}")
             }
             Self::InvalidContinuousLimitMaxType {
                 expr_span: _,
                 found_value,
             } => {
-                let found_value_type = found_value.type_();
-                format!(
-                    "expected a number value, but found {found_value} (type: {found_value_type})"
-                )
+                format!("expected a number value, but found {found_value}")
             }
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => {
                 "discrete limit cannot contain a boolean value".to_string()
@@ -156,19 +147,13 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_value,
             } => {
-                let found_value_type = found_value.type_();
-                format!(
-                    "expected a string value, but found {found_value} (type: {found_value_type})"
-                )
+                format!("expected a string value, but found {found_value}")
             }
             Self::ExpectedNumberLimit {
                 expr_span: _,
                 found_value,
             } => {
-                let found_value_type = found_value.type_();
-                format!(
-                    "expected a number value, but found {found_value} (type: {found_value_type})"
-                )
+                format!("expected a number value, but found {found_value}")
             }
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
