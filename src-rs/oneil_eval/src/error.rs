@@ -62,9 +62,19 @@ pub enum EvalError {
     BooleanCannotBeDiscreteLimitValue {
         expr_span: Span,
     },
-    DuplicateStringLimit,
-    ExpectedStringLimit,
-    ExpectedNumberLimit,
+    DuplicateStringLimit {
+        expr_span: Span,
+        original_expr_span: Span,
+        string_value: String,
+    },
+    ExpectedStringLimit {
+        expr_span: Span,
+        found_type: ValueType,
+    },
+    ExpectedNumberLimit {
+        expr_span: Span,
+        found_type: ValueType,
+    },
     DiscreteLimitUnitMismatch,
     ParameterValueOutsideLimits,
     ParameterUnitDoesNotMatchLimit,
@@ -124,9 +134,23 @@ impl AsOneilError for EvalError {
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => {
                 "discrete limit cannot contain a boolean value".to_string()
             }
-            Self::DuplicateStringLimit => todo!(),
-            Self::ExpectedStringLimit => todo!(),
-            Self::ExpectedNumberLimit => todo!(),
+            Self::DuplicateStringLimit {
+                expr_span: _,
+                original_expr_span: _,
+                string_value,
+            } => format!("duplicate string value '{string_value}' in discrete limit"),
+            Self::ExpectedStringLimit {
+                expr_span: _,
+                found_type,
+            } => {
+                format!("expected a string value, but found a {found_type} value")
+            }
+            Self::ExpectedNumberLimit {
+                expr_span: _,
+                found_type,
+            } => {
+                format!("expected a number value, but found a {found_type} value")
+            }
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
@@ -181,9 +205,19 @@ impl AsOneilError for EvalError {
             Self::BooleanCannotBeDiscreteLimitValue {
                 expr_span: location_span,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::DuplicateStringLimit => todo!(),
-            Self::ExpectedStringLimit => todo!(),
-            Self::ExpectedNumberLimit => todo!(),
+            Self::DuplicateStringLimit {
+                expr_span: location_span,
+                original_expr_span: _,
+                string_value: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::ExpectedStringLimit {
+                expr_span: location_span,
+                found_type: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::ExpectedNumberLimit {
+                expr_span: location_span,
+                found_type: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
@@ -248,9 +282,21 @@ impl AsOneilError for EvalError {
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => vec![ErrorContext::Note(
                 "discrete limit values must evaluate to a number or a string value".to_string(),
             )],
-            Self::DuplicateStringLimit => todo!(),
-            Self::ExpectedStringLimit => todo!(),
-            Self::ExpectedNumberLimit => todo!(),
+            Self::DuplicateStringLimit {
+                expr_span: _,
+                original_expr_span: _,
+                string_value: _,
+            } => vec![ErrorContext::Note(
+                "duplicate string values in discrete limits are not allowed".to_string(),
+            )],
+            Self::ExpectedStringLimit {
+                expr_span: _,
+                found_type: _,
+            } => Vec::new(),
+            Self::ExpectedNumberLimit {
+                expr_span: _,
+                found_type: _,
+            } => Vec::new(),
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
@@ -323,9 +369,25 @@ impl AsOneilError for EvalError {
                 found_type: _,
             } => Vec::new(),
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => Vec::new(),
-            Self::DuplicateStringLimit => todo!(),
-            Self::ExpectedStringLimit => todo!(),
-            Self::ExpectedNumberLimit => todo!(),
+            Self::DuplicateStringLimit {
+                expr_span: _,
+                original_expr_span,
+                string_value,
+            } => vec![(
+                ErrorContext::Note(format!("original value `{string_value}` is found here")),
+                Some(ErrorLocation::from_source_and_span(
+                    source,
+                    *original_expr_span,
+                )),
+            )],
+            Self::ExpectedStringLimit {
+                expr_span: _,
+                found_type: _,
+            } => Vec::new(),
+            Self::ExpectedNumberLimit {
+                expr_span: _,
+                found_type: _,
+            } => Vec::new(),
             Self::DiscreteLimitUnitMismatch => todo!(),
             Self::ParameterValueOutsideLimits => todo!(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
