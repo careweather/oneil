@@ -31,6 +31,10 @@ fn resolve_unit_recursive(
             identifier,
             exponent,
         } => {
+            let unit_span = unit.span();
+            let name_span = identifier.span();
+            let exponent_span = exponent.as_ref().map(ast::Node::span);
+
             let exponent_value = exponent.as_ref().map_or(1.0, |e| e.value());
             let exponent_value = if is_inverse {
                 -exponent_value
@@ -38,7 +42,13 @@ fn resolve_unit_recursive(
                 exponent_value
             };
 
-            let unit = ir::Unit::new(identifier.as_str().to_string(), exponent_value);
+            let unit = ir::Unit::new(
+                unit_span,
+                identifier.as_str().to_string(),
+                name_span,
+                exponent_value,
+                exponent_span,
+            );
             units.push(unit);
             units
         }
@@ -63,7 +73,7 @@ fn resolve_display_unit(unit: &ast::UnitExprNode) -> ir::DisplayCompositeUnit {
             identifier,
             exponent,
         } => {
-            let display_unit = ir::Unit::new(
+            let display_unit = ir::DisplayUnit::new(
                 identifier.as_str().to_string(),
                 exponent.as_ref().map_or(1.0, |e| e.value()),
             );

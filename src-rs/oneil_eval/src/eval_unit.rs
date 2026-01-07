@@ -64,6 +64,8 @@ fn eval_unit_component<F: BuiltinFunction>(
     unit: &ir::Unit,
     context: &EvalContext<F>,
 ) -> Result<Unit, EvalError> {
+    let unit_name_span = unit.name_span();
+
     let full_name = unit.name();
     let exponent = unit.exponent();
 
@@ -98,15 +100,20 @@ fn eval_unit_component<F: BuiltinFunction>(
         }
     }
 
+    // TODO: come up with potential recommended units that this might be
+
     // if we get here, the unit is not found
-    Err(EvalError::UnknownUnit)
+    Err(EvalError::UnknownUnit {
+        unit_name: full_name.to_string(),
+        unit_name_span,
+    })
 }
 
 fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
     match unit {
         ir::DisplayCompositeUnit::BaseUnit(unit) => {
-            let name = unit.name().to_string();
-            let exponent = unit.exponent();
+            let name = unit.name.to_string();
+            let exponent = unit.exponent;
             DisplayUnit::Unit { name, exponent }
         }
         ir::DisplayCompositeUnit::Unitless => DisplayUnit::Unitless,
