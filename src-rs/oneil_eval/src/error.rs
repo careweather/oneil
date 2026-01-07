@@ -79,7 +79,28 @@ pub enum EvalError {
         found_value: Value,
     },
     DiscreteLimitUnitMismatch,
-    ParameterValueOutsideLimits,
+    ParameterValueBelowDefaultLimits {
+        param_expr_span: Span,
+        param_value: Value,
+    },
+    ParameterValueBelowContinuousLimits {
+        param_expr_span: Span,
+        param_value: Value,
+        min_expr_span: Span,
+        min_value: Value,
+    },
+    ParameterValueAboveContinuousLimits {
+        param_expr_span: Span,
+        param_value: Value,
+        max_expr_span: Span,
+        max_value: Value,
+    },
+    ParameterValueNotInDiscreteLimits {
+        param_expr_span: Span,
+        param_value: Value,
+        limit_expr_span: Span,
+        limit_values: Vec<Value>,
+    },
     ParameterUnitDoesNotMatchLimit,
     Unsupported,
 }
@@ -164,7 +185,36 @@ impl AsOneilError for EvalError {
                 format!("expected a number value, but found {found_value}")
             }
             Self::DiscreteLimitUnitMismatch => todo!(),
-            Self::ParameterValueOutsideLimits => todo!(),
+            Self::ParameterValueBelowDefaultLimits {
+                param_expr_span: _,
+                param_value,
+            } => {
+                format!("parameter value {param_value} is below the default parameter limit")
+            }
+            Self::ParameterValueBelowContinuousLimits {
+                param_expr_span: _,
+                param_value,
+                min_expr_span: _,
+                min_value,
+            } => {
+                format!("parameter value {param_value} is below the limit {min_value}")
+            }
+            Self::ParameterValueAboveContinuousLimits {
+                param_expr_span: _,
+                param_value,
+                max_expr_span: _,
+                max_value,
+            } => {
+                format!("parameter value {param_value} is above the limit {max_value}")
+            }
+            Self::ParameterValueNotInDiscreteLimits {
+                param_expr_span: _,
+                param_value,
+                limit_expr_span: _,
+                limit_values: _,
+            } => {
+                format!("parameter value {param_value} is not in the discrete limit")
+            }
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
         }
@@ -234,7 +284,28 @@ impl AsOneilError for EvalError {
                 found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::DiscreteLimitUnitMismatch => todo!(),
-            Self::ParameterValueOutsideLimits => todo!(),
+            Self::ParameterValueBelowDefaultLimits {
+                param_expr_span: location_span,
+                param_value: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::ParameterValueBelowContinuousLimits {
+                param_expr_span: location_span,
+                param_value: _,
+                min_expr_span: _,
+                min_value: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::ParameterValueAboveContinuousLimits {
+                param_expr_span: location_span,
+                param_value: _,
+                max_expr_span: _,
+                max_value: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::ParameterValueNotInDiscreteLimits {
+                param_expr_span: location_span,
+                param_value: _,
+                limit_expr_span: _,
+                limit_values: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
         }
@@ -316,7 +387,35 @@ impl AsOneilError for EvalError {
                 found_value: _,
             } => Vec::new(),
             Self::DiscreteLimitUnitMismatch => todo!(),
-            Self::ParameterValueOutsideLimits => todo!(),
+            Self::ParameterValueBelowDefaultLimits {
+                param_expr_span: _,
+                param_value: _,
+            } => vec![
+                ErrorContext::Note(
+                    "the default limits for number parameters are (0, inf)".to_string(),
+                ),
+                ErrorContext::Help(
+                    "consider specifying a continuous limit for the parameter".to_string(),
+                ),
+            ],
+            Self::ParameterValueBelowContinuousLimits {
+                param_expr_span: _,
+                param_value: _,
+                min_expr_span: _,
+                min_value: _,
+            } => Vec::new(),
+            Self::ParameterValueAboveContinuousLimits {
+                param_expr_span: _,
+                param_value: _,
+                max_expr_span: _,
+                max_value: _,
+            } => Vec::new(),
+            Self::ParameterValueNotInDiscreteLimits {
+                param_expr_span: _,
+                param_value: _,
+                limit_expr_span: _,
+                limit_values: _,
+            } => Vec::new(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
         }
@@ -410,7 +509,53 @@ impl AsOneilError for EvalError {
                 found_value: _,
             } => Vec::new(),
             Self::DiscreteLimitUnitMismatch => todo!(),
-            Self::ParameterValueOutsideLimits => todo!(),
+            Self::ParameterValueBelowDefaultLimits {
+                param_expr_span: _,
+                param_value: _,
+            } => Vec::new(),
+            Self::ParameterValueBelowContinuousLimits {
+                param_expr_span: _,
+                param_value: _,
+                min_expr_span,
+                min_value,
+            } => vec![(
+                ErrorContext::Note(format!(
+                    "the limit minimum for this parameter is {min_value}"
+                )),
+                Some(ErrorLocation::from_source_and_span(source, *min_expr_span)),
+            )],
+            Self::ParameterValueAboveContinuousLimits {
+                param_expr_span: _,
+                param_value: _,
+                max_expr_span,
+                max_value,
+            } => vec![(
+                ErrorContext::Note(format!(
+                    "the limit maximum for this parameter is {max_value}"
+                )),
+                Some(ErrorLocation::from_source_and_span(source, *max_expr_span)),
+            )],
+            Self::ParameterValueNotInDiscreteLimits {
+                param_expr_span: _,
+                param_value: _,
+                limit_expr_span,
+                limit_values,
+            } => {
+                let limit_values = limit_values
+                    .into_iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                vec![(
+                    ErrorContext::Note(format!(
+                        "the limit values for this parameter are [{limit_values:?}]"
+                    )),
+                    Some(ErrorLocation::from_source_and_span(
+                        source,
+                        *limit_expr_span,
+                    )),
+                )]
+            }
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
         }

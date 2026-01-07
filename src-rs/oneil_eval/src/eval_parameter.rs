@@ -87,7 +87,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
 
     // check that the value is within the provided limits
     let limits = eval_limits(parameter.limits(), context)?;
-    verify_value_is_within_limits(&value, limits)?;
+    verify_value_is_within_limits(&value, expr_span, limits)?;
 
     Ok(value)
 }
@@ -171,15 +171,19 @@ enum Limits {
     AnyStringOrBooleanOrPositiveNumber,
     NumberRange {
         min: Number,
+        min_expr_span: Span,
         max: Number,
+        max_expr_span: Span,
         unit: Option<Unit>,
     },
     NumberDiscrete {
         values: Vec<Number>,
         unit: Option<Unit>,
+        limit_expr_span: Span,
     },
     StringDiscrete {
         values: HashSet<String>,
+        limit_expr_span: Span,
     },
 }
 
@@ -190,7 +194,10 @@ fn eval_limits<F: BuiltinFunction>(
     match limits {
         ir::Limits::Default => Ok(Limits::AnyStringOrBooleanOrPositiveNumber),
         ir::Limits::Continuous { min, max } => eval_continuous_limits(min, max, context),
-        ir::Limits::Discrete { values } => eval_discrete_limits(values, context),
+        ir::Limits::Discrete {
+            values,
+            limit_expr_span,
+        } => eval_discrete_limits(values, limit_expr_span, context),
     }
 }
 
@@ -202,9 +209,9 @@ fn eval_continuous_limits<F: BuiltinFunction>(
     let min = eval_expr(min, context).and_then(|(value, expr_span)| match value {
         Value::MeasuredNumber(number) => {
             let (number, unit) = number.into_number_and_unit();
-            Ok((number, Some(unit)))
+            Ok((number, *expr_span, Some(unit)))
         }
-        Value::Number(number) => Ok((number, None)),
+        Value::Number(number) => Ok((number, *expr_span, None)),
         Value::Boolean(_) | Value::String(_) => {
             Err(vec![EvalError::InvalidContinuousLimitMinType {
                 expr_span: *expr_span,
@@ -216,9 +223,9 @@ fn eval_continuous_limits<F: BuiltinFunction>(
     let max = eval_expr(max, context).and_then(|(value, expr_span)| match value {
         Value::MeasuredNumber(number) => {
             let (number, unit) = number.into_number_and_unit();
-            Ok((number, Some(unit)))
+            Ok((number, *expr_span, Some(unit)))
         }
-        Value::Number(number) => Ok((number, None)),
+        Value::Number(number) => Ok((number, *expr_span, None)),
         Value::Boolean(_) | Value::String(_) => {
             Err(vec![EvalError::InvalidContinuousLimitMaxType {
                 expr_span: *expr_span,
@@ -227,8 +234,10 @@ fn eval_continuous_limits<F: BuiltinFunction>(
         }
     });
 
-    let (min, min_unit, max, max_unit) = match (min, max) {
-        (Ok((min, min_unit)), Ok((max, max_unit))) => (min, min_unit, max, max_unit),
+    let (min, min_expr_span, min_unit, max, max_expr_span, max_unit) = match (min, max) {
+        (Ok((min, min_expr_span, min_unit)), Ok((max, max_expr_span, max_unit))) => {
+            (min, min_expr_span, min_unit, max, max_expr_span, max_unit)
+        }
         (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => return Err(errors),
         (Err(errors), Err(errors2)) => {
             let mut errors = errors;
@@ -249,7 +258,13 @@ fn eval_continuous_limits<F: BuiltinFunction>(
         (None, None) => None,
     };
 
-    Ok(Limits::NumberRange { min, max, unit })
+    Ok(Limits::NumberRange {
+        min,
+        min_expr_span,
+        max,
+        max_expr_span,
+        unit,
+    })
 }
 
 #[expect(
@@ -258,6 +273,7 @@ fn eval_continuous_limits<F: BuiltinFunction>(
 )]
 fn eval_discrete_limits<F: BuiltinFunction>(
     values: &[ir::Expr],
+    limit_expr_span: &Span,
     context: &EvalContext<F>,
 ) -> Result<Limits, Vec<EvalError>> {
     let values = values.iter().map(|value| eval_expr(value, context));
@@ -285,13 +301,15 @@ fn eval_discrete_limits<F: BuiltinFunction>(
 
     match first_value {
         Value::String(first_value) => {
-            eval_string_discrete_limits(first_value, first_expr_span, results)
+            eval_string_discrete_limits(first_value, first_expr_span, results, limit_expr_span)
         }
-        Value::Number(first_value) => eval_number_discrete_limits(first_value, None, results),
+        Value::Number(first_value) => {
+            eval_number_discrete_limits(first_value, None, results, limit_expr_span)
+        }
         Value::MeasuredNumber(first_value) => {
             let (first_value, limit_unit) = first_value.into_number_and_unit();
 
-            eval_number_discrete_limits(first_value, Some(limit_unit), results)
+            eval_number_discrete_limits(first_value, Some(limit_unit), results, limit_expr_span)
         }
         Value::Boolean(_) => Err(vec![EvalError::BooleanCannotBeDiscreteLimitValue {
             expr_span: *first_expr_span,
@@ -303,6 +321,7 @@ fn eval_string_discrete_limits(
     first_value: String,
     first_expr_span: &Span,
     results: Vec<(Value, &Span)>,
+    limit_expr_span: &Span,
 ) -> Result<Limits, Vec<EvalError>> {
     let mut errors = Vec::new();
     let mut strings = HashMap::new();
@@ -333,7 +352,10 @@ fn eval_string_discrete_limits(
 
     if errors.is_empty() {
         let strings = strings.into_keys().collect();
-        Ok(Limits::StringDiscrete { values: strings })
+        Ok(Limits::StringDiscrete {
+            values: strings,
+            limit_expr_span: *limit_expr_span,
+        })
     } else {
         Err(errors)
     }
@@ -343,6 +365,7 @@ fn eval_number_discrete_limits(
     first_value: Number,
     limit_unit: Option<Unit>,
     results: Vec<(Value, &Span)>,
+    limit_expr_span: &Span,
 ) -> Result<Limits, Vec<EvalError>> {
     let mut errors = Vec::new();
     let mut numbers = Vec::new();
@@ -384,94 +407,205 @@ fn eval_number_discrete_limits(
         Ok(Limits::NumberDiscrete {
             values: numbers,
             unit: limit_unit,
+            limit_expr_span: *limit_expr_span,
         })
     } else {
         Err(errors)
     }
 }
 
-fn verify_value_is_within_limits(value: &Value, limits: Limits) -> Result<(), Vec<EvalError>> {
+fn verify_value_is_within_limits(
+    value: &Value,
+    param_expr_span: &Span,
+    limits: Limits,
+) -> Result<(), Vec<EvalError>> {
     match limits {
-        Limits::AnyStringOrBooleanOrPositiveNumber => match value {
-            Value::MeasuredNumber(number) if number.normalized_value().min() < 0.0 => {
-                Err(vec![EvalError::ParameterValueOutsideLimits])
-            }
-            Value::Number(number) if number.min() < 0.0 => {
-                Err(vec![EvalError::ParameterValueOutsideLimits])
-            }
-            Value::Boolean(_) | Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
+        Limits::AnyStringOrBooleanOrPositiveNumber => {
+            verify_value_is_within_default_limits(value, param_expr_span)
+        }
+        Limits::NumberRange {
+            min,
+            min_expr_span,
+            max,
+            max_expr_span,
+            unit,
+        } => verify_value_is_within_number_range(
+            value,
+            param_expr_span,
+            min,
+            min_expr_span,
+            max,
+            max_expr_span,
+            unit,
+        ),
+        Limits::NumberDiscrete {
+            values,
+            unit,
+            limit_expr_span,
+        } => verify_value_is_within_number_discrete_limit(
+            value,
+            param_expr_span,
+            values,
+            unit,
+            limit_expr_span,
+        ),
+        Limits::StringDiscrete {
+            values,
+            limit_expr_span,
+        } => verify_value_is_within_string_discrete_limit(
+            value,
+            param_expr_span,
+            values,
+            limit_expr_span,
+        ),
+    }
+}
+
+fn verify_value_is_within_default_limits(
+    value: &Value,
+    param_expr_span: &Span,
+) -> Result<(), Vec<EvalError>> {
+    match value {
+        Value::MeasuredNumber(number)
+            if !number.unit().is_db && number.normalized_value().min() < 0.0 =>
+        {
+            // note that if the unit is a decibel unit, then negative values are
+            // expected and allowed
+            Err(vec![EvalError::ParameterValueBelowDefaultLimits {
+                param_expr_span: *param_expr_span,
+                param_value: value.clone(),
+            }])
+        }
+        Value::Number(number) if number.min() < 0.0 => {
+            Err(vec![EvalError::ParameterValueBelowDefaultLimits {
+                param_expr_span: *param_expr_span,
+                param_value: value.clone(),
+            }])
+        }
+        Value::Boolean(_) | Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
+            Ok(())
+        }
+    }
+}
+
+fn verify_value_is_within_number_range(
+    value: &Value,
+    param_expr_span: &Span,
+    min: Number,
+    min_expr_span: Span,
+    max: Number,
+    max_expr_span: Span,
+    unit: Option<Unit>,
+) -> Result<(), Vec<EvalError>> {
+    match value {
+        Value::Boolean(_) | Value::String(_) => {
+            Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+        }
+        Value::Number(number) => {
+            if unit.is_some() {
+                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+            } else if number.min() < min.min() || number.max() > max.max() {
+                Err(vec![EvalError::ParameterValueBelowContinuousLimits {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    min_expr_span,
+                    min_value: Value::Number(min),
+                }])
+            } else {
                 Ok(())
             }
-        },
-        Limits::NumberRange { min, max, unit } => match value {
-            Value::Boolean(_) | Value::String(_) => {
-                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+        }
+        Value::MeasuredNumber(number) => {
+            if let Some(unit) = unit
+                && !number.unit().dimensionally_eq(&unit)
+            {
+                return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
             }
-            Value::Number(number) => {
-                if unit.is_some() {
-                    Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
-                } else if number.min() < min.min() || number.max() > max.max() {
-                    Err(vec![EvalError::ParameterValueOutsideLimits])
-                } else {
-                    Ok(())
-                }
-            }
-            Value::MeasuredNumber(number) => {
-                if let Some(unit) = unit
-                    && !number.unit().dimensionally_eq(&unit)
-                {
-                    return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-                }
 
-                // the min and the max must be converted to the same unit as the number
-                let adjusted_min = MeasuredNumber::from_number_and_unit(min, number.unit().clone());
-                let adjusted_max = MeasuredNumber::from_number_and_unit(max, number.unit().clone());
+            // the min and the max must be converted to the same unit as the number
+            let adjusted_min = MeasuredNumber::from_number_and_unit(min, number.unit().clone());
+            let adjusted_max = MeasuredNumber::from_number_and_unit(max, number.unit().clone());
 
-                if number.normalized_value().min() < adjusted_min.normalized_value().min()
-                    || number.normalized_value().max() > adjusted_max.normalized_value().max()
-                {
-                    Err(vec![EvalError::ParameterValueOutsideLimits])
-                } else {
-                    Ok(())
-                }
-            }
-        },
-        Limits::NumberDiscrete { values, unit } => {
-            if let Value::MeasuredNumber(number) = value {
-                // the number must have the same unit as the limit unit,
-                // unless the limit unit is unitless
-                if let Some(unit) = unit
-                    && !number.unit().dimensionally_eq(&unit)
-                {
-                    return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-                }
-
-                let is_inside_limits = values.into_iter().any(|limit_value| {
-                    let adjusted_limit_value =
-                        MeasuredNumber::from_number_and_unit(limit_value, number.unit().clone());
-                    adjusted_limit_value
-                        .normalized_value()
-                        .contains(number.normalized_value())
-                });
-
-                if is_inside_limits {
-                    Ok(())
-                } else {
-                    Err(vec![EvalError::ParameterValueOutsideLimits])
-                }
+            if number.normalized_value().min() < adjusted_min.normalized_value().min()
+                || number.normalized_value().max() > adjusted_max.normalized_value().max()
+            {
+                Err(vec![EvalError::ParameterValueAboveContinuousLimits {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    max_expr_span,
+                    max_value: Value::Number(max),
+                }])
             } else {
-                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+                Ok(())
             }
         }
-        Limits::StringDiscrete { values } => match value {
-            Value::String(string) if !values.contains(string) => {
-                Err(vec![EvalError::ParameterValueOutsideLimits])
-            }
-            Value::String(_) => Ok(()),
-            Value::Boolean(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
-                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
-            }
-        },
+    }
+}
+
+fn verify_value_is_within_number_discrete_limit(
+    value: &Value,
+    param_expr_span: &Span,
+    values: Vec<Number>,
+    unit: Option<Unit>,
+    limit_expr_span: Span,
+) -> Result<(), Vec<EvalError>> {
+    let Value::MeasuredNumber(number) = value else {
+        return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
+    };
+    // the number must have the same unit as the limit unit,
+    // unless the limit unit is unitless
+    if let Some(unit) = unit
+        && !number.unit().dimensionally_eq(&unit)
+    {
+        return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
+    }
+    let is_inside_limits = values.iter().any(|limit_value| {
+        let adjusted_limit_value =
+            MeasuredNumber::from_number_and_unit(*limit_value, number.unit().clone());
+        adjusted_limit_value
+            .normalized_value()
+            .contains(number.normalized_value())
+    });
+    if is_inside_limits {
+        Ok(())
+    } else {
+        let values: Vec<Value> = values
+            .into_iter()
+            .map(|value| {
+                let measured_number =
+                    MeasuredNumber::from_number_and_unit(value, number.unit().clone());
+                Value::MeasuredNumber(measured_number)
+            })
+            .collect();
+        Err(vec![EvalError::ParameterValueNotInDiscreteLimits {
+            param_expr_span: *param_expr_span,
+            param_value: value.clone(),
+            limit_expr_span,
+            limit_values: values,
+        }])
+    }
+}
+
+fn verify_value_is_within_string_discrete_limit(
+    value: &Value,
+    param_expr_span: &Span,
+    values: HashSet<String>,
+    limit_expr_span: Span,
+) -> Result<(), Vec<EvalError>> {
+    match value {
+        Value::String(string) if !values.contains(string) => {
+            let values: Vec<Value> = values.into_iter().map(Value::String).collect();
+            Err(vec![EvalError::ParameterValueNotInDiscreteLimits {
+                param_expr_span: *param_expr_span,
+                param_value: value.clone(),
+                limit_expr_span,
+                limit_values: values,
+            }])
+        }
+        Value::String(_) => Ok(()),
+        Value::Boolean(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
+            Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+        }
     }
 }
 

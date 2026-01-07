@@ -204,6 +204,8 @@ pub enum Limits {
     Discrete {
         /// Vector of expressions representing allowed values.
         values: Vec<Expr>,
+        /// The span of the expression representing the limit.
+        limit_expr_span: Span,
     },
 }
 
@@ -222,8 +224,11 @@ impl Limits {
 
     /// Creates discrete limits with a set of allowed values.
     #[must_use]
-    pub const fn discrete(values: Vec<Expr>) -> Self {
-        Self::Discrete { values }
+    pub const fn discrete(values: Vec<Expr>, limit_expr_span: Span) -> Self {
+        Self::Discrete {
+            values,
+            limit_expr_span,
+        }
     }
 }
 

@@ -246,7 +246,10 @@ fn print_limits(limits: &ir::Limits, indent: usize) {
             println!("{}    └── Max:", "  ".repeat(indent));
             print_expression(max, indent + 2);
         }
-        ir::Limits::Discrete { values } => {
+        ir::Limits::Discrete {
+            values,
+            limit_expr_span: _,
+        } => {
             println!("{}    ├── Type: Discrete", "  ".repeat(indent));
             for (i, value) in values.iter().enumerate() {
                 let is_last = i == values.len() - 1;
