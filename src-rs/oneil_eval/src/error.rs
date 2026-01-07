@@ -59,7 +59,9 @@ pub enum EvalError {
         expr_span: Span,
         found_type: ValueType,
     },
-    LimitCannotBeBoolean,
+    BooleanCannotBeDiscreteLimitValue {
+        expr_span: Span,
+    },
     DuplicateStringLimit,
     ExpectedStringLimit,
     ExpectedNumberLimit,
@@ -119,7 +121,9 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_type,
             } => format!("expected a number value, but found a {found_type} value"),
-            Self::LimitCannotBeBoolean => todo!(),
+            Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => {
+                "discrete limit cannot contain a boolean value".to_string()
+            }
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
             Self::ExpectedNumberLimit => todo!(),
@@ -174,7 +178,9 @@ impl AsOneilError for EvalError {
                 expr_span: location_span,
                 found_type: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::LimitCannotBeBoolean => todo!(),
+            Self::BooleanCannotBeDiscreteLimitValue {
+                expr_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
             Self::ExpectedNumberLimit => todo!(),
@@ -239,7 +245,9 @@ impl AsOneilError for EvalError {
             } => vec![ErrorContext::Note(
                 "continuous limit maximum must evaluate to a number value".to_string(),
             )],
-            Self::LimitCannotBeBoolean => todo!(),
+            Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => vec![ErrorContext::Note(
+                "discrete limit values must evaluate to a number or a string value".to_string(),
+            )],
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
             Self::ExpectedNumberLimit => todo!(),
@@ -314,7 +322,7 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_type: _,
             } => Vec::new(),
-            Self::LimitCannotBeBoolean => todo!(),
+            Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => Vec::new(),
             Self::DuplicateStringLimit => todo!(),
             Self::ExpectedStringLimit => todo!(),
             Self::ExpectedNumberLimit => todo!(),
