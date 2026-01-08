@@ -4,6 +4,11 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 
+mod doc_store;
+
+use oneil_runner::{builtins, file_parser};
+
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tower_lsp_server::jsonrpc::Result;
@@ -16,8 +21,6 @@ use tower_lsp_server::lsp_types::{
     TextDocumentSyncSaveOptions,
 };
 use tower_lsp_server::{Client, LanguageServer, LspService, Server, UriExt};
-
-mod doc_store;
 
 use doc_store::DocumentStore;
 
@@ -177,7 +180,15 @@ impl LanguageServer for Backend {
         &self,
         params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
-        let _position = params.text_document_position_params.position;
+        let position = params.text_document_position_params.position;
+        let uri = params.text_document_position_params.text_document.uri;
+
+        let builtin_variables = builtins::Builtins::new();
+        let model_collection = oneil_model_resolver::load_model(
+            PathBuf::from(uri.path().as_str()),
+            &builtin_variables,
+            &file_parser::FileLoader,
+        );
 
         // Look up position in code
         // Determine meaning of token

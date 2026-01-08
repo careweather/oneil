@@ -1,6 +1,6 @@
 [package]
-name = "oneil_lsp"
-description = "LSP for the Oneil programming language"
+name = "oneil_runner"
+description = "Reference implementations for the model resolver's requirements such as builtins and file loader"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -8,17 +8,14 @@ license.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
-readme.workspace = true
+readme = "README.md"
 
 [dependencies]
 oneil_ast = { path = "../oneil_ast" }
+oneil_parser = { path = "../oneil_parser" }
 oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }
-oneil_parser = { path = "../oneil_parser" }
-oneil_runner = { path = "../oneil_runner" }
-tokio = { version = "1", features = ["full"] }
-tower-lsp-server = "0.22.1"
 
 [lints]
 workspace = true

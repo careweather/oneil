@@ -6,16 +6,11 @@ use std::io::{self, Write};
 use clap::Parser;
 use oneil_model_resolver::FileLoader;
 
-use crate::{
-    builtins::Builtins,
-    command::{CliCommand, Commands, DevCommands},
-    file_parser::LoadingError,
-};
+use crate::command::{CliCommand, Commands, DevCommands};
+use oneil_runner::{builtins::Builtins, file_parser::{self, LoadingError}};
 
-mod builtins;
 mod command;
 mod convert_error;
-mod file_parser;
 mod printer;
 
 /// Main entry point for the Oneil CLI application

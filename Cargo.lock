@@ -445,6 +445,7 @@ dependencies = [
  "oneil_lsp",
  "oneil_model_resolver",
  "oneil_parser",
+ "oneil_runner",
  "oneil_shared",
 ]
 
@@ -470,6 +471,7 @@ dependencies = [
  "oneil_ir",
  "oneil_model_resolver",
  "oneil_parser",
+ "oneil_runner",
  "oneil_shared",
  "tokio",
  "tower-lsp-server",
@@ -491,6 +493,17 @@ dependencies = [
  "nom",
  "nom_locate",
  "oneil_ast",
+ "oneil_shared",
+]
+
+[[package]]
+name = "oneil_runner"
+version = "0.15.0"
+dependencies = [
+ "oneil_ast",
+ "oneil_ir",
+ "oneil_model_resolver",
+ "oneil_parser",
  "oneil_shared",
 ]
 

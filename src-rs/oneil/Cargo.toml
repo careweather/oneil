@@ -17,6 +17,7 @@ oneil_lsp = { path = "../oneil_lsp" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }
 oneil_parser = { path = "../oneil_parser" }
 oneil_shared = { path = "../oneil_shared" }
+oneil_runner = { path = "../oneil_runner" }
 clap = { version = "4.5.1", features = ["derive"] }
 colored = "3.0.0"
 
