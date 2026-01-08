@@ -199,6 +199,8 @@ pub enum Limits {
         min: Expr,
         /// The maximum allowed value expression.
         max: Expr,
+        /// The span of the expression representing the limit.
+        limit_expr_span: Span,
     },
     /// Discrete set of allowed values.
     Discrete {
@@ -218,8 +220,12 @@ impl Limits {
 
     /// Creates continuous limits with minimum and maximum expressions.
     #[must_use]
-    pub const fn continuous(min: Expr, max: Expr) -> Self {
-        Self::Continuous { min, max }
+    pub const fn continuous(min: Expr, max: Expr, limit_expr_span: Span) -> Self {
+        Self::Continuous {
+            min,
+            max,
+            limit_expr_span,
+        }
     }
 
     /// Creates discrete limits with a set of allowed values.

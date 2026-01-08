@@ -366,7 +366,7 @@ fn resolve_limits(
     parameter_context: &ParameterContext<'_>,
 ) -> Result<ir::Limits, Vec<ParameterResolutionError>> {
     match limits.map(|limits| (&**limits, limits.span())) {
-        Some((ast::Limits::Continuous { min, max }, _span)) => {
+        Some((ast::Limits::Continuous { min, max }, span)) => {
             let min = resolve_expr(min, builtin_ref, reference_context, parameter_context)
                 .map_err(error::convert_errors);
 
@@ -375,7 +375,7 @@ fn resolve_limits(
 
             let (min, max) = error::combine_errors(min, max)?;
 
-            Ok(ir::Limits::continuous(min, max))
+            Ok(ir::Limits::continuous(min, max, span))
         }
         Some((ast::Limits::Discrete { values }, span)) => {
             let values = values.iter().map(|value| {

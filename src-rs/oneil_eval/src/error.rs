@@ -101,6 +101,10 @@ pub enum EvalError {
         limit_expr_span: Span,
         limit_values: Vec<Value>,
     },
+    BooleanCannotHaveALimit {
+        expr_span: Span,
+        limit_span: Span,
+    },
     ParameterUnitDoesNotMatchLimit,
     Unsupported,
 }
@@ -215,6 +219,12 @@ impl AsOneilError for EvalError {
             } => {
                 format!("parameter value {param_value} is not in the discrete limit")
             }
+            Self::BooleanCannotHaveALimit {
+                expr_span: _,
+                limit_span: _,
+            } => {
+                format!("boolean value cannot have a limit")
+            }
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
         }
@@ -305,6 +315,10 @@ impl AsOneilError for EvalError {
                 param_value: _,
                 limit_expr_span: _,
                 limit_values: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::BooleanCannotHaveALimit {
+                expr_span: location_span,
+                limit_span: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
@@ -415,6 +429,10 @@ impl AsOneilError for EvalError {
                 param_value: _,
                 limit_expr_span: _,
                 limit_values: _,
+            } => Vec::new(),
+            Self::BooleanCannotHaveALimit {
+                expr_span: _,
+                limit_span: _,
             } => Vec::new(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
@@ -556,6 +574,10 @@ impl AsOneilError for EvalError {
                     )),
                 )]
             }
+            Self::BooleanCannotHaveALimit {
+                expr_span: _,
+                limit_span: _,
+            } => Vec::new(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported => todo!(),
         }

@@ -239,7 +239,11 @@ fn print_limits(limits: &ir::Limits, indent: usize) {
         ir::Limits::Default => {
             println!("{}    └── Type: Default", "  ".repeat(indent));
         }
-        ir::Limits::Continuous { min, max } => {
+        ir::Limits::Continuous {
+            min,
+            max,
+            limit_expr_span: _,
+        } => {
             println!("{}    ├── Type: Continuous", "  ".repeat(indent));
             println!("{}    ├── Min:", "  ".repeat(indent));
             print_expression(min, indent + 2);
