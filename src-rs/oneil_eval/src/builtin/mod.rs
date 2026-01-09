@@ -3,6 +3,8 @@
 
 use ::std::collections::HashMap;
 
+use oneil_shared::span::Span;
+
 use crate::{
     error::EvalError,
     value::{Unit, Value},
@@ -53,11 +55,19 @@ pub trait BuiltinFunction {
     /// # Errors
     ///
     /// Returns an error if the builtin function fails to evaluate.
-    fn call(&self, args: Vec<Value>) -> Result<Value, Vec<EvalError>>;
+    fn call(
+        &self,
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+    ) -> Result<Value, Vec<EvalError>>;
 }
 
-impl<F: Fn(Vec<Value>) -> Result<Value, Vec<EvalError>>> BuiltinFunction for F {
-    fn call(&self, args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        self(args)
+impl<F: Fn(Span, Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>>> BuiltinFunction for F {
+    fn call(
+        &self,
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+    ) -> Result<Value, Vec<EvalError>> {
+        self(identifier_span, args)
     }
 }

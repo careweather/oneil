@@ -127,22 +127,27 @@ impl<F: BuiltinFunction> EvalContext<F> {
     pub fn evaluate_builtin_function(
         &self,
         identifier: &ir::Identifier,
-        args: Vec<Value>,
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
     ) -> Result<Value, Vec<EvalError>> {
         self.builtins
             .functions
             .get(identifier.as_str())
             .expect("builtin function should be defined")
-            .call(args)
+            .call(identifier_span, args)
     }
 
     pub fn evaluate_imported_function(
         &self,
         identifier: &ir::Identifier,
-        args: Vec<Value>,
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
     ) -> Result<Value, Vec<EvalError>> {
         let _ = (self, identifier, args);
-        Err(vec![EvalError::Unsupported])
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     pub fn lookup_unit(&self, name: &str) -> Option<Unit> {
@@ -153,9 +158,14 @@ impl<F: BuiltinFunction> EvalContext<F> {
         &self.builtins.prefixes
     }
 
-    pub fn load_python_import(&mut self, python_path: PathBuf) {
-        self.python_imports
-            .insert(python_path, Err(EvalError::Unsupported));
+    pub fn load_python_import(&mut self, python_path: PathBuf, python_import_span: Span) {
+        self.python_imports.insert(
+            python_path,
+            Err(EvalError::Unsupported {
+                relevant_span: python_import_span,
+                will_be_supported: true,
+            }),
+        );
     }
 
     pub fn set_active_model(&mut self, model_path: PathBuf) {

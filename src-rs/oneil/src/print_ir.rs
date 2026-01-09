@@ -23,7 +23,11 @@ pub fn print(ir: &ir::ModelCollection, print_debug: bool) {
         for (i, import) in python_imports.iter().enumerate() {
             let is_last = i == python_imports.len() - 1;
             let prefix = if is_last { "└──" } else { "├──" };
-            println!("│   {}Import: \"{}\"", prefix, import.as_ref().display());
+            println!(
+                "│   {}Import: \"{}\"",
+                prefix,
+                import.import_path().as_ref().display()
+            );
         }
     }
 
@@ -289,7 +293,9 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
             args,
         } => {
             let name = match name {
-                ir::FunctionName::Builtin(name) | ir::FunctionName::Imported(name) => name.as_str(),
+                ir::FunctionName::Builtin(name, _) | ir::FunctionName::Imported(name, _) => {
+                    name.as_str()
+                }
             };
 
             println!("{}    ├── FunctionCall: \"{}\"", "  ".repeat(indent), name);

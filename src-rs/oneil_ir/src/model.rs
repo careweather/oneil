@@ -104,10 +104,10 @@ impl ModelCollection {
 
     /// Returns all Python imports from all models in the collection.
     #[must_use]
-    pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
+    pub fn get_python_imports(&self) -> Vec<&PythonImport> {
         self.models
             .values()
-            .flat_map(|model| model.python_imports.keys())
+            .flat_map(|model| model.python_imports.values())
             .collect()
     }
 

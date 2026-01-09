@@ -232,12 +232,13 @@ fn resolve_function_name(
     name: &ast::IdentifierNode,
     builtin_ref: &impl BuiltinRef,
 ) -> ir::FunctionName {
+    let name_span = name.span();
     let name = ir::Identifier::new(name.as_str().to_string());
 
     if builtin_ref.has_builtin_function(&name) {
-        ir::FunctionName::builtin(name)
+        ir::FunctionName::builtin(name, name_span)
     } else {
-        ir::FunctionName::imported(name)
+        ir::FunctionName::imported(name, name_span)
     }
 }
 
@@ -481,10 +482,11 @@ mod tests {
             panic!("Expected function call, got {result:?}");
         };
 
-        assert_eq!(
-            name,
-            ir::FunctionName::builtin(ir::Identifier::new("foo".to_string()))
-        );
+        let ir::FunctionName::Builtin(name, _name_span) = name else {
+            panic!("Expected builtin function, got {name:?}");
+        };
+
+        assert_eq!(name.as_str(), "foo");
 
         assert_eq!(args.len(), 1);
 
@@ -529,10 +531,11 @@ mod tests {
             panic!("Expected function call, got {result:?}");
         };
 
-        assert_eq!(
-            name,
-            ir::FunctionName::imported(ir::Identifier::new("custom_function".to_string()))
-        );
+        let ir::FunctionName::Imported(name, _name_span) = name else {
+            panic!("Expected imported function, got {name:?}");
+        };
+
+        assert_eq!(name.as_str(), "custom_function");
 
         assert_eq!(args.len(), 1);
 
@@ -733,10 +736,11 @@ mod tests {
             panic!("Expected function call on right side, got {right:?}");
         };
 
-        assert_eq!(
-            name,
-            ir::FunctionName::imported(ir::Identifier::new("foo".to_string()))
-        );
+        let ir::FunctionName::Imported(name, _name_span) = name else {
+            panic!("Expected imported function, got {name:?}");
+        };
+
+        assert_eq!(name.as_str(), "foo");
 
         assert_eq!(args.len(), 1);
 
@@ -842,9 +846,11 @@ mod tests {
             let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
-            let expected_func_builtin =
-                ir::FunctionName::builtin(ir::Identifier::new(func_name.to_string()));
-            assert_eq!(result, expected_func_builtin);
+            let ir::FunctionName::Builtin(name, _name_span) = result else {
+                panic!("Expected builtin function, got {result:?}");
+            };
+
+            assert_eq!(name.as_str(), func_name);
         }
     }
 
@@ -869,7 +875,7 @@ mod tests {
             let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
-            let ir::FunctionName::Imported(name) = result else {
+            let ir::FunctionName::Imported(name, _name_span) = result else {
                 panic!("Expected imported function, got {result:?}");
             };
 

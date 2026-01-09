@@ -274,7 +274,7 @@ fn eval_unary_op(op: ir::UnaryOp, expr_result: Value) -> Result<Value, Vec<EvalE
 fn eval_function_call_args<F: BuiltinFunction>(
     args: &[ir::Expr],
     context: &EvalContext<F>,
-) -> Result<Vec<Value>, Vec<EvalError>> {
+) -> Result<Vec<(Value, Span)>, Vec<EvalError>> {
     let args_results = args.iter().map(|arg| eval_expr(arg, context));
 
     let mut args = vec![];
@@ -282,7 +282,7 @@ fn eval_function_call_args<F: BuiltinFunction>(
 
     for result in args_results {
         match result {
-            Ok((value, value_span)) => args.push(value),
+            Ok((value, value_span)) => args.push((value, *value_span)),
             Err(arg_errors) => errors.extend(arg_errors),
         }
     }
@@ -296,15 +296,15 @@ fn eval_function_call_args<F: BuiltinFunction>(
 
 fn eval_function_call<F: BuiltinFunction>(
     name: &ir::FunctionName,
-    args: Vec<Value>,
+    args: Vec<(Value, Span)>,
     context: &EvalContext<F>,
 ) -> Result<Value, Vec<EvalError>> {
     match name {
-        ir::FunctionName::Builtin(fn_identifier) => {
-            context.evaluate_builtin_function(fn_identifier, args)
+        ir::FunctionName::Builtin(fn_identifier, fn_identifier_span) => {
+            context.evaluate_builtin_function(fn_identifier, *fn_identifier_span, args)
         }
-        ir::FunctionName::Imported(fn_identifier) => {
-            context.evaluate_imported_function(fn_identifier, args)
+        ir::FunctionName::Imported(fn_identifier, fn_identifier_span) => {
+            context.evaluate_imported_function(fn_identifier, *fn_identifier_span, args)
         }
     }
 }

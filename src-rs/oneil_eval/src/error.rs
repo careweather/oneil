@@ -106,7 +106,10 @@ pub enum EvalError {
         limit_span: Span,
     },
     ParameterUnitDoesNotMatchLimit,
-    Unsupported,
+    Unsupported {
+        relevant_span: Span,
+        will_be_supported: bool,
+    },
 }
 
 impl AsOneilError for EvalError {
@@ -226,7 +229,10 @@ impl AsOneilError for EvalError {
                 format!("boolean value cannot have a limit")
             }
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
-            Self::Unsupported => todo!(),
+            Self::Unsupported {
+                relevant_span: _,
+                will_be_supported: _,
+            } => "unsupported feature".to_string(),
         }
     }
 
@@ -321,7 +327,10 @@ impl AsOneilError for EvalError {
                 limit_span: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
-            Self::Unsupported => todo!(),
+            Self::Unsupported {
+                relevant_span: location_span,
+                will_be_supported: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
         }
     }
 
@@ -435,7 +444,18 @@ impl AsOneilError for EvalError {
                 limit_span: _,
             } => Vec::new(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
-            Self::Unsupported => todo!(),
+            Self::Unsupported {
+                relevant_span: _,
+                will_be_supported,
+            } => {
+                if *will_be_supported {
+                    vec![ErrorContext::Note(
+                        "this feature will be supported in the future".to_string(),
+                    )]
+                } else {
+                    Vec::new()
+                }
+            }
         }
     }
 
@@ -579,7 +599,10 @@ impl AsOneilError for EvalError {
                 limit_span: _,
             } => Vec::new(),
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
-            Self::Unsupported => todo!(),
+            Self::Unsupported {
+                relevant_span: _,
+                will_be_supported: _,
+            } => Vec::new(),
         }
     }
 }

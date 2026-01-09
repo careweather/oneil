@@ -3,6 +3,8 @@
 
 use ::std::collections::HashMap;
 
+use oneil_shared::span::Span;
+
 use crate::{
     EvalError,
     value::{Dimension, DimensionMap, DisplayUnit, Number, Unit, Value},
@@ -663,7 +665,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
 }
 
 /// Type alias for standard builtin function type
-pub type StdBuiltinFunction = fn(Vec<Value>) -> Result<Value, Vec<EvalError>>;
+pub type StdBuiltinFunction = fn(Span, Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>>;
 
 /// The builtin functions that come with Oneil:
 /// - `min` - minimum
@@ -722,6 +724,8 @@ pub fn builtin_functions() -> HashMap<String, StdBuiltinFunction> {
 }
 
 mod fns {
+    use oneil_shared::span::Span;
+
     use crate::{
         EvalError,
         value::{
@@ -730,14 +734,12 @@ mod fns {
         },
     };
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "the function signature needs to match the `StdBuiltinFunction` trait"
-    )]
-    pub fn min(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+    pub fn min(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
             return Err(vec![EvalError::InvalidArgumentCount]);
         }
+
+        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
 
         let number_list = extract_homogeneous_numbers_list(&args)?;
 
@@ -787,14 +789,12 @@ mod fns {
         }
     }
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "the function signature needs to match the `StdBuiltinFunction` trait"
-    )]
-    pub fn max(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+    pub fn max(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
             return Err(vec![EvalError::InvalidArgumentCount]);
         }
+
+        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
 
         let number_list = extract_homogeneous_numbers_list(&args)?;
 
@@ -846,44 +846,64 @@ mod fns {
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn sin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn sin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn cos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn cos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn tan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn tan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn asin(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn asin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn acos(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn acos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn atan(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn atan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
-    pub fn sqrt(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+    pub fn sqrt(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.len() != 1 {
             return Err(vec![EvalError::InvalidArgumentCount]);
         }
+
+        let args = args.into_iter().map(|(value, _)| value);
 
         let mut args = args.into_iter();
 
@@ -895,41 +915,70 @@ mod fns {
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn ln(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn ln(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn log(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn log(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn log10(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn log10(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn floor(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn floor(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn ceiling(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn ceiling(
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+    ) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn extent(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn extent(
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+    ) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
-    pub fn range(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+    pub fn range(
+        _identifier_span: Span,
+        args: Vec<(Value, Span)>,
+    ) -> Result<Value, Vec<EvalError>> {
+        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
+
         match args.len() {
             1 => {
                 let mut args = args.into_iter();
@@ -974,17 +1023,25 @@ mod fns {
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn abs(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn abs(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn sign(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn sign(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
-    pub fn mid(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
+    pub fn mid(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
+
         match args.len() {
             1 => {
                 let mut args = args.into_iter();
@@ -1031,13 +1088,19 @@ mod fns {
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn strip(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn strip(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn mnmx(args: Vec<Value>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported])
+    pub fn mnmx(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        Err(vec![EvalError::Unsupported {
+            relevant_span: identifier_span,
+            will_be_supported: true,
+        }])
     }
 }

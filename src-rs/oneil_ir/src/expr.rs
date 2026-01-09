@@ -293,22 +293,22 @@ pub enum UnaryOp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionName {
     /// Built-in mathematical function.
-    Builtin(Identifier),
+    Builtin(Identifier, Span),
     /// Function imported from a Python module.
-    Imported(Identifier),
+    Imported(Identifier, Span),
 }
 
 impl FunctionName {
     /// Creates a reference to a built-in function.
     #[must_use]
-    pub const fn builtin(name: Identifier) -> Self {
-        Self::Builtin(name)
+    pub const fn builtin(name: Identifier, name_span: Span) -> Self {
+        Self::Builtin(name, name_span)
     }
 
     /// Creates a reference to an imported Python function.
     #[must_use]
-    pub const fn imported(name: Identifier) -> Self {
-        Self::Imported(name)
+    pub const fn imported(name: Identifier, name_span: Span) -> Self {
+        Self::Imported(name, name_span)
     }
 }
 
