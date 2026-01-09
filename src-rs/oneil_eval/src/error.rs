@@ -108,6 +108,7 @@ pub enum EvalError {
     ParameterUnitDoesNotMatchLimit,
     Unsupported {
         relevant_span: Span,
+        feature_name: Option<String>,
         will_be_supported: bool,
     },
 }
@@ -231,8 +232,15 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported {
                 relevant_span: _,
+                feature_name,
                 will_be_supported: _,
-            } => "unsupported feature".to_string(),
+            } => {
+                if let Some(feature_name) = feature_name {
+                    format!("unsupported feature: {feature_name}")
+                } else {
+                    "unsupported feature".to_string()
+                }
+            }
         }
     }
 
@@ -329,6 +337,7 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported {
                 relevant_span: location_span,
+                feature_name: _,
                 will_be_supported: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
         }
@@ -446,9 +455,16 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported {
                 relevant_span: _,
+                feature_name,
                 will_be_supported,
             } => {
-                if *will_be_supported {
+                if let Some(feature_name) = feature_name
+                    && *will_be_supported
+                {
+                    vec![ErrorContext::Note(format!(
+                        "{feature_name} will be supported in the future"
+                    ))]
+                } else if *will_be_supported {
                     vec![ErrorContext::Note(
                         "this feature will be supported in the future".to_string(),
                     )]
@@ -601,6 +617,7 @@ impl AsOneilError for EvalError {
             Self::ParameterUnitDoesNotMatchLimit => todo!(),
             Self::Unsupported {
                 relevant_span: _,
+                feature_name: _,
                 will_be_supported: _,
             } => Vec::new(),
         }

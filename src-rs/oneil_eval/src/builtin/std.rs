@@ -849,6 +849,7 @@ mod fns {
     pub fn sin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("sin".to_string()),
             will_be_supported: true,
         }])
     }
@@ -858,6 +859,7 @@ mod fns {
     pub fn cos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("cos".to_string()),
             will_be_supported: true,
         }])
     }
@@ -867,6 +869,7 @@ mod fns {
     pub fn tan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("tan".to_string()),
             will_be_supported: true,
         }])
     }
@@ -876,6 +879,7 @@ mod fns {
     pub fn asin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("asin".to_string()),
             will_be_supported: true,
         }])
     }
@@ -885,6 +889,7 @@ mod fns {
     pub fn acos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("acos".to_string()),
             will_be_supported: true,
         }])
     }
@@ -894,6 +899,7 @@ mod fns {
     pub fn atan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("atan".to_string()),
             will_be_supported: true,
         }])
     }
@@ -918,6 +924,7 @@ mod fns {
     pub fn ln(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("ln".to_string()),
             will_be_supported: true,
         }])
     }
@@ -927,6 +934,7 @@ mod fns {
     pub fn log(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("log".to_string()),
             will_be_supported: true,
         }])
     }
@@ -936,6 +944,7 @@ mod fns {
     pub fn log10(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("log10".to_string()),
             will_be_supported: true,
         }])
     }
@@ -945,6 +954,7 @@ mod fns {
     pub fn floor(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("floor".to_string()),
             will_be_supported: true,
         }])
     }
@@ -957,6 +967,7 @@ mod fns {
     ) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("ceiling".to_string()),
             will_be_supported: true,
         }])
     }
@@ -969,6 +980,7 @@ mod fns {
     ) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("extent".to_string()),
             will_be_supported: true,
         }])
     }
@@ -1026,6 +1038,7 @@ mod fns {
     pub fn abs(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("abs".to_string()),
             will_be_supported: true,
         }])
     }
@@ -1035,6 +1048,7 @@ mod fns {
     pub fn sign(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("sign".to_string()),
             will_be_supported: true,
         }])
     }
@@ -1091,6 +1105,7 @@ mod fns {
     pub fn strip(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("strip".to_string()),
             will_be_supported: true,
         }])
     }
@@ -1100,6 +1115,7 @@ mod fns {
     pub fn mnmx(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("mnmx".to_string()),
             will_be_supported: true,
         }])
     }

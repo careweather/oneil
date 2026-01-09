@@ -146,6 +146,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         let _ = (self, identifier, args);
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
+            feature_name: Some("imported function".to_string()),
             will_be_supported: true,
         }])
     }
@@ -163,6 +164,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
             python_path,
             Err(EvalError::Unsupported {
                 relevant_span: python_import_span,
+                feature_name: Some("Python import".to_string()),
                 will_be_supported: true,
             }),
         );
