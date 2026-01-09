@@ -728,15 +728,21 @@ mod fns {
 
     use crate::{
         EvalError,
+        error::ExpectedArgumentCount,
         value::{
             MeasuredNumber, Number, Value,
             util::{HomogeneousNumberList, extract_homogeneous_numbers_list},
         },
     };
 
-    pub fn min(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+    pub fn min(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
-            return Err(vec![EvalError::InvalidArgumentCount]);
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "min".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::AtLeast(1),
+                actual_argument_count: args.len(),
+            }]);
         }
 
         let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
@@ -789,9 +795,14 @@ mod fns {
         }
     }
 
-    pub fn max(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+    pub fn max(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
-            return Err(vec![EvalError::InvalidArgumentCount]);
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "max".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::AtLeast(1),
+                actual_argument_count: args.len(),
+            }]);
         }
 
         let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
@@ -904,9 +915,14 @@ mod fns {
         }])
     }
 
-    pub fn sqrt(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+    pub fn sqrt(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.len() != 1 {
-            return Err(vec![EvalError::InvalidArgumentCount]);
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "sqrt".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Exact(1),
+                actual_argument_count: args.len(),
+            }]);
         }
 
         let args = args.into_iter().map(|(value, _)| value);
@@ -985,10 +1001,7 @@ mod fns {
         }])
     }
 
-    pub fn range(
-        _identifier_span: Span,
-        args: Vec<(Value, Span)>,
-    ) -> Result<Value, Vec<EvalError>> {
+    pub fn range(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
 
         match args.len() {
@@ -1029,7 +1042,12 @@ mod fns {
 
                 left.checked_sub(right).map_err(|error| vec![error])
             }
-            _ => Err(vec![EvalError::InvalidArgumentCount]),
+            _ => Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "range".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Between(1, 2),
+                actual_argument_count: args.len(),
+            }]),
         }
     }
 
@@ -1053,7 +1071,7 @@ mod fns {
         }])
     }
 
-    pub fn mid(_identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+    pub fn mid(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
 
         match args.len() {
@@ -1096,7 +1114,12 @@ mod fns {
                     .and_then(|value| value.checked_div(Value::from(2.0)))
                     .map_err(|error| vec![error])
             }
-            _ => Err(vec![EvalError::InvalidArgumentCount]),
+            _ => Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "mid".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Between(1, 2),
+                actual_argument_count: args.len(),
+            }]),
         }
     }
 

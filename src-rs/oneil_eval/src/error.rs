@@ -16,6 +16,14 @@ pub struct ModelError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ExpectedArgumentCount {
+    Exact(usize),
+    AtLeast(usize),
+    AtMost(usize),
+    Between(usize, usize),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
     InvalidUnit,
     HasExponentWithUnits,
@@ -27,7 +35,12 @@ pub enum EvalError {
         parameter_name_span: Span,
     },
     UndefinedBuiltinValue,
-    InvalidArgumentCount,
+    InvalidArgumentCount {
+        function_name: String,
+        function_name_span: Span,
+        expected_argument_count: ExpectedArgumentCount,
+        actual_argument_count: usize,
+    },
     ParameterUnitMismatch,
     UnknownUnit {
         unit_name: String,
@@ -128,7 +141,32 @@ impl AsOneilError for EvalError {
                 format!("parameter `{parameter_name}` has errors")
             }
             Self::UndefinedBuiltinValue => todo!(),
-            Self::InvalidArgumentCount => todo!(),
+            Self::InvalidArgumentCount {
+                function_name,
+                function_name_span: _,
+                expected_argument_count,
+                actual_argument_count,
+            } => {
+                let expected_argument_count = match expected_argument_count {
+                    ExpectedArgumentCount::Exact(count) if *count == 1 => "1 argument".to_string(),
+                    ExpectedArgumentCount::Exact(count) => format!("{count} arguments"),
+                    ExpectedArgumentCount::AtLeast(count) if *count == 1 => {
+                        "at least 1 argument".to_string()
+                    }
+                    ExpectedArgumentCount::AtLeast(count) => format!("at least {count} arguments"),
+                    ExpectedArgumentCount::AtMost(count) if *count == 1 => {
+                        "at most 1 argument".to_string()
+                    }
+                    ExpectedArgumentCount::AtMost(count) => format!("at most {count} arguments"),
+                    ExpectedArgumentCount::Between(min, max) => {
+                        format!("between {min} and {max} arguments")
+                    }
+                };
+
+                format!(
+                    "{function_name} expects {expected_argument_count}, but found {actual_argument_count}"
+                )
+            }
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
                 unit_name,
@@ -203,7 +241,7 @@ impl AsOneilError for EvalError {
                 param_expr_span: _,
                 param_value,
                 min_expr_span: _,
-                min_value,
+                min_value: _,
             } => {
                 format!("parameter value {param_value} is below the limit")
             }
@@ -211,7 +249,7 @@ impl AsOneilError for EvalError {
                 param_expr_span: _,
                 param_value,
                 max_expr_span: _,
-                max_value,
+                max_value: _,
             } => {
                 format!("parameter value {param_value} is above the limit")
             }
@@ -256,7 +294,12 @@ impl AsOneilError for EvalError {
                 parameter_name_span: location_span,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::UndefinedBuiltinValue => todo!(),
-            Self::InvalidArgumentCount => todo!(),
+            Self::InvalidArgumentCount {
+                function_name: _,
+                function_name_span: location_span,
+                expected_argument_count: _,
+                actual_argument_count: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
                 unit_name: _,
@@ -355,7 +398,12 @@ impl AsOneilError for EvalError {
                 parameter_name_span: _,
             } => Vec::new(),
             Self::UndefinedBuiltinValue => todo!(),
-            Self::InvalidArgumentCount => todo!(),
+            Self::InvalidArgumentCount {
+                function_name: _,
+                function_name_span: _,
+                expected_argument_count: _,
+                actual_argument_count: _,
+            } => Vec::new(),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
                 unit_name: _,
@@ -493,7 +541,12 @@ impl AsOneilError for EvalError {
                 parameter_name_span: _,
             } => Vec::new(),
             Self::UndefinedBuiltinValue => todo!(),
-            Self::InvalidArgumentCount => todo!(),
+            Self::InvalidArgumentCount {
+                function_name: _,
+                function_name_span: _,
+                expected_argument_count: _,
+                actual_argument_count: _,
+            } => Vec::new(),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
                 unit_name: _,
