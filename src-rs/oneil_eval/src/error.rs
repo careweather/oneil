@@ -7,7 +7,7 @@ use oneil_shared::{
     span::Span,
 };
 
-use crate::value::Value;
+use crate::value::{DisplayUnit, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelError {
@@ -15,7 +15,7 @@ pub struct ModelError {
     pub error: EvalError,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectedArgumentCount {
     Exact(usize),
     AtLeast(usize),
@@ -26,7 +26,10 @@ pub enum ExpectedArgumentCount {
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
     InvalidUnit,
-    HasExponentWithUnits,
+    HasExponentWithUnits {
+        exponent_span: Span,
+        exponent_value: Value,
+    },
     HasIntervalExponent,
     InvalidOperation,
     InvalidType,
@@ -130,7 +133,10 @@ impl AsOneilError for EvalError {
     fn message(&self) -> String {
         match self {
             Self::InvalidUnit => todo!(),
-            Self::HasExponentWithUnits => todo!(),
+            Self::HasExponentWithUnits {
+                exponent_span: _,
+                exponent_value: _,
+            } => format!("exponent cannot have units"),
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
@@ -285,7 +291,10 @@ impl AsOneilError for EvalError {
     fn error_location(&self, source: &str) -> Option<oneil_shared::error::ErrorLocation> {
         match self {
             Self::InvalidUnit => todo!(),
-            Self::HasExponentWithUnits => todo!(),
+            Self::HasExponentWithUnits {
+                exponent_span: location_span,
+                exponent_value: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
@@ -389,7 +398,14 @@ impl AsOneilError for EvalError {
     fn context(&self) -> Vec<oneil_shared::error::Context> {
         match self {
             Self::InvalidUnit => todo!(),
-            Self::HasExponentWithUnits => todo!(),
+            Self::HasExponentWithUnits {
+                exponent_span: _,
+                exponent_value,
+            } => {
+                vec![ErrorContext::Note(format!(
+                    "exponent evaluated to {exponent_value}"
+                ))]
+            }
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
@@ -532,7 +548,10 @@ impl AsOneilError for EvalError {
     )> {
         match self {
             Self::InvalidUnit => todo!(),
-            Self::HasExponentWithUnits => todo!(),
+            Self::HasExponentWithUnits {
+                exponent_span: _,
+                exponent_value: _,
+            } => Vec::new(),
             Self::HasIntervalExponent => todo!(),
             Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
