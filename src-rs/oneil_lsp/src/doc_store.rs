@@ -148,6 +148,12 @@ impl DocumentStore {
             version: doc.version,
         })
     }
+
+    /// Converts an LSP position to a byte offset in the document.
+    pub async fn position_to_offset(&self, uri: &Uri, position: Position) -> Option<usize> {
+        let docs = self.docs.read().await;
+        docs.get(uri)?.position_to_offset(position)
+    }
 }
 
 fn compute_line_offsets(text: &str) -> Vec<usize> {

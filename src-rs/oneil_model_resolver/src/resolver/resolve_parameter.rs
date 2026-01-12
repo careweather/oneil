@@ -1,10 +1,9 @@
 //! Parameter resolution model for the Oneil model loader.
 
-use std::{collections::HashMap, ops::Deref};
+use std::{collections::HashMap, collections::HashSet, ops::Deref};
 
 use oneil_ast as ast;
 use oneil_ir as ir;
-use oneil_shared::span::Span;
 
 use crate::{
     BuiltinRef,
@@ -52,26 +51,21 @@ pub fn resolve_parameters(
         }
     }
 
-    // split the parameter map into two maps, one for the spans and one for the
-    // AST nodes
-    let (parameter_span_map, parameter_ast_map): (
-        HashMap<_, Span>,
-        HashMap<_, &ast::ParameterNode>,
-    ) = parameter_map
+    // Convert parameter nodes into a map
+    let parameter_ast_map: HashMap<_, &ast::ParameterNode> = parameter_map
         .into_iter()
-        .map(|(ident, (span, ast))| ((ident.clone(), span), (ident, ast)))
-        .unzip();
+        .map(|(ident, (_, ast))| (ident, ast))
+        .collect();
 
     // note that an 'internal dependency' is a dependency on a parameter
     // that is defined within the current model
     let dependencies = get_all_parameter_internal_dependencies(&parameter_ast_map);
 
-    for (parameter_identifier, parameter_identifier_span) in parameter_span_map {
+    for (parameter_identifier, _) in &parameter_ast_map {
         let mut parameter_stack = Stack::new();
 
         parameter_builder = resolve_parameter(
-            parameter_identifier,
-            parameter_identifier_span,
+            parameter_identifier.clone(),
             &parameter_ast_map,
             &dependencies,
             &mut parameter_stack,
@@ -87,7 +81,7 @@ pub fn resolve_parameters(
 /// Analyzes all parameters to extract their internal dependencies.
 fn get_all_parameter_internal_dependencies<'a>(
     parameter_map: &'a HashMap<ir::ParameterName, &'a ast::ParameterNode>,
-) -> HashMap<&'a ir::ParameterName, HashMap<ir::ParameterName, Span>> {
+) -> HashMap<&'a ir::ParameterName, HashSet<ir::ParameterName>> {
     let mut dependencies = HashMap::new();
 
     for identifier in parameter_map.keys() {
@@ -106,8 +100,8 @@ fn get_all_parameter_internal_dependencies<'a>(
 /// Extracts internal dependencies from a single parameter.
 fn get_parameter_internal_dependencies(
     parameter: &ast::Parameter,
-) -> HashMap<ir::ParameterName, Span> {
-    let dependencies = HashMap::new();
+) -> HashSet<ir::ParameterName> {
+    let dependencies = HashSet::new();
 
     let limits = parameter.limits().map(ast::Node::deref);
     let dependencies = match limits {
@@ -137,8 +131,8 @@ fn get_parameter_internal_dependencies(
 /// Extracts internal dependencies from an expression.
 fn get_expr_internal_dependencies(
     expr: &ast::Expr,
-    mut dependencies: HashMap<ir::ParameterName, Span>,
-) -> HashMap<ir::ParameterName, Span> {
+    mut dependencies: HashSet<ir::ParameterName>,
+) -> HashSet<ir::ParameterName> {
     match expr {
         ast::Expr::BinaryOp { op: _, left, right } => {
             let dependencies = get_expr_internal_dependencies(left, dependencies);
@@ -158,8 +152,7 @@ fn get_expr_internal_dependencies(
         ast::Expr::Variable(variable) => match &**variable {
             ast::Variable::Identifier(identifier_node) => {
                 let identifier = ir::ParameterName::new(identifier_node.as_str().to_string());
-                let identifier_span = identifier_node.span();
-                dependencies.insert(identifier, identifier_span);
+                dependencies.insert(identifier);
                 dependencies
             }
 
@@ -193,16 +186,11 @@ fn get_expr_internal_dependencies(
 }
 
 /// Resolves a single parameter with dependency tracking.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "this requires multiple pieces of context to resolve"
-)]
 fn resolve_parameter(
     parameter_identifier: ir::ParameterName,
-    parameter_identifier_span: Span,
     // context
     parameter_ast_map: &HashMap<ir::ParameterName, &ast::ParameterNode>,
-    dependencies: &HashMap<&ir::ParameterName, HashMap<ir::ParameterName, Span>>,
+    dependencies: &HashMap<&ir::ParameterName, HashSet<ir::ParameterName>>,
     parameter_stack: &mut Stack<ir::ParameterName>,
     builtin_ref: &impl BuiltinRef,
     context: &ReferenceContext<'_, '_>,
@@ -210,7 +198,7 @@ fn resolve_parameter(
     mut parameter_builder: ParameterBuilder,
 ) -> ParameterBuilder {
     // check that the parameter exists
-    if !parameter_ast_map.contains_key(&parameter_identifier) {
+    let Some(param) = parameter_ast_map.get(&parameter_identifier) else {
         // This is technically a resolution error. However, this error will
         // be caught later when the variable is resolved. In order to avoid
         // duplicate errors, we return Ok(()) and let the variable resolution
@@ -218,7 +206,9 @@ fn resolve_parameter(
         //
         // This also accounts for the fact that the parameter may be a builtin
         return parameter_builder;
-    }
+    };
+
+    let parameter_identifier_span = param.ident().span();
 
     assert!(
         dependencies.contains_key(&parameter_identifier),
@@ -252,10 +242,9 @@ fn resolve_parameter(
     parameter_stack.push(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    for (dependency_identifier, dependency_span) in parameter_dependencies {
+    for dependency_identifier in parameter_dependencies {
         parameter_builder = resolve_parameter(
             dependency_identifier.clone(),
-            *dependency_span,
             parameter_ast_map,
             dependencies,
             parameter_stack,
@@ -292,7 +281,7 @@ fn resolve_parameter(
     match error::combine_errors(value, limits) {
         Ok((value, limits)) => {
             // build the parameter
-            let parameter_dependencies = parameter_dependencies.keys().cloned().collect();
+            let parameter_dependencies = parameter_dependencies.iter().cloned().collect();
 
             let parameter = ir::Parameter::new(
                 parameter_dependencies,
@@ -611,7 +600,6 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert!(dependencies.is_empty());
@@ -627,7 +615,6 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 1);
@@ -645,7 +632,6 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
@@ -659,8 +645,7 @@ mod tests {
         let expr = test_ast::literal_number_expr_node(42.0);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr, HashSet::new());
 
         // check the dependencies
         assert!(result.is_empty());
@@ -673,8 +658,7 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr, HashSet::new());
 
         // check the dependencies
         assert_eq!(result.len(), 1);
@@ -695,8 +679,7 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr, HashSet::new());
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -717,8 +700,7 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr, HashSet::new());
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -733,8 +715,7 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr, HashSet::new());
 
         // check the dependencies - accessors don't count as internal dependencies
         assert!(result.is_empty());
@@ -1097,8 +1078,7 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
 
         // check the dependencies
         assert_eq!(result.len(), 2);
@@ -1124,8 +1104,7 @@ mod tests {
             test_ast::comparison_op_expr_node(op1_node, left_expr, middle_expr, rest_chained);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
 
         // check the dependencies
         assert_eq!(result.len(), 3);
@@ -1146,8 +1125,7 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
 
         // check the dependencies - should only contain the variable
         assert_eq!(result.len(), 1);
@@ -1181,8 +1159,7 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(comp_op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
-        let result: HashSet<_> = result.into_keys().collect();
+        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
 
         // check the dependencies
         assert_eq!(result.len(), 4);
@@ -1216,7 +1193,6 @@ mod tests {
 
         // get the dependencies
         let dependencies = get_parameter_internal_dependencies(&parameter);
-        let dependencies: HashSet<_> = dependencies.into_keys().collect();
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
