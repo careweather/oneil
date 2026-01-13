@@ -317,7 +317,12 @@ fn eval_discrete_limits<F: BuiltinFunction>(
         Value::MeasuredNumber(first_value) => {
             let (first_value, limit_unit) = first_value.into_number_and_unit();
 
-            eval_number_discrete_limits(first_value, Some(limit_unit), results, limit_expr_span)
+            eval_number_discrete_limits(
+                first_value,
+                Some((limit_unit, *first_expr_span)),
+                results,
+                limit_expr_span,
+            )
         }
         Value::Boolean(_) => Err(vec![EvalError::BooleanCannotBeDiscreteLimitValue {
             expr_span: *first_expr_span,
@@ -381,7 +386,7 @@ fn eval_string_discrete_limits(
 
 fn eval_number_discrete_limits(
     first_value: Number,
-    limit_unit: Option<Unit>,
+    limit_unit: Option<(Unit, Span)>,
     results: Vec<(Value, &Span)>,
     limit_expr_span: &Span,
 ) -> Result<Limits, Vec<EvalError>> {
@@ -397,14 +402,19 @@ fn eval_number_discrete_limits(
                 let (number_result, number_result_unit) = number_result.into_number_and_unit();
 
                 match &limit_unit {
-                    Some(limit_unit) if number_result_unit.dimensionally_eq(limit_unit) => {
+                    Some((limit_unit, _)) if number_result_unit.dimensionally_eq(limit_unit) => {
                         numbers.push(number_result);
                     }
-                    Some(_) => {
-                        errors.push(EvalError::DiscreteLimitUnitMismatch);
+                    Some((limit_unit, limit_expr_span)) => {
+                        errors.push(EvalError::DiscreteLimitUnitMismatch {
+                            limit_unit: limit_unit.display_unit.clone(),
+                            limit_span: *limit_expr_span,
+                            value_unit: number_result_unit.display_unit.clone(),
+                            value_unit_span: *expr_span,
+                        });
                     }
                     None => {
-                        limit_unit = Some(number_result_unit);
+                        limit_unit = Some((number_result_unit, *expr_span));
                         numbers.push(number_result);
                     }
                 }
@@ -420,6 +430,8 @@ fn eval_number_discrete_limits(
             }
         }
     }
+
+    let limit_unit = limit_unit.map(|(unit, _)| unit);
 
     if errors.is_empty() {
         Ok(Limits::NumberDiscrete {

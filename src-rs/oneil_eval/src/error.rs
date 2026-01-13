@@ -94,7 +94,12 @@ pub enum EvalError {
         expr_span: Span,
         found_value: Value,
     },
-    DiscreteLimitUnitMismatch,
+    DiscreteLimitUnitMismatch {
+        limit_unit: DisplayUnit,
+        limit_span: Span,
+        value_unit: DisplayUnit,
+        value_unit_span: Span,
+    },
     ParameterValueBelowDefaultLimits {
         param_expr_span: Span,
         param_value: Value,
@@ -256,7 +261,16 @@ impl AsOneilError for EvalError {
             } => {
                 format!("expected a number value, but found {found_value}")
             }
-            Self::DiscreteLimitUnitMismatch => todo!(),
+            Self::DiscreteLimitUnitMismatch {
+                limit_unit,
+                limit_span: _,
+                value_unit,
+                value_unit_span: _,
+            } => {
+                format!(
+                    "discrete limit value unit `{value_unit}` does not match expected unit `{limit_unit}`"
+                )
+            }
             Self::ParameterValueBelowDefaultLimits {
                 param_expr_span: _,
                 param_value,
@@ -407,7 +421,12 @@ impl AsOneilError for EvalError {
                 expr_span: location_span,
                 found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::DiscreteLimitUnitMismatch => todo!(),
+            Self::DiscreteLimitUnitMismatch {
+                limit_unit: _,
+                limit_span: _,
+                value_unit: _,
+                value_unit_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ParameterValueBelowDefaultLimits {
                 param_expr_span: location_span,
                 param_value: _,
@@ -550,7 +569,12 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_value: _,
             } => Vec::new(),
-            Self::DiscreteLimitUnitMismatch => todo!(),
+            Self::DiscreteLimitUnitMismatch {
+                limit_unit: _,
+                limit_span: _,
+                value_unit: _,
+                value_unit_span: _,
+            } => Vec::new(),
             Self::ParameterValueBelowDefaultLimits {
                 param_expr_span: _,
                 param_value: _,
@@ -722,7 +746,15 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_value: _,
             } => Vec::new(),
-            Self::DiscreteLimitUnitMismatch => todo!(),
+            Self::DiscreteLimitUnitMismatch {
+                limit_unit: _,
+                limit_span,
+                value_unit: _,
+                value_unit_span: _,
+            } => vec![(
+                ErrorContext::Note(format!("expected unit was derived from this expression")),
+                Some(ErrorLocation::from_source_and_span(source, *limit_span)),
+            )],
             Self::ParameterValueBelowDefaultLimits {
                 param_expr_span: _,
                 param_value: _,
