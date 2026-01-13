@@ -74,7 +74,12 @@ pub fn eval_parameter<F: BuiltinFunction>(
             // even if there is no explicit unit
             Value::MeasuredNumber(number)
         }
-        (Value::MeasuredNumber(_), None) => return Err(vec![EvalError::ParameterUnitMismatch]),
+        (Value::MeasuredNumber(number), None) => {
+            return Err(vec![EvalError::ParameterMissingUnitAnnotation {
+                param_expr_span: *expr_span,
+                param_value_unit: number.unit().display_unit.clone(),
+            }]);
+        }
         (Value::MeasuredNumber(number), Some((unit, unit_span)))
             if !number.unit().dimensionally_eq(&unit) =>
         {

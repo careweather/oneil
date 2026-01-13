@@ -44,6 +44,10 @@ pub enum EvalError {
         expected_argument_count: ExpectedArgumentCount,
         actual_argument_count: usize,
     },
+    ParameterMissingUnitAnnotation {
+        param_expr_span: Span,
+        param_value_unit: DisplayUnit,
+    },
     ParameterUnitMismatch,
     UnknownUnit {
         unit_name: String,
@@ -197,6 +201,12 @@ impl AsOneilError for EvalError {
                 format!(
                     "{function_name} expects {expected_argument_count}, but found {actual_argument_count}"
                 )
+            }
+            Self::ParameterMissingUnitAnnotation {
+                param_expr_span: _,
+                param_value_unit: _,
+            } => {
+                format!("parameter is missing a unit")
             }
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
@@ -371,6 +381,10 @@ impl AsOneilError for EvalError {
                 expected_argument_count: _,
                 actual_argument_count: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::ParameterMissingUnitAnnotation {
+                param_expr_span: location_span,
+                param_value_unit: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
                 unit_name: _,
@@ -507,6 +521,15 @@ impl AsOneilError for EvalError {
                 expected_argument_count: _,
                 actual_argument_count: _,
             } => Vec::new(),
+            Self::ParameterMissingUnitAnnotation {
+                param_expr_span: _,
+                param_value_unit,
+            } => vec![
+                ErrorContext::Note(format!("parameter value has unit `{param_value_unit}`")),
+                ErrorContext::Help(format!(
+                    "add a unit annotation `:{param_value_unit}` to the parameter"
+                )),
+            ],
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
                 unit_name: _,
@@ -677,6 +700,10 @@ impl AsOneilError for EvalError {
                 function_name_span: _,
                 expected_argument_count: _,
                 actual_argument_count: _,
+            } => Vec::new(),
+            Self::ParameterMissingUnitAnnotation {
+                param_expr_span: _,
+                param_value_unit: _,
             } => Vec::new(),
             Self::ParameterUnitMismatch => todo!(),
             Self::UnknownUnit {
