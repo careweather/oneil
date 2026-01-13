@@ -519,13 +519,19 @@ fn verify_value_is_within_number_range(
             expr_span: *param_expr_span,
             limit_span: limit_expr_span,
         }]),
-        Value::String(_) => {
-            todo!();
-            Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
-        }
+        Value::String(_) => Err(vec![EvalError::StringCannotHaveNumberLimit {
+            param_expr_span: *param_expr_span,
+            param_value: value.clone(),
+            limit_span: limit_expr_span,
+        }]),
         Value::Number(number) => {
-            if unit.is_some() {
-                Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+            if let Some(limit_unit) = unit {
+                Err(vec![EvalError::UnitlessNumberCannotHaveLimitWithUnit {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    limit_span: limit_expr_span,
+                    limit_unit: limit_unit.display_unit,
+                }])
             } else if number.min() < min.min() {
                 Err(vec![EvalError::ParameterValueBelowContinuousLimits {
                     param_expr_span: *param_expr_span,
@@ -545,15 +551,21 @@ fn verify_value_is_within_number_range(
             }
         }
         Value::MeasuredNumber(number) => {
-            if let Some(unit) = unit
-                && !number.unit().dimensionally_eq(&unit)
-            {
-                return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-            }
+            let limit_unit = match unit {
+                Some(unit) if number.unit().dimensionally_eq(&unit) => unit,
+                Some(unit) => {
+                    return Err(vec![EvalError::LimitUnitDoesNotMatchParameterUnit {
+                        param_unit: number.unit().display_unit.clone(),
+                        limit_span: limit_expr_span,
+                        limit_unit: unit.display_unit,
+                    }]);
+                }
+                None => number.unit().clone(),
+            };
 
             // the min and the max must be converted to the same unit as the number
-            let adjusted_min = MeasuredNumber::from_number_and_unit(min, number.unit().clone());
-            let adjusted_max = MeasuredNumber::from_number_and_unit(max, number.unit().clone());
+            let adjusted_min = MeasuredNumber::from_number_and_unit(min, limit_unit.clone());
+            let adjusted_max = MeasuredNumber::from_number_and_unit(max, limit_unit);
 
             if number.normalized_value().min() < adjusted_min.normalized_value().min()
                 || number.normalized_value().max() > adjusted_max.normalized_value().max()
@@ -578,49 +590,86 @@ fn verify_value_is_within_number_discrete_limit(
     unit: Option<Unit>,
     limit_expr_span: Span,
 ) -> Result<(), Vec<EvalError>> {
-    let number = match value {
-        Value::MeasuredNumber(number) => number,
-        Value::Number(number) => todo!(),
-        Value::Boolean(_) => {
-            return Err(vec![EvalError::BooleanCannotHaveALimit {
-                expr_span: *param_expr_span,
-                limit_span: limit_expr_span,
-            }]);
-        }
-        Value::String(_) => return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]),
-    };
+    match value {
+        Value::MeasuredNumber(number) => {
+            let limit_unit = match unit {
+                Some(limit_unit) if number.unit().dimensionally_eq(&limit_unit) => limit_unit,
+                Some(limit_unit) => {
+                    return Err(vec![EvalError::LimitUnitDoesNotMatchParameterUnit {
+                        param_unit: number.unit().display_unit.clone(),
+                        limit_span: limit_expr_span,
+                        limit_unit: limit_unit.display_unit,
+                    }]);
+                }
+                None => number.unit().clone(),
+            };
 
-    // the number must have the same unit as the limit unit,
-    // unless the limit unit is unitless
-    if let Some(unit) = unit
-        && !number.unit().dimensionally_eq(&unit)
-    {
-        return Err(vec![EvalError::ParameterUnitDoesNotMatchLimit]);
-    }
-    let is_inside_limits = values.iter().any(|limit_value| {
-        let adjusted_limit_value =
-            MeasuredNumber::from_number_and_unit(*limit_value, number.unit().clone());
-        adjusted_limit_value
-            .normalized_value()
-            .contains(number.normalized_value())
-    });
-    if is_inside_limits {
-        Ok(())
-    } else {
-        let values: Vec<Value> = values
-            .into_iter()
-            .map(|value| {
-                let measured_number =
-                    MeasuredNumber::from_number_and_unit(value, number.unit().clone());
-                Value::MeasuredNumber(measured_number)
-            })
-            .collect();
-        Err(vec![EvalError::ParameterValueNotInDiscreteLimits {
+            let is_inside_limits = values.iter().any(|limit_value| {
+                let adjusted_limit_value =
+                    MeasuredNumber::from_number_and_unit(*limit_value, limit_unit.clone());
+                adjusted_limit_value
+                    .normalized_value()
+                    .contains(number.normalized_value())
+            });
+
+            if is_inside_limits {
+                Ok(())
+            } else {
+                let values: Vec<Value> = values
+                    .into_iter()
+                    .map(|value| {
+                        let measured_number =
+                            MeasuredNumber::from_number_and_unit(value, number.unit().clone());
+                        Value::MeasuredNumber(measured_number)
+                    })
+                    .collect();
+
+                Err(vec![EvalError::ParameterValueNotInDiscreteLimits {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    limit_expr_span,
+                    limit_values: values,
+                }])
+            }
+        }
+
+        Value::Number(number) => {
+            if let Some(limit_unit) = unit {
+                return Err(vec![EvalError::UnitlessNumberCannotHaveLimitWithUnit {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    limit_span: limit_expr_span,
+                    limit_unit: limit_unit.display_unit,
+                }]);
+            }
+
+            let is_inside_limits = values
+                .iter()
+                .any(|limit_value| limit_value.contains(number));
+
+            if is_inside_limits {
+                Ok(())
+            } else {
+                let values: Vec<Value> = values.into_iter().map(Value::Number).collect();
+                Err(vec![EvalError::ParameterValueNotInDiscreteLimits {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    limit_expr_span,
+                    limit_values: values,
+                }])
+            }
+        }
+
+        Value::Boolean(_) => Err(vec![EvalError::BooleanCannotHaveALimit {
+            expr_span: *param_expr_span,
+            limit_span: limit_expr_span,
+        }]),
+
+        Value::String(_) => Err(vec![EvalError::StringCannotHaveNumberLimit {
             param_expr_span: *param_expr_span,
             param_value: value.clone(),
-            limit_expr_span,
-            limit_values: values,
-        }])
+            limit_span: limit_expr_span,
+        }]),
     }
 }
 
@@ -646,7 +695,11 @@ fn verify_value_is_within_string_discrete_limit(
             limit_span: limit_expr_span,
         }]),
         Value::Number(_) | Value::MeasuredNumber(_) => {
-            Err(vec![EvalError::ParameterUnitDoesNotMatchLimit])
+            Err(vec![EvalError::NumberCannotHaveStringLimit {
+                param_expr_span: *param_expr_span,
+                param_value: value.clone(),
+                limit_span: limit_expr_span,
+            }])
         }
     }
 }

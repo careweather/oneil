@@ -121,7 +121,27 @@ pub enum EvalError {
         expr_span: Span,
         limit_span: Span,
     },
-    ParameterUnitDoesNotMatchLimit,
+    StringCannotHaveNumberLimit {
+        param_expr_span: Span,
+        param_value: Value,
+        limit_span: Span,
+    },
+    NumberCannotHaveStringLimit {
+        param_expr_span: Span,
+        param_value: Value,
+        limit_span: Span,
+    },
+    UnitlessNumberCannotHaveLimitWithUnit {
+        param_expr_span: Span,
+        param_value: Value,
+        limit_span: Span,
+        limit_unit: DisplayUnit,
+    },
+    LimitUnitDoesNotMatchParameterUnit {
+        param_unit: DisplayUnit,
+        limit_span: Span,
+        limit_unit: DisplayUnit,
+    },
     Unsupported {
         relevant_span: Span,
         feature_name: Option<String>,
@@ -273,14 +293,42 @@ impl AsOneilError for EvalError {
             } => {
                 format!("boolean value cannot have a limit")
             }
-            Self::ParameterUnitDoesNotMatchLimit => todo!(),
+            Self::StringCannotHaveNumberLimit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: _,
+            } => {
+                format!("string value cannot have a number limit")
+            }
+            Self::NumberCannotHaveStringLimit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: _,
+            } => {
+                format!("number value cannot have a string limit")
+            }
+            Self::UnitlessNumberCannotHaveLimitWithUnit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: _,
+                limit_unit,
+            } => {
+                format!("unitless number cannot have a limit with unit `{limit_unit}`")
+            }
+            Self::LimitUnitDoesNotMatchParameterUnit {
+                param_unit,
+                limit_span: _,
+                limit_unit,
+            } => {
+                format!("limit unit `{limit_unit}` does not match parameter unit `{param_unit}`")
+            }
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
                 will_be_supported: _,
             } => {
                 if let Some(feature_name) = feature_name {
-                    format!("unsupported feature: {feature_name}")
+                    format!("unsupported feature: `{feature_name}`")
                 } else {
                     "unsupported feature".to_string()
                 }
@@ -386,7 +434,27 @@ impl AsOneilError for EvalError {
                 expr_span: location_span,
                 limit_span: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterUnitDoesNotMatchLimit => todo!(),
+            Self::StringCannotHaveNumberLimit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::NumberCannotHaveStringLimit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::UnitlessNumberCannotHaveLimitWithUnit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: location_span,
+                limit_unit: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::LimitUnitDoesNotMatchParameterUnit {
+                param_unit: _,
+                limit_span: location_span,
+                limit_unit: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::Unsupported {
                 relevant_span: location_span,
                 feature_name: _,
@@ -516,7 +584,27 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 limit_span: _,
             } => Vec::new(),
-            Self::ParameterUnitDoesNotMatchLimit => todo!(),
+            Self::StringCannotHaveNumberLimit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: _,
+            } => Vec::new(),
+            Self::NumberCannotHaveStringLimit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: _,
+            } => Vec::new(),
+            Self::UnitlessNumberCannotHaveLimitWithUnit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: _,
+                limit_unit,
+            } => vec![ErrorContext::Note(format!("limit has unit `{limit_unit}`"))],
+            Self::LimitUnitDoesNotMatchParameterUnit {
+                param_unit: _,
+                limit_span: _,
+                limit_unit: _,
+            } => Vec::new(),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
@@ -526,7 +614,7 @@ impl AsOneilError for EvalError {
                     && *will_be_supported
                 {
                     vec![ErrorContext::Note(format!(
-                        "{feature_name} will be supported in the future"
+                        "`{feature_name}` will be supported in the future"
                     ))]
                 } else if *will_be_supported {
                     vec![ErrorContext::Note(
@@ -686,7 +774,39 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 limit_span: _,
             } => Vec::new(),
-            Self::ParameterUnitDoesNotMatchLimit => todo!(),
+            Self::StringCannotHaveNumberLimit {
+                param_expr_span,
+                param_value,
+                limit_span: _,
+            } => vec![(
+                ErrorContext::Note(format!("parameter value is {param_value}")),
+                Some(ErrorLocation::from_source_and_span(
+                    source,
+                    *param_expr_span,
+                )),
+            )],
+            Self::NumberCannotHaveStringLimit {
+                param_expr_span,
+                param_value,
+                limit_span: _,
+            } => vec![(
+                ErrorContext::Note(format!("parameter value is {param_value}")),
+                Some(ErrorLocation::from_source_and_span(
+                    source,
+                    *param_expr_span,
+                )),
+            )],
+            Self::UnitlessNumberCannotHaveLimitWithUnit {
+                param_expr_span: _,
+                param_value: _,
+                limit_span: _,
+                limit_unit: _,
+            } => Vec::new(),
+            Self::LimitUnitDoesNotMatchParameterUnit {
+                param_unit: _,
+                limit_span: _,
+                limit_unit: _,
+            } => Vec::new(),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name: _,
