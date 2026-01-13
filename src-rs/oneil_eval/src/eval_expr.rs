@@ -29,9 +29,11 @@ pub fn eval_expr<'a, F: BuiltinFunction>(
         } => {
             let ComparisonSubexpressionsResult {
                 left_result,
+                left_result_span,
                 rest_results,
             } = eval_comparison_subexpressions(left, *op, right, rest_chained, context)?;
-            eval_comparison_chain(left_result, rest_results).map(|result| (result, span))
+            eval_comparison_chain(left_result, left_result_span, rest_results)
+                .map(|result| (result, span))
         }
         ir::Expr::BinaryOp {
             op,
@@ -41,13 +43,22 @@ pub fn eval_expr<'a, F: BuiltinFunction>(
         } => {
             let BinaryOpSubexpressionsResult {
                 left_result,
+                left_result_span,
                 right_result,
+                right_result_span,
             } = eval_binary_op_subexpressions(left, right, context)?;
-            eval_binary_op(left_result, *op, right_result).map(|result| (result, span))
+            eval_binary_op(
+                left_result,
+                left_result_span,
+                *op,
+                right_result,
+                right_result_span,
+            )
+            .map(|result| (result, span))
         }
         ir::Expr::UnaryOp { op, expr, span } => {
             let (expr_result, expr_result_span) = eval_expr(expr, context)?;
-            eval_unary_op(*op, expr_result).map(|result| (result, span))
+            eval_unary_op(*op, expr_result, *expr_result_span).map(|result| (result, span))
         }
         ir::Expr::FunctionCall {
             name,
@@ -70,7 +81,8 @@ pub fn eval_expr<'a, F: BuiltinFunction>(
 
 struct ComparisonSubexpressionsResult {
     left_result: Value,
-    rest_results: Vec<(ir::ComparisonOp, Value)>,
+    left_result_span: Span,
+    rest_results: Vec<(ir::ComparisonOp, (Value, Span))>,
 }
 
 fn eval_comparison_subexpressions<F: BuiltinFunction>(
@@ -89,11 +101,10 @@ fn eval_comparison_subexpressions<F: BuiltinFunction>(
                 .map(|(op, right_operand)| (*op, right_operand)),
         )
         .map(|(op, right_operand)| {
-            eval_expr(right_operand, context)
-                .map(|(right_result, right_result_span)| (op, right_result))
+            eval_expr(right_operand, context).map(|(result, span)| (op, (result, span)))
         });
 
-    let (left_result, rest_results) = match left_result {
+    let (left_result, left_result_span, rest_results) = match left_result {
         Err(left_errors) => {
             // find all evaluation errors that occurred and return them
             let errors = left_errors
@@ -111,7 +122,9 @@ fn eval_comparison_subexpressions<F: BuiltinFunction>(
             // check for evaluation errors
             for result in rest_results {
                 match result {
-                    Ok((op, right_operand)) => ok_rest_results.push((op, right_operand)),
+                    Ok((op, (right_operand, right_operand_span))) => {
+                        ok_rest_results.push((op, (right_operand, *right_operand_span)))
+                    }
                     Err(mut errors) => err_rest_results.append(&mut errors),
                 }
             }
@@ -122,99 +135,153 @@ fn eval_comparison_subexpressions<F: BuiltinFunction>(
             }
 
             // otherwise, everything was okay
-            (left_result, ok_rest_results)
+            (left_result, *left_result_span, ok_rest_results)
         }
     };
     Ok(ComparisonSubexpressionsResult {
         left_result,
+        left_result_span,
         rest_results,
     })
 }
 
 fn eval_comparison_chain(
     left_result: Value,
-    rest_results: Vec<(ir::ComparisonOp, Value)>,
+    left_result_span: Span,
+    rest_results: Vec<(ir::ComparisonOp, (Value, Span))>,
 ) -> Result<Value, Vec<EvalError>> {
     // structs only used internally in this function
     struct ComparisonSuccess {
         result: bool,
-        next_lhs: Value,
+        next_lhs: (Value, Span),
     }
 
     struct ComparisonFailure {
         errors: Vec<EvalError>,
-        last_successful_lhs: Value,
+        last_successful_lhs: (Value, Span),
     }
 
     let initial_result = Ok(ComparisonSuccess {
         result: true,
-        next_lhs: left_result,
+        next_lhs: (left_result, left_result_span),
     });
 
-    let comparison_result =
-        rest_results
-            .into_iter()
-            .fold(
-                initial_result,
-                |comparison_result, (op, rhs)| match comparison_result {
-                    Ok(ComparisonSuccess {
-                        next_lhs: lhs,
-                        result,
-                    }) => {
-                        let comparison_result = eval_comparison_op(&lhs, op, &rhs);
+    let comparison_result = rest_results.into_iter().fold(
+        initial_result,
+        |comparison_result, (op, (rhs, rhs_span))| match comparison_result {
+            Ok(ComparisonSuccess {
+                next_lhs: (lhs, lhs_span),
+                result,
+            }) => {
+                let comparison_result = eval_comparison_op(&lhs, lhs_span, op, &rhs, rhs_span);
 
-                        comparison_result
-                            .map(|comparison_result| ComparisonSuccess {
-                                result: result && comparison_result,
-                                next_lhs: rhs,
-                            })
-                            .map_err(|error| ComparisonFailure {
-                                errors: vec![error],
-                                last_successful_lhs: lhs,
-                            })
-                    }
+                comparison_result
+                    .map(|comparison_result| ComparisonSuccess {
+                        result: result && comparison_result,
+                        next_lhs: (rhs, rhs_span),
+                    })
+                    .map_err(|error| ComparisonFailure {
+                        errors: vec![error],
+                        last_successful_lhs: (lhs, lhs_span),
+                    })
+            }
 
-                    Err(ComparisonFailure {
-                        errors,
-                        last_successful_lhs,
-                    }) => {
-                        let result = eval_comparison_op(&last_successful_lhs, op, &rhs);
+            Err(ComparisonFailure {
+                errors,
+                last_successful_lhs: (last_successful_lhs, last_successful_lhs_span),
+            }) => {
+                let result = eval_comparison_op(
+                    &last_successful_lhs,
+                    last_successful_lhs_span,
+                    op,
+                    &rhs,
+                    rhs_span,
+                );
 
-                        let errors = if let Err(error) = result {
-                            let mut comparison_errors = errors;
-                            comparison_errors.push(error);
-                            comparison_errors
-                        } else {
-                            errors
-                        };
+                let errors = if let Err(error) = result {
+                    let mut comparison_errors = errors;
+                    comparison_errors.push(error);
+                    comparison_errors
+                } else {
+                    errors
+                };
 
-                        Err(ComparisonFailure {
-                            errors,
-                            last_successful_lhs,
-                        })
-                    }
-                },
-            );
+                Err(ComparisonFailure {
+                    errors,
+                    last_successful_lhs: (last_successful_lhs, last_successful_lhs_span),
+                })
+            }
+        },
+    );
 
     comparison_result
         .map(|comparison_success| Value::Boolean(comparison_success.result))
         .map_err(|comparison_failure| comparison_failure.errors)
 }
 
-fn eval_comparison_op(lhs: &Value, op: ir::ComparisonOp, rhs: &Value) -> Result<bool, EvalError> {
+fn eval_comparison_op(
+    lhs: &Value,
+    lhs_span: Span,
+    op: ir::ComparisonOp,
+    rhs: &Value,
+    rhs_span: Span,
+) -> Result<bool, EvalError> {
     match op {
-        ir::ComparisonOp::Eq => lhs.checked_eq(rhs),
-        ir::ComparisonOp::NotEq => lhs.checked_ne(rhs),
-        ir::ComparisonOp::LessThan => lhs.checked_lt(rhs),
-        ir::ComparisonOp::LessThanEq => lhs.checked_lte(rhs),
-        ir::ComparisonOp::GreaterThan => lhs.checked_gt(rhs),
-        ir::ComparisonOp::GreaterThanEq => lhs.checked_gte(rhs),
+        ir::ComparisonOp::Eq => lhs
+            .checked_eq(rhs)
+            .map_err(|error| EvalError::BinaryEvalError {
+                lhs_span,
+                rhs_span,
+                error,
+            }),
+        ir::ComparisonOp::NotEq => {
+            lhs.checked_ne(rhs)
+                .map_err(|error| EvalError::BinaryEvalError {
+                    lhs_span,
+                    rhs_span,
+                    error,
+                })
+        }
+        ir::ComparisonOp::LessThan => {
+            lhs.checked_lt(rhs)
+                .map_err(|error| EvalError::BinaryEvalError {
+                    lhs_span,
+                    rhs_span,
+                    error,
+                })
+        }
+        ir::ComparisonOp::LessThanEq => {
+            lhs.checked_lte(rhs)
+                .map_err(|error| EvalError::BinaryEvalError {
+                    lhs_span,
+                    rhs_span,
+                    error,
+                })
+        }
+        ir::ComparisonOp::GreaterThan => {
+            lhs.checked_gt(rhs)
+                .map_err(|error| EvalError::BinaryEvalError {
+                    lhs_span,
+                    rhs_span,
+                    error,
+                })
+        }
+        ir::ComparisonOp::GreaterThanEq => {
+            lhs.checked_gte(rhs)
+                .map_err(|error| EvalError::BinaryEvalError {
+                    lhs_span,
+                    rhs_span,
+                    error,
+                })
+        }
     }
 }
 
 struct BinaryOpSubexpressionsResult {
     left_result: Value,
+    left_result_span: Span,
     right_result: Value,
+    right_result_span: Span,
 }
 
 fn eval_binary_op_subexpressions<F: BuiltinFunction>(
@@ -229,7 +296,9 @@ fn eval_binary_op_subexpressions<F: BuiltinFunction>(
         (Ok((left_result, left_result_span)), Ok((right_result, right_result_span))) => {
             Ok(BinaryOpSubexpressionsResult {
                 left_result,
+                left_result_span: *left_result_span,
                 right_result,
+                right_result_span: *right_result_span,
             })
         }
         (Err(left_errors), Ok(_)) => Err(left_errors),
@@ -242,8 +311,10 @@ fn eval_binary_op_subexpressions<F: BuiltinFunction>(
 
 fn eval_binary_op(
     left_result: Value,
+    left_result_span: Span,
     op: ir::BinaryOp,
     right_result: Value,
+    right_result_span: Span,
 ) -> Result<Value, Vec<EvalError>> {
     let result = match op {
         ir::BinaryOp::Add => left_result.checked_add(right_result),
@@ -259,16 +330,31 @@ fn eval_binary_op(
         ir::BinaryOp::MinMax => left_result.checked_min_max(right_result),
     };
 
-    result.map_err(|error| vec![error])
+    result.map_err(|error| {
+        vec![EvalError::BinaryEvalError {
+            lhs_span: left_result_span,
+            rhs_span: right_result_span,
+            error,
+        }]
+    })
 }
 
-fn eval_unary_op(op: ir::UnaryOp, expr_result: Value) -> Result<Value, Vec<EvalError>> {
+fn eval_unary_op(
+    op: ir::UnaryOp,
+    expr_result: Value,
+    expr_result_span: Span,
+) -> Result<Value, Vec<EvalError>> {
     let result = match op {
         ir::UnaryOp::Neg => expr_result.checked_neg(),
         ir::UnaryOp::Not => expr_result.checked_not(),
     };
 
-    result.map_err(|error| vec![error])
+    result.map_err(|error| {
+        vec![EvalError::UnaryEvalError {
+            expr_span: expr_result_span,
+            error,
+        }]
+    })
 }
 
 fn eval_function_call_args<F: BuiltinFunction>(

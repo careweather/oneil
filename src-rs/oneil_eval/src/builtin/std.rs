@@ -925,14 +925,20 @@ mod fns {
             }]);
         }
 
-        let args = args.into_iter().map(|(value, _)| value);
-
         let mut args = args.into_iter();
 
-        let arg = args.next().expect("there should be one argument");
+        let (arg, arg_span) = args.next().expect("there should be one argument");
 
-        arg.checked_pow(Value::from(0.5))
-            .map_err(|error| vec![error])
+        arg.checked_pow(Value::from(0.5)).map_err(|error| {
+            vec![EvalError::BinaryEvalError {
+                lhs_span: arg_span,
+                // This isn't relevant, since the only possible error is that
+                // the argument is not a number, so we just use the identifier span
+                // TODO: figure out a better way to handle this
+                rhs_span: identifier_span,
+                error,
+            }]
+        })
     }
 
     #[expect(unused_variables, reason = "not implemented")]
@@ -1002,8 +1008,6 @@ mod fns {
     }
 
     pub fn range(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
-
         match args.len() {
             1 => {
                 let mut args = args.into_iter();
@@ -1011,12 +1015,12 @@ mod fns {
                 let arg = args.next().expect("there should be one argument");
 
                 let (number_value, unit) = match arg {
-                    Value::MeasuredNumber(number) => {
+                    (Value::MeasuredNumber(number), _arg_span) => {
                         let (number_value, unit) = number.into_number_and_unit();
                         (number_value, Some(unit))
                     }
-                    Value::Number(number) => (number, None),
-                    Value::Boolean(_) | Value::String(_) => {
+                    (Value::Number(number), _arg_span) => (number, None),
+                    (Value::Boolean(_) | Value::String(_), _arg_span) => {
                         return Err(vec![EvalError::InvalidType]);
                     }
                 };
@@ -1037,10 +1041,16 @@ mod fns {
             2 => {
                 let mut args = args.into_iter();
 
-                let left = args.next().expect("there should be two arguments");
-                let right = args.next().expect("there should be two arguments");
+                let (left, left_span) = args.next().expect("there should be two arguments");
+                let (right, right_span) = args.next().expect("there should be two arguments");
 
-                left.checked_sub(right).map_err(|error| vec![error])
+                left.checked_sub(right).map_err(|error| {
+                    vec![EvalError::BinaryEvalError {
+                        lhs_span: left_span,
+                        rhs_span: right_span,
+                        error,
+                    }]
+                })
             }
             _ => Err(vec![EvalError::InvalidArgumentCount {
                 function_name: "range".to_string(),
@@ -1072,8 +1082,6 @@ mod fns {
     }
 
     pub fn mid(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
-
         match args.len() {
             1 => {
                 let mut args = args.into_iter();
@@ -1081,12 +1089,12 @@ mod fns {
                 let arg = args.next().expect("there should be one argument");
 
                 let (number_value, unit) = match arg {
-                    Value::MeasuredNumber(number) => {
+                    (Value::MeasuredNumber(number), _arg_span) => {
                         let (number_value, unit) = number.into_number_and_unit();
                         (number_value, Some(unit))
                     }
-                    Value::Number(number) => (number, None),
-                    Value::Boolean(_) | Value::String(_) => {
+                    (Value::Number(number), _arg_span) => (number, None),
+                    (Value::Boolean(_) | Value::String(_), _arg_span) => {
                         return Err(vec![EvalError::InvalidType]);
                     }
                 };
@@ -1107,12 +1115,18 @@ mod fns {
             2 => {
                 let mut args = args.into_iter();
 
-                let left = args.next().expect("there should be two arguments");
-                let right = args.next().expect("there should be two arguments");
+                let (left, left_span) = args.next().expect("there should be two arguments");
+                let (right, right_span) = args.next().expect("there should be two arguments");
 
                 left.checked_add(right)
                     .and_then(|value| value.checked_div(Value::from(2.0)))
-                    .map_err(|error| vec![error])
+                    .map_err(|error| {
+                        vec![EvalError::BinaryEvalError {
+                            lhs_span: left_span,
+                            rhs_span: right_span,
+                            error,
+                        }]
+                    })
             }
             _ => Err(vec![EvalError::InvalidArgumentCount {
                 function_name: "mid".to_string(),

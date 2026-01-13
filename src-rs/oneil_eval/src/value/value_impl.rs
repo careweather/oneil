@@ -1,7 +1,10 @@
 use std::{cmp::Ordering, fmt};
 
 use crate::{
-    EvalError,
+    error::{
+        BinaryEvalError, BinaryOperation, BooleanBinaryOperation, NumberBinaryOperation,
+        UnaryEvalError, UnaryOperation,
+    },
     value::{MeasuredNumber, Number, ValueType},
 };
 
@@ -32,7 +35,7 @@ impl Value {
     /// # Errors
     ///
     /// Returns `ValueError::InvalidType` if the values have incompatible types.
-    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, EvalError> {
+    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(lhs == rhs),
             (Self::String(lhs), Self::String(rhs)) => Ok(lhs == rhs),
@@ -43,7 +46,10 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs
                 .checked_partial_cmp(rhs)
                 .map(|ordering| ordering == Some(Ordering::Equal)),
-            _ => Err(EvalError::InvalidType),
+            (lhs, rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: lhs.type_(),
+                rhs_type: rhs.type_(),
+            }),
         }
     }
 
@@ -52,7 +58,7 @@ impl Value {
     /// # Errors
     ///
     /// Returns `ValueError::InvalidType` if the values have incompatible types.
-    pub fn checked_ne(&self, rhs: &Self) -> Result<bool, EvalError> {
+    pub fn checked_ne(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         self.checked_eq(rhs).map(|eq| !eq)
     }
 
@@ -63,7 +69,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_lt(&self, rhs: &Self) -> Result<bool, EvalError> {
+    pub fn checked_lt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs < rhs),
@@ -72,8 +78,14 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs
                 .checked_partial_cmp(rhs)
                 .map(|ordering| ordering == Some(Ordering::Less)),
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::Number(_) | Self::MeasuredNumber(_), _) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: self.type_(),
+                rhs_type: rhs.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::LessThan),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -84,7 +96,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_lte(&self, rhs: &Self) -> Result<bool, EvalError> {
+    pub fn checked_lte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs <= rhs),
@@ -95,8 +107,14 @@ impl Value {
                     ordering == Some(Ordering::Less) || ordering == Some(Ordering::Equal)
                 })
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: self.type_(),
+                rhs_type: rhs.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::LessThanEq),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -107,7 +125,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_gt(&self, rhs: &Self) -> Result<bool, EvalError> {
+    pub fn checked_gt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs > rhs),
@@ -116,8 +134,14 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs
                 .checked_partial_cmp(rhs)
                 .map(|ordering| ordering == Some(Ordering::Greater)),
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: self.type_(),
+                rhs_type: rhs.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::GreaterThan),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -128,7 +152,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_gte(&self, rhs: &Self) -> Result<bool, EvalError> {
+    pub fn checked_gte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs >= rhs),
@@ -139,8 +163,14 @@ impl Value {
                     ordering == Some(Ordering::Greater) || ordering == Some(Ordering::Equal)
                 })
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: self.type_(),
+                rhs_type: rhs.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::GreaterThanEq),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -151,7 +181,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_add(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_add(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs + rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a measured number
@@ -161,8 +191,23 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_add(&rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs_number.unit().clone(),
+                    number_type: lhs_number.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs_number.type_(),
+                },
+                rhs_type: rhs_number.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Add),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -173,7 +218,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_sub(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_sub(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs - rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a measured number
@@ -183,8 +228,23 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_sub(&rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs_number.unit().clone(),
+                    number_type: lhs_number.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs_number.type_(),
+                },
+                rhs_type: rhs_number.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Sub),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -197,7 +257,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_escaped_sub(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_escaped_sub(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs - rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a measured number
@@ -207,8 +267,23 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_escaped_sub(&rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs_number.unit().clone(),
+                    number_type: lhs_number.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs_number.type_(),
+                },
+                rhs_type: rhs_number.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Sub),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -219,7 +294,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_mul(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_mul(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs * rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
@@ -229,8 +304,23 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_mul(rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs_number.unit().clone(),
+                    number_type: lhs_number.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs_number.type_(),
+                },
+                rhs_type: rhs_number.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Mul),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -241,7 +331,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_div(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_div(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs / rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
@@ -251,8 +341,23 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_div(rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs_number.unit().clone(),
+                    number_type: lhs_number.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs_number.type_(),
+                },
+                rhs_type: rhs_number.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Div),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -265,7 +370,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs / rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
@@ -275,8 +380,23 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_escaped_div(rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs_number.unit().clone(),
+                    number_type: lhs_number.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs_number.type_(),
+                },
+                rhs_type: rhs_number.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Div),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -287,7 +407,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_rem(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_rem(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs % rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
@@ -297,8 +417,23 @@ impl Value {
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_rem(&rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs_number.unit().clone(),
+                    number_type: lhs_number.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs_number.type_(),
+                },
+                rhs_type: rhs_number.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Rem),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -309,14 +444,26 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_pow(self, exponent: Self) -> Result<Self, EvalError> {
+    pub fn checked_pow(self, exponent: Self) -> Result<Self, BinaryEvalError> {
         match (self, exponent) {
             (Self::Number(base), Self::Number(exponent)) => Ok(Self::Number(base.pow(exponent))),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
                 Ok(Self::MeasuredNumber(lhs.checked_pow(&rhs)?))
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::Number(_) | Self::MeasuredNumber(_), Self::MeasuredNumber(rhs)) => {
+                Err(BinaryEvalError::ExponentHasUnits {
+                    exponent_unit: rhs.unit().display_unit.clone(),
+                })
+            }
+            (Self::Number(_) | Self::MeasuredNumber(_), exponent) => {
+                Err(BinaryEvalError::InvalidExponentType {
+                    exponent_type: exponent.type_(),
+                })
+            }
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::Pow),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -327,11 +474,17 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a boolean.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a boolean.
-    pub fn checked_and(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_and(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(Self::Boolean(lhs && rhs)),
-            (Self::Boolean(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::Boolean(_), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Boolean,
+                rhs_type: rhs.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Boolean(BooleanBinaryOperation::And),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -342,11 +495,17 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a boolean.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a boolean.
-    pub fn checked_or(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_or(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(Self::Boolean(lhs || rhs)),
-            (Self::Boolean(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::Boolean(_), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Boolean,
+                rhs_type: rhs.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Boolean(BooleanBinaryOperation::And),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -357,7 +516,7 @@ impl Value {
     /// Returns `ValueError::InvalidType` if the right operand is not a number.
     ///
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
-    pub fn checked_min_max(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_min_max(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => {
                 Ok(Self::Number(lhs.tightest_enclosing_interval(rhs)))
@@ -366,14 +525,29 @@ impl Value {
                 // the operation is associative
                 Ok(Self::MeasuredNumber(rhs.min_max_number(lhs)))
             }
+            (Self::Number(lhs), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::Number {
+                    number_type: lhs.type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
                 Ok(Self::MeasuredNumber(lhs.min_max_number(rhs)))
             }
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_min_max(&rhs).map(Self::MeasuredNumber)
             }
-            (Self::MeasuredNumber(_), _) => Err(EvalError::InvalidType),
-            _ => Err(EvalError::InvalidOperation),
+            (Self::MeasuredNumber(lhs), rhs) => Err(BinaryEvalError::TypeMismatch {
+                lhs_type: ValueType::MeasuredNumber {
+                    unit: lhs.unit().clone(),
+                    number_type: lhs.normalized_value().type_(),
+                },
+                rhs_type: rhs.type_(),
+            }),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
+                op: BinaryOperation::Number(NumberBinaryOperation::MinMax),
+                lhs_type: lhs.type_(),
+            }),
         }
     }
 
@@ -382,11 +556,14 @@ impl Value {
     /// # Errors
     ///
     /// Returns `ValueError::InvalidOperation` if the value is not a number.
-    pub fn checked_neg(self) -> Result<Self, EvalError> {
+    pub fn checked_neg(self) -> Result<Self, UnaryEvalError> {
         match self {
             Self::Number(number) => Ok(Self::Number(-number)),
             Self::MeasuredNumber(number) => Ok(Self::MeasuredNumber(number.checked_neg())),
-            Self::Boolean(_) | Self::String(_) => Err(EvalError::InvalidOperation),
+            Self::Boolean(_) | Self::String(_) => Err(UnaryEvalError::InvalidType {
+                op: UnaryOperation::Neg,
+                value_type: self.type_(),
+            }),
         }
     }
 
@@ -395,11 +572,14 @@ impl Value {
     /// # Errors
     ///
     /// Returns `ValueError::InvalidOperation` if the value is not a boolean.
-    pub fn checked_not(self) -> Result<Self, EvalError> {
+    pub fn checked_not(self) -> Result<Self, UnaryEvalError> {
         match self {
             Self::Boolean(boolean) => Ok(Self::Boolean(!boolean)),
             Self::String(_) | Self::Number(_) | Self::MeasuredNumber(_) => {
-                Err(EvalError::InvalidOperation)
+                Err(UnaryEvalError::InvalidType {
+                    op: UnaryOperation::Not,
+                    value_type: self.type_(),
+                })
             }
         }
     }

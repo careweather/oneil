@@ -1,8 +1,11 @@
 use std::{cmp::Ordering, fmt, ops};
 
-use crate::value::{
-    EvalError, Interval, NumberType, Unit,
-    util::{db_to_linear, is_close, linear_to_db},
+use crate::{
+    error::BinaryEvalError,
+    value::{
+        Interval, NumberType, Unit,
+        util::{db_to_linear, is_close, linear_to_db},
+    },
 };
 
 // TODO: document how this guarantees that the number is
@@ -113,9 +116,12 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the units don't match.
-    pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, EvalError> {
+    pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(EvalError::InvalidUnit);
+            return Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            });
         }
 
         Ok(self.normalized_value.partial_cmp(&rhs.normalized_value))
@@ -126,7 +132,7 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, EvalError> {
+    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         self.checked_partial_cmp(rhs)
             .map(|ordering| ordering == Some(Ordering::Equal))
     }
@@ -136,9 +142,12 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_add(self, rhs: &Self) -> Result<Self, EvalError> {
+    pub fn checked_add(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(EvalError::InvalidUnit);
+            return Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            });
         }
 
         Ok(Self {
@@ -152,9 +161,12 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_sub(self, rhs: &Self) -> Result<Self, EvalError> {
+    pub fn checked_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(EvalError::InvalidUnit);
+            return Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            });
         }
 
         Ok(Self {
@@ -170,9 +182,12 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_escaped_sub(self, rhs: &Self) -> Result<Self, EvalError> {
+    pub fn checked_escaped_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(EvalError::InvalidUnit);
+            return Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            });
         }
 
         Ok(Self {
@@ -186,7 +201,7 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// This function never returns an error.
-    pub fn checked_mul(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_mul(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         Ok(Self {
             normalized_value: self.normalized_value * rhs.normalized_value,
             unit: self.unit * rhs.unit,
@@ -198,7 +213,7 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_div(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_div(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         Ok(Self {
             normalized_value: self.normalized_value / rhs.normalized_value,
             unit: self.unit / rhs.unit,
@@ -212,7 +227,7 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, EvalError> {
+    pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         Ok(Self {
             normalized_value: self.normalized_value.escaped_div(rhs.normalized_value),
             unit: self.unit / rhs.unit,
@@ -224,9 +239,12 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_rem(self, rhs: &Self) -> Result<Self, EvalError> {
+    pub fn checked_rem(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(EvalError::InvalidUnit);
+            return Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            });
         }
 
         Ok(Self {
@@ -240,13 +258,15 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_pow(self, exponent: &Number) -> Result<Self, EvalError> {
+    pub fn checked_pow(self, exponent: &Number) -> Result<Self, BinaryEvalError> {
         match exponent {
             Number::Scalar(exponent_value) => Ok(Self {
                 normalized_value: self.normalized_value.pow(Number::Scalar(*exponent_value)),
                 unit: self.unit.pow(*exponent_value),
             }),
-            Number::Interval(_) => Err(EvalError::HasIntervalExponent),
+            Number::Interval(exponent_interval) => Err(BinaryEvalError::ExponentIsInterval {
+                exponent_interval: *exponent_interval,
+            }),
         }
     }
 
@@ -255,10 +275,13 @@ impl MeasuredNumber {
     /// # Errors
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_min_max(self, rhs: &Self) -> Result<Self, EvalError> {
+    pub fn checked_min_max(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         // check that the units match (or are unitless)
         if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(EvalError::InvalidUnit);
+            return Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            });
         }
 
         // if the left unit is unitless, use the right unit, otherwise use the left unit

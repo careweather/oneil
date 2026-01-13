@@ -7,12 +7,78 @@ use oneil_shared::{
     span::Span,
 };
 
-use crate::value::{DisplayUnit, Value};
+use crate::value::{DisplayUnit, Interval, Value, ValueType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelError {
     pub model_path: PathBuf,
     pub error: EvalError,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumberBinaryOperation {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Pow,
+    MinMax,
+    LessThan,
+    LessThanEq,
+    GreaterThan,
+    GreaterThanEq,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BooleanBinaryOperation {
+    And,
+    Or,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOperation {
+    Number(NumberBinaryOperation),
+    Boolean(BooleanBinaryOperation),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BinaryEvalError {
+    UnitMismatch {
+        lhs_unit: DisplayUnit,
+        rhs_unit: DisplayUnit,
+    },
+    TypeMismatch {
+        lhs_type: ValueType,
+        rhs_type: ValueType,
+    },
+    InvalidType {
+        op: BinaryOperation,
+        lhs_type: ValueType,
+    },
+    ExponentHasUnits {
+        exponent_unit: DisplayUnit,
+    },
+    ExponentIsInterval {
+        exponent_interval: Interval,
+    },
+    InvalidExponentType {
+        exponent_type: ValueType,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOperation {
+    Neg,
+    Not,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnaryEvalError {
+    InvalidType {
+        op: UnaryOperation,
+        value_type: ValueType,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,13 +91,20 @@ pub enum ExpectedArgumentCount {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
+    BinaryEvalError {
+        lhs_span: Span,
+        rhs_span: Span,
+        error: BinaryEvalError,
+    },
+    UnaryEvalError {
+        expr_span: Span,
+        error: UnaryEvalError,
+    },
     InvalidUnit,
     HasExponentWithUnits {
         exponent_span: Span,
         exponent_value: Value,
     },
-    HasIntervalExponent,
-    InvalidOperation,
     InvalidType,
     ParameterHasError {
         parameter_name: String,
@@ -171,13 +244,80 @@ pub enum EvalError {
 impl AsOneilError for EvalError {
     fn message(&self) -> String {
         match self {
+            Self::BinaryEvalError {
+                lhs_span: _,
+                rhs_span: _,
+                error,
+            } => match error {
+                BinaryEvalError::UnitMismatch { lhs_unit, rhs_unit } => {
+                    format!("expected unit `{rhs_unit}` but found `{lhs_unit}`")
+                }
+                BinaryEvalError::TypeMismatch { lhs_type, rhs_type } => {
+                    format!("expected type `{rhs_type}` but found `{lhs_type}`")
+                }
+                BinaryEvalError::InvalidType { op, lhs_type } => {
+                    let op_str = match op {
+                        BinaryOperation::Number(NumberBinaryOperation::Add) => "addition",
+                        BinaryOperation::Number(NumberBinaryOperation::Sub) => "subtraction",
+                        BinaryOperation::Number(NumberBinaryOperation::Mul) => "multiplication",
+                        BinaryOperation::Number(NumberBinaryOperation::Div) => "division",
+                        BinaryOperation::Number(NumberBinaryOperation::Rem) => "remainder",
+                        BinaryOperation::Number(NumberBinaryOperation::Pow) => "power",
+                        BinaryOperation::Number(NumberBinaryOperation::MinMax) => "min/max",
+                        BinaryOperation::Number(NumberBinaryOperation::LessThan) => "less than",
+                        BinaryOperation::Number(NumberBinaryOperation::LessThanEq) => {
+                            "less than or equal to"
+                        }
+                        BinaryOperation::Number(NumberBinaryOperation::GreaterThan) => {
+                            "greater than"
+                        }
+                        BinaryOperation::Number(NumberBinaryOperation::GreaterThanEq) => {
+                            "greater than or equal to"
+                        }
+                        BinaryOperation::Boolean(BooleanBinaryOperation::And) => "and",
+                        BinaryOperation::Boolean(BooleanBinaryOperation::Or) => "or",
+                    };
+
+                    let expected_type = match op {
+                        BinaryOperation::Number(_) => "number",
+                        BinaryOperation::Boolean(_) => "boolean",
+                    };
+
+                    format!("'{op_str}' operation expects a {expected_type} but found `{lhs_type}`")
+                }
+                BinaryEvalError::ExponentHasUnits { exponent_unit: _ } => {
+                    format!("exponent cannot have units")
+                }
+                BinaryEvalError::ExponentIsInterval {
+                    exponent_interval: _,
+                } => {
+                    format!("exponent cannot be an interval")
+                }
+                BinaryEvalError::InvalidExponentType { exponent_type } => {
+                    format!("expected a number exponent but found `{exponent_type}`")
+                }
+            },
+            Self::UnaryEvalError { expr_span, error } => match error {
+                UnaryEvalError::InvalidType { op, value_type } => {
+                    let op_str = match op {
+                        UnaryOperation::Neg => "negation",
+                        UnaryOperation::Not => "logical NOT",
+                    };
+                    let expected_type = match op {
+                        UnaryOperation::Neg => "number",
+                        UnaryOperation::Not => "boolean",
+                    };
+
+                    format!(
+                        "'{op_str}' operation expects a {expected_type} but found `{value_type}`"
+                    )
+                }
+            },
             Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: _,
                 exponent_value: _,
             } => format!("exponent cannot have units"),
-            Self::HasIntervalExponent => todo!(),
-            Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name,
@@ -382,15 +522,45 @@ impl AsOneilError for EvalError {
         }
     }
 
-    fn error_location(&self, source: &str) -> Option<oneil_shared::error::ErrorLocation> {
+    fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
+            Self::BinaryEvalError {
+                lhs_span,
+                rhs_span,
+                error,
+            } => match error {
+                BinaryEvalError::UnitMismatch {
+                    lhs_unit: _,
+                    rhs_unit: _,
+                } => Some(ErrorLocation::from_source_and_span(source, *rhs_span)),
+                BinaryEvalError::TypeMismatch {
+                    lhs_type: _,
+                    rhs_type: _,
+                } => Some(ErrorLocation::from_source_and_span(source, *rhs_span)),
+                BinaryEvalError::InvalidType { op: _, lhs_type: _ } => {
+                    Some(ErrorLocation::from_source_and_span(source, *lhs_span))
+                }
+                BinaryEvalError::ExponentHasUnits { exponent_unit: _ } => {
+                    Some(ErrorLocation::from_source_and_span(source, *rhs_span))
+                }
+                BinaryEvalError::ExponentIsInterval {
+                    exponent_interval: _,
+                } => Some(ErrorLocation::from_source_and_span(source, *rhs_span)),
+                BinaryEvalError::InvalidExponentType { exponent_type: _ } => {
+                    Some(ErrorLocation::from_source_and_span(source, *rhs_span))
+                }
+            },
+            Self::UnaryEvalError { expr_span, error } => match error {
+                UnaryEvalError::InvalidType {
+                    op: _,
+                    value_type: _,
+                } => Some(ErrorLocation::from_source_and_span(source, *expr_span)),
+            },
             Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: location_span,
                 exponent_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::HasIntervalExponent => todo!(),
-            Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name: _,
@@ -528,8 +698,43 @@ impl AsOneilError for EvalError {
         }
     }
 
-    fn context(&self) -> Vec<oneil_shared::error::Context> {
+    fn context(&self) -> Vec<ErrorContext> {
         match self {
+            Self::BinaryEvalError {
+                lhs_span: _,
+                rhs_span: _,
+                error,
+            } => match error {
+                BinaryEvalError::UnitMismatch {
+                    lhs_unit: _,
+                    rhs_unit: _,
+                } => Vec::new(),
+                BinaryEvalError::TypeMismatch {
+                    lhs_type: _,
+                    rhs_type: _,
+                } => Vec::new(),
+                BinaryEvalError::InvalidType { op: _, lhs_type: _ } => Vec::new(),
+                BinaryEvalError::ExponentHasUnits { exponent_unit } => vec![ErrorContext::Note(
+                    format!("exponent has units `{exponent_unit}`"),
+                )],
+                BinaryEvalError::ExponentIsInterval { exponent_interval } => {
+                    vec![ErrorContext::Note(format!(
+                        "exponent is <{} | {}>",
+                        exponent_interval.min(),
+                        exponent_interval.max()
+                    ))]
+                }
+                BinaryEvalError::InvalidExponentType { exponent_type: _ } => Vec::new(),
+            },
+            Self::UnaryEvalError {
+                expr_span: _,
+                error,
+            } => match error {
+                UnaryEvalError::InvalidType {
+                    op: _,
+                    value_type: _,
+                } => Vec::new(),
+            },
             Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: _,
@@ -539,8 +744,6 @@ impl AsOneilError for EvalError {
                     "exponent evaluated to {exponent_value}"
                 ))]
             }
-            Self::HasIntervalExponent => todo!(),
-            Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name: _,
@@ -718,21 +921,45 @@ impl AsOneilError for EvalError {
         }
     }
 
-    fn context_with_source(
-        &self,
-        source: &str,
-    ) -> Vec<(
-        oneil_shared::error::Context,
-        Option<oneil_shared::error::ErrorLocation>,
-    )> {
+    fn context_with_source(&self, source: &str) -> Vec<(ErrorContext, Option<ErrorLocation>)> {
         match self {
+            Self::BinaryEvalError {
+                lhs_span,
+                rhs_span: _,
+                error,
+            } => match error {
+                BinaryEvalError::UnitMismatch {
+                    lhs_unit,
+                    rhs_unit: _,
+                } => vec![(
+                    ErrorContext::Note(format!("this expression has unit `{lhs_unit}`")),
+                    Some(ErrorLocation::from_source_and_span(source, *lhs_span)),
+                )],
+                BinaryEvalError::TypeMismatch { lhs_type, rhs_type } => vec![(
+                    ErrorContext::Note(format!("this expression has type `{lhs_type}`")),
+                    Some(ErrorLocation::from_source_and_span(source, *lhs_span)),
+                )],
+                BinaryEvalError::InvalidType { op: _, lhs_type: _ } => Vec::new(),
+                BinaryEvalError::ExponentHasUnits { exponent_unit: _ } => Vec::new(),
+                BinaryEvalError::ExponentIsInterval {
+                    exponent_interval: _,
+                } => Vec::new(),
+                BinaryEvalError::InvalidExponentType { exponent_type: _ } => Vec::new(),
+            },
+            Self::UnaryEvalError {
+                expr_span: _,
+                error,
+            } => match error {
+                UnaryEvalError::InvalidType {
+                    op: _,
+                    value_type: _,
+                } => Vec::new(),
+            },
             Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: _,
                 exponent_value: _,
             } => Vec::new(),
-            Self::HasIntervalExponent => todo!(),
-            Self::InvalidOperation => todo!(),
             Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name: _,
