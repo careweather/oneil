@@ -37,7 +37,6 @@ pub enum EvalError {
         parameter_name: String,
         parameter_name_span: Span,
     },
-    UndefinedBuiltinValue,
     InvalidArgumentCount {
         function_name: String,
         function_name_span: Span,
@@ -180,7 +179,6 @@ impl AsOneilError for EvalError {
             } => {
                 format!("parameter `{parameter_name}` has errors")
             }
-            Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount {
                 function_name,
                 function_name_span: _,
@@ -386,7 +384,6 @@ impl AsOneilError for EvalError {
                 parameter_name: _,
                 parameter_name_span: location_span,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount {
                 function_name: _,
                 function_name_span: location_span,
@@ -531,7 +528,6 @@ impl AsOneilError for EvalError {
                 parameter_name: _,
                 parameter_name_span: _,
             } => Vec::new(),
-            Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount {
                 function_name: _,
                 function_name_span: _,
@@ -716,7 +712,6 @@ impl AsOneilError for EvalError {
                 parameter_name: _,
                 parameter_name_span: _,
             } => Vec::new(),
-            Self::UndefinedBuiltinValue => todo!(),
             Self::InvalidArgumentCount {
                 function_name: _,
                 function_name_span: _,
