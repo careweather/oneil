@@ -83,9 +83,14 @@ pub fn eval_parameter<F: BuiltinFunction>(
         (Value::MeasuredNumber(number), Some((unit, unit_span)))
             if !number.unit().dimensionally_eq(&unit) =>
         {
-            return Err(vec![EvalError::ParameterUnitMismatch]);
+            return Err(vec![EvalError::ParameterUnitMismatch {
+                param_expr_span: *expr_span,
+                param_value_unit: number.unit().display_unit.clone(),
+                param_unit_span: unit_span,
+                param_unit: unit.display_unit,
+            }]);
         }
-        (Value::MeasuredNumber(number), Some((unit, unit_span))) => {
+        (Value::MeasuredNumber(number), Some((unit, _unit_span))) => {
             Value::MeasuredNumber(number.with_unit(unit))
         }
     };

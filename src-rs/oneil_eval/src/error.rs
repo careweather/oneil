@@ -48,7 +48,12 @@ pub enum EvalError {
         param_expr_span: Span,
         param_value_unit: DisplayUnit,
     },
-    ParameterUnitMismatch,
+    ParameterUnitMismatch {
+        param_expr_span: Span,
+        param_value_unit: DisplayUnit,
+        param_unit_span: Span,
+        param_unit: DisplayUnit,
+    },
     UnknownUnit {
         unit_name: String,
         unit_name_span: Span,
@@ -208,7 +213,14 @@ impl AsOneilError for EvalError {
             } => {
                 format!("parameter is missing a unit")
             }
-            Self::ParameterUnitMismatch => todo!(),
+            Self::ParameterUnitMismatch {
+                param_expr_span: _,
+                param_value_unit,
+                param_unit_span: _,
+                param_unit,
+            } => format!(
+                "parameter value unit `{param_value_unit}` does not match expected unit `{param_unit}`"
+            ),
             Self::UnknownUnit {
                 unit_name,
                 unit_name_span: _,
@@ -385,7 +397,12 @@ impl AsOneilError for EvalError {
                 param_expr_span: location_span,
                 param_value_unit: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterUnitMismatch => todo!(),
+            Self::ParameterUnitMismatch {
+                param_expr_span: location_span,
+                param_value_unit: _,
+                param_unit_span: _,
+                param_unit: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::UnknownUnit {
                 unit_name: _,
                 unit_name_span: location_span,
@@ -530,7 +547,12 @@ impl AsOneilError for EvalError {
                     "add a unit annotation `:{param_value_unit}` to the parameter"
                 )),
             ],
-            Self::ParameterUnitMismatch => todo!(),
+            Self::ParameterUnitMismatch {
+                param_expr_span: _,
+                param_value_unit: _,
+                param_unit_span: _,
+                param_unit: _,
+            } => Vec::new(),
             Self::UnknownUnit {
                 unit_name: _,
                 unit_name_span: _,
@@ -705,7 +727,18 @@ impl AsOneilError for EvalError {
                 param_expr_span: _,
                 param_value_unit: _,
             } => Vec::new(),
-            Self::ParameterUnitMismatch => todo!(),
+            Self::ParameterUnitMismatch {
+                param_expr_span: _,
+                param_value_unit: _,
+                param_unit_span,
+                param_unit: _,
+            } => vec![(
+                ErrorContext::Note("parameter unit defined here".to_string()),
+                Some(ErrorLocation::from_source_and_span(
+                    source,
+                    *param_unit_span,
+                )),
+            )],
             Self::UnknownUnit {
                 unit_name: _,
                 unit_name_span: _,
