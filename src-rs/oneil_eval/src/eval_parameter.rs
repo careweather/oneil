@@ -486,11 +486,7 @@ fn verify_value_is_within_default_limits(
     param_expr_span: &Span,
 ) -> Result<(), Vec<EvalError>> {
     match value {
-        Value::MeasuredNumber(number)
-            if !number.unit().is_db && number.normalized_value().min() < 0.0 =>
-        {
-            // note that if the unit is a decibel unit, then negative values are
-            // expected and allowed
+        Value::MeasuredNumber(number) if number.normalized_value().min() < 0.0 => {
             Err(vec![EvalError::ParameterValueBelowDefaultLimits {
                 param_expr_span: *param_expr_span,
                 param_value: value.clone(),
