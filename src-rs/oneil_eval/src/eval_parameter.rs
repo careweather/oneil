@@ -266,7 +266,12 @@ fn eval_continuous_limits<F: BuiltinFunction>(
     let unit = match (min_unit, max_unit) {
         (Some(min_unit), Some(max_unit)) => {
             if !min_unit.dimensionally_eq(&max_unit) {
-                return Err(vec![EvalError::InvalidUnit]);
+                return Err(vec![EvalError::MaxUnitDoesNotMatchMinUnit {
+                    max_unit: max_unit.display_unit,
+                    max_unit_span: max_expr_span,
+                    min_unit: min_unit.display_unit,
+                    min_unit_span: min_expr_span,
+                }]);
             }
 
             Some(min_unit)

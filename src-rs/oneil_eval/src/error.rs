@@ -86,6 +86,12 @@ pub enum EvalError {
         expr_span: Span,
         found_value: Value,
     },
+    MaxUnitDoesNotMatchMinUnit {
+        max_unit: DisplayUnit,
+        max_unit_span: Span,
+        min_unit: DisplayUnit,
+        min_unit_span: Span,
+    },
     BooleanCannotBeDiscreteLimitValue {
         expr_span: Span,
     },
@@ -261,6 +267,12 @@ impl AsOneilError for EvalError {
             } => {
                 format!("expected a number value, but found {found_value}")
             }
+            Self::MaxUnitDoesNotMatchMinUnit {
+                max_unit: _,
+                max_unit_span: _,
+                min_unit: _,
+                min_unit_span: _,
+            } => format!("max limit unit does not match min limit unit"),
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => {
                 "discrete limit cannot contain a boolean value".to_string()
             }
@@ -433,6 +445,12 @@ impl AsOneilError for EvalError {
                 expr_span: location_span,
                 found_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
+            Self::MaxUnitDoesNotMatchMinUnit {
+                max_unit: _,
+                max_unit_span: location_span,
+                min_unit: _,
+                min_unit_span: _,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::BooleanCannotBeDiscreteLimitValue {
                 expr_span: location_span,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
@@ -592,6 +610,14 @@ impl AsOneilError for EvalError {
             } => vec![ErrorContext::Note(
                 "continuous limit maximum must evaluate to a number value".to_string(),
             )],
+            Self::MaxUnitDoesNotMatchMinUnit {
+                max_unit,
+                max_unit_span: _,
+                min_unit: _,
+                min_unit_span: _,
+            } => vec![ErrorContext::Note(format!(
+                "max limit unit is `{max_unit}`"
+            ))],
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => vec![ErrorContext::Note(
                 "discrete limit values must evaluate to a number or a string value".to_string(),
             )],
@@ -781,6 +807,15 @@ impl AsOneilError for EvalError {
                 expr_span: _,
                 found_value: _,
             } => Vec::new(),
+            Self::MaxUnitDoesNotMatchMinUnit {
+                max_unit: _,
+                max_unit_span: _,
+                min_unit,
+                min_unit_span,
+            } => vec![(
+                ErrorContext::Note(format!("min limit unit is `{min_unit}`")),
+                Some(ErrorLocation::from_source_and_span(source, *min_unit_span)),
+            )],
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => Vec::new(),
             Self::DuplicateStringLimit {
                 expr_span: _,
