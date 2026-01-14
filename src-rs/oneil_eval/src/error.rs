@@ -465,24 +465,24 @@ impl AsOneilError for EvalError {
                 expected_type: _,
                 expected_source_span: _,
                 found_type: _,
-                found_span: _,
-            } => todo!(),
+                found_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::UnitMismatch {
                 expected_unit: _,
                 expected_source_span: _,
                 found_unit: _,
-                found_span: _,
-            } => todo!(),
+                found_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::InvalidType {
                 expected_type: _,
                 found_type: _,
-                found_span: _,
-            } => todo!(),
+                found_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::InvalidNumberType {
                 number_type: _,
                 found_number_type: _,
-                found_span: _,
-            } => todo!(),
+                found_span: location_span,
+            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
             Self::ExponentHasUnits {
                 exponent_span: location_span,
                 exponent_unit: _,
@@ -634,23 +634,23 @@ impl AsOneilError for EvalError {
                 expected_source_span: _,
                 found_type: _,
                 found_span: _,
-            } => todo!(),
+            } => Vec::new(),
             Self::UnitMismatch {
                 expected_unit: _,
                 expected_source_span: _,
                 found_unit: _,
                 found_span: _,
-            } => todo!(),
+            } => Vec::new(),
             Self::InvalidType {
                 expected_type: _,
                 found_type: _,
                 found_span: _,
-            } => todo!(),
+            } => Vec::new(),
             Self::InvalidNumberType {
                 number_type: _,
                 found_number_type: _,
                 found_span: _,
-            } => todo!(),
+            } => Vec::new(),
             Self::ExponentHasUnits {
                 exponent_span: _,
                 exponent_unit,
@@ -846,27 +846,43 @@ impl AsOneilError for EvalError {
     fn context_with_source(&self, source: &str) -> Vec<(ErrorContext, Option<ErrorLocation>)> {
         match self {
             Self::TypeMismatch {
-                expected_type: _,
-                expected_source_span: _,
+                expected_type,
+                expected_source_span,
                 found_type: _,
                 found_span: _,
-            } => todo!(),
+            } => vec![(
+                ErrorContext::Note(format!(
+                    "expected because this expression has type `{expected_type}`",
+                )),
+                Some(ErrorLocation::from_source_and_span(
+                    source,
+                    *expected_source_span,
+                )),
+            )],
             Self::UnitMismatch {
-                expected_unit: _,
-                expected_source_span: _,
+                expected_unit,
+                expected_source_span,
                 found_unit: _,
                 found_span: _,
-            } => todo!(),
+            } => vec![(
+                ErrorContext::Note(format!(
+                    "expected because this expression has unit `{expected_unit}`",
+                )),
+                Some(ErrorLocation::from_source_and_span(
+                    source,
+                    *expected_source_span,
+                )),
+            )],
             Self::InvalidType {
                 expected_type: _,
                 found_type: _,
                 found_span: _,
-            } => todo!(),
+            } => Vec::new(),
             Self::InvalidNumberType {
                 number_type: _,
                 found_number_type: _,
                 found_span: _,
-            } => todo!(),
+            } => Vec::new(),
             Self::ExponentHasUnits {
                 exponent_span: _,
                 exponent_unit: _,
