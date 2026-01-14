@@ -925,16 +925,8 @@ mod fns {
 
         let (arg, arg_span) = args.next().expect("there should be one argument");
 
-        arg.checked_pow(Value::from(0.5)).map_err(|error| {
-            vec![EvalError::BinaryEvalError {
-                lhs_span: arg_span,
-                // This isn't relevant, since the only possible error is that
-                // the argument is not a number, so we just use the identifier span
-                // TODO: figure out a better way to handle this
-                rhs_span: identifier_span,
-                error,
-            }]
-        })
+        arg.checked_pow(Value::from(0.5))
+            .map_err(|error| vec![error.expect_only_lhs_error(arg_span)])
     }
 
     #[expect(unused_variables, reason = "not implemented")]
@@ -1048,13 +1040,8 @@ mod fns {
                 let (left, left_span) = args.next().expect("there should be two arguments");
                 let (right, right_span) = args.next().expect("there should be two arguments");
 
-                left.checked_sub(right).map_err(|error| {
-                    vec![EvalError::BinaryEvalError {
-                        lhs_span: left_span,
-                        rhs_span: right_span,
-                        error,
-                    }]
-                })
+                left.checked_sub(right)
+                    .map_err(|error| vec![error.into_eval_error(left_span, right_span)])
             }
             _ => Err(vec![EvalError::InvalidArgumentCount {
                 function_name: "range".to_string(),
@@ -1132,13 +1119,7 @@ mod fns {
 
                 left.checked_add(right)
                     .and_then(|value| value.checked_div(Value::from(2.0)))
-                    .map_err(|error| {
-                        vec![EvalError::BinaryEvalError {
-                            lhs_span: left_span,
-                            rhs_span: right_span,
-                            error,
-                        }]
-                    })
+                    .map_err(|error| vec![error.into_eval_error(left_span, right_span)])
             }
             _ => Err(vec![EvalError::InvalidArgumentCount {
                 function_name: "mid".to_string(),

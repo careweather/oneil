@@ -1,11 +1,11 @@
 use std::{cmp::Ordering, fmt};
 
 use crate::{
-    error::{
-        BinaryEvalError, BinaryOperation, BooleanBinaryOperation, NumberBinaryOperation,
-        UnaryEvalError, UnaryOperation,
+    error::ExpectedType,
+    value::{
+        MeasuredNumber, Number, ValueType,
+        error::{BinaryEvalError, UnaryEvalError, UnaryOperation},
     },
-    value::{MeasuredNumber, Number, ValueType},
 };
 
 // TODO: document the layers of a value
@@ -82,8 +82,8 @@ impl Value {
                 lhs_type: self.type_(),
                 rhs_type: rhs.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::LessThan),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -111,8 +111,8 @@ impl Value {
                 lhs_type: self.type_(),
                 rhs_type: rhs.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::LessThanEq),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -138,8 +138,8 @@ impl Value {
                 lhs_type: self.type_(),
                 rhs_type: rhs.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::GreaterThan),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -167,8 +167,8 @@ impl Value {
                 lhs_type: self.type_(),
                 rhs_type: rhs.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::GreaterThanEq),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -204,8 +204,8 @@ impl Value {
                 },
                 rhs_type: rhs_number.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Add),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -241,8 +241,8 @@ impl Value {
                 },
                 rhs_type: rhs_number.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Sub),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -280,8 +280,8 @@ impl Value {
                 },
                 rhs_type: rhs_number.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Sub),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -317,8 +317,8 @@ impl Value {
                 },
                 rhs_type: rhs_number.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Mul),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -354,8 +354,8 @@ impl Value {
                 },
                 rhs_type: rhs_number.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Div),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -393,8 +393,8 @@ impl Value {
                 },
                 rhs_type: rhs_number.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Div),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -430,8 +430,8 @@ impl Value {
                 },
                 rhs_type: rhs_number.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Rem),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -456,12 +456,13 @@ impl Value {
                 })
             }
             (Self::Number(_) | Self::MeasuredNumber(_), exponent) => {
-                Err(BinaryEvalError::InvalidExponentType {
-                    exponent_type: exponent.type_(),
+                Err(BinaryEvalError::InvalidRhsType {
+                    expected_type: ExpectedType::Number,
+                    rhs_type: exponent.type_(),
                 })
             }
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::Pow),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -481,8 +482,8 @@ impl Value {
                 lhs_type: ValueType::Boolean,
                 rhs_type: rhs.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Boolean(BooleanBinaryOperation::And),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::Boolean,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -502,8 +503,8 @@ impl Value {
                 lhs_type: ValueType::Boolean,
                 rhs_type: rhs.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Boolean(BooleanBinaryOperation::And),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::Boolean,
                 lhs_type: lhs.type_(),
             }),
         }
@@ -544,8 +545,8 @@ impl Value {
                 },
                 rhs_type: rhs.type_(),
             }),
-            (lhs, _rhs) => Err(BinaryEvalError::InvalidType {
-                op: BinaryOperation::Number(NumberBinaryOperation::MinMax),
+            (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
                 lhs_type: lhs.type_(),
             }),
         }

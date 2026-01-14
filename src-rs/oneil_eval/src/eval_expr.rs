@@ -226,55 +226,16 @@ fn eval_comparison_op(
     rhs: &Value,
     rhs_span: Span,
 ) -> Result<bool, EvalError> {
-    match op {
-        ir::ComparisonOp::Eq => lhs
-            .checked_eq(rhs)
-            .map_err(|error| EvalError::BinaryEvalError {
-                lhs_span,
-                rhs_span,
-                error,
-            }),
-        ir::ComparisonOp::NotEq => {
-            lhs.checked_ne(rhs)
-                .map_err(|error| EvalError::BinaryEvalError {
-                    lhs_span,
-                    rhs_span,
-                    error,
-                })
-        }
-        ir::ComparisonOp::LessThan => {
-            lhs.checked_lt(rhs)
-                .map_err(|error| EvalError::BinaryEvalError {
-                    lhs_span,
-                    rhs_span,
-                    error,
-                })
-        }
-        ir::ComparisonOp::LessThanEq => {
-            lhs.checked_lte(rhs)
-                .map_err(|error| EvalError::BinaryEvalError {
-                    lhs_span,
-                    rhs_span,
-                    error,
-                })
-        }
-        ir::ComparisonOp::GreaterThan => {
-            lhs.checked_gt(rhs)
-                .map_err(|error| EvalError::BinaryEvalError {
-                    lhs_span,
-                    rhs_span,
-                    error,
-                })
-        }
-        ir::ComparisonOp::GreaterThanEq => {
-            lhs.checked_gte(rhs)
-                .map_err(|error| EvalError::BinaryEvalError {
-                    lhs_span,
-                    rhs_span,
-                    error,
-                })
-        }
-    }
+    let result = match op {
+        ir::ComparisonOp::Eq => lhs.checked_eq(rhs),
+        ir::ComparisonOp::NotEq => lhs.checked_ne(rhs),
+        ir::ComparisonOp::LessThan => lhs.checked_lt(rhs),
+        ir::ComparisonOp::LessThanEq => lhs.checked_lte(rhs),
+        ir::ComparisonOp::GreaterThan => lhs.checked_gt(rhs),
+        ir::ComparisonOp::GreaterThanEq => lhs.checked_gte(rhs),
+    };
+
+    result.map_err(|error| error.into_eval_error(lhs_span, rhs_span))
 }
 
 struct BinaryOpSubexpressionsResult {
@@ -330,13 +291,7 @@ fn eval_binary_op(
         ir::BinaryOp::MinMax => left_result.checked_min_max(right_result),
     };
 
-    result.map_err(|error| {
-        vec![EvalError::BinaryEvalError {
-            lhs_span: left_result_span,
-            rhs_span: right_result_span,
-            error,
-        }]
-    })
+    result.map_err(|error| vec![error.into_eval_error(left_result_span, right_result_span)])
 }
 
 fn eval_unary_op(
@@ -349,12 +304,7 @@ fn eval_unary_op(
         ir::UnaryOp::Not => expr_result.checked_not(),
     };
 
-    result.map_err(|error| {
-        vec![EvalError::UnaryEvalError {
-            expr_span: expr_result_span,
-            error,
-        }]
-    })
+    result.map_err(|error| vec![error.into_eval_error(expr_result_span)])
 }
 
 fn eval_function_call_args<F: BuiltinFunction>(

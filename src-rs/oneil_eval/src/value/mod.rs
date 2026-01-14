@@ -4,14 +4,13 @@
 //! are represented, see the `README.md` for
 //! this crate.
 
+mod error;
 mod interval;
 mod number;
 mod type_;
 mod unit;
 pub mod util;
 mod value_impl;
-
-use crate::EvalError;
 
 pub use self::interval::Interval;
 pub use self::number::{MeasuredNumber, Number};
