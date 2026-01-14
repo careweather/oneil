@@ -130,12 +130,11 @@ fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
     }
 }
 
-use std::str::FromStr;
-
 #[cfg(test)]
-#[cfg(never)]
 mod test {
     use std::f64::consts::PI;
+
+    use oneil_shared::span::SourceLocation;
 
     use crate::{
         assert_is_close, assert_units_dimensionally_eq,
@@ -144,6 +143,25 @@ mod test {
     };
 
     use super::*;
+
+    /// Returns a dummy span for use in test parameters.
+    ///
+    /// This function creates a span with all fields set to zero.
+    /// It is not intended to be directly tested, but rather used
+    /// as a placeholder when constructing IR nodes for testing.
+    fn random_span() -> Span {
+        let start = SourceLocation {
+            offset: 0,
+            line: 0,
+            column: 0,
+        };
+        let end = SourceLocation {
+            offset: 0,
+            line: 0,
+            column: 0,
+        };
+        Span::new(start, end)
+    }
 
     fn create_eval_context() -> EvalContext<StdBuiltinFunction> {
         let builtins = BuiltinMap::new(
@@ -157,7 +175,7 @@ mod test {
 
     /// Returns a display unit that isn't intended to be tested.
     fn unimportant_display_unit() -> ir::DisplayCompositeUnit {
-        ir::DisplayCompositeUnit::BaseUnit(ir::Unit::new("unimportant".to_string(), 1.0))
+        ir::DisplayCompositeUnit::BaseUnit(ir::DisplayUnit::new("unimportant".to_string(), 1.0))
     }
 
     fn ir_composite_unit(
@@ -165,9 +183,17 @@ mod test {
     ) -> ir::CompositeUnit {
         let unit_vec = unit_list
             .into_iter()
-            .map(|(name, exponent)| ir::Unit::new(name.to_string(), exponent))
+            .map(|(name, exponent)| {
+                ir::Unit::new(
+                    random_span(),
+                    name.to_string(),
+                    random_span(),
+                    exponent,
+                    None,
+                )
+            })
             .collect::<Vec<_>>();
-        ir::CompositeUnit::new(unit_vec, unimportant_display_unit())
+        ir::CompositeUnit::new(unit_vec, unimportant_display_unit(), random_span())
     }
 
     mod unit_eval {
@@ -200,7 +226,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -221,7 +247,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -242,7 +268,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -263,7 +289,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -284,7 +310,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -312,7 +338,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -338,7 +364,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -359,7 +385,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -380,7 +406,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -402,7 +428,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -424,7 +450,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -446,7 +472,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -467,7 +493,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -496,7 +522,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -525,7 +551,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -554,7 +580,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -582,7 +608,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -603,7 +629,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -624,7 +650,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -645,7 +671,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -670,7 +696,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -698,7 +724,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -720,7 +746,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -742,7 +768,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -764,7 +790,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -786,7 +812,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -808,7 +834,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -833,7 +859,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -856,7 +882,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -886,7 +912,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -910,7 +936,7 @@ mod test {
 
             // unwrap result
             let unit = result.expect("should be able to eval unit");
-            let Some(unit) = unit else {
+            let Some((unit, _unit_span)) = unit else {
                 panic!("unit should be some");
             };
 
@@ -937,14 +963,14 @@ mod test {
             // evaluate newton unit
             let result = eval_unit(&newton_unit, &context);
             let newton_unit = result.expect("should be able to eval unit");
-            let Some(newton_unit) = newton_unit else {
+            let Some((newton_unit, _unit_span)) = newton_unit else {
                 panic!("newton unit should be some");
             };
 
             // evaluate kg_m_s_2 unit
             let result = eval_unit(&kg_m_s_2_unit, &context);
             let kg_m_s_2_unit = result.expect("should be able to eval unit");
-            let Some(kg_m_s_2_unit) = kg_m_s_2_unit else {
+            let Some((kg_m_s_2_unit, _unit_span)) = kg_m_s_2_unit else {
                 panic!("kg_m_s_2 unit should be some");
             };
 
@@ -962,14 +988,14 @@ mod test {
             // evaluate joule unit
             let result = eval_unit(&joule_unit, &context);
             let joule_unit = result.expect("should be able to eval unit");
-            let Some(joule_unit) = joule_unit else {
+            let Some((joule_unit, _unit_span)) = joule_unit else {
                 panic!("joule unit should be some");
             };
 
             // evaluate newton_meter unit
             let result = eval_unit(&newton_meter_unit, &context);
             let newton_meter_unit = result.expect("should be able to eval unit");
-            let Some(newton_meter_unit) = newton_meter_unit else {
+            let Some((newton_meter_unit, _unit_span)) = newton_meter_unit else {
                 panic!("newton_meter unit should be some");
             };
 
@@ -987,14 +1013,14 @@ mod test {
             // evaluate joule unit
             let result = eval_unit(&joule_unit, &context);
             let joule_unit = result.expect("should be able to eval unit");
-            let Some(joule_unit) = joule_unit else {
+            let Some((joule_unit, _unit_span)) = joule_unit else {
                 panic!("joule unit should be some");
             };
 
             // evaluate kg_m2_s2 unit
             let result = eval_unit(&kg_m2_s2_unit, &context);
             let kg_m2_s2_unit = result.expect("should be able to eval unit");
-            let Some(kg_m2_s2_unit) = kg_m2_s2_unit else {
+            let Some((kg_m2_s2_unit, _unit_span)) = kg_m2_s2_unit else {
                 panic!("kg_m2_s2 unit should be some");
             };
 
@@ -1012,14 +1038,14 @@ mod test {
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
             let watt_unit = result.expect("should be able to eval unit");
-            let Some(watt_unit) = watt_unit else {
+            let Some((watt_unit, _unit_span)) = watt_unit else {
                 panic!("watt unit should be some");
             };
 
             // evaluate joule_per_second unit
             let result = eval_unit(&joule_per_second_unit, &context);
             let joule_per_second_unit = result.expect("should be able to eval unit");
-            let Some(joule_per_second_unit) = joule_per_second_unit else {
+            let Some((joule_per_second_unit, _unit_span)) = joule_per_second_unit else {
                 panic!("joule_per_second unit should be some");
             };
 
@@ -1038,14 +1064,15 @@ mod test {
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
             let watt_unit = result.expect("should be able to eval unit");
-            let Some(watt_unit) = watt_unit else {
+            let Some((watt_unit, _unit_span)) = watt_unit else {
                 panic!("watt unit should be some");
             };
 
             // evaluate newton_meter_per_second unit
             let result = eval_unit(&newton_meter_per_second_unit, &context);
             let newton_meter_per_second_unit = result.expect("should be able to eval unit");
-            let Some(newton_meter_per_second_unit) = newton_meter_per_second_unit else {
+            let Some((newton_meter_per_second_unit, _unit_span)) = newton_meter_per_second_unit
+            else {
                 panic!("newton_meter_per_second unit should be some");
             };
 
@@ -1063,14 +1090,14 @@ mod test {
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
             let watt_unit = result.expect("should be able to eval unit");
-            let Some(watt_unit) = watt_unit else {
+            let Some((watt_unit, _unit_span)) = watt_unit else {
                 panic!("watt unit should be some");
             };
 
             // evaluate kg_m2_s3 unit
             let result = eval_unit(&kg_m2_s3_unit, &context);
             let kg_m2_s3_unit = result.expect("should be able to eval unit");
-            let Some(kg_m2_s3_unit) = kg_m2_s3_unit else {
+            let Some((kg_m2_s3_unit, _unit_span)) = kg_m2_s3_unit else {
                 panic!("kg_m2_s3 unit should be some");
             };
 
@@ -1088,14 +1115,14 @@ mod test {
             // evaluate volt unit
             let result = eval_unit(&volt_unit, &context);
             let volt_unit = result.expect("should be able to eval unit");
-            let Some(volt_unit) = volt_unit else {
+            let Some((volt_unit, _unit_span)) = volt_unit else {
                 panic!("volt unit should be some");
             };
 
             // evaluate watt_per_ampere unit
             let result = eval_unit(&watt_per_ampere_unit, &context);
             let watt_per_ampere_unit = result.expect("should be able to eval unit");
-            let Some(watt_per_ampere_unit) = watt_per_ampere_unit else {
+            let Some((watt_per_ampere_unit, _unit_span)) = watt_per_ampere_unit else {
                 panic!("watt_per_ampere unit should be some");
             };
 
@@ -1114,14 +1141,14 @@ mod test {
             // evaluate volt unit
             let result = eval_unit(&volt_unit, &context);
             let volt_unit = result.expect("should be able to eval unit");
-            let Some(volt_unit) = volt_unit else {
+            let Some((volt_unit, _unit_span)) = volt_unit else {
                 panic!("volt unit should be some");
             };
 
             // evaluate kg_m2_s3_a unit
             let result = eval_unit(&kg_m2_s3_a_unit, &context);
             let kg_m2_s3_a_unit = result.expect("should be able to eval unit");
-            let Some(kg_m2_s3_a_unit) = kg_m2_s3_a_unit else {
+            let Some((kg_m2_s3_a_unit, _unit_span)) = kg_m2_s3_a_unit else {
                 panic!("kg_m2_s3_a unit should be some");
             };
 
@@ -1139,14 +1166,14 @@ mod test {
             // evaluate ohm unit
             let result = eval_unit(&ohm_unit, &context);
             let ohm_unit = result.expect("should be able to eval unit");
-            let Some(ohm_unit) = ohm_unit else {
+            let Some((ohm_unit, _unit_span)) = ohm_unit else {
                 panic!("ohm unit should be some");
             };
 
             // evaluate volt_per_ampere unit
             let result = eval_unit(&volt_per_ampere_unit, &context);
             let volt_per_ampere_unit = result.expect("should be able to eval unit");
-            let Some(volt_per_ampere_unit) = volt_per_ampere_unit else {
+            let Some((volt_per_ampere_unit, _unit_span)) = volt_per_ampere_unit else {
                 panic!("volt_per_ampere unit should be some");
             };
 
@@ -1165,14 +1192,14 @@ mod test {
             // evaluate ohm unit
             let result = eval_unit(&ohm_unit, &context);
             let ohm_unit = result.expect("should be able to eval unit");
-            let Some(ohm_unit) = ohm_unit else {
+            let Some((ohm_unit, _unit_span)) = ohm_unit else {
                 panic!("ohm unit should be some");
             };
 
             // evaluate kg_m2_s3_a2 unit
             let result = eval_unit(&kg_m2_s3_a2_unit, &context);
             let kg_m2_s3_a2_unit = result.expect("should be able to eval unit");
-            let Some(kg_m2_s3_a2_unit) = kg_m2_s3_a2_unit else {
+            let Some((kg_m2_s3_a2_unit, _unit_span)) = kg_m2_s3_a2_unit else {
                 panic!("kg_m2_s3_a2 unit should be some");
             };
 
@@ -1190,14 +1217,15 @@ mod test {
             // evaluate pascal unit
             let result = eval_unit(&pascal_unit, &context);
             let pascal_unit = result.expect("should be able to eval unit");
-            let Some(pascal_unit) = pascal_unit else {
+            let Some((pascal_unit, _unit_span)) = pascal_unit else {
                 panic!("pascal unit should be some");
             };
 
             // evaluate newton_per_square_meter unit
             let result = eval_unit(&newton_per_square_meter_unit, &context);
             let newton_per_square_meter_unit = result.expect("should be able to eval unit");
-            let Some(newton_per_square_meter_unit) = newton_per_square_meter_unit else {
+            let Some((newton_per_square_meter_unit, _unit_span)) = newton_per_square_meter_unit
+            else {
                 panic!("newton_per_square_meter unit should be some");
             };
 
@@ -1215,14 +1243,14 @@ mod test {
             // evaluate pascal unit
             let result = eval_unit(&pascal_unit, &context);
             let pascal_unit = result.expect("should be able to eval unit");
-            let Some(pascal_unit) = pascal_unit else {
+            let Some((pascal_unit, _unit_span)) = pascal_unit else {
                 panic!("pascal unit should be some");
             };
 
             // evaluate kg_m_s2 unit
             let result = eval_unit(&kg_m_s2_unit, &context);
             let kg_m_s2_unit = result.expect("should be able to eval unit");
-            let Some(kg_m_s2_unit) = kg_m_s2_unit else {
+            let Some((kg_m_s2_unit, _unit_span)) = kg_m_s2_unit else {
                 panic!("kg_m_s2 unit should be some");
             };
 
@@ -1241,14 +1269,14 @@ mod test {
             // evaluate watt_hour unit
             let result = eval_unit(&watt_hour_unit, &context);
             let watt_hour_unit = result.expect("should be able to eval unit");
-            let Some(watt_hour_unit) = watt_hour_unit else {
+            let Some((watt_hour_unit, _unit_span)) = watt_hour_unit else {
                 panic!("watt_hour unit should be some");
             };
 
             // evaluate watt_times_hour unit
             let result = eval_unit(&watt_times_hour_unit, &context);
             let watt_times_hour_unit = result.expect("should be able to eval unit");
-            let Some(watt_times_hour_unit) = watt_times_hour_unit else {
+            let Some((watt_times_hour_unit, _unit_span)) = watt_times_hour_unit else {
                 panic!("watt_times_hour unit should be some");
             };
 
@@ -1267,14 +1295,14 @@ mod test {
             // evaluate amp_hour unit
             let result = eval_unit(&amp_hour_unit, &context);
             let amp_hour_unit = result.expect("should be able to eval unit");
-            let Some(amp_hour_unit) = amp_hour_unit else {
+            let Some((amp_hour_unit, _unit_span)) = amp_hour_unit else {
                 panic!("amp_hour unit should be some");
             };
 
             // evaluate ampere_times_hour unit
             let result = eval_unit(&ampere_times_hour_unit, &context);
             let ampere_times_hour_unit = result.expect("should be able to eval unit");
-            let Some(ampere_times_hour_unit) = ampere_times_hour_unit else {
+            let Some((ampere_times_hour_unit, _unit_span)) = ampere_times_hour_unit else {
                 panic!("ampere_times_hour unit should be some");
             };
 
@@ -1292,14 +1320,14 @@ mod test {
             // evaluate tesla unit
             let result = eval_unit(&tesla_unit, &context);
             let tesla_unit = result.expect("should be able to eval unit");
-            let Some(tesla_unit) = tesla_unit else {
+            let Some((tesla_unit, _unit_span)) = tesla_unit else {
                 panic!("tesla unit should be some");
             };
 
             // evaluate kg_s2_a unit
             let result = eval_unit(&kg_s2_a_unit, &context);
             let kg_s2_a_unit = result.expect("should be able to eval unit");
-            let Some(kg_s2_a_unit) = kg_s2_a_unit else {
+            let Some((kg_s2_a_unit, _unit_span)) = kg_s2_a_unit else {
                 panic!("kg_s2_a unit should be some");
             };
 
@@ -1318,14 +1346,14 @@ mod test {
             // evaluate hertz unit
             let result = eval_unit(&hertz_unit, &context);
             let hertz_unit = result.expect("should be able to eval unit");
-            let Some(hertz_unit) = hertz_unit else {
+            let Some((hertz_unit, _unit_span)) = hertz_unit else {
                 panic!("hertz unit should be some");
             };
 
             // evaluate per_second unit
             let result = eval_unit(&per_second_unit, &context);
             let per_second_unit = result.expect("should be able to eval unit");
-            let Some(per_second_unit) = per_second_unit else {
+            let Some((per_second_unit, _unit_span)) = per_second_unit else {
                 panic!("per_second unit should be some");
             };
 

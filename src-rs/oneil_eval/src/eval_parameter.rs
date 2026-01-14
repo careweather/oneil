@@ -735,10 +735,7 @@ fn verify_value_is_within_string_discrete_limit(
     }
 }
 
-use std::convert::TryInto;
-
 #[cfg(test)]
-#[cfg(never)]
 mod tests {
     use crate::{
         assert_is_close, assert_units_dimensionally_eq,
@@ -1549,7 +1546,7 @@ mod tests {
 
         /// Returns a display composite unit that isn't intended to be tested.
         fn unimportant_display_composite_unit() -> DisplayCompositeUnit {
-            DisplayCompositeUnit::BaseUnit(ir::Unit::new("unimportant".to_string(), 1.0))
+            DisplayCompositeUnit::BaseUnit(ir::DisplayUnit::new("unimportant".to_string(), 1.0))
         }
 
         /// Builds a simple parameter with a literal numeric value.
@@ -1575,9 +1572,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1629,9 +1635,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1689,9 +1704,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1749,9 +1773,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1809,9 +1842,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1872,9 +1914,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1935,9 +1986,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -1995,9 +2055,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -2052,9 +2121,18 @@ mod tests {
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
@@ -2101,15 +2179,27 @@ mod tests {
             let expr = ir::Expr::FunctionCall {
                 span: random_span(),
                 name_span: random_span(),
-                name: ir::FunctionName::Builtin(ir::Identifier::new(function.to_string())),
+                name: ir::FunctionName::Builtin(
+                    ir::Identifier::new(function.to_string()),
+                    random_span(),
+                ),
                 args,
             };
 
             let units = units
                 .into_iter()
-                .map(|(unit, exponent)| ir::Unit::new(unit.to_string(), exponent))
+                .map(|(unit, exponent)| {
+                    ir::Unit::new(
+                        random_span(),
+                        unit.to_string(),
+                        random_span(),
+                        exponent,
+                        None,
+                    )
+                })
                 .collect();
-            let units = ir::CompositeUnit::new(units, unimportant_display_composite_unit());
+            let units =
+                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
                 HashSet::new(),
