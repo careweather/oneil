@@ -728,9 +728,9 @@ mod fns {
 
     use crate::{
         EvalError,
-        error::ExpectedArgumentCount,
+        error::{ExpectedArgumentCount, ExpectedType},
         value::{
-            MeasuredNumber, Number, Value,
+            MeasuredNumber, Number, NumberType, Value,
             util::{HomogeneousNumberList, extract_homogeneous_numbers_list},
         },
     };
@@ -744,8 +744,6 @@ mod fns {
                 actual_argument_count: args.len(),
             }]);
         }
-
-        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
 
         let number_list = extract_homogeneous_numbers_list(&args)?;
 
@@ -804,8 +802,6 @@ mod fns {
                 actual_argument_count: args.len(),
             }]);
         }
-
-        let args = args.into_iter().map(|(value, _)| value).collect::<Vec<_>>();
 
         let number_list = extract_homogeneous_numbers_list(&args)?;
 
@@ -1012,21 +1008,29 @@ mod fns {
             1 => {
                 let mut args = args.into_iter();
 
-                let arg = args.next().expect("there should be one argument");
+                let (arg, arg_span) = args.next().expect("there should be one argument");
 
                 let (number_value, unit) = match arg {
-                    (Value::MeasuredNumber(number), _arg_span) => {
+                    Value::MeasuredNumber(number) => {
                         let (number_value, unit) = number.into_number_and_unit();
                         (number_value, Some(unit))
                     }
-                    (Value::Number(number), _arg_span) => (number, None),
-                    (Value::Boolean(_) | Value::String(_), _arg_span) => {
-                        return Err(vec![EvalError::InvalidType]);
+                    Value::Number(number) => (number, None),
+                    Value::Boolean(_) | Value::String(_) => {
+                        return Err(vec![EvalError::InvalidType {
+                            expected_type: ExpectedType::NumberOrMeasuredNumber,
+                            found_type: arg.type_(),
+                            found_span: arg_span,
+                        }]);
                     }
                 };
 
                 let Number::Interval(interval) = number_value else {
-                    return Err(vec![EvalError::InvalidType]);
+                    return Err(vec![EvalError::InvalidNumberType {
+                        number_type: NumberType::Interval,
+                        found_number_type: number_value.type_(),
+                        found_span: arg_span,
+                    }]);
                 };
 
                 let result = interval.max() - interval.min();
@@ -1086,21 +1090,29 @@ mod fns {
             1 => {
                 let mut args = args.into_iter();
 
-                let arg = args.next().expect("there should be one argument");
+                let (arg, arg_span) = args.next().expect("there should be one argument");
 
                 let (number_value, unit) = match arg {
-                    (Value::MeasuredNumber(number), _arg_span) => {
+                    Value::MeasuredNumber(number) => {
                         let (number_value, unit) = number.into_number_and_unit();
                         (number_value, Some(unit))
                     }
-                    (Value::Number(number), _arg_span) => (number, None),
-                    (Value::Boolean(_) | Value::String(_), _arg_span) => {
-                        return Err(vec![EvalError::InvalidType]);
+                    Value::Number(number) => (number, None),
+                    Value::Boolean(_) | Value::String(_) => {
+                        return Err(vec![EvalError::InvalidType {
+                            expected_type: ExpectedType::NumberOrMeasuredNumber,
+                            found_type: arg.type_(),
+                            found_span: arg_span,
+                        }]);
                     }
                 };
 
                 let Number::Interval(interval) = number_value else {
-                    return Err(vec![EvalError::InvalidType]);
+                    return Err(vec![EvalError::InvalidNumberType {
+                        number_type: NumberType::Interval,
+                        found_number_type: number_value.type_(),
+                        found_span: arg_span,
+                    }]);
                 };
 
                 let mid = f64::midpoint(interval.min(), interval.max());

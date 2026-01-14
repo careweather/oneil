@@ -1,7 +1,10 @@
 //! Utility functions for the value module
 
+use oneil_shared::span::Span;
+
 use crate::{
     EvalError,
+    error::ExpectedType,
     value::{DimensionMap, MeasuredNumber, Number, Value},
 };
 
@@ -87,7 +90,7 @@ pub enum HomogeneousNumberList<'a> {
     reason = "callers are expected to enforce the invariant that the list is not empty so that they can provide the correct error message"
 )]
 pub fn extract_homogeneous_numbers_list(
-    values: &[Value],
+    values: &[(Value, Span)],
 ) -> Result<HomogeneousNumberList<'_>, Vec<EvalError>> {
     // Only used within this function
     enum ListResult<'a> {
@@ -100,7 +103,7 @@ pub fn extract_homogeneous_numbers_list(
     let mut list_result: Option<ListResult<'_>> = None;
     let mut errors = Vec::new();
 
-    for value in values {
+    for (value, value_span) in values {
         match value {
             Value::MeasuredNumber(number) => {
                 match &mut list_result {
@@ -137,7 +140,11 @@ pub fn extract_homogeneous_numbers_list(
                     }
                 }
             }
-            Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType),
+            Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type: value.type_(),
+                found_span: *value_span,
+            }),
         }
     }
 

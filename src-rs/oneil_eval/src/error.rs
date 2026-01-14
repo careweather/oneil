@@ -7,7 +7,7 @@ use oneil_shared::{
     span::Span,
 };
 
-use crate::value::{DisplayUnit, Interval, Value, ValueType};
+use crate::value::{DisplayUnit, Interval, NumberType, Value, ValueType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelError {
@@ -82,6 +82,15 @@ pub enum UnaryEvalError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpectedType {
+    Number,
+    Boolean,
+    String,
+    MeasuredNumber,
+    NumberOrMeasuredNumber,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectedArgumentCount {
     Exact(usize),
     AtLeast(usize),
@@ -91,6 +100,28 @@ pub enum ExpectedArgumentCount {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
+    TypeMismatch {
+        expected_type: ValueType,
+        expected_source_span: Span,
+        found_type: ValueType,
+        found_span: Span,
+    },
+    UnitMismatch {
+        expected_unit: DisplayUnit,
+        expected_source_span: Span,
+        found_unit: DisplayUnit,
+        found_span: Span,
+    },
+    InvalidType {
+        expected_type: ExpectedType,
+        found_type: ValueType,
+        found_span: Span,
+    },
+    InvalidNumberType {
+        number_type: NumberType,
+        found_number_type: NumberType,
+        found_span: Span,
+    },
     BinaryEvalError {
         lhs_span: Span,
         rhs_span: Span,
@@ -105,7 +136,6 @@ pub enum EvalError {
         exponent_span: Span,
         exponent_value: Value,
     },
-    InvalidType,
     ParameterHasError {
         parameter_name: String,
         parameter_name_span: Span,
@@ -318,7 +348,6 @@ impl AsOneilError for EvalError {
                 exponent_span: _,
                 exponent_value: _,
             } => format!("exponent cannot have units"),
-            Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name,
                 parameter_name_span: _,
@@ -561,7 +590,6 @@ impl AsOneilError for EvalError {
                 exponent_span: location_span,
                 exponent_value: _,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name: _,
                 parameter_name_span: location_span,
@@ -744,7 +772,6 @@ impl AsOneilError for EvalError {
                     "exponent evaluated to {exponent_value}"
                 ))]
             }
-            Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name: _,
                 parameter_name_span: _,
@@ -960,7 +987,6 @@ impl AsOneilError for EvalError {
                 exponent_span: _,
                 exponent_value: _,
             } => Vec::new(),
-            Self::InvalidType => todo!(),
             Self::ParameterHasError {
                 parameter_name: _,
                 parameter_name_span: _,
