@@ -131,7 +131,6 @@ pub enum EvalError {
         expr_span: Span,
         error: UnaryEvalError,
     },
-    InvalidUnit,
     HasExponentWithUnits {
         exponent_span: Span,
         exponent_value: Value,
@@ -343,7 +342,6 @@ impl AsOneilError for EvalError {
                     )
                 }
             },
-            Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: _,
                 exponent_value: _,
@@ -585,7 +583,6 @@ impl AsOneilError for EvalError {
                     value_type: _,
                 } => Some(ErrorLocation::from_source_and_span(source, *expr_span)),
             },
-            Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: location_span,
                 exponent_value: _,
@@ -763,7 +760,6 @@ impl AsOneilError for EvalError {
                     value_type: _,
                 } => Vec::new(),
             },
-            Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: _,
                 exponent_value,
@@ -982,7 +978,6 @@ impl AsOneilError for EvalError {
                     value_type: _,
                 } => Vec::new(),
             },
-            Self::InvalidUnit => todo!(),
             Self::HasExponentWithUnits {
                 exponent_span: _,
                 exponent_value: _,
