@@ -212,6 +212,11 @@ pub enum EvalError {
 }
 
 impl AsOneilError for EvalError {
+    #[expect(clippy::too_many_lines, reason = "matching on each enum variant")]
+    #[expect(
+        clippy::match_same_arms,
+        reason = "in order to keep the enums in order, we don't combine the same arms"
+    )]
     fn message(&self) -> String {
         match self {
             Self::TypeMismatch {
@@ -251,11 +256,11 @@ impl AsOneilError for EvalError {
             Self::ExponentHasUnits {
                 exponent_span: _,
                 exponent_unit: _,
-            } => format!("exponent cannot have units"),
+            } => "exponent cannot have units".to_string(),
             Self::ExponentIsInterval {
                 exponent_interval: _,
                 exponent_value_span: _,
-            } => format!("exponent cannot be an interval"),
+            } => "exponent cannot be an interval".to_string(),
             Self::ParameterHasError {
                 parameter_name,
                 parameter_name_span: _,
@@ -291,9 +296,7 @@ impl AsOneilError for EvalError {
             Self::ParameterMissingUnitAnnotation {
                 param_expr_span: _,
                 param_value_unit: _,
-            } => {
-                format!("parameter is missing a unit")
-            }
+            } => "parameter is missing a unit".to_string(),
             Self::ParameterUnitMismatch {
                 param_expr_span: _,
                 param_value_unit,
@@ -349,7 +352,7 @@ impl AsOneilError for EvalError {
                 max_unit_span: _,
                 min_unit: _,
                 min_unit_span: _,
-            } => format!("max limit unit does not match min limit unit"),
+            } => "max limit unit does not match min limit unit".to_string(),
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => {
                 "discrete limit cannot contain a boolean value".to_string()
             }
@@ -413,23 +416,17 @@ impl AsOneilError for EvalError {
             Self::BooleanCannotHaveALimit {
                 expr_span: _,
                 limit_span: _,
-            } => {
-                format!("boolean value cannot have a limit")
-            }
+            } => "boolean value cannot have a limit".to_string(),
             Self::StringCannotHaveNumberLimit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: _,
-            } => {
-                format!("string value cannot have a number limit")
-            }
+            } => "string value cannot have a number limit".to_string(),
             Self::NumberCannotHaveStringLimit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: _,
-            } => {
-                format!("number value cannot have a string limit")
-            }
+            } => "number value cannot have a string limit".to_string(),
             Self::UnitlessNumberCannotHaveLimitWithUnit {
                 param_expr_span: _,
                 param_value: _,
@@ -449,16 +446,14 @@ impl AsOneilError for EvalError {
                 relevant_span: _,
                 feature_name,
                 will_be_supported: _,
-            } => {
-                if let Some(feature_name) = feature_name {
-                    format!("unsupported feature: `{feature_name}`")
-                } else {
-                    "unsupported feature".to_string()
-                }
-            }
+            } => feature_name.as_ref().map_or_else(
+                || "unsupported feature".to_string(),
+                |feature_name| format!("unsupported feature: `{feature_name}`"),
+            ),
         }
     }
 
+    #[expect(clippy::too_many_lines, reason = "matching on each enum variant")]
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
             Self::TypeMismatch {
@@ -466,160 +461,160 @@ impl AsOneilError for EvalError {
                 expected_source_span: _,
                 found_type: _,
                 found_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::UnitMismatch {
+            }
+            | Self::UnitMismatch {
                 expected_unit: _,
                 expected_source_span: _,
                 found_unit: _,
                 found_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidType {
+            }
+            | Self::InvalidType {
                 expected_type: _,
                 found_type: _,
                 found_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidNumberType {
+            }
+            | Self::InvalidNumberType {
                 number_type: _,
                 found_number_type: _,
                 found_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ExponentHasUnits {
+            }
+            | Self::ExponentHasUnits {
                 exponent_span: location_span,
                 exponent_unit: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ExponentIsInterval {
+            }
+            | Self::ExponentIsInterval {
                 exponent_interval: _,
                 exponent_value_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterHasError {
+            }
+            | Self::ParameterHasError {
                 parameter_name: _,
                 parameter_name_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidArgumentCount {
+            }
+            | Self::InvalidArgumentCount {
                 function_name: _,
                 function_name_span: location_span,
                 expected_argument_count: _,
                 actual_argument_count: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterMissingUnitAnnotation {
+            }
+            | Self::ParameterMissingUnitAnnotation {
                 param_expr_span: location_span,
                 param_value_unit: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterUnitMismatch {
+            }
+            | Self::ParameterUnitMismatch {
                 param_expr_span: location_span,
                 param_value_unit: _,
                 param_unit_span: _,
                 param_unit: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::UnknownUnit {
+            }
+            | Self::UnknownUnit {
                 unit_name: _,
                 unit_name_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidIfExpressionType {
+            }
+            | Self::InvalidIfExpressionType {
                 expr_span: location_span,
                 found_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::MultiplePiecewiseBranchesMatch {
+            }
+            | Self::MultiplePiecewiseBranchesMatch {
                 param_ident: _,
                 param_ident_span: location_span,
                 matching_branche_spans: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::NoPiecewiseBranchMatch {
+            }
+            | Self::NoPiecewiseBranchMatch {
                 param_ident: _,
                 param_ident_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::BooleanCannotHaveUnit {
+            }
+            | Self::BooleanCannotHaveUnit {
                 expr_span: _,
                 unit_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::StringCannotHaveUnit {
+            }
+            | Self::StringCannotHaveUnit {
                 expr_span: _,
                 unit_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidContinuousLimitMinType {
+            }
+            | Self::InvalidContinuousLimitMinType {
                 expr_span: location_span,
                 found_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::InvalidContinuousLimitMaxType {
+            }
+            | Self::InvalidContinuousLimitMaxType {
                 expr_span: location_span,
                 found_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::MaxUnitDoesNotMatchMinUnit {
+            }
+            | Self::MaxUnitDoesNotMatchMinUnit {
                 max_unit: _,
                 max_unit_span: location_span,
                 min_unit: _,
                 min_unit_span: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::BooleanCannotBeDiscreteLimitValue {
+            }
+            | Self::BooleanCannotBeDiscreteLimitValue {
                 expr_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::DuplicateStringLimit {
+            }
+            | Self::DuplicateStringLimit {
                 expr_span: location_span,
                 original_expr_span: _,
                 string_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ExpectedStringLimit {
+            }
+            | Self::ExpectedStringLimit {
                 expr_span: location_span,
                 found_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ExpectedNumberLimit {
+            }
+            | Self::ExpectedNumberLimit {
                 expr_span: location_span,
                 found_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::DiscreteLimitUnitMismatch {
+            }
+            | Self::DiscreteLimitUnitMismatch {
                 limit_unit: _,
                 limit_span: _,
                 value_unit: _,
                 value_unit_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterValueBelowDefaultLimits {
+            }
+            | Self::ParameterValueBelowDefaultLimits {
                 param_expr_span: location_span,
                 param_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterValueBelowContinuousLimits {
+            }
+            | Self::ParameterValueBelowContinuousLimits {
                 param_expr_span: location_span,
                 param_value: _,
                 min_expr_span: _,
                 min_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterValueAboveContinuousLimits {
+            }
+            | Self::ParameterValueAboveContinuousLimits {
                 param_expr_span: location_span,
                 param_value: _,
                 max_expr_span: _,
                 max_value: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::ParameterValueNotInDiscreteLimits {
+            }
+            | Self::ParameterValueNotInDiscreteLimits {
                 param_expr_span: location_span,
                 param_value: _,
                 limit_expr_span: _,
                 limit_values: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::BooleanCannotHaveALimit {
+            }
+            | Self::BooleanCannotHaveALimit {
                 expr_span: location_span,
                 limit_span: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::StringCannotHaveNumberLimit {
+            }
+            | Self::StringCannotHaveNumberLimit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::NumberCannotHaveStringLimit {
+            }
+            | Self::NumberCannotHaveStringLimit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: location_span,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::UnitlessNumberCannotHaveLimitWithUnit {
+            }
+            | Self::UnitlessNumberCannotHaveLimitWithUnit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: location_span,
                 limit_unit: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::LimitUnitDoesNotMatchParameterUnit {
+            }
+            | Self::LimitUnitDoesNotMatchParameterUnit {
                 param_unit: _,
                 limit_span: location_span,
                 limit_unit: _,
-            } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
-            Self::Unsupported {
+            }
+            | Self::Unsupported {
                 relevant_span: location_span,
                 feature_name: _,
                 will_be_supported: _,
@@ -627,6 +622,11 @@ impl AsOneilError for EvalError {
         }
     }
 
+    #[expect(clippy::too_many_lines, reason = "matching on each enum variant")]
+    #[expect(
+        clippy::match_same_arms,
+        reason = "in order to keep the enums in order, we don't combine the same arms"
+    )]
     fn context(&self) -> Vec<ErrorContext> {
         match self {
             Self::TypeMismatch {
@@ -843,6 +843,11 @@ impl AsOneilError for EvalError {
         }
     }
 
+    #[expect(clippy::too_many_lines, reason = "matching on each enum variant")]
+    #[expect(
+        clippy::match_same_arms,
+        reason = "in order to keep the enums in order, we don't combine the same arms"
+    )]
     fn context_with_source(&self, source: &str) -> Vec<(ErrorContext, Option<ErrorLocation>)> {
         match self {
             Self::TypeMismatch {
@@ -999,7 +1004,7 @@ impl AsOneilError for EvalError {
                 value_unit: _,
                 value_unit_span: _,
             } => vec![(
-                ErrorContext::Note(format!("expected unit was derived from this expression")),
+                ErrorContext::Note("expected unit was derived from this expression".to_string()),
                 Some(ErrorLocation::from_source_and_span(source, *limit_span)),
             )],
             Self::ParameterValueBelowDefaultLimits {
@@ -1035,8 +1040,8 @@ impl AsOneilError for EvalError {
                 limit_values,
             } => {
                 let limit_values = limit_values
-                    .into_iter()
-                    .map(|value| value.to_string())
+                    .iter()
+                    .map(Value::to_string)
                     .collect::<Vec<String>>()
                     .join(", ");
                 vec![(

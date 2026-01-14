@@ -6,6 +6,10 @@ use crate::{
     value::{DisplayUnit, Interval, ValueType},
 };
 
+/// Errors that can occur when evaluating a binary operation
+///
+/// Note that all `ValueType`s are boxed to decrease the size
+/// of the error enum.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinaryEvalError {
     UnitMismatch {
@@ -13,16 +17,16 @@ pub enum BinaryEvalError {
         rhs_unit: DisplayUnit,
     },
     TypeMismatch {
-        lhs_type: ValueType,
-        rhs_type: ValueType,
+        lhs_type: Box<ValueType>,
+        rhs_type: Box<ValueType>,
     },
     InvalidLhsType {
         expected_type: ExpectedType,
-        lhs_type: ValueType,
+        lhs_type: Box<ValueType>,
     },
     InvalidRhsType {
         expected_type: ExpectedType,
-        rhs_type: ValueType,
+        rhs_type: Box<ValueType>,
     },
     ExponentHasUnits {
         exponent_unit: DisplayUnit,
@@ -42,9 +46,9 @@ impl BinaryEvalError {
                 found_span: rhs_span,
             },
             Self::TypeMismatch { lhs_type, rhs_type } => EvalError::TypeMismatch {
-                expected_type: lhs_type,
+                expected_type: *lhs_type,
                 expected_source_span: lhs_span,
-                found_type: rhs_type,
+                found_type: *rhs_type,
                 found_span: rhs_span,
             },
             Self::InvalidLhsType {
@@ -52,7 +56,7 @@ impl BinaryEvalError {
                 lhs_type,
             } => EvalError::InvalidType {
                 expected_type,
-                found_type: lhs_type,
+                found_type: *lhs_type,
                 found_span: lhs_span,
             },
             Self::InvalidRhsType {
@@ -60,7 +64,7 @@ impl BinaryEvalError {
                 rhs_type,
             } => EvalError::InvalidType {
                 expected_type,
-                found_type: rhs_type,
+                found_type: *rhs_type,
                 found_span: rhs_span,
             },
             Self::ExponentHasUnits { exponent_unit } => EvalError::ExponentHasUnits {
@@ -81,7 +85,7 @@ impl BinaryEvalError {
                 lhs_type,
             } => EvalError::InvalidType {
                 expected_type,
-                found_type: lhs_type,
+                found_type: *lhs_type,
                 found_span: lhs_span,
             },
             Self::UnitMismatch { .. }
@@ -89,7 +93,7 @@ impl BinaryEvalError {
             | Self::InvalidRhsType { .. }
             | Self::ExponentHasUnits { .. }
             | Self::ExponentIsInterval { .. } => {
-                panic!("expected only lhs errors, but got {:?}", self)
+                panic!("expected only lhs errors, but got {self:?}")
             }
         }
     }
@@ -101,7 +105,7 @@ impl BinaryEvalError {
                 rhs_type,
             } => EvalError::InvalidType {
                 expected_type,
-                found_type: rhs_type,
+                found_type: *rhs_type,
                 found_span: rhs_span,
             },
             Self::ExponentHasUnits { exponent_unit } => EvalError::ExponentHasUnits {
@@ -113,13 +117,13 @@ impl BinaryEvalError {
                 exponent_value_span: rhs_span,
             },
             Self::UnitMismatch { .. } | Self::TypeMismatch { .. } | Self::InvalidLhsType { .. } => {
-                panic!("expected only rhs errors, but got {:?}", self)
+                panic!("expected only rhs errors, but got {self:?}")
             }
         }
     }
 
     pub fn expect_no_errors(self) -> EvalError {
-        panic!("expected no errors, but got {:?}", self)
+        panic!("expected no errors, but got {self:?}")
     }
 }
 
@@ -133,7 +137,7 @@ pub enum UnaryOperation {
 pub enum UnaryEvalError {
     InvalidType {
         op: UnaryOperation,
-        value_type: ValueType,
+        value_type: Box<ValueType>,
     },
 }
 
@@ -148,7 +152,7 @@ impl UnaryEvalError {
 
                 EvalError::InvalidType {
                     expected_type,
-                    found_type: value_type,
+                    found_type: *value_type,
                     found_span: value_span,
                 }
             }
@@ -156,6 +160,6 @@ impl UnaryEvalError {
     }
 
     pub fn expect_no_errors(self) -> EvalError {
-        panic!("expected no errors, but got {:?}", self)
+        panic!("expected no errors, but got {self:?}")
     }
 }

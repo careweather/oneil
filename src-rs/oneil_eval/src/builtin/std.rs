@@ -735,6 +735,10 @@ mod fns {
         },
     };
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "matches the expected signature"
+    )]
     pub fn min(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
             return Err(vec![EvalError::InvalidArgumentCount {
@@ -793,6 +797,10 @@ mod fns {
         }
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "matches the expected signature"
+    )]
     pub fn max(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.is_empty() {
             return Err(vec![EvalError::InvalidArgumentCount {

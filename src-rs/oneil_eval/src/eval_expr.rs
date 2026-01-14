@@ -123,7 +123,7 @@ fn eval_comparison_subexpressions<F: BuiltinFunction>(
             for result in rest_results {
                 match result {
                     Ok((op, (right_operand, right_operand_span))) => {
-                        ok_rest_results.push((op, (right_operand, *right_operand_span)))
+                        ok_rest_results.push((op, (right_operand, *right_operand_span)));
                     }
                     Err(mut errors) => err_rest_results.append(&mut errors),
                 }
@@ -181,7 +181,7 @@ fn eval_comparison_chain(
                         next_lhs: (rhs, rhs_span),
                     })
                     .map_err(|error| ComparisonFailure {
-                        errors: vec![error],
+                        errors: vec![*error],
                         last_successful_lhs: (lhs, lhs_span),
                     })
             }
@@ -200,7 +200,7 @@ fn eval_comparison_chain(
 
                 let errors = if let Err(error) = result {
                     let mut comparison_errors = errors;
-                    comparison_errors.push(error);
+                    comparison_errors.push(*error);
                     comparison_errors
                 } else {
                     errors
@@ -225,7 +225,7 @@ fn eval_comparison_op(
     op: ir::ComparisonOp,
     rhs: &Value,
     rhs_span: Span,
-) -> Result<bool, EvalError> {
+) -> Result<bool, Box<EvalError>> {
     let result = match op {
         ir::ComparisonOp::Eq => lhs.checked_eq(rhs),
         ir::ComparisonOp::NotEq => lhs.checked_ne(rhs),
@@ -235,7 +235,7 @@ fn eval_comparison_op(
         ir::ComparisonOp::GreaterThanEq => lhs.checked_gte(rhs),
     };
 
-    result.map_err(|error| error.into_eval_error(lhs_span, rhs_span))
+    result.map_err(|error| Box::new(error.into_eval_error(lhs_span, rhs_span)))
 }
 
 struct BinaryOpSubexpressionsResult {

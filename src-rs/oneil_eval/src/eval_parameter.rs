@@ -531,6 +531,10 @@ fn verify_value_is_within_default_limits(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "each argument has an associated span"
+)]
 fn verify_value_is_within_number_range(
     value: &Value,
     param_expr_span: &Span,

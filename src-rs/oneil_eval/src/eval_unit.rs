@@ -39,7 +39,7 @@ pub fn eval_unit<F: BuiltinFunction>(
                 };
             }
             Err(error) => {
-                errors.push(error);
+                errors.push(*error);
             }
         }
     }
@@ -63,7 +63,7 @@ pub fn eval_unit<F: BuiltinFunction>(
 fn eval_unit_component<F: BuiltinFunction>(
     unit: &ir::Unit,
     context: &EvalContext<F>,
-) -> Result<Unit, EvalError> {
+) -> Result<Unit, Box<EvalError>> {
     let unit_name_span = unit.name_span();
 
     let full_name = unit.name();
@@ -103,10 +103,10 @@ fn eval_unit_component<F: BuiltinFunction>(
     // TODO: come up with potential recommended units that this might be
 
     // if we get here, the unit is not found
-    Err(EvalError::UnknownUnit {
+    Err(Box::new(EvalError::UnknownUnit {
         unit_name: full_name.to_string(),
         unit_name_span,
-    })
+    }))
 }
 
 fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {

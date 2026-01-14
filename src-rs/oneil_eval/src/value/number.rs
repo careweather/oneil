@@ -145,7 +145,7 @@ impl MeasuredNumber {
     pub fn checked_add(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
             return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit.clone(),
+                lhs_unit: self.unit.display_unit,
                 rhs_unit: rhs.unit.display_unit.clone(),
             });
         }
@@ -164,7 +164,7 @@ impl MeasuredNumber {
     pub fn checked_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
             return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit.clone(),
+                lhs_unit: self.unit.display_unit,
                 rhs_unit: rhs.unit.display_unit.clone(),
             });
         }
@@ -185,7 +185,7 @@ impl MeasuredNumber {
     pub fn checked_escaped_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
             return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit.clone(),
+                lhs_unit: self.unit.display_unit,
                 rhs_unit: rhs.unit.display_unit.clone(),
             });
         }
@@ -242,7 +242,7 @@ impl MeasuredNumber {
     pub fn checked_rem(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
         if !self.unit.dimensionally_eq(&rhs.unit) {
             return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit.clone(),
+                lhs_unit: self.unit.display_unit,
                 rhs_unit: rhs.unit.display_unit.clone(),
             });
         }
@@ -279,7 +279,7 @@ impl MeasuredNumber {
         // check that the units match (or are unitless)
         if !self.unit.dimensionally_eq(&rhs.unit) {
             return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit.clone(),
+                lhs_unit: self.unit.display_unit,
                 rhs_unit: rhs.unit.display_unit.clone(),
             });
         }

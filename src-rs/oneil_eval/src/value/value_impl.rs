@@ -47,8 +47,8 @@ impl Value {
                 .checked_partial_cmp(rhs)
                 .map(|ordering| ordering == Some(Ordering::Equal)),
             (lhs, rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: lhs.type_(),
-                rhs_type: rhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
+                rhs_type: Box::new(rhs.type_()),
             }),
         }
     }
@@ -79,12 +79,12 @@ impl Value {
                 .checked_partial_cmp(rhs)
                 .map(|ordering| ordering == Some(Ordering::Less)),
             (Self::Number(_) | Self::MeasuredNumber(_), _) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: self.type_(),
-                rhs_type: rhs.type_(),
+                lhs_type: Box::new(self.type_()),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -108,12 +108,12 @@ impl Value {
                 })
             }
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: self.type_(),
-                rhs_type: rhs.type_(),
+                lhs_type: Box::new(self.type_()),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -135,12 +135,12 @@ impl Value {
                 .checked_partial_cmp(rhs)
                 .map(|ordering| ordering == Some(Ordering::Greater)),
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: self.type_(),
-                rhs_type: rhs.type_(),
+                lhs_type: Box::new(self.type_()),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -164,12 +164,12 @@ impl Value {
                 })
             }
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: self.type_(),
-                rhs_type: rhs.type_(),
+                lhs_type: Box::new(self.type_()),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -192,21 +192,21 @@ impl Value {
                 lhs.checked_add(&rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs_number.unit().clone(),
                     number_type: lhs_number.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs_number.type_(),
-                },
-                rhs_type: rhs_number.type_(),
+                }),
+                rhs_type: Box::new(rhs_number.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -229,21 +229,21 @@ impl Value {
                 lhs.checked_sub(&rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs_number.unit().clone(),
                     number_type: lhs_number.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs_number.type_(),
-                },
-                rhs_type: rhs_number.type_(),
+                }),
+                rhs_type: Box::new(rhs_number.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -268,21 +268,21 @@ impl Value {
                 lhs.checked_escaped_sub(&rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs_number.unit().clone(),
                     number_type: lhs_number.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs_number.type_(),
-                },
-                rhs_type: rhs_number.type_(),
+                }),
+                rhs_type: Box::new(rhs_number.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -305,21 +305,21 @@ impl Value {
                 lhs.checked_mul(rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs_number.unit().clone(),
                     number_type: lhs_number.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs_number.type_(),
-                },
-                rhs_type: rhs_number.type_(),
+                }),
+                rhs_type: Box::new(rhs_number.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -342,21 +342,21 @@ impl Value {
                 lhs.checked_div(rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs_number.unit().clone(),
                     number_type: lhs_number.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs_number.type_(),
-                },
-                rhs_type: rhs_number.type_(),
+                }),
+                rhs_type: Box::new(rhs_number.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -381,21 +381,21 @@ impl Value {
                 lhs.checked_escaped_div(rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs_number.unit().clone(),
                     number_type: lhs_number.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs_number.type_(),
-                },
-                rhs_type: rhs_number.type_(),
+                }),
+                rhs_type: Box::new(rhs_number.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -418,21 +418,21 @@ impl Value {
                 lhs.checked_rem(&rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs_number), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs_number.unit().clone(),
                     number_type: lhs_number.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::Number(lhs_number), rhs_number) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs_number.type_(),
-                },
-                rhs_type: rhs_number.type_(),
+                }),
+                rhs_type: Box::new(rhs_number.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -458,12 +458,12 @@ impl Value {
             (Self::Number(_) | Self::MeasuredNumber(_), exponent) => {
                 Err(BinaryEvalError::InvalidRhsType {
                     expected_type: ExpectedType::Number,
-                    rhs_type: exponent.type_(),
+                    rhs_type: Box::new(exponent.type_()),
                 })
             }
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -479,12 +479,12 @@ impl Value {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(Self::Boolean(lhs && rhs)),
             (Self::Boolean(_), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Boolean,
-                rhs_type: rhs.type_(),
+                lhs_type: Box::new(ValueType::Boolean),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::Boolean,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -500,12 +500,12 @@ impl Value {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(Self::Boolean(lhs || rhs)),
             (Self::Boolean(_), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Boolean,
-                rhs_type: rhs.type_(),
+                lhs_type: Box::new(ValueType::Boolean),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::Boolean,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -527,10 +527,10 @@ impl Value {
                 Ok(Self::MeasuredNumber(rhs.min_max_number(lhs)))
             }
             (Self::Number(lhs), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::Number {
+                lhs_type: Box::new(ValueType::Number {
                     number_type: lhs.type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
                 Ok(Self::MeasuredNumber(lhs.min_max_number(rhs)))
@@ -539,15 +539,15 @@ impl Value {
                 lhs.checked_min_max(&rhs).map(Self::MeasuredNumber)
             }
             (Self::MeasuredNumber(lhs), rhs) => Err(BinaryEvalError::TypeMismatch {
-                lhs_type: ValueType::MeasuredNumber {
+                lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs.unit().clone(),
                     number_type: lhs.normalized_value().type_(),
-                },
-                rhs_type: rhs.type_(),
+                }),
+                rhs_type: Box::new(rhs.type_()),
             }),
             (lhs, _rhs) => Err(BinaryEvalError::InvalidLhsType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
-                lhs_type: lhs.type_(),
+                lhs_type: Box::new(lhs.type_()),
             }),
         }
     }
@@ -563,7 +563,7 @@ impl Value {
             Self::MeasuredNumber(number) => Ok(Self::MeasuredNumber(number.checked_neg())),
             Self::Boolean(_) | Self::String(_) => Err(UnaryEvalError::InvalidType {
                 op: UnaryOperation::Neg,
-                value_type: self.type_(),
+                value_type: Box::new(self.type_()),
             }),
         }
     }
@@ -579,7 +579,7 @@ impl Value {
             Self::String(_) | Self::Number(_) | Self::MeasuredNumber(_) => {
                 Err(UnaryEvalError::InvalidType {
                     op: UnaryOperation::Not,
-                    value_type: self.type_(),
+                    value_type: Box::new(self.type_()),
                 })
             }
         }

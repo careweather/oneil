@@ -5,7 +5,7 @@ use oneil_shared::span::Span;
 use crate::{
     EvalError,
     error::ExpectedType,
-    value::{DimensionMap, DisplayUnit, MeasuredNumber, Number, Unit, Value},
+    value::{DisplayUnit, MeasuredNumber, Number, Unit, Value},
 };
 
 const TOLERANCE: f64 = 1e-10;
@@ -69,6 +69,19 @@ pub enum HomogeneousNumberList<'a> {
     MeasuredNumbers(Vec<&'a MeasuredNumber>),
 }
 
+// Only used within `extract_homogeneous_numbers_list` and its helper functions
+enum ListResult<'a> {
+    Numbers {
+        numbers: Vec<&'a Number>,
+        first_number_span: &'a Span,
+    },
+    MeasuredNumbers {
+        numbers: Vec<&'a MeasuredNumber>,
+        expected_unit: &'a Unit,
+        expected_unit_value_span: &'a Span,
+    },
+}
+
 /// Ensures that all of the numbers in the list are either all measured numbers
 /// with dimensionally equivalent units or all numbers. The list must not be empty.
 ///
@@ -92,19 +105,6 @@ pub enum HomogeneousNumberList<'a> {
 pub fn extract_homogeneous_numbers_list(
     values: &[(Value, Span)],
 ) -> Result<HomogeneousNumberList<'_>, Vec<EvalError>> {
-    // Only used within this function
-    enum ListResult<'a> {
-        Numbers {
-            numbers: Vec<&'a Number>,
-            first_number_span: &'a Span,
-        },
-        MeasuredNumbers {
-            numbers: Vec<&'a MeasuredNumber>,
-            expected_unit: &'a Unit,
-            expected_unit_value_span: &'a Span,
-        },
-    }
-
     assert!(!values.is_empty());
 
     let mut list_result: Option<ListResult<'_>> = None;
@@ -113,78 +113,14 @@ pub fn extract_homogeneous_numbers_list(
     for (value, value_span) in values {
         match value {
             Value::MeasuredNumber(number) => {
-                match &mut list_result {
-                    Some(ListResult::MeasuredNumbers {
-                        numbers,
-                        expected_unit,
-                        expected_unit_value_span,
-                    }) => {
-                        if number.unit().dimensionally_eq(expected_unit) {
-                            numbers.push(number);
-                        } else {
-                            errors.push(EvalError::UnitMismatch {
-                                expected_unit: expected_unit.display_unit.clone(),
-                                expected_source_span: **expected_unit_value_span,
-                                found_unit: number.unit().display_unit.clone(),
-                                found_span: *value_span,
-                            });
-                        }
-                    }
-                    Some(ListResult::Numbers {
-                        numbers: _,
-                        first_number_span,
-                    }) => {
-                        errors.push(EvalError::UnitMismatch {
-                            expected_unit: DisplayUnit::Unitless,
-                            expected_source_span: **first_number_span,
-                            found_unit: number.unit().display_unit.clone(),
-                            found_span: *value_span,
-                        });
-                    }
-                    None => {
-                        // the first argument is the expected output
-                        list_result = Some(ListResult::MeasuredNumbers {
-                            numbers: vec![number],
-                            expected_unit: number.unit(),
-                            expected_unit_value_span: value_span,
-                        });
-                    }
-                }
+                handle_measured_number(number, value_span, &mut list_result, &mut errors);
             }
             Value::Number(number) => {
-                match &mut list_result {
-                    Some(ListResult::MeasuredNumbers {
-                        numbers: _numbers,
-                        expected_unit: expected_unit,
-                        expected_unit_value_span: expected_unit_value_span,
-                    }) => {
-                        errors.push(EvalError::UnitMismatch {
-                            expected_unit: expected_unit.display_unit.clone(),
-                            expected_source_span: **expected_unit_value_span,
-                            found_unit: DisplayUnit::Unitless,
-                            found_span: *value_span,
-                        });
-                    }
-                    Some(ListResult::Numbers {
-                        numbers,
-                        first_number_span: _,
-                    }) => {
-                        numbers.push(number);
-                    }
-                    None => {
-                        // the first argument is the expected output
-                        list_result = Some(ListResult::Numbers {
-                            numbers: vec![&number],
-                            first_number_span: value_span,
-                        });
-                    }
-                }
+                handle_number(number, value_span, &mut list_result, &mut errors);
             }
-            Value::String(_) | Value::Boolean(_) => errors.push(EvalError::InvalidType {
-                expected_type: ExpectedType::NumberOrMeasuredNumber,
-                found_type: value.type_(),
-                found_span: *value_span,
-            }),
+            Value::String(_) | Value::Boolean(_) => {
+                handle_invalid_type(value, value_span, &mut errors);
+            }
         }
     }
 
@@ -195,7 +131,131 @@ pub fn extract_homogeneous_numbers_list(
     let list_result =
         list_result.expect("there should be at least one number, which means this must be set");
 
-    let homogeneous_number_list = match list_result {
+    Ok(convert_to_homogeneous_list(list_result))
+}
+
+/// Handles a measured number value, updating the list result and collecting errors.
+///
+/// # Arguments
+///
+/// * `number` - The measured number to process
+/// * `value_span` - The span of the value
+/// * `list_result` - The current list result state
+/// * `errors` - The vector to collect errors in
+fn handle_measured_number<'a>(
+    number: &'a MeasuredNumber,
+    value_span: &'a Span,
+    list_result: &mut Option<ListResult<'a>>,
+    errors: &mut Vec<EvalError>,
+) {
+    match list_result {
+        Some(ListResult::MeasuredNumbers {
+            numbers,
+            expected_unit,
+            expected_unit_value_span,
+        }) => {
+            if number.unit().dimensionally_eq(expected_unit) {
+                numbers.push(number);
+            } else {
+                errors.push(EvalError::UnitMismatch {
+                    expected_unit: expected_unit.display_unit.clone(),
+                    expected_source_span: **expected_unit_value_span,
+                    found_unit: number.unit().display_unit.clone(),
+                    found_span: *value_span,
+                });
+            }
+        }
+        Some(ListResult::Numbers {
+            numbers: _,
+            first_number_span,
+        }) => {
+            errors.push(EvalError::UnitMismatch {
+                expected_unit: DisplayUnit::Unitless,
+                expected_source_span: **first_number_span,
+                found_unit: number.unit().display_unit.clone(),
+                found_span: *value_span,
+            });
+        }
+        None => {
+            // the first argument is the expected output
+            *list_result = Some(ListResult::MeasuredNumbers {
+                numbers: vec![number],
+                expected_unit: number.unit(),
+                expected_unit_value_span: value_span,
+            });
+        }
+    }
+}
+
+/// Handles a number value, updating the list result and collecting errors.
+///
+/// # Arguments
+///
+/// * `number` - The number to process
+/// * `value_span` - The span of the value
+/// * `list_result` - The current list result state
+/// * `errors` - The vector to collect errors in
+fn handle_number<'a>(
+    number: &'a Number,
+    value_span: &'a Span,
+    list_result: &mut Option<ListResult<'a>>,
+    errors: &mut Vec<EvalError>,
+) {
+    match list_result {
+        Some(ListResult::MeasuredNumbers {
+            numbers: _numbers,
+            expected_unit,
+            expected_unit_value_span,
+        }) => {
+            errors.push(EvalError::UnitMismatch {
+                expected_unit: expected_unit.display_unit.clone(),
+                expected_source_span: **expected_unit_value_span,
+                found_unit: DisplayUnit::Unitless,
+                found_span: *value_span,
+            });
+        }
+        Some(ListResult::Numbers {
+            numbers,
+            first_number_span: _,
+        }) => {
+            numbers.push(number);
+        }
+        None => {
+            // the first argument is the expected output
+            *list_result = Some(ListResult::Numbers {
+                numbers: vec![number],
+                first_number_span: value_span,
+            });
+        }
+    }
+}
+
+/// Handles an invalid type value, adding an error to the errors vector.
+///
+/// # Arguments
+///
+/// * `value` - The invalid value
+/// * `value_span` - The span of the value
+/// * `errors` - The vector to collect errors in
+fn handle_invalid_type(value: &Value, value_span: &Span, errors: &mut Vec<EvalError>) {
+    errors.push(EvalError::InvalidType {
+        expected_type: ExpectedType::NumberOrMeasuredNumber,
+        found_type: value.type_(),
+        found_span: *value_span,
+    });
+}
+
+/// Converts a `ListResult` into a `HomogeneousNumberList`.
+///
+/// # Arguments
+///
+/// * `list_result` - The list result to convert
+///
+/// # Returns
+///
+/// The converted homogeneous number list
+fn convert_to_homogeneous_list(list_result: ListResult<'_>) -> HomogeneousNumberList<'_> {
+    match list_result {
         ListResult::Numbers {
             numbers,
             first_number_span: _,
@@ -205,7 +265,5 @@ pub fn extract_homogeneous_numbers_list(
             expected_unit: _,
             expected_unit_value_span: _,
         } => HomogeneousNumberList::MeasuredNumbers(numbers),
-    };
-
-    Ok(homogeneous_number_list)
+    }
 }
