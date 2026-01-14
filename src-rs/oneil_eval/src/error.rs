@@ -1,5 +1,3 @@
-#![expect(missing_docs, reason = "this enum will be reworked in the next task")]
-
 use std::{fmt, path::PathBuf};
 
 use oneil_shared::{
@@ -9,18 +7,33 @@ use oneil_shared::{
 
 use crate::value::{DisplayUnit, Interval, NumberType, Value, ValueType};
 
+/// An error that occurred during model evaluation.
+///
+/// This error type associates an evaluation error with the path to the model file
+/// where the error occurred.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelError {
+    /// The path to the model file where the error occurred.
     pub model_path: PathBuf,
+    /// The evaluation error that occurred.
     pub error: EvalError,
 }
 
+/// Represents the expected type for type checking operations.
+///
+/// This enum is used to specify what type is expected in various type checking
+/// contexts, such as function arguments or expression evaluation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectedType {
-    Number,
+    /// A boolean value.
     Boolean,
+    /// A string value.
     String,
+    /// A unitless number (scalar or interval without units).
+    Number,
+    /// A number with a unit (measured number).
     MeasuredNumber,
+    /// Either a unitless number or a number with a unit.
     NumberOrMeasuredNumber,
 }
 
@@ -36,177 +49,359 @@ impl fmt::Display for ExpectedType {
     }
 }
 
+/// Represents the expected number of arguments for a function call.
+///
+/// This enum is used to specify argument count requirements when validating
+/// function calls.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpectedArgumentCount {
+    /// Exactly the specified number of arguments is required.
     Exact(usize),
+    /// At least the specified number of arguments is required.
     AtLeast(usize),
+    /// At most the specified number of arguments is allowed.
     AtMost(usize),
+    /// Between the minimum (inclusive) and maximum (inclusive) number of arguments is required.
     Between(usize, usize),
 }
 
+/// Errors that can occur during expression evaluation.
+///
+/// This enum represents all possible errors that can occur when evaluating
+/// Oneil expressions, including type mismatches, unit errors, parameter validation
+/// errors, and limit constraint violations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
+    /// A type mismatch error where the expected and found types do not match.
+    ///
+    /// This occurs when an expression is expected to have a specific type
+    /// because of the type of a previous expression, but evaluates to a
+    /// different type.
     TypeMismatch {
+        /// The expected value type.
         expected_type: ValueType,
+        /// The source span of the expression that caused the expected type.
         expected_source_span: Span,
+        /// The actual value type that was found.
         found_type: ValueType,
+        /// The source span of the expression that produced the wrong type.
         found_span: Span,
     },
+    /// A unit mismatch error where the expected and found units do not match.
+    ///
+    /// This occurs when an expression is expected to have a specific unit
+    /// because of the unit of a previous expression, but evaluates to a
+    /// evaluates to a different unit.
     UnitMismatch {
+        /// The expected unit.
         expected_unit: DisplayUnit,
+        /// The source span of the expression that expected this unit.
         expected_source_span: Span,
+        /// The actual unit that was found.
         found_unit: DisplayUnit,
+        /// The source span of the expression that produced the wrong unit.
         found_span: Span,
     },
+    /// An invalid type error where the found type does not match the expected type category.
+    ///
+    /// This occurs when an operation expects an expression to be a specific type category
+    /// (e.g., number, boolean, string) but the expression evaluates to a different type.
     InvalidType {
+        /// The expected type category.
         expected_type: ExpectedType,
+        /// The actual value type that was found.
         found_type: ValueType,
+        /// The source span of the expression that produced the wrong type.
         found_span: Span,
     },
+    /// An invalid number type error where the found number type does not match the expected one.
+    ///
+    /// This occurs when an operation expects an expression to be a scalar or interval but
+    /// the expression evaluates to the opposite number type.
     InvalidNumberType {
+        /// The expected number type (scalar or interval).
         number_type: NumberType,
+        /// The actual number type that was found.
         found_number_type: NumberType,
+        /// The source span of the expression that produced the wrong number type.
         found_span: Span,
     },
+    /// An error indicating that an exponent expression has units, which is not allowed.
+    ///
+    /// Exponents in power operations must be unitless numbers.
     ExponentHasUnits {
+        /// The source span of the exponent expression.
         exponent_span: Span,
+        /// The unit that was found on the exponent.
         exponent_unit: DisplayUnit,
     },
+    /// An error indicating that an exponent expression evaluates to an interval, which is not allowed
+    /// if the base has a unit.
+    ///
+    /// Exponents in power operations must be scalar values, not intervals.
     ExponentIsInterval {
+        /// The interval value that the exponent evaluated to.
         exponent_interval: Interval,
+        /// The source span of the exponent expression.
         exponent_value_span: Span,
     },
+    /// An error indicating that a parameter has errors that prevent its evaluation.
+    ///
+    /// This occurs when a parameter is referenced but has errors that make it
+    /// impossible to evaluate the current parameter.
+    ///
+    /// For error reporting, this error can typically be ignored. The main purpose of this error
+    /// is error propagation, not error reporting.
     ParameterHasError {
+        /// The name of the parameter that has errors.
         parameter_name: String,
+        /// The source span of the parameter name.
         parameter_name_span: Span,
     },
+    /// An error indicating that a function was called with an invalid number of arguments.
     InvalidArgumentCount {
+        /// The name of the function that was called incorrectly.
         function_name: String,
+        /// The source span of the function name.
         function_name_span: Span,
+        /// The expected argument count specification.
         expected_argument_count: ExpectedArgumentCount,
+        /// The actual number of arguments that were provided.
         actual_argument_count: usize,
     },
+    /// An error indicating that a parameter value has a unit but the parameter is missing a unit annotation.
+    ///
+    /// This occurs when a parameter's value expression evaluates to a value with
+    /// a unit, but the parameter definition does not include a unit annotation.
     ParameterMissingUnitAnnotation {
+        /// The source span of the parameter expression.
         param_expr_span: Span,
+        /// The unit that the parameter value has.
         param_value_unit: DisplayUnit,
     },
+    /// An error indicating that a parameter value's unit does not match the parameter's declared unit.
+    ///
+    /// This occurs when a parameter's value expression evaluates to a value with
+    /// a different unit than what is specified in the parameter's unit annotation.
     ParameterUnitMismatch {
+        /// The source span of the parameter expression.
         param_expr_span: Span,
+        /// The unit that the parameter value has.
         param_value_unit: DisplayUnit,
+        /// The source span of the parameter's unit annotation.
         param_unit_span: Span,
+        /// The unit that the parameter is declared to have.
         param_unit: DisplayUnit,
     },
+    /// An error indicating that an unknown unit name was used.
+    ///
+    /// This occurs when a unit name is referenced that is not recognized by
+    /// the unit system.
     UnknownUnit {
+        /// The name of the unknown unit.
         unit_name: String,
+        /// The source span of the unit name.
         unit_name_span: Span,
     },
+    /// An error indicating that a piecewise expression condition does not evaluate to a boolean.
     InvalidIfExpressionType {
+        /// The source span of the conditional expression.
         expr_span: Span,
+        /// The value that the expression evaluated to.
         found_value: Value,
     },
+    /// An error indicating that multiple piecewise branches match for a parameter.
     MultiplePiecewiseBranchesMatch {
+        /// The name of the parameter being evaluated.
         param_ident: String,
+        /// The source span of the parameter identifier.
         param_ident_span: Span,
+        /// The source spans of all matching branch conditions.
         matching_branche_spans: Vec<Span>,
     },
+    /// An error indicating that no piecewise branch matches for a parameter.
     NoPiecewiseBranchMatch {
+        /// The name of the parameter being evaluated.
         param_ident: String,
+        /// The source span of the parameter identifier.
         param_ident_span: Span,
     },
+    /// An error indicating that a boolean value cannot have a unit annotation.
     BooleanCannotHaveUnit {
+        /// The source span of the boolean expression.
         expr_span: Span,
+        /// The source span of the unit annotation.
         unit_span: Span,
     },
+    /// An error indicating that a string value cannot have a unit annotation.
     StringCannotHaveUnit {
+        /// The source span of the string expression.
         expr_span: Span,
+        /// The source span of the unit annotation.
         unit_span: Span,
     },
+    /// An error indicating that a continuous limit minimum expression does not evaluate to a number.
     InvalidContinuousLimitMinType {
+        /// The source span of the minimum limit expression.
         expr_span: Span,
+        /// The value that the expression evaluated to.
         found_value: Value,
     },
+    /// An error indicating that a continuous limit maximum expression does not evaluate to a number.
     InvalidContinuousLimitMaxType {
+        /// The source span of the maximum limit expression.
         expr_span: Span,
+        /// The value that the expression evaluated to.
         found_value: Value,
     },
+    /// An error indicating that a continuous limit's max unit does not match its min unit.
     MaxUnitDoesNotMatchMinUnit {
+        /// The unit of the maximum limit value.
         max_unit: DisplayUnit,
+        /// The source span of the maximum limit expression.
         max_unit_span: Span,
+        /// The unit of the minimum limit value.
         min_unit: DisplayUnit,
+        /// The source span of the minimum limit expression.
         min_unit_span: Span,
     },
+    /// An error indicating that a boolean value cannot be used as a discrete limit value.
     BooleanCannotBeDiscreteLimitValue {
+        /// The source span of the boolean expression.
         expr_span: Span,
     },
+    /// An error indicating that a duplicate string value appears in a discrete limit.
     DuplicateStringLimit {
+        /// The source span of the duplicate string expression.
         expr_span: Span,
+        /// The source span of the original string expression.
         original_expr_span: Span,
+        /// The string value that was duplicated.
         string_value: String,
     },
+    /// An error indicating that a discrete limit value was expected to be a string but was not.
     ExpectedStringLimit {
+        /// The source span of the invalid limit expression.
         expr_span: Span,
+        /// The value that the expression evaluated to.
         found_value: Value,
     },
+    /// An error indicating that a discrete limit value was expected to be a number but was not.
     ExpectedNumberLimit {
+        /// The source span of the invalid limit expression.
         expr_span: Span,
+        /// The value that the expression evaluated to.
         found_value: Value,
     },
+    /// An error indicating that a discrete limit value's unit does not match the expected unit.
     DiscreteLimitUnitMismatch {
+        /// The expected unit for the limit values.
         limit_unit: DisplayUnit,
+        /// The source span of the source of the expected unit.
         limit_span: Span,
+        /// The unit that the limit value has.
         value_unit: DisplayUnit,
+        /// The source span of the limit value expression.
         value_unit_span: Span,
     },
+    /// An error indicating that a parameter value is below the default parameter limits.
+    ///
+    /// This occurs when a parameter value is negative, which violates
+    /// the default limits for number parameters (0, inf).
     ParameterValueBelowDefaultLimits {
+        /// The source span of the parameter expression.
         param_expr_span: Span,
+        /// The parameter value that violates the limits.
         param_value: Value,
     },
+    /// An error indicating that a parameter value is below its continuous limit minimum.
     ParameterValueBelowContinuousLimits {
+        /// The source span of the parameter expression.
         param_expr_span: Span,
+        /// The parameter value that violates the limit.
         param_value: Value,
+        /// The source span of the minimum limit expression.
         min_expr_span: Span,
+        /// The minimum limit value.
         min_value: Value,
     },
+    /// An error indicating that a parameter value is above its continuous limit maximum.
     ParameterValueAboveContinuousLimits {
+        /// The source span of the parameter expression.
         param_expr_span: Span,
+        /// The parameter value that violates the limit.
         param_value: Value,
+        /// The source span of the maximum limit expression.
         max_expr_span: Span,
+        /// The maximum limit value.
         max_value: Value,
     },
+    /// An error indicating that a parameter value is not in its discrete limit list.
     ParameterValueNotInDiscreteLimits {
+        /// The source span of the parameter expression.
         param_expr_span: Span,
+        /// The parameter value that is not in the limit list.
         param_value: Value,
+        /// The source span of the discrete limit definition.
         limit_expr_span: Span,
+        /// The list of allowed limit values.
         limit_values: Vec<Value>,
     },
+    /// An error indicating that a boolean parameter cannot have a limit.
     BooleanCannotHaveALimit {
+        /// The source span of the boolean parameter expression.
         expr_span: Span,
+        /// The source span of the limit definition.
         limit_span: Span,
     },
+    /// An error indicating that a string parameter cannot have a number limit.
     StringCannotHaveNumberLimit {
+        /// The source span of the string parameter expression.
         param_expr_span: Span,
+        /// The parameter value.
         param_value: Value,
+        /// The source span of the limit definition.
         limit_span: Span,
     },
+    /// An error indicating that a number parameter cannot have a string limit.
     NumberCannotHaveStringLimit {
+        /// The source span of the number parameter expression.
         param_expr_span: Span,
+        /// The parameter value.
         param_value: Value,
+        /// The source span of the limit definition.
         limit_span: Span,
     },
+    /// An error indicating that a unitless number parameter cannot have a limit with units.
     UnitlessNumberCannotHaveLimitWithUnit {
+        /// The source span of the parameter expression.
         param_expr_span: Span,
+        /// The parameter value.
         param_value: Value,
+        /// The source span of the limit definition.
         limit_span: Span,
+        /// The unit that the limit has.
         limit_unit: DisplayUnit,
     },
+    /// An error indicating that a limit's unit does not match the parameter's unit.
     LimitUnitDoesNotMatchParameterUnit {
+        /// The unit that the parameter is declared to have.
         param_unit: DisplayUnit,
+        /// The source span of the limit definition.
         limit_span: Span,
+        /// The unit that the limit has.
         limit_unit: DisplayUnit,
     },
+    /// An error indicating that an unsupported feature was used.
+    ///
+    /// This occurs when attempting to use a language feature that is not yet
+    /// implemented or is not supported.
     Unsupported {
+        /// The source span of the unsupported feature usage.
         relevant_span: Span,
+        /// The name of the unsupported feature, if known.
         feature_name: Option<String>,
+        /// Whether this feature is planned to be supported in the future.
         will_be_supported: bool,
     },
 }
