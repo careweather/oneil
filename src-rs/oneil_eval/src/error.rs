@@ -1,6 +1,6 @@
 #![expect(missing_docs, reason = "this enum will be reworked in the next task")]
 
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 use oneil_shared::{
     error::{AsOneilError, Context as ErrorContext, ErrorLocation},
@@ -88,6 +88,18 @@ pub enum ExpectedType {
     String,
     MeasuredNumber,
     NumberOrMeasuredNumber,
+}
+
+impl fmt::Display for ExpectedType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Number => write!(f, "unitless number"),
+            Self::Boolean => write!(f, "boolean"),
+            Self::String => write!(f, "string"),
+            Self::MeasuredNumber => write!(f, "number with a unit"),
+            Self::NumberOrMeasuredNumber => write!(f, "number"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -273,6 +285,40 @@ pub enum EvalError {
 impl AsOneilError for EvalError {
     fn message(&self) -> String {
         match self {
+            Self::TypeMismatch {
+                expected_type,
+                expected_source_span: _,
+                found_type,
+                found_span: _,
+            } => format!("expected type `{expected_type}` but found `{found_type}`"),
+            Self::UnitMismatch {
+                expected_unit,
+                expected_source_span: _,
+                found_unit,
+                found_span: _,
+            } => format!("expected unit `{expected_unit}` but found `{found_unit}`"),
+            Self::InvalidType {
+                expected_type,
+                found_type,
+                found_span: _,
+            } => format!("expected type `{expected_type}` but found `{found_type}`"),
+            Self::InvalidNumberType {
+                number_type,
+                found_number_type,
+                found_span: _,
+            } => {
+                let number_type = match number_type {
+                    NumberType::Scalar => "scalar",
+                    NumberType::Interval => "interval",
+                };
+
+                let found_number_type = match found_number_type {
+                    NumberType::Scalar => "scalar",
+                    NumberType::Interval => "interval",
+                };
+
+                format!("expected {number_type} but found {found_number_type}")
+            }
             Self::BinaryEvalError {
                 lhs_span: _,
                 rhs_span: _,
@@ -326,7 +372,10 @@ impl AsOneilError for EvalError {
                     format!("expected a number exponent but found `{exponent_type}`")
                 }
             },
-            Self::UnaryEvalError { expr_span, error } => match error {
+            Self::UnaryEvalError {
+                expr_span: _,
+                error,
+            } => match error {
                 UnaryEvalError::InvalidType { op, value_type } => {
                     let op_str = match op {
                         UnaryOperation::Neg => "negation",
@@ -551,6 +600,28 @@ impl AsOneilError for EvalError {
 
     fn error_location(&self, source: &str) -> Option<ErrorLocation> {
         match self {
+            Self::TypeMismatch {
+                expected_type: _,
+                expected_source_span: _,
+                found_type: _,
+                found_span: _,
+            } => todo!(),
+            Self::UnitMismatch {
+                expected_unit: _,
+                expected_source_span: _,
+                found_unit: _,
+                found_span: _,
+            } => todo!(),
+            Self::InvalidType {
+                expected_type: _,
+                found_type: _,
+                found_span: _,
+            } => todo!(),
+            Self::InvalidNumberType {
+                number_type: _,
+                found_number_type: _,
+                found_span: _,
+            } => todo!(),
             Self::BinaryEvalError {
                 lhs_span,
                 rhs_span,
@@ -725,6 +796,28 @@ impl AsOneilError for EvalError {
 
     fn context(&self) -> Vec<ErrorContext> {
         match self {
+            Self::TypeMismatch {
+                expected_type: _,
+                expected_source_span: _,
+                found_type: _,
+                found_span: _,
+            } => todo!(),
+            Self::UnitMismatch {
+                expected_unit: _,
+                expected_source_span: _,
+                found_unit: _,
+                found_span: _,
+            } => todo!(),
+            Self::InvalidType {
+                expected_type: _,
+                found_type: _,
+                found_span: _,
+            } => todo!(),
+            Self::InvalidNumberType {
+                number_type: _,
+                found_number_type: _,
+                found_span: _,
+            } => todo!(),
             Self::BinaryEvalError {
                 lhs_span: _,
                 rhs_span: _,
@@ -946,6 +1039,28 @@ impl AsOneilError for EvalError {
 
     fn context_with_source(&self, source: &str) -> Vec<(ErrorContext, Option<ErrorLocation>)> {
         match self {
+            Self::TypeMismatch {
+                expected_type: _,
+                expected_source_span: _,
+                found_type: _,
+                found_span: _,
+            } => todo!(),
+            Self::UnitMismatch {
+                expected_unit: _,
+                expected_source_span: _,
+                found_unit: _,
+                found_span: _,
+            } => todo!(),
+            Self::InvalidType {
+                expected_type: _,
+                found_type: _,
+                found_span: _,
+            } => todo!(),
+            Self::InvalidNumberType {
+                number_type: _,
+                found_number_type: _,
+                found_span: _,
+            } => todo!(),
             Self::BinaryEvalError {
                 lhs_span,
                 rhs_span: _,
