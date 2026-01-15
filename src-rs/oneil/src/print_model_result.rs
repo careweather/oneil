@@ -81,6 +81,8 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
         }),
     };
 
+    let should_print_debug_info = model_config.print_level == PrintLevel::Debug;
+
     if parameters_to_print.is_empty() {
         let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No performance parameters found)");
         println!("{message}");
@@ -88,7 +90,7 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
     }
 
     for parameter in parameters_to_print {
-        print_parameter(parameter);
+        print_parameter(parameter, should_print_debug_info);
     }
 }
 
@@ -191,7 +193,7 @@ fn print_model_header(model_result: &result::Model) {
     println!("{divider_line}");
 }
 
-fn print_parameter(parameter: &result::Parameter) {
+fn print_parameter(parameter: &result::Parameter, should_print_debug_info: bool) {
     let styled_ident = stylesheet::PARAMETER_IDENTIFIER.style(&parameter.ident);
     print!("{styled_ident} = ");
 
@@ -199,6 +201,20 @@ fn print_parameter(parameter: &result::Parameter) {
 
     let styled_label = stylesheet::PARAMETER_LABEL.style(format!("# {}", parameter.label));
     println!("  {styled_label}");
+
+    if should_print_debug_info && let Some(debug_info) = &parameter.debug_info {
+        print_debug_info(debug_info);
+    }
+}
+
+fn print_debug_info(debug_info: &result::DebugInfo) {
+    for (dependency_name, dependency_value) in &debug_info.dependency_values {
+        let indent = " ".repeat(2);
+        let styled_dependency_name = stylesheet::PARAMETER_IDENTIFIER.style(dependency_name);
+        print!("{indent}- {styled_dependency_name} = ");
+        print_value(dependency_value);
+        println!();
+    }
 }
 
 fn print_value(value: &Value) {

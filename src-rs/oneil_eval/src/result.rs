@@ -94,6 +94,8 @@ pub struct Parameter {
     /// This represents the values of the dependencies at the time the
     /// parameter was evaluated.
     pub dependency_values: HashMap<String, Value>,
+    /// The debug information for this parameter, if requested.
+    pub debug_info: Option<DebugInfo>,
 }
 
 impl Parameter {
@@ -103,6 +105,13 @@ impl Parameter {
     pub fn should_print(&self, print_level: PrintLevel) -> bool {
         self.print_level >= print_level
     }
+}
+
+/// Debug information for a parameter.
+#[derive(Debug, Clone)]
+pub struct DebugInfo {
+    /// The values of the dependencies at the time the parameter was evaluated.
+    pub dependency_values: HashMap<String, Value>,
 }
 
 /// The trace level for debugging and diagnostic output.
@@ -119,6 +128,4 @@ pub enum PrintLevel {
     Trace,
     /// Performance output.
     Performance,
-    /// Performance output with debug information.
-    PerformanceDebug,
 }

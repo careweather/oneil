@@ -77,14 +77,26 @@ fn parameter_result_from<F: BuiltinFunction>(
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
 ) -> result::Parameter {
-    let print_level = match parameter.trace_level() {
-        ir::TraceLevel::Debug if parameter.is_performance() => result::PrintLevel::PerformanceDebug,
-        ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
-            result::PrintLevel::Performance
+    let (print_level, debug_info) = match parameter.trace_level() {
+        ir::TraceLevel::Debug if parameter.is_performance() => {
+            let dependency_values = get_dependency_values(parameter.dependencies(), context);
+            (
+                result::PrintLevel::Performance,
+                Some(result::DebugInfo { dependency_values }),
+            )
         }
-        ir::TraceLevel::Debug => result::PrintLevel::Debug,
-        ir::TraceLevel::Trace => result::PrintLevel::Trace,
-        ir::TraceLevel::None => result::PrintLevel::None,
+        ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
+            (result::PrintLevel::Performance, None)
+        }
+        ir::TraceLevel::Debug => {
+            let dependency_values = get_dependency_values(parameter.dependencies(), context);
+            (
+                result::PrintLevel::Debug,
+                Some(result::DebugInfo { dependency_values }),
+            )
+        }
+        ir::TraceLevel::Trace => (result::PrintLevel::Trace, None),
+        ir::TraceLevel::None => (result::PrintLevel::None, None),
     };
 
     let dependency_values = get_dependency_values(parameter.dependencies(), context);
@@ -95,6 +107,7 @@ fn parameter_result_from<F: BuiltinFunction>(
         value,
         print_level,
         dependency_values,
+        debug_info,
     }
 }
 

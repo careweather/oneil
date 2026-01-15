@@ -2258,6 +2258,7 @@ mod tests {
                 label: name.to_string(),
                 print_level: result::PrintLevel::None,
                 dependency_values: HashMap::new(),
+                debug_info: None,
             }
         }
     }
