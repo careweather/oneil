@@ -105,9 +105,7 @@ fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
     let failing_tests = model_tests
         .iter()
         .filter_map(|test| match &test.result {
-            result::TestResult::Failed { dependency_values } => {
-                Some((test.expr_span, dependency_values))
-            }
+            result::TestResult::Failed { debug_info } => Some((test.expr_span, debug_info)),
             result::TestResult::Passed => None,
         })
         .collect::<Vec<_>>();
@@ -138,7 +136,7 @@ fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
     let tests_label = stylesheet::TESTS_FAIL_COLOR.style("FAILING TESTS");
     println!("{tests_label}");
 
-    for (test_span, dependency_values) in failing_tests {
+    for (test_span, debug_info) in failing_tests {
         let test_start_offset = test_span.start().offset;
         let test_end_offset = test_span.end().offset;
         let test_expr_str = file_contents.get(test_start_offset..test_end_offset);
@@ -156,14 +154,7 @@ fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
         };
 
         println!("{test_expr_str}");
-
-        for (dependency_name, dependency_value) in dependency_values {
-            let indent = " ".repeat(2);
-            let styled_dependency_name = stylesheet::PARAMETER_IDENTIFIER.style(dependency_name);
-            print!("{indent}- {styled_dependency_name} = ");
-            print_value(dependency_value);
-            println!();
-        }
+        print_debug_info(debug_info);
     }
 
     println!("{divider_line}");

@@ -182,8 +182,9 @@ fn eval_test<F: BuiltinFunction>(
         }),
         Value::Boolean(false) => {
             let dependency_values = get_dependency_values(test.dependencies(), context);
+            let debug_info = result::DebugInfo { dependency_values };
             Ok(result::Test {
-                result: result::TestResult::Failed { dependency_values },
+                result: result::TestResult::Failed { debug_info },
                 expr_span: *expr_span,
             })
         }

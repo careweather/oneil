@@ -66,7 +66,7 @@ pub enum TestResult {
     /// The test failed.
     Failed {
         /// The values of the test dependencies.
-        dependency_values: HashMap<String, Value>,
+        debug_info: DebugInfo,
     },
 }
 
