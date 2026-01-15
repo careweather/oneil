@@ -102,6 +102,7 @@ pub fn resolve_variable(
             let expr = ir::Expr::external_variable(
                 variable_span,
                 reference_path.clone(),
+                reference_name,
                 reference_name_span,
                 var_identifier,
                 var_identifier_span,
@@ -129,10 +130,11 @@ mod tests {
 
             let ir::Expr::Variable {
                 span: _,
-                variable: ir::Variable::Builtin {
-                    ident: actual_ident,
-                    ..
-                },
+                variable:
+                    ir::Variable::Builtin {
+                        ident: actual_ident,
+                        ..
+                    },
             } = variable
             else {
                 panic!("expected builtin variable, got {variable:?}");
@@ -153,10 +155,11 @@ mod tests {
 
             let ir::Expr::Variable {
                 span: _,
-                variable: ir::Variable::Parameter {
-                    parameter_name: actual_ident,
-                    ..
-                },
+                variable:
+                    ir::Variable::Parameter {
+                        parameter_name: actual_ident,
+                        ..
+                    },
             } = variable
             else {
                 panic!("expected parameter variable, got {variable:?}");
@@ -180,7 +183,7 @@ mod tests {
                 span: _,
                 variable:
                     ir::Variable::External {
-                        model: actual_model_path,
+                        model_path: actual_model_path,
                         parameter_name: actual_parameter_name,
                         ..
                     },

@@ -350,7 +350,7 @@ fn print_variable(var: &ir::Variable, indent: usize) {
             );
         }
         ir::Variable::External {
-            model,
+            model_path: model,
             parameter_name,
             ..
         } => {

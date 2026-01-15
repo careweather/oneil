@@ -12,7 +12,9 @@ mod test;
 mod unit;
 
 pub use debug_info::TraceLevel;
-pub use expr::{BinaryOp, ComparisonOp, Expr, FunctionName, Literal, UnaryOp, Variable};
+pub use expr::{
+    BinaryOp, ComparisonOp, Expr, ExprVisitor, FunctionName, Literal, UnaryOp, Variable,
+};
 pub use model::{Model, ModelCollection};
 pub use model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName};
 pub use parameter::{

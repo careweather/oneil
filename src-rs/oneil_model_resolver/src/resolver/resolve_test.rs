@@ -9,7 +9,7 @@ use crate::{
     BuiltinRef,
     error::{self, TestResolutionError},
     resolver::{
-        resolve_expr::{get_expr_internal_dependencies, resolve_expr},
+        resolve_expr::{get_expr_dependencies, resolve_expr},
         resolve_trace_level::resolve_trace_level,
     },
     util::context::{ParameterContext, ReferenceContext},
@@ -31,8 +31,6 @@ pub fn resolve_tests(
 
         let trace_level = resolve_trace_level(test.trace_level());
 
-        let dependencies = get_expr_internal_dependencies(test.expr(), HashMap::new());
-
         let test_expr = resolve_expr(
             test.expr(),
             builtin_ref,
@@ -40,6 +38,8 @@ pub fn resolve_tests(
             parameter_context,
         )
         .map_err(|errors| (test_index, error::convert_errors(errors)))?;
+
+        let dependencies = get_expr_dependencies(&test_expr);
 
         Ok((
             test_index,

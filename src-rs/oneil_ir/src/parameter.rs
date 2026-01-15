@@ -4,7 +4,9 @@ use std::collections::HashMap;
 
 use oneil_shared::span::Span;
 
-use crate::{Identifier, ModelPath, debug_info::TraceLevel, expr::Expr, unit::CompositeUnit};
+use crate::{
+    Identifier, ModelPath, ReferenceName, debug_info::TraceLevel, expr::Expr, unit::CompositeUnit,
+};
 
 /// A name for a parameter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -147,7 +149,7 @@ pub struct Dependencies {
     /// The dependencies on parameters defined in the current model.
     parameter: HashMap<ParameterName, Span>,
     /// The dependencies on parameters defined in other models.
-    external: HashMap<(ModelPath, ParameterName), Span>,
+    external: HashMap<(ReferenceName, ParameterName), (ModelPath, Span)>,
 }
 
 impl Dependencies {
@@ -175,8 +177,37 @@ impl Dependencies {
 
     /// Returns the dependencies on parameters defined in other models.
     #[must_use]
-    pub const fn external(&self) -> &HashMap<(ModelPath, ParameterName), Span> {
+    pub const fn external(&self) -> &HashMap<(ReferenceName, ParameterName), (ModelPath, Span)> {
         &self.external
+    }
+
+    /// Inserts a dependency on a builtin variable.
+    pub fn insert_builtin(&mut self, ident: Identifier, span: Span) {
+        self.builtin.insert(ident, span);
+    }
+
+    /// Inserts a dependency on a parameter defined in the current model.
+    pub fn insert_parameter(&mut self, parameter_name: ParameterName, span: Span) {
+        self.parameter.insert(parameter_name, span);
+    }
+
+    /// Inserts a dependency on a parameter defined in another model.
+    pub fn insert_external(
+        &mut self,
+        reference_name: ReferenceName,
+        parameter_name: ParameterName,
+        model_path: ModelPath,
+        full_span: Span,
+    ) {
+        self.external
+            .insert((reference_name, parameter_name), (model_path, full_span));
+    }
+
+    /// Extends the dependencies with the given dependencies.
+    pub fn extend(&mut self, other: Self) {
+        self.builtin.extend(other.builtin);
+        self.parameter.extend(other.parameter);
+        self.external.extend(other.external);
     }
 }
 

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use oneil_ast as ast;
-use oneil_ir as ir;
+use oneil_ir::{self as ir, Dependencies};
 use oneil_shared::span::Span;
 
 use crate::{
@@ -258,61 +258,96 @@ fn resolve_literal(literal: &ast::LiteralNode) -> ir::Literal {
 }
 
 /// Extracts internal dependencies from an expression.
-pub fn get_expr_internal_dependencies(
-    expr: &ast::Expr,
-    mut dependencies: HashMap<ir::ParameterName, Span>,
-) -> HashMap<ir::ParameterName, Span> {
-    match expr {
-        ast::Expr::BinaryOp { op: _, left, right } => {
-            let dependencies = get_expr_internal_dependencies(left, dependencies);
-            get_expr_internal_dependencies(right, dependencies)
-        }
+///
+/// Note that these dependencies include both parameters and builtin variables.
+pub fn get_expr_internal_dependencies(expr: &ast::ExprNode) -> HashMap<ir::Identifier, Span> {
+    struct ExprInternalDependencyVisitor {
+        dependencies: HashMap<ir::Identifier, Span>,
+    }
 
-        ast::Expr::UnaryOp { op: _, expr } | ast::Expr::Parenthesized { expr } => {
-            get_expr_internal_dependencies(expr, dependencies)
-        }
+    impl ast::ExprVisitor for ExprInternalDependencyVisitor {
+        fn visit_variable(mut self, _span: Span, var: &ast::VariableNode) -> Self {
+            match &**var {
+                ast::Variable::Identifier(identifier_node) => {
+                    let identifier = ir::Identifier::new(identifier_node.as_str().to_string());
+                    let identifier_span = identifier_node.span();
+                    self.dependencies.insert(identifier, identifier_span);
+                    self
+                }
 
-        ast::Expr::FunctionCall { name: _, args } => {
-            args.iter().fold(dependencies, |dependencies, arg| {
-                get_expr_internal_dependencies(arg, dependencies)
-            })
-        }
-
-        ast::Expr::Variable(variable) => match &**variable {
-            ast::Variable::Identifier(identifier_node) => {
-                let identifier = ir::ParameterName::new(identifier_node.as_str().to_string());
-                let identifier_span = identifier_node.span();
-                dependencies.insert(identifier, identifier_span);
-                dependencies
+                ast::Variable::ModelParameter {
+                    reference_model: _,
+                    parameter: _,
+                } => {
+                    // an accessor implies that the dependency is on a parameter
+                    // outside of the current model, so it doesn't count as an
+                    // internal dependency
+                    self
+                }
             }
-
-            ast::Variable::ModelParameter {
-                reference_model: _,
-                parameter: _,
-            } => {
-                // an accessor implies that the dependency is on a parameter
-                // outside of the current model, so it doesn't count as an
-                // internal dependency
-                dependencies
-            }
-        },
-        ast::Expr::Literal(_) => dependencies,
-        ast::Expr::ComparisonOp {
-            op: _,
-            left,
-            right,
-            rest_chained,
-        } => {
-            let dependencies = get_expr_internal_dependencies(left, dependencies);
-            let dependencies = get_expr_internal_dependencies(right, dependencies);
-            // Handle chained comparisons
-            rest_chained
-                .iter()
-                .fold(dependencies, |dependencies, (_, expr)| {
-                    get_expr_internal_dependencies(expr, dependencies)
-                })
         }
     }
+
+    let visitor = ExprInternalDependencyVisitor {
+        dependencies: HashMap::new(),
+    };
+    let visitor = expr.pre_order_visit(visitor);
+    visitor.dependencies
+}
+
+/// Extracts dependencies from an expression.
+///
+/// This should only be called for expressions that are guaranteed to be valid and resolved.
+///
+/// # Panics
+///
+/// This function will panic if it encounters a variable that has not been completely resolved.
+pub fn get_expr_dependencies(expr: &ir::Expr) -> Dependencies {
+    struct ExprDependencyVisitor {
+        dependencies: Dependencies,
+    }
+
+    impl ir::ExprVisitor for ExprDependencyVisitor {
+        fn visit_variable(mut self, span: Span, variable: &ir::Variable) -> Self {
+            match variable {
+                ir::Variable::Builtin { ident, ident_span } => {
+                    self.dependencies.insert_builtin(ident.clone(), *ident_span);
+                    self
+                }
+
+                ir::Variable::Parameter {
+                    parameter_name,
+                    parameter_span,
+                } => {
+                    self.dependencies
+                        .insert_parameter(parameter_name.clone(), *parameter_span);
+                    self
+                }
+
+                ir::Variable::External {
+                    model_path,
+                    reference_name,
+                    reference_span: _,
+                    parameter_name,
+                    parameter_span: _,
+                } => {
+                    self.dependencies.insert_external(
+                        reference_name.clone(),
+                        parameter_name.clone(),
+                        model_path.clone(),
+                        span,
+                    );
+                    self
+                }
+            }
+        }
+    }
+
+    let visitor = ExprDependencyVisitor {
+        dependencies: Dependencies::new(),
+    };
+    let visitor = expr.pre_order_visit(visitor);
+    visitor.dependencies
 }
 
 #[cfg(test)]

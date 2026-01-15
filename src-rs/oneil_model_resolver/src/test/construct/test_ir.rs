@@ -89,7 +89,6 @@ impl ModelBuilder {
 }
 
 pub struct ParameterBuilder {
-    dependencies: HashMap<ir::ParameterName, Span>,
     name: Option<ir::ParameterName>,
     name_span: Option<Span>,
     span: Option<Span>,
@@ -102,7 +101,6 @@ pub struct ParameterBuilder {
 impl ParameterBuilder {
     pub fn new() -> Self {
         Self {
-            dependencies: HashMap::new(),
             name: None,
             name_span: None,
             span: None,
@@ -142,7 +140,7 @@ impl ParameterBuilder {
         let trace_level = self.trace_level;
 
         ir::Parameter::new(
-            self.dependencies,
+            ir::Dependencies::new(),
             name,
             name_span,
             span,
