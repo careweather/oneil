@@ -102,6 +102,21 @@ pub enum EvalError {
         /// The source span of the expression that produced the wrong unit.
         found_span: Span,
     },
+    /// A number type mismatch error where the expected and found number types do not match.
+    ///
+    /// This occurs when an expression is expected to have a specific number type
+    /// (scalar or interval) because of the number type of a previous expression,
+    /// but evaluates to a different number type.
+    NumberTypeMismatch {
+        /// The expected number type (scalar or interval).
+        expected_number_type: NumberType,
+        /// The source span of the expression that caused the expected number type.
+        expected_source_span: Span,
+        /// The actual number type that was found.
+        found_number_type: NumberType,
+        /// The source span of the expression that produced the wrong number type.
+        found_span: Span,
+    },
     /// An invalid type error where the found type does not match the expected type category.
     ///
     /// This occurs when an operation expects an expression to be a specific type category
@@ -112,6 +127,18 @@ pub enum EvalError {
         /// The actual value type that was found.
         found_type: ValueType,
         /// The source span of the expression that produced the wrong type.
+        found_span: Span,
+    },
+    /// An invalid unit error where the found unit does not match the expected one.
+    ///
+    /// This occurs when an operation expects an expression to be unitless but finds a number
+    /// with a unit, or expects a number with a unit but finds a unitless number.
+    InvalidUnit {
+        /// The expected unit, or None if a unitless number was expected.
+        expected_unit: Option<DisplayUnit>,
+        /// The unit that was found, or None if a unitless number was found.
+        found_unit: Option<DisplayUnit>,
+        /// The source span of the expression that produced the wrong unit.
         found_span: Span,
     },
     /// An invalid number type error where the found number type does not match the expected one.
@@ -426,11 +453,44 @@ impl AsOneilError for EvalError {
                 found_unit,
                 found_span: _,
             } => format!("expected unit `{expected_unit}` but found `{found_unit}`"),
+            Self::NumberTypeMismatch {
+                expected_number_type,
+                expected_source_span: _,
+                found_number_type,
+                found_span: _,
+            } => {
+                let expected_number_type = match expected_number_type {
+                    NumberType::Scalar => "scalar",
+                    NumberType::Interval => "interval",
+                };
+
+                let found_number_type = match found_number_type {
+                    NumberType::Scalar => "scalar",
+                    NumberType::Interval => "interval",
+                };
+
+                format!("expected {expected_number_type} but found {found_number_type}")
+            }
             Self::InvalidType {
                 expected_type,
                 found_type,
                 found_span: _,
             } => format!("expected type `{expected_type}` but found `{found_type}`"),
+            Self::InvalidUnit {
+                expected_unit,
+                found_unit,
+                found_span: _,
+            } => {
+                let expected = expected_unit.as_ref().map_or_else(
+                    || "unitless number".to_string(),
+                    |u| format!("number with unit `{u}`"),
+                );
+                let found = found_unit.as_ref().map_or_else(
+                    || "unitless number".to_string(),
+                    |u| format!("number with unit `{u}`"),
+                );
+                format!("expected {expected} but found {found}")
+            }
             Self::InvalidNumberType {
                 number_type,
                 found_number_type,
@@ -663,9 +723,20 @@ impl AsOneilError for EvalError {
                 found_unit: _,
                 found_span: location_span,
             }
+            | Self::NumberTypeMismatch {
+                expected_number_type: _,
+                expected_source_span: _,
+                found_number_type: _,
+                found_span: location_span,
+            }
             | Self::InvalidType {
                 expected_type: _,
                 found_type: _,
+                found_span: location_span,
+            }
+            | Self::InvalidUnit {
+                expected_unit: _,
+                found_unit: _,
                 found_span: location_span,
             }
             | Self::InvalidNumberType {
@@ -836,9 +907,20 @@ impl AsOneilError for EvalError {
                 found_unit: _,
                 found_span: _,
             } => Vec::new(),
+            Self::NumberTypeMismatch {
+                expected_number_type: _,
+                expected_source_span: _,
+                found_number_type: _,
+                found_span: _,
+            } => Vec::new(),
             Self::InvalidType {
                 expected_type: _,
                 found_type: _,
+                found_span: _,
+            } => Vec::new(),
+            Self::InvalidUnit {
+                expected_unit: _,
+                found_unit: _,
                 found_span: _,
             } => Vec::new(),
             Self::InvalidNumberType {
@@ -1073,9 +1155,35 @@ impl AsOneilError for EvalError {
                     *expected_source_span,
                 )),
             )],
+            Self::NumberTypeMismatch {
+                expected_number_type,
+                expected_source_span,
+                found_number_type: _,
+                found_span: _,
+            } => {
+                let expected_number_type = match expected_number_type {
+                    NumberType::Scalar => "scalar",
+                    NumberType::Interval => "interval",
+                };
+
+                vec![(
+                    ErrorContext::Note(format!(
+                        "expected because this expression has number type `{expected_number_type}`",
+                    )),
+                    Some(ErrorLocation::from_source_and_span(
+                        source,
+                        *expected_source_span,
+                    )),
+                )]
+            }
             Self::InvalidType {
                 expected_type: _,
                 found_type: _,
+                found_span: _,
+            } => Vec::new(),
+            Self::InvalidUnit {
+                expected_unit: _,
+                found_unit: _,
                 found_span: _,
             } => Vec::new(),
             Self::InvalidNumberType {
