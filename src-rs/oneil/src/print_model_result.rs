@@ -1,4 +1,4 @@
-use std::{fmt, str};
+use std::{fmt, path::Path, str};
 
 use anstream::{print, println};
 use oneil_eval::{
@@ -54,6 +54,10 @@ impl fmt::Display for PrintMode {
     }
 }
 
+pub fn divider_line() -> String {
+    "─".repeat(80)
+}
+
 pub fn print(model_result: &result::Model, print_debug: bool, model_config: &ModelPrintConfig) {
     if print_debug {
         println!("{model_result:?}");
@@ -61,6 +65,8 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
     }
 
     print_model_header(model_result);
+
+    print_failing_tests(&model_result.path, &model_result.tests);
 
     let parameters_to_print = model_result
         .parameters
@@ -79,8 +85,67 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
     }
 }
 
+fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
+    let failing_tests = model_tests
+        .iter()
+        .filter(|test| !test.passed)
+        .collect::<Vec<_>>();
+
+    if failing_tests.is_empty() {
+        return;
+    }
+
+    let divider_line = divider_line();
+    let file_contents = std::fs::read_to_string(model_path);
+
+    let file_contents = match file_contents {
+        Ok(file_contents) => file_contents,
+        Err(e) => {
+            let error_label = stylesheet::ERROR_COLOR.style("error");
+
+            println!(
+                "{error_label}: couldn't read `{}` - {}",
+                model_path.display(),
+                e
+            );
+            println!("{divider_line}");
+
+            return;
+        }
+    };
+
+    let tests_label = stylesheet::TESTS_FAIL_COLOR.style("Failing Tests");
+    println!("{tests_label}:");
+
+    for test in failing_tests {
+        let test_span = test.expr_span;
+        let test_start_offset = test_span.start().offset;
+        let test_end_offset = test_span.end().offset;
+        let test_expr_str = file_contents.get(test_start_offset..test_end_offset);
+
+        let test_expr_str = match test_expr_str {
+            Some(test_expr_str) => test_expr_str,
+            None => {
+                let error_label = stylesheet::ERROR_COLOR.style("error");
+                let test_start_line = test_span.start().line;
+                let test_start_column = test_span.start().column;
+
+                println!(
+                    "{error_label}: couldn't get test expression for test at line {test_start_line}, column {test_start_column}"
+                );
+
+                continue;
+            }
+        };
+
+        println!("{test_expr_str}");
+    }
+
+    println!("{divider_line}");
+}
+
 fn print_model_header(model_result: &result::Model) {
-    let break_line = "─".repeat(80);
+    let divider_line = divider_line();
     let model_label = stylesheet::MODEL_LABEL.style("Model");
     let tests_label = stylesheet::TESTS_LABEL.style("Tests");
 
@@ -93,10 +158,10 @@ fn print_model_header(model_result: &result::Model) {
         stylesheet::TESTS_FAIL_COLOR.style("FAIL")
     };
 
-    println!("{break_line}");
+    println!("{divider_line}");
     println!("{model_label}: {}", model_result.path.display());
     println!("{tests_label}: {passed_count}/{test_count} ({test_result_string})");
-    println!("{break_line}");
+    println!("{divider_line}");
 }
 
 fn print_parameter(parameter: &result::Parameter) {
