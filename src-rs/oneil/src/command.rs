@@ -44,6 +44,10 @@ pub enum Commands {
         /// Print level for the output (all, debug, trace, perf)
         #[arg(long, default_value_t)]
         print_level: PrintLevel,
+
+        /// Only print info about the top model
+        #[arg(long)]
+        top_only: bool,
     },
     /// Run the LSP
     Lsp {},

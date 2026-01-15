@@ -39,7 +39,8 @@ fn main() {
             print_debug,
             no_colors,
             print_level,
-        } => handle_eval_command(&file, print_debug, print_level, no_colors),
+            top_only,
+        } => handle_eval_command(&file, print_debug, print_level, no_colors, top_only),
     }
 }
 
@@ -121,7 +122,13 @@ fn handle_dev_command(command: DevCommand) {
     }
 }
 
-fn handle_eval_command(file: &Path, print_debug: bool, print_level: PrintLevel, no_colors: bool) {
+fn handle_eval_command(
+    file: &Path,
+    print_debug: bool,
+    print_level: PrintLevel,
+    no_colors: bool,
+    top_only: bool,
+) {
     set_color_choice(no_colors);
 
     let builtins = Builtins::new(
@@ -152,7 +159,14 @@ fn handle_eval_command(file: &Path, print_debug: bool, print_level: PrintLevel, 
 
     match model_result {
         Ok(model_result) => {
-            print_model_result::print(&model_result, print_debug, ModelPrintConfig { print_level });
+            print_model_result::print(
+                &model_result,
+                print_debug,
+                ModelPrintConfig {
+                    print_level,
+                    top_model_only: top_only,
+                },
+            );
         }
         Err(errors) => {
             for error in errors {

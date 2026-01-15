@@ -5,12 +5,14 @@ use oneil_eval::{
     result,
     value::{self, Value},
 };
+use oneil_shared::span::Span;
 
 use crate::stylesheet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModelPrintConfig {
     pub print_level: PrintLevel,
+    pub top_model_only: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,11 +66,52 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: Mode
         return;
     }
 
-    print_model_header(model_result);
+    let parameters_to_print = get_model_parameters(
+        model_result,
+        model_config.print_level,
+        model_config.top_model_only,
+        HashMap::new(),
+    );
 
-    print_failing_tests(&model_result.path, &model_result.tests);
+    let test_info = get_model_tests(
+        model_result,
+        model_config.top_model_only,
+        TestInfo::default(),
+    );
 
-    let parameters_to_print = match model_config.print_level {
+    print_model_header(&model_result.path, &test_info);
+
+    print_failing_tests(&test_info);
+
+    let should_print_debug_info = model_config.print_level == PrintLevel::Debug;
+
+    if parameters_to_print.is_empty() {
+        let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No performance parameters found)");
+        println!("{message}");
+        return;
+    }
+
+    let only_top_model_is_printed = parameters_to_print.len() == 1
+        && parameters_to_print.contains_key(model_result.path.as_path());
+
+    for (path, parameters) in parameters_to_print {
+        if !only_top_model_is_printed {
+            print_model_path_header(path);
+        }
+
+        for parameter in parameters {
+            print_parameter(parameter, should_print_debug_info);
+        }
+    }
+}
+
+fn get_model_parameters<'a>(
+    model_result: &'a result::Model,
+    print_level: PrintLevel,
+    top_model_only: bool,
+    mut models: HashMap<&'a Path, Vec<&'a result::Parameter>>,
+) -> HashMap<&'a Path, Vec<&'a result::Parameter>> {
+    let parameters_to_print = match print_level {
         PrintLevel::All => filter_parameters(&model_result.parameters, |_parameter| true),
         PrintLevel::Debug => filter_parameters(&model_result.parameters, |parameter| {
             parameter.should_print(result::PrintLevel::Debug)
@@ -81,16 +124,59 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: Mode
         }),
     };
 
-    let should_print_debug_info = model_config.print_level == PrintLevel::Debug;
+    models.insert(&model_result.path, parameters_to_print);
 
-    if parameters_to_print.is_empty() {
-        let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No performance parameters found)");
-        println!("{message}");
-        return;
+    if top_model_only {
+        models
+    } else {
+        model_result
+            .submodels
+            .values()
+            .fold(models, |models, submodel| {
+                get_model_parameters(submodel, print_level, top_model_only, models)
+            })
     }
+}
 
-    for parameter in parameters_to_print {
-        print_parameter(parameter, should_print_debug_info);
+#[derive(Default)]
+struct TestInfo<'a> {
+    pub test_count: usize,
+    pub passed_count: usize,
+    // this is a vec in order to preserve the order of the models
+    pub failed_tests: Vec<(&'a Path, Vec<(Span, &'a result::DebugInfo)>)>,
+}
+
+fn get_model_tests<'a>(
+    model_result: &'a result::Model,
+    top_model_only: bool,
+    mut test_info: TestInfo<'a>,
+) -> TestInfo<'a> {
+    let test_count = model_result.tests.len();
+    let failed_tests = model_result
+        .tests
+        .iter()
+        .filter_map(|test| match &test.result {
+            result::TestResult::Failed { debug_info } => Some((test.expr_span, debug_info)),
+            result::TestResult::Passed => None,
+        })
+        .collect::<Vec<_>>();
+
+    test_info.test_count += test_count;
+    test_info.passed_count += test_count - failed_tests.len();
+
+    test_info
+        .failed_tests
+        .push((&model_result.path, failed_tests));
+
+    if top_model_only {
+        test_info
+    } else {
+        model_result
+            .submodels
+            .values()
+            .fold(test_info, |test_info, submodel| {
+                get_model_tests(submodel, top_model_only, test_info)
+            })
     }
 }
 
@@ -101,20 +187,24 @@ fn filter_parameters(
     parameters.values().filter(arg).collect()
 }
 
-fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
-    let failing_tests = model_tests
-        .iter()
-        .filter_map(|test| match &test.result {
-            result::TestResult::Failed { debug_info } => Some((test.expr_span, debug_info)),
-            result::TestResult::Passed => None,
-        })
-        .collect::<Vec<_>>();
-
-    if failing_tests.is_empty() {
+fn print_failing_tests(test_info: &TestInfo<'_>) {
+    if test_info.failed_tests.is_empty() {
         return;
     }
 
     let divider_line = divider_line();
+
+    let tests_label = stylesheet::TESTS_FAIL_COLOR.style("FAILING TESTS");
+    println!("{tests_label}");
+
+    for (model_path, failing_tests) in &test_info.failed_tests {
+        print_model_failing_tests(model_path, failing_tests);
+    }
+
+    println!("{divider_line}");
+}
+
+fn print_model_failing_tests(model_path: &Path, failing_tests: &[(Span, &result::DebugInfo)]) {
     let file_contents = std::fs::read_to_string(model_path);
 
     let file_contents = match file_contents {
@@ -127,14 +217,12 @@ fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
                 model_path.display(),
                 e
             );
-            println!("{divider_line}");
 
             return;
         }
     };
 
-    let tests_label = stylesheet::TESTS_FAIL_COLOR.style("FAILING TESTS");
-    println!("{tests_label}");
+    print_model_path_header(model_path);
 
     for (test_span, debug_info) in failing_tests {
         let test_start_offset = test_span.start().offset;
@@ -156,21 +244,15 @@ fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
         println!("{test_expr_str}");
         print_debug_info(debug_info);
     }
-
-    println!("{divider_line}");
 }
 
-fn print_model_header(model_result: &result::Model) {
+fn print_model_header(model_path: &Path, test_info: &TestInfo<'_>) {
     let divider_line = divider_line();
     let model_label = stylesheet::MODEL_LABEL.style("Model");
     let tests_label = stylesheet::TESTS_LABEL.style("Tests");
 
-    let test_count = model_result.tests.len();
-    let passed_count = model_result
-        .tests
-        .iter()
-        .filter(|test| test.passed())
-        .count();
+    let test_count = test_info.test_count;
+    let passed_count = test_info.passed_count;
 
     let test_result_string = if passed_count == test_count {
         stylesheet::TESTS_PASS_COLOR.style("PASS")
@@ -179,9 +261,14 @@ fn print_model_header(model_result: &result::Model) {
     };
 
     println!("{divider_line}");
-    println!("{model_label}: {}", model_result.path.display());
+    println!("{model_label}: {}", model_path.display());
     println!("{tests_label}: {passed_count}/{test_count} ({test_result_string})");
     println!("{divider_line}");
+}
+
+fn print_model_path_header(model_path: &Path) {
+    let header = stylesheet::MODEL_PATH_HEADER.style(model_path.display());
+    println!("{header}");
 }
 
 fn print_parameter(parameter: &result::Parameter, should_print_debug_info: bool) {
