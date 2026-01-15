@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use oneil_shared::span::Span;
 
-use crate::{debug_info::TraceLevel, expr::Expr, unit::CompositeUnit};
+use crate::{Identifier, ModelPath, debug_info::TraceLevel, expr::Expr, unit::CompositeUnit};
 
 /// A name for a parameter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,7 +45,7 @@ impl Label {
 /// Represents a single parameter in an Oneil model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    dependencies: HashMap<ParameterName, Span>,
+    dependencies: Dependencies,
     name: ParameterName,
     name_span: Span,
     span: Span,
@@ -61,7 +61,7 @@ impl Parameter {
     #[expect(clippy::too_many_arguments, reason = "this is a constructor")]
     #[must_use]
     pub const fn new(
-        dependencies: HashMap<ParameterName, Span>,
+        dependencies: Dependencies,
         name: ParameterName,
         name_span: Span,
         span: Span,
@@ -86,7 +86,7 @@ impl Parameter {
 
     /// Returns a reference to the set of parameter dependencies.
     #[must_use]
-    pub const fn dependencies(&self) -> &HashMap<ParameterName, Span> {
+    pub const fn dependencies(&self) -> &Dependencies {
         &self.dependencies
     }
 
@@ -136,6 +136,53 @@ impl Parameter {
     #[must_use]
     pub const fn trace_level(&self) -> TraceLevel {
         self.trace_level
+    }
+}
+
+/// The dependencies of a parameter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dependencies {
+    /// The dependencies on builtin variables.
+    builtin: HashMap<Identifier, Span>,
+    /// The dependencies on parameters defined in the current model.
+    parameter: HashMap<ParameterName, Span>,
+    /// The dependencies on parameters defined in other models.
+    external: HashMap<(ModelPath, ParameterName), Span>,
+}
+
+impl Dependencies {
+    /// Creates new dependencies.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            builtin: HashMap::new(),
+            parameter: HashMap::new(),
+            external: HashMap::new(),
+        }
+    }
+
+    /// Returns the dependencies on builtin variables.
+    #[must_use]
+    pub const fn builtin(&self) -> &HashMap<Identifier, Span> {
+        &self.builtin
+    }
+
+    /// Returns the dependencies on parameters defined in the current model.
+    #[must_use]
+    pub const fn parameter(&self) -> &HashMap<ParameterName, Span> {
+        &self.parameter
+    }
+
+    /// Returns the dependencies on parameters defined in other models.
+    #[must_use]
+    pub const fn external(&self) -> &HashMap<(ModelPath, ParameterName), Span> {
+        &self.external
+    }
+}
+
+impl Default for Dependencies {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

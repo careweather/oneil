@@ -1,10 +1,8 @@
 //! Testing for Oneil model IR.
 
-use std::collections::HashMap;
-
 use oneil_shared::span::Span;
 
-use crate::{ParameterName, debug_info::TraceLevel, expr::Expr};
+use crate::{Dependencies, debug_info::TraceLevel, expr::Expr};
 
 /// An index for identifying tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -24,7 +22,7 @@ pub struct Test {
     span: Span,
     trace_level: TraceLevel,
     expr: Expr,
-    dependencies: HashMap<ParameterName, Span>,
+    dependencies: Dependencies,
 }
 
 impl Test {
@@ -34,7 +32,7 @@ impl Test {
         span: Span,
         trace_level: TraceLevel,
         expr: Expr,
-        dependencies: HashMap<ParameterName, Span>,
+        dependencies: Dependencies,
     ) -> Self {
         Self {
             span,
@@ -64,7 +62,7 @@ impl Test {
 
     /// Returns the dependencies of this test.
     #[must_use]
-    pub const fn dependencies(&self) -> &HashMap<ParameterName, Span> {
+    pub const fn dependencies(&self) -> &Dependencies {
         &self.dependencies
     }
 }

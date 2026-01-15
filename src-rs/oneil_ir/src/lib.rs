@@ -15,7 +15,9 @@ pub use debug_info::TraceLevel;
 pub use expr::{BinaryOp, ComparisonOp, Expr, FunctionName, Literal, UnaryOp, Variable};
 pub use model::{Model, ModelCollection};
 pub use model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName};
-pub use parameter::{Label, Limits, Parameter, ParameterName, ParameterValue, PiecewiseExpr};
+pub use parameter::{
+    Dependencies, Label, Limits, Parameter, ParameterName, ParameterValue, PiecewiseExpr,
+};
 pub use python_import::PythonImport;
 pub use reference::{Identifier, ModelPath, PythonPath};
 pub use test::{Test, TestIndex};
