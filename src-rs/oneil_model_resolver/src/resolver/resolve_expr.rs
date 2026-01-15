@@ -75,6 +75,10 @@ pub fn resolve_expr(
 }
 
 /// Resolves a comparison expression with optional chained comparisons.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "there are five important arguments (the first five), the rest are context"
+)]
 fn resolve_comparison_expression(
     span: Span,
     op: &ast::ComparisonOpNode,
