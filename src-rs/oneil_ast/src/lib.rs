@@ -18,8 +18,8 @@ pub use declaration::{
     SubmodelListNode, UseModel, UseModelNode,
 };
 pub use expression::{
-    BinaryOp, BinaryOpNode, ComparisonOp, ComparisonOpNode, Expr, ExprNode, Literal, LiteralNode,
-    UnaryOp, UnaryOpNode, Variable, VariableNode,
+    BinaryOp, BinaryOpNode, ComparisonOp, ComparisonOpNode, Expr, ExprNode, ExprVisitor, Literal,
+    LiteralNode, UnaryOp, UnaryOpNode, Variable, VariableNode,
 };
 pub use model::{Model, ModelNode, Section, SectionHeader, SectionHeaderNode, SectionNode};
 pub use naming::{Directory, DirectoryNode, Identifier, IdentifierNode, Label, LabelNode};
