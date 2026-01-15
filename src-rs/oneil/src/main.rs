@@ -152,11 +152,7 @@ fn handle_eval_command(file: &Path, print_debug: bool, print_level: PrintLevel, 
 
     match model_result {
         Ok(model_result) => {
-            print_model_result::print(
-                &model_result,
-                print_debug,
-                &ModelPrintConfig { print_level },
-            );
+            print_model_result::print(&model_result, print_debug, ModelPrintConfig { print_level });
         }
         Err(errors) => {
             for error in errors {

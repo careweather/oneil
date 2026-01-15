@@ -58,7 +58,7 @@ pub fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print(model_result: &result::Model, print_debug: bool, model_config: &ModelPrintConfig) {
+pub fn print(model_result: &result::Model, print_debug: bool, model_config: ModelPrintConfig) {
     if print_debug {
         println!("{model_result:?}");
         return;
