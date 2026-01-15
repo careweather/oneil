@@ -175,7 +175,7 @@ fn print_parameter(
     let dependencies = parameter.dependencies();
     if !dependencies.is_empty() {
         println!("{}    ├── Dependencies:", "  ".repeat(indent));
-        for (i, dep) in dependencies.iter().enumerate() {
+        for (i, dep) in dependencies.keys().enumerate() {
             let is_last = i == dependencies.len() - 1;
             let dep_prefix = if is_last { "└──" } else { "├──" };
             println!(

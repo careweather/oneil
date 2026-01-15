@@ -10,10 +10,12 @@ use oneil_model_resolver::FileLoader;
 use oneil_runner::{
     builtins::Builtins,
     file_parser::{self, LoadingError},
-    print_model_result::{ModelPrintConfig, PrintMode},
 };
 
-use crate::command::{CliCommand, Commands, DevCommand};
+use crate::{
+    command::{CliCommand, Commands, DevCommand},
+    print_model_result::{ModelPrintConfig, PrintMode},
+};
 
 mod command;
 mod convert_error;

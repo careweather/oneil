@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
     EvalError, builtin::BuiltinFunction, context::EvalContext, error::ExpectedType, eval_expr,
@@ -54,7 +55,7 @@ pub fn eval_model<F: BuiltinFunction>(
 
         let value = eval_parameter::eval_parameter(parameter, &context);
 
-        let parameter_result = value.map(|value| parameter_result_from(value, parameter));
+        let parameter_result = value.map(|value| parameter_result_from(value, parameter, &context));
 
         context.add_parameter_result(parameter_name.as_str().to_string(), parameter_result);
     }
@@ -71,18 +72,18 @@ pub fn eval_model<F: BuiltinFunction>(
     context
 }
 
-fn parameter_result_from(value: Value, parameter: &ir::Parameter) -> result::Parameter {
+fn parameter_result_from<F: BuiltinFunction>(
+    value: Value,
+    parameter: &ir::Parameter,
+    context: &EvalContext<F>,
+) -> result::Parameter {
     let trace = match parameter.trace_level() {
         ir::TraceLevel::None => result::TraceLevel::None,
         ir::TraceLevel::Trace => result::TraceLevel::Trace,
         ir::TraceLevel::Debug => result::TraceLevel::Debug,
     };
 
-    let dependencies = parameter
-        .dependencies()
-        .iter()
-        .map(|dependency| dependency.as_str().to_string())
-        .collect();
+    let dependency_values = get_dependency_values(parameter.dependencies(), context);
 
     result::Parameter {
         ident: parameter.name().as_str().to_string(),
@@ -90,7 +91,7 @@ fn parameter_result_from(value: Value, parameter: &ir::Parameter) -> result::Par
         value,
         is_performance: parameter.is_performance(),
         trace,
-        dependencies,
+        dependency_values,
     }
 }
 
@@ -127,7 +128,7 @@ fn process_parameter_dependencies(
     mut evaluation_order: Vec<ir::ParameterName>,
     parameters: &HashMap<ir::ParameterName, ir::Parameter>,
 ) -> (Vec<ir::ParameterName>, HashSet<ir::ParameterName>) {
-    for dependency in parameter.dependencies() {
+    for dependency in parameter.dependencies().keys() {
         if visited.contains(dependency) {
             continue;
         }
@@ -164,7 +165,7 @@ fn eval_test<F: BuiltinFunction>(
             expr_span: *expr_span,
         }),
         Value::Boolean(false) => {
-            let dependency_values = get_test_dependency_values(test, context);
+            let dependency_values = get_dependency_values(test.dependencies(), context);
             Ok(result::Test {
                 result: result::TestResult::Failed { dependency_values },
                 expr_span: *expr_span,
@@ -181,11 +182,11 @@ fn eval_test<F: BuiltinFunction>(
 }
 
 /// Gets the values of the dependencies for test reporting purposes.
-fn get_test_dependency_values<F: BuiltinFunction>(
-    test: &oneil_ir::Test,
+fn get_dependency_values<F: BuiltinFunction>(
+    dependencies: &HashMap<ir::ParameterName, Span>,
     context: &EvalContext<F>,
 ) -> HashMap<String, Value> {
-    test.dependencies()
+    dependencies
         .iter()
         .map(|(dependency, dependency_span)| {
             let value = context

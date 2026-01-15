@@ -4,10 +4,7 @@
 //! evaluating Oneil models, including evaluated parameters, tests, and
 //! hierarchical model structures.
 
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use oneil_shared::span::Span;
 
@@ -99,9 +96,9 @@ pub struct Parameter {
     pub trace: TraceLevel,
     /// The set of parameter identifiers that this parameter depends on.
     ///
-    /// This represents the dependency graph of parameters, which is used for
-    /// determining evaluation order and understanding parameter relationships.
-    pub dependencies: HashSet<String>,
+    /// This represents the values of the dependencies at the time the
+    /// parameter was evaluated.
+    pub dependency_values: HashMap<String, Value>,
 }
 
 /// The trace level for debugging and diagnostic output.

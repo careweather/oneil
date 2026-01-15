@@ -4,6 +4,7 @@ use std::{collections::HashMap, collections::HashSet, ops::Deref};
 
 use oneil_ast as ast;
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
     BuiltinRef,
@@ -82,7 +83,7 @@ pub fn resolve_parameters(
 /// Analyzes all parameters to extract their internal dependencies.
 fn get_all_parameter_internal_dependencies<'a>(
     parameter_map: &'a HashMap<ir::ParameterName, &'a ast::ParameterNode>,
-) -> HashMap<&'a ir::ParameterName, HashSet<ir::ParameterName>> {
+) -> HashMap<&'a ir::ParameterName, HashMap<ir::ParameterName, Span>> {
     let mut dependencies = HashMap::new();
 
     for identifier in parameter_map.keys() {
@@ -99,8 +100,10 @@ fn get_all_parameter_internal_dependencies<'a>(
 }
 
 /// Extracts internal dependencies from a single parameter.
-fn get_parameter_internal_dependencies(parameter: &ast::Parameter) -> HashSet<ir::ParameterName> {
-    let dependencies = HashSet::new();
+fn get_parameter_internal_dependencies(
+    parameter: &ast::Parameter,
+) -> HashMap<ir::ParameterName, Span> {
+    let dependencies = HashMap::new();
 
     let limits = parameter.limits().map(ast::Node::deref);
     let dependencies = match limits {
@@ -132,7 +135,7 @@ fn resolve_parameter(
     parameter_identifier: ir::ParameterName,
     // context
     parameter_ast_map: &HashMap<ir::ParameterName, &ast::ParameterNode>,
-    dependencies: &HashMap<&ir::ParameterName, HashSet<ir::ParameterName>>,
+    dependencies: &HashMap<&ir::ParameterName, HashMap<ir::ParameterName, Span>>,
     parameter_stack: &mut Stack<ir::ParameterName>,
     builtin_ref: &impl BuiltinRef,
     context: &ReferenceContext<'_, '_>,
@@ -184,7 +187,7 @@ fn resolve_parameter(
     parameter_stack.push(parameter_identifier.clone());
 
     // resolve the parameter dependencies
-    for dependency_identifier in parameter_dependencies {
+    for dependency_identifier in parameter_dependencies.keys() {
         parameter_builder = resolve_parameter(
             dependency_identifier.clone(),
             parameter_ast_map,
@@ -225,7 +228,7 @@ fn resolve_parameter(
     match error::combine_errors(value, limits) {
         Ok((value, limits)) => {
             // build the parameter
-            let parameter_dependencies = parameter_dependencies.iter().cloned().collect();
+            let parameter_dependencies = parameter_dependencies.clone();
 
             let parameter = ir::Parameter::new(
                 parameter_dependencies,
@@ -455,7 +458,7 @@ mod tests {
         assert!(
             param_b
                 .dependencies()
-                .contains(&ir::ParameterName::new("a".to_string()))
+                .contains_key(&ir::ParameterName::new("a".to_string()))
         );
     }
 
@@ -563,7 +566,7 @@ mod tests {
 
         // check the dependencies
         assert_eq!(dependencies.len(), 1);
-        assert!(dependencies.contains(&ir::ParameterName::new("b".to_string())));
+        assert!(dependencies.contains_key(&ir::ParameterName::new("b".to_string())));
     }
 
     #[test]
@@ -580,8 +583,8 @@ mod tests {
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
-        assert!(dependencies.contains(&ir::ParameterName::new("min_val".to_string())));
-        assert!(dependencies.contains(&ir::ParameterName::new("max_val".to_string())));
+        assert!(dependencies.contains_key(&ir::ParameterName::new("min_val".to_string())));
+        assert!(dependencies.contains_key(&ir::ParameterName::new("max_val".to_string())));
     }
 
     #[test]
@@ -590,7 +593,7 @@ mod tests {
         let expr = test_ast::literal_number_expr_node(42.0);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
 
         // check the dependencies
         assert!(result.is_empty());
@@ -603,11 +606,11 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
 
         // check the dependencies
         assert_eq!(result.len(), 1);
-        assert!(result.contains(&ir::ParameterName::new("test_var".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("test_var".to_string())));
     }
 
     #[test]
@@ -624,12 +627,12 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
 
         // check the dependencies
         assert_eq!(result.len(), 2);
-        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("b".to_string())));
     }
 
     #[test]
@@ -645,12 +648,12 @@ mod tests {
         );
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
 
         // check the dependencies
         assert_eq!(result.len(), 2);
-        assert!(result.contains(&ir::ParameterName::new("arg1".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("arg2".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("arg1".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("arg2".to_string())));
     }
 
     #[test]
@@ -660,7 +663,7 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr, HashMap::new());
 
         // check the dependencies - accessors don't count as internal dependencies
         assert!(result.is_empty());
@@ -1023,12 +1026,12 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
 
         // check the dependencies
         assert_eq!(result.len(), 2);
-        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("b".to_string())));
     }
 
     #[test]
@@ -1049,13 +1052,13 @@ mod tests {
             test_ast::comparison_op_expr_node(op1_node, left_expr, middle_expr, rest_chained);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
 
         // check the dependencies
         assert_eq!(result.len(), 3);
-        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("c".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("b".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("c".to_string())));
     }
 
     #[test]
@@ -1070,11 +1073,11 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
 
         // check the dependencies - should only contain the variable
         assert_eq!(result.len(), 1);
-        assert!(result.contains(&ir::ParameterName::new("x".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("x".to_string())));
     }
 
     #[test]
@@ -1104,14 +1107,14 @@ mod tests {
         let expr_node = test_ast::comparison_op_expr_node(comp_op_node, left_expr, right_expr, []);
 
         // get the dependencies
-        let result = get_expr_internal_dependencies(&expr_node, HashSet::new());
+        let result = get_expr_internal_dependencies(&expr_node, HashMap::new());
 
         // check the dependencies
         assert_eq!(result.len(), 4);
-        assert!(result.contains(&ir::ParameterName::new("a".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("b".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("c".to_string())));
-        assert!(result.contains(&ir::ParameterName::new("d".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("a".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("b".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("c".to_string())));
+        assert!(result.contains_key(&ir::ParameterName::new("d".to_string())));
     }
 
     #[test]
@@ -1141,7 +1144,7 @@ mod tests {
 
         // check the dependencies
         assert_eq!(dependencies.len(), 2);
-        assert!(dependencies.contains(&ir::ParameterName::new("x".to_string())));
-        assert!(dependencies.contains(&ir::ParameterName::new("threshold".to_string())));
+        assert!(dependencies.contains_key(&ir::ParameterName::new("x".to_string())));
+        assert!(dependencies.contains_key(&ir::ParameterName::new("threshold".to_string())));
     }
 }

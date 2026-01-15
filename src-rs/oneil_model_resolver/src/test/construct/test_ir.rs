@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -89,7 +89,7 @@ impl ModelBuilder {
 }
 
 pub struct ParameterBuilder {
-    dependencies: HashSet<ir::ParameterName>,
+    dependencies: HashMap<ir::ParameterName, Span>,
     name: Option<ir::ParameterName>,
     name_span: Option<Span>,
     span: Option<Span>,
@@ -102,7 +102,7 @@ pub struct ParameterBuilder {
 impl ParameterBuilder {
     pub fn new() -> Self {
         Self {
-            dependencies: HashSet::new(),
+            dependencies: HashMap::new(),
             name: None,
             name_span: None,
             span: None,

@@ -1,6 +1,6 @@
 //! Parameter definitions and management for Oneil model IR.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use oneil_shared::span::Span;
 
@@ -45,7 +45,7 @@ impl Label {
 /// Represents a single parameter in an Oneil model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    dependencies: HashSet<ParameterName>,
+    dependencies: HashMap<ParameterName, Span>,
     name: ParameterName,
     name_span: Span,
     span: Span,
@@ -61,7 +61,7 @@ impl Parameter {
     #[expect(clippy::too_many_arguments, reason = "this is a constructor")]
     #[must_use]
     pub const fn new(
-        dependencies: HashSet<ParameterName>,
+        dependencies: HashMap<ParameterName, Span>,
         name: ParameterName,
         name_span: Span,
         span: Span,
@@ -86,7 +86,7 @@ impl Parameter {
 
     /// Returns a reference to the set of parameter dependencies.
     #[must_use]
-    pub const fn dependencies(&self) -> &HashSet<ParameterName> {
+    pub const fn dependencies(&self) -> &HashMap<ParameterName, Span> {
         &self.dependencies
     }
 
