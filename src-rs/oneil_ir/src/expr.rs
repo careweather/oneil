@@ -168,32 +168,6 @@ impl Expr {
     pub const fn literal(span: Span, value: Literal) -> Self {
         Self::Literal { span, value }
     }
-
-    /// Returns the span of this expression.
-    #[must_use]
-    pub const fn span(&self) -> Span {
-        match self {
-            Self::ComparisonOp { span, .. }
-            | Self::BinaryOp { span, .. }
-            | Self::UnaryOp { span, .. }
-            | Self::FunctionCall { span, .. }
-            | Self::Variable { span, .. }
-            | Self::Literal { span, .. } => *span,
-        }
-    }
-
-    /// Returns the span of the function name if this is a function call.
-    #[must_use]
-    pub const fn function_name_span(&self) -> Option<Span> {
-        match self {
-            Self::FunctionCall { name_span, .. } => Some(*name_span),
-            Self::ComparisonOp { .. }
-            | Self::BinaryOp { .. }
-            | Self::UnaryOp { .. }
-            | Self::Variable { .. }
-            | Self::Literal { .. } => None,
-        }
-    }
 }
 
 /// Binary operators for mathematical and logical operations.
@@ -371,26 +345,6 @@ impl Variable {
             model_span,
             parameter_name,
             parameter_span,
-        }
-    }
-
-    /// Returns the span of the referenced parameter identifier.
-    #[must_use]
-    pub const fn parameter_span(&self) -> Span {
-        match self {
-            Self::Builtin { ident_span, .. } => *ident_span,
-            Self::Parameter { parameter_span, .. } | Self::External { parameter_span, .. } => {
-                *parameter_span
-            }
-        }
-    }
-
-    /// Returns the span of the referenced model identifier, if any.
-    #[must_use]
-    pub const fn model_span(&self) -> Option<Span> {
-        match self {
-            Self::External { model_span, .. } => Some(*model_span),
-            Self::Builtin { .. } | Self::Parameter { .. } => None,
         }
     }
 }

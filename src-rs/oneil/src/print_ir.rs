@@ -410,5 +410,5 @@ fn print_test(test: &ir::Test, indent: usize) {
 
     // Print test expression
     println!("{}    └── Test Expression:", "  ".repeat(indent));
-    print_expression(test.test_expr(), indent + 2);
+    print_expression(test.expr(), indent + 2);
 }

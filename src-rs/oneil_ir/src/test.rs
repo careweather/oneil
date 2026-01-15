@@ -21,17 +21,17 @@ impl TestIndex {
 pub struct Test {
     span: Span,
     trace_level: TraceLevel,
-    test_expr: Expr,
+    expr: Expr,
 }
 
 impl Test {
     /// Creates a new test with the specified properties.
     #[must_use]
-    pub const fn new(span: Span, trace_level: TraceLevel, test_expr: Expr) -> Self {
+    pub const fn new(span: Span, trace_level: TraceLevel, expr: Expr) -> Self {
         Self {
             span,
             trace_level,
-            test_expr,
+            expr,
         }
     }
 
@@ -49,7 +49,7 @@ impl Test {
 
     /// Returns the test expression that defines the expected behavior.
     #[must_use]
-    pub const fn test_expr(&self) -> &Expr {
-        &self.test_expr
+    pub const fn expr(&self) -> &Expr {
+        &self.expr
     }
 }

@@ -58,6 +58,7 @@ pub struct Parameter {
 
 impl Parameter {
     /// Creates a new parameter with the specified properties.
+    #[expect(clippy::too_many_arguments, reason = "this is a constructor")]
     #[must_use]
     pub const fn new(
         dependencies: HashSet<ParameterName>,
@@ -196,9 +197,9 @@ pub enum Limits {
     /// Continuous range with minimum and maximum values.
     Continuous {
         /// The minimum allowed value expression.
-        min: Expr,
+        min: Box<Expr>,
         /// The maximum allowed value expression.
-        max: Expr,
+        max: Box<Expr>,
         /// The span of the expression representing the limit.
         limit_expr_span: Span,
     },
@@ -220,10 +221,10 @@ impl Limits {
 
     /// Creates continuous limits with minimum and maximum expressions.
     #[must_use]
-    pub const fn continuous(min: Expr, max: Expr, limit_expr_span: Span) -> Self {
+    pub fn continuous(min: Expr, max: Expr, limit_expr_span: Span) -> Self {
         Self::Continuous {
-            min,
-            max,
+            min: Box::new(min),
+            max: Box::new(max),
             limit_expr_span,
         }
     }

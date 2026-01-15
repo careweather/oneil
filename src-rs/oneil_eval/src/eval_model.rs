@@ -161,5 +161,5 @@ fn eval_test<'a, F: BuiltinFunction>(
     test: &'a ir::Test,
     context: &EvalContext<F>,
 ) -> Result<(Value, &'a Span), Vec<EvalError>> {
-    eval_expr(test.test_expr(), context)
+    eval_expr(test.expr(), context)
 }
