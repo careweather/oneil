@@ -14,11 +14,43 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
         return;
     }
 
-    for parameter in model_result.parameters.values() {
-        if parameter.is_performance {
-            print_parameter(parameter);
-        }
+    print_model_header(model_result);
+
+    let parameters_to_print = model_result
+        .parameters
+        .values()
+        .filter(|parameter| parameter.is_performance)
+        .collect::<Vec<_>>();
+
+    if parameters_to_print.is_empty() {
+        let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No performance parameters found)");
+        println!("{message}");
+        return;
     }
+
+    for parameter in parameters_to_print {
+        print_parameter(parameter);
+    }
+}
+
+fn print_model_header(model_result: &result::Model) {
+    let break_line = "─".repeat(80);
+    let model_label = stylesheet::MODEL_LABEL.style("Model");
+    let tests_label = stylesheet::TESTS_LABEL.style("Tests");
+
+    let test_count = model_result.tests.len();
+    let passed_count = model_result.tests.iter().filter(|test| test.passed).count();
+
+    let test_result_string = if passed_count == test_count {
+        stylesheet::TESTS_PASS_COLOR.style("PASS")
+    } else {
+        stylesheet::TESTS_FAIL_COLOR.style("FAIL")
+    };
+
+    println!("{break_line}");
+    println!("{model_label}: {}", model_result.path.display());
+    println!("{tests_label}: {passed_count}/{test_count} ({test_result_string})");
+    println!("{break_line}");
 }
 
 fn print_parameter(parameter: &result::Parameter) {
