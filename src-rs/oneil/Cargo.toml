@@ -1,6 +1,7 @@
 [package]
 name = "oneil"
 description = "CLI tool for using the Oneil programming language"
+default-run = "oneil"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -12,6 +13,7 @@ categories.workspace = true
 
 [dependencies]
 oneil_ast = { path = "../oneil_ast" }
+oneil_eval = { path = "../oneil_eval" }
 oneil_ir = { path = "../oneil_ir" }
 oneil_lsp = { path = "../oneil_lsp" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }

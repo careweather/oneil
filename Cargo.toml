@@ -1,5 +1,5 @@
 [workspace]
-members = ["src-rs/*"]
+members = ["src-rs/*", "src-rs/*/fuzz"]
 resolver = "3"
 
 [workspace.package]
@@ -9,7 +9,13 @@ authors = ["Brendon Bown <brendon.bown@gmail.com>", "Preston Corless <pgattic@gm
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/careweather/oneil"
-keywords = ["programming-language", "oneil", "engineering", "specification", "units"]
+keywords = [
+    "programming-language",
+    "oneil",
+    "engineering",
+    "specification",
+    "units",
+]
 categories = ["compilers", "science", "simulation"]
 
 # Lints originally derived from https://medium.com/@carlmkadie/92bb899d47ef

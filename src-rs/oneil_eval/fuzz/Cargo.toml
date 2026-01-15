@@ -1,0 +1,37 @@
+[package]
+name = "oneil_eval_fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+oneil_eval = { path = "..", features = ["arbitrary"] }
+
+[lib]
+name = "shared"
+path = "shared/lib.rs"
+
+[[bin]]
+name = "single_op_inclusion_property"
+path = "fuzz_targets/single_op_inclusion_property.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "single_op_valid_interval"
+path = "fuzz_targets/single_op_valid_interval.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "contains_is_valid"
+path = "fuzz_targets/contains_is_valid.rs"
+test = false
+doc = false
+bench = false

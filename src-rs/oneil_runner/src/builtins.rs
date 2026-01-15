@@ -1,45 +1,36 @@
+use ::std::{collections::HashMap, rc::Rc};
+
+use oneil_eval::{
+    builtin::{BuiltinFunction, BuiltinMap},
+    value::{SizedUnit, Value},
+};
 use oneil_ir as ir;
 use oneil_model_resolver::BuiltinRef;
 
-// TODO: later, this will hold the actual values/functions that are built into the language
-//       right now, it just holds the names of the builtins
-pub struct Builtins;
+pub struct Builtins<F: BuiltinFunction> {
+    pub builtin_map: BuiltinMap<F>,
+}
 
-impl Builtins {
-    pub const fn new() -> Self {
-        Self
+impl<F: BuiltinFunction> Builtins<F> {
+    #[must_use]
+    pub const fn new(
+        values: HashMap<String, Value>,
+        functions: HashMap<String, F>,
+        units: HashMap<String, Rc<SizedUnit>>,
+        prefixes: HashMap<String, f64>,
+    ) -> Self {
+        Self {
+            builtin_map: BuiltinMap::new(values, functions, units, prefixes),
+        }
     }
 }
 
-impl BuiltinRef for Builtins {
+impl<F: BuiltinFunction> BuiltinRef for Builtins<F> {
     fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool {
-        matches!(identifier.as_str(), "pi" | "e" | "inf")
+        self.builtin_map.values.contains_key(identifier.as_str())
     }
 
     fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
-        matches!(
-            identifier.as_str(),
-            "min"
-                | "max"
-                | "sin"
-                | "cos"
-                | "tan"
-                | "asin"
-                | "acos"
-                | "atan"
-                | "sqrt"
-                | "ln"
-                | "log"
-                | "log10"
-                | "floor"
-                | "ceiling"
-                | "extent"
-                | "range"
-                | "abs"
-                | "sign"
-                | "mid"
-                | "strip"
-                | "mnmx"
-        )
+        self.builtin_map.functions.contains_key(identifier.as_str())
     }
 }

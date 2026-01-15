@@ -1,0 +1,3 @@
+[submodule "docs/research/2025-11-12-interval-arithmetic-analysis"]
+	path = docs/research/2025-11-12-interval-arithmetic-analysis
+	url = git@github.com:pixilcode/interval-arithmetic-analysis.git

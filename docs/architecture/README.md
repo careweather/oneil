@@ -22,7 +22,7 @@ This is the basic structure of the system. Each component is broken into an indi
 - [`oneil_ir`](../../src-rs/oneil_ir/) - contains data structures for the Oneil
   IR
 
-- [`oneil_evaluator`](#) - (WIP) contains the code for evaluating the IR
+- [`oneil_evaluator`](../../src-rs/oneil_eval/) - contains the code for evaluating the IR
 
 
 Other crates include:
