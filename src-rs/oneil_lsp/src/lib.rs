@@ -7,6 +7,7 @@
 mod doc_store;
 mod symbol_lookup;
 
+use oneil_eval::builtin;
 use oneil_runner::{builtins, file_parser};
 
 use std::path::PathBuf;
@@ -204,7 +205,12 @@ impl LanguageServer for Backend {
 
         // Load and resolve the model
         let model_path = PathBuf::from(uri.path().as_str());
-        let builtin_variables = builtins::Builtins::new();
+        let builtin_variables = builtins::Builtins::new(
+            builtin::std::builtin_values(),
+            builtin::std::builtin_functions(),
+            builtin::std::builtin_units(),
+            builtin::std::builtin_prefixes(),
+        );
         let model_collection = match oneil_model_resolver::load_model(
             &model_path,
             &builtin_variables,

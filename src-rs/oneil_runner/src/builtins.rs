@@ -1,4 +1,5 @@
-use ::std::{collections::HashMap, rc::Rc};
+use ::std::collections::HashMap;
+use std::sync::Arc;
 
 use oneil_eval::{
     builtin::{BuiltinFunction, BuiltinMap},
@@ -16,7 +17,7 @@ impl<F: BuiltinFunction> Builtins<F> {
     pub const fn new(
         values: HashMap<String, Value>,
         functions: HashMap<String, F>,
-        units: HashMap<String, Rc<SizedUnit>>,
+        units: HashMap<String, Arc<SizedUnit>>,
         prefixes: HashMap<String, f64>,
     ) -> Self {
         Self {

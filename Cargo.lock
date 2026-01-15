@@ -544,6 +544,7 @@ name = "oneil_lsp"
 version = "0.15.0"
 dependencies = [
  "oneil_ast",
+ "oneil_eval",
  "oneil_ir",
  "oneil_model_resolver",
  "oneil_parser",

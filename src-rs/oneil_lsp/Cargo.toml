@@ -12,6 +12,7 @@ readme.workspace = true
 
 [dependencies]
 oneil_ast = { path = "../oneil_ast" }
+oneil_eval = { path = "../oneil_eval" }
 oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }

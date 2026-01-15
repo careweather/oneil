@@ -1,7 +1,8 @@
 //! The standard builtin values, functions, units, and prefixes
 //! that come with Oneil.
 
-use ::std::{collections::HashMap, rc::Rc};
+use ::std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::{
     EvalError,
@@ -157,7 +158,7 @@ pub fn builtin_prefixes() -> HashMap<String, f64> {
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
 #[must_use]
-pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
+pub fn builtin_units() -> HashMap<String, Arc<SizedUnit>> {
     let units = [
         // === BASE UNITS ===
         (
@@ -700,10 +701,10 @@ pub fn builtin_units() -> HashMap<String, Rc<SizedUnit>> {
     units
         .into_iter()
         .flat_map(|(names, unit)| {
-            let unit = Rc::new(unit);
+            let unit = Arc::new(unit);
             names
                 .iter()
-                .map(move |name| ((*name).to_string(), Rc::clone(&unit)))
+                .map(move |name| ((*name).to_string(), Arc::clone(&unit)))
         })
         .collect()
 }
