@@ -159,10 +159,17 @@ fn eval_test<F: BuiltinFunction>(
     let (test_result, expr_span) = eval_expr(test.expr(), context)?;
 
     match test_result {
-        Value::Boolean(passed) => Ok(result::Test {
-            passed,
+        Value::Boolean(true) => Ok(result::Test {
+            result: result::TestResult::Passed,
             expr_span: *expr_span,
         }),
+        Value::Boolean(false) => {
+            let dependency_values = get_test_dependency_values(test, context);
+            Ok(result::Test {
+                result: result::TestResult::Failed { dependency_values },
+                expr_span: *expr_span,
+            })
+        }
         Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
             Err(vec![EvalError::InvalidType {
                 expected_type: ExpectedType::Boolean,
@@ -171,4 +178,23 @@ fn eval_test<F: BuiltinFunction>(
             }])
         }
     }
+}
+
+/// Gets the values of the dependencies for test reporting purposes.
+fn get_test_dependency_values<F: BuiltinFunction>(
+    test: &oneil_ir::Test,
+    context: &EvalContext<F>,
+) -> HashMap<String, Value> {
+    test.dependencies()
+        .iter()
+        .map(|(dependency, dependency_span)| {
+            let value = context
+                .lookup_parameter_value(dependency, *dependency_span)
+                .expect(
+                    "dependency should be found because the test expression resolved successfully",
+                );
+
+            (dependency.as_str().to_string(), value)
+        })
+        .collect::<HashMap<_, _>>()
 }

@@ -9,7 +9,8 @@ use crate::{
     BuiltinRef,
     error::{self, ParameterResolutionError},
     resolver::{
-        resolve_expr::resolve_expr, resolve_trace_level::resolve_trace_level,
+        resolve_expr::{get_expr_internal_dependencies, resolve_expr},
+        resolve_trace_level::resolve_trace_level,
         resolve_unit::resolve_unit,
     },
     util::{
@@ -122,63 +123,6 @@ fn get_parameter_internal_dependencies(parameter: &ast::Parameter) -> HashSet<ir
                 let dependencies = get_expr_internal_dependencies(part.if_expr(), dependencies);
                 get_expr_internal_dependencies(part.expr(), dependencies)
             })
-        }
-    }
-}
-
-/// Extracts internal dependencies from an expression.
-fn get_expr_internal_dependencies(
-    expr: &ast::Expr,
-    mut dependencies: HashSet<ir::ParameterName>,
-) -> HashSet<ir::ParameterName> {
-    match expr {
-        ast::Expr::BinaryOp { op: _, left, right } => {
-            let dependencies = get_expr_internal_dependencies(left, dependencies);
-            get_expr_internal_dependencies(right, dependencies)
-        }
-
-        ast::Expr::UnaryOp { op: _, expr } | ast::Expr::Parenthesized { expr } => {
-            get_expr_internal_dependencies(expr, dependencies)
-        }
-
-        ast::Expr::FunctionCall { name: _, args } => {
-            args.iter().fold(dependencies, |dependencies, arg| {
-                get_expr_internal_dependencies(arg, dependencies)
-            })
-        }
-
-        ast::Expr::Variable(variable) => match &**variable {
-            ast::Variable::Identifier(identifier_node) => {
-                let identifier = ir::ParameterName::new(identifier_node.as_str().to_string());
-                dependencies.insert(identifier);
-                dependencies
-            }
-
-            ast::Variable::ModelParameter {
-                reference_model: _,
-                parameter: _,
-            } => {
-                // an accessor implies that the dependency is on a parameter
-                // outside of the current model, so it doesn't count as an
-                // internal dependency
-                dependencies
-            }
-        },
-        ast::Expr::Literal(_) => dependencies,
-        ast::Expr::ComparisonOp {
-            op: _,
-            left,
-            right,
-            rest_chained,
-        } => {
-            let dependencies = get_expr_internal_dependencies(left, dependencies);
-            let dependencies = get_expr_internal_dependencies(right, dependencies);
-            // Handle chained comparisons
-            rest_chained
-                .iter()
-                .fold(dependencies, |dependencies, (_, expr)| {
-                    get_expr_internal_dependencies(expr, dependencies)
-                })
         }
     }
 }

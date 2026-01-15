@@ -50,7 +50,27 @@ pub struct Test {
     /// The source span of the test expression.
     pub expr_span: Span,
     /// The evaluated value of the test expression.
-    pub passed: bool,
+    pub result: TestResult,
+}
+
+impl Test {
+    /// Returns whether the test passed.
+    #[must_use]
+    pub const fn passed(&self) -> bool {
+        matches!(self.result, TestResult::Passed)
+    }
+}
+
+/// The result of evaluating a test.
+#[derive(Debug, Clone)]
+pub enum TestResult {
+    /// The test passed.
+    Passed,
+    /// The test failed.
+    Failed {
+        /// The values of the test dependencies.
+        dependency_values: HashMap<String, Value>,
+    },
 }
 
 /// The result of evaluating a parameter.

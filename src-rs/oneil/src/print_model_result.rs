@@ -88,7 +88,12 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
 fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
     let failing_tests = model_tests
         .iter()
-        .filter(|test| !test.passed)
+        .filter_map(|test| match &test.result {
+            result::TestResult::Failed { dependency_values } => {
+                Some((test.expr_span, dependency_values))
+            }
+            result::TestResult::Passed => None,
+        })
         .collect::<Vec<_>>();
 
     if failing_tests.is_empty() {
@@ -114,31 +119,35 @@ fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {
         }
     };
 
-    let tests_label = stylesheet::TESTS_FAIL_COLOR.style("Failing Tests");
-    println!("{tests_label}:");
+    let tests_label = stylesheet::TESTS_FAIL_COLOR.style("FAILING TESTS");
+    println!("{tests_label}");
 
-    for test in failing_tests {
-        let test_span = test.expr_span;
+    for (test_span, dependency_values) in failing_tests {
         let test_start_offset = test_span.start().offset;
         let test_end_offset = test_span.end().offset;
         let test_expr_str = file_contents.get(test_start_offset..test_end_offset);
 
-        let test_expr_str = match test_expr_str {
-            Some(test_expr_str) => test_expr_str,
-            None => {
-                let error_label = stylesheet::ERROR_COLOR.style("error");
-                let test_start_line = test_span.start().line;
-                let test_start_column = test_span.start().column;
+        let Some(test_expr_str) = test_expr_str else {
+            let error_label = stylesheet::ERROR_COLOR.style("error");
+            let test_start_line = test_span.start().line;
+            let test_start_column = test_span.start().column;
 
-                println!(
-                    "{error_label}: couldn't get test expression for test at line {test_start_line}, column {test_start_column}"
-                );
+            println!(
+                "{error_label}: couldn't get test expression for test at line {test_start_line}, column {test_start_column}"
+            );
 
-                continue;
-            }
+            continue;
         };
 
         println!("{test_expr_str}");
+
+        for (dependency_name, dependency_value) in dependency_values {
+            let indent = " ".repeat(2);
+            let styled_dependency_name = stylesheet::PARAMETER_IDENTIFIER.style(dependency_name);
+            print!("{indent}- {styled_dependency_name} = ");
+            print_value(dependency_value);
+            println!();
+        }
     }
 
     println!("{divider_line}");
@@ -150,7 +159,11 @@ fn print_model_header(model_result: &result::Model) {
     let tests_label = stylesheet::TESTS_LABEL.style("Tests");
 
     let test_count = model_result.tests.len();
-    let passed_count = model_result.tests.iter().filter(|test| test.passed).count();
+    let passed_count = model_result
+        .tests
+        .iter()
+        .filter(|test| test.passed())
+        .count();
 
     let test_result_string = if passed_count == test_count {
         stylesheet::TESTS_PASS_COLOR.style("PASS")

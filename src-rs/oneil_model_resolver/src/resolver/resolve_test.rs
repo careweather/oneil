@@ -8,7 +8,10 @@ use oneil_ir as ir;
 use crate::{
     BuiltinRef,
     error::{self, TestResolutionError},
-    resolver::{resolve_expr::resolve_expr, resolve_trace_level::resolve_trace_level},
+    resolver::{
+        resolve_expr::{get_expr_internal_dependencies, resolve_expr},
+        resolve_trace_level::resolve_trace_level,
+    },
     util::context::{ParameterContext, ReferenceContext},
 };
 
@@ -28,6 +31,8 @@ pub fn resolve_tests(
 
         let trace_level = resolve_trace_level(test.trace_level());
 
+        let dependencies = get_expr_internal_dependencies(test.expr(), HashMap::new());
+
         let test_expr = resolve_expr(
             test.expr(),
             builtin_ref,
@@ -36,7 +41,10 @@ pub fn resolve_tests(
         )
         .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
-        Ok((test_index, ir::Test::new(test_span, trace_level, test_expr)))
+        Ok((
+            test_index,
+            ir::Test::new(test_span, trace_level, test_expr, dependencies),
+        ))
     });
 
     error::split_ok_and_errors(tests)
