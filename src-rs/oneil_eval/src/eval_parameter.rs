@@ -2256,8 +2256,7 @@ mod tests {
                 value,
                 ident: name.to_string(),
                 label: name.to_string(),
-                is_performance: false,
-                trace: result::TraceLevel::None,
+                print_level: result::PrintLevel::None,
                 dependency_values: HashMap::new(),
             }
         }

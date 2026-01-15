@@ -3,7 +3,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-use crate::print_model_result::PrintMode;
+use crate::print_model_result::PrintLevel;
 
 /// Oneil language CLI - Main command-line interface structure
 #[derive(Parser)]
@@ -41,9 +41,9 @@ pub enum Commands {
         #[arg(long)]
         no_colors: bool,
 
-        /// Print mode
+        /// Print level for the output (all, debug, trace, perf)
         #[arg(long, default_value_t)]
-        print_mode: PrintMode,
+        print_level: PrintLevel,
     },
     /// Run the LSP
     Lsp {},

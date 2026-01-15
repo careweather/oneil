@@ -14,7 +14,7 @@ use oneil_runner::{
 
 use crate::{
     command::{CliCommand, Commands, DevCommand},
-    print_model_result::{ModelPrintConfig, PrintMode},
+    print_model_result::{ModelPrintConfig, PrintLevel},
 };
 
 mod command;
@@ -38,8 +38,8 @@ fn main() {
             file,
             print_debug,
             no_colors,
-            print_mode,
-        } => handle_eval_command(&file, print_debug, print_mode, no_colors),
+            print_level,
+        } => handle_eval_command(&file, print_debug, print_level, no_colors),
     }
 }
 
@@ -121,7 +121,7 @@ fn handle_dev_command(command: DevCommand) {
     }
 }
 
-fn handle_eval_command(file: &Path, print_debug: bool, print_mode: PrintMode, no_colors: bool) {
+fn handle_eval_command(file: &Path, print_debug: bool, print_level: PrintLevel, no_colors: bool) {
     set_color_choice(no_colors);
 
     let builtins = Builtins::new(
@@ -152,7 +152,11 @@ fn handle_eval_command(file: &Path, print_debug: bool, print_mode: PrintMode, no
 
     match model_result {
         Ok(model_result) => {
-            print_model_result::print(&model_result, print_debug, &ModelPrintConfig { print_mode });
+            print_model_result::print(
+                &model_result,
+                print_debug,
+                &ModelPrintConfig { print_level },
+            );
         }
         Err(errors) => {
             for error in errors {

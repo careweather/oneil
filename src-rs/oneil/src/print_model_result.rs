@@ -1,4 +1,4 @@
-use std::{fmt, path::Path, str};
+use std::{collections::HashMap, fmt, path::Path, str};
 
 use anstream::{print, println};
 use oneil_eval::{
@@ -10,24 +10,24 @@ use crate::stylesheet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModelPrintConfig {
-    pub print_mode: PrintMode,
+    pub print_level: PrintLevel,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrintMode {
+pub enum PrintLevel {
     All,
     Debug,
     Trace,
     Performance,
 }
 
-impl Default for PrintMode {
+impl Default for PrintLevel {
     fn default() -> Self {
         Self::Performance
     }
 }
 
-impl str::FromStr for PrintMode {
+impl str::FromStr for PrintLevel {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -43,7 +43,7 @@ impl str::FromStr for PrintMode {
     }
 }
 
-impl fmt::Display for PrintMode {
+impl fmt::Display for PrintLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::All => write!(f, "all"),
@@ -68,11 +68,18 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
 
     print_failing_tests(&model_result.path, &model_result.tests);
 
-    let parameters_to_print = model_result
-        .parameters
-        .values()
-        .filter(|parameter| parameter.is_performance)
-        .collect::<Vec<_>>();
+    let parameters_to_print = match model_config.print_level {
+        PrintLevel::All => filter_parameters(&model_result.parameters, |_parameter| true),
+        PrintLevel::Debug => filter_parameters(&model_result.parameters, |parameter| {
+            parameter.should_print(result::PrintLevel::Debug)
+        }),
+        PrintLevel::Trace => filter_parameters(&model_result.parameters, |parameter| {
+            parameter.should_print(result::PrintLevel::Trace)
+        }),
+        PrintLevel::Performance => filter_parameters(&model_result.parameters, |parameter| {
+            parameter.should_print(result::PrintLevel::Performance)
+        }),
+    };
 
     if parameters_to_print.is_empty() {
         let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No performance parameters found)");
@@ -83,6 +90,13 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: &Mod
     for parameter in parameters_to_print {
         print_parameter(parameter);
     }
+}
+
+fn filter_parameters(
+    parameters: &HashMap<String, result::Parameter>,
+    arg: impl Fn(&&result::Parameter) -> bool,
+) -> Vec<&result::Parameter> {
+    parameters.values().filter(arg).collect()
 }
 
 fn print_failing_tests(model_path: &Path, model_tests: &[result::Test]) {

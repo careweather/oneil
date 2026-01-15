@@ -84,16 +84,11 @@ pub struct Parameter {
     pub label: String,
     /// The evaluated value of the parameter.
     pub value: Value,
-    /// Whether this parameter is marked as a performance parameter.
-    ///
-    /// Performance parameters are typically displayed in output and represent
-    /// key metrics or results of the model.
-    pub is_performance: bool,
-    /// The trace level for this parameter.
+    /// The print level for this parameter.
     ///
     /// This determines the level of debugging/tracing information that should
-    /// be generated for this parameter during evaluation.
-    pub trace: TraceLevel,
+    /// be generated for this parameter during output.
+    pub print_level: PrintLevel,
     /// The set of parameter identifiers that this parameter depends on.
     ///
     /// This represents the values of the dependencies at the time the
@@ -101,16 +96,29 @@ pub struct Parameter {
     pub dependency_values: HashMap<String, Value>,
 }
 
+impl Parameter {
+    /// Returns whether this parameter should be printed at
+    /// the given print level.
+    #[must_use]
+    pub fn should_print(&self, print_level: PrintLevel) -> bool {
+        self.print_level >= print_level
+    }
+}
+
 /// The trace level for debugging and diagnostic output.
 ///
 /// Trace levels control the verbosity of debugging information during model
 /// evaluation. Higher levels provide more detailed information.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TraceLevel {
-    /// No tracing output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum PrintLevel {
+    /// No output.
     None,
-    /// Basic tracing output.
-    Trace,
     /// Detailed debugging output.
     Debug,
+    /// Basic tracing output.
+    Trace,
+    /// Performance output.
+    Performance,
+    /// Performance output with debug information.
+    PerformanceDebug,
 }

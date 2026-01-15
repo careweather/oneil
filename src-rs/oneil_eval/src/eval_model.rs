@@ -77,10 +77,14 @@ fn parameter_result_from<F: BuiltinFunction>(
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
 ) -> result::Parameter {
-    let trace = match parameter.trace_level() {
-        ir::TraceLevel::None => result::TraceLevel::None,
-        ir::TraceLevel::Trace => result::TraceLevel::Trace,
-        ir::TraceLevel::Debug => result::TraceLevel::Debug,
+    let print_level = match parameter.trace_level() {
+        ir::TraceLevel::Debug if parameter.is_performance() => result::PrintLevel::PerformanceDebug,
+        ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
+            result::PrintLevel::Performance
+        }
+        ir::TraceLevel::Debug => result::PrintLevel::Debug,
+        ir::TraceLevel::Trace => result::PrintLevel::Trace,
+        ir::TraceLevel::None => result::PrintLevel::None,
     };
 
     let dependency_values = get_dependency_values(parameter.dependencies(), context);
@@ -89,8 +93,7 @@ fn parameter_result_from<F: BuiltinFunction>(
         ident: parameter.name().as_str().to_string(),
         label: parameter.label().as_str().to_string(),
         value,
-        is_performance: parameter.is_performance(),
-        trace,
+        print_level,
         dependency_values,
     }
 }
