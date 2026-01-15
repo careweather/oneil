@@ -50,10 +50,7 @@ pub struct Test {
     /// The source span of the test expression.
     pub expr_span: Span,
     /// The evaluated value of the test expression.
-    ///
-    /// This should typically be a boolean value, where `true` indicates the
-    /// test passed and `false` indicates it failed.
-    pub value: Value,
+    pub passed: bool,
 }
 
 /// The result of evaluating a parameter.

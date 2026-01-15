@@ -1,11 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use oneil_ir as ir;
-use oneil_shared::span::Span;
 
 use crate::{
-    EvalError, builtin::BuiltinFunction, context::EvalContext, eval_expr, eval_parameter, result,
-    value::Value,
+    EvalError, builtin::BuiltinFunction, context::EvalContext, error::ExpectedType, eval_expr,
+    eval_parameter, result, value::Value,
 };
 
 /// Evaluates a model and returns the context with the results of the model.
@@ -63,11 +62,7 @@ pub fn eval_model<F: BuiltinFunction>(
     // Evaluate tests
     let tests = model.get_tests();
     for test in tests.values() {
-        let value = eval_test(test, &context);
-        let test_result = value.map(|(value, expr_span)| result::Test {
-            value,
-            expr_span: *expr_span,
-        });
+        let test_result = eval_test(test, &context);
         context.add_test_result(test_result);
     }
 
@@ -157,9 +152,23 @@ fn process_parameter_dependencies(
     (evaluation_order, visited)
 }
 
-fn eval_test<'a, F: BuiltinFunction>(
-    test: &'a ir::Test,
+fn eval_test<F: BuiltinFunction>(
+    test: &ir::Test,
     context: &EvalContext<F>,
-) -> Result<(Value, &'a Span), Vec<EvalError>> {
-    eval_expr(test.expr(), context)
+) -> Result<result::Test, Vec<EvalError>> {
+    let (test_result, expr_span) = eval_expr(test.expr(), context)?;
+
+    match test_result {
+        Value::Boolean(passed) => Ok(result::Test {
+            passed,
+            expr_span: *expr_span,
+        }),
+        Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
+            Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::Boolean,
+                found_type: test_result.type_(),
+                found_span: *expr_span,
+            }])
+        }
+    }
 }
