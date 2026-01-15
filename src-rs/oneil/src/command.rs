@@ -3,6 +3,8 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+use crate::print_model_result::PrintMode;
+
 /// Oneil language CLI - Main command-line interface structure
 #[derive(Parser)]
 #[command(name = "oneil")]
@@ -38,6 +40,10 @@ pub enum Commands {
         /// terminals that don't support ANSI color codes or for redirecting to files.
         #[arg(long)]
         no_colors: bool,
+
+        /// Print mode
+        #[arg(long, default_value_t)]
+        print_mode: PrintMode,
     },
     /// Run the LSP
     Lsp {},

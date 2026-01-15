@@ -10,7 +10,7 @@ use oneil_model_resolver::FileLoader;
 use oneil_runner::{
     builtins::Builtins,
     file_parser::{self, LoadingError},
-    print_model_result::ModelPrintConfig,
+    print_model_result::{ModelPrintConfig, PrintMode},
 };
 
 use crate::command::{CliCommand, Commands, DevCommand};
@@ -36,7 +36,8 @@ fn main() {
             file,
             print_debug,
             no_colors,
-        } => handle_eval_command(&file, print_debug, no_colors),
+            print_mode,
+        } => handle_eval_command(&file, print_debug, print_mode, no_colors),
     }
 }
 
@@ -118,7 +119,7 @@ fn handle_dev_command(command: DevCommand) {
     }
 }
 
-fn handle_eval_command(file: &Path, print_debug: bool, no_colors: bool) {
+fn handle_eval_command(file: &Path, print_debug: bool, print_mode: PrintMode, no_colors: bool) {
     set_color_choice(no_colors);
 
     let builtins = Builtins::new(
@@ -149,7 +150,7 @@ fn handle_eval_command(file: &Path, print_debug: bool, no_colors: bool) {
 
     match model_result {
         Ok(model_result) => {
-            print_model_result::print(&model_result, print_debug, &ModelPrintConfig {});
+            print_model_result::print(&model_result, print_debug, &ModelPrintConfig { print_mode });
         }
         Err(errors) => {
             for error in errors {

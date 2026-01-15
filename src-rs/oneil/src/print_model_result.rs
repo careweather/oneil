@@ -1,3 +1,5 @@
+use std::{fmt, str};
+
 use anstream::{print, println};
 use oneil_eval::{
     result,
@@ -6,7 +8,51 @@ use oneil_eval::{
 
 use crate::stylesheet;
 
-pub struct ModelPrintConfig {}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModelPrintConfig {
+    pub print_mode: PrintMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrintMode {
+    All,
+    Debug,
+    Trace,
+    Performance,
+}
+
+impl Default for PrintMode {
+    fn default() -> Self {
+        Self::Performance
+    }
+}
+
+impl str::FromStr for PrintMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "all" => Ok(Self::All),
+            "debug" => Ok(Self::Debug),
+            "trace" => Ok(Self::Trace),
+            "perf" | "performance" => Ok(Self::Performance),
+            _ => Err(format!(
+                "Invalid print mode: {s} (valid modes: all, debug, trace, perf, performance)"
+            )),
+        }
+    }
+}
+
+impl fmt::Display for PrintMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::All => write!(f, "all"),
+            Self::Debug => write!(f, "debug"),
+            Self::Trace => write!(f, "trace"),
+            Self::Performance => write!(f, "perf"),
+        }
+    }
+}
 
 pub fn print(model_result: &result::Model, print_debug: bool, model_config: &ModelPrintConfig) {
     if print_debug {
