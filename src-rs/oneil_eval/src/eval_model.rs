@@ -79,34 +79,49 @@ fn parameter_result_from<F: BuiltinFunction>(
 ) -> result::Parameter {
     let (print_level, debug_info) = match parameter.trace_level() {
         ir::TraceLevel::Debug if parameter.is_performance() => {
-            let dependency_values = get_dependency_values(parameter.dependencies(), context);
+            let builtin_dependency_values =
+                get_builtin_dependency_values(parameter.dependencies().builtin(), context);
+            let parameter_dependency_values =
+                get_parameter_dependency_values(parameter.dependencies().parameter(), context);
+            let external_dependency_values =
+                get_external_dependency_values(parameter.dependencies().external(), context);
             (
                 result::PrintLevel::Performance,
-                Some(result::DebugInfo { dependency_values }),
+                Some(result::DebugInfo {
+                    builtin_dependency_values,
+                    parameter_dependency_values,
+                    external_dependency_values,
+                }),
             )
         }
         ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
             (result::PrintLevel::Performance, None)
         }
         ir::TraceLevel::Debug => {
-            let dependency_values = get_dependency_values(parameter.dependencies(), context);
+            let builtin_dependency_values =
+                get_builtin_dependency_values(parameter.dependencies().builtin(), context);
+            let parameter_dependency_values =
+                get_parameter_dependency_values(parameter.dependencies().parameter(), context);
+            let external_dependency_values =
+                get_external_dependency_values(parameter.dependencies().external(), context);
             (
                 result::PrintLevel::Debug,
-                Some(result::DebugInfo { dependency_values }),
+                Some(result::DebugInfo {
+                    builtin_dependency_values,
+                    parameter_dependency_values,
+                    external_dependency_values,
+                }),
             )
         }
         ir::TraceLevel::Trace => (result::PrintLevel::Trace, None),
         ir::TraceLevel::None => (result::PrintLevel::None, None),
     };
 
-    let dependency_values = get_dependency_values(parameter.dependencies(), context);
-
     result::Parameter {
         ident: parameter.name().as_str().to_string(),
         label: parameter.label().as_str().to_string(),
         value,
         print_level,
-        dependency_values,
         debug_info,
     }
 }
@@ -124,7 +139,7 @@ fn get_evaluation_order(
 
         (evaluation_order, visited) = process_parameter_dependencies(
             parameter_name,
-            parameter,
+            parameter.dependencies(),
             visited,
             evaluation_order,
             parameters,
@@ -139,12 +154,12 @@ fn get_evaluation_order(
 
 fn process_parameter_dependencies(
     parameter_name: &ir::ParameterName,
-    parameter: &ir::Parameter,
+    parameter_dependencies: &ir::Dependencies,
     mut visited: HashSet<ir::ParameterName>,
     mut evaluation_order: Vec<ir::ParameterName>,
     parameters: &HashMap<ir::ParameterName, ir::Parameter>,
 ) -> (Vec<ir::ParameterName>, HashSet<ir::ParameterName>) {
-    for dependency in parameter.dependencies().keys() {
+    for dependency in parameter_dependencies.parameter().keys() {
         if visited.contains(dependency) {
             continue;
         }
@@ -156,7 +171,7 @@ fn process_parameter_dependencies(
 
         (evaluation_order, visited) = process_parameter_dependencies(
             dependency,
-            dependency_parameter,
+            dependency_parameter.dependencies(),
             visited,
             evaluation_order,
             parameters,
@@ -181,8 +196,18 @@ fn eval_test<F: BuiltinFunction>(
             expr_span: *expr_span,
         }),
         Value::Boolean(false) => {
-            let dependency_values = get_dependency_values(test.dependencies(), context);
-            let debug_info = result::DebugInfo { dependency_values };
+            let builtin_dependency_values =
+                get_builtin_dependency_values(test.dependencies().builtin(), context);
+            let parameter_dependency_values =
+                get_parameter_dependency_values(test.dependencies().parameter(), context);
+            let external_dependency_values =
+                get_external_dependency_values(test.dependencies().external(), context);
+
+            let debug_info = result::DebugInfo {
+                builtin_dependency_values,
+                parameter_dependency_values,
+                external_dependency_values,
+            };
             Ok(result::Test {
                 result: result::TestResult::Failed { debug_info },
                 expr_span: *expr_span,
@@ -198,8 +223,28 @@ fn eval_test<F: BuiltinFunction>(
     }
 }
 
-/// Gets the values of the dependencies for test reporting purposes.
-fn get_dependency_values<F: BuiltinFunction>(
+/// Gets the values of the builtin dependencies for debug reporting purposes.
+fn get_builtin_dependency_values<F: BuiltinFunction>(
+    dependencies: &HashMap<ir::Identifier, Span>,
+    context: &EvalContext<F>,
+) -> HashMap<String, Value> {
+    dependencies
+        .keys()
+        .map(|dependency| {
+            let value = context.lookup_builtin_variable(dependency);
+            (dependency.as_str().to_string(), value)
+        })
+        .collect::<HashMap<_, _>>()
+}
+
+/// Gets the values of the dependencies for debug reporting purposes.
+///
+/// This should only be called on expressions that have already been evaluated successfully.
+///
+/// # Panics
+///
+/// This function will panic if any of the dependencies are not found.
+fn get_parameter_dependency_values<F: BuiltinFunction>(
     dependencies: &HashMap<ir::ParameterName, Span>,
     context: &EvalContext<F>,
 ) -> HashMap<String, Value> {
@@ -208,11 +253,42 @@ fn get_dependency_values<F: BuiltinFunction>(
         .map(|(dependency, dependency_span)| {
             let value = context
                 .lookup_parameter_value(dependency, *dependency_span)
-                .expect(
-                    "dependency should be found because the test expression resolved successfully",
-                );
+                .expect("dependency should be found because the expression evaluated successfully");
 
             (dependency.as_str().to_string(), value)
         })
+        .collect::<HashMap<_, _>>()
+}
+
+/// Gets the values of the external dependencies for debug reporting purposes.
+///
+/// This should only be called on expressions that have already been evaluated successfully.
+///
+/// # Panics
+///
+/// This function will panic if any of the dependencies are not found.
+fn get_external_dependency_values<F: BuiltinFunction>(
+    dependencies: &HashMap<(ir::ReferenceName, ir::ParameterName), (ir::ModelPath, Span)>,
+    context: &EvalContext<F>,
+) -> HashMap<(String, String), Value> {
+    dependencies
+        .iter()
+        .map(
+            |((reference_name, parameter_name), (model_path, dependency_span))| {
+                let value = context.lookup_model_parameter_value(
+                    model_path,
+                    parameter_name,
+                    *dependency_span,
+                );
+
+                let reference_name = reference_name.as_str().to_string();
+                let parameter_name = parameter_name.as_str().to_string();
+                let value = value.expect(
+                    "dependency should be found because the expression evaluated successfully",
+                );
+
+                ((reference_name, parameter_name), value)
+            },
+        )
         .collect::<HashMap<_, _>>()
 }

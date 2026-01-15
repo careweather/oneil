@@ -89,11 +89,6 @@ pub struct Parameter {
     /// This determines the level of debugging/tracing information that should
     /// be generated for this parameter during output.
     pub print_level: PrintLevel,
-    /// The set of parameter identifiers that this parameter depends on.
-    ///
-    /// This represents the values of the dependencies at the time the
-    /// parameter was evaluated.
-    pub dependency_values: HashMap<String, Value>,
     /// The debug information for this parameter, if requested.
     pub debug_info: Option<DebugInfo>,
 }
@@ -110,8 +105,12 @@ impl Parameter {
 /// Debug information for a parameter.
 #[derive(Debug, Clone)]
 pub struct DebugInfo {
-    /// The values of the dependencies at the time the parameter was evaluated.
-    pub dependency_values: HashMap<String, Value>,
+    /// The values of the builtin dependencies at the time the parameter was evaluated.
+    pub builtin_dependency_values: HashMap<String, Value>,
+    /// The values of the parameter dependencies at the time the parameter was evaluated.
+    pub parameter_dependency_values: HashMap<String, Value>,
+    /// The values of the external dependencies at the time the parameter was evaluated.
+    pub external_dependency_values: HashMap<(String, String), Value>,
 }
 
 /// The trace level for debugging and diagnostic output.

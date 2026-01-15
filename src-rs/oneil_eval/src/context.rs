@@ -71,38 +71,30 @@ impl<F: BuiltinFunction> EvalContext<F> {
     pub fn lookup_parameter_value(
         &self,
         parameter_name: &ir::ParameterName,
-        parameter_name_span: Span,
+        variable_span: Span,
     ) -> Result<Value, Vec<EvalError>> {
         let current_model = self
             .current_model
             .as_ref()
             .expect("current model should be set when looking up a parameter");
 
-        self.lookup_model_parameter_value_internal(
-            current_model,
-            parameter_name,
-            parameter_name_span,
-        )
+        self.lookup_model_parameter_value_internal(current_model, parameter_name, variable_span)
     }
 
     pub fn lookup_model_parameter_value(
         &self,
         model: &ir::ModelPath,
         parameter_name: &ir::ParameterName,
-        parameter_name_span: Span,
+        variable_span: Span,
     ) -> Result<Value, Vec<EvalError>> {
-        self.lookup_model_parameter_value_internal(
-            model.as_ref(),
-            parameter_name,
-            parameter_name_span,
-        )
+        self.lookup_model_parameter_value_internal(model.as_ref(), parameter_name, variable_span)
     }
 
     fn lookup_model_parameter_value_internal(
         &self,
         model_path: &Path,
         parameter_name: &ir::ParameterName,
-        parameter_name_span: Span,
+        variable_span: Span,
     ) -> Result<Value, Vec<EvalError>> {
         let model = self
             .models
@@ -118,7 +110,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .map_err(|_errors| {
                 vec![EvalError::ParameterHasError {
                     parameter_name: parameter_name.as_str().to_string(),
-                    parameter_name_span,
+                    variable_span,
                 }]
             })
     }

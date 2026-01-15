@@ -183,7 +183,7 @@ pub enum EvalError {
         /// The name of the parameter that has errors.
         parameter_name: String,
         /// The source span of the parameter name.
-        parameter_name_span: Span,
+        variable_span: Span,
     },
     /// An error indicating that a function was called with an invalid number of arguments.
     InvalidArgumentCount {
@@ -518,7 +518,7 @@ impl AsOneilError for EvalError {
             } => "exponent cannot be an interval".to_string(),
             Self::ParameterHasError {
                 parameter_name,
-                parameter_name_span: _,
+                variable_span: _,
             } => {
                 format!("parameter `{parameter_name}` has errors")
             }
@@ -754,7 +754,7 @@ impl AsOneilError for EvalError {
             }
             | Self::ParameterHasError {
                 parameter_name: _,
-                parameter_name_span: location_span,
+                variable_span: location_span,
             }
             | Self::InvalidArgumentCount {
                 function_name: _,
@@ -946,7 +946,7 @@ impl AsOneilError for EvalError {
             ))],
             Self::ParameterHasError {
                 parameter_name: _,
-                parameter_name_span: _,
+                variable_span: _,
             } => Vec::new(),
             Self::InvalidArgumentCount {
                 function_name: _,
@@ -1201,7 +1201,7 @@ impl AsOneilError for EvalError {
             } => Vec::new(),
             Self::ParameterHasError {
                 parameter_name: _,
-                parameter_name_span: _,
+                variable_span: _,
             } => Vec::new(),
             Self::InvalidArgumentCount {
                 function_name: _,

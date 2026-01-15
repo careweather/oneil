@@ -1518,8 +1518,6 @@ mod tests {
         use crate::context::EvalContext;
         use crate::result;
 
-        use std::collections::HashMap;
-
         use oneil_ir::DisplayCompositeUnit;
         use oneil_shared::span::SourceLocation;
 
@@ -1586,7 +1584,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -1649,7 +1647,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -1718,7 +1716,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -1787,7 +1785,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -1856,7 +1854,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -1928,7 +1926,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -2000,7 +1998,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -2069,7 +2067,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -2135,7 +2133,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -2202,7 +2200,7 @@ mod tests {
                 ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
 
             ir::Parameter::new(
-                HashMap::new(),
+                ir::Dependencies::new(),
                 ir::ParameterName::new(name.to_string()),
                 random_span(),
                 random_span(),
@@ -2257,7 +2255,6 @@ mod tests {
                 ident: name.to_string(),
                 label: name.to_string(),
                 print_level: result::PrintLevel::None,
-                dependency_values: HashMap::new(),
                 debug_info: None,
             }
         }
