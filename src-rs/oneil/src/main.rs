@@ -1,11 +1,12 @@
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 //! CLI for the Oneil programming language
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anstream::{ColorChoice, eprintln, println};
 use clap::Parser;
-use oneil_eval::builtin::std as oneil_std;
+use oneil_eval::builtin::{BuiltinFunction, std as oneil_std};
+use oneil_ir as ir;
 use oneil_model_resolver::FileLoader;
 use oneil_runner::{
     builtins::Builtins,
@@ -51,73 +52,135 @@ fn handle_dev_command(command: DevCommand) {
             display_partial,
             print_debug,
             no_colors,
-        } => {
-            set_color_choice(no_colors);
-
-            let is_multiple_files = files.len() > 1;
-            for file in files {
-                if is_multiple_files {
-                    println!("===== {} =====", file.display());
-                }
-
-                let ast = file_parser::FileLoader.parse_ast(&file);
-                match ast {
-                    Ok(ast) => print_ast::print(&ast, print_debug),
-                    Err(LoadingError::InvalidFile(error)) => {
-                        let error = convert_error::file::convert(&file, &error);
-                        print_error::print(&error, print_debug);
-                    }
-                    Err(LoadingError::Parser(error_with_partial)) => {
-                        let errors =
-                            convert_error::parser::convert_all(&file, &error_with_partial.errors);
-
-                        for error in errors {
-                            print_error::print(&error, print_debug);
-                            eprintln!();
-                        }
-
-                        if display_partial {
-                            print_ast::print(&error_with_partial.partial_result, print_debug);
-                        }
-                    }
-                }
-            }
-        }
+        } => handle_print_ast(&files, display_partial, print_debug, no_colors),
         DevCommand::PrintIr {
             file,
             display_partial,
             print_debug,
             no_colors,
-        } => {
-            set_color_choice(no_colors);
+        } => handle_print_ir(&file, display_partial, print_debug, no_colors),
+        DevCommand::PrintModelResult { file, no_colors } => {
+            handle_print_model_result(&file, no_colors);
+        }
+    }
+}
 
-            let builtin_variables = Builtins::new(
-                oneil_std::builtin_values(),
-                oneil_std::builtin_functions(),
-                oneil_std::builtin_units(),
-                oneil_std::builtin_prefixes(),
-            );
+/// Handles the `dev print-ast` command.
+fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool, no_colors: bool) {
+    set_color_choice(no_colors);
 
-            let model_collection = oneil_model_resolver::load_model(
-                file,
-                &builtin_variables,
-                &file_parser::FileLoader,
-            );
-            match model_collection {
-                Ok(model_collection) => print_ir::print(&model_collection, print_debug),
-                Err(error) => {
-                    let (model_collection, error_map) = *error;
-                    let errors = convert_error::loader::convert_map(&error_map);
-                    for error in errors {
-                        print_error::print(&error, print_debug);
-                        eprintln!();
-                    }
+    let is_multiple_files = files.len() > 1;
+    for file in files {
+        if is_multiple_files {
+            println!("===== {} =====", file.display());
+        }
 
-                    if display_partial {
-                        print_ir::print(&model_collection, print_debug);
-                    }
+        let ast = file_parser::FileLoader.parse_ast(file);
+        match ast {
+            Ok(ast) => print_ast::print(&ast, print_debug),
+            Err(LoadingError::InvalidFile(error)) => {
+                let error = convert_error::file::convert(file, &error);
+                print_error::print(&error, print_debug);
+            }
+            Err(LoadingError::Parser(error_with_partial)) => {
+                let errors = convert_error::parser::convert_all(file, &error_with_partial.errors);
+
+                for error in errors {
+                    print_error::print(&error, print_debug);
+                    eprintln!();
+                }
+
+                if display_partial {
+                    print_ast::print(&error_with_partial.partial_result, print_debug);
                 }
             }
+        }
+    }
+}
+
+/// Handles the `dev print-ir` command.
+fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool, no_colors: bool) {
+    set_color_choice(no_colors);
+
+    let builtin_variables = create_builtins();
+
+    let model_collection =
+        oneil_model_resolver::load_model(file, &builtin_variables, &file_parser::FileLoader);
+    match model_collection {
+        Ok(model_collection) => print_ir::print(&model_collection, print_debug),
+        Err(error) => {
+            let (model_collection, error_map) = *error;
+            let errors = convert_error::loader::convert_map(&error_map);
+            for error in errors {
+                print_error::print(&error, print_debug);
+                eprintln!();
+            }
+
+            if display_partial {
+                print_ir::print(&model_collection, print_debug);
+            }
+        }
+    }
+}
+
+/// Handles the `dev print-model-result` command.
+fn handle_print_model_result(file: &Path, no_colors: bool) {
+    set_color_choice(no_colors);
+
+    let builtins = create_builtins();
+
+    let Some(model_collection) = load_model_collection(file, &builtins, false) else {
+        return;
+    };
+
+    let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
+
+    let model_result = eval_context.get_model_result(file);
+
+    match model_result {
+        Ok(model_result) => {
+            println!("{:?}", model_result);
+        }
+        Err(errors) => {
+            for error in errors {
+                let error = convert_error::eval::convert(&error);
+                print_error::print(&error, false);
+                eprintln!();
+            }
+        }
+    }
+}
+
+/// Creates a new `Builtins` instance with standard library builtins.
+fn create_builtins() -> Builtins<oneil_std::StdBuiltinFunction> {
+    Builtins::new(
+        oneil_std::builtin_values(),
+        oneil_std::builtin_functions(),
+        oneil_std::builtin_units(),
+        oneil_std::builtin_prefixes(),
+    )
+}
+
+/// Loads a model collection, printing errors if loading fails.
+///
+/// Returns `Some(model_collection)` if loading succeeds, otherwise prints errors and returns `None`.
+fn load_model_collection<F: BuiltinFunction>(
+    file: &Path,
+    builtins: &Builtins<F>,
+    print_debug: bool,
+) -> Option<Box<ir::ModelCollection>> {
+    let model_collection =
+        oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
+    match model_collection {
+        Ok(model_collection) => Some(model_collection),
+        Err(error) => {
+            let (_model_collection, error_map) = *error;
+            let errors = convert_error::loader::convert_map(&error_map);
+            for error in errors {
+                print_error::print(&error, print_debug);
+                eprintln!();
+            }
+            None
         }
     }
 }

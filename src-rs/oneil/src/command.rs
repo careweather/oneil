@@ -54,6 +54,10 @@ pub enum Commands {
 }
 
 /// Development-specific commands for the Oneil CLI
+#[expect(
+    clippy::enum_variant_names,
+    reason = "the names are descriptive and just happen to start with the same word; in the future, other commands may be added that don't start with the same word"
+)]
 #[derive(Subcommand)]
 pub enum DevCommand {
     /// Print the Abstract Syntax Tree (AST) of a Oneil source file
@@ -99,6 +103,22 @@ pub enum DevCommand {
         /// Print the output in debug format
         #[arg(long)]
         print_debug: bool,
+
+        /// Disable colors in the output
+        ///
+        /// When enabled, suppresses colored output for better compatibility with
+        /// terminals that don't support ANSI color codes or for redirecting to files.
+        #[arg(long)]
+        no_colors: bool,
+    },
+    /// Print the results of evaluating an Oneil model
+    ///
+    /// This prints a debug representation, unlike the `Eval` command,
+    /// which is intended to be used by end users.
+    PrintModelResult {
+        /// Path to the Oneil model file to evaluate
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
 
         /// Disable colors in the output
         ///
