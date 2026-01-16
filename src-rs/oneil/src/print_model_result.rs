@@ -94,13 +94,17 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: Mode
     let only_top_model_is_printed = parameters_to_print.len() == 1
         && parameters_to_print.contains_key(model_result.path.as_path());
 
-    for (path, parameters) in parameters_to_print {
+    for (index, (path, parameters)) in parameters_to_print.iter().enumerate() {
         if !only_top_model_is_printed {
             print_model_path_header(path);
         }
 
         for parameter in parameters {
             print_parameter(parameter, should_print_debug_info);
+        }
+
+        if index < parameters_to_print.len() - 1 {
+            println!();
         }
     }
 }
@@ -124,7 +128,9 @@ fn get_model_parameters<'a>(
         }),
     };
 
-    models.insert(&model_result.path, parameters_to_print);
+    if !parameters_to_print.is_empty() {
+        models.insert(&model_result.path, parameters_to_print);
+    }
 
     if top_model_only {
         models
@@ -164,9 +170,11 @@ fn get_model_tests<'a>(
     test_info.test_count += test_count;
     test_info.passed_count += test_count - failed_tests.len();
 
-    test_info
-        .failed_tests
-        .push((&model_result.path, failed_tests));
+    if !failed_tests.is_empty() {
+        test_info
+            .failed_tests
+            .push((&model_result.path, failed_tests));
+    }
 
     if top_model_only {
         test_info
@@ -197,8 +205,12 @@ fn print_failing_tests(test_info: &TestInfo<'_>) {
     let tests_label = stylesheet::TESTS_FAIL_COLOR.style("FAILING TESTS");
     println!("{tests_label}");
 
-    for (model_path, failing_tests) in &test_info.failed_tests {
+    for (index, (model_path, failing_tests)) in test_info.failed_tests.iter().enumerate() {
         print_model_failing_tests(model_path, failing_tests);
+
+        if index < test_info.failed_tests.len() - 1 {
+            println!();
+        }
     }
 
     println!("{divider_line}");
