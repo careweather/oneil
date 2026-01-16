@@ -7,11 +7,11 @@ use oneil_eval::{
 };
 use oneil_shared::span::Span;
 
-use crate::{command::PrintParams, stylesheet};
+use crate::{command::PrintMode, stylesheet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModelPrintConfig {
-    pub print_level: PrintParams,
+    pub print_level: PrintMode,
     pub top_model_only: bool,
 }
 
@@ -63,16 +63,16 @@ pub fn print(model_result: &result::Model, print_debug_info: bool, model_config:
 
 fn get_model_parameters<'a>(
     model_result: &'a result::Model,
-    print_level: PrintParams,
+    print_level: PrintMode,
     top_model_only: bool,
     mut models: HashMap<&'a Path, Vec<&'a result::Parameter>>,
 ) -> HashMap<&'a Path, Vec<&'a result::Parameter>> {
     let parameters_to_print = match print_level {
-        PrintParams::All => filter_parameters(&model_result.parameters, |_parameter| true),
-        PrintParams::Trace => filter_parameters(&model_result.parameters, |parameter| {
+        PrintMode::All => filter_parameters(&model_result.parameters, |_parameter| true),
+        PrintMode::Trace => filter_parameters(&model_result.parameters, |parameter| {
             parameter.should_print(result::PrintLevel::Trace)
         }),
-        PrintParams::Performance => filter_parameters(&model_result.parameters, |parameter| {
+        PrintMode::Performance => filter_parameters(&model_result.parameters, |parameter| {
             parameter.should_print(result::PrintLevel::Performance)
         }),
     };

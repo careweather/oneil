@@ -32,8 +32,8 @@ pub enum Commands {
         /// - `perf`: print parameters marked with `$` (performance parameters) only
         ///
         /// - `all`: print all parameter values
-        #[arg(long, short = 'p', default_value_t)]
-        print: PrintParams,
+        #[arg(long, short = 'm', default_value_t)]
+        print_mode: PrintMode,
 
         /// Print debug information
         ///
@@ -148,19 +148,19 @@ pub enum DevCommand {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrintParams {
-    All,
+pub enum PrintMode {
     Trace,
     Performance,
+    All,
 }
 
-impl Default for PrintParams {
+impl Default for PrintMode {
     fn default() -> Self {
         Self::Trace
     }
 }
 
-impl str::FromStr for PrintParams {
+impl str::FromStr for PrintMode {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -173,7 +173,7 @@ impl str::FromStr for PrintParams {
     }
 }
 
-impl fmt::Display for PrintParams {
+impl fmt::Display for PrintMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::All => write!(f, "all"),
