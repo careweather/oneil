@@ -18,17 +18,24 @@ pub struct CliCommand {
 /// Available top-level commands for the Oneil CLI
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Development tools for debugging and testing Oneil source files
-    Dev {
-        /// The specific development command to execute
-        #[command(subcommand)]
-        command: DevCommand,
-    },
-    /// Evaluate a Oneil model
+    /// Evaluate an Oneil model
     Eval {
         /// Path to the Oneil model file to evaluate
         #[arg(value_name = "FILE")]
         file: PathBuf,
+
+        /// Print level for the output
+        ///
+        /// This can be one of:
+        ///
+        /// - `trace`: print parameters marked with `*` (trace parameters),
+        ///   `**` (debug parameters), or `$` (performance parameters)
+        ///
+        /// - `perf`: print parameters marked with `$` (performance parameters) only
+        ///
+        /// - `all`: print all parameter values
+        #[arg(long, short = 'p', default_value_t)]
+        print: PrintLevel,
 
         /// Print debug information
         ///
@@ -37,29 +44,30 @@ pub enum Commands {
         #[arg(long, short = 'd')]
         debug: bool,
 
-        /// Disable colors in the output
-        ///
-        /// When enabled, suppresses colored output for better compatibility with
-        /// terminals that don't support ANSI color codes or for redirecting to files.
-        #[arg(long)]
-        no_colors: bool,
-
-        /// Print level for the output (all, trace, perf)
-        ///
-        /// This can be one of:
-        /// - `all`: print all parameter values
-        /// - `trace` (default): print parameters marked with `*` (trace parameters),
-        ///   `**` (debug parameters), or `$` (performance parameters)
-        /// - `perf`: print parameters marked with `$` (performance parameters) only
-        #[arg(long, short = 'p', default_value_t)]
-        print: PrintLevel,
-
         /// Only print info about the top model
         ///
         /// By default, Oneil will print the results of the top model
         /// and all of its submodels.
         #[arg(long)]
         top_only: bool,
+
+        /// Disable colors in the output
+        ///
+        /// When enabled, suppresses colored output for better compatibility with
+        /// terminals that don't support ANSI color codes or for redirecting to files.
+        #[arg(long)]
+        no_colors: bool,
+    },
+    /// Development tools for debugging and testing Oneil source files
+    ///
+    /// NOTE: because these commands are not intended for end users, they are hidden
+    /// from the help output. However, they can still be used. See `oneil dev --help`
+    /// for more information.
+    #[clap(hide = true)]
+    Dev {
+        /// The specific development command to execute
+        #[command(subcommand)]
+        command: DevCommand,
     },
     /// Run the LSP
     Lsp {},
