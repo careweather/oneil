@@ -173,19 +173,7 @@ fn print_parameter(
 
     // Print dependencies
     let dependencies = parameter.dependencies();
-    if !dependencies.is_empty() {
-        println!("{}    ├── Dependencies:", "  ".repeat(indent));
-        for (i, dep) in dependencies.keys().enumerate() {
-            let is_last = i == dependencies.len() - 1;
-            let dep_prefix = if is_last { "└──" } else { "├──" };
-            println!(
-                "{}        {}Dependency: \"{}\"",
-                "  ".repeat(indent),
-                dep_prefix,
-                dep.as_str()
-            );
-        }
-    }
+    print_dependencies(indent, dependencies);
 
     // Print value
     println!("{}    ├── Value:", "  ".repeat(indent));
@@ -204,6 +192,58 @@ fn print_parameter(
         "  ".repeat(indent),
         parameter.trace_level()
     );
+}
+
+fn print_dependencies(indent: usize, dependencies: &oneil_ir::Dependencies) {
+    let builtin_deps = dependencies.builtin();
+    let parameter_deps = dependencies.parameter();
+    let external_deps = dependencies.external();
+
+    let total_deps = builtin_deps.len() + parameter_deps.len() + external_deps.len();
+    if total_deps > 0 {
+        println!("{}    ├── Dependencies:", "  ".repeat(indent));
+        let mut dep_index = 0;
+
+        // Print builtin dependencies
+        for ident in builtin_deps.keys() {
+            dep_index += 1;
+            let is_last = dep_index == total_deps;
+            let dep_prefix = if is_last { "└──" } else { "├──" };
+            println!(
+                "{}        {}Builtin: \"{}\"",
+                "  ".repeat(indent),
+                dep_prefix,
+                ident.as_str()
+            );
+        }
+
+        // Print parameter dependencies
+        for param_name in parameter_deps.keys() {
+            dep_index += 1;
+            let is_last = dep_index == total_deps;
+            let dep_prefix = if is_last { "└──" } else { "├──" };
+            println!(
+                "{}        {}Parameter: \"{}\"",
+                "  ".repeat(indent),
+                dep_prefix,
+                param_name.as_str()
+            );
+        }
+
+        // Print external dependencies
+        for (ref_name, param_name) in external_deps.keys() {
+            dep_index += 1;
+            let is_last = dep_index == total_deps;
+            let dep_prefix = if is_last { "└──" } else { "├──" };
+            println!(
+                "{}        {}External: \"{}\".\"{}\"",
+                "  ".repeat(indent),
+                dep_prefix,
+                param_name.as_str(),
+                ref_name.as_str(),
+            );
+        }
+    }
 }
 
 /// Prints a parameter value

@@ -286,13 +286,27 @@ fn print_parameter(parameter: &result::Parameter, should_print_debug_info: bool)
 }
 
 fn print_debug_info(debug_info: &result::DebugInfo) {
-    for (dependency_name, dependency_value) in &debug_info.dependency_values {
-        let indent = " ".repeat(2);
-        let styled_dependency_name = stylesheet::PARAMETER_IDENTIFIER.style(dependency_name);
-        print!("{indent}- {styled_dependency_name} = ");
-        print_value(dependency_value);
-        println!();
+    let indent = 2;
+    for (dependency_name, dependency_value) in &debug_info.builtin_dependency_values {
+        print_variable_value(dependency_name, dependency_value, indent);
     }
+    for (dependency_name, dependency_value) in &debug_info.parameter_dependency_values {
+        print_variable_value(dependency_name, dependency_value, indent);
+    }
+    for ((reference_name, parameter_name), dependency_value) in
+        &debug_info.external_dependency_values
+    {
+        let variable_name = format!("{parameter_name}.{reference_name}");
+        print_variable_value(&variable_name, dependency_value, indent);
+    }
+}
+
+fn print_variable_value(name: &str, value: &Value, indent: usize) {
+    let indent = " ".repeat(indent);
+    let styled_dependency_name = stylesheet::PARAMETER_IDENTIFIER.style(name);
+    print!("{indent}- {styled_dependency_name} = ");
+    print_value(value);
+    println!();
 }
 
 fn print_value(value: &Value) {
