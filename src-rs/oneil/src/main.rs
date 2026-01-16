@@ -14,8 +14,8 @@ use oneil_runner::{
 };
 
 use crate::{
-    command::{CliCommand, Commands, DevCommand},
-    print_model_result::{ModelPrintConfig, PrintLevel},
+    command::{CliCommand, Commands, DevCommand, PrintParams},
+    print_model_result::ModelPrintConfig,
 };
 
 mod command;
@@ -188,7 +188,7 @@ fn load_model_collection<F: BuiltinFunction>(
 fn handle_eval_command(
     file: &Path,
     print_debug_info: bool,
-    print_level: PrintLevel,
+    print_level: PrintParams,
     no_colors: bool,
     top_only: bool,
 ) {

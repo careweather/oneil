@@ -1,9 +1,7 @@
 //! Command-line interface definitions for the Oneil CLI
 
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
-
-use crate::print_model_result::PrintLevel;
+use std::{fmt, path::PathBuf, str};
 
 /// Oneil language CLI - Main command-line interface structure
 #[derive(Parser)]
@@ -24,7 +22,7 @@ pub enum Commands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Print level for the output
+        /// Selects which parameters to print
         ///
         /// This can be one of:
         ///
@@ -35,7 +33,7 @@ pub enum Commands {
         ///
         /// - `all`: print all parameter values
         #[arg(long, short = 'p', default_value_t)]
-        print: PrintLevel,
+        print: PrintParams,
 
         /// Print debug information
         ///
@@ -147,4 +145,40 @@ pub enum DevCommand {
         #[arg(long)]
         no_colors: bool,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrintParams {
+    All,
+    Trace,
+    Performance,
+}
+
+impl Default for PrintParams {
+    fn default() -> Self {
+        Self::Trace
+    }
+}
+
+impl str::FromStr for PrintParams {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "all" => Ok(Self::All),
+            "trace" => Ok(Self::Trace),
+            "perf" => Ok(Self::Performance),
+            _ => Err("valid options are `all`, `trace`, or `perf`".to_string()),
+        }
+    }
+}
+
+impl fmt::Display for PrintParams {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::All => write!(f, "all"),
+            Self::Trace => write!(f, "trace"),
+            Self::Performance => write!(f, "perf"),
+        }
+    }
 }

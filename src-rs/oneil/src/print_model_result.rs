@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, path::Path, str};
+use std::{collections::HashMap, path::Path};
 
 use anstream::{print, println};
 use oneil_eval::{
@@ -7,50 +7,12 @@ use oneil_eval::{
 };
 use oneil_shared::span::Span;
 
-use crate::stylesheet;
+use crate::{command::PrintParams, stylesheet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModelPrintConfig {
-    pub print_level: PrintLevel,
+    pub print_level: PrintParams,
     pub top_model_only: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrintLevel {
-    All,
-    Trace,
-    Performance,
-}
-
-impl Default for PrintLevel {
-    fn default() -> Self {
-        Self::Trace
-    }
-}
-
-impl str::FromStr for PrintLevel {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "all" => Ok(Self::All),
-            "trace" => Ok(Self::Trace),
-            "perf" | "performance" => Ok(Self::Performance),
-            _ => Err(format!(
-                "Invalid print mode: {s} (valid modes: all, trace, perf, performance)"
-            )),
-        }
-    }
-}
-
-impl fmt::Display for PrintLevel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::All => write!(f, "all"),
-            Self::Trace => write!(f, "trace"),
-            Self::Performance => write!(f, "perf"),
-        }
-    }
 }
 
 pub fn divider_line() -> String {
@@ -101,16 +63,16 @@ pub fn print(model_result: &result::Model, print_debug_info: bool, model_config:
 
 fn get_model_parameters<'a>(
     model_result: &'a result::Model,
-    print_level: PrintLevel,
+    print_level: PrintParams,
     top_model_only: bool,
     mut models: HashMap<&'a Path, Vec<&'a result::Parameter>>,
 ) -> HashMap<&'a Path, Vec<&'a result::Parameter>> {
     let parameters_to_print = match print_level {
-        PrintLevel::All => filter_parameters(&model_result.parameters, |_parameter| true),
-        PrintLevel::Trace => filter_parameters(&model_result.parameters, |parameter| {
+        PrintParams::All => filter_parameters(&model_result.parameters, |_parameter| true),
+        PrintParams::Trace => filter_parameters(&model_result.parameters, |parameter| {
             parameter.should_print(result::PrintLevel::Trace)
         }),
-        PrintLevel::Performance => filter_parameters(&model_result.parameters, |parameter| {
+        PrintParams::Performance => filter_parameters(&model_result.parameters, |parameter| {
             parameter.should_print(result::PrintLevel::Performance)
         }),
     };
