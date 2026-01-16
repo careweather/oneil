@@ -37,11 +37,11 @@ fn main() {
         Commands::Dev { command } => handle_dev_command(command),
         Commands::Eval {
             file,
-            print_debug,
+            debug: print_debug_info,
             no_colors,
-            print_level,
+            print: print_level,
             top_only,
-        } => handle_eval_command(&file, print_debug, print_level, no_colors, top_only),
+        } => handle_eval_command(&file, print_debug_info, print_level, no_colors, top_only),
     }
 }
 
@@ -187,7 +187,7 @@ fn load_model_collection<F: BuiltinFunction>(
 
 fn handle_eval_command(
     file: &Path,
-    print_debug: bool,
+    print_debug_info: bool,
     print_level: PrintLevel,
     no_colors: bool,
     top_only: bool,
@@ -209,7 +209,7 @@ fn handle_eval_command(
             let (_model_collection, error_map) = *error;
             let errors = convert_error::loader::convert_map(&error_map);
             for error in errors {
-                print_error::print(&error, print_debug);
+                print_error::print(&error, false);
                 eprintln!();
             }
             return;
@@ -224,7 +224,7 @@ fn handle_eval_command(
         Ok(model_result) => {
             print_model_result::print(
                 &model_result,
-                print_debug,
+                print_debug_info,
                 ModelPrintConfig {
                     print_level,
                     top_model_only: top_only,
@@ -234,7 +234,7 @@ fn handle_eval_command(
         Err(errors) => {
             for error in errors {
                 let error = convert_error::eval::convert(&error);
-                print_error::print(&error, print_debug);
+                print_error::print(&error, false);
                 eprintln!();
             }
         }

@@ -18,14 +18,13 @@ pub struct ModelPrintConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrintLevel {
     All,
-    Debug,
     Trace,
     Performance,
 }
 
 impl Default for PrintLevel {
     fn default() -> Self {
-        Self::Performance
+        Self::Trace
     }
 }
 
@@ -35,11 +34,10 @@ impl str::FromStr for PrintLevel {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "all" => Ok(Self::All),
-            "debug" => Ok(Self::Debug),
             "trace" => Ok(Self::Trace),
             "perf" | "performance" => Ok(Self::Performance),
             _ => Err(format!(
-                "Invalid print mode: {s} (valid modes: all, debug, trace, perf, performance)"
+                "Invalid print mode: {s} (valid modes: all, trace, perf, performance)"
             )),
         }
     }
@@ -49,7 +47,6 @@ impl fmt::Display for PrintLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::All => write!(f, "all"),
-            Self::Debug => write!(f, "debug"),
             Self::Trace => write!(f, "trace"),
             Self::Performance => write!(f, "perf"),
         }
@@ -60,12 +57,7 @@ pub fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print(model_result: &result::Model, print_debug: bool, model_config: ModelPrintConfig) {
-    if print_debug {
-        println!("{model_result:?}");
-        return;
-    }
-
+pub fn print(model_result: &result::Model, print_debug_info: bool, model_config: ModelPrintConfig) {
     let parameters_to_print = get_model_parameters(
         model_result,
         model_config.print_level,
@@ -83,8 +75,6 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: Mode
 
     print_failing_tests(&test_info);
 
-    let should_print_debug_info = model_config.print_level == PrintLevel::Debug;
-
     if parameters_to_print.is_empty() {
         let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No performance parameters found)");
         println!("{message}");
@@ -100,7 +90,7 @@ pub fn print(model_result: &result::Model, print_debug: bool, model_config: Mode
         }
 
         for parameter in parameters {
-            print_parameter(parameter, should_print_debug_info);
+            print_parameter(parameter, print_debug_info);
         }
 
         if index < parameters_to_print.len() - 1 {
@@ -117,9 +107,6 @@ fn get_model_parameters<'a>(
 ) -> HashMap<&'a Path, Vec<&'a result::Parameter>> {
     let parameters_to_print = match print_level {
         PrintLevel::All => filter_parameters(&model_result.parameters, |_parameter| true),
-        PrintLevel::Debug => filter_parameters(&model_result.parameters, |parameter| {
-            parameter.should_print(result::PrintLevel::Debug)
-        }),
         PrintLevel::Trace => filter_parameters(&model_result.parameters, |parameter| {
             parameter.should_print(result::PrintLevel::Trace)
         }),

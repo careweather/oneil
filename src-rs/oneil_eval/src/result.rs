@@ -121,8 +121,6 @@ pub struct DebugInfo {
 pub enum PrintLevel {
     /// No output.
     None,
-    /// Detailed debugging output.
-    Debug,
     /// Basic tracing output.
     Trace,
     /// Performance output.

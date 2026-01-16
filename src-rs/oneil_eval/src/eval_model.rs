@@ -105,7 +105,7 @@ fn parameter_result_from<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(parameter.dependencies().external(), context);
             (
-                result::PrintLevel::Debug,
+                result::PrintLevel::Trace,
                 Some(result::DebugInfo {
                     builtin_dependency_values,
                     parameter_dependency_values,

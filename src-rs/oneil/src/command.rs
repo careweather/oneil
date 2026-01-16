@@ -30,9 +30,12 @@ pub enum Commands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Print the output in debug format
-        #[arg(long)]
-        print_debug: bool,
+        /// Print debug information
+        ///
+        /// For parameters marked with `**`, this will print the
+        /// values of variables used to evaluate the parameter.
+        #[arg(long, short = 'd')]
+        debug: bool,
 
         /// Disable colors in the output
         ///
@@ -41,11 +44,20 @@ pub enum Commands {
         #[arg(long)]
         no_colors: bool,
 
-        /// Print level for the output (all, debug, trace, perf)
-        #[arg(long, default_value_t)]
-        print_level: PrintLevel,
+        /// Print level for the output (all, trace, perf)
+        ///
+        /// This can be one of:
+        /// - `all`: print all parameter values
+        /// - `trace` (default): print parameters marked with `*` (trace parameters),
+        ///   `**` (debug parameters), or `$` (performance parameters)
+        /// - `perf`: print parameters marked with `$` (performance parameters) only
+        #[arg(long, short = 'p', default_value_t)]
+        print: PrintLevel,
 
         /// Only print info about the top model
+        ///
+        /// By default, Oneil will print the results of the top model
+        /// and all of its submodels.
         #[arg(long)]
         top_only: bool,
     },
