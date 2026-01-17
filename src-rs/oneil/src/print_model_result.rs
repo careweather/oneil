@@ -1,17 +1,24 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
-use anstream::{print, println};
+use anstream::{eprintln, print, println};
 use oneil_eval::{
     result,
     value::{self, Value},
 };
 use oneil_shared::span::Span;
 
-use crate::{command::PrintMode, stylesheet};
+use crate::{
+    command::{PrintMode, VariableList},
+    stylesheet,
+};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelPrintConfig {
-    pub print_level: PrintMode,
+    pub print_mode: PrintMode,
+    pub variables: Option<VariableList>,
     pub top_model_only: bool,
 }
 
@@ -20,76 +27,23 @@ pub fn divider_line() -> String {
 }
 
 pub fn print(model_result: &result::Model, print_debug_info: bool, model_config: ModelPrintConfig) {
-    let parameters_to_print = get_model_parameters(
-        model_result,
-        model_config.print_level,
-        model_config.top_model_only,
-        HashMap::new(),
-    );
-
     let test_info = get_model_tests(
         model_result,
         model_config.top_model_only,
         TestInfo::default(),
     );
 
+    let divider_line = divider_line();
+    println!("{divider_line}");
+
     print_model_header(&model_result.path, &test_info);
 
     print_failing_tests(&test_info);
 
-    if parameters_to_print.is_empty() {
-        let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No performance parameters found)");
-        println!("{message}");
-        return;
-    }
-
-    let only_top_model_is_printed = parameters_to_print.len() == 1
-        && parameters_to_print.contains_key(model_result.path.as_path());
-
-    for (index, (path, parameters)) in parameters_to_print.iter().enumerate() {
-        if !only_top_model_is_printed {
-            print_model_path_header(path);
-        }
-
-        for parameter in parameters {
-            print_parameter(parameter, print_debug_info);
-        }
-
-        if index < parameters_to_print.len() - 1 {
-            println!();
-        }
-    }
-}
-
-fn get_model_parameters<'a>(
-    model_result: &'a result::Model,
-    print_level: PrintMode,
-    top_model_only: bool,
-    mut models: HashMap<&'a Path, Vec<&'a result::Parameter>>,
-) -> HashMap<&'a Path, Vec<&'a result::Parameter>> {
-    let parameters_to_print = match print_level {
-        PrintMode::All => filter_parameters(&model_result.parameters, |_parameter| true),
-        PrintMode::Trace => filter_parameters(&model_result.parameters, |parameter| {
-            parameter.should_print(result::PrintLevel::Trace)
-        }),
-        PrintMode::Performance => filter_parameters(&model_result.parameters, |parameter| {
-            parameter.should_print(result::PrintLevel::Performance)
-        }),
-    };
-
-    if !parameters_to_print.is_empty() {
-        models.insert(&model_result.path, parameters_to_print);
-    }
-
-    if top_model_only {
-        models
+    if let Some(variables) = model_config.variables {
+        print_parameters_by_list(model_result, print_debug_info, variables);
     } else {
-        model_result
-            .submodels
-            .values()
-            .fold(models, |models, submodel| {
-                get_model_parameters(submodel, print_level, top_model_only, models)
-            })
+        print_parameters_by_filter(model_result, print_debug_info, &model_config);
     }
 }
 
@@ -135,13 +89,6 @@ fn get_model_tests<'a>(
                 get_model_tests(submodel, top_model_only, test_info)
             })
     }
-}
-
-fn filter_parameters(
-    parameters: &HashMap<String, result::Parameter>,
-    arg: impl Fn(&&result::Parameter) -> bool,
-) -> Vec<&result::Parameter> {
-    parameters.values().filter(arg).collect()
 }
 
 fn print_failing_tests(test_info: &TestInfo<'_>) {
@@ -221,7 +168,6 @@ fn print_model_header(model_path: &Path, test_info: &TestInfo<'_>) {
         stylesheet::TESTS_FAIL_COLOR.style("FAIL")
     };
 
-    println!("{divider_line}");
     println!("{model_label}: {}", model_path.display());
     println!("{tests_label}: {passed_count}/{test_count} ({test_result_string})");
     println!("{divider_line}");
@@ -230,6 +176,193 @@ fn print_model_header(model_path: &Path, test_info: &TestInfo<'_>) {
 fn print_model_path_header(model_path: &Path) {
     let header = stylesheet::MODEL_PATH_HEADER.style(model_path.display());
     println!("{header}");
+}
+
+fn print_parameters_by_list(
+    model_result: &result::Model,
+    print_debug_info: bool,
+    variables: VariableList,
+) {
+    let ModelParametersToPrint {
+        parameters: parameters_to_print,
+        parameters_not_found,
+    } = get_model_parameters_by_list(model_result, variables);
+
+    if parameters_to_print.is_empty() && parameters_not_found.is_empty() {
+        let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No parameters found)");
+        eprintln!("{message}");
+        return;
+    }
+
+    for parameter_name in parameters_not_found {
+        let message = stylesheet::ERROR_COLOR
+            .bold()
+            .style(format!("Parameter not found: \"{parameter_name}\""));
+        eprintln!("{message}");
+    }
+
+    for (parameter_name, parameter) in parameters_to_print {
+        let styled_parameter_name = stylesheet::PARAMETERS_NAME_LABEL.style(parameter_name);
+        print!("{styled_parameter_name}: ");
+        print_parameter(parameter, print_debug_info);
+    }
+}
+
+struct ModelParametersToPrint<'a> {
+    pub parameters: HashMap<String, &'a result::Parameter>,
+    pub parameters_not_found: HashSet<String>,
+}
+
+fn get_model_parameters_by_list(
+    model_result: &result::Model,
+    variables: VariableList,
+) -> ModelParametersToPrint<'_> {
+    let mut parameters = HashMap::new();
+    let mut parameters_not_found = HashSet::new();
+
+    for variable in variables.into_iter() {
+        let variable_name = variable.to_string();
+        let result = get_parameter_from_model(model_result, variable);
+
+        match result {
+            Some(variable_value) => {
+                parameters.insert(variable_name, variable_value);
+            }
+            None => {
+                parameters_not_found.insert(variable_name);
+            }
+        }
+    }
+
+    ModelParametersToPrint {
+        parameters,
+        parameters_not_found,
+    }
+}
+
+fn get_parameter_from_model(
+    model_result: &result::Model,
+    param: crate::command::Variable,
+) -> Option<&result::Parameter> {
+    let mut param_vec = param.into_vec();
+
+    let parameter = param_vec.remove(0);
+
+    return recurse(model_result, parameter, param_vec);
+
+    #[expect(
+        clippy::items_after_statements,
+        reason = "this is an internal recursive function, we keep it here for clarity"
+    )]
+    fn recurse(
+        model: &result::Model,
+        parameter: String,
+        mut submodels: Vec<String>,
+    ) -> Option<&result::Parameter> {
+        // note that we're popping the last submodel since that's the
+        // top-most submodel
+        let Some(submodel) = submodels.pop() else {
+            return model.parameters.get(&parameter);
+        };
+
+        let submodel = model.submodels.get(&submodel)?;
+
+        recurse(submodel, parameter, submodels)
+    }
+}
+
+fn print_parameters_by_filter(
+    model_result: &result::Model,
+    print_debug_info: bool,
+    model_config: &ModelPrintConfig,
+) {
+    let parameters_to_print = get_model_parameters_by_filter(
+        model_result,
+        model_config.print_mode,
+        model_config.top_model_only,
+    );
+
+    let parameter_kind = match model_config.print_mode {
+        PrintMode::Trace => "trace ",
+        PrintMode::Performance => "performance ",
+        PrintMode::All => "",
+    };
+
+    if parameters_to_print.is_empty() {
+        let message = stylesheet::NO_PARAMETERS_MESSAGE
+            .style(format!("(No {parameter_kind}parameters found)"));
+        eprintln!("{message}");
+        return;
+    }
+
+    let only_top_model_is_printed = parameters_to_print.len() == 1
+        && parameters_to_print.contains_key(model_result.path.as_path());
+
+    for (index, (path, parameters)) in parameters_to_print.iter().enumerate() {
+        if !only_top_model_is_printed {
+            print_model_path_header(path);
+        }
+
+        for parameter in parameters {
+            print_parameter(parameter, print_debug_info);
+        }
+
+        if index < parameters_to_print.len() - 1 {
+            println!();
+        }
+    }
+}
+
+fn get_model_parameters_by_filter(
+    model_result: &result::Model,
+    print_level: PrintMode,
+    top_model_only: bool,
+) -> HashMap<&Path, Vec<&result::Parameter>> {
+    return recurse(model_result, print_level, top_model_only, HashMap::new());
+
+    #[expect(
+        clippy::items_after_statements,
+        reason = "this is an internal recursive function, we keep it here for clarity"
+    )]
+    fn recurse<'a>(
+        model_result: &'a result::Model,
+        print_level: PrintMode,
+        top_model_only: bool,
+        mut parameters: HashMap<&'a Path, Vec<&'a result::Parameter>>,
+    ) -> HashMap<&'a Path, Vec<&'a result::Parameter>> {
+        let parameters_to_print: Vec<_> = match print_level {
+            PrintMode::All => model_result
+                .parameters
+                .values()
+                .filter(|_parameter| true)
+                .collect(),
+            PrintMode::Trace => model_result
+                .parameters
+                .values()
+                .filter(|parameter| parameter.should_print(result::PrintLevel::Trace))
+                .collect(),
+            PrintMode::Performance => model_result
+                .parameters
+                .values()
+                .filter(|parameter| parameter.should_print(result::PrintLevel::Performance))
+                .collect(),
+        };
+
+        if !parameters_to_print.is_empty() {
+            parameters.insert(&model_result.path, parameters_to_print);
+        }
+
+        if top_model_only {
+            parameters
+        } else {
+            model_result
+                .submodels
+                .values()
+                .fold(parameters, |parameters, submodel| {
+                    recurse(submodel, print_level, top_model_only, parameters)
+                })
+        }
+    }
 }
 
 fn print_parameter(parameter: &result::Parameter, should_print_debug_info: bool) {

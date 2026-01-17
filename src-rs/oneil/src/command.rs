@@ -22,7 +22,28 @@ pub enum Commands {
         #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Selects which parameters to print
+        /// When provided, selects which parameters to print
+        ///
+        /// The value should be a comma-separated list of parameters. A parameter
+        /// may have one or more submodels, separated by a dot. `p.submodel2.submodel1` means the
+        /// parameter `p` in `submodel2`, which is in `submodel1`, which
+        /// is in the top model.
+        ///
+        /// When provided, `--print-mode` and `--top-only` are ignored.
+        ///
+        /// Examples:
+        ///
+        /// - `--params a` - print the parameter `a` in the top model
+        ///
+        /// - `--params a,b,c.sub,d` - print the parameters `a`, `b`, and `d` in
+        ///   the top model, and the parameter `c` in the submodel `sub`
+        ///
+        /// - `-p a.submodel2.submodel1` - print the parameter `a` in the submodel `submodel2` in
+        ///   the submodel `submodel1` in the top model
+        #[arg(long, short = 'p')]
+        params: Option<VariableList>,
+
+        /// Selects what mode to print the results in
         ///
         /// This can be one of:
         ///
@@ -180,5 +201,67 @@ impl fmt::Display for PrintMode {
             Self::Trace => write!(f, "trace"),
             Self::Performance => write!(f, "perf"),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariableList(Vec<Variable>);
+
+impl VariableList {
+    pub fn into_iter(self) -> impl IntoIterator<Item = Variable> {
+        self.0.into_iter()
+    }
+}
+
+impl str::FromStr for VariableList {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let params = s
+            .split(',')
+            .filter_map(|s| (!s.is_empty()).then_some(s.trim().parse::<Variable>()))
+            .collect::<Result<_, _>>()?;
+        Ok(Self(params))
+    }
+}
+
+impl fmt::Display for VariableList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(Variable::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Variable(Vec<String>);
+
+impl Variable {
+    /// Splits the variable into a vector of strings.
+    ///
+    /// `param.submodel1.submodel2` becomes `["param", "submodel1", "submodel2"]`.
+    pub fn into_vec(self) -> Vec<String> {
+        self.0
+    }
+}
+
+impl str::FromStr for Variable {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.split('.').map(str::to_string).collect()))
+    }
+}
+
+impl fmt::Display for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.join("."))
     }
 }
