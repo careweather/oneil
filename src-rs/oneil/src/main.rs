@@ -185,6 +185,7 @@ fn handle_eval_command(args: EvalArgs) {
         params: variables,
         print_mode,
         debug: print_debug_info,
+        watch,
         top_only,
         no_header,
         no_test_report,
@@ -211,7 +212,11 @@ fn handle_eval_command(args: EvalArgs) {
         oneil_std::builtin_prefixes(),
     );
 
-    eval_model(&file, &builtins, model_print_config);
+    if watch {
+        todo!();
+    } else {
+        eval_model(&file, &builtins, model_print_config);
+    }
 }
 
 fn eval_model<F: BuiltinFunction + Clone>(

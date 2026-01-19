@@ -86,6 +86,10 @@ pub struct EvalArgs {
     #[arg(long, short = 'D')]
     pub debug: bool,
 
+    /// Watch files for changes and re-evaluate the model
+    #[arg(long)]
+    pub watch: bool,
+
     /// Only print info about the top model
     ///
     /// By default, Oneil will print the results of the top model
