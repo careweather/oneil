@@ -15,11 +15,18 @@ use crate::{
     stylesheet,
 };
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "this is a configuration struct for printing model results"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelPrintConfig {
     pub print_mode: PrintMode,
     pub variables: Option<VariableList>,
     pub top_model_only: bool,
+    pub no_header: bool,
+    pub no_test_report: bool,
+    pub no_parameters: bool,
 }
 
 pub fn divider_line() -> String {
@@ -36,14 +43,20 @@ pub fn print(model_result: &result::Model, print_debug_info: bool, model_config:
     let divider_line = divider_line();
     println!("{divider_line}");
 
-    print_model_header(&model_result.path, &test_info);
+    if !model_config.no_header {
+        print_model_header(&model_result.path, &test_info);
+    }
 
-    print_failing_tests(&test_info);
+    if !model_config.no_test_report {
+        print_failing_tests(&test_info);
+    }
 
-    if let Some(variables) = model_config.variables {
-        print_parameters_by_list(model_result, print_debug_info, variables);
-    } else {
-        print_parameters_by_filter(model_result, print_debug_info, &model_config);
+    if !model_config.no_parameters {
+        if let Some(variables) = model_config.variables {
+            print_parameters_by_list(model_result, print_debug_info, variables);
+        } else {
+            print_parameters_by_filter(model_result, print_debug_info, &model_config);
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 //! Command-line interface definitions for the Oneil CLI
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use std::{fmt, path::PathBuf, str};
 
 /// Oneil language CLI - Main command-line interface structure
@@ -17,66 +17,9 @@ pub struct CliCommand {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Evaluate an Oneil model
-    Eval {
-        /// Path to the Oneil model file to evaluate
-        #[arg(value_name = "FILE")]
-        file: PathBuf,
+    #[clap(visible_alias = "e")]
+    Eval(EvalArgs),
 
-        /// When provided, selects which parameters to print
-        ///
-        /// The value should be a comma-separated list of parameters. A parameter
-        /// may have one or more submodels, separated by a dot. `p.submodel2.submodel1` means the
-        /// parameter `p` in `submodel2`, which is in `submodel1`, which
-        /// is in the top model.
-        ///
-        /// When provided, `--print-mode` and `--top-only` are ignored.
-        ///
-        /// Examples:
-        ///
-        /// - `--params a` - print the parameter `a` in the top model
-        ///
-        /// - `--params a,b,c.sub,d` - print the parameters `a`, `b`, and `d` in
-        ///   the top model, and the parameter `c` in the submodel `sub`
-        ///
-        /// - `-p a.submodel2.submodel1` - print the parameter `a` in the submodel `submodel2` in
-        ///   the submodel `submodel1` in the top model
-        #[arg(long, short = 'p')]
-        params: Option<VariableList>,
-
-        /// Selects what mode to print the results in
-        ///
-        /// This can be one of:
-        ///
-        /// - `trace`: print parameters marked with `*` (trace parameters),
-        ///   `**` (debug parameters), or `$` (performance parameters)
-        ///
-        /// - `perf`: print parameters marked with `$` (performance parameters) only
-        ///
-        /// - `all`: print all parameter values
-        #[arg(long, short = 'm', default_value_t)]
-        print_mode: PrintMode,
-
-        /// Print debug information
-        ///
-        /// For parameters marked with `**`, this will print the
-        /// values of variables used to evaluate the parameter.
-        #[arg(long, short = 'd')]
-        debug: bool,
-
-        /// Only print info about the top model
-        ///
-        /// By default, Oneil will print the results of the top model
-        /// and all of its submodels.
-        #[arg(long)]
-        top_only: bool,
-
-        /// Disable colors in the output
-        ///
-        /// When enabled, suppresses colored output for better compatibility with
-        /// terminals that don't support ANSI color codes or for redirecting to files.
-        #[arg(long)]
-        no_colors: bool,
-    },
     /// Development tools for debugging and testing Oneil source files
     ///
     /// NOTE: because these commands are not intended for end users, they are hidden
@@ -90,6 +33,86 @@ pub enum Commands {
     },
     /// Run the LSP
     Lsp {},
+}
+
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "this is a configuration struct for evaluating a model"
+)]
+#[derive(Args)]
+pub struct EvalArgs {
+    /// Path to the Oneil model file to evaluate
+    #[arg(value_name = "FILE")]
+    pub file: PathBuf,
+
+    /// When provided, selects which parameters to print
+    ///
+    /// The value should be a comma-separated list of parameters. A parameter
+    /// may have one or more submodels, separated by a dot. `p.submodel2.submodel1` means the
+    /// parameter `p` in `submodel2`, which is in `submodel1`, which
+    /// is in the top model.
+    ///
+    /// When provided, `--print-mode` and `--top-only` are ignored.
+    ///
+    /// Examples:
+    ///
+    /// - `--params a` - print the parameter `a` in the top model
+    ///
+    /// - `--params a,b,c.sub,d` - print the parameters `a`, `b`, and `d` in
+    ///   the top model, and the parameter `c` in the submodel `sub`
+    ///
+    /// - `-p a.submodel2.submodel1` - print the parameter `a` in the submodel `submodel2` in
+    ///   the submodel `submodel1` in the top model
+    #[arg(long, short = 'p')]
+    pub params: Option<VariableList>,
+
+    /// Selects what mode to print the results in
+    ///
+    /// This can be one of:
+    ///
+    /// - `trace`: print parameters marked with `*` (trace parameters),
+    ///   `**` (debug parameters), or `$` (performance parameters)
+    ///
+    /// - `perf`: print parameters marked with `$` (performance parameters) only
+    ///
+    /// - `all`: print all parameter values
+    #[arg(long, short = 'm', default_value_t)]
+    pub print_mode: PrintMode,
+
+    /// Print debug information
+    ///
+    /// For parameters marked with `**`, this will print the
+    /// values of variables used to evaluate the parameter.
+    #[arg(long, short = 'D')]
+    pub debug: bool,
+
+    /// Only print info about the top model
+    ///
+    /// By default, Oneil will print the results of the top model
+    /// and all of its submodels.
+    #[arg(long)]
+    pub top_only: bool,
+
+    /// Don't print the results header
+    #[arg(long)]
+    pub no_header: bool,
+
+    /// Don't print the test report
+    #[arg(long)]
+    pub no_test_report: bool,
+
+    /// Don't print the parameters
+    ///
+    /// Note that this overrides the `--params` and `--print-mode` options.
+    #[arg(long)]
+    pub no_parameters: bool,
+
+    /// Disable colors in the output
+    ///
+    /// When enabled, suppresses colored output for better compatibility with
+    /// terminals that don't support ANSI color codes or for redirecting to files.
+    #[arg(long)]
+    pub no_colors: bool,
 }
 
 /// Development-specific commands for the Oneil CLI

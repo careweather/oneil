@@ -14,7 +14,7 @@ use oneil_runner::{
 };
 
 use crate::{
-    command::{CliCommand, Commands, DevCommand, PrintMode, VariableList},
+    command::{CliCommand, Commands, DevCommand, EvalArgs},
     print_model_result::ModelPrintConfig,
 };
 
@@ -35,21 +35,7 @@ fn main() {
             oneil_lsp::run();
         }
         Commands::Dev { command } => handle_dev_command(command),
-        Commands::Eval {
-            file,
-            params: variables,
-            print_mode,
-            debug: print_debug_info,
-            no_colors,
-            top_only,
-        } => handle_eval_command(
-            &file,
-            variables,
-            print_mode,
-            print_debug_info,
-            no_colors,
-            top_only,
-        ),
+        Commands::Eval(args) => handle_eval_command(args),
     }
 }
 
@@ -193,14 +179,19 @@ fn load_model_collection<F: BuiltinFunction>(
     }
 }
 
-fn handle_eval_command(
-    file: &Path,
-    variables: Option<VariableList>,
-    print_mode: PrintMode,
-    print_debug_info: bool,
-    no_colors: bool,
-    top_only: bool,
-) {
+fn handle_eval_command(args: EvalArgs) {
+    let EvalArgs {
+        file,
+        params: variables,
+        print_mode,
+        debug: print_debug_info,
+        top_only,
+        no_header,
+        no_test_report,
+        no_parameters,
+        no_colors,
+    } = args;
+
     set_color_choice(no_colors);
 
     let builtins = Builtins::new(
@@ -211,7 +202,7 @@ fn handle_eval_command(
     );
 
     let model_collection =
-        oneil_model_resolver::load_model(file, &builtins, &file_parser::FileLoader);
+        oneil_model_resolver::load_model(&file, &builtins, &file_parser::FileLoader);
     let model_collection = match model_collection {
         Ok(model_collection) => model_collection,
         Err(error) => {
@@ -227,7 +218,7 @@ fn handle_eval_command(
 
     let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
 
-    let model_result = eval_context.get_model_result(file);
+    let model_result = eval_context.get_model_result(&file);
 
     match model_result {
         Ok(model_result) => {
@@ -238,6 +229,9 @@ fn handle_eval_command(
                     print_mode,
                     variables,
                     top_model_only: top_only,
+                    no_header,
+                    no_test_report,
+                    no_parameters,
                 },
             );
         }
