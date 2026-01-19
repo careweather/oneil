@@ -1,10 +1,21 @@
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 //! CLI for the Oneil programming language
 
-use std::path::{Path, PathBuf};
+#![expect(
+    clippy::multiple_crate_versions,
+    reason = "this isn't causing problems, and it's going to take time to fix"
+)]
 
-use anstream::{ColorChoice, eprintln, println};
+use std::{
+    collections::HashSet,
+    io::Write,
+    path::{Path, PathBuf},
+    sync::mpsc,
+};
+
+use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
+use notify::Watcher;
 use oneil_eval::builtin::{BuiltinFunction, std as oneil_std};
 use oneil_ir as ir;
 use oneil_model_resolver::FileLoader;
@@ -213,9 +224,44 @@ fn handle_eval_command(args: EvalArgs) {
     );
 
     if watch {
-        todo!();
+        watch_model(&file, &builtins, model_print_config);
     } else {
-        eval_model(&file, &builtins, model_print_config);
+        let _watch_paths = eval_model(&file, &builtins, model_print_config);
+    }
+}
+
+fn watch_model<F: BuiltinFunction + Clone>(
+    file: &Path,
+    builtins: &Builtins<F>,
+    model_print_config: ModelPrintConfig,
+) {
+    let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
+
+    let mut watcher = match notify::recommended_watcher(tx) {
+        Ok(watcher) => watcher,
+        Err(error) => {
+            // we don't expect this to happen often, so we can just print the error and return
+            let error_msg = stylesheet::ERROR_COLOR
+                .bold()
+                .style("error: failed to create watcher");
+            eprintln!("{error_msg} - {error}");
+            return;
+        }
+    };
+
+    clear_screen();
+    let watch_paths = eval_model(file, builtins, model_print_config);
+
+    update_watch_paths(&mut watcher, &watch_paths, &HashSet::new());
+
+    for event in rx {
+        match event {
+            Ok(event) => {
+                clear_screen();
+                println!("{:?}", event);
+            }
+            Err(error) => println!("error: {error}"),
+        }
     }
 }
 
@@ -223,20 +269,21 @@ fn eval_model<F: BuiltinFunction + Clone>(
     file: &Path,
     builtins: &Builtins<F>,
     model_print_config: ModelPrintConfig,
-) {
+) -> HashSet<PathBuf> {
     let model_collection =
         oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
     let model_collection = match model_collection {
         Ok(model_collection) => model_collection,
         Err(error) => {
-            let (_model_collection, error_map) = *error;
+            let (model_collection, error_map) = *error;
+
             let errors = convert_error::loader::convert_map(&error_map);
             for error in errors {
                 print_error::print(&error, false);
                 eprintln!();
             }
 
-            return;
+            return watch_paths_from_model_collection(&model_collection);
         }
     };
 
@@ -257,6 +304,59 @@ fn eval_model<F: BuiltinFunction + Clone>(
             }
         }
     }
+
+    watch_paths_from_model_collection(&model_collection)
+}
+
+fn watch_paths_from_model_collection(model_collection: &ir::ModelCollection) -> HashSet<PathBuf> {
+    let model_paths = model_collection
+        .get_models()
+        .keys()
+        .map(|path| path.as_ref().to_path_buf());
+
+    let python_imports = model_collection
+        .get_python_imports()
+        .into_iter()
+        .map(|import| import.import_path().as_ref().to_path_buf());
+
+    model_paths.chain(python_imports).collect()
+}
+
+fn update_watch_paths(
+    watcher: &mut notify::RecommendedWatcher,
+    add_paths: &HashSet<PathBuf>,
+    remove_paths: &HashSet<PathBuf>,
+) {
+    let mut watcher_paths_mut = watcher.paths_mut();
+
+    for path in add_paths {
+        let result = watcher_paths_mut.add(path, notify::RecursiveMode::NonRecursive);
+        if let Err(error) = result {
+            let error_msg = format!("error: failed to add path {} to watcher", path.display());
+            let error_msg = stylesheet::ERROR_COLOR.bold().style(error_msg);
+            eprintln!("{error_msg} - {error}");
+        }
+    }
+
+    for path in remove_paths {
+        let result = watcher_paths_mut.remove(path);
+        if let Err(error) = result {
+            let error_msg = format!(
+                "error: failed to remove path {} from watcher",
+                path.display()
+            );
+            let error_msg = stylesheet::ERROR_COLOR.bold().style(error_msg);
+            eprintln!("{error_msg} - {error}");
+        }
+    }
+
+    let commit_result = watcher_paths_mut.commit();
+    if let Err(error) = commit_result {
+        let error_msg = stylesheet::ERROR_COLOR
+            .bold()
+            .style("error: failed to commit watcher paths");
+        eprintln!("{error_msg} - {error}");
+    }
 }
 
 fn set_color_choice(no_colors: bool) {
@@ -266,4 +366,9 @@ fn set_color_choice(no_colors: bool) {
         ColorChoice::Auto
     };
     ColorChoice::write_global(color_choice);
+}
+
+fn clear_screen() {
+    print!("\x1B[2J\x1B[1;1H");
+    std::io::stdout().flush().expect("failed to flush stdout");
 }
