@@ -1,6 +1,6 @@
 use std::fs;
 
-use oneil_eval::ModelError;
+use oneil_eval::{EvalError, ModelError};
 use oneil_shared::error::OneilError;
 
 /// Converts a model evaluation error into a unified CLI error format
@@ -17,11 +17,18 @@ use oneil_shared::error::OneilError;
 ///
 /// Returns a new `OneilError` instance with the error message, context, and
 /// location information (if the source file could be read).
-pub fn convert(error: &ModelError) -> OneilError {
+pub fn convert(error: &ModelError) -> Option<OneilError> {
     let source = fs::read_to_string(&error.model_path).ok();
-    OneilError::from_error_with_optional_source(
+
+    // skip `ParameterHasError` errors because they are the result of
+    // another parameter having an error, which is printed separately
+    if matches!(error.error, EvalError::ParameterHasError { .. }) {
+        return None;
+    }
+
+    Some(OneilError::from_error_with_optional_source(
         &error.error,
         error.model_path.clone(),
         source.as_deref(),
-    )
+    ))
 }

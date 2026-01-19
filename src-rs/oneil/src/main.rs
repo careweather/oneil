@@ -150,8 +150,11 @@ fn handle_print_model_result(file: &Path, display_partial: bool, no_colors: bool
 
     for error in errors {
         let error = convert_error::eval::convert(&error);
-        print_error::print(&error, false);
-        eprintln!();
+
+        if let Some(error) = error {
+            print_error::print(&error, false);
+            eprintln!();
+        }
     }
 
     if !had_errors || display_partial {
@@ -329,8 +332,11 @@ fn eval_model<F: BuiltinFunction + Clone>(
 
     for error in errors {
         let error = convert_error::eval::convert(&error);
-        print_error::print(&error, false);
-        eprintln!();
+
+        if let Some(error) = error {
+            print_error::print(&error, false);
+            eprintln!();
+        }
     }
 
     if !had_errors || model_print_config.display_partial_results {
