@@ -22,6 +22,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelPrintConfig {
     pub print_mode: PrintMode,
+    pub print_debug_info: bool,
     pub variables: Option<VariableList>,
     pub top_model_only: bool,
     pub no_header: bool,
@@ -33,7 +34,7 @@ pub fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print(model_result: &result::Model, print_debug_info: bool, model_config: ModelPrintConfig) {
+pub fn print(model_result: &result::Model, model_config: ModelPrintConfig) {
     let test_info = get_model_tests(
         model_result,
         model_config.top_model_only,
@@ -53,9 +54,9 @@ pub fn print(model_result: &result::Model, print_debug_info: bool, model_config:
 
     if !model_config.no_parameters {
         if let Some(variables) = model_config.variables {
-            print_parameters_by_list(model_result, print_debug_info, variables);
+            print_parameters_by_list(model_result, model_config.print_debug_info, variables);
         } else {
-            print_parameters_by_filter(model_result, print_debug_info, &model_config);
+            print_parameters_by_filter(model_result, model_config.print_debug_info, &model_config);
         }
     }
 }

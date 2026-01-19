@@ -194,6 +194,16 @@ fn handle_eval_command(args: EvalArgs) {
 
     set_color_choice(no_colors);
 
+    let model_print_config = ModelPrintConfig {
+        print_mode,
+        print_debug_info,
+        variables,
+        top_model_only: top_only,
+        no_header,
+        no_test_report,
+        no_parameters,
+    };
+
     let builtins = Builtins::new(
         oneil_std::builtin_values(),
         oneil_std::builtin_functions(),
@@ -201,8 +211,16 @@ fn handle_eval_command(args: EvalArgs) {
         oneil_std::builtin_prefixes(),
     );
 
+    eval_model(&file, &builtins, model_print_config);
+}
+
+fn eval_model<F: BuiltinFunction + Clone>(
+    file: &Path,
+    builtins: &Builtins<F>,
+    model_print_config: ModelPrintConfig,
+) {
     let model_collection =
-        oneil_model_resolver::load_model(&file, &builtins, &file_parser::FileLoader);
+        oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
     let model_collection = match model_collection {
         Ok(model_collection) => model_collection,
         Err(error) => {
@@ -212,28 +230,19 @@ fn handle_eval_command(args: EvalArgs) {
                 print_error::print(&error, false);
                 eprintln!();
             }
+
             return;
         }
     };
 
-    let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
-
-    let model_result = eval_context.get_model_result(&file);
+    // TODO: remove this clone?
+    let eval_context =
+        oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map.clone());
+    let model_result = eval_context.get_model_result(file);
 
     match model_result {
         Ok(model_result) => {
-            print_model_result::print(
-                &model_result,
-                print_debug_info,
-                ModelPrintConfig {
-                    print_mode,
-                    variables,
-                    top_model_only: top_only,
-                    no_header,
-                    no_test_report,
-                    no_parameters,
-                },
-            );
+            print_model_result::print(&model_result, model_print_config);
         }
         Err(errors) => {
             for error in errors {
