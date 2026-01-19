@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fmt, ops};
+use std::{fmt, ops};
+
+use indexmap::IndexMap;
 
 use crate::value::util::is_close;
 
@@ -165,21 +167,21 @@ pub enum Dimension {
 
 /// A map of dimensions and their exponents.
 ///
-/// For example, "m/s" is represented as `DimensionMap(HashMap::from([(Dimension::Distance, 1.0), (Dimension::Time, -1.0)]))`.
+/// For example, "m/s" is represented as `DimensionMap(IndexMap::from([(Dimension::Distance, 1.0), (Dimension::Time, -1.0)]))`.
 #[derive(Debug, Clone)]
-pub struct DimensionMap(HashMap<Dimension, f64>);
+pub struct DimensionMap(IndexMap<Dimension, f64>);
 
 impl DimensionMap {
     /// Creates a new unit from a map of dimensions and their exponents.
     #[must_use]
-    pub const fn new(units: HashMap<Dimension, f64>) -> Self {
+    pub const fn new(units: IndexMap<Dimension, f64>) -> Self {
         Self(units)
     }
 
     /// Creates a unitless unit, which is a unit with no dimensions.
     #[must_use]
     pub fn unitless() -> Self {
-        Self(HashMap::new())
+        Self(IndexMap::new())
     }
 
     /// Checks if the unit is unitless (has no dimensions).

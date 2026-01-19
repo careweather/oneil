@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_ast as ast;
 use oneil_ir as ir;
@@ -7,8 +7,8 @@ use crate::{
     FileLoader, error::resolution::ImportResolutionError, util::builder::ModelCollectionBuilder,
 };
 
-type ValidatedImports = HashMap<ir::PythonPath, ir::PythonImport>;
-type ImportErrors = HashMap<ir::PythonPath, ImportResolutionError>;
+type ValidatedImports = IndexMap<ir::PythonPath, ir::PythonImport>;
+type ImportErrors = IndexMap<ir::PythonPath, ImportResolutionError>;
 
 /// Validates a list of Python import declarations for a given model.
 pub fn resolve_python_imports<F>(
@@ -24,8 +24,8 @@ pub fn resolve_python_imports<F>(
 where
     F: FileLoader,
 {
-    let mut python_imports: HashMap<ir::PythonPath, ir::PythonImport> = HashMap::new();
-    let mut import_resolution_errors = HashMap::new();
+    let mut python_imports: IndexMap<ir::PythonPath, ir::PythonImport> = IndexMap::new();
+    let mut import_resolution_errors = IndexMap::new();
 
     for import in imports {
         let python_path = model_path.get_sibling_path(import.path().as_str());

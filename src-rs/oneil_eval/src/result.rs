@@ -4,7 +4,9 @@
 //! evaluating Oneil models, including evaluated parameters, tests, and
 //! hierarchical model structures.
 
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
+
+use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
@@ -24,12 +26,12 @@ pub struct Model {
     ///
     /// Submodels are evaluated recursively, so each entry contains a fully
     /// evaluated `Model` structure.
-    pub submodels: HashMap<String, Model>,
+    pub submodels: IndexMap<String, Model>,
     /// A map of parameter identifiers to their evaluated results.
     ///
     /// Parameters are stored by their identifier (name) and contain their
     /// evaluated values, units, and metadata.
-    pub parameters: HashMap<String, Parameter>,
+    pub parameters: IndexMap<String, Parameter>,
     /// A list of evaluated test results.
     ///
     /// Tests are evaluated expressions that verify model behavior. Each test
@@ -106,11 +108,11 @@ impl Parameter {
 #[derive(Debug, Clone)]
 pub struct DebugInfo {
     /// The values of the builtin dependencies at the time the parameter was evaluated.
-    pub builtin_dependency_values: HashMap<String, Value>,
+    pub builtin_dependency_values: IndexMap<String, Value>,
     /// The values of the parameter dependencies at the time the parameter was evaluated.
-    pub parameter_dependency_values: HashMap<String, Value>,
+    pub parameter_dependency_values: IndexMap<String, Value>,
     /// The values of the external dependencies at the time the parameter was evaluated.
-    pub external_dependency_values: HashMap<(String, String), Value>,
+    pub external_dependency_values: IndexMap<(String, String), Value>,
 }
 
 /// The trace level for debugging and diagnostic output.

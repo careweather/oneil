@@ -1,11 +1,11 @@
 use submodel1 as s1
 use submodel2 as s2
 
-X: x = 2 + 1
+* X: x = 2 + 2
 
 Y: y = x + 2
 
-Pi: pi = pi.s1
+* Pi: pi = pi.s1
 
 # A section
 section My Section
@@ -13,5 +13,7 @@ section My Section
 import pyfile
 use submodel3 as s3
 
-Z: z = x - y
+Z(-inf, inf): z = x - y
+
+test: pi.s1 == pi
 

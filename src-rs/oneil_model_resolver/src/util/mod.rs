@@ -1,6 +1,8 @@
 //! Utility types and traits for the Oneil model loader.
 
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
+
+use indexmap::IndexMap;
 
 use oneil_ast as ast;
 use oneil_ir as ir;
@@ -11,10 +13,10 @@ pub mod builder;
 pub mod builtin_ref;
 pub mod context;
 
-pub type SubmodelMap = HashMap<ir::SubmodelName, ir::SubmodelImport>;
-pub type ReferenceMap = HashMap<ir::ReferenceName, ir::ReferenceImport>;
-pub type SubmodelResolutionErrors = HashMap<ir::SubmodelName, ModelImportResolutionError>;
-pub type ReferenceResolutionErrors = HashMap<ir::ReferenceName, ModelImportResolutionError>;
+pub type SubmodelMap = IndexMap<ir::SubmodelName, ir::SubmodelImport>;
+pub type ReferenceMap = IndexMap<ir::ReferenceName, ir::ReferenceImport>;
+pub type SubmodelResolutionErrors = IndexMap<ir::SubmodelName, ModelImportResolutionError>;
+pub type ReferenceResolutionErrors = IndexMap<ir::ReferenceName, ModelImportResolutionError>;
 
 /// Trait for loading and parsing Oneil model files.
 ///

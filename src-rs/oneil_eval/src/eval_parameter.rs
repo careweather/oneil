@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -355,7 +355,7 @@ fn eval_string_discrete_limits(
     results: Vec<(Value, &Span)>,
     limit_expr_span: &Span,
 ) -> Result<Limits, Vec<EvalError>> {
-    let mut seen_strings = HashMap::new();
+    let mut seen_strings = IndexMap::new();
     let mut errors = Vec::new();
 
     // this is a vector of strings since for errors,

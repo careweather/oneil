@@ -48,18 +48,18 @@ mod test {
     /// Asserts that two units are equal.
     ///
     /// ```rust
-    /// # use std::collections::HashMap;
+    /// # use indexmap::IndexMap;
     /// # use oneil_eval::{assert_units_eq, value::{Dimension, DimensionMap}};
     ///
-    /// let unit = DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)]));
+    /// let unit = DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)]));
     /// assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
     /// ```
     macro_rules! assert_units_dimensionally_eq {
         ($expected_unit_list:expr, $actual_unit:expr) => {{
-            use std::collections::HashMap;
+            use indexmap::IndexMap;
             use $crate::value::DimensionMap;
 
-            let expected: DimensionMap = DimensionMap::new(HashMap::from($expected_unit_list));
+            let expected: DimensionMap = DimensionMap::new(IndexMap::from($expected_unit_list));
             let actual: &Unit = &$actual_unit;
             assert_eq!(expected, actual.dimension_map);
         }};

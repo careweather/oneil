@@ -1,9 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-};
+use std::path::Path;
 
 use anstream::{eprintln, print, println};
+use indexmap::{IndexMap, IndexSet};
 use oneil_eval::{
     result,
     value::{self, Value},
@@ -223,16 +221,16 @@ fn print_parameters_by_list(
 }
 
 struct ModelParametersToPrint<'a> {
-    pub parameters: HashMap<String, &'a result::Parameter>,
-    pub parameters_not_found: HashSet<String>,
+    pub parameters: IndexMap<String, &'a result::Parameter>,
+    pub parameters_not_found: IndexSet<String>,
 }
 
 fn get_model_parameters_by_list<'a>(
     model_result: &'a result::Model,
     variables: &VariableList,
 ) -> ModelParametersToPrint<'a> {
-    let mut parameters = HashMap::new();
-    let mut parameters_not_found = HashSet::new();
+    let mut parameters = IndexMap::new();
+    let mut parameters_not_found = IndexSet::new();
 
     for variable in variables.iter() {
         let variable_name = variable.to_string();
@@ -331,8 +329,8 @@ fn get_model_parameters_by_filter(
     model_result: &result::Model,
     print_level: PrintMode,
     top_model_only: bool,
-) -> HashMap<&Path, Vec<&result::Parameter>> {
-    return recurse(model_result, print_level, top_model_only, HashMap::new());
+) -> IndexMap<&Path, Vec<&result::Parameter>> {
+    return recurse(model_result, print_level, top_model_only, IndexMap::new());
 
     #[expect(
         clippy::items_after_statements,
@@ -342,8 +340,8 @@ fn get_model_parameters_by_filter(
         model_result: &'a result::Model,
         print_level: PrintMode,
         top_model_only: bool,
-        mut parameters: HashMap<&'a Path, Vec<&'a result::Parameter>>,
-    ) -> HashMap<&'a Path, Vec<&'a result::Parameter>> {
+        mut parameters: IndexMap<&'a Path, Vec<&'a result::Parameter>>,
+    ) -> IndexMap<&'a Path, Vec<&'a result::Parameter>> {
         let parameters_to_print: Vec<_> = match print_level {
             PrintMode::All => model_result
                 .parameters

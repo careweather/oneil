@@ -1,7 +1,9 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     path::{Path, PathBuf},
 };
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -15,16 +17,16 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Model {
-    parameters: HashMap<String, Result<result::Parameter, Vec<EvalError>>>,
-    submodels: HashMap<String, PathBuf>,
+    parameters: IndexMap<String, Result<result::Parameter, Vec<EvalError>>>,
+    submodels: IndexMap<String, PathBuf>,
     tests: Vec<Result<result::Test, Vec<EvalError>>>,
 }
 
 impl Model {
     pub fn new() -> Self {
         Self {
-            parameters: HashMap::new(),
-            submodels: HashMap::new(),
+            parameters: IndexMap::new(),
+            submodels: IndexMap::new(),
             tests: Vec::new(),
         }
     }
@@ -32,9 +34,9 @@ impl Model {
 
 #[derive(Debug, Clone)]
 pub struct EvalContext<F: BuiltinFunction> {
-    models: HashMap<PathBuf, Model>,
+    models: IndexMap<PathBuf, Model>,
     // TODO: update this to hold the actual Python import results
-    python_imports: HashMap<PathBuf, Result<(), EvalError>>,
+    python_imports: IndexMap<PathBuf, Result<(), EvalError>>,
     current_model: Option<PathBuf>,
     active_python_imports: HashSet<PathBuf>,
     active_references: HashSet<PathBuf>,
@@ -44,8 +46,8 @@ pub struct EvalContext<F: BuiltinFunction> {
 impl<F: BuiltinFunction> EvalContext<F> {
     pub fn new(builtins: BuiltinMap<F>) -> Self {
         Self {
-            models: HashMap::new(),
-            python_imports: HashMap::new(),
+            models: IndexMap::new(),
+            python_imports: IndexMap::new(),
             current_model: None,
             active_python_imports: HashSet::new(),
             active_references: HashSet::new(),
@@ -147,7 +149,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         self.builtins.units.get(name).cloned()
     }
 
-    pub const fn available_prefixes(&self) -> &HashMap<String, f64> {
+    pub const fn available_prefixes(&self) -> &IndexMap<String, f64> {
         &self.builtins.prefixes
     }
 
@@ -257,7 +259,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
                 submodel_result.map(|submodel_result| (name.clone(), submodel_result))
             })
             .fold(
-                (HashMap::new(), Vec::new()),
+                (IndexMap::new(), Vec::new()),
                 |(mut submodels, mut submodel_errors), result| match result {
                     Ok((name, submodel_result)) => {
                         submodels.insert(name, submodel_result);
@@ -280,7 +282,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
                     .map(|parameter_result| (name.clone(), parameter_result))
             })
             .fold(
-                (HashMap::new(), Vec::new()),
+                (IndexMap::new(), Vec::new()),
                 |(mut parameters, mut parameter_errors), result| match result {
                     Ok((name, parameter_result)) => {
                         parameters.insert(name, parameter_result);

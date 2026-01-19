@@ -1,6 +1,6 @@
 //! Expression resolution for the Oneil model loader
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_ast as ast;
 use oneil_ir::{self as ir, Dependencies};
@@ -260,9 +260,9 @@ fn resolve_literal(literal: &ast::LiteralNode) -> ir::Literal {
 /// Extracts internal dependencies from an expression.
 ///
 /// Note that these dependencies include both parameters and builtin variables.
-pub fn get_expr_internal_dependencies(expr: &ast::ExprNode) -> HashMap<ir::Identifier, Span> {
+pub fn get_expr_internal_dependencies(expr: &ast::ExprNode) -> IndexMap<ir::Identifier, Span> {
     struct ExprInternalDependencyVisitor {
-        dependencies: HashMap<ir::Identifier, Span>,
+        dependencies: IndexMap<ir::Identifier, Span>,
     }
 
     impl ast::ExprVisitor for ExprInternalDependencyVisitor {
@@ -289,7 +289,7 @@ pub fn get_expr_internal_dependencies(expr: &ast::ExprNode) -> HashMap<ir::Ident
     }
 
     let visitor = ExprInternalDependencyVisitor {
-        dependencies: HashMap::new(),
+        dependencies: IndexMap::new(),
     };
     let visitor = expr.pre_order_visit(visitor);
     visitor.dependencies

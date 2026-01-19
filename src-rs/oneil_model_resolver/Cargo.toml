@@ -14,6 +14,7 @@ readme = "README.md"
 oneil_ast = { path = "../oneil_ast" }
 oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
+indexmap = { workspace = true }
 
 [dev-dependencies]
 oneil_shared = { path = "../oneil_shared", features = ["random_span"] }

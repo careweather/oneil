@@ -1,7 +1,6 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+
+use indexmap::IndexMap;
 
 use oneil_ast as ast;
 
@@ -80,7 +79,7 @@ impl FileLoader for TestPythonValidator {
 /// It maintains a map of file paths to AST models and returns the appropriate
 /// model when a file is requested for parsing.
 pub struct TestFileParser {
-    models: HashMap<PathBuf, ast::ModelNode>,
+    models: IndexMap<PathBuf, ast::ModelNode>,
 }
 
 impl TestFileParser {
@@ -97,7 +96,7 @@ impl TestFileParser {
     /// Creates a new test file parser with no predefined models.
     pub fn empty() -> Self {
         Self {
-            models: HashMap::new(),
+            models: IndexMap::new(),
         }
     }
 }

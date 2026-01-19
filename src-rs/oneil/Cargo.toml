@@ -22,6 +22,7 @@ oneil_shared = { path = "../oneil_shared" }
 oneil_runner = { path = "../oneil_runner" }
 anstream = "0.6.21"
 clap = { version = "4.5.1", features = ["derive"] }
+indexmap = { workspace = true }
 notify = "8.2.0"
 owo-colors = "4.2.3"
 

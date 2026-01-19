@@ -1,7 +1,7 @@
 //! Functionality for Oneil's builtin values, functions, units,
 //! and unit prefixes
 
-use ::std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
@@ -18,23 +18,23 @@ pub mod std;
 #[derive(Debug, Clone)]
 pub struct BuiltinMap<F: BuiltinFunction> {
     /// A map of builtin values
-    pub values: HashMap<String, Value>,
+    pub values: IndexMap<String, Value>,
     /// A map of builtin functions
-    pub functions: HashMap<String, F>,
+    pub functions: IndexMap<String, F>,
     /// A map of builtin units
-    pub units: HashMap<String, Unit>,
+    pub units: IndexMap<String, Unit>,
     /// A map of builtin unit prefixes
-    pub prefixes: HashMap<String, f64>,
+    pub prefixes: IndexMap<String, f64>,
 }
 
 impl<F: BuiltinFunction> BuiltinMap<F> {
     /// Creates a new builtin map.
     #[must_use]
     pub const fn new(
-        values: HashMap<String, Value>,
-        functions: HashMap<String, F>,
-        units: HashMap<String, Unit>,
-        prefixes: HashMap<String, f64>,
+        values: IndexMap<String, Value>,
+        functions: IndexMap<String, F>,
+        units: IndexMap<String, Unit>,
+        prefixes: IndexMap<String, f64>,
     ) -> Self {
         Self {
             values,

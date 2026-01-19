@@ -305,7 +305,7 @@ fn handle_resolution_error(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use indexmap::IndexMap;
 
     use crate::test::construct::{ModelContextBuilder, test_ast, test_ir};
 
@@ -318,7 +318,7 @@ mod tests {
     // than some line in an `assert_has_submodels` function
     macro_rules! assert_has_submodels {
         ($actual_submodel_map:expr, $expected_submodels:expr $(,)?) => {
-            let actual_submodel_map: &HashMap<ir::SubmodelName, ir::SubmodelImport> =
+            let actual_submodel_map: &IndexMap<ir::SubmodelName, ir::SubmodelImport> =
                 $actual_submodel_map;
             let expected_submodels: Vec<(&'static str, &ir::ModelPath)> =
                 $expected_submodels.into_iter().collect();
@@ -356,7 +356,7 @@ mod tests {
     // than some line in an `assert_has_references` function
     macro_rules! assert_has_references {
         ($reference_map:expr, $references:expr $(,)?) => {
-            let reference_map: &HashMap<ir::ReferenceName, ir::ReferenceImport> = $reference_map;
+            let reference_map: &IndexMap<ir::ReferenceName, ir::ReferenceImport> = $reference_map;
             let references: Vec<(&'static str, &ir::ModelPath)> = $references.into_iter().collect();
 
             // check that the reference map length is the same as the number of references

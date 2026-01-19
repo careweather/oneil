@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 
@@ -42,7 +44,7 @@ pub fn eval_model_collection_with_context<F: BuiltinFunction>(
     context
 }
 
-fn get_evaluation_order(models: &HashMap<ir::ModelPath, ir::Model>) -> Vec<ir::ModelPath> {
+fn get_evaluation_order(models: &IndexMap<ir::ModelPath, ir::Model>) -> Vec<ir::ModelPath> {
     let mut evaluation_order = Vec::new();
     let mut visited = HashSet::new();
 
@@ -63,7 +65,7 @@ fn process_model_dependencies(
     model: &ir::Model,
     mut visited: HashSet<ir::ModelPath>,
     mut evaluation_order: Vec<ir::ModelPath>,
-    models: &HashMap<ir::ModelPath, ir::Model>,
+    models: &IndexMap<ir::ModelPath, ir::Model>,
 ) -> (Vec<ir::ModelPath>, HashSet<ir::ModelPath>) {
     for reference_import in model.get_references().values() {
         let reference_model_path = reference_import.path();

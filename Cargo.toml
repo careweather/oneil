@@ -18,6 +18,9 @@ keywords = [
 ]
 categories = ["compilers", "science", "simulation"]
 
+[workspace.dependencies]
+indexmap = "2.1"
+
 # Lints originally derived from https://medium.com/@carlmkadie/92bb899d47ef
 # 
 # To use the lints in VSCode with rust-analyzer, follow this:
@@ -107,12 +110,3 @@ unused_result_ok = "warn"
 unwrap_used = "warn"
 use_debug = "warn"
 wildcard_enum_match_arm = "warn"
-
-[workspace.lints.clippy.disallowed_macros]
-level = "warn"
-disallowed-macros = [
-    { path = "std::println", reason = "use anstream::println instead", replace = "anstream::println" },
-    { path = "std::print", reason = "use anstream::print instead", replace = "anstream::print" },
-    { path = "std::eprintln", reason = "use anstream::eprintln instead", replace = "anstream::eprintln" },
-    { path = "std::eprint", reason = "use anstream::eprint instead", replace = "anstream::eprint" },
-]

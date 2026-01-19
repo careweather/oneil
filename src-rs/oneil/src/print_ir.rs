@@ -1,6 +1,6 @@
 //! Intermediate Representation (IR) printing functionality for the Oneil CLI
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use anstream::println;
 use oneil_ir as ir;
@@ -117,7 +117,7 @@ fn print_model(model_path: &ir::ModelPath, model: &ir::Model, indent: usize, pre
 }
 
 /// Prints submodels
-fn print_submodels(submodels: &HashMap<ir::SubmodelName, ir::SubmodelImport>, indent: usize) {
+fn print_submodels(submodels: &IndexMap<ir::SubmodelName, ir::SubmodelImport>, indent: usize) {
     for (i, (identifier, submodel)) in submodels.iter().enumerate() {
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -132,7 +132,7 @@ fn print_submodels(submodels: &HashMap<ir::SubmodelName, ir::SubmodelImport>, in
 }
 
 /// Prints submodels
-fn print_references(references: &HashMap<ir::ReferenceName, ir::ReferenceImport>, indent: usize) {
+fn print_references(references: &IndexMap<ir::ReferenceName, ir::ReferenceImport>, indent: usize) {
     for (i, (identifier, reference)) in references.iter().enumerate() {
         let is_last = i == references.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -147,7 +147,7 @@ fn print_references(references: &HashMap<ir::ReferenceName, ir::ReferenceImport>
 }
 
 /// Prints parameters
-fn print_parameters(parameters: &HashMap<ir::ParameterName, ir::Parameter>, indent: usize) {
+fn print_parameters(parameters: &IndexMap<ir::ParameterName, ir::Parameter>, indent: usize) {
     for (i, (parameter_name, parameter)) in parameters.iter().enumerate() {
         let is_last = i == parameters.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -425,7 +425,7 @@ fn print_unit(unit: &ir::CompositeUnit, indent: usize) {
 }
 
 /// Prints tests
-fn print_tests(tests: &HashMap<ir::TestIndex, ir::Test>, indent: usize) {
+fn print_tests(tests: &IndexMap<ir::TestIndex, ir::Test>, indent: usize) {
     for (i, (test_index, test)) in tests.iter().enumerate() {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };

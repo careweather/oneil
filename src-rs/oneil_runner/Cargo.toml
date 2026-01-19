@@ -17,6 +17,7 @@ oneil_parser = { path = "../oneil_parser" }
 oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }
+indexmap = { workspace = true }
 
 [lints]
 workspace = true

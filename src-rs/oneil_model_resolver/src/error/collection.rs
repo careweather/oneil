@@ -1,6 +1,8 @@
 //! Error collection and management for model loading.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 
@@ -13,15 +15,15 @@ use crate::error::{CircularDependencyError, LoadError, ParameterResolutionError}
 /// A collection of errors that occurred during model loading.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelErrorMap<Ps, Py> {
-    model: HashMap<ir::ModelPath, LoadError<Ps>>,
-    circular_dependency: HashMap<ir::ModelPath, Vec<CircularDependencyError>>,
-    import: HashMap<ir::PythonPath, Py>,
+    model: IndexMap<ir::ModelPath, LoadError<Ps>>,
+    circular_dependency: IndexMap<ir::ModelPath, Vec<CircularDependencyError>>,
+    import: IndexMap<ir::PythonPath, Py>,
 }
 
 impl<Ps, Py> ModelErrorMap<Ps, Py> {
     /// Returns a reference to the map of model errors.
     #[must_use]
-    pub const fn get_model_errors(&self) -> &HashMap<ir::ModelPath, LoadError<Ps>> {
+    pub const fn get_model_errors(&self) -> &IndexMap<ir::ModelPath, LoadError<Ps>> {
         &self.model
     }
 
@@ -29,13 +31,13 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     #[must_use]
     pub const fn get_circular_dependency_errors(
         &self,
-    ) -> &HashMap<ir::ModelPath, Vec<CircularDependencyError>> {
+    ) -> &IndexMap<ir::ModelPath, Vec<CircularDependencyError>> {
         &self.circular_dependency
     }
 
     /// Returns a reference to the map of import errors.
     #[must_use]
-    pub const fn get_import_errors(&self) -> &HashMap<ir::PythonPath, Py> {
+    pub const fn get_import_errors(&self) -> &IndexMap<ir::PythonPath, Py> {
         &self.import
     }
 
@@ -43,9 +45,9 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            model: HashMap::new(),
-            circular_dependency: HashMap::new(),
-            import: HashMap::new(),
+            model: IndexMap::new(),
+            circular_dependency: IndexMap::new(),
+            import: IndexMap::new(),
         }
     }
 
@@ -104,19 +106,19 @@ impl<Ps, Py> Default for ModelErrorMap<Ps, Py> {
 /// A collection of parameter resolution errors for a single model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParameterErrorMap {
-    errors: HashMap<ir::Identifier, Vec<ParameterResolutionError>>,
+    errors: IndexMap<ir::Identifier, Vec<ParameterResolutionError>>,
 }
 
 impl<Ps, Py, S> From<ModelErrorMap<Ps, Py>>
     for (
-        HashMap<ir::ModelPath, (Option<LoadError<Ps>>, Option<Vec<CircularDependencyError>>), S>,
-        HashMap<ir::PythonPath, Py, S>,
+        IndexMap<ir::ModelPath, (Option<LoadError<Ps>>, Option<Vec<CircularDependencyError>>), S>,
+        IndexMap<ir::PythonPath, Py, S>,
     )
 where
     S: ::std::hash::BuildHasher + Default,
 {
     fn from(mut error: ModelErrorMap<Ps, Py>) -> Self {
-        let mut all_model_errors = HashMap::default();
+        let mut all_model_errors = IndexMap::default();
 
         // remove model errors and corresponding circular dependency errors, if
         // any exists
@@ -124,7 +126,7 @@ where
             .model
             .into_iter()
             .for_each(|(model_path, load_error)| {
-                let circular_dependency_errors = error.circular_dependency.remove(&model_path);
+                let circular_dependency_errors = error.circular_dependency.swap_remove(&model_path);
 
                 all_model_errors.insert(model_path, (Some(load_error), circular_dependency_errors));
             });
@@ -147,7 +149,7 @@ impl ParameterErrorMap {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            errors: HashMap::default(),
+            errors: IndexMap::default(),
         }
     }
 
@@ -175,7 +177,7 @@ impl Default for ParameterErrorMap {
     }
 }
 
-impl<S> From<ParameterErrorMap> for HashMap<ir::Identifier, Vec<ParameterResolutionError>, S>
+impl<S> From<ParameterErrorMap> for IndexMap<ir::Identifier, Vec<ParameterResolutionError>, S>
 where
     S: ::std::hash::BuildHasher + Default,
 {

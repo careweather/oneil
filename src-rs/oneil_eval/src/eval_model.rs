@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -127,7 +129,7 @@ fn parameter_result_from<F: BuiltinFunction>(
 }
 
 fn get_evaluation_order(
-    parameters: &HashMap<ir::ParameterName, ir::Parameter>,
+    parameters: &IndexMap<ir::ParameterName, ir::Parameter>,
 ) -> Vec<ir::ParameterName> {
     let mut evaluation_order = Vec::new();
     let mut visited = HashSet::new();
@@ -157,7 +159,7 @@ fn process_parameter_dependencies(
     parameter_dependencies: &ir::Dependencies,
     mut visited: HashSet<ir::ParameterName>,
     mut evaluation_order: Vec<ir::ParameterName>,
-    parameters: &HashMap<ir::ParameterName, ir::Parameter>,
+    parameters: &IndexMap<ir::ParameterName, ir::Parameter>,
 ) -> (Vec<ir::ParameterName>, HashSet<ir::ParameterName>) {
     for dependency in parameter_dependencies.parameter().keys() {
         if visited.contains(dependency) {
@@ -225,16 +227,16 @@ fn eval_test<F: BuiltinFunction>(
 
 /// Gets the values of the builtin dependencies for debug reporting purposes.
 fn get_builtin_dependency_values<F: BuiltinFunction>(
-    dependencies: &HashMap<ir::Identifier, Span>,
+    dependencies: &IndexMap<ir::Identifier, Span>,
     context: &EvalContext<F>,
-) -> HashMap<String, Value> {
+) -> IndexMap<String, Value> {
     dependencies
         .keys()
         .map(|dependency| {
             let value = context.lookup_builtin_variable(dependency);
             (dependency.as_str().to_string(), value)
         })
-        .collect::<HashMap<_, _>>()
+        .collect::<IndexMap<_, _>>()
 }
 
 /// Gets the values of the dependencies for debug reporting purposes.
@@ -245,9 +247,9 @@ fn get_builtin_dependency_values<F: BuiltinFunction>(
 ///
 /// This function will panic if any of the dependencies are not found.
 fn get_parameter_dependency_values<F: BuiltinFunction>(
-    dependencies: &HashMap<ir::ParameterName, Span>,
+    dependencies: &IndexMap<ir::ParameterName, Span>,
     context: &EvalContext<F>,
-) -> HashMap<String, Value> {
+) -> IndexMap<String, Value> {
     dependencies
         .iter()
         .map(|(dependency, dependency_span)| {
@@ -257,7 +259,7 @@ fn get_parameter_dependency_values<F: BuiltinFunction>(
 
             (dependency.as_str().to_string(), value)
         })
-        .collect::<HashMap<_, _>>()
+        .collect::<IndexMap<_, _>>()
 }
 
 /// Gets the values of the external dependencies for debug reporting purposes.
@@ -268,9 +270,9 @@ fn get_parameter_dependency_values<F: BuiltinFunction>(
 ///
 /// This function will panic if any of the dependencies are not found.
 fn get_external_dependency_values<F: BuiltinFunction>(
-    dependencies: &HashMap<(ir::ReferenceName, ir::ParameterName), (ir::ModelPath, Span)>,
+    dependencies: &IndexMap<(ir::ReferenceName, ir::ParameterName), (ir::ModelPath, Span)>,
     context: &EvalContext<F>,
-) -> HashMap<(String, String), Value> {
+) -> IndexMap<(String, String), Value> {
     dependencies
         .iter()
         .map(
@@ -290,5 +292,5 @@ fn get_external_dependency_values<F: BuiltinFunction>(
                 ((reference_name, parameter_name), value)
             },
         )
-        .collect::<HashMap<_, _>>()
+        .collect::<IndexMap<_, _>>()
 }

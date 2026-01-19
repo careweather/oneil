@@ -1,6 +1,6 @@
 //! Parameter definitions and management for Oneil model IR.
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
@@ -145,11 +145,11 @@ impl Parameter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dependencies {
     /// The dependencies on builtin variables.
-    builtin: HashMap<Identifier, Span>,
+    builtin: IndexMap<Identifier, Span>,
     /// The dependencies on parameters defined in the current model.
-    parameter: HashMap<ParameterName, Span>,
+    parameter: IndexMap<ParameterName, Span>,
     /// The dependencies on parameters defined in other models.
-    external: HashMap<(ReferenceName, ParameterName), (ModelPath, Span)>,
+    external: IndexMap<(ReferenceName, ParameterName), (ModelPath, Span)>,
 }
 
 impl Dependencies {
@@ -157,27 +157,27 @@ impl Dependencies {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            builtin: HashMap::new(),
-            parameter: HashMap::new(),
-            external: HashMap::new(),
+            builtin: IndexMap::new(),
+            parameter: IndexMap::new(),
+            external: IndexMap::new(),
         }
     }
 
     /// Returns the dependencies on builtin variables.
     #[must_use]
-    pub const fn builtin(&self) -> &HashMap<Identifier, Span> {
+    pub const fn builtin(&self) -> &IndexMap<Identifier, Span> {
         &self.builtin
     }
 
     /// Returns the dependencies on parameters defined in the current model.
     #[must_use]
-    pub const fn parameter(&self) -> &HashMap<ParameterName, Span> {
+    pub const fn parameter(&self) -> &IndexMap<ParameterName, Span> {
         &self.parameter
     }
 
     /// Returns the dependencies on parameters defined in other models.
     #[must_use]
-    pub const fn external(&self) -> &HashMap<(ReferenceName, ParameterName), (ModelPath, Span)> {
+    pub const fn external(&self) -> &IndexMap<(ReferenceName, ParameterName), (ModelPath, Span)> {
         &self.external
     }
 

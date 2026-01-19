@@ -1,6 +1,8 @@
 //! Utility functions for error handling and manipulation.
 
-use std::{collections::HashMap, hash::Hash};
+use std::hash::Hash;
+
+use indexmap::IndexMap;
 
 /// Combines the results of two operations, collecting all errors.
 ///
@@ -90,9 +92,9 @@ pub fn combine_error_list<T, E>(
 ///
 /// # Returns
 ///
-/// Returns a tuple `(O, HashMap<I, Vec<E>>)` where:
+/// Returns a tuple `(O, IndexMap<I, Vec<E>>)` where:
 /// - `O` is a collection of successful results (must implement `FromIterator<T>`)
-/// - `HashMap<I, Vec<E>>` maps error keys to their associated errors
+/// - `IndexMap<I, Vec<E>>` maps error keys to their associated errors
 ///
 /// # Panics
 ///
@@ -100,13 +102,13 @@ pub fn combine_error_list<T, E>(
 #[must_use]
 pub fn split_ok_and_errors<T, I, E, O>(
     results: impl IntoIterator<Item = Result<T, (I, Vec<E>)>>,
-) -> (O, HashMap<I, Vec<E>>)
+) -> (O, IndexMap<I, Vec<E>>)
 where
     I: Eq + Hash,
     O: FromIterator<T>,
 {
     let (ok, errors) = results.into_iter().fold(
-        (Vec::new(), HashMap::new()),
+        (Vec::new(), IndexMap::new()),
         |(mut ok, mut acc_errors), result| match result {
             Ok(result) => {
                 ok.push(result);

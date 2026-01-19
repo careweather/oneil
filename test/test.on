@@ -1,7 +1,8 @@
-X: x = pi
+** X: x = pi
 
-X1[0, 1]: x1 = true
+# TODO: deterministic evaluation
 
-X2['hello', 'world']: x2 = true
+# TODO: cargo run -- eval test/models/top.on -p pi.submodel1,pi.s1
+#                                                            ^^^^^
 
-X4(0, 1): x4 = true
+# TODO: partial evaluation

@@ -1,7 +1,7 @@
 //! The standard builtin values, functions, units, and prefixes
 //! that come with Oneil.
 
-use ::std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
@@ -14,8 +14,8 @@ use crate::{
 /// - `pi` - the mathematical constant π
 /// - `e` - the mathematical constant e
 #[must_use]
-pub fn builtin_values() -> HashMap<String, Value> {
-    HashMap::from([
+pub fn builtin_values() -> IndexMap<String, Value> {
+    IndexMap::from([
         (
             "pi".to_string(),
             Value::Number(Number::Scalar(std::f64::consts::PI)),
@@ -49,8 +49,8 @@ pub fn builtin_values() -> HashMap<String, Value> {
 /// - `R` - ronna
 /// - `Q` - quetta
 #[must_use]
-pub fn builtin_prefixes() -> HashMap<String, f64> {
-    HashMap::from(
+pub fn builtin_prefixes() -> IndexMap<String, f64> {
+    IndexMap::from(
         [
             ("q", 1e-30), // quecto
             ("r", 1e-27), // ronto
@@ -153,7 +153,7 @@ pub fn builtin_prefixes() -> HashMap<String, f64> {
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
 #[must_use]
-pub fn builtin_units() -> HashMap<String, Unit> {
+pub fn builtin_units() -> IndexMap<String, Unit> {
     /// Information about a builtin unit.
     ///
     /// This is only used in this function to avoid code duplication.
@@ -170,62 +170,62 @@ pub fn builtin_units() -> HashMap<String, Unit> {
             // the kilogram is the base unit of mass, so the gram is 1e-3 of a kilogram
             names: ["g", "gram", "grams"].as_ref(),
             magnitude: 1e-3,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Mass, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["m", "meter", "meters", "metre", "metres"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["s", "second", "seconds", "sec", "secs"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["K", "Kelvin"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Temperature, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Temperature, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["A", "Ampere", "Amp"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Current, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Current, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["b", "bit", "bits"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Information, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["$", "dollar", "dollars"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mol", "mole", "moles"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Substance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Substance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["cd", "candela"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
         },
         // === DERIVED UNITS ===
         UnitInfo {
             names: ["V", "Volt", "Volts"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -236,7 +236,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["W", "Watt", "Watts"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -246,13 +246,13 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["Hz", "Hertz"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, -1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["J", "Joule", "Joules"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -2.0),
@@ -262,7 +262,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["Wh", "Watt-hour", "Watt-hours"].as_ref(),
             magnitude: 3600.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -2.0),
@@ -272,7 +272,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["Ah", "Amp-hour", "Amp-hours"].as_ref(),
             magnitude: 3600.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Current, 1.0),
                 (Dimension::Time, 1.0),
             ])),
@@ -281,7 +281,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["T", "Tesla", "Teslas"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
                 (Dimension::Current, -1.0),
@@ -291,7 +291,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["Ohm", "Ohms"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -302,7 +302,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["N", "Newton", "Newtons"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -2.0),
@@ -312,7 +312,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["Gs", "Gauss"].as_ref(),
             magnitude: 0.0001,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
                 (Dimension::Current, -1.0),
@@ -322,13 +322,13 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["lm", "Lumen", "Lumens"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["lx", "Lux", "Luxes"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::LuminousIntensity, 1.0),
                 (Dimension::Distance, -2.0),
             ])),
@@ -337,7 +337,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["bps" /* bits per second */].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Information, 1.0),
                 (Dimension::Time, -1.0),
             ])),
@@ -346,13 +346,13 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["B", "byte", "bytes"].as_ref(),
             magnitude: 8.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Information, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["Pa", "Pascal", "Pascals"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -363,91 +363,91 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["mil", "millennium", "millennia"].as_ref(),
             magnitude: 3.1556952e10,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["cen", "century", "centuries"].as_ref(),
             magnitude: 3.1556952e9,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["dec", "decade", "decades"].as_ref(),
             magnitude: 3.1556952e8,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["yr", "year", "years"].as_ref(),
             magnitude: 3.1556952e7,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mon", "month", "months"].as_ref(),
             magnitude: 2.629746e6,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["week", "weeks"].as_ref(),
             magnitude: 6.048e5,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["day", "days"].as_ref(),
             magnitude: 8.64e4,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["hr", "hour", "hours"].as_ref(),
             magnitude: 3600.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["min", "minute", "minutes"].as_ref(),
             magnitude: 60.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["rpm" /* revolutions per minute */].as_ref(),
             magnitude: 0.10471975511965977,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Time, -1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["k$" /* thousand dollars */].as_ref(),
             magnitude: 1000.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["M$" /* million dollars */].as_ref(),
             magnitude: 1e6,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["B$" /* billion dollars */].as_ref(),
             magnitude: 1e9,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["T$" /* trillion dollars */].as_ref(),
             magnitude: 1e12,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["g_E" /* Earth gravity */].as_ref(),
             magnitude: 9.81,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
             ])),
@@ -463,13 +463,13 @@ pub fn builtin_units() -> HashMap<String, Unit> {
             ]
             .as_ref(),
             magnitude: 0.01,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["psi" /* pounds per square inch */].as_ref(),
             magnitude: 6894.757293168361,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -479,7 +479,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["atm", "atmosphere", "atmospheres"].as_ref(),
             magnitude: 101325.0,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -489,7 +489,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["bar", "bars"].as_ref(),
             magnitude: 1e5,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -499,7 +499,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["Ba", "barye", "baryes"].as_ref(),
             magnitude: 0.1,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -509,7 +509,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["dyne", "dynes"].as_ref(),
             magnitude: 1e-5,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -2.0),
@@ -519,7 +519,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["mmHg" /* millimeter of mercury */].as_ref(),
             magnitude: 133.322387415,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -529,7 +529,7 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["torr", "torrs"].as_ref(),
             magnitude: 133.3224,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -539,43 +539,43 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["in", "inch", "inches"].as_ref(),
             magnitude: 0.0254,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["ft", "foot", "feet"].as_ref(),
             magnitude: 0.3048,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["yd", "yard", "yards"].as_ref(),
             magnitude: 0.9144,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mi", "mile", "miles"].as_ref(),
             magnitude: 1609.344,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["nmi" /* nautical mile */].as_ref(),
             magnitude: 1852.0,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["lb", "lbs", "pound", "pounds"].as_ref(),
             magnitude: 0.45359237,
-            dimensions: DimensionMap::new(HashMap::from([(Dimension::Mass, 1.0)])),
+            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
         },
         UnitInfo {
             names: ["mph" /* mile per hour */].as_ref(),
             magnitude: 0.44704,
-            dimensions: DimensionMap::new(HashMap::from([
+            dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -1.0),
             ])),
@@ -585,55 +585,55 @@ pub fn builtin_units() -> HashMap<String, Unit> {
         UnitInfo {
             names: ["rev", "revolution", "revolutions", "rotation", "rotations"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["cyc", "cycle", "cycles"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["rad", "radian", "radians"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["deg", "degree", "degrees"].as_ref(),
             magnitude: 0.017453292519943295,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["%", "percent"].as_ref(),
             magnitude: 0.01,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["ppm" /* part per million */].as_ref(),
             magnitude: 1e-6,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["ppb" /* part per billion */].as_ref(),
             magnitude: 1e-9,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["arcmin", "arcminute", "arcminutes"].as_ref(),
             magnitude: 0.0002908882086657216,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
             names: ["arcsec", "arcsecond", "arcseconds"].as_ref(),
             magnitude: 4.84813681109536e-06,
-            dimensions: DimensionMap::new(HashMap::from([])),
+            dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
     ];
@@ -694,8 +694,8 @@ pub type StdBuiltinFunction = fn(Span, Vec<(Value, Span)>) -> Result<Value, Vec<
 /// will return an `EvalError::Unsupported` error when called. However,
 /// we plan to implement them in the future.
 #[must_use]
-pub fn builtin_functions() -> HashMap<String, StdBuiltinFunction> {
-    HashMap::from(
+pub fn builtin_functions() -> IndexMap<String, StdBuiltinFunction> {
+    IndexMap::from(
         [
             ("min", fns::min as StdBuiltinFunction),
             ("max", fns::max as StdBuiltinFunction),

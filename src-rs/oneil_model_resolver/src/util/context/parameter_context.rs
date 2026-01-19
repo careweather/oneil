@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 
@@ -9,14 +9,14 @@ use crate::{
 
 #[derive(Debug)]
 pub struct ParameterContext<'parameter> {
-    parameters: &'parameter HashMap<ir::ParameterName, ir::Parameter>,
-    parameter_errors: &'parameter HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+    parameters: &'parameter IndexMap<ir::ParameterName, ir::Parameter>,
+    parameter_errors: &'parameter IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
 }
 
 impl<'parameter> ParameterContext<'parameter> {
     pub const fn new(
-        parameters: &'parameter HashMap<ir::ParameterName, ir::Parameter>,
-        parameter_errors: &'parameter HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+        parameters: &'parameter IndexMap<ir::ParameterName, ir::Parameter>,
+        parameter_errors: &'parameter IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
     ) -> Self {
         Self {
             parameters,

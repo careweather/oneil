@@ -1,6 +1,8 @@
 //! Parameter resolution model for the Oneil model loader.
 
-use std::{collections::HashMap, collections::HashSet, ops::Deref};
+use std::ops::Deref;
+
+use indexmap::IndexMap;
 
 use oneil_ast as ast;
 use oneil_ir as ir;
@@ -21,8 +23,8 @@ use crate::{
     },
 };
 
-pub type ParameterMap = HashMap<ir::ParameterName, ir::Parameter>;
-pub type ParameterErrorMap = HashMap<ir::ParameterName, Vec<ParameterResolutionError>>;
+pub type ParameterMap = IndexMap<ir::ParameterName, ir::Parameter>;
+pub type ParameterErrorMap = IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>;
 
 /// Resolves a collection of AST parameters into resolved model parameters.
 pub fn resolve_parameters(
@@ -32,7 +34,7 @@ pub fn resolve_parameters(
 ) -> (ParameterMap, ParameterErrorMap) {
     let mut parameter_builder = ParameterBuilder::new();
 
-    let mut parameter_map = HashMap::new();
+    let mut parameter_map = IndexMap::new();
 
     for parameter in parameters {
         let ident = ir::ParameterName::new(parameter.ident().as_str().to_string());
@@ -54,7 +56,7 @@ pub fn resolve_parameters(
     }
 
     // Convert parameter nodes into a map
-    let parameter_ast_map: HashMap<_, &ast::ParameterNode> = parameter_map
+    let parameter_ast_map: IndexMap<_, &ast::ParameterNode> = parameter_map
         .into_iter()
         .map(|(ident, (_, ast))| (ident, ast))
         .collect();
@@ -87,9 +89,9 @@ pub fn resolve_parameters(
 /// Note that the dependencies are both parameter names and builtins, which
 /// is why we use identifiers instead of parameter names.
 fn get_all_parameter_internal_dependencies<'a>(
-    parameter_map: &'a HashMap<ir::ParameterName, &'a ast::ParameterNode>,
-) -> HashMap<&'a ir::ParameterName, HashMap<ir::Identifier, Span>> {
-    let mut dependencies = HashMap::new();
+    parameter_map: &'a IndexMap<ir::ParameterName, &'a ast::ParameterNode>,
+) -> IndexMap<&'a ir::ParameterName, IndexMap<ir::Identifier, Span>> {
+    let mut dependencies = IndexMap::new();
 
     for identifier in parameter_map.keys() {
         let parameter = parameter_map
@@ -107,8 +109,8 @@ fn get_all_parameter_internal_dependencies<'a>(
 /// Extracts internal dependencies from a single parameter.
 fn get_parameter_internal_dependencies(
     parameter: &ast::Parameter,
-) -> HashMap<ir::Identifier, Span> {
-    let mut dependencies = HashMap::new();
+) -> IndexMap<ir::Identifier, Span> {
+    let mut dependencies = IndexMap::new();
 
     let limits = parameter.limits().map(ast::Node::deref);
     match limits {
@@ -156,8 +158,8 @@ fn get_parameter_internal_dependencies(
 fn try_resolve_identifier_as_parameter(
     parameter_identifier: &ir::Identifier,
     // context
-    parameter_ast_map: &HashMap<ir::ParameterName, &ast::ParameterNode>,
-    dependencies: &HashMap<&ir::ParameterName, HashMap<ir::Identifier, Span>>,
+    parameter_ast_map: &IndexMap<ir::ParameterName, &ast::ParameterNode>,
+    dependencies: &IndexMap<&ir::ParameterName, IndexMap<ir::Identifier, Span>>,
     parameter_stack: &mut Stack<ir::ParameterName>,
     builtin_ref: &impl BuiltinRef,
     context: &ReferenceContext<'_, '_>,
