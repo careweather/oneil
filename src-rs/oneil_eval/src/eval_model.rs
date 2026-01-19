@@ -35,9 +35,10 @@ pub fn eval_model<F: BuiltinFunction>(
 
     // Bring references into scope
     let references = model.get_references();
-    for reference in references.values() {
-        let path = reference.path().as_ref().to_path_buf();
+    for (reference_name, reference_import) in references {
+        let path = reference_import.path().as_ref().to_path_buf();
         context.activate_reference(path);
+        context.add_reference(reference_name.as_str(), reference_import.path());
     }
 
     // Add submodels to the current model

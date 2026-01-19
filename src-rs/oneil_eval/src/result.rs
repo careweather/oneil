@@ -27,6 +27,11 @@ pub struct Model {
     /// Submodels are evaluated recursively, so each entry contains a fully
     /// evaluated `Model` structure.
     pub submodels: IndexMap<String, Model>,
+    /// A map of reference names to their evaluated results.
+    ///
+    /// References are evaluated recursively, so each entry contains a fully
+    /// evaluated `Model` structure.
+    pub references: IndexMap<String, Model>,
     /// A map of parameter identifiers to their evaluated results.
     ///
     /// Parameters are stored by their identifier (name) and contain their

@@ -19,6 +19,7 @@ use crate::{
 pub struct Model {
     parameters: IndexMap<String, Result<result::Parameter, Vec<EvalError>>>,
     submodels: IndexMap<String, PathBuf>,
+    references: IndexMap<String, PathBuf>,
     tests: Vec<Result<result::Test, Vec<EvalError>>>,
 }
 
@@ -27,6 +28,7 @@ impl Model {
         Self {
             parameters: IndexMap::new(),
             submodels: IndexMap::new(),
+            references: IndexMap::new(),
             tests: Vec::new(),
         }
     }
@@ -218,6 +220,22 @@ impl<F: BuiltinFunction> EvalContext<F> {
         );
     }
 
+    pub fn add_reference(&mut self, reference_name: &str, reference_path: &ir::ModelPath) {
+        let Some(current_model) = self.current_model.as_ref() else {
+            panic!("current model should be set when adding a reference");
+        };
+
+        let model = self
+            .models
+            .get_mut(current_model)
+            .expect("current model should be created when set");
+
+        model.references.insert(
+            reference_name.to_string(),
+            reference_path.as_ref().to_path_buf(),
+        );
+    }
+
     pub fn add_test_result(&mut self, test_result: Result<result::Test, Vec<EvalError>>) {
         let Some(current_model) = self.current_model.as_ref() else {
             panic!("current model should be set when adding a test result");
@@ -245,18 +263,50 @@ impl<F: BuiltinFunction> EvalContext<F> {
         reason = "the panic is used to enforce an invariant that should never be violated"
     )]
     pub fn get_model_result(&self, model_path: &Path) -> Result<result::Model, Vec<ModelError>> {
-        // get the model
         let Some(model) = self.models.get(model_path) else {
             panic!("model should have been created during evaluation");
         };
 
-        // get the submodels
-        let (submodels, submodel_errors) = model
+        let (submodels, submodel_errors) = self.collect_submodels(model, model_path);
+        let (references, reference_errors) = self.collect_references(model, model_path);
+        let (parameters, parameter_errors) = Self::collect_parameters(model, model_path);
+        let (tests, test_errors) = Self::collect_tests(model, model_path);
+
+        let errors = [
+            submodel_errors,
+            reference_errors,
+            parameter_errors,
+            test_errors,
+        ]
+        .concat();
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        Ok(result::Model {
+            path: model_path.to_path_buf(),
+            submodels,
+            references,
+            parameters,
+            tests,
+        })
+    }
+
+    /// Collects submodel results recursively.
+    ///
+    /// Returns a tuple of (successful submodels, errors).
+    fn collect_submodels(
+        &self,
+        model: &Model,
+        _model_path: &Path,
+    ) -> (IndexMap<String, result::Model>, Vec<ModelError>) {
+        model
             .submodels
             .iter()
             .map(|(name, submodel_path)| {
-                let submodel_result = self.get_model_result(submodel_path);
-                submodel_result.map(|submodel_result| (name.clone(), submodel_result))
+                self.get_model_result(submodel_path)
+                    .map(|submodel_result| (name.clone(), submodel_result))
             })
             .fold(
                 (IndexMap::new(), Vec::new()),
@@ -270,10 +320,47 @@ impl<F: BuiltinFunction> EvalContext<F> {
                         (submodels, submodel_errors)
                     }
                 },
-            );
+            )
+    }
 
-        // get the parameters
-        let (parameters, parameter_errors) = model
+    /// Collects reference results recursively.
+    ///
+    /// Returns a tuple of (successful references, errors).
+    fn collect_references(
+        &self,
+        model: &Model,
+        _model_path: &Path,
+    ) -> (IndexMap<String, result::Model>, Vec<ModelError>) {
+        model
+            .references
+            .iter()
+            .map(|(name, reference_path)| {
+                self.get_model_result(reference_path)
+                    .map(|reference_result| (name.clone(), reference_result))
+            })
+            .fold(
+                (IndexMap::new(), Vec::new()),
+                |(mut references, mut reference_errors), result| match result {
+                    Ok((name, reference_result)) => {
+                        references.insert(name, reference_result);
+                        (references, reference_errors)
+                    }
+                    Err(errors) => {
+                        reference_errors.extend(errors);
+                        (references, reference_errors)
+                    }
+                },
+            )
+    }
+
+    /// Collects parameter results.
+    ///
+    /// Returns a tuple of (successful parameters, errors).
+    fn collect_parameters(
+        model: &Model,
+        model_path: &Path,
+    ) -> (IndexMap<String, result::Parameter>, Vec<ModelError>) {
+        model
             .parameters
             .iter()
             .map(|(name, parameter_result)| {
@@ -298,10 +385,14 @@ impl<F: BuiltinFunction> EvalContext<F> {
                         (parameters, parameter_errors)
                     }
                 },
-            );
+            )
+    }
 
-        // get the tests
-        let (tests, test_errors) = model.tests.iter().fold(
+    /// Collects test results.
+    ///
+    /// Returns a tuple of (successful tests, errors).
+    fn collect_tests(model: &Model, model_path: &Path) -> (Vec<result::Test>, Vec<ModelError>) {
+        model.tests.iter().fold(
             (Vec::new(), Vec::new()),
             |(mut tests, mut test_errors), test_result| match test_result.clone() {
                 Ok(test_result) => {
@@ -318,21 +409,6 @@ impl<F: BuiltinFunction> EvalContext<F> {
                     (tests, test_errors)
                 }
             },
-        );
-
-        let errors = [submodel_errors, parameter_errors, test_errors].concat();
-
-        if !errors.is_empty() {
-            return Err(errors);
-        }
-
-        let model_result = result::Model {
-            path: model_path.to_path_buf(),
-            submodels,
-            parameters,
-            tests,
-        };
-
-        Ok(model_result)
+        )
     }
 }

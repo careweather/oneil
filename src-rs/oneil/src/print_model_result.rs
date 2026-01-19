@@ -277,9 +277,15 @@ fn get_parameter_from_model<'a>(
             return model.parameters.get(&parameter);
         };
 
-        let submodel = model.submodels.get(&submodel)?;
+        // check if the submodel is a reference or a submodel
+        // NOTE: although all submodels are also references, we need to check both since
+        //       the submodel name might be different from the reference name
+        let model = model
+            .references
+            .get(&submodel)
+            .or_else(|| model.submodels.get(&submodel))?;
 
-        recurse(submodel, parameter, submodels)
+        recurse(model, parameter, submodels)
     }
 }
 
@@ -367,12 +373,12 @@ fn get_model_parameters_by_filter(
         if top_model_only {
             parameters
         } else {
-            model_result
-                .submodels
-                .values()
-                .fold(parameters, |parameters, submodel| {
-                    recurse(submodel, print_level, top_model_only, parameters)
-                })
+            // NOTE: all submodels are also references, so we can simply use the references map
+            let models = model_result.references.values();
+
+            models.fold(parameters, |parameters, model| {
+                recurse(model, print_level, top_model_only, parameters)
+            })
         }
     }
 }
