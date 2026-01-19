@@ -97,6 +97,13 @@ pub struct EvalArgs {
     #[arg(long)]
     pub top_only: bool,
 
+    /// Display partial results even if there are errors
+    ///
+    /// If errors occurred during evaluation, errors will be printed,
+    /// then the partial results will be printed.
+    #[arg(long)]
+    pub partial: bool,
+
     /// Don't print the results header
     #[arg(long)]
     pub no_header: bool,
@@ -185,6 +192,13 @@ pub enum DevCommand {
         /// Path to the Oneil model file to evaluate
         #[arg(value_name = "FILE")]
         file: PathBuf,
+
+        /// Display partial results even if there are errors
+        ///
+        /// When enabled, shows the portion of the results that were successfully generated
+        /// before encountering errors. Useful for debugging model evaluation issues.
+        #[arg(long)]
+        display_partial: bool,
 
         /// Disable colors in the output
         ///

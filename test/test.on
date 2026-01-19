@@ -1,8 +1,1 @@
 ** X: x = pi
-
-# TODO: deterministic evaluation
-
-# TODO: cargo run -- eval test/models/top.on -p pi.submodel1,pi.s1
-#                                                            ^^^^^
-
-# TODO: partial evaluation

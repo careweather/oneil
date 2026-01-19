@@ -255,14 +255,15 @@ impl<F: BuiltinFunction> EvalContext<F> {
 
     /// Gets the result of a model.
     ///
+    /// Returns a model with all valid results, as well as
+    /// a list of any errors that occurred during evaluation.
+    ///
+    /// If no errors occurred, the list of errors will be empty.
+    ///
     /// # Panics
     ///
     /// Panics if the model is not found.
-    #[expect(
-        clippy::panic_in_result_fn,
-        reason = "the panic is used to enforce an invariant that should never be violated"
-    )]
-    pub fn get_model_result(&self, model_path: &Path) -> Result<result::Model, Vec<ModelError>> {
+    pub fn get_model_result(&self, model_path: &Path) -> (result::Model, Vec<ModelError>) {
         let Some(model) = self.models.get(model_path) else {
             panic!("model should have been created during evaluation");
         };
@@ -272,6 +273,14 @@ impl<F: BuiltinFunction> EvalContext<F> {
         let (parameters, parameter_errors) = Self::collect_parameters(model, model_path);
         let (tests, test_errors) = Self::collect_tests(model, model_path);
 
+        let model_result = result::Model {
+            path: model_path.to_path_buf(),
+            submodels,
+            references,
+            parameters,
+            tests,
+        };
+
         let errors = [
             submodel_errors,
             reference_errors,
@@ -280,17 +289,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         ]
         .concat();
 
-        if !errors.is_empty() {
-            return Err(errors);
-        }
-
-        Ok(result::Model {
-            path: model_path.to_path_buf(),
-            submodels,
-            references,
-            parameters,
-            tests,
-        })
+        (model_result, errors)
     }
 
     /// Collects submodel results recursively.
@@ -305,20 +304,15 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .submodels
             .iter()
             .map(|(name, submodel_path)| {
-                self.get_model_result(submodel_path)
-                    .map(|submodel_result| (name.clone(), submodel_result))
+                let (submodel, submodel_errors) = self.get_model_result(submodel_path);
+                (name.clone(), submodel, submodel_errors)
             })
             .fold(
                 (IndexMap::new(), Vec::new()),
-                |(mut submodels, mut submodel_errors), result| match result {
-                    Ok((name, submodel_result)) => {
-                        submodels.insert(name, submodel_result);
-                        (submodels, submodel_errors)
-                    }
-                    Err(error) => {
-                        submodel_errors.extend(error);
-                        (submodels, submodel_errors)
-                    }
+                |(mut submodels, mut submodel_errors), (name, submodel, errors)| {
+                    submodels.insert(name, submodel);
+                    submodel_errors.extend(errors);
+                    (submodels, submodel_errors)
                 },
             )
     }
@@ -335,20 +329,15 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .references
             .iter()
             .map(|(name, reference_path)| {
-                self.get_model_result(reference_path)
-                    .map(|reference_result| (name.clone(), reference_result))
+                let (reference, reference_errors) = self.get_model_result(reference_path);
+                (name.clone(), reference, reference_errors)
             })
             .fold(
                 (IndexMap::new(), Vec::new()),
-                |(mut references, mut reference_errors), result| match result {
-                    Ok((name, reference_result)) => {
-                        references.insert(name, reference_result);
-                        (references, reference_errors)
-                    }
-                    Err(errors) => {
-                        reference_errors.extend(errors);
-                        (references, reference_errors)
-                    }
+                |(mut references, mut reference_errors), (name, reference, errors)| {
+                    references.insert(name, reference);
+                    reference_errors.extend(errors);
+                    (references, reference_errors)
                 },
             )
     }

@@ -23,6 +23,7 @@ pub struct ModelPrintConfig {
     pub print_debug_info: bool,
     pub variables: Option<VariableList>,
     pub top_model_only: bool,
+    pub display_partial_results: bool,
     pub no_header: bool,
     pub no_test_report: bool,
     pub no_parameters: bool,

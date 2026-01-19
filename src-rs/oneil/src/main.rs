@@ -64,8 +64,12 @@ fn handle_dev_command(command: DevCommand) {
             print_debug,
             no_colors,
         } => handle_print_ir(&file, display_partial, print_debug, no_colors),
-        DevCommand::PrintModelResult { file, no_colors } => {
-            handle_print_model_result(&file, no_colors);
+        DevCommand::PrintModelResult {
+            file,
+            display_partial,
+            no_colors,
+        } => {
+            handle_print_model_result(&file, display_partial, no_colors);
         }
     }
 }
@@ -129,7 +133,7 @@ fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool, no_col
 }
 
 /// Handles the `dev print-model-result` command.
-fn handle_print_model_result(file: &Path, no_colors: bool) {
+fn handle_print_model_result(file: &Path, display_partial: bool, no_colors: bool) {
     set_color_choice(no_colors);
 
     let builtins = create_builtins();
@@ -140,19 +144,18 @@ fn handle_print_model_result(file: &Path, no_colors: bool) {
 
     let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
 
-    let model_result = eval_context.get_model_result(file);
+    let (model_result, errors) = eval_context.get_model_result(file);
 
-    match model_result {
-        Ok(model_result) => {
-            println!("{:?}", model_result);
-        }
-        Err(errors) => {
-            for error in errors {
-                let error = convert_error::eval::convert(&error);
-                print_error::print(&error, false);
-                eprintln!();
-            }
-        }
+    let had_errors = !errors.is_empty();
+
+    for error in errors {
+        let error = convert_error::eval::convert(&error);
+        print_error::print(&error, false);
+        eprintln!();
+    }
+
+    if !had_errors || display_partial {
+        println!("{:?}", model_result);
     }
 }
 
@@ -198,6 +201,7 @@ fn handle_eval_command(args: EvalArgs) {
         debug: print_debug_info,
         watch,
         top_only,
+        partial: display_partial_results,
         no_header,
         no_test_report,
         no_parameters,
@@ -211,6 +215,7 @@ fn handle_eval_command(args: EvalArgs) {
         print_debug_info,
         variables,
         top_model_only: top_only,
+        display_partial_results,
         no_header,
         no_test_report,
         no_parameters,
@@ -318,19 +323,18 @@ fn eval_model<F: BuiltinFunction + Clone>(
     // TODO: remove this clone?
     let eval_context =
         oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map.clone());
-    let model_result = eval_context.get_model_result(file);
+    let (model_result, errors) = eval_context.get_model_result(file);
 
-    match model_result {
-        Ok(model_result) => {
-            print_model_result::print(&model_result, model_print_config);
-        }
-        Err(errors) => {
-            for error in errors {
-                let error = convert_error::eval::convert(&error);
-                print_error::print(&error, false);
-                eprintln!();
-            }
-        }
+    let had_errors = !errors.is_empty();
+
+    for error in errors {
+        let error = convert_error::eval::convert(&error);
+        print_error::print(&error, false);
+        eprintln!();
+    }
+
+    if !had_errors || model_print_config.display_partial_results {
+        print_model_result::print(&model_result, model_print_config);
     }
 
     watch_paths_from_model_collection(&model_collection)
