@@ -305,7 +305,13 @@ fn eval_model<F: BuiltinFunction + Clone>(
                 eprintln!();
             }
 
-            return watch_paths_from_model_collection(&model_collection);
+            let model_watch_paths = watch_paths_from_model_collection(&model_collection);
+            let error_model_watch_paths = error_map.get_watch_paths();
+
+            return model_watch_paths
+                .into_iter()
+                .chain(error_model_watch_paths)
+                .collect();
         }
     };
 

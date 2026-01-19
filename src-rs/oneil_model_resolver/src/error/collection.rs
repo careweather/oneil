@@ -1,6 +1,6 @@
 //! Error collection and management for model loading.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf};
 
 use indexmap::IndexMap;
 
@@ -94,6 +94,18 @@ impl<Ps, Py> ModelErrorMap<Ps, Py> {
     #[must_use]
     pub fn get_imports_with_errors(&self) -> HashSet<&ir::PythonPath> {
         self.import.keys().collect()
+    }
+
+    /// Returns all paths that could be watched for changes.
+    #[must_use]
+    pub fn get_watch_paths(&self) -> HashSet<PathBuf> {
+        let model_watch_paths = self
+            .model
+            .keys()
+            .chain(self.circular_dependency.keys())
+            .map(|path| path.as_ref().to_path_buf());
+        let python_watch_paths = self.import.keys().map(|path| path.as_ref().to_path_buf());
+        model_watch_paths.chain(python_watch_paths).collect()
     }
 }
 
