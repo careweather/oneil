@@ -68,7 +68,7 @@ pub enum TestResult {
     /// The test failed.
     Failed {
         /// The values of the test dependencies.
-        debug_info: DebugInfo,
+        debug_info: Box<DebugInfo>,
     },
 }
 

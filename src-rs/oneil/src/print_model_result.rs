@@ -77,7 +77,7 @@ fn get_model_tests<'a>(
         .tests
         .iter()
         .filter_map(|test| match &test.result {
-            result::TestResult::Failed { debug_info } => Some((test.expr_span, debug_info)),
+            result::TestResult::Failed { debug_info } => Some((test.expr_span, &**debug_info)),
             result::TestResult::Passed => None,
         })
         .collect::<Vec<_>>();

@@ -205,11 +205,11 @@ fn eval_test<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(test.dependencies().external(), context);
 
-            let debug_info = result::DebugInfo {
+            let debug_info = Box::new(result::DebugInfo {
                 builtin_dependency_values,
                 parameter_dependency_values,
                 external_dependency_values,
-            };
+            });
             Ok(result::Test {
                 result: result::TestResult::Failed { debug_info },
                 expr_span: *expr_span,
