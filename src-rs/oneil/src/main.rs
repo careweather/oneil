@@ -224,16 +224,16 @@ fn handle_eval_command(args: EvalArgs) {
     );
 
     if watch {
-        watch_model(&file, &builtins, model_print_config);
+        watch_model(&file, &builtins, &model_print_config);
     } else {
-        let _watch_paths = eval_model(&file, &builtins, model_print_config);
+        let _watch_paths = eval_model(&file, &builtins, &model_print_config);
     }
 }
 
 fn watch_model<F: BuiltinFunction + Clone>(
     file: &Path,
     builtins: &Builtins<F>,
-    model_print_config: ModelPrintConfig,
+    model_print_config: &ModelPrintConfig,
 ) {
     let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
 
@@ -250,17 +250,39 @@ fn watch_model<F: BuiltinFunction + Clone>(
     };
 
     clear_screen();
-    let watch_paths = eval_model(file, builtins, model_print_config);
+    let mut watch_paths = HashSet::new();
 
-    update_watch_paths(&mut watcher, &watch_paths, &HashSet::new());
+    let new_watch_paths = eval_model(file, builtins, model_print_config);
+
+    let (add_paths, remove_paths) = find_watch_paths_difference(&watch_paths, &new_watch_paths);
+
+    update_watcher(&mut watcher, &add_paths, &remove_paths);
+    watch_paths = new_watch_paths;
 
     for event in rx {
         match event {
-            Ok(event) => {
-                clear_screen();
-                println!("{:?}", event);
+            Ok(event) => match event.kind {
+                notify::EventKind::Modify(_) => {
+                    clear_screen();
+
+                    let new_watch_paths = eval_model(file, builtins, model_print_config);
+
+                    let (add_paths, remove_paths) =
+                        find_watch_paths_difference(&watch_paths, &new_watch_paths);
+
+                    update_watcher(&mut watcher, &add_paths, &remove_paths);
+                    watch_paths = new_watch_paths;
+                }
+                notify::EventKind::Any
+                | notify::EventKind::Access(_)
+                | notify::EventKind::Create(_)
+                | notify::EventKind::Remove(_)
+                | notify::EventKind::Other => { /* do nothing */ }
+            },
+            Err(error) => {
+                let error_msg = stylesheet::ERROR_COLOR.bold().style("watcher error:");
+                eprintln!("{error_msg} - {error}");
             }
-            Err(error) => println!("error: {error}"),
         }
     }
 }
@@ -268,7 +290,7 @@ fn watch_model<F: BuiltinFunction + Clone>(
 fn eval_model<F: BuiltinFunction + Clone>(
     file: &Path,
     builtins: &Builtins<F>,
-    model_print_config: ModelPrintConfig,
+    model_print_config: &ModelPrintConfig,
 ) -> HashSet<PathBuf> {
     let model_collection =
         oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
@@ -322,10 +344,19 @@ fn watch_paths_from_model_collection(model_collection: &ir::ModelCollection) -> 
     model_paths.chain(python_imports).collect()
 }
 
-fn update_watch_paths(
+fn find_watch_paths_difference<'a>(
+    old_paths: &'a HashSet<PathBuf>,
+    new_paths: &'a HashSet<PathBuf>,
+) -> (HashSet<&'a PathBuf>, HashSet<&'a PathBuf>) {
+    let add_paths = new_paths.difference(old_paths).collect();
+    let remove_paths = old_paths.difference(new_paths).collect();
+    (add_paths, remove_paths)
+}
+
+fn update_watcher(
     watcher: &mut notify::RecommendedWatcher,
-    add_paths: &HashSet<PathBuf>,
-    remove_paths: &HashSet<PathBuf>,
+    add_paths: &HashSet<&PathBuf>,
+    remove_paths: &HashSet<&PathBuf>,
 ) {
     let mut watcher_paths_mut = watcher.paths_mut();
 

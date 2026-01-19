@@ -235,8 +235,8 @@ impl fmt::Display for PrintMode {
 pub struct VariableList(Vec<Variable>);
 
 impl VariableList {
-    pub fn into_iter(self) -> impl IntoIterator<Item = Variable> {
-        self.0.into_iter()
+    pub fn iter(&self) -> impl Iterator<Item = &Variable> {
+        self.0.iter()
     }
 }
 
@@ -274,8 +274,8 @@ impl Variable {
     /// Splits the variable into a vector of strings.
     ///
     /// `param.submodel1.submodel2` becomes `["param", "submodel1", "submodel2"]`.
-    pub fn into_vec(self) -> Vec<String> {
-        self.0
+    pub fn to_vec(&self) -> Vec<String> {
+        self.0.clone()
     }
 }
 

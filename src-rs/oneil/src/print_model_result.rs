@@ -11,7 +11,7 @@ use oneil_eval::{
 use oneil_shared::span::Span;
 
 use crate::{
-    command::{PrintMode, VariableList},
+    command::{PrintMode, Variable, VariableList},
     stylesheet,
 };
 
@@ -34,7 +34,7 @@ pub fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print(model_result: &result::Model, model_config: ModelPrintConfig) {
+pub fn print(model_result: &result::Model, model_config: &ModelPrintConfig) {
     let test_info = get_model_tests(
         model_result,
         model_config.top_model_only,
@@ -53,10 +53,10 @@ pub fn print(model_result: &result::Model, model_config: ModelPrintConfig) {
     }
 
     if !model_config.no_parameters {
-        if let Some(variables) = model_config.variables {
+        if let Some(variables) = &model_config.variables {
             print_parameters_by_list(model_result, model_config.print_debug_info, variables);
         } else {
-            print_parameters_by_filter(model_result, model_config.print_debug_info, &model_config);
+            print_parameters_by_filter(model_result, model_config.print_debug_info, model_config);
         }
     }
 }
@@ -195,7 +195,7 @@ fn print_model_path_header(model_path: &Path) {
 fn print_parameters_by_list(
     model_result: &result::Model,
     print_debug_info: bool,
-    variables: VariableList,
+    variables: &VariableList,
 ) {
     let ModelParametersToPrint {
         parameters: parameters_to_print,
@@ -227,14 +227,14 @@ struct ModelParametersToPrint<'a> {
     pub parameters_not_found: HashSet<String>,
 }
 
-fn get_model_parameters_by_list(
-    model_result: &result::Model,
-    variables: VariableList,
-) -> ModelParametersToPrint<'_> {
+fn get_model_parameters_by_list<'a>(
+    model_result: &'a result::Model,
+    variables: &VariableList,
+) -> ModelParametersToPrint<'a> {
     let mut parameters = HashMap::new();
     let mut parameters_not_found = HashSet::new();
 
-    for variable in variables.into_iter() {
+    for variable in variables.iter() {
         let variable_name = variable.to_string();
         let result = get_parameter_from_model(model_result, variable);
 
@@ -254,11 +254,11 @@ fn get_model_parameters_by_list(
     }
 }
 
-fn get_parameter_from_model(
-    model_result: &result::Model,
-    param: crate::command::Variable,
-) -> Option<&result::Parameter> {
-    let mut param_vec = param.into_vec();
+fn get_parameter_from_model<'a>(
+    model_result: &'a result::Model,
+    param: &Variable,
+) -> Option<&'a result::Parameter> {
+    let mut param_vec = param.to_vec();
 
     let parameter = param_vec.remove(0);
 
