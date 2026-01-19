@@ -598,9 +598,14 @@ fn verify_value_is_within_number_range(
             let adjusted_min = MeasuredNumber::from_number_and_unit(min, limit_unit.clone());
             let adjusted_max = MeasuredNumber::from_number_and_unit(max, limit_unit);
 
-            if number.normalized_value().min() < adjusted_min.normalized_value().min()
-                || number.normalized_value().max() > adjusted_max.normalized_value().max()
-            {
+            if number.normalized_value().min() < adjusted_min.normalized_value().min() {
+                Err(vec![EvalError::ParameterValueBelowContinuousLimits {
+                    param_expr_span: *param_expr_span,
+                    param_value: value.clone(),
+                    min_expr_span,
+                    min_value: Value::Number(min),
+                }])
+            } else if number.normalized_value().max() > adjusted_max.normalized_value().max() {
                 Err(vec![EvalError::ParameterValueAboveContinuousLimits {
                     param_expr_span: *param_expr_span,
                     param_value: value.clone(),
