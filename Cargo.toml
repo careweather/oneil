@@ -5,7 +5,7 @@ resolver = "3"
 [workspace.package]
 version = "0.15.0"
 edition = "2024"
-authors = ["Brendon Bown <brendon.bown@gmail.com>"]
+authors = ["Brendon Bown <brendon.bown@gmail.com>", "Preston Corless <pgattic@gmail.com>"]
 license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/careweather/oneil"

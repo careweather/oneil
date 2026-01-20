@@ -1,0 +1,74 @@
+{
+  "name": "oneil",
+  "displayName": "Oneil",
+  "description": "VS Code support for the Oneil design specification language",
+  "icon": "./icons/oneil-logo-large.png",
+  "version": "0.1.0",
+  "publisher": "careweather",
+  "license": "MPL-2.0",
+  "engines": {
+    "vscode": "^1.0.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "bugs": {
+    "url": "https://github.com/careweather/oneil/issues"
+  },
+  "homepage": "https://github.com/careweather/oneil",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/careweather/oneil.git"
+  },
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "oneil",
+        "aliases": [
+          "Oneil",
+          "oneil"
+        ],
+        "extensions": [
+          ".on"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/oneil-logo.svg",
+          "dark": "./icons/oneil-logo.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "oneil",
+        "scopeName": "source.oneil",
+        "path": "./syntaxes/oneil.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.latex": "latex"
+        },
+        "tokenTypes": {
+          "meta.embedded.latex": "other"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@types/vscode": "^1.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3",
+    "vscode-languageclient": "^9.0.0"
+  }
+}

@@ -9,17 +9,15 @@ use std::{
 use clap::Parser;
 use oneil_eval::builtin::std as oneil_std;
 use oneil_model_resolver::FileLoader;
-
-use crate::{
+use oneil_runner::{
     builtins::Builtins,
-    command::{CliCommand, Commands, DevCommand},
-    file_parser::LoadingError,
+    file_parser::{self, LoadingError},
 };
 
-mod builtins;
+use crate::command::{CliCommand, Commands, DevCommand};
+
 mod command;
 mod convert_error;
-mod file_parser;
 mod printer;
 
 /// Main entry point for the Oneil CLI application
@@ -27,6 +25,10 @@ fn main() -> io::Result<()> {
     let cli = CliCommand::parse();
 
     match cli.command {
+        Commands::Lsp {} => {
+            oneil_lsp::run();
+            Ok(())
+        }
         Commands::Dev { command } => handle_dev_command(command),
         Commands::Eval {
             file,

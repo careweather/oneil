@@ -70,7 +70,6 @@ def parse_file(file_name):
     with open(file_name, 'r') as f:
         final_line = 0
         for i, line in enumerate(f.readlines()):
-            unit_fx = lambda x:x
             final_line = i
             if line == '\n':
                 last_line_blank = True
@@ -186,6 +185,7 @@ def parse_file(file_name):
                 prev_line = 'test'
             elif re.search(r"^(\*{1,2}\s*)?\w+(\.\w+)?\s*=>?[^:]+(:.*)?$", line):
                 last_line_blank = False
+                unit_fx = lambda x:x
 
                 id, equation, arguments, units, unit_fx, hrunits, pointer = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
                 isdiscrete = True if not pointer and isinstance(equation, str) else False
@@ -195,6 +195,8 @@ def parse_file(file_name):
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
                 last_line_blank = False
+                unit_fx = lambda x:x
+                
                 parameter, unit_fx = parse_parameter(line, i+1, file_name.replace(".on", ""), imports, section)
                 parameters.append(parameter)
                 prev_line = 'param'

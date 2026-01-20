@@ -39,6 +39,8 @@ pub enum Commands {
         #[arg(long)]
         no_colors: bool,
     },
+    /// Run the LSP
+    Lsp {},
 }
 
 /// Development-specific commands for the Oneil CLI

@@ -1,27 +1,25 @@
 [package]
-name = "oneil"
-description = "CLI tool for using the Oneil programming language"
-default-run = "oneil"
+name = "oneil_lsp"
+description = "LSP for the Oneil programming language"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-readme.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+readme.workspace = true
 
 [dependencies]
 oneil_ast = { path = "../oneil_ast" }
 oneil_eval = { path = "../oneil_eval" }
+oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
-oneil_lsp = { path = "../oneil_lsp" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }
 oneil_parser = { path = "../oneil_parser" }
-oneil_shared = { path = "../oneil_shared" }
 oneil_runner = { path = "../oneil_runner" }
-clap = { version = "4.5.1", features = ["derive"] }
-colored = "3.0.0"
+tokio = { version = "1", features = ["full"] }
+tower-lsp-server = "0.22.1"
 
 [lints]
 workspace = true

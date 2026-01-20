@@ -1,0 +1,178 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Oneil",
+  "scopeName": "source.oneil",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#units"
+    },
+    {
+      "include": "#identifiers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "comment": "single-line comments",
+          "name": "comment.line.number-sign.oneil",
+          "begin": "#",
+          "end": "$",
+          "patterns": [
+            {
+              "comment": "comment tags",
+              "name": "keyword.other.commenttag.oneil",
+              "match": "\\b(TODO|NOTE|FIXME)\\b"
+            }
+          ]
+        },
+        {
+          "comment": "single-line notes",
+          "name": "comment.line.documentation.oneil",
+          "begin": "^\\s*~(?!~)",
+          "end": "$",
+          "contentName": "meta.embedded.latex",
+          "patterns": [
+            {
+              "include": "text.tex.latex"
+            }
+          ]
+        },
+        {
+          "comment": "multi-line notes",
+          "name": "comment.block.documentation.oneil",
+          "begin": "~~~~*",
+          "end": "~~~~*",
+          "contentName": "meta.embedded.latex",
+          "patterns": [
+            {
+              "include": "text.tex.latex"
+            }
+          ]
+        },
+        {
+          "comment": "indented notes (deprecated)",
+          "name": "comment.block.documentation.oneil",
+          "begin": "^\\s+(?=[^{#\\s])",
+          "end": "$",
+          "contentName": "meta.embedded.latex",
+          "patterns": [
+            {
+              "include": "text.tex.latex"
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.oneil",
+          "match": "\\b(import|use|ref|as|with|section|test|if|and|or|not)\\b"
+        },
+        {
+          "comment": "deprecated",
+          "name": "keyword.control.oneil",
+          "match": "\\b(from)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.scientific.oneil",
+          "match": "\\b(\\+|-)?inf\\b"
+        },
+        {
+          "name": "constant.numeric.scientific.oneil",
+          "match": "\\b(\\+|-)?([0-9]*\\.[0-9]+|[0-9]+)[eE][+-]?[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.float.oneil",
+          "match": "\\b(\\+|-)?[0-9]*\\.[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.oneil",
+          "match": "\\b(\\+|-)?[0-9]+\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.oneil",
+          "match": "\\'[^\\']*\\'"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arithmetic.oneil",
+          "match": "\\+|-|--|\\*|/|//|%|\\^"
+        },
+        {
+          "name": "keyword.operator.comparison.oneil",
+          "match": "<=|>=|==|!=|<|>"
+        },
+        {
+          "name": "keyword.operator.assignment.oneil",
+          "match": "=|=>"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "support.function.oneil",
+          "match": "\\b(sin|cos|tan|asin|acos|atan|sinh|cosh|tanh|min|max|sqrt|abs|mnmx|log|log2|log10|ln|floor|ceiling|extent|range|strip|mid|sign)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.oneil",
+          "match": "\\b(pi|e)\\b"
+        }
+      ]
+    },
+    "units": {
+      "patterns": [
+        {
+          "name": "entity.name.type.unit.oneil",
+          "match": "(?<=:)\\s*[A-Za-z_][A-Za-z0-9_]*(?:\\^[+-]?[0-9]+)?(?:\\s*[*/]\\s*[A-Za-z_][A-Za-z0-9_]*(?:\\^[+-]?[0-9]+)?)*\\s*$"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.oneil",
+          "match": "[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    }
+  }
+}
