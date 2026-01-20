@@ -25,7 +25,7 @@ use oneil_runner::{
 };
 
 use crate::{
-    command::{CliCommand, Commands, DevCommand, EvalArgs},
+    command::{CliCommand, Commands, DevCommand, EvalArgs, TestArgs},
     print_model_result::ModelPrintConfig,
 };
 
@@ -49,6 +49,7 @@ fn main() {
         }
         Commands::Dev { command } => handle_dev_command(command),
         Commands::Eval(args) => handle_eval_command(args),
+        Commands::Test(args) => handle_test_command(args),
     }
 }
 
@@ -412,4 +413,14 @@ fn set_color_choice(no_colors: bool) {
 fn clear_screen() {
     print!("\x1B[2J\x1B[1;1H");
     std::io::stdout().flush().expect("failed to flush stdout");
+}
+
+fn handle_test_command(args: TestArgs) {
+    let TestArgs {
+        file,
+        no_header,
+        no_test_report,
+    } = args;
+
+    todo!()
 }

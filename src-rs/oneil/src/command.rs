@@ -27,6 +27,10 @@ pub enum Commands {
     #[clap(visible_alias = "e")]
     Eval(EvalArgs),
 
+    /// Run tests in an Oneil model
+    #[clap(visible_alias = "t")]
+    Test(TestArgs),
+
     /// Run the LSP
     Lsp {},
 
@@ -124,6 +128,21 @@ pub struct EvalArgs {
     /// Note that this overrides the `--params` and `--print-mode` options.
     #[arg(long)]
     pub no_parameters: bool,
+}
+
+#[derive(Args)]
+pub struct TestArgs {
+    /// Path to the Oneil model file to run tests in
+    #[arg(value_name = "FILE")]
+    pub file: PathBuf,
+
+    /// Don't print the results header
+    #[arg(long)]
+    pub no_header: bool,
+
+    /// Don't print the test report
+    #[arg(long)]
+    pub no_test_report: bool,
 }
 
 /// Development-specific commands for the Oneil CLI
