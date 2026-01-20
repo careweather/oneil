@@ -144,12 +144,14 @@ fn handle_print_model_result(file: &Path, display_partial: bool, no_colors: bool
 
     let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
 
-    let (model_result, errors) = eval_context.get_model_result(file);
+    let model_result = eval_context
+        .get_model_result(file)
+        .expect("model should be evaluated");
 
-    let had_errors = !errors.is_empty();
+    let errors = model_result.get_errors();
 
-    for error in errors {
-        let error = convert_error::eval::convert(&error);
+    for error in &errors {
+        let error = convert_error::eval::convert(error);
 
         if let Some(error) = error {
             print_error::print(&error, false);
@@ -157,7 +159,7 @@ fn handle_print_model_result(file: &Path, display_partial: bool, no_colors: bool
         }
     }
 
-    if !had_errors || display_partial {
+    if errors.is_empty() || display_partial {
         println!("{:?}", model_result);
     }
 }
@@ -326,12 +328,14 @@ fn eval_model<F: BuiltinFunction + Clone>(
     // TODO: remove this clone?
     let eval_context =
         oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map.clone());
-    let (model_result, errors) = eval_context.get_model_result(file);
+    let model_result = eval_context
+        .get_model_result(file)
+        .expect("model should be evaluated");
 
-    let had_errors = !errors.is_empty();
+    let errors = model_result.get_errors();
 
-    for error in errors {
-        let error = convert_error::eval::convert(&error);
+    for error in &errors {
+        let error = convert_error::eval::convert(error);
 
         if let Some(error) = error {
             print_error::print(&error, false);
@@ -339,7 +343,7 @@ fn eval_model<F: BuiltinFunction + Clone>(
         }
     }
 
-    if !had_errors || model_print_config.display_partial_results {
+    if errors.is_empty() || model_print_config.display_partial_results {
         print_model_result::print(&model_result, model_print_config);
     }
 

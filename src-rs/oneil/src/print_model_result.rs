@@ -33,18 +33,15 @@ pub fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print(model_result: &result::Model, model_config: &ModelPrintConfig) {
-    let test_info = get_model_tests(
-        model_result,
-        model_config.top_model_only,
-        TestInfo::default(),
-    );
+pub fn print(model_result: &result::EvalResult, model_config: &ModelPrintConfig) {
+    let top_model = model_result.get_top_model();
+    let test_info = get_model_tests(top_model, model_config.top_model_only, TestInfo::default());
 
     let divider_line = divider_line();
     println!("{divider_line}");
 
     if !model_config.no_header {
-        print_model_header(&model_result.path, &test_info);
+        print_model_header(top_model.path(), &test_info);
     }
 
     if !model_config.no_test_report {
@@ -53,29 +50,28 @@ pub fn print(model_result: &result::Model, model_config: &ModelPrintConfig) {
 
     if !model_config.no_parameters {
         if let Some(variables) = &model_config.variables {
-            print_parameters_by_list(model_result, model_config.print_debug_info, variables);
+            print_parameters_by_list(top_model, model_config.print_debug_info, variables);
         } else {
-            print_parameters_by_filter(model_result, model_config.print_debug_info, model_config);
+            print_parameters_by_filter(top_model, model_config.print_debug_info, model_config);
         }
     }
 }
 
 #[derive(Default)]
-struct TestInfo<'a> {
+struct TestInfo<'result> {
     pub test_count: usize,
     pub passed_count: usize,
-    // this is a vec in order to preserve the order of the models
-    pub failed_tests: Vec<(&'a Path, Vec<(Span, &'a result::DebugInfo)>)>,
+    pub failed_tests: IndexMap<&'result Path, Vec<(Span, &'result result::DebugInfo)>>,
 }
 
-fn get_model_tests<'a>(
-    model_result: &'a result::Model,
+fn get_model_tests<'result>(
+    model_ref: result::ModelReference<'result>,
     top_model_only: bool,
-    mut test_info: TestInfo<'a>,
-) -> TestInfo<'a> {
-    let test_count = model_result.tests.len();
-    let failed_tests = model_result
-        .tests
+    mut test_info: TestInfo<'result>,
+) -> TestInfo<'result> {
+    let tests = model_ref.tests();
+    let test_count = tests.len();
+    let failed_tests = tests
         .iter()
         .filter_map(|test| match &test.result {
             result::TestResult::Failed { debug_info } => Some((test.expr_span, &**debug_info)),
@@ -89,17 +85,17 @@ fn get_model_tests<'a>(
     if !failed_tests.is_empty() {
         test_info
             .failed_tests
-            .push((&model_result.path, failed_tests));
+            .insert(model_ref.path(), failed_tests);
     }
 
     if top_model_only {
         test_info
     } else {
-        model_result
-            .submodels
+        model_ref
+            .submodels()
             .values()
             .fold(test_info, |test_info, submodel| {
-                get_model_tests(submodel, top_model_only, test_info)
+                get_model_tests(*submodel, top_model_only, test_info)
             })
     }
 }
@@ -192,14 +188,14 @@ fn print_model_path_header(model_path: &Path) {
 }
 
 fn print_parameters_by_list(
-    model_result: &result::Model,
+    model_ref: result::ModelReference<'_>,
     print_debug_info: bool,
     variables: &VariableList,
 ) {
     let ModelParametersToPrint {
         parameters: parameters_to_print,
         parameters_not_found,
-    } = get_model_parameters_by_list(model_result, variables);
+    } = get_model_parameters_by_list(model_ref, variables);
 
     if parameters_to_print.is_empty() && parameters_not_found.is_empty() {
         let message = stylesheet::NO_PARAMETERS_MESSAGE.style("(No parameters found)");
@@ -221,21 +217,21 @@ fn print_parameters_by_list(
     }
 }
 
-struct ModelParametersToPrint<'a> {
-    pub parameters: IndexMap<String, &'a result::Parameter>,
+struct ModelParametersToPrint<'result> {
+    pub parameters: IndexMap<String, &'result result::Parameter>,
     pub parameters_not_found: IndexSet<String>,
 }
 
-fn get_model_parameters_by_list<'a>(
-    model_result: &'a result::Model,
+fn get_model_parameters_by_list<'result>(
+    model_ref: result::ModelReference<'result>,
     variables: &VariableList,
-) -> ModelParametersToPrint<'a> {
+) -> ModelParametersToPrint<'result> {
     let mut parameters = IndexMap::new();
     let mut parameters_not_found = IndexSet::new();
 
     for variable in variables.iter() {
         let variable_name = variable.to_string();
-        let result = get_parameter_from_model(model_result, variable);
+        let result = get_parameter_from_model(model_ref, variable);
 
         match result {
             Some(variable_value) => {
@@ -253,50 +249,51 @@ fn get_model_parameters_by_list<'a>(
     }
 }
 
-fn get_parameter_from_model<'a>(
-    model_result: &'a result::Model,
+fn get_parameter_from_model<'result>(
+    model_ref: result::ModelReference<'result>,
     param: &Variable,
-) -> Option<&'a result::Parameter> {
+) -> Option<&'result result::Parameter> {
     let mut param_vec = param.to_vec();
 
     let parameter = param_vec.remove(0);
 
-    return recurse(model_result, parameter, param_vec);
+    return recurse(model_ref, parameter, param_vec);
 
     #[expect(
         clippy::items_after_statements,
         reason = "this is an internal recursive function, we keep it here for clarity"
     )]
     fn recurse(
-        model: &result::Model,
+        model_ref: result::ModelReference<'_>,
         parameter: String,
-        mut submodels: Vec<String>,
+        mut param_vec: Vec<String>,
     ) -> Option<&result::Parameter> {
         // note that we're popping the last submodel since that's the
         // top-most submodel
-        let Some(submodel) = submodels.pop() else {
-            return model.parameters.get(&parameter);
+        let Some(submodel) = param_vec.pop() else {
+            return model_ref.parameters().get(parameter.as_str()).map(|p| &**p);
         };
 
         // check if the submodel is a reference or a submodel
         // NOTE: although all submodels are also references, we need to check both since
         //       the submodel name might be different from the reference name
-        let model = model
-            .references
-            .get(&submodel)
-            .or_else(|| model.submodels.get(&submodel))?;
+        let references = model_ref.references();
+        let submodels = model_ref.submodels();
+        let model = references
+            .get(submodel.as_str())
+            .or(submodels.get(submodel.as_str()))?;
 
-        recurse(model, parameter, submodels)
+        recurse(*model, parameter, param_vec)
     }
 }
 
 fn print_parameters_by_filter(
-    model_result: &result::Model,
+    model_ref: result::ModelReference<'_>,
     print_debug_info: bool,
     model_config: &ModelPrintConfig,
 ) {
     let parameters_to_print = get_model_parameters_by_filter(
-        model_result,
+        model_ref,
         model_config.print_mode,
         model_config.top_model_only,
     );
@@ -314,8 +311,8 @@ fn print_parameters_by_filter(
         return;
     }
 
-    let only_top_model_is_printed = parameters_to_print.len() == 1
-        && parameters_to_print.contains_key(model_result.path.as_path());
+    let only_top_model_is_printed =
+        parameters_to_print.len() == 1 && parameters_to_print.contains_key(model_ref.path());
 
     for (index, (path, parameters)) in parameters_to_print.iter().enumerate() {
         if !only_top_model_is_printed {
@@ -333,52 +330,54 @@ fn print_parameters_by_filter(
 }
 
 fn get_model_parameters_by_filter(
-    model_result: &result::Model,
+    model_ref: result::ModelReference<'_>,
     print_level: PrintMode,
     top_model_only: bool,
 ) -> IndexMap<&Path, Vec<&result::Parameter>> {
-    return recurse(model_result, print_level, top_model_only, IndexMap::new());
+    return recurse(model_ref, print_level, top_model_only, IndexMap::new());
 
     #[expect(
         clippy::items_after_statements,
         reason = "this is an internal recursive function, we keep it here for clarity"
     )]
-    fn recurse<'a>(
-        model_result: &'a result::Model,
+    fn recurse<'result>(
+        model_ref: result::ModelReference<'result>,
         print_level: PrintMode,
         top_model_only: bool,
-        mut parameters: IndexMap<&'a Path, Vec<&'a result::Parameter>>,
-    ) -> IndexMap<&'a Path, Vec<&'a result::Parameter>> {
+        mut parameters: IndexMap<&'result Path, Vec<&'result result::Parameter>>,
+    ) -> IndexMap<&'result Path, Vec<&'result result::Parameter>> {
+        let model_parameters = model_ref.parameters();
         let parameters_to_print: Vec<_> = match print_level {
-            PrintMode::All => model_result
-                .parameters
+            PrintMode::All => model_parameters
                 .values()
                 .filter(|_parameter| true)
+                .map(|p| &**p)
                 .collect(),
-            PrintMode::Trace => model_result
-                .parameters
+            PrintMode::Trace => model_parameters
                 .values()
                 .filter(|parameter| parameter.should_print(result::PrintLevel::Trace))
+                .map(|p| &**p)
                 .collect(),
-            PrintMode::Performance => model_result
-                .parameters
+            PrintMode::Performance => model_parameters
                 .values()
                 .filter(|parameter| parameter.should_print(result::PrintLevel::Performance))
+                .map(|p| &**p)
                 .collect(),
         };
 
         if !parameters_to_print.is_empty() {
-            parameters.insert(&model_result.path, parameters_to_print);
+            parameters.insert(model_ref.path(), parameters_to_print);
         }
 
         if top_model_only {
             parameters
         } else {
             // NOTE: all submodels are also references, so we can simply use the references map
-            let models = model_result.references.values();
+            let references = model_ref.references();
+            let models = references.values();
 
             models.fold(parameters, |parameters, model| {
-                recurse(model, print_level, top_model_only, parameters)
+                recurse(*model, print_level, top_model_only, parameters)
             })
         }
     }
