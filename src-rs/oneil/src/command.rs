@@ -11,6 +11,13 @@ pub struct CliCommand {
     /// The subcommand to execute
     #[command(subcommand)]
     pub command: Commands,
+
+    /// Disable colors in the output
+    ///
+    /// When enabled, suppresses colored output for better compatibility with
+    /// terminals that don't support ANSI color codes or for redirecting to files.
+    #[arg(long)]
+    pub no_colors: bool,
 }
 
 /// Available top-level commands for the Oneil CLI
@@ -19,6 +26,9 @@ pub enum Commands {
     /// Evaluate an Oneil model
     #[clap(visible_alias = "e")]
     Eval(EvalArgs),
+
+    /// Run the LSP
+    Lsp {},
 
     /// Development tools for debugging and testing Oneil source files
     ///
@@ -31,8 +41,6 @@ pub enum Commands {
         #[command(subcommand)]
         command: DevCommand,
     },
-    /// Run the LSP
-    Lsp {},
 }
 
 #[expect(
@@ -116,13 +124,6 @@ pub struct EvalArgs {
     /// Note that this overrides the `--params` and `--print-mode` options.
     #[arg(long)]
     pub no_parameters: bool,
-
-    /// Disable colors in the output
-    ///
-    /// When enabled, suppresses colored output for better compatibility with
-    /// terminals that don't support ANSI color codes or for redirecting to files.
-    #[arg(long)]
-    pub no_colors: bool,
 }
 
 /// Development-specific commands for the Oneil CLI
@@ -151,13 +152,6 @@ pub enum DevCommand {
         /// of the formatted tree structure. Useful for detailed internal analysis.
         #[arg(long)]
         print_debug: bool,
-
-        /// Disable colors in the output
-        ///
-        /// When enabled, suppresses colored output for better compatibility with
-        /// terminals that don't support ANSI color codes or for redirecting to files.
-        #[arg(long)]
-        no_colors: bool,
     },
     /// Print the Intermediate Representation (IR) of a Oneil source file
     PrintIr {
@@ -175,13 +169,6 @@ pub enum DevCommand {
         /// Print the output in debug format
         #[arg(long)]
         print_debug: bool,
-
-        /// Disable colors in the output
-        ///
-        /// When enabled, suppresses colored output for better compatibility with
-        /// terminals that don't support ANSI color codes or for redirecting to files.
-        #[arg(long)]
-        no_colors: bool,
     },
     /// Print the results of evaluating an Oneil model
     ///
@@ -198,13 +185,6 @@ pub enum DevCommand {
         /// before encountering errors. Useful for debugging model evaluation issues.
         #[arg(long)]
         display_partial: bool,
-
-        /// Disable colors in the output
-        ///
-        /// When enabled, suppresses colored output for better compatibility with
-        /// terminals that don't support ANSI color codes or for redirecting to files.
-        #[arg(long)]
-        no_colors: bool,
     },
 }
 

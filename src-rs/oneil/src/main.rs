@@ -41,6 +41,8 @@ mod stylesheet;
 fn main() {
     let cli = CliCommand::parse();
 
+    set_color_choice(cli.no_colors);
+
     match cli.command {
         Commands::Lsp {} => {
             oneil_lsp::run();
@@ -56,28 +58,23 @@ fn handle_dev_command(command: DevCommand) {
             files,
             display_partial,
             print_debug,
-            no_colors,
-        } => handle_print_ast(&files, display_partial, print_debug, no_colors),
+        } => handle_print_ast(&files, display_partial, print_debug),
         DevCommand::PrintIr {
             file,
             display_partial,
             print_debug,
-            no_colors,
-        } => handle_print_ir(&file, display_partial, print_debug, no_colors),
+        } => handle_print_ir(&file, display_partial, print_debug),
         DevCommand::PrintModelResult {
             file,
             display_partial,
-            no_colors,
         } => {
-            handle_print_model_result(&file, display_partial, no_colors);
+            handle_print_model_result(&file, display_partial);
         }
     }
 }
 
 /// Handles the `dev print-ast` command.
-fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool, no_colors: bool) {
-    set_color_choice(no_colors);
-
+fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool) {
     let is_multiple_files = files.len() > 1;
     for file in files {
         if is_multiple_files {
@@ -108,9 +105,7 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool,
 }
 
 /// Handles the `dev print-ir` command.
-fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool, no_colors: bool) {
-    set_color_choice(no_colors);
-
+fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
     let builtin_variables = create_builtins();
 
     let model_collection =
@@ -133,9 +128,7 @@ fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool, no_col
 }
 
 /// Handles the `dev print-model-result` command.
-fn handle_print_model_result(file: &Path, display_partial: bool, no_colors: bool) {
-    set_color_choice(no_colors);
-
+fn handle_print_model_result(file: &Path, display_partial: bool) {
     let builtins = create_builtins();
 
     let Some(model_collection) = load_model_collection(file, &builtins, false) else {
@@ -210,10 +203,7 @@ fn handle_eval_command(args: EvalArgs) {
         no_header,
         no_test_report,
         no_parameters,
-        no_colors,
     } = args;
-
-    set_color_choice(no_colors);
 
     let model_print_config = ModelPrintConfig {
         print_mode,
