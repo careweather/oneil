@@ -22,7 +22,7 @@ pub struct ModelPrintConfig {
     pub print_mode: PrintMode,
     pub print_debug_info: bool,
     pub variables: Option<VariableList>,
-    pub top_model_only: bool,
+    pub recursive: bool,
     pub display_partial_results: bool,
     pub no_header: bool,
     pub no_test_report: bool,
@@ -35,7 +35,7 @@ pub fn divider_line() -> String {
 
 pub fn print(model_result: &result::EvalResult, model_config: &ModelPrintConfig) {
     let top_model = model_result.get_top_model();
-    let test_info = get_model_tests(top_model, model_config.top_model_only, TestInfo::default());
+    let test_info = get_model_tests(top_model, model_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
     println!("{divider_line}");
@@ -66,7 +66,7 @@ struct TestInfo<'result> {
 
 fn get_model_tests<'result>(
     model_ref: result::ModelReference<'result>,
-    top_model_only: bool,
+    recursive: bool,
     mut test_info: TestInfo<'result>,
 ) -> TestInfo<'result> {
     let tests = model_ref.tests();
@@ -88,15 +88,15 @@ fn get_model_tests<'result>(
             .insert(model_ref.path(), failed_tests);
     }
 
-    if top_model_only {
-        test_info
-    } else {
+    if recursive {
         model_ref
             .submodels()
             .values()
             .fold(test_info, |test_info, submodel| {
-                get_model_tests(*submodel, top_model_only, test_info)
+                get_model_tests(*submodel, recursive, test_info)
             })
+    } else {
+        test_info
     }
 }
 
@@ -293,11 +293,8 @@ fn print_parameters_by_filter(
     print_debug_info: bool,
     model_config: &ModelPrintConfig,
 ) {
-    let parameters_to_print = get_model_parameters_by_filter(
-        model_ref,
-        model_config.print_mode,
-        model_config.top_model_only,
-    );
+    let parameters_to_print =
+        get_model_parameters_by_filter(model_ref, model_config.print_mode, model_config.recursive);
 
     let parameter_kind = match model_config.print_mode {
         PrintMode::Trace => "trace ",
@@ -333,9 +330,9 @@ fn print_parameters_by_filter(
 fn get_model_parameters_by_filter(
     model_ref: result::ModelReference<'_>,
     print_level: PrintMode,
-    top_model_only: bool,
+    recursive: bool,
 ) -> IndexMap<&Path, Vec<&result::Parameter>> {
-    return recurse(model_ref, print_level, top_model_only, IndexMap::new());
+    return recurse(model_ref, print_level, recursive, IndexMap::new());
 
     #[expect(
         clippy::items_after_statements,
@@ -344,7 +341,7 @@ fn get_model_parameters_by_filter(
     fn recurse<'result>(
         model_ref: result::ModelReference<'result>,
         print_level: PrintMode,
-        top_model_only: bool,
+        recursive: bool,
         mut parameters: IndexMap<&'result Path, Vec<&'result result::Parameter>>,
     ) -> IndexMap<&'result Path, Vec<&'result result::Parameter>> {
         let model_parameters = model_ref.parameters();
@@ -370,16 +367,16 @@ fn get_model_parameters_by_filter(
             parameters.insert(model_ref.path(), parameters_to_print);
         }
 
-        if top_model_only {
-            parameters
-        } else {
+        if recursive {
             // NOTE: all submodels are also references, so we can simply use the references map
             let references = model_ref.references();
             let models = references.values();
 
             models.fold(parameters, |parameters, model| {
-                recurse(*model, print_level, top_model_only, parameters)
+                recurse(*model, print_level, recursive, parameters)
             })
+        } else {
+            parameters
         }
     }
 }

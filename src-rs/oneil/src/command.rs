@@ -90,12 +90,11 @@ pub struct EvalArgs {
     #[arg(long)]
     pub watch: bool,
 
-    /// Only print info about the top model
+    /// Print info about submodels as well as the top model
     ///
-    /// By default, Oneil will print the results of the top model
-    /// and all of its submodels.
-    #[arg(long)]
-    pub top_only: bool,
+    /// By default, Oneil will only print the results of the top model.
+    #[arg(long, short = 'r')]
+    pub recursive: bool,
 
     /// Display partial results even if there are errors
     ///
