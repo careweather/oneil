@@ -145,6 +145,7 @@ SI_UNITS = {
     # "m/s^2": ({"m": 1, "s": -2}, 1, {"alt": [("meter/second^2", "meters/second^2")]}),
     "Pa": ({"kg": 1, "m": -1, "s": -2}, 1, {"alt": ["Pascal"]}),
     # "m^2": ({"m": 2}, 1, {"alt": ["meter^2", "square meter"]}),
+    "sps": ({"s": -1}, 1, {"alt": ["samples per second","symbols per second"]}),
 }
 
 if invalid_units(SI_UNITS):
@@ -188,6 +189,7 @@ LEGACY_UNITS = {
     "nmi": ({"m": 1}, 1852.0, {"alt": ["nautical mile", "nautical miles"]}),
     "lb": ({"kg": 1}, 0.45359237, {"alt": ["lbs", "pound", "pounds"]}),
     "mph": ({"m": 1, "s": -1}, 0.44704, {"alt": ["mile per hour", "miles per hour"]}),
+    "kt": ({"m": 1, "s": -1}, 0.514444, {"alt": ["knot", "knots", "nautical mile per hour", "nautical miles per hour", "kn", "kts", "kns"]}),
 }
 
 if invalid_units(LEGACY_UNITS):
@@ -208,6 +210,7 @@ DIMENSIONLESS_UNITS = {
     "": ({}, 1, {"alt":[]}),
     "'": ({}, 0.0002908882086657216, {"alt": ["arcminute", "arcmin"]}),
     '"': ({}, 4.84813681109536e-06, {"alt": ["arcsecond", "arcsec"]}),
+    "sample": ({}, 1, {"alt": ["samples"]}),
 }
 
 if any(u for v in DIMENSIONLESS_UNITS.values() for u in v[0]):
@@ -415,7 +418,9 @@ def _find_derived_unit(base_units, value, pref=None):
                 raise ValueError("Requested units do not match parameter units.")
         elif pref.strip("dB") in LINEAR_UNITS:
             if LINEAR_UNITS[pref.strip("dB")][0] == base_units:
-                return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
+                # Use errstate to allow log10(0) to return -inf (mathematically correct for dB)
+                with np.errstate(divide='ignore'):
+                    return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
             else:
                 raise ValueError("Requested units do not match parameter units.")
         else:
