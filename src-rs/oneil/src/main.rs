@@ -16,7 +16,10 @@ use std::{
 use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use notify::Watcher;
-use oneil_eval::builtin::{BuiltinFunction, std as oneil_std};
+use oneil_eval::{
+    builtin::{BuiltinFunction, std as oneil_std},
+    result::EvalResult,
+};
 use oneil_ir as ir;
 use oneil_model_resolver::FileLoader;
 use oneil_runner::{
@@ -227,7 +230,11 @@ fn handle_eval_command(args: EvalArgs) {
     if watch {
         watch_model(&file, &builtins, &model_print_config);
     } else {
-        let _watch_paths = eval_model(&file, &builtins, &model_print_config);
+        let (model_result, _watch_paths) = eval_model(&file, &builtins);
+
+        if let Some(model_result) = model_result {
+            print_model_result(&model_result, &model_print_config);
+        }
     }
 }
 
@@ -253,7 +260,11 @@ fn watch_model<F: BuiltinFunction + Clone>(
     clear_screen();
     let mut watch_paths = HashSet::new();
 
-    let new_watch_paths = eval_model(file, builtins, model_print_config);
+    let (model_result, new_watch_paths) = eval_model(file, builtins);
+
+    if let Some(model_result) = model_result {
+        print_model_result(&model_result, model_print_config);
+    }
 
     let (add_paths, remove_paths) = find_watch_paths_difference(&watch_paths, &new_watch_paths);
 
@@ -266,7 +277,11 @@ fn watch_model<F: BuiltinFunction + Clone>(
                 notify::EventKind::Modify(_) => {
                     clear_screen();
 
-                    let new_watch_paths = eval_model(file, builtins, model_print_config);
+                    let (model_result, new_watch_paths) = eval_model(file, builtins);
+
+                    if let Some(model_result) = model_result {
+                        print_model_result(&model_result, model_print_config);
+                    }
 
                     let (add_paths, remove_paths) =
                         find_watch_paths_difference(&watch_paths, &new_watch_paths);
@@ -291,8 +306,7 @@ fn watch_model<F: BuiltinFunction + Clone>(
 fn eval_model<F: BuiltinFunction + Clone>(
     file: &Path,
     builtins: &Builtins<F>,
-    model_print_config: &ModelPrintConfig,
-) -> HashSet<PathBuf> {
+) -> (Option<EvalResult>, HashSet<PathBuf>) {
     let model_collection =
         oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
     let model_collection = match model_collection {
@@ -309,10 +323,12 @@ fn eval_model<F: BuiltinFunction + Clone>(
             let model_watch_paths = watch_paths_from_model_collection(&model_collection);
             let error_model_watch_paths = error_map.get_watch_paths();
 
-            return model_watch_paths
+            let watch_paths = model_watch_paths
                 .into_iter()
                 .chain(error_model_watch_paths)
                 .collect();
+
+            return (None, watch_paths);
         }
     };
 
@@ -323,22 +339,9 @@ fn eval_model<F: BuiltinFunction + Clone>(
         .get_model_result(file)
         .expect("model should be evaluated");
 
-    let errors = model_result.get_errors();
+    let watch_paths = watch_paths_from_model_collection(&model_collection);
 
-    for error in &errors {
-        let error = convert_error::eval::convert(error);
-
-        if let Some(error) = error {
-            print_error::print(&error, false);
-            eprintln!();
-        }
-    }
-
-    if errors.is_empty() || model_print_config.display_partial_results {
-        print_model_result::print(&model_result, model_print_config);
-    }
-
-    watch_paths_from_model_collection(&model_collection)
+    (Some(model_result), watch_paths)
 }
 
 fn watch_paths_from_model_collection(model_collection: &ir::ModelCollection) -> HashSet<PathBuf> {
@@ -353,6 +356,23 @@ fn watch_paths_from_model_collection(model_collection: &ir::ModelCollection) -> 
         .map(|import| import.import_path().as_ref().to_path_buf());
 
     model_paths.chain(python_imports).collect()
+}
+
+fn print_model_result(model_result: &EvalResult, model_print_config: &ModelPrintConfig) {
+    let errors = model_result.get_errors();
+
+    for error in &errors {
+        let error = convert_error::eval::convert(error);
+
+        if let Some(error) = error {
+            print_error::print(&error, false);
+            eprintln!();
+        }
+    }
+
+    if errors.is_empty() || model_print_config.display_partial_results {
+        print_model_result::print(model_result, model_print_config);
+    }
 }
 
 fn find_watch_paths_difference<'a>(
