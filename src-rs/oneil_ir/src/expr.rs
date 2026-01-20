@@ -187,7 +187,11 @@ impl Expr {
     pub const fn function_name_span(&self) -> Option<Span> {
         match self {
             Self::FunctionCall { name_span, .. } => Some(*name_span),
-            _ => None,
+            Self::ComparisonOp { .. }
+            | Self::BinaryOp { .. }
+            | Self::UnaryOp { .. }
+            | Self::Variable { .. }
+            | Self::Literal { .. } => None,
         }
     }
 }
@@ -375,8 +379,9 @@ impl Variable {
     pub const fn parameter_span(&self) -> Span {
         match self {
             Self::Builtin { ident_span, .. } => *ident_span,
-            Self::Parameter { parameter_span, .. } => *parameter_span,
-            Self::External { parameter_span, .. } => *parameter_span,
+            Self::Parameter { parameter_span, .. } | Self::External { parameter_span, .. } => {
+                *parameter_span
+            }
         }
     }
 
@@ -385,7 +390,7 @@ impl Variable {
     pub const fn model_span(&self) -> Option<Span> {
         match self {
             Self::External { model_span, .. } => Some(*model_span),
-            _ => None,
+            Self::Builtin { .. } | Self::Parameter { .. } => None,
         }
     }
 }

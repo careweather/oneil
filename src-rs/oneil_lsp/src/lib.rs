@@ -130,8 +130,7 @@ impl LanguageServer for Backend {
             .await;
 
         if let Err(error) = result {
-            let _ = self
-                .client
+            self.client
                 .log_message(MessageType::ERROR, format!("did_change error: {error}"))
                 .await;
         }
@@ -186,20 +185,21 @@ impl LanguageServer for Backend {
         let uri = params.text_document_position_params.text_document.uri;
 
         // Convert LSP position to byte offset
-        let offset = match self.docs.position_to_offset(&uri, position).await {
-            Some(offset) => offset,
-            None => {
-                self.client
-                    .log_message(MessageType::WARNING, "Could not convert position to offset")
-                    .await;
-                return Ok(None);
-            }
+        let Some(offset) = self.docs.position_to_offset(&uri, position).await else {
+            self.client
+                .log_message(MessageType::WARNING, "Could not convert position to offset")
+                .await;
+
+            return Ok(None);
         };
 
         self.client
             .log_message(
                 MessageType::INFO,
-                format!("goto_definition: offset={}, position={}:{}", offset, position.line, position.character),
+                format!(
+                    "goto_definition: offset={}, position={}:{}",
+                    offset, position.line, position.character
+                ),
             )
             .await;
 
@@ -211,64 +211,45 @@ impl LanguageServer for Backend {
             builtin::std::builtin_units(),
             builtin::std::builtin_prefixes(),
         );
-        let model_collection = match oneil_model_resolver::load_model(
+
+        let Ok(model_collection) = oneil_model_resolver::load_model(
             &model_path,
             &builtin_variables,
             &file_parser::FileLoader,
-        ) {
-            Ok(collection) => collection,
-            Err(_) => {
-                self.client
-                    .log_message(MessageType::ERROR, "Failed to load model")
-                    .await;
-                return Ok(None);
-            }
+        ) else {
+            self.client
+                .log_message(MessageType::ERROR, "Failed to load model")
+                .await;
+
+            return Ok(None);
         };
 
         // Get the current model
         let current_model_path = oneil_ir::ModelPath::new(&model_path);
-        let model = match model_collection.get_models().get(&current_model_path) {
-            Some(model) => model,
-            None => {
-                self.client
-                    .log_message(MessageType::ERROR, "Model not found in collection")
-                    .await;
-                return Ok(None);
-            }
+        let Some(model) = model_collection.get_models().get(&current_model_path) else {
+            self.client
+                .log_message(MessageType::ERROR, "Model not found in collection")
+                .await;
+
+            return Ok(None);
         };
 
         // Find the symbol at the cursor position
-        let symbol = match symbol_lookup::find_symbol_at_offset(model, &current_model_path, offset)
-        {
-            Some(symbol) => {
-                self.client
-                    .log_message(MessageType::INFO, format!("Found symbol: {:?}", symbol))
-                    .await;
-                symbol
-            }
-            None => {
-                // No symbol found at this position
-                self.client
-                    .log_message(MessageType::INFO, "No symbol found at position")
-                    .await;
-                return Ok(None);
-            }
+        let Some(symbol) = symbol_lookup::find_symbol_at_offset(model, &current_model_path, offset)
+        else {
+            self.client
+                .log_message(MessageType::INFO, "No symbol found at position")
+                .await;
+            return Ok(None);
         };
+
+        self.client
+            .log_message(MessageType::INFO, format!("Found symbol: {symbol:?}"))
+            .await;
 
         // Resolve the symbol to its definition location
         let location =
             symbol_lookup::resolve_definition(&symbol, &model_collection, &current_model_path);
-        self.client.log_message(MessageType::INFO, format!("{:?}", symbol)).await;
-        match &symbol {
-            symbol_lookup::SymbolAtPosition::ParameterReference { name, .. } => {
-                // Find the parameter in the current model
-                let model = model_collection.get_models().get(&current_model_path);
-                let param = model.map(|x| x.get_parameter(name));
-                self.client.log_message(MessageType::INFO, format!("{:?}", model)).await;
-                self.client.log_message(MessageType::INFO, format!("{:?}", param)).await;
-            }
-            _ => {}
-        }
 
         Ok(location.map(GotoDefinitionResponse::Scalar))
     }
@@ -282,8 +263,7 @@ pub async fn run() {
     let docs = Arc::new(DocumentStore::new());
     let (service, socket) = LspService::new(|client| Backend {
         client,
-        docs: docs.clone(),
+        docs: Arc::clone(&docs),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
-

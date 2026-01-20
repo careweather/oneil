@@ -61,7 +61,7 @@ pub fn resolve_parameters(
     // that is defined within the current model
     let dependencies = get_all_parameter_internal_dependencies(&parameter_ast_map);
 
-    for (parameter_identifier, _) in &parameter_ast_map {
+    for parameter_identifier in parameter_ast_map.keys() {
         let mut parameter_stack = Stack::new();
 
         parameter_builder = resolve_parameter(
@@ -98,9 +98,7 @@ fn get_all_parameter_internal_dependencies<'a>(
 }
 
 /// Extracts internal dependencies from a single parameter.
-fn get_parameter_internal_dependencies(
-    parameter: &ast::Parameter,
-) -> HashSet<ir::ParameterName> {
+fn get_parameter_internal_dependencies(parameter: &ast::Parameter) -> HashSet<ir::ParameterName> {
     let dependencies = HashSet::new();
 
     let limits = parameter.limits().map(ast::Node::deref);

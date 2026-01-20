@@ -179,9 +179,5 @@ fn utf16_to_byte_offset(line_text: &str, utf16_index: usize) -> Option<usize> {
         byte_count += ch.len_utf8();
     }
 
-    if utf16_count == utf16_index {
-        Some(byte_count)
-    } else {
-        None
-    }
+    (utf16_count == utf16_index).then_some(byte_count)
 }

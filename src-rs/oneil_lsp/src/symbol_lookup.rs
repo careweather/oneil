@@ -2,22 +2,16 @@
 
 use oneil_ir::{self as ir, ModelCollection, ModelPath, ParameterName};
 use oneil_shared::span::Span;
-use tower_lsp_server::lsp_types::{Location, Position, Range, Uri};
 use tower_lsp_server::UriExt;
+use tower_lsp_server::lsp_types::{Location, Position, Range, Uri};
 
 /// Represents a symbol found at a cursor position
 #[derive(Debug, Clone)]
 pub enum SymbolAtPosition {
     /// A parameter definition (cursor is on the parameter name in its declaration)
-    ParameterDefinition {
-        name: ParameterName,
-        span: Span,
-    },
+    ParameterDefinition { name: ParameterName, span: Span },
     /// A parameter reference (cursor is on a parameter used in an expression)
-    ParameterReference {
-        name: ParameterName,
-        span: Span,
-    },
+    ParameterReference { name: ParameterName, span: Span },
     /// An external variable reference (e.g., `x.model_name`)
     ExternalReference {
         model_name: String,
@@ -26,7 +20,11 @@ pub enum SymbolAtPosition {
         parameter_span: Span,
     },
     /// A submodel or reference import name
-    ModelImport { name: String, span: Span, path: ModelPath },
+    ModelImport {
+        name: String,
+        span: Span,
+        path: ModelPath,
+    },
 }
 
 /// Finds the symbol at a given byte offset in a model
@@ -68,7 +66,7 @@ pub fn find_symbol_at_offset(
     }
 
     // Check if cursor is on a variable reference in parameter expressions
-    for (_param_name, param) in model.get_parameters() {
+    for param in model.get_parameters().values() {
         if let Some(symbol) = find_symbol_in_parameter_value(param.value(), offset) {
             return Some(symbol);
         }
@@ -110,16 +108,12 @@ fn find_symbol_in_expr(expr: &ir::Expr, offset: usize) -> Option<SymbolAtPositio
                 ir::Variable::Parameter {
                     parameter_name,
                     parameter_span,
-                } => {
-                    if span_contains_offset(*parameter_span, offset) {
-                        Some(SymbolAtPosition::ParameterReference {
-                            name: parameter_name.clone(),
-                            span: *parameter_span,
-                        })
-                    } else {
-                        None
+                } => span_contains_offset(*parameter_span, offset).then(|| {
+                    SymbolAtPosition::ParameterReference {
+                        name: parameter_name.clone(),
+                        span: *parameter_span,
                     }
-                }
+                }),
                 ir::Variable::External {
                     model,
                     model_span,
@@ -215,14 +209,20 @@ pub fn resolve_definition(
             let current_model = model_collection.get_models().get(current_model_path)?;
 
             // Check submodels
-            if let Some(submodel) = current_model.get_submodels().get(&ir::SubmodelName::new(model_name.clone())) {
+            if let Some(submodel) = current_model
+                .get_submodels()
+                .get(&ir::SubmodelName::new(model_name.clone()))
+            {
                 let external_model = model_collection.get_models().get(submodel.path())?;
                 let param = external_model.get_parameter(parameter_name)?;
                 return Some(span_to_location(submodel.path(), param.name_span()));
             }
 
             // Check references
-            if let Some(reference) = current_model.get_references().get(&ir::ReferenceName::new(model_name.clone())) {
+            if let Some(reference) = current_model
+                .get_references()
+                .get(&ir::ReferenceName::new(model_name.clone()))
+            {
                 let external_model = model_collection.get_models().get(reference.path())?;
                 let param = external_model.get_parameter(parameter_name)?;
                 return Some(span_to_location(reference.path(), param.name_span()));
@@ -251,14 +251,18 @@ pub fn resolve_definition(
 }
 
 /// Checks if a span contains a given byte offset
-fn span_contains_offset(span: Span, offset: usize) -> bool {
+const fn span_contains_offset(span: Span, offset: usize) -> bool {
     span.start().offset <= offset && offset < span.end().offset
 }
 
 /// Converts a Span to an LSP Location
 fn span_to_location(model_path: &ModelPath, span: Span) -> Location {
-    let uri = Uri::from_file_path(model_path.as_ref())
-        .unwrap_or_else(|| panic!("Failed to convert model path to URI: {:?}", model_path.as_ref()));
+    let uri = Uri::from_file_path(model_path.as_ref()).unwrap_or_else(|| {
+        panic!(
+            "Failed to convert model path to URI: {}",
+            model_path.as_ref().display()
+        )
+    });
     Location {
         uri,
         range: span_to_range(span),
@@ -266,7 +270,11 @@ fn span_to_location(model_path: &ModelPath, span: Span) -> Location {
 }
 
 /// Converts a Span to an LSP Range
-fn span_to_range(span: Span) -> Range {
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "we know the values are not pointers"
+)]
+const fn span_to_range(span: Span) -> Range {
     Range {
         start: Position {
             line: (span.start().line - 1) as u32, // Span uses 1-indexed lines, LSP uses 0-indexed
@@ -278,4 +286,3 @@ fn span_to_range(span: Span) -> Range {
         },
     }
 }
-

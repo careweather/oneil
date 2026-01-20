@@ -50,6 +50,7 @@ impl DoesNotExistError {
     /// # Returns
     ///
     /// A reference to the `PathBuf` containing the path of the missing file.
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.0
     }
