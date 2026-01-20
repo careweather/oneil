@@ -80,16 +80,17 @@ impl EvalResult {
 ///
 /// This stores a reference to a model and a reference to the
 /// entire model collection.
+#[derive(Debug, Clone, Copy)]
 pub struct ModelReference<'result> {
     model: &'result Model,
     model_collection: &'result IndexMap<PathBuf, (Model, Vec<ModelError>)>,
 }
 
-impl ModelReference<'_> {
+impl<'result> ModelReference<'result> {
     /// Returns the file path of this model.
     #[must_use]
-    pub const fn path(&self) -> &PathBuf {
-        &self.model.path
+    pub fn path(&self) -> &'result Path {
+        self.model.path.as_path()
     }
 
     /// Returns a map of submodel names to their model references.
@@ -101,7 +102,7 @@ impl ModelReference<'_> {
     /// the case as long as creating the `EvalResult`
     /// resolves successfully.
     #[must_use]
-    pub fn submodels(&self) -> IndexMap<String, Self> {
+    pub fn submodels(&self) -> IndexMap<&'result str, Self> {
         self.model
             .submodels
             .iter()
@@ -112,7 +113,7 @@ impl ModelReference<'_> {
                     .expect("submodel should be visited");
 
                 (
-                    name.clone(),
+                    name.as_str(),
                     Self {
                         model,
                         model_collection: self.model_collection,
@@ -131,7 +132,7 @@ impl ModelReference<'_> {
     /// the case as long as creating the `EvalResult`
     /// resolves successfully.
     #[must_use]
-    pub fn references(&self) -> IndexMap<String, Self> {
+    pub fn references(&self) -> IndexMap<&'result str, Self> {
         self.model
             .references
             .iter()
@@ -142,7 +143,7 @@ impl ModelReference<'_> {
                     .expect("reference should be visited");
 
                 (
-                    name.clone(),
+                    name.as_str(),
                     Self {
                         model,
                         model_collection: self.model_collection,
@@ -154,14 +155,18 @@ impl ModelReference<'_> {
 
     /// Returns a map of parameter names to their evaluated parameter data.
     #[must_use]
-    pub const fn parameters(&self) -> &IndexMap<String, Parameter> {
-        &self.model.parameters
+    pub fn parameters(&self) -> IndexMap<&'result str, &'result Parameter> {
+        self.model
+            .parameters
+            .iter()
+            .map(|(name, parameter)| (name.as_str(), parameter))
+            .collect()
     }
 
     /// Returns the list of evaluated test results for this model.
     #[must_use]
-    pub const fn tests(&self) -> &Vec<Test> {
-        &self.model.tests
+    pub fn tests(&self) -> Vec<&'result Test> {
+        self.model.tests.iter().collect()
     }
 }
 
