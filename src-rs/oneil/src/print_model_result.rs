@@ -146,7 +146,11 @@ fn print_model_failing_tests(model_path: &Path, failing_tests: &[(Span, &result:
         let test_end_offset = test_span.end().offset;
         let test_expr_str = file_contents.get(test_start_offset..test_end_offset);
 
-        let Some(test_expr_str) = test_expr_str else {
+        if let Some(test_expr_str) = test_expr_str {
+            let test_label = stylesheet::FAILING_TEST_LABEL.style("test:");
+            let test_expr_str = stylesheet::FAILING_TEST_EXPR_STR.style(test_expr_str);
+            println!("{test_label} {test_expr_str}");
+        } else {
             let error_label = stylesheet::ERROR_COLOR.style("error");
             let test_start_line = test_span.start().line;
             let test_start_column = test_span.start().column;
@@ -154,11 +158,8 @@ fn print_model_failing_tests(model_path: &Path, failing_tests: &[(Span, &result:
             println!(
                 "{error_label}: couldn't get test expression for test at line {test_start_line}, column {test_start_column}"
             );
+        }
 
-            continue;
-        };
-
-        println!("{test_expr_str}");
         print_debug_info(debug_info);
     }
 }
