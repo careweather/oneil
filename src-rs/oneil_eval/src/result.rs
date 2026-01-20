@@ -4,13 +4,166 @@
 //! evaluating Oneil models, including evaluated parameters, tests, and
 //! hierarchical model structures.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
-use crate::value::Value;
+use crate::{ModelError, value::Value};
+
+/// The result of evaluating a model hierarchy.
+///
+/// This structure holds the top-level model path and
+/// a map of model paths to their evaluation results (model data and errors).
+///
+/// In order to get the top-level model data, use the `get_top_model` method.
+#[derive(Debug, Clone)]
+pub struct EvalResult {
+    top_model_path: PathBuf,
+    model_info: IndexMap<PathBuf, (Model, Vec<ModelError>)>,
+}
+
+impl EvalResult {
+    /// Creates a new `EvalResult` for the given top-level model path.
+    #[must_use]
+    pub(crate) fn new(top_model_path: PathBuf) -> Self {
+        Self {
+            top_model_path,
+            model_info: IndexMap::new(),
+        }
+    }
+
+    /// Adds a model's evaluation result to this collection.
+    pub(crate) fn add_model(&mut self, model_path: PathBuf, model: Model, errors: Vec<ModelError>) {
+        self.model_info.insert(model_path, (model, errors));
+    }
+
+    /// Checks whether a model at the given path has been visited and evaluated.
+    #[must_use]
+    pub(crate) fn model_is_visited(&self, model_path: impl AsRef<Path>) -> bool {
+        self.model_info.contains_key(model_path.as_ref())
+    }
+
+    /// Returns a reference to the top-level model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the top model has not been visited
+    /// and added to this result. This should never be
+    /// the case as long as creating the `EvalResult`
+    /// resolves successfully.
+    #[must_use]
+    pub fn get_top_model(&self) -> ModelReference<'_> {
+        let top_model = &self
+            .model_info
+            .get(&self.top_model_path)
+            .expect("top model should be visited");
+
+        ModelReference {
+            model: &top_model.0,
+            model_collection: &self.model_info,
+        }
+    }
+
+    /// Returns all errors from all models in this evaluation result.
+    #[must_use]
+    pub fn get_errors(&self) -> Vec<&ModelError> {
+        self.model_info
+            .values()
+            .flat_map(|(_, errors)| errors.iter())
+            .collect()
+    }
+}
+
+/// A reference to an evaluated model within a model hierarchy.
+///
+/// This stores a reference to a model and a reference to the
+/// entire model collection.
+pub struct ModelReference<'result> {
+    model: &'result Model,
+    model_collection: &'result IndexMap<PathBuf, (Model, Vec<ModelError>)>,
+}
+
+impl ModelReference<'_> {
+    /// Returns the file path of this model.
+    #[must_use]
+    pub const fn path(&self) -> &PathBuf {
+        &self.model.path
+    }
+
+    /// Returns a map of submodel names to their model references.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any submodel has not been visited and
+    /// added to the model collection. This should never be
+    /// the case as long as creating the `EvalResult`
+    /// resolves successfully.
+    #[must_use]
+    pub fn submodels(&self) -> IndexMap<String, Self> {
+        self.model
+            .submodels
+            .iter()
+            .map(|(name, path)| {
+                let (model, _) = self
+                    .model_collection
+                    .get(path)
+                    .expect("submodel should be visited");
+
+                (
+                    name.clone(),
+                    Self {
+                        model,
+                        model_collection: self.model_collection,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    /// Returns a map of reference names to their model references.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any reference has not been visited and
+    /// added to the model collection. This should never be
+    /// the case as long as creating the `EvalResult`
+    /// resolves successfully.
+    #[must_use]
+    pub fn references(&self) -> IndexMap<String, Self> {
+        self.model
+            .references
+            .iter()
+            .map(|(name, path)| {
+                let (model, _) = self
+                    .model_collection
+                    .get(path)
+                    .expect("reference should be visited");
+
+                (
+                    name.clone(),
+                    Self {
+                        model,
+                        model_collection: self.model_collection,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    /// Returns a map of parameter names to their evaluated parameter data.
+    #[must_use]
+    pub const fn parameters(&self) -> &IndexMap<String, Parameter> {
+        &self.model.parameters
+    }
+
+    /// Returns the list of evaluated test results for this model.
+    #[must_use]
+    pub const fn tests(&self) -> &Vec<Test> {
+        &self.model.tests
+    }
+}
 
 /// The result of evaluating a model.
 ///
@@ -19,19 +172,19 @@ use crate::value::Value;
 /// the evaluation process and can be used for output, further processing, or
 /// analysis.
 #[derive(Debug, Clone)]
-pub struct Model {
+pub(crate) struct Model {
     /// The file path of the model that was evaluated.
     pub path: PathBuf,
     /// A map of submodel names to their evaluated results.
     ///
     /// Submodels are evaluated recursively, so each entry contains a fully
     /// evaluated `Model` structure.
-    pub submodels: IndexMap<String, Model>,
+    pub submodels: IndexMap<String, PathBuf>,
     /// A map of reference names to their evaluated results.
     ///
     /// References are evaluated recursively, so each entry contains a fully
     /// evaluated `Model` structure.
-    pub references: IndexMap<String, Model>,
+    pub references: IndexMap<String, PathBuf>,
     /// A map of parameter identifiers to their evaluated results.
     ///
     /// Parameters are stored by their identifier (name) and contain their

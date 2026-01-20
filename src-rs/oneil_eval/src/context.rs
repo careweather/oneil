@@ -11,7 +11,7 @@ use oneil_shared::span::Span;
 use crate::{
     builtin::{BuiltinFunction, BuiltinMap},
     error::{EvalError, ModelError},
-    result,
+    result::{self, EvalResult},
     value::{Unit, Value},
 };
 
@@ -259,17 +259,35 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// a list of any errors that occurred during evaluation.
     ///
     /// If no errors occurred, the list of errors will be empty.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the model is not found.
-    pub fn get_model_result(&self, model_path: &Path) -> (result::Model, Vec<ModelError>) {
+    pub fn get_model_result(&self, model_path: &Path) -> Option<EvalResult> {
+        if !self.models.contains_key(model_path) {
+            return None;
+        }
+
+        let mut eval_result = EvalResult::new(model_path.to_path_buf());
+
+        self.collect_model_info(model_path, &mut eval_result);
+
+        Some(eval_result)
+    }
+
+    fn collect_model_info(&self, model_path: &Path, eval_result: &mut EvalResult) {
+        if eval_result.model_is_visited(model_path) {
+            return;
+        }
+
         let Some(model) = self.models.get(model_path) else {
-            panic!("model should have been created during evaluation");
+            panic!("model should exist");
         };
 
-        let (submodels, submodel_errors) = self.collect_submodels(model, model_path);
-        let (references, reference_errors) = self.collect_references(model, model_path);
+        // NOTE: we only need to do references because all submodels are also references
+        for reference_path in model.references.values() {
+            self.collect_model_info(reference_path, eval_result);
+        }
+
+        let submodels = model.submodels.clone();
+        let references = model.references.clone();
+
         let (parameters, parameter_errors) = Self::collect_parameters(model, model_path);
         let (tests, test_errors) = Self::collect_tests(model, model_path);
 
@@ -281,65 +299,9 @@ impl<F: BuiltinFunction> EvalContext<F> {
             tests,
         };
 
-        let errors = [
-            submodel_errors,
-            reference_errors,
-            parameter_errors,
-            test_errors,
-        ]
-        .concat();
+        let errors = [parameter_errors, test_errors].concat();
 
-        (model_result, errors)
-    }
-
-    /// Collects submodel results recursively.
-    ///
-    /// Returns a tuple of (successful submodels, errors).
-    fn collect_submodels(
-        &self,
-        model: &Model,
-        _model_path: &Path,
-    ) -> (IndexMap<String, result::Model>, Vec<ModelError>) {
-        model
-            .submodels
-            .iter()
-            .map(|(name, submodel_path)| {
-                let (submodel, submodel_errors) = self.get_model_result(submodel_path);
-                (name.clone(), submodel, submodel_errors)
-            })
-            .fold(
-                (IndexMap::new(), Vec::new()),
-                |(mut submodels, mut submodel_errors), (name, submodel, errors)| {
-                    submodels.insert(name, submodel);
-                    submodel_errors.extend(errors);
-                    (submodels, submodel_errors)
-                },
-            )
-    }
-
-    /// Collects reference results recursively.
-    ///
-    /// Returns a tuple of (successful references, errors).
-    fn collect_references(
-        &self,
-        model: &Model,
-        _model_path: &Path,
-    ) -> (IndexMap<String, result::Model>, Vec<ModelError>) {
-        model
-            .references
-            .iter()
-            .map(|(name, reference_path)| {
-                let (reference, reference_errors) = self.get_model_result(reference_path);
-                (name.clone(), reference, reference_errors)
-            })
-            .fold(
-                (IndexMap::new(), Vec::new()),
-                |(mut references, mut reference_errors), (name, reference, errors)| {
-                    references.insert(name, reference);
-                    reference_errors.extend(errors);
-                    (references, reference_errors)
-                },
-            )
+        eval_result.add_model(model_path.to_path_buf(), model_result, errors);
     }
 
     /// Collects parameter results.
