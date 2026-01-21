@@ -7,19 +7,33 @@ use oneil_shared::span::Span;
 
 use crate::value::Value;
 
+/// A value in a dependency tree
 #[derive(Debug, Clone, PartialEq)]
 pub struct DependencyTreeValue {
+    /// The reference name used to access an external model, if this is an external dependency.
+    ///
+    /// This is `None` for builtin dependencies and parameters within the same model as the original parameter.
     pub reference_name: Option<String>,
+    /// The name of the parameter or builtin value.
     pub parameter_name: String,
+    /// The evaluated value of the parameter or builtin.
     pub parameter_value: Value,
+    /// Display information for the parameter, containing the model path and source span.
+    ///
+    /// This is `None` for builtin dependencies, which don't have a source location.
     pub display_info: Option<(PathBuf, Span)>,
 }
 
+/// A value in a requires tree
 #[derive(Debug, Clone, PartialEq)]
 pub struct RequiresTreeValue {
+    /// The path to the model containing the parameter
     pub model_path: PathBuf,
+    /// The name of the parameter
     pub parameter_name: String,
+    /// The evaluated value of the parameter
     pub parameter_value: Value,
+    /// Display information for the parameter, containing the model path and source span.
     pub display_info: (PathBuf, Span),
 }
 
@@ -126,16 +140,18 @@ impl DependencyGraph {
             .insert(requires);
     }
 
+    /// Returns the parameters that depend on a given parameter.
+    #[must_use]
     pub fn depends_on(&self, model_path: &Path, parameter_name: &str) -> Option<&DependencySet> {
-        self.depends_on
-            .get(model_path)
-            .and_then(|model| model.get(parameter_name))
+        let model = self.depends_on.get(model_path)?;
+        model.get(parameter_name)
     }
 
+    /// Returns the parameters that require a given parameter.
+    #[must_use]
     pub fn requires(&self, model_path: &Path, parameter_name: &str) -> Option<&RequiresSet> {
-        self.required_by
-            .get(model_path)
-            .and_then(|model| model.get(parameter_name))
+        let model = self.required_by.get(model_path)?;
+        model.get(parameter_name)
     }
 }
 
