@@ -11,16 +11,16 @@ use oneil_shared::span::Span;
 use crate::{
     builtin::{BuiltinFunction, BuiltinMap},
     error::{EvalError, ModelError},
-    result::{self, EvalResult},
+    output::eval_result,
     value::{Unit, Value},
 };
 
 #[derive(Debug, Clone)]
 pub struct Model {
-    parameters: IndexMap<String, Result<result::Parameter, Vec<EvalError>>>,
+    parameters: IndexMap<String, Result<eval_result::Parameter, Vec<EvalError>>>,
     submodels: IndexMap<String, PathBuf>,
     references: IndexMap<String, PathBuf>,
-    tests: Vec<Result<result::Test, Vec<EvalError>>>,
+    tests: Vec<Result<eval_result::Test, Vec<EvalError>>>,
 }
 
 impl Model {
@@ -189,7 +189,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     pub fn add_parameter_result(
         &mut self,
         parameter_name: String,
-        result: Result<result::Parameter, Vec<EvalError>>,
+        result: Result<eval_result::Parameter, Vec<EvalError>>,
     ) {
         // TODO: Maybe use type state pattern to enforce this?
         let Some(current_model) = self.current_model.as_ref() else {
@@ -236,7 +236,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         );
     }
 
-    pub fn add_test_result(&mut self, test_result: Result<result::Test, Vec<EvalError>>) {
+    pub fn add_test_result(&mut self, test_result: Result<eval_result::Test, Vec<EvalError>>) {
         let Some(current_model) = self.current_model.as_ref() else {
             panic!("current model should be set when adding a test result");
         };
@@ -259,19 +259,19 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// a list of any errors that occurred during evaluation.
     ///
     /// If no errors occurred, the list of errors will be empty.
-    pub fn get_model_result(&self, model_path: &Path) -> Option<EvalResult> {
+    pub fn get_model_result(&self, model_path: &Path) -> Option<eval_result::EvalResult> {
         if !self.models.contains_key(model_path) {
             return None;
         }
 
-        let mut eval_result = EvalResult::new(model_path.to_path_buf());
+        let mut eval_result = eval_result::EvalResult::new(model_path.to_path_buf());
 
         self.collect_model_info(model_path, &mut eval_result);
 
         Some(eval_result)
     }
 
-    fn collect_model_info(&self, model_path: &Path, eval_result: &mut EvalResult) {
+    fn collect_model_info(&self, model_path: &Path, eval_result: &mut eval_result::EvalResult) {
         if eval_result.model_is_visited(model_path) {
             return;
         }
@@ -291,7 +291,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         let (parameters, parameter_errors) = Self::collect_parameters(model, model_path);
         let (tests, test_errors) = Self::collect_tests(model, model_path);
 
-        let model_result = result::Model {
+        let model_result = eval_result::Model {
             path: model_path.to_path_buf(),
             submodels,
             references,
@@ -310,7 +310,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     fn collect_parameters(
         model: &Model,
         model_path: &Path,
-    ) -> (IndexMap<String, result::Parameter>, Vec<ModelError>) {
+    ) -> (IndexMap<String, eval_result::Parameter>, Vec<ModelError>) {
         model
             .parameters
             .iter()
@@ -342,7 +342,10 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// Collects test results.
     ///
     /// Returns a tuple of (successful tests, errors).
-    fn collect_tests(model: &Model, model_path: &Path) -> (Vec<result::Test>, Vec<ModelError>) {
+    fn collect_tests(
+        model: &Model,
+        model_path: &Path,
+    ) -> (Vec<eval_result::Test>, Vec<ModelError>) {
         model.tests.iter().fold(
             (Vec::new(), Vec::new()),
             |(mut tests, mut test_errors), test_result| match test_result.clone() {

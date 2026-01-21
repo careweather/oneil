@@ -1521,7 +1521,7 @@ mod tests {
 
         use crate::builtin::std::StdBuiltinFunction;
         use crate::context::EvalContext;
-        use crate::result;
+        use crate::output::eval_result;
 
         use oneil_ir::DisplayCompositeUnit;
         use oneil_shared::span::SourceLocation;
@@ -2254,12 +2254,12 @@ mod tests {
             context
         }
 
-        pub fn build_parameter_result(name: &str, value: Value) -> result::Parameter {
-            result::Parameter {
+        pub fn build_parameter_result(name: &str, value: Value) -> eval_result::Parameter {
+            eval_result::Parameter {
                 value,
                 ident: name.to_string(),
                 label: name.to_string(),
-                print_level: result::PrintLevel::None,
+                print_level: eval_result::PrintLevel::None,
                 debug_info: None,
             }
         }

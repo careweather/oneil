@@ -7,7 +7,7 @@ use oneil_shared::span::Span;
 
 use crate::{
     EvalError, builtin::BuiltinFunction, context::EvalContext, error::ExpectedType, eval_expr,
-    eval_parameter, result, value::Value,
+    eval_parameter, output::eval_result, value::Value,
 };
 
 /// Evaluates a model and returns the context with the results of the model.
@@ -79,7 +79,7 @@ fn parameter_result_from<F: BuiltinFunction>(
     value: Value,
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
-) -> result::Parameter {
+) -> eval_result::Parameter {
     let (print_level, debug_info) = match parameter.trace_level() {
         ir::TraceLevel::Debug if parameter.is_performance() => {
             let builtin_dependency_values =
@@ -89,8 +89,8 @@ fn parameter_result_from<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(parameter.dependencies().external(), context);
             (
-                result::PrintLevel::Performance,
-                Some(result::DebugInfo {
+                eval_result::PrintLevel::Performance,
+                Some(eval_result::DebugInfo {
                     builtin_dependency_values,
                     parameter_dependency_values,
                     external_dependency_values,
@@ -98,7 +98,7 @@ fn parameter_result_from<F: BuiltinFunction>(
             )
         }
         ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
-            (result::PrintLevel::Performance, None)
+            (eval_result::PrintLevel::Performance, None)
         }
         ir::TraceLevel::Debug => {
             let builtin_dependency_values =
@@ -108,19 +108,19 @@ fn parameter_result_from<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(parameter.dependencies().external(), context);
             (
-                result::PrintLevel::Trace,
-                Some(result::DebugInfo {
+                eval_result::PrintLevel::Trace,
+                Some(eval_result::DebugInfo {
                     builtin_dependency_values,
                     parameter_dependency_values,
                     external_dependency_values,
                 }),
             )
         }
-        ir::TraceLevel::Trace => (result::PrintLevel::Trace, None),
-        ir::TraceLevel::None => (result::PrintLevel::None, None),
+        ir::TraceLevel::Trace => (eval_result::PrintLevel::Trace, None),
+        ir::TraceLevel::None => (eval_result::PrintLevel::None, None),
     };
 
-    result::Parameter {
+    eval_result::Parameter {
         ident: parameter.name().as_str().to_string(),
         label: parameter.label().as_str().to_string(),
         value,
@@ -190,12 +190,12 @@ fn process_parameter_dependencies(
 fn eval_test<F: BuiltinFunction>(
     test: &ir::Test,
     context: &EvalContext<F>,
-) -> Result<result::Test, Vec<EvalError>> {
+) -> Result<eval_result::Test, Vec<EvalError>> {
     let (test_result, expr_span) = eval_expr(test.expr(), context)?;
 
     match test_result {
-        Value::Boolean(true) => Ok(result::Test {
-            result: result::TestResult::Passed,
+        Value::Boolean(true) => Ok(eval_result::Test {
+            result: eval_result::TestResult::Passed,
             expr_span: *expr_span,
         }),
         Value::Boolean(false) => {
@@ -206,13 +206,13 @@ fn eval_test<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(test.dependencies().external(), context);
 
-            let debug_info = Box::new(result::DebugInfo {
+            let debug_info = Box::new(eval_result::DebugInfo {
                 builtin_dependency_values,
                 parameter_dependency_values,
                 external_dependency_values,
             });
-            Ok(result::Test {
-                result: result::TestResult::Failed { debug_info },
+            Ok(eval_result::Test {
+                result: eval_result::TestResult::Failed { debug_info },
                 expr_span: *expr_span,
             })
         }

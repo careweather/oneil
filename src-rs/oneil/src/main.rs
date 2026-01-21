@@ -18,7 +18,7 @@ use clap::Parser;
 use notify::Watcher;
 use oneil_eval::{
     builtin::{BuiltinFunction, std as oneil_std},
-    result::EvalResult,
+    output::eval_result::EvalResult,
 };
 use oneil_ir as ir;
 use oneil_model_resolver::FileLoader;

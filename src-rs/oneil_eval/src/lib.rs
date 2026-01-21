@@ -9,7 +9,7 @@ mod eval_model;
 mod eval_model_collection;
 mod eval_parameter;
 mod eval_unit;
-pub mod result;
+pub mod output;
 pub mod value;
 
 pub use error::{EvalError, ModelError};
