@@ -19,6 +19,7 @@ use crate::{
     value::{Unit, Value},
 };
 
+/// Represents a model with its evaluated parameters, submodels, references, and tests.
 #[derive(Debug, Clone)]
 pub struct Model {
     parameters: IndexMap<String, Result<eval_result::Parameter, Vec<EvalError>>>,
@@ -28,6 +29,7 @@ pub struct Model {
 }
 
 impl Model {
+    /// Creates a new empty model.
     pub fn new() -> Self {
         Self {
             parameters: IndexMap::new(),
@@ -38,6 +40,13 @@ impl Model {
     }
 }
 
+/// Evaluation context that tracks models, their parameters, dependencies, and builtin functions.
+///
+/// The context maintains state during evaluation, including:
+/// - Evaluated models and their parameters
+/// - Python imports and their results
+/// - Active models, references, and imports
+/// - Builtin functions and values
 #[derive(Debug, Clone)]
 pub struct EvalContext<F: BuiltinFunction> {
     models: IndexMap<PathBuf, Model>,
@@ -50,7 +59,9 @@ pub struct EvalContext<F: BuiltinFunction> {
 }
 
 impl<F: BuiltinFunction> EvalContext<F> {
-    pub fn new(builtins: BuiltinMap<F>) -> Self {
+    /// Creates a new evaluation context with the given builtin functions.
+    #[must_use]
+    pub(crate) fn new(builtins: BuiltinMap<F>) -> Self {
         Self {
             models: IndexMap::new(),
             python_imports: IndexMap::new(),
@@ -68,7 +79,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// Panics if the builtin value is not defined. This should never be the case.
     /// If it is, then there is a bug either in the model resolver when it resolves builtin variables
     /// or in the builtin map when it defines the builtin values.
-    pub fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
+    #[must_use]
+    pub(crate) fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
         self.builtins
             .values
             .get(identifier.as_str())
@@ -76,7 +88,12 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .clone()
     }
 
-    pub fn lookup_parameter_value(
+    /// Looks up a parameter value in the current model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no current model is set or if the parameter is not defined in the model.
+    pub(crate) fn lookup_parameter_value(
         &self,
         parameter_name: &ir::ParameterName,
         variable_span: Span,
@@ -89,7 +106,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
         self.lookup_model_parameter_value_internal(current_model, parameter_name, variable_span)
     }
 
-    pub fn lookup_model_parameter_value(
+    /// Looks up a parameter value in a specific model.
+    pub(crate) fn lookup_model_parameter_value(
         &self,
         model: &ir::ModelPath,
         parameter_name: &ir::ParameterName,
@@ -123,8 +141,12 @@ impl<F: BuiltinFunction> EvalContext<F> {
             })
     }
 
-    // TODO: figure out what error this should actually be
-    pub fn evaluate_builtin_function(
+    /// Evaluates a builtin function with the given arguments.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the builtin function is not defined. This should never be the case.
+    pub(crate) fn evaluate_builtin_function(
         &self,
         identifier: &ir::Identifier,
         identifier_span: Span,
@@ -137,7 +159,10 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .call(identifier_span, args)
     }
 
-    pub fn evaluate_imported_function(
+    /// Evaluates an imported function with the given arguments.
+    ///
+    /// Currently unsupported and always returns an error.
+    pub(crate) fn evaluate_imported_function(
         &self,
         identifier: &ir::Identifier,
         identifier_span: Span,
@@ -151,15 +176,26 @@ impl<F: BuiltinFunction> EvalContext<F> {
         }])
     }
 
-    pub fn lookup_unit(&self, name: &str) -> Option<Unit> {
+    /// Looks up a unit by name.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the unit is not defined. This should never be the case.
+    #[must_use]
+    pub(crate) fn lookup_unit(&self, name: &str) -> Option<Unit> {
         self.builtins.units.get(name).cloned()
     }
 
-    pub const fn available_prefixes(&self) -> &IndexMap<String, f64> {
+    /// Returns the available unit prefixes.
+    #[must_use]
+    pub(crate) const fn available_prefixes(&self) -> &IndexMap<String, f64> {
         &self.builtins.prefixes
     }
 
-    pub fn load_python_import(&mut self, python_path: PathBuf, python_import_span: Span) {
+    /// Loads a Python import into the context.
+    ///
+    /// Currently unsupported and always stores an error result.
+    pub(crate) fn load_python_import(&mut self, python_path: PathBuf, python_import_span: Span) {
         self.python_imports.insert(
             python_path,
             Err(EvalError::Unsupported {
@@ -170,7 +206,10 @@ impl<F: BuiltinFunction> EvalContext<F> {
         );
     }
 
-    pub fn set_active_model(&mut self, model_path: PathBuf) {
+    /// Sets the active model for evaluation.
+    ///
+    /// Creates a new model entry if it doesn't exist.
+    pub(crate) fn set_active_model(&mut self, model_path: PathBuf) {
         self.models
             .entry(model_path.clone())
             .or_insert_with(Model::new);
@@ -178,19 +217,29 @@ impl<F: BuiltinFunction> EvalContext<F> {
         self.current_model = Some(model_path);
     }
 
-    pub fn clear_active_model(&mut self) {
+    /// Clears the active model.
+    ///
+    /// After calling this, no model will be active until `set_active_model` is called again.
+    pub(crate) fn clear_active_model(&mut self) {
         self.current_model = None;
     }
 
-    pub fn clear_active_python_imports(&mut self) {
+    /// Clears all active Python imports.
+    pub(crate) fn clear_active_python_imports(&mut self) {
         self.active_python_imports.clear();
     }
 
-    pub fn activate_python_import(&mut self, python_import: PathBuf) {
+    /// Activates a Python import for the current evaluation.
+    pub(crate) fn activate_python_import(&mut self, python_import: PathBuf) {
         self.active_python_imports.insert(python_import);
     }
 
-    pub fn add_parameter_result(
+    /// Adds a parameter evaluation result to the current model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no current model is set or if the current model was not created.
+    pub(crate) fn add_parameter_result(
         &mut self,
         parameter_name: String,
         result: Result<eval_result::Parameter, Vec<EvalError>>,
@@ -208,7 +257,12 @@ impl<F: BuiltinFunction> EvalContext<F> {
         model.parameters.insert(parameter_name, result);
     }
 
-    pub fn add_submodel(&mut self, submodel_name: &str, submodel_import: &ir::ModelPath) {
+    /// Adds a submodel to the current model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no current model is set or if the current model was not created.
+    pub(crate) fn add_submodel(&mut self, submodel_name: &str, submodel_import: &ir::ModelPath) {
         let Some(current_model) = self.current_model.as_ref() else {
             panic!("current model should be set when adding a submodel");
         };
@@ -224,7 +278,12 @@ impl<F: BuiltinFunction> EvalContext<F> {
         );
     }
 
-    pub fn add_reference(&mut self, reference_name: &str, reference_path: &ir::ModelPath) {
+    /// Adds a reference to the current model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no current model is set or if the current model was not created.
+    pub(crate) fn add_reference(&mut self, reference_name: &str, reference_path: &ir::ModelPath) {
         let Some(current_model) = self.current_model.as_ref() else {
             panic!("current model should be set when adding a reference");
         };
@@ -240,7 +299,15 @@ impl<F: BuiltinFunction> EvalContext<F> {
         );
     }
 
-    pub fn add_test_result(&mut self, test_result: Result<eval_result::Test, Vec<EvalError>>) {
+    /// Adds a test evaluation result to the current model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no current model is set or if the current model was not created.
+    pub(crate) fn add_test_result(
+        &mut self,
+        test_result: Result<eval_result::Test, Vec<EvalError>>,
+    ) {
         let Some(current_model) = self.current_model.as_ref() else {
             panic!("current model should be set when adding a test result");
         };
@@ -253,7 +320,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
         model.tests.push(test_result);
     }
 
-    pub fn activate_reference(&mut self, reference: PathBuf) {
+    /// Activates a reference for the current evaluation.
+    pub(crate) fn activate_reference(&mut self, reference: PathBuf) {
         self.active_references.insert(reference);
     }
 
@@ -263,6 +331,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// a list of any errors that occurred during evaluation.
     ///
     /// If no errors occurred, the list of errors will be empty.
+    #[must_use]
     pub fn get_model_result(&self, model_path: &Path) -> Option<eval_result::EvalResult> {
         if !self.models.contains_key(model_path) {
             return None;
@@ -371,6 +440,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     }
 
     /// Gets the dependency graph for all models in the context.
+    #[must_use]
     pub fn get_dependency_graph(&self) -> DependencyGraph {
         let mut dependency_graph = DependencyGraph::new();
 
@@ -411,6 +481,11 @@ impl<F: BuiltinFunction> EvalContext<F> {
         dependency_graph
     }
 
+    /// Gets the dependency tree for a specific parameter.
+    ///
+    /// The tree shows all parameters, builtin values, and external dependencies
+    /// that the specified parameter depends on, recursively.
+    #[must_use]
     pub fn get_dependency_parameter_tree(
         &self,
         model_path: &Path,
@@ -440,7 +515,9 @@ impl<F: BuiltinFunction> EvalContext<F> {
             let value =
                 context.get_dependency_tree_value(model_path, reference_name, parameter_name)?;
 
-            let deps = dependency_graph.depends_on(model_path, parameter_name)?;
+            let deps = dependency_graph
+                .depends_on(model_path, parameter_name)
+                .expect("dependency graph should have parameter");
 
             let builtin_deps = deps.builtin_dependencies.iter().map(|dep| {
                 let parameter_value =
@@ -512,6 +589,11 @@ impl<F: BuiltinFunction> EvalContext<F> {
         Some(tree_value)
     }
 
+    /// Gets the "requires" tree for a specific parameter.
+    ///
+    /// The tree shows all parameters that depend on the specified parameter, recursively.
+    /// This is the inverse of the dependency tree.
+    #[must_use]
     pub fn get_requires_tree(
         &self,
         model_path: &Path,
@@ -532,7 +614,9 @@ impl<F: BuiltinFunction> EvalContext<F> {
         ) -> Option<Tree<RequiresTreeValue>> {
             let value = context.get_requires_tree_value(model_path, parameter_name)?;
 
-            let deps = dependency_graph.requires(model_path, parameter_name)?;
+            let deps = dependency_graph
+                .requires(model_path, parameter_name)
+                .expect("dependency graph should have parameter");
 
             let parameter_deps = deps.parameter_requires.iter().filter_map(|dep| {
                 recurse(context, model_path, &dep.parameter_name, dependency_graph)
