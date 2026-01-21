@@ -11,6 +11,11 @@ use crate::{
     value::{MeasuredNumber, Number, Unit, Value},
 };
 
+pub struct EvalParameterResult {
+    value: Value,
+    expr_span: Span,
+}
+
 /// Evaluates a parameter and returns the resulting value.
 ///
 /// # Errors
@@ -23,7 +28,7 @@ use crate::{
 pub fn eval_parameter<F: BuiltinFunction>(
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
-) -> Result<Value, Vec<EvalError>> {
+) -> Result<EvalParameterResult, Vec<EvalError>> {
     // TODO: this is about where we would use `trace_level`, but I'm not yet sure
     //       how to handle it.
 
@@ -99,7 +104,10 @@ pub fn eval_parameter<F: BuiltinFunction>(
     let limits = eval_limits(parameter.limits(), context)?;
     verify_value_is_within_limits(&value, expr_span, limits)?;
 
-    Ok(value)
+    Ok(EvalParameterResult {
+        value,
+        expr_span: *expr_span,
+    })
 }
 
 fn get_piecewise_result<'a, F: BuiltinFunction>(
@@ -758,7 +766,7 @@ mod tests {
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         // check the parameter value
-        let Value::Number(number) = parameter_value else {
+        let Value::Number(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -780,7 +788,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -810,7 +818,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -840,7 +848,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -871,7 +879,7 @@ mod tests {
         let expected_dimensions = [];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -906,7 +914,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -941,7 +949,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -981,7 +989,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1021,7 +1029,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1059,7 +1067,7 @@ mod tests {
         ];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1094,7 +1102,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 2.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1129,7 +1137,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1165,7 +1173,7 @@ mod tests {
         let expected_dimensions = [];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1202,7 +1210,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1238,7 +1246,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1270,7 +1278,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1305,7 +1313,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1333,7 +1341,7 @@ mod tests {
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
         let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        let parameter_result = helper::build_parameter_result("x", x_value);
+        let parameter_result = helper::build_parameter_result("x", x_value.value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = min(x) with unit m
@@ -1343,7 +1351,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1379,7 +1387,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1407,7 +1415,7 @@ mod tests {
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
         let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        let parameter_result = helper::build_parameter_result("x", x_value);
+        let parameter_result = helper::build_parameter_result("x", x_value.value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = max(x) with unit m
@@ -1417,7 +1425,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1446,7 +1454,7 @@ mod tests {
         // add x as an interval parameter [2.0, 4.0] m
         let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
         let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
-        let parameter_result = helper::build_parameter_result("x", x_value);
+        let parameter_result = helper::build_parameter_result("x", x_value.value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = range(x) with unit m
@@ -1456,7 +1464,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -1492,7 +1500,7 @@ mod tests {
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
         // check the parameter value
-        let Value::MeasuredNumber(number) = parameter_value else {
+        let Value::MeasuredNumber(number) = parameter_value.value else {
             panic!("expected number");
         };
 
@@ -2247,7 +2255,7 @@ mod tests {
                 let parameter = build_simple_parameter(name, value, units);
                 let parameter_value =
                     eval_parameter(&parameter, &context).expect("eval should succeed");
-                let parameter_result = build_parameter_result(name, parameter_value);
+                let parameter_result = build_parameter_result(name, parameter_value.value);
                 context.add_parameter_result(name.to_string(), Ok(parameter_result));
             }
 
@@ -2262,6 +2270,7 @@ mod tests {
                 print_level: eval_result::PrintLevel::None,
                 debug_info: None,
                 dependencies: DependencySet::default(),
+                expr_span: random_span(),
             }
         }
     }
