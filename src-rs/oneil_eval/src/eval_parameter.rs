@@ -1518,9 +1518,9 @@ mod tests {
         use std::path::PathBuf;
 
         use crate::builtin::BuiltinMap;
-
         use crate::builtin::std::StdBuiltinFunction;
         use crate::context::EvalContext;
+        use crate::output::dependency::DependencySet;
         use crate::output::eval_result;
 
         use oneil_ir::DisplayCompositeUnit;
@@ -2261,6 +2261,7 @@ mod tests {
                 label: name.to_string(),
                 print_level: eval_result::PrintLevel::None,
                 debug_info: None,
+                dependencies: DependencySet::default(),
             }
         }
     }

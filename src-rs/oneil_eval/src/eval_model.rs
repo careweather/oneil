@@ -1,13 +1,21 @@
 use std::collections::HashSet;
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    EvalError, builtin::BuiltinFunction, context::EvalContext, error::ExpectedType, eval_expr,
-    eval_parameter, output::eval_result, value::Value,
+    EvalError,
+    builtin::BuiltinFunction,
+    context::EvalContext,
+    error::ExpectedType,
+    eval_expr, eval_parameter,
+    output::{
+        dependency::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency},
+        eval_result,
+    },
+    value::Value,
 };
 
 /// Evaluates a model and returns the context with the results of the model.
@@ -120,12 +128,50 @@ fn parameter_result_from<F: BuiltinFunction>(
         ir::TraceLevel::None => (eval_result::PrintLevel::None, None),
     };
 
+    let builtin_dependencies = parameter
+        .dependencies()
+        .builtin()
+        .keys()
+        .map(|builtin_ident| BuiltinDependency {
+            ident: builtin_ident.as_str().to_string(),
+        })
+        .collect::<IndexSet<_>>();
+
+    let parameter_dependencies = parameter
+        .dependencies()
+        .parameter()
+        .keys()
+        .map(|parameter_name| ParameterDependency {
+            parameter_name: parameter_name.as_str().to_string(),
+        })
+        .collect::<IndexSet<_>>();
+
+    let external_dependencies = parameter
+        .dependencies()
+        .external()
+        .iter()
+        .map(
+            |((reference_name, parameter_name), (model_path, _))| ExternalDependency {
+                model_path: model_path.as_ref().to_path_buf(),
+                reference_name: reference_name.as_str().to_string(),
+                parameter_name: parameter_name.as_str().to_string(),
+            },
+        )
+        .collect::<IndexSet<_>>();
+
+    let dependencies = DependencySet {
+        builtin_dependencies,
+        parameter_dependencies,
+        external_dependencies,
+    };
+
     eval_result::Parameter {
         ident: parameter.name().as_str().to_string(),
         label: parameter.label().as_str().to_string(),
         value,
         print_level,
         debug_info,
+        dependencies,
     }
 }
 

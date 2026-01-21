@@ -11,7 +11,7 @@ use oneil_shared::span::Span;
 use crate::{
     builtin::{BuiltinFunction, BuiltinMap},
     error::{EvalError, ModelError},
-    output::eval_result,
+    output::{dependency::DependencyGraph, eval_result},
     value::{Unit, Value},
 };
 
@@ -364,5 +364,46 @@ impl<F: BuiltinFunction> EvalContext<F> {
                 }
             },
         )
+    }
+
+    /// Gets the dependency graph for all models in the context.
+    pub fn get_dependency_graph(&self) -> DependencyGraph {
+        let mut dependency_graph = DependencyGraph::new();
+
+        for (model_path, model) in &self.models {
+            for parameter in model.parameters.values() {
+                let Ok(parameter) = parameter else {
+                    continue;
+                };
+
+                let dependencies = &parameter.dependencies;
+
+                for dependency in &dependencies.builtin_dependencies {
+                    dependency_graph.add_depends_on_builtin(
+                        model_path.clone(),
+                        parameter.ident.clone(),
+                        dependency.clone(),
+                    );
+                }
+
+                for dependency in &dependencies.parameter_dependencies {
+                    dependency_graph.add_depends_on_parameter(
+                        model_path.clone(),
+                        parameter.ident.clone(),
+                        dependency.clone(),
+                    );
+                }
+
+                for dependency in &dependencies.external_dependencies {
+                    dependency_graph.add_depends_on_external(
+                        model_path.clone(),
+                        parameter.ident.clone(),
+                        dependency.clone(),
+                    );
+                }
+            }
+        }
+
+        dependency_graph
     }
 }

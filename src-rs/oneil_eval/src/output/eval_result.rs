@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
-use crate::{ModelError, value::Value};
+use crate::{ModelError, output::dependency::DependencySet, value::Value};
 
 /// The result of evaluating a model hierarchy.
 ///
@@ -256,6 +256,8 @@ pub struct Parameter {
     pub print_level: PrintLevel,
     /// The debug information for this parameter, if requested.
     pub debug_info: Option<DebugInfo>,
+    /// The dependencies of this parameter.
+    pub dependencies: DependencySet,
 }
 
 impl Parameter {
