@@ -29,11 +29,11 @@ pub struct ModelPrintConfig {
     pub no_parameters: bool,
 }
 
-pub fn divider_line() -> String {
+fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print(model_result: &result::EvalResult, model_config: &ModelPrintConfig) {
+pub fn print_eval_result(model_result: &result::EvalResult, model_config: &ModelPrintConfig) {
     let top_model = model_result.get_top_model();
     let test_info = get_model_tests(top_model, model_config.recursive, TestInfo::default());
 
@@ -54,6 +54,29 @@ pub fn print(model_result: &result::EvalResult, model_config: &ModelPrintConfig)
         } else {
             print_parameters_by_filter(top_model, model_config.print_debug_info, model_config);
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestPrintConfig {
+    pub no_header: bool,
+    pub no_test_report: bool,
+    pub recursive: bool,
+}
+
+pub fn print_test_results(model_result: &result::EvalResult, test_config: &TestPrintConfig) {
+    let top_model = model_result.get_top_model();
+    let test_info = get_model_tests(top_model, test_config.recursive, TestInfo::default());
+
+    let divider_line = divider_line();
+    println!("{divider_line}");
+
+    if !test_config.no_header {
+        print_model_header(top_model.path(), &test_info);
+    }
+
+    if !test_config.no_test_report {
+        print_all_tests(top_model, test_config.recursive);
     }
 }
 
@@ -147,8 +170,8 @@ fn print_model_failing_tests(model_path: &Path, failing_tests: &[(Span, &result:
         let test_expr_str = file_contents.get(test_start_offset..test_end_offset);
 
         if let Some(test_expr_str) = test_expr_str {
-            let test_label = stylesheet::FAILING_TEST_LABEL.style("test:");
-            let test_expr_str = stylesheet::FAILING_TEST_EXPR_STR.style(test_expr_str);
+            let test_label = stylesheet::TEST_EXPR_LABEL.style("test:");
+            let test_expr_str = stylesheet::TEST_EXPR_STR.style(test_expr_str);
             println!("{test_label} {test_expr_str}");
         } else {
             let error_label = stylesheet::ERROR_COLOR.style("error");
@@ -442,4 +465,72 @@ fn print_number_value(value: &value::Number) {
 fn print_number_unit(unit: &value::Unit) {
     let styled_display_unit = stylesheet::PARAMETER_UNIT.style(unit.display_unit.to_string());
     print!(" :{styled_display_unit}");
+}
+
+fn print_all_tests(model_ref: result::ModelReference<'_>, recursive: bool) {
+    let model_path = model_ref.path();
+    let tests = model_ref.tests();
+
+    if recursive && !tests.is_empty() {
+        print_model_path_header(model_path);
+    }
+
+    let file_contents = std::fs::read_to_string(model_path);
+
+    let file_contents = match file_contents {
+        Ok(file_contents) => file_contents,
+        Err(e) => {
+            let error_label = stylesheet::ERROR_COLOR.style("error");
+
+            println!(
+                "{error_label}: couldn't read `{}` - {}",
+                model_path.display(),
+                e
+            );
+
+            return;
+        }
+    };
+
+    for test in &tests {
+        let test_start_offset = test.expr_span.start().offset;
+        let test_end_offset = test.expr_span.end().offset;
+        let test_expr_str = file_contents.get(test_start_offset..test_end_offset);
+
+        if let Some(test_expr_str) = test_expr_str {
+            let test_label = stylesheet::TEST_EXPR_LABEL.style("test:");
+            let test_expr_str = stylesheet::TEST_EXPR_STR.style(test_expr_str);
+            println!("{test_label} {test_expr_str}");
+        } else {
+            let error_label = stylesheet::ERROR_COLOR.style("error");
+            let test_start_line = test.expr_span.start().line;
+            let test_start_column = test.expr_span.start().column;
+
+            println!(
+                "{error_label}: couldn't get test expression for test at line {test_start_line}, column {test_start_column}"
+            );
+        }
+
+        match &test.result {
+            result::TestResult::Passed => {
+                let test_result_str = stylesheet::TESTS_PASS_COLOR.style("PASS");
+                println!("  Result: {test_result_str}");
+            }
+            result::TestResult::Failed { debug_info } => {
+                let test_result_str = stylesheet::TESTS_FAIL_COLOR.style("FAIL");
+                println!("  Result: {test_result_str}");
+                print_debug_info(debug_info);
+            }
+        }
+    }
+
+    if recursive {
+        if !tests.is_empty() {
+            println!();
+        }
+
+        for reference in model_ref.references().values() {
+            print_all_tests(*reference, recursive);
+        }
+    }
 }

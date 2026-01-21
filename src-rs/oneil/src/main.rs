@@ -29,7 +29,7 @@ use oneil_runner::{
 
 use crate::{
     command::{CliCommand, Commands, DevCommand, EvalArgs, TestArgs},
-    print_model_result::ModelPrintConfig,
+    print_model_result::{ModelPrintConfig, TestPrintConfig},
 };
 
 mod command;
@@ -220,12 +220,7 @@ fn handle_eval_command(args: EvalArgs) {
         no_parameters,
     };
 
-    let builtins = Builtins::new(
-        oneil_std::builtin_values(),
-        oneil_std::builtin_functions(),
-        oneil_std::builtin_units(),
-        oneil_std::builtin_prefixes(),
-    );
+    let builtins = create_builtins();
 
     if watch {
         watch_model(&file, &builtins, &model_print_config);
@@ -371,7 +366,7 @@ fn print_model_result(model_result: &EvalResult, model_print_config: &ModelPrint
     }
 
     if errors.is_empty() || model_print_config.display_partial_results {
-        print_model_result::print(model_result, model_print_config);
+        print_model_result::print_eval_result(model_result, model_print_config);
     }
 }
 
@@ -438,9 +433,21 @@ fn clear_screen() {
 fn handle_test_command(args: TestArgs) {
     let TestArgs {
         file,
+        recursive,
         no_header,
         no_test_report,
     } = args;
 
-    todo!()
+    let test_print_config = TestPrintConfig {
+        no_header,
+        no_test_report,
+        recursive,
+    };
+
+    let builtins = create_builtins();
+    let (model_result, _watch_paths) = eval_model(&file, &builtins);
+
+    if let Some(model_result) = model_result {
+        print_model_result::print_test_results(&model_result, &test_print_config);
+    }
 }

@@ -136,6 +136,13 @@ pub struct TestArgs {
     #[arg(value_name = "FILE")]
     pub file: PathBuf,
 
+    /// Print submodel test results recursively
+    ///
+    /// By default, only the top model test results are printed. When enabled,
+    /// submodel test results are also printed.
+    #[arg(long)]
+    pub recursive: bool,
+
     /// Don't print the results header
     #[arg(long)]
     pub no_header: bool,
