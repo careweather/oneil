@@ -28,7 +28,7 @@ use oneil_runner::{
 };
 
 use crate::{
-    command::{CliCommand, Commands, DevCommand, EvalArgs, TestArgs},
+    command::{CliCommand, Commands, DevCommand, EvalArgs, TestArgs, TreeArgs},
     print_model_result::{ModelPrintConfig, TestPrintConfig},
 };
 
@@ -53,6 +53,7 @@ fn main() {
         Commands::Dev { command } => handle_dev_command(command),
         Commands::Eval(args) => handle_eval_command(args),
         Commands::Test(args) => handle_test_command(args),
+        Commands::Tree(args) => handle_tree_command(args),
     }
 }
 
@@ -450,4 +451,16 @@ fn handle_test_command(args: TestArgs) {
     if let Some(model_result) = model_result {
         print_model_result::print_test_results(&model_result, &test_print_config);
     }
+}
+
+fn handle_tree_command(args: TreeArgs) {
+    let TreeArgs {
+        file,
+        params,
+        list_refs,
+        recursive,
+        depth,
+    } = args;
+
+    if list_refs { todo!() } else { todo!() }
 }

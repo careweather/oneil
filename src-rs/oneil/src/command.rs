@@ -31,6 +31,9 @@ pub enum Commands {
     #[clap(visible_alias = "t")]
     Test(TestArgs),
 
+    /// Print the dependency or "requires" tree for one or more parameters
+    Tree(TreeArgs),
+
     /// Run the LSP
     Lsp {},
 
@@ -150,6 +153,39 @@ pub struct TestArgs {
     /// Don't print the test report
     #[arg(long)]
     pub no_test_report: bool,
+}
+
+#[derive(Args)]
+pub struct TreeArgs {
+    /// Path to the Oneil model file to print the tree for
+    #[arg(value_name = "FILE")]
+    pub file: PathBuf,
+
+    /// The parameter to print the tree for
+    #[arg(value_name = "PARAM", required = true)]
+    pub params: Vec<String>,
+
+    /// Print the tree of parameter references
+    ///
+    /// By default, the tree printed represents the dependencies
+    /// of the provided parameters. When enabled, the tree instead
+    /// represents parameters where the provided parameters are referenced.
+    #[arg(long)]
+    pub list_refs: bool,
+
+    /// Print submodel values in the tree
+    ///
+    /// By default, only the top model values are included in the tree. When enabled,
+    /// submodel values are also included in the tree.
+    #[arg(long)]
+    pub recursive: bool,
+
+    /// Depth of the tree to print
+    ///
+    /// By default, the tree is printed to the full depth. When enabled,
+    /// the tree is printed to the specified depth.
+    #[arg(long)]
+    pub depth: Option<usize>,
 }
 
 /// Development-specific commands for the Oneil CLI
