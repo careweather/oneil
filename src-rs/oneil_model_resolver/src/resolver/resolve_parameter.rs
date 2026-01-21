@@ -411,8 +411,6 @@ pub fn get_parameter_dependencies(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use crate::{
         error::VariableResolutionError,
         test::{
