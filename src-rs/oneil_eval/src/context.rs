@@ -491,7 +491,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         model_path: &Path,
         reference_name: Option<&str>,
         parameter_name: &str,
-    ) -> Option<Tree<DependencyTreeValue>> {
+    ) -> (Option<Tree<DependencyTreeValue>>, Vec<ModelError>) {
         let dependency_graph = self.get_dependency_graph();
         return recurse(
             self,
@@ -511,9 +511,12 @@ impl<F: BuiltinFunction> EvalContext<F> {
             reference_name: Option<&str>,
             parameter_name: &str,
             dependency_graph: &DependencyGraph,
-        ) -> Option<Tree<DependencyTreeValue>> {
-            let value =
-                context.get_dependency_tree_value(model_path, reference_name, parameter_name)?;
+        ) -> (Option<Tree<DependencyTreeValue>>, Vec<ModelError>) {
+            let Some(value) =
+                context.get_dependency_tree_value(model_path, reference_name, parameter_name)
+            else {
+                return (None, Vec::new());
+            };
 
             let deps = dependency_graph
                 .depends_on(model_path, parameter_name)
@@ -533,7 +536,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
                 Tree::new(tree_value, Vec::new())
             });
 
-            let parameter_deps = deps.parameter_dependencies.iter().filter_map(|dep| {
+            let parameter_deps = deps.parameter_dependencies.iter().map(|dep| {
                 recurse(
                     context,
                     model_path,
@@ -543,7 +546,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
                 )
             });
 
-            let external_deps = deps.external_dependencies.iter().filter_map(|dep| {
+            let external_deps = deps.external_dependencies.iter().map(|dep| {
                 recurse(
                     context,
                     &dep.model_path,
@@ -553,12 +556,23 @@ impl<F: BuiltinFunction> EvalContext<F> {
                 )
             });
 
-            let children = builtin_deps
-                .chain(parameter_deps)
-                .chain(external_deps)
-                .collect::<Vec<_>>();
+            let (param_children, errors): (Vec<_>, Vec<_>) =
+                parameter_deps.chain(external_deps).unzip();
 
-            Some(Tree::new(value, children))
+            let param_children = param_children.into_iter().flatten();
+            let errors = errors.into_iter().flatten().collect();
+
+            let children = builtin_deps.chain(param_children).collect();
+
+            match value {
+                Ok(value) => (Some(Tree::new(value, children)), errors),
+                Err(value_errors) => {
+                    let mut all_errors = value_errors;
+                    all_errors.extend(errors);
+
+                    (None, all_errors)
+                }
+            }
         }
     }
 
@@ -567,9 +581,24 @@ impl<F: BuiltinFunction> EvalContext<F> {
         model_path: &Path,
         reference_name: Option<&str>,
         parameter_name: &str,
-    ) -> Option<DependencyTreeValue> {
+    ) -> Option<Result<DependencyTreeValue, Vec<ModelError>>> {
         let model = self.models.get(model_path)?;
-        let parameter = model.parameters.get(parameter_name)?.as_ref().ok()?;
+        let parameter = model.parameters.get(parameter_name)?.as_ref();
+
+        let parameter = match parameter {
+            Ok(parameter) => parameter,
+            Err(errors) => {
+                let errors = errors
+                    .iter()
+                    .map(|error| ModelError {
+                        model_path: model_path.to_path_buf(),
+                        error: error.clone(),
+                    })
+                    .collect();
+
+                return Some(Err(errors));
+            }
+        };
 
         let reference_name = reference_name.map(str::to_string);
         let parameter_name = parameter_name.to_string();
@@ -586,7 +615,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
             display_info,
         };
 
-        Some(tree_value)
+        Some(Ok(tree_value))
     }
 
     /// Gets the "requires" tree for a specific parameter.
@@ -598,7 +627,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         &self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> Option<Tree<RequiresTreeValue>> {
+    ) -> (Option<Tree<RequiresTreeValue>>, Vec<ModelError>) {
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, parameter_name, &dependency_graph);
 
@@ -611,18 +640,21 @@ impl<F: BuiltinFunction> EvalContext<F> {
             model_path: &Path,
             parameter_name: &str,
             dependency_graph: &DependencyGraph,
-        ) -> Option<Tree<RequiresTreeValue>> {
-            let value = context.get_requires_tree_value(model_path, parameter_name)?;
+        ) -> (Option<Tree<RequiresTreeValue>>, Vec<ModelError>) {
+            let Some(value) = context.get_requires_tree_value(model_path, parameter_name) else {
+                return (None, Vec::new());
+            };
 
             let deps = dependency_graph
                 .requires(model_path, parameter_name)
                 .expect("dependency graph should have parameter");
 
-            let parameter_deps = deps.parameter_requires.iter().filter_map(|dep| {
-                recurse(context, model_path, &dep.parameter_name, dependency_graph)
-            });
+            let parameter_deps = deps
+                .parameter_requires
+                .iter()
+                .map(|dep| recurse(context, model_path, &dep.parameter_name, dependency_graph));
 
-            let external_deps = deps.external_requires.iter().filter_map(|dep| {
+            let external_deps = deps.external_requires.iter().map(|dep| {
                 recurse(
                     context,
                     &dep.model_path,
@@ -631,9 +663,19 @@ impl<F: BuiltinFunction> EvalContext<F> {
                 )
             });
 
-            let children = parameter_deps.chain(external_deps).collect::<Vec<_>>();
+            let (children, errors): (Vec<_>, Vec<_>) = parameter_deps.chain(external_deps).unzip();
+            let children = children.into_iter().flatten().collect();
+            let errors = errors.into_iter().flatten().collect();
 
-            Some(Tree::new(value, children))
+            match value {
+                Ok(value) => (Some(Tree::new(value, children)), errors),
+                Err(value_errors) => {
+                    let mut all_errors = value_errors;
+                    all_errors.extend(errors);
+
+                    (None, all_errors)
+                }
+            }
         }
     }
 
@@ -641,9 +683,24 @@ impl<F: BuiltinFunction> EvalContext<F> {
         &self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> Option<RequiresTreeValue> {
+    ) -> Option<Result<RequiresTreeValue, Vec<ModelError>>> {
         let model = self.models.get(model_path)?;
-        let parameter = model.parameters.get(parameter_name)?.as_ref().ok()?;
+        let parameter = model.parameters.get(parameter_name)?.as_ref();
+
+        let parameter = match parameter {
+            Ok(parameter) => parameter,
+            Err(errors) => {
+                let errors = errors
+                    .iter()
+                    .map(|error| ModelError {
+                        model_path: model_path.to_path_buf(),
+                        error: error.clone(),
+                    })
+                    .collect();
+
+                return Some(Err(errors));
+            }
+        };
 
         let model_path = model_path.to_path_buf();
 
@@ -661,6 +718,6 @@ impl<F: BuiltinFunction> EvalContext<F> {
             display_info,
         };
 
-        Some(tree_value)
+        Some(Ok(tree_value))
     }
 }
