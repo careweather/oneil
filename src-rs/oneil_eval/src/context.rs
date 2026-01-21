@@ -486,20 +486,13 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// The tree shows all parameters, builtin values, and external dependencies
     /// that the specified parameter depends on, recursively.
     #[must_use]
-    pub fn get_dependency_parameter_tree(
+    pub fn get_dependency_tree(
         &self,
         model_path: &Path,
-        reference_name: Option<&str>,
         parameter_name: &str,
     ) -> (Option<Tree<DependencyTreeValue>>, Vec<ModelError>) {
         let dependency_graph = self.get_dependency_graph();
-        return recurse(
-            self,
-            model_path,
-            reference_name,
-            parameter_name,
-            &dependency_graph,
-        );
+        return recurse(self, model_path, None, parameter_name, &dependency_graph);
 
         #[expect(
             clippy::items_after_statements,

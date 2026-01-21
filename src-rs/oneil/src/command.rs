@@ -186,6 +186,13 @@ pub struct TreeArgs {
     /// the tree is printed to the specified depth.
     #[arg(long)]
     pub depth: Option<usize>,
+
+    /// Display partial trees even if there are errors
+    ///
+    /// If errors occurred during evaluation, errors will be printed,
+    /// then the partial trees will be printed.
+    #[arg(long)]
+    pub partial: bool,
 }
 
 /// Development-specific commands for the Oneil CLI

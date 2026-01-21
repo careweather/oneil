@@ -17,6 +17,7 @@ use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use notify::Watcher;
 use oneil_eval::{
+    EvalContext,
     builtin::{BuiltinFunction, std as oneil_std},
     output::eval_result::EvalResult,
 };
@@ -30,6 +31,7 @@ use oneil_runner::{
 use crate::{
     command::{CliCommand, Commands, DevCommand, EvalArgs, TestArgs, TreeArgs},
     print_model_result::{ModelPrintConfig, TestPrintConfig},
+    print_tree::TreePrintConfig,
 };
 
 mod command;
@@ -38,6 +40,7 @@ mod print_ast;
 mod print_error;
 mod print_ir;
 mod print_model_result;
+mod print_tree;
 mod stylesheet;
 
 /// Main entry point for the Oneil CLI application
@@ -226,9 +229,13 @@ fn handle_eval_command(args: EvalArgs) {
     if watch {
         watch_model(&file, &builtins, &model_print_config);
     } else {
-        let (model_result, _watch_paths) = eval_model(&file, &builtins);
+        let (eval_context, _watch_paths) = eval_model(&file, &builtins);
 
-        if let Some(model_result) = model_result {
+        if let Some(eval_context) = eval_context {
+            let model_result = eval_context
+                .get_model_result(&file)
+                .expect("model should be evaluated");
+
             print_model_result(&model_result, &model_print_config);
         }
     }
@@ -256,9 +263,13 @@ fn watch_model<F: BuiltinFunction + Clone>(
     clear_screen();
     let mut watch_paths = HashSet::new();
 
-    let (model_result, new_watch_paths) = eval_model(file, builtins);
+    let (eval_context, new_watch_paths) = eval_model(file, builtins);
 
-    if let Some(model_result) = model_result {
+    if let Some(eval_context) = eval_context {
+        let model_result = eval_context
+            .get_model_result(file)
+            .expect("model should be evaluated");
+
         print_model_result(&model_result, model_print_config);
     }
 
@@ -273,9 +284,13 @@ fn watch_model<F: BuiltinFunction + Clone>(
                 notify::EventKind::Modify(_) => {
                     clear_screen();
 
-                    let (model_result, new_watch_paths) = eval_model(file, builtins);
+                    let (eval_context, new_watch_paths) = eval_model(file, builtins);
 
-                    if let Some(model_result) = model_result {
+                    if let Some(eval_context) = eval_context {
+                        let model_result = eval_context
+                            .get_model_result(file)
+                            .expect("model should be evaluated");
+
                         print_model_result(&model_result, model_print_config);
                     }
 
@@ -302,7 +317,7 @@ fn watch_model<F: BuiltinFunction + Clone>(
 fn eval_model<F: BuiltinFunction + Clone>(
     file: &Path,
     builtins: &Builtins<F>,
-) -> (Option<EvalResult>, HashSet<PathBuf>) {
+) -> (Option<EvalContext<F>>, HashSet<PathBuf>) {
     let model_collection =
         oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
     let model_collection = match model_collection {
@@ -331,13 +346,10 @@ fn eval_model<F: BuiltinFunction + Clone>(
     // TODO: remove this clone?
     let eval_context =
         oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map.clone());
-    let model_result = eval_context
-        .get_model_result(file)
-        .expect("model should be evaluated");
 
     let watch_paths = watch_paths_from_model_collection(&model_collection);
 
-    (Some(model_result), watch_paths)
+    (Some(eval_context), watch_paths)
 }
 
 fn watch_paths_from_model_collection(model_collection: &ir::ModelCollection) -> HashSet<PathBuf> {
@@ -446,9 +458,13 @@ fn handle_test_command(args: TestArgs) {
     };
 
     let builtins = create_builtins();
-    let (model_result, _watch_paths) = eval_model(&file, &builtins);
+    let (eval_context, _watch_paths) = eval_model(&file, &builtins);
 
-    if let Some(model_result) = model_result {
+    if let Some(eval_context) = eval_context {
+        let model_result = eval_context
+            .get_model_result(&file)
+            .expect("model should be evaluated");
+
         print_model_result::print_test_results(&model_result, &test_print_config);
     }
 }
@@ -460,7 +476,65 @@ fn handle_tree_command(args: TreeArgs) {
         list_refs,
         recursive,
         depth,
+        partial,
     } = args;
 
-    if list_refs { todo!() } else { todo!() }
+    let tree_print_config = TreePrintConfig {
+        recursive,
+        depth,
+        partial,
+    };
+
+    let builtins = create_builtins();
+    let (eval_context, _watch_paths) = eval_model(&file, &builtins);
+
+    let Some(eval_context) = eval_context else {
+        return;
+    };
+
+    for param in params {
+        if list_refs {
+            let (requires_tree, errors) = eval_context.get_requires_tree(&file, &param);
+
+            for error in &errors {
+                let error = convert_error::eval::convert(error);
+
+                if let Some(error) = error {
+                    print_error::print(&error, false);
+                    eprintln!();
+                }
+                eprintln!();
+            }
+
+            if errors.is_empty() || partial {
+                if let Some(requires_tree) = requires_tree {
+                    print_tree::print_requires_tree(&requires_tree, &tree_print_config);
+                } else {
+                    let error_label = stylesheet::ERROR_COLOR.bold().style("error:");
+                    eprintln!("{error_label} parameter \"{param}\" not found in model");
+                }
+            }
+        } else {
+            let (dependency_tree, errors) = eval_context.get_dependency_tree(&file, &param);
+
+            for error in &errors {
+                let error = convert_error::eval::convert(error);
+
+                if let Some(error) = error {
+                    print_error::print(&error, false);
+                    eprintln!();
+                }
+                eprintln!();
+            }
+
+            if errors.is_empty() || partial {
+                if let Some(dependency_tree) = dependency_tree {
+                    print_tree::print_dependency_tree(&dependency_tree, &tree_print_config);
+                } else {
+                    let error_label = stylesheet::ERROR_COLOR.bold().style("error:");
+                    eprintln!("{error_label} parameter \"{param}\" not found in model");
+                }
+            }
+        }
+    }
 }
