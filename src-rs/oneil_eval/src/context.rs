@@ -11,7 +11,11 @@ use oneil_shared::span::Span;
 use crate::{
     builtin::{BuiltinFunction, BuiltinMap},
     error::{EvalError, ModelError},
-    output::{dependency::DependencyGraph, eval_result},
+    output::{
+        dependency::{DependencyGraph, DependencyTreeValue, RequiresTreeValue},
+        eval_result,
+        tree::Tree,
+    },
     value::{Unit, Value},
 };
 
@@ -405,5 +409,174 @@ impl<F: BuiltinFunction> EvalContext<F> {
         }
 
         dependency_graph
+    }
+
+    pub fn get_dependency_parameter_tree(
+        &self,
+        model_path: &Path,
+        reference_name: Option<&str>,
+        parameter_name: &str,
+    ) -> Option<Tree<DependencyTreeValue>> {
+        let dependency_graph = self.get_dependency_graph();
+        return recurse(
+            self,
+            model_path,
+            reference_name,
+            parameter_name,
+            &dependency_graph,
+        );
+
+        #[expect(
+            clippy::items_after_statements,
+            reason = "this is an internal recursive function, we keep it here for clarity"
+        )]
+        fn recurse<F: BuiltinFunction>(
+            context: &EvalContext<F>,
+            model_path: &Path,
+            reference_name: Option<&str>,
+            parameter_name: &str,
+            dependency_graph: &DependencyGraph,
+        ) -> Option<Tree<DependencyTreeValue>> {
+            let value =
+                context.get_dependency_tree_value(model_path, reference_name, parameter_name)?;
+
+            let deps = dependency_graph.depends_on(model_path, parameter_name)?;
+
+            let builtin_deps = deps.builtin_dependencies.iter().map(|dep| {
+                let parameter_value =
+                    context.lookup_builtin_variable(&ir::Identifier::new(dep.ident.clone()));
+
+                let tree_value = DependencyTreeValue {
+                    reference_name: None,
+                    parameter_name: dep.ident.clone(),
+                    parameter_value,
+                    display_info: None,
+                };
+
+                Tree::new(tree_value, Vec::new())
+            });
+
+            let parameter_deps = deps.parameter_dependencies.iter().filter_map(|dep| {
+                recurse(
+                    context,
+                    model_path,
+                    reference_name,
+                    &dep.parameter_name,
+                    dependency_graph,
+                )
+            });
+
+            let external_deps = deps.external_dependencies.iter().filter_map(|dep| {
+                recurse(
+                    context,
+                    &dep.model_path,
+                    Some(&dep.reference_name),
+                    &dep.parameter_name,
+                    dependency_graph,
+                )
+            });
+
+            let children = builtin_deps
+                .chain(parameter_deps)
+                .chain(external_deps)
+                .collect::<Vec<_>>();
+
+            Some(Tree::new(value, children))
+        }
+    }
+
+    fn get_dependency_tree_value(
+        &self,
+        model_path: &Path,
+        reference_name: Option<&str>,
+        parameter_name: &str,
+    ) -> Option<DependencyTreeValue> {
+        let model = self.models.get(model_path)?;
+        let parameter = model.parameters.get(parameter_name)?.as_ref().ok()?;
+
+        let reference_name = reference_name.map(str::to_string);
+        let parameter_name = parameter_name.to_string();
+
+        let parameter_value = parameter.value.clone();
+
+        let span = parameter.expr_span;
+        let display_info = Some((model_path.to_path_buf(), span));
+
+        let tree_value = DependencyTreeValue {
+            reference_name,
+            parameter_name,
+            parameter_value,
+            display_info,
+        };
+
+        Some(tree_value)
+    }
+
+    pub fn get_requires_tree(
+        &self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> Option<Tree<RequiresTreeValue>> {
+        let dependency_graph = self.get_dependency_graph();
+        return recurse(self, model_path, parameter_name, &dependency_graph);
+
+        #[expect(
+            clippy::items_after_statements,
+            reason = "this is an internal recursive function, we keep it here for clarity"
+        )]
+        fn recurse<F: BuiltinFunction>(
+            context: &EvalContext<F>,
+            model_path: &Path,
+            parameter_name: &str,
+            dependency_graph: &DependencyGraph,
+        ) -> Option<Tree<RequiresTreeValue>> {
+            let value = context.get_requires_tree_value(model_path, parameter_name)?;
+
+            let deps = dependency_graph.requires(model_path, parameter_name)?;
+
+            let parameter_deps = deps.parameter_requires.iter().filter_map(|dep| {
+                recurse(context, model_path, &dep.parameter_name, dependency_graph)
+            });
+
+            let external_deps = deps.external_requires.iter().filter_map(|dep| {
+                recurse(
+                    context,
+                    &dep.model_path,
+                    &dep.parameter_name,
+                    dependency_graph,
+                )
+            });
+
+            let children = parameter_deps.chain(external_deps).collect::<Vec<_>>();
+
+            Some(Tree::new(value, children))
+        }
+    }
+
+    fn get_requires_tree_value(
+        &self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> Option<RequiresTreeValue> {
+        let model = self.models.get(model_path)?;
+        let parameter = model.parameters.get(parameter_name)?.as_ref().ok()?;
+
+        let model_path = model_path.to_path_buf();
+
+        let parameter_name = parameter_name.to_string();
+
+        let parameter_value = parameter.value.clone();
+
+        let span = parameter.expr_span;
+        let display_info = (model_path.clone(), span);
+
+        let tree_value = RequiresTreeValue {
+            model_path,
+            parameter_name,
+            parameter_value,
+            display_info,
+        };
+
+        Some(tree_value)
     }
 }

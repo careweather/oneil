@@ -258,6 +258,8 @@ pub struct Parameter {
     pub debug_info: Option<DebugInfo>,
     /// The dependencies of this parameter.
     pub dependencies: DependencySet,
+    /// The span of the parameter expression.
+    pub expr_span: Span,
 }
 
 impl Parameter {

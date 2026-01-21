@@ -1,8 +1,27 @@
 //!  A dependency graph for the results of evaluating Oneil models.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
+use oneil_shared::span::Span;
+
+use crate::value::Value;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DependencyTreeValue {
+    pub reference_name: Option<String>,
+    pub parameter_name: String,
+    pub parameter_value: Value,
+    pub display_info: Option<(PathBuf, Span)>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RequiresTreeValue {
+    pub model_path: PathBuf,
+    pub parameter_name: String,
+    pub parameter_value: Value,
+    pub display_info: (PathBuf, Span),
+}
 
 /// A dependency graph for the results of evaluating Oneil models.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,6 +125,18 @@ impl DependencyGraph {
             .external_requires
             .insert(requires);
     }
+
+    pub fn depends_on(&self, model_path: &Path, parameter_name: &str) -> Option<&DependencySet> {
+        self.depends_on
+            .get(model_path)
+            .and_then(|model| model.get(parameter_name))
+    }
+
+    pub fn requires(&self, model_path: &Path, parameter_name: &str) -> Option<&RequiresSet> {
+        self.required_by
+            .get(model_path)
+            .and_then(|model| model.get(parameter_name))
+    }
 }
 
 impl Default for DependencyGraph {
@@ -154,9 +185,9 @@ impl Default for DependencySet {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequiresSet {
     /// Parameters within the same model that require this parameter.
-    parameter_requires: IndexSet<ParameterRequires>,
+    pub parameter_requires: IndexSet<ParameterRequires>,
     /// External models that require this parameter.
-    external_requires: IndexSet<ExternalRequires>,
+    pub external_requires: IndexSet<ExternalRequires>,
 }
 
 impl RequiresSet {

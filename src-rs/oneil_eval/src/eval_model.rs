@@ -66,7 +66,8 @@ pub fn eval_model<F: BuiltinFunction>(
 
         let value = eval_parameter::eval_parameter(parameter, &context);
 
-        let parameter_result = value.map(|value| parameter_result_from(value, parameter, &context));
+        let parameter_result = value
+            .map(|value| parameter_result_from(value.value, value.expr_span, parameter, &context));
 
         context.add_parameter_result(parameter_name.as_str().to_string(), parameter_result);
     }
@@ -85,6 +86,7 @@ pub fn eval_model<F: BuiltinFunction>(
 
 fn parameter_result_from<F: BuiltinFunction>(
     value: Value,
+    expr_span: Span,
     parameter: &ir::Parameter,
     context: &EvalContext<F>,
 ) -> eval_result::Parameter {
@@ -172,6 +174,7 @@ fn parameter_result_from<F: BuiltinFunction>(
         print_level,
         debug_info,
         dependencies,
+        expr_span,
     }
 }
 

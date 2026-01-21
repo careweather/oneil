@@ -12,8 +12,8 @@ use crate::{
 };
 
 pub struct EvalParameterResult {
-    value: Value,
-    expr_span: Span,
+    pub value: Value,
+    pub expr_span: Span,
 }
 
 /// Evaluates a parameter and returns the resulting value.
