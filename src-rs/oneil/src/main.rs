@@ -33,7 +33,7 @@ use oneil_runner::{
 };
 
 use crate::{
-    command::{CliCommand, Commands, DevCommand, EvalArgs, TestArgs, TreeArgs},
+    command::{BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, TestArgs, TreeArgs},
     print_model_result::{ModelPrintConfig, TestPrintConfig},
     print_tree::TreePrintConfig,
 };
@@ -62,6 +62,7 @@ fn main() {
         Commands::Eval(args) => handle_eval_command(args),
         Commands::Test(args) => handle_test_command(args),
         Commands::Tree(args) => handle_tree_command(args),
+        Commands::Builtins { command } => handle_builtins_command(command),
     }
 }
 
@@ -581,4 +582,37 @@ fn handle_tree_command(args: TreeArgs) {
 fn print_param_not_found(param: &str) {
     let error_label = stylesheet::ERROR_COLOR.bold().style("error:");
     eprintln!("{error_label} parameter \"{param}\" not found in model");
+}
+
+fn handle_builtins_command(command: Option<BuiltinsCommand>) {
+    match command {
+        None | Some(BuiltinsCommand::All) => print_builtins_all(),
+        Some(BuiltinsCommand::Units) => print_builtins_units(),
+        Some(BuiltinsCommand::Functions) => print_builtins_functions(),
+        Some(BuiltinsCommand::Values) => print_builtins_values(),
+        Some(BuiltinsCommand::Prefixes) => print_builtins_prefixes(),
+    }
+}
+
+fn print_builtins_all() {
+    print_builtins_units();
+    print_builtins_functions();
+    print_builtins_values();
+    print_builtins_prefixes();
+}
+
+fn print_builtins_units() {
+    todo!()
+}
+
+fn print_builtins_functions() {
+    todo!()
+}
+
+fn print_builtins_values() {
+    todo!()
+}
+
+fn print_builtins_prefixes() {
+    todo!()
 }

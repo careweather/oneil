@@ -34,6 +34,13 @@ pub enum Commands {
     /// Print the dependency or "requires" tree for one or more parameters
     Tree(TreeArgs),
 
+    /// Print the builtins for the Oneil language
+    Builtins {
+        /// The builtins to print
+        #[command(subcommand)]
+        command: Option<BuiltinsCommand>,
+    },
+
     /// Run the LSP
     Lsp {},
 
@@ -193,6 +200,30 @@ pub struct TreeArgs {
     /// then the partial trees will be printed.
     #[arg(long)]
     pub partial: bool,
+}
+
+/// Available subcommands for the `Builtins` command
+#[derive(Subcommand, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinsCommand {
+    /// Print all the builtins
+    #[command(name = "all")]
+    All,
+
+    /// Print the builtin units
+    #[command(name = "unit")]
+    Units,
+
+    /// Print the builtin functions
+    #[command(name = "func")]
+    Functions,
+
+    /// Print the builtin values
+    #[command(name = "value")]
+    Values,
+
+    /// Print the builtin unit prefixes
+    #[command(name = "prefix")]
+    Prefixes,
 }
 
 /// Development-specific commands for the Oneil CLI
