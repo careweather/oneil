@@ -1401,4 +1401,10 @@ impl AsOneilError for EvalError {
             } => Vec::new(),
         }
     }
+
+    fn should_show_to_user(&self) -> bool {
+        // skip `ParameterHasError` errors because they are the result of
+        // another parameter having an error
+        !matches!(self, Self::ParameterHasError { .. })
+    }
 }

@@ -98,4 +98,8 @@ impl AsOneilError for ImportResolutionError {
             Self::FailedValidation { .. } => vec![],
         }
     }
+
+    fn should_show_to_user(&self) -> bool {
+        !matches!(self, Self::FailedValidation { .. })
+    }
 }
