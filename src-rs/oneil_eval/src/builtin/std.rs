@@ -972,7 +972,7 @@ mod fns {
         },
     };
 
-    pub const MIN_DESCRIPTION: &str = "Find the minimum value of the given values. If a value is an interval, the minimum value of the interval is used.";
+    pub const MIN_DESCRIPTION: &str = "Find the minimum value of the given values.\n\nIf a value is an interval, the minimum value of the interval is used.";
 
     #[expect(
         clippy::needless_pass_by_value,
@@ -1036,7 +1036,7 @@ mod fns {
         }
     }
 
-    pub const MAX_DESCRIPTION: &str = "Find the maximum value of the given values. If a value is an interval, the maximum value of the interval is used.";
+    pub const MAX_DESCRIPTION: &str = "Find the maximum value of the given values.\n\nIf a value is an interval, the maximum value of the interval is used.";
 
     #[expect(
         clippy::needless_pass_by_value,
@@ -1273,7 +1273,7 @@ mod fns {
         }])
     }
 
-    pub const RANGE_DESCRIPTION: &str = "Compute the range of values. With one argument (an interval), returns the difference between the maximum and minimum. With two arguments, returns the difference between them.";
+    pub const RANGE_DESCRIPTION: &str = "Compute the range of values.\n\nWith one argument (an interval), returns the difference between the maximum and minimum.\n\nWith two arguments, returns the difference between them.";
 
     pub fn range(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         match args.len() {
@@ -1357,7 +1357,7 @@ mod fns {
         }])
     }
 
-    pub const MID_DESCRIPTION: &str = "Compute the midpoint. With one argument (an interval), returns the midpoint of the interval. With two arguments, returns the midpoint between them.";
+    pub const MID_DESCRIPTION: &str = "Compute the midpoint.\n\nWith one argument (an interval), returns the midpoint of the interval.\n\nWith two arguments, returns the midpoint between them.";
 
     pub fn mid(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         match args.len() {
