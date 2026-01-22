@@ -24,9 +24,9 @@ pub struct DependencyTreeValue {
     pub display_info: Option<(PathBuf, Span)>,
 }
 
-/// A value in a requires tree
+/// A value in a reference tree
 #[derive(Debug, Clone, PartialEq)]
-pub struct RequiresTreeValue {
+pub struct ReferenceTreeValue {
     /// The path to the model containing the parameter
     pub model_path: PathBuf,
     /// The name of the parameter
@@ -41,7 +41,7 @@ pub struct RequiresTreeValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DependencyGraph {
     depends_on: IndexMap<PathBuf, IndexMap<String, DependencySet>>,
-    required_by: IndexMap<PathBuf, IndexMap<String, RequiresSet>>,
+    referenced_by: IndexMap<PathBuf, IndexMap<String, ReferenceSet>>,
 }
 
 impl DependencyGraph {
@@ -50,7 +50,7 @@ impl DependencyGraph {
     pub fn new() -> Self {
         Self {
             depends_on: IndexMap::new(),
-            required_by: IndexMap::new(),
+            referenced_by: IndexMap::new(),
         }
     }
 
@@ -89,19 +89,19 @@ impl DependencyGraph {
             parameter_name: dependency_parameter_name,
         } = dependency;
 
-        let requires = ParameterRequires {
+        let reference = ParameterReference {
             parameter_name: param_name,
         };
 
-        self.required_by
+        self.referenced_by
             // the model path is the same for both parameters
             // because they are in the same model
             .entry(param_path)
             .or_default()
             .entry(dependency_parameter_name)
             .or_default()
-            .parameter_requires
-            .insert(requires);
+            .parameter_references
+            .insert(reference);
     }
 
     /// Adds an external dependency to the graph.
@@ -125,19 +125,19 @@ impl DependencyGraph {
             parameter_name: dependency_parameter_name,
         } = dependency;
 
-        let requires = ExternalRequires {
+        let reference = ExternalReference {
             model_path: param_path,
             parameter_name: param_name,
             using_reference_name: dependency_reference_name,
         };
 
-        self.required_by
+        self.referenced_by
             .entry(dependency_model_path)
             .or_default()
             .entry(dependency_parameter_name)
             .or_default()
-            .external_requires
-            .insert(requires);
+            .external_references
+            .insert(reference);
     }
 
     /// Returns the parameters that depend on a given parameter.
@@ -147,10 +147,10 @@ impl DependencyGraph {
         model.get(parameter_name)
     }
 
-    /// Returns the parameters that require a given parameter.
+    /// Returns the parameters that reference a given parameter.
     #[must_use]
-    pub fn requires(&self, model_path: &Path, parameter_name: &str) -> Option<&RequiresSet> {
-        let model = self.required_by.get(model_path)?;
+    pub fn references(&self, model_path: &Path, parameter_name: &str) -> Option<&ReferenceSet> {
+        let model = self.referenced_by.get(model_path)?;
         model.get(parameter_name)
     }
 }
@@ -194,30 +194,30 @@ impl Default for DependencySet {
     }
 }
 
-/// A set of parameters that require a given parameter.
+/// A set of parameters that reference a given parameter.
 ///
-/// This structure tracks which other parameters or external models require
+/// This structure tracks which other parameters or external models reference
 /// a given parameter. This is the reverse mapping of dependencies.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RequiresSet {
-    /// Parameters within the same model that require this parameter.
-    pub parameter_requires: IndexSet<ParameterRequires>,
-    /// External models that require this parameter.
-    pub external_requires: IndexSet<ExternalRequires>,
+pub struct ReferenceSet {
+    /// Parameters within the same model that reference this parameter.
+    pub parameter_references: IndexSet<ParameterReference>,
+    /// External models that reference this parameter.
+    pub external_references: IndexSet<ExternalReference>,
 }
 
-impl RequiresSet {
-    /// Creates a new empty requires set.
+impl ReferenceSet {
+    /// Creates a new empty reference set.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            parameter_requires: IndexSet::new(),
-            external_requires: IndexSet::new(),
+            parameter_references: IndexSet::new(),
+            external_references: IndexSet::new(),
         }
     }
 }
 
-impl Default for RequiresSet {
+impl Default for ReferenceSet {
     fn default() -> Self {
         Self::new()
     }
@@ -251,25 +251,25 @@ pub struct ExternalDependency {
     pub parameter_name: String,
 }
 
-/// A requirement from another parameter within the same model.
+/// A reference from another parameter within the same model.
 ///
 /// This represents the reverse relationship of a `ParameterDependency`:
-/// it indicates that another parameter in the same model requires this parameter.
+/// it indicates that another parameter in the same model references this parameter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ParameterRequires {
-    /// The name of the parameter that requires this parameter.
+pub struct ParameterReference {
+    /// The name of the parameter that references this parameter.
     pub parameter_name: String,
 }
 
-/// A requirement from an external model.
+/// A reference from an external model.
 ///
 /// This represents the reverse relationship of an `ExternalDependency`:
-/// it indicates that a parameter in another model requires this parameter.
+/// it indicates that a parameter in another model references this parameter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ExternalRequires {
-    /// The path to the model that requires this parameter.
+pub struct ExternalReference {
+    /// The path to the model that references this parameter.
     pub model_path: PathBuf,
-    /// The name of the parameter in the external model that requires this parameter.
+    /// The name of the parameter in the external model that references this parameter.
     pub parameter_name: String,
     /// The reference name used by the external model to access this model.
     pub using_reference_name: String,

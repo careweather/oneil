@@ -6,7 +6,7 @@ use std::{
 use anstream::{print, println};
 use oneil_eval::{
     output::{
-        dependency::{DependencyTreeValue, RequiresTreeValue},
+        dependency::{DependencyTreeValue, ReferenceTreeValue},
         tree::Tree,
     },
     value::Value,
@@ -20,15 +20,15 @@ pub struct TreePrintConfig {
     pub depth: Option<usize>,
 }
 
-/// Prints a requires tree showing which parameters require a given parameter.
-pub fn print_requires_tree(
+/// Prints a reference tree showing which parameters reference a given parameter.
+pub fn print_reference_tree(
     top_model_path: &Path,
-    requires_tree: &Tree<RequiresTreeValue>,
+    reference_tree: &Tree<ReferenceTreeValue>,
     tree_print_config: &TreePrintConfig,
     file_cache: &mut HashMap<PathBuf, String>,
 ) {
     print_tree_node(
-        requires_tree,
+        reference_tree,
         tree_print_config,
         0,
         true,
@@ -38,7 +38,7 @@ pub fn print_requires_tree(
     );
 }
 
-/// Prints a dependency tree showing which parameters are required by a given parameter.
+/// Prints a dependency tree showing which parameters are referenced by a given parameter.
 pub fn print_dependency_tree(
     top_model_path: &Path,
     dependency_tree: &Tree<DependencyTreeValue>,
@@ -230,7 +230,7 @@ trait PrintableTreeValue {
     fn is_outside_top_model(&self, top_model_path: &Path) -> bool;
 }
 
-impl PrintableTreeValue for RequiresTreeValue {
+impl PrintableTreeValue for ReferenceTreeValue {
     fn get_styled_value_name(&self) -> String {
         let model_path = self.model_path.display();
         let styled_model_path = stylesheet::MODEL_LABEL.style(model_path);

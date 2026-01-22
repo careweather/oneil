@@ -12,7 +12,7 @@ use crate::{
     builtin::{BuiltinFunction, BuiltinMap},
     error::{EvalError, ModelError},
     output::{
-        dependency::{DependencyGraph, DependencyTreeValue, RequiresTreeValue},
+        dependency::{DependencyGraph, DependencyTreeValue, ReferenceTreeValue},
         eval_result,
         tree::Tree,
     },
@@ -614,16 +614,16 @@ impl<F: BuiltinFunction> EvalContext<F> {
         Some(Ok(tree_value))
     }
 
-    /// Gets the "requires" tree for a specific parameter.
+    /// Gets the reference tree for a specific parameter.
     ///
     /// The tree shows all parameters that depend on the specified parameter, recursively.
     /// This is the inverse of the dependency tree.
     #[must_use]
-    pub fn get_requires_tree(
+    pub fn get_reference_tree(
         &self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> (Option<Tree<RequiresTreeValue>>, Vec<ModelError>) {
+    ) -> (Option<Tree<ReferenceTreeValue>>, Vec<ModelError>) {
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, parameter_name, &dependency_graph);
 
@@ -636,24 +636,24 @@ impl<F: BuiltinFunction> EvalContext<F> {
             model_path: &Path,
             parameter_name: &str,
             dependency_graph: &DependencyGraph,
-        ) -> (Option<Tree<RequiresTreeValue>>, Vec<ModelError>) {
-            let Some(value) = context.get_requires_tree_value(model_path, parameter_name) else {
+        ) -> (Option<Tree<ReferenceTreeValue>>, Vec<ModelError>) {
+            let Some(value) = context.get_reference_tree_value(model_path, parameter_name) else {
                 return (None, Vec::new());
             };
 
             let deps = dependency_graph
-                .requires(model_path, parameter_name)
+                .references(model_path, parameter_name)
                 .cloned()
-                // if the parameter is not found, it has no requires
-                // so we return an empty requires set
+                // if the parameter is not found, it has no references
+                // so we return an empty reference set
                 .unwrap_or_default();
 
             let parameter_deps = deps
-                .parameter_requires
+                .parameter_references
                 .iter()
                 .map(|dep| recurse(context, model_path, &dep.parameter_name, dependency_graph));
 
-            let external_deps = deps.external_requires.iter().map(|dep| {
+            let external_deps = deps.external_references.iter().map(|dep| {
                 recurse(
                     context,
                     &dep.model_path,
@@ -678,11 +678,11 @@ impl<F: BuiltinFunction> EvalContext<F> {
         }
     }
 
-    fn get_requires_tree_value(
+    fn get_reference_tree_value(
         &self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> Option<Result<RequiresTreeValue, Vec<ModelError>>> {
+    ) -> Option<Result<ReferenceTreeValue, Vec<ModelError>>> {
         let model = self.models.get(model_path)?;
         let parameter = model.parameters.get(parameter_name)?.as_ref();
 
@@ -710,7 +710,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         let span = parameter.expr_span;
         let display_info = (model_path.clone(), span);
 
-        let tree_value = RequiresTreeValue {
+        let tree_value = ReferenceTreeValue {
             model_path,
             parameter_name,
             parameter_value,

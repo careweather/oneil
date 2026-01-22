@@ -20,7 +20,7 @@ use oneil_eval::{
     EvalContext,
     builtin::{BuiltinFunction, std as oneil_std},
     output::{
-        dependency::{DependencyTreeValue, RequiresTreeValue},
+        dependency::{DependencyTreeValue, ReferenceTreeValue},
         eval_result::EvalResult,
         tree::Tree,
     },
@@ -484,7 +484,7 @@ fn handle_test_command(args: TestArgs) {
 
 fn handle_tree_command(args: TreeArgs) {
     enum TreeResults {
-        RequiresTrees(Vec<(String, Option<Tree<RequiresTreeValue>>)>),
+        ReferenceTrees(Vec<(String, Option<Tree<ReferenceTreeValue>>)>),
         DependencyTrees(Vec<(String, Option<Tree<DependencyTreeValue>>)>),
     }
 
@@ -511,13 +511,13 @@ fn handle_tree_command(args: TreeArgs) {
         let mut errors = Vec::new();
 
         for param in params {
-            let (requires_tree, tree_errors) = eval_context.get_requires_tree(&file, &param);
+            let (reference_tree, tree_errors) = eval_context.get_reference_tree(&file, &param);
 
-            trees.push((param, requires_tree));
+            trees.push((param, reference_tree));
             errors.extend(tree_errors);
         }
 
-        (TreeResults::RequiresTrees(trees), errors)
+        (TreeResults::ReferenceTrees(trees), errors)
     } else {
         let mut trees = Vec::new();
         let mut errors = Vec::new();
@@ -549,13 +549,13 @@ fn handle_tree_command(args: TreeArgs) {
     let mut file_cache = std::collections::HashMap::new();
 
     match trees {
-        TreeResults::RequiresTrees(trees) => {
+        TreeResults::ReferenceTrees(trees) => {
             for (param, tree) in trees {
                 match tree {
-                    Some(requires_tree) => {
-                        print_tree::print_requires_tree(
+                    Some(reference_tree) => {
+                        print_tree::print_reference_tree(
                             &file,
-                            &requires_tree,
+                            &reference_tree,
                             &tree_print_config,
                             &mut file_cache,
                         );

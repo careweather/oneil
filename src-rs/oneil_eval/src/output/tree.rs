@@ -1,5 +1,5 @@
 //! Trees used for expressing relationships between parameters
-//! including dependencies and requirements.
+//! including dependencies and references.
 
 /// A tree of values with children.
 #[derive(Debug, Clone, PartialEq, Eq)]
