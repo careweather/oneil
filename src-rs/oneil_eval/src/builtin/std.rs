@@ -10,220 +10,272 @@ use crate::{
     value::{Dimension, DimensionMap, DisplayUnit, Number, Unit, Value},
 };
 
-/// The builtin values that come with Oneil:
-/// - `pi` - the mathematical constant π
-/// - `e` - the mathematical constant e
-#[must_use]
-pub fn builtin_values() -> IndexMap<String, Value> {
-    IndexMap::from([
-        (
-            "pi".to_string(),
-            Value::Number(Number::Scalar(std::f64::consts::PI)),
-        ),
-        (
-            "e".to_string(),
-            Value::Number(Number::Scalar(std::f64::consts::E)),
-        ),
-    ])
+struct StdBuiltinValue {
+    name: &'static str,
+    value: Value,
+    description: &'static str,
+}
+fn builtin_values_complete() -> impl Iterator<Item = StdBuiltinValue> {
+    [
+        StdBuiltinValue {
+            name: "pi",
+            value: Value::Number(Number::Scalar(std::f64::consts::PI)),
+            description: "The mathematical constant π",
+        },
+        StdBuiltinValue {
+            name: "e",
+            value: Value::Number(Number::Scalar(std::f64::consts::E)),
+            description: "The mathematical constant e",
+        },
+    ]
+    .into_iter()
 }
 
-/// The builtin unit prefixes that come with Oneil:
-/// - `q` - quecto
-/// - `r` - ronto
-/// - `y` - yocto
-/// - `z` - zepto
-/// - `a` - atto
-/// - `f` - femto
-/// - `p` - pico
-/// - `n` - nano
-/// - `u` - micro
-/// - `m` - milli
-/// - `k` - kilo
-/// - `M` - mega
-/// - `G` - giga
-/// - `T` - tera
-/// - `P` - peta
-/// - `E` - exa
-/// - `Z` - zetta
-/// - `Y` - yotta
-/// - `R` - ronna
-/// - `Q` - quetta
+/// The builtin values that come with Oneil:
+#[must_use]
+pub fn builtin_values() -> IndexMap<String, Value> {
+    builtin_values_complete()
+        .map(|value| (value.name.to_string(), value.value))
+        .collect()
+}
+
+/// The documentation for the builtin values that come with Oneil.
+#[must_use]
+pub fn builtin_values_docs() -> IndexMap<String, (String, Value)> {
+    builtin_values_complete()
+        .map(|value| {
+            (
+                value.name.to_string(),
+                (value.description.to_string(), value.value),
+            )
+        })
+        .collect()
+}
+
+struct StdBuiltinPrefix {
+    name: &'static str,
+    value: f64,
+    description: &'static str,
+}
+
+#[expect(clippy::too_many_lines, reason = "this is a list of builtin prefixes")]
+fn builtin_prefixes_complete() -> impl Iterator<Item = StdBuiltinPrefix> {
+    [
+        StdBuiltinPrefix {
+            name: "q",
+            value: 1e-30,
+            description: "quecto",
+        },
+        StdBuiltinPrefix {
+            name: "r",
+            value: 1e-27,
+            description: "ronto",
+        },
+        StdBuiltinPrefix {
+            name: "y",
+            value: 1e-24,
+            description: "yocto",
+        },
+        StdBuiltinPrefix {
+            name: "z",
+            value: 1e-21,
+            description: "zepto",
+        },
+        StdBuiltinPrefix {
+            name: "a",
+            value: 1e-18,
+            description: "atto",
+        },
+        StdBuiltinPrefix {
+            name: "f",
+            value: 1e-15,
+            description: "femto",
+        },
+        StdBuiltinPrefix {
+            name: "p",
+            value: 1e-12,
+            description: "pico",
+        },
+        StdBuiltinPrefix {
+            name: "n",
+            value: 1e-9,
+            description: "nano",
+        },
+        StdBuiltinPrefix {
+            name: "u",
+            value: 1e-6,
+            description: "micro",
+        },
+        StdBuiltinPrefix {
+            name: "m",
+            value: 1e-3,
+            description: "milli",
+        },
+        StdBuiltinPrefix {
+            name: "k",
+            value: 1e3,
+            description: "kilo",
+        },
+        StdBuiltinPrefix {
+            name: "M",
+            value: 1e6,
+            description: "mega",
+        },
+        StdBuiltinPrefix {
+            name: "G",
+            value: 1e9,
+            description: "giga",
+        },
+        StdBuiltinPrefix {
+            name: "T",
+            value: 1e12,
+            description: "tera",
+        },
+        StdBuiltinPrefix {
+            name: "P",
+            value: 1e15,
+            description: "peta",
+        },
+        StdBuiltinPrefix {
+            name: "E",
+            value: 1e18,
+            description: "exa",
+        },
+        StdBuiltinPrefix {
+            name: "Z",
+            value: 1e21,
+            description: "zetta",
+        },
+        StdBuiltinPrefix {
+            name: "Y",
+            value: 1e24,
+            description: "yotta",
+        },
+        StdBuiltinPrefix {
+            name: "R",
+            value: 1e27,
+            description: "ronna",
+        },
+        StdBuiltinPrefix {
+            name: "Q",
+            value: 1e30,
+            description: "quetta",
+        },
+    ]
+    .into_iter()
+}
+
+/// The builtin unit prefixes that come with Oneil.
 #[must_use]
 pub fn builtin_prefixes() -> IndexMap<String, f64> {
-    IndexMap::from(
-        [
-            ("q", 1e-30), // quecto
-            ("r", 1e-27), // ronto
-            ("y", 1e-24), // yocto
-            ("z", 1e-21), // zepto
-            ("a", 1e-18), // atto
-            ("f", 1e-15), // femto
-            ("p", 1e-12), // pico
-            ("n", 1e-9),  // nano
-            ("u", 1e-6),  // micro
-            ("m", 1e-3),  // milli
-            ("k", 1e3),   // kilo
-            ("M", 1e6),   // mega
-            ("G", 1e9),   // giga
-            ("T", 1e12),  // tera
-            ("P", 1e15),  // peta
-            ("E", 1e18),  // exa
-            ("Z", 1e21),  // zetta
-            ("Y", 1e24),  // yotta
-            ("R", 1e27),  // ronna
-            ("Q", 1e30),  // quetta
-        ]
-        .map(|(k, v)| (k.to_string(), v)),
-    )
+    builtin_prefixes_complete()
+        .map(|prefix| (prefix.name.to_string(), prefix.value))
+        .collect()
+}
+
+/// The documentation for the builtin prefixes that come with Oneil.
+#[must_use]
+pub fn builtin_prefixes_docs() -> IndexMap<String, (String, f64)> {
+    builtin_prefixes_complete()
+        .map(|prefix| {
+            (
+                prefix.name.to_string(),
+                (prefix.description.to_string(), prefix.value),
+            )
+        })
+        .collect()
+}
+
+struct StdBuiltinUnit {
+    name: &'static str,
+    aliases: IndexMap<&'static str, Unit>,
 }
 
 /// The builtin units that come with Oneil.
-///
-/// Base units:
-/// - `g` - gram
-/// - `m` - meter
-/// - `s` - second
-/// - `K` - Kelvin
-/// - `A` - Ampere
-/// - `b` - bit
-/// - `$` - dollar
-/// - `mol` - mole
-/// - `cd` - candela
-///
-/// Derived units:
-/// - `V` - Volt
-/// - `W` - Watt
-/// - `Hz` - Hertz
-/// - `J` - Joule
-/// - `Wh` - Watt-hour
-/// - `Ah` - Amp-hour
-/// - `T` - Tesla
-/// - `Ohm` - Ohm
-/// - `N` - Newton
-/// - `Gs` - Gauss
-/// - `lm` - lumen
-/// - `lx` - lux
-/// - `bps` - bits per second
-/// - `B` - byte
-/// - `Pa` - Pascal
-///
-/// Legacy units:
-/// - `mil` - millennium
-/// - `cen` - century
-/// - `dec` - decade
-/// - `yr` - year
-/// - `mon` - month
-/// - `week` - week
-/// - `day` - day
-/// - `hr` - hour
-/// - `min` - minute
-/// - `rpm` - revolutions per minute
-/// - `k$` - thousand dollars
-/// - `M$` - million dollars
-/// - `B$` - billion dollars
-/// - `T$` - trillion dollars
-/// - `g_E` - Earth gravity
-/// - `cm` - centimeter
-/// - `psi` - pound per square inch
-/// - `kpsi` - kilopound per square inch
-/// - `atm` - atmosphere
-/// - `bar` - bar
-/// - `Ba` - barye
-/// - `dyne` - dyne
-/// - `mmHg` - millimeter of mercury
-/// - `torr` - torr
-/// - `in` - inch
-/// - `ft` - foot
-/// - `yd` - yard
-/// - `mi` - mile
-/// - `nmi` - nautical mile
-/// - `lb` - pound
-/// - `mph` - mile per hour
-///
-/// Dimensionless units:
-/// - `rev` - revolution
-/// - `cyc` - cycle
-/// - `rad` - radian
-/// - `deg` - degree
-/// - `%` - percent
-/// - `ppm` - part per million
-/// - `ppb` - part per billion
-/// - `arcmin` - arcminute
-/// - `arcsec` - arcsecond
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
-#[must_use]
-pub fn builtin_units() -> IndexMap<String, Unit> {
+fn builtin_units_complete() -> impl Iterator<Item = StdBuiltinUnit> {
     /// Information about a builtin unit.
     ///
     /// This is only used in this function to avoid code duplication.
     struct UnitInfo {
-        names: &'static [&'static str],
+        name: &'static str,
+        aliases: &'static [&'static str],
         magnitude: f64,
         dimensions: DimensionMap,
         is_db: bool,
     }
 
-    let units = vec![
+    let units = [
         // === BASE UNITS ===
         UnitInfo {
             // the kilogram is the base unit of mass, so the gram is 1e-3 of a kilogram
-            names: ["g", "gram", "grams"].as_ref(),
+            name: "gram",
+            aliases: ["g", "gram", "grams"].as_ref(),
             magnitude: 1e-3,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["m", "meter", "meters", "metre", "metres"].as_ref(),
+            name: "meter",
+            aliases: ["m", "meter", "meters", "metre", "metres"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["s", "second", "seconds", "sec", "secs"].as_ref(),
+            name: "second",
+            aliases: ["s", "second", "seconds", "sec", "secs"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["K", "Kelvin"].as_ref(),
+            name: "Kelvin",
+            aliases: ["K", "Kelvin"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Temperature, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["A", "Ampere", "Amp"].as_ref(),
+            name: "Ampere",
+            aliases: ["A", "Ampere", "Amp"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Current, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["b", "bit", "bits"].as_ref(),
+            name: "bit",
+            aliases: ["b", "bit", "bits"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["$", "dollar", "dollars"].as_ref(),
+            name: "dollar",
+            aliases: ["$", "dollar", "dollars"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["mol", "mole", "moles"].as_ref(),
+            name: "mole",
+            aliases: ["mol", "mole", "moles"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Substance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["cd", "candela"].as_ref(),
+            name: "candela",
+            aliases: ["cd", "candela"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
         },
         // === DERIVED UNITS ===
         UnitInfo {
-            names: ["V", "Volt", "Volts"].as_ref(),
+            name: "Volt",
+            aliases: ["V", "Volt", "Volts"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -234,7 +286,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["W", "Watt", "Watts"].as_ref(),
+            name: "Watt",
+            aliases: ["W", "Watt", "Watts"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -244,13 +297,15 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["Hz", "Hertz"].as_ref(),
+            name: "Hertz",
+            aliases: ["Hz", "Hertz"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["J", "Joule", "Joules"].as_ref(),
+            name: "Joule",
+            aliases: ["J", "Joule", "Joules"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -260,7 +315,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["Wh", "Watt-hour", "Watt-hours"].as_ref(),
+            name: "Watt-hour",
+            aliases: ["Wh", "Watt-hour", "Watt-hours"].as_ref(),
             magnitude: 3600.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -270,7 +326,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["Ah", "Amp-hour", "Amp-hours"].as_ref(),
+            name: "Amp-hour",
+            aliases: ["Ah", "Amp-hour", "Amp-hours"].as_ref(),
             magnitude: 3600.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Current, 1.0),
@@ -279,7 +336,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["T", "Tesla", "Teslas"].as_ref(),
+            name: "Tesla",
+            aliases: ["T", "Tesla", "Teslas"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -289,7 +347,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["Ohm", "Ohms"].as_ref(),
+            name: "Ohm",
+            aliases: ["Ohm", "Ohms"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -300,7 +359,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["N", "Newton", "Newtons"].as_ref(),
+            name: "Newton",
+            aliases: ["N", "Newton", "Newtons"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -310,7 +370,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["Gs", "Gauss"].as_ref(),
+            name: "Gauss",
+            aliases: ["Gs", "Gauss"].as_ref(),
             magnitude: 0.0001,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -320,13 +381,15 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["lm", "Lumen", "Lumens"].as_ref(),
+            name: "Lumen",
+            aliases: ["lm", "Lumen", "Lumens"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["lx", "Lux", "Luxes"].as_ref(),
+            name: "Lux",
+            aliases: ["lx", "Lux", "Luxes"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::LuminousIntensity, 1.0),
@@ -335,7 +398,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["bps" /* bits per second */].as_ref(),
+            name: "bits per second",
+            aliases: ["bps"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Information, 1.0),
@@ -344,13 +408,15 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["B", "byte", "bytes"].as_ref(),
+            name: "byte",
+            aliases: ["B", "byte", "bytes"].as_ref(),
             magnitude: 8.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["Pa", "Pascal", "Pascals"].as_ref(),
+            name: "Pascal",
+            aliases: ["Pa", "Pascal", "Pascals"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -361,91 +427,106 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
         },
         // === LEGACY UNITS ===
         UnitInfo {
-            names: ["mil", "millennium", "millennia"].as_ref(),
+            name: "millennium",
+            aliases: ["mil", "millennium", "millennia"].as_ref(),
             magnitude: 3.1556952e10,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["cen", "century", "centuries"].as_ref(),
+            name: "century",
+            aliases: ["cen", "century", "centuries"].as_ref(),
             magnitude: 3.1556952e9,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["dec", "decade", "decades"].as_ref(),
+            name: "decade",
+            aliases: ["dec", "decade", "decades"].as_ref(),
             magnitude: 3.1556952e8,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["yr", "year", "years"].as_ref(),
+            name: "year",
+            aliases: ["yr", "year", "years"].as_ref(),
             magnitude: 3.1556952e7,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["mon", "month", "months"].as_ref(),
+            name: "month",
+            aliases: ["mon", "month", "months"].as_ref(),
             magnitude: 2.629746e6,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["week", "weeks"].as_ref(),
+            name: "week",
+            aliases: ["week", "weeks"].as_ref(),
             magnitude: 6.048e5,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["day", "days"].as_ref(),
+            name: "day",
+            aliases: ["day", "days"].as_ref(),
             magnitude: 8.64e4,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["hr", "hour", "hours"].as_ref(),
+            name: "hour",
+            aliases: ["hr", "hour", "hours"].as_ref(),
             magnitude: 3600.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["min", "minute", "minutes"].as_ref(),
+            name: "minute",
+            aliases: ["min", "minute", "minutes"].as_ref(),
             magnitude: 60.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["rpm" /* revolutions per minute */].as_ref(),
+            name: "revolutions per minute",
+            aliases: ["rpm"].as_ref(),
             magnitude: 0.10471975511965977,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["k$" /* thousand dollars */].as_ref(),
+            name: "thousand dollars",
+            aliases: ["k$"].as_ref(),
             magnitude: 1000.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["M$" /* million dollars */].as_ref(),
+            name: "million dollars",
+            aliases: ["M$"].as_ref(),
             magnitude: 1e6,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["B$" /* billion dollars */].as_ref(),
+            name: "billion dollars",
+            aliases: ["B$"].as_ref(),
             magnitude: 1e9,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["T$" /* trillion dollars */].as_ref(),
+            name: "trillion dollars",
+            aliases: ["T$"].as_ref(),
             magnitude: 1e12,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["g_E" /* Earth gravity */].as_ref(),
+            name: "Earth gravity",
+            aliases: ["g_E"].as_ref(),
             magnitude: 9.81,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -454,7 +535,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: [
+            name: "centimeter",
+            aliases: [
                 "cm",
                 "centimeter",
                 "centimeters",
@@ -467,7 +549,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["psi" /* pounds per square inch */].as_ref(),
+            name: "pounds per square inch",
+            aliases: ["psi"].as_ref(),
             magnitude: 6894.757293168361,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -477,7 +560,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["atm", "atmosphere", "atmospheres"].as_ref(),
+            name: "atmosphere",
+            aliases: ["atm", "atmosphere", "atmospheres"].as_ref(),
             magnitude: 101325.0,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -487,7 +571,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["bar", "bars"].as_ref(),
+            name: "bar",
+            aliases: ["bar", "bars"].as_ref(),
             magnitude: 1e5,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -497,7 +582,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["Ba", "barye", "baryes"].as_ref(),
+            name: "barye",
+            aliases: ["Ba", "barye", "baryes"].as_ref(),
             magnitude: 0.1,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -507,7 +593,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["dyne", "dynes"].as_ref(),
+            name: "dyne",
+            aliases: ["dyne", "dynes"].as_ref(),
             magnitude: 1e-5,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -517,7 +604,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["mmHg" /* millimeter of mercury */].as_ref(),
+            name: "millimeter of mercury",
+            aliases: ["mmHg"].as_ref(),
             magnitude: 133.322387415,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -527,7 +615,8 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["torr", "torrs"].as_ref(),
+            name: "torr",
+            aliases: ["torr", "torrs"].as_ref(),
             magnitude: 133.3224,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Mass, 1.0),
@@ -537,43 +626,50 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
             is_db: false,
         },
         UnitInfo {
-            names: ["in", "inch", "inches"].as_ref(),
+            name: "inch",
+            aliases: ["in", "inch", "inches"].as_ref(),
             magnitude: 0.0254,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["ft", "foot", "feet"].as_ref(),
+            name: "foot",
+            aliases: ["ft", "foot", "feet"].as_ref(),
             magnitude: 0.3048,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["yd", "yard", "yards"].as_ref(),
+            name: "yard",
+            aliases: ["yd", "yard", "yards"].as_ref(),
             magnitude: 0.9144,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["mi", "mile", "miles"].as_ref(),
+            name: "mile",
+            aliases: ["mi", "mile", "miles"].as_ref(),
             magnitude: 1609.344,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["nmi" /* nautical mile */].as_ref(),
+            name: "nautical mile",
+            aliases: ["nmi"].as_ref(),
             magnitude: 1852.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["lb", "lbs", "pound", "pounds"].as_ref(),
+            name: "pound",
+            aliases: ["lb", "lbs", "pound", "pounds"].as_ref(),
             magnitude: 0.45359237,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
         },
         UnitInfo {
-            names: ["mph" /* mile per hour */].as_ref(),
+            name: "mile per hour",
+            aliases: ["mph"].as_ref(),
             magnitude: 0.44704,
             dimensions: DimensionMap::new(IndexMap::from([
                 (Dimension::Distance, 1.0),
@@ -583,84 +679,120 @@ pub fn builtin_units() -> IndexMap<String, Unit> {
         },
         // === DIMENSIONLESS UNITS ===
         UnitInfo {
-            names: ["rev", "revolution", "revolutions", "rotation", "rotations"].as_ref(),
+            name: "revolution",
+            aliases: ["rev", "revolution", "revolutions", "rotation", "rotations"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["cyc", "cycle", "cycles"].as_ref(),
+            name: "cycle",
+            aliases: ["cyc", "cycle", "cycles"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["rad", "radian", "radians"].as_ref(),
+            name: "radian",
+            aliases: ["rad", "radian", "radians"].as_ref(),
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["deg", "degree", "degrees"].as_ref(),
+            name: "degree",
+            aliases: ["deg", "degree", "degrees"].as_ref(),
             magnitude: 0.017453292519943295,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["%", "percent"].as_ref(),
+            name: "percent",
+            aliases: ["%", "percent"].as_ref(),
             magnitude: 0.01,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["ppm" /* part per million */].as_ref(),
+            name: "part per million",
+            aliases: ["ppm"].as_ref(),
             magnitude: 1e-6,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["ppb" /* part per billion */].as_ref(),
+            name: "part per billion",
+            aliases: ["ppb"].as_ref(),
             magnitude: 1e-9,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["arcmin", "arcminute", "arcminutes"].as_ref(),
+            name: "arcminute",
+            aliases: ["arcmin", "arcminute", "arcminutes"].as_ref(),
             magnitude: 0.0002908882086657216,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
         UnitInfo {
-            names: ["arcsec", "arcsecond", "arcseconds"].as_ref(),
+            name: "arcsecond",
+            aliases: ["arcsec", "arcsecond", "arcseconds"].as_ref(),
             magnitude: 4.84813681109536e-06,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
         },
     ];
 
-    units
-        .into_iter()
-        .flat_map(
-            |UnitInfo {
-                 names,
-                 magnitude,
-                 dimensions,
-                 is_db,
-             }| {
-                names.iter().map(move |name| {
+    units.into_iter().map(
+        |UnitInfo {
+             name,
+             aliases,
+             magnitude,
+             dimensions,
+             is_db,
+         }| {
+            let aliases = aliases
+                .iter()
+                .map(move |alias| {
                     let unit = Unit {
                         dimension_map: dimensions.clone(),
                         magnitude,
                         is_db,
                         display_unit: DisplayUnit::Unit {
-                            name: (*name).to_string(),
+                            name: (*alias).to_string(),
                             exponent: 1.0,
                         },
                     };
-                    ((*name).to_string(), unit)
+                    (*alias, unit)
                 })
-            },
-        )
+                .collect();
+
+            StdBuiltinUnit { name, aliases }
+        },
+    )
+}
+
+/// The builtin units that come with Oneil.
+#[must_use]
+pub fn builtin_units() -> IndexMap<String, Unit> {
+    builtin_units_complete()
+        .flat_map(|unit| {
+            unit.aliases
+                .into_iter()
+                .map(|(alias, unit)| (alias.to_string(), unit))
+        })
+        .collect()
+}
+
+/// The documentation for the builtin units that come with Oneil.
+#[must_use]
+pub fn builtin_units_docs() -> IndexMap<&'static str, Vec<&'static str>> {
+    builtin_units_complete()
+        .map(|unit| {
+            let aliases: Vec<&str> = unit.aliases.keys().copied().collect();
+
+            (unit.name, aliases)
+        })
         .collect()
 }
 
