@@ -19,7 +19,7 @@ use oneil_model_resolver::{
     ModelErrorMap,
     error::{
         CircularDependencyError, ImportResolutionError, LoadError, ModelImportResolutionError,
-        ParameterResolutionError, ResolutionErrors, TestResolutionError, VariableResolutionError,
+        ParameterResolutionError, ResolutionErrors, VariableResolutionError,
     },
 };
 use oneil_shared::error::{ErrorLocation, OneilError};
@@ -189,10 +189,6 @@ fn convert_model_errors(
 /// This function attempts to read the source file to provide location information.
 /// If the file cannot be read, it adds a file reading error and processes the
 /// resolution errors without location information.
-#[expect(
-    clippy::too_many_lines,
-    reason = "this is a repetitive and easy-to-read function"
-)]
 fn convert_resolution_errors(
     model_path: &ir::ModelPath,
     resolution_errors: &ResolutionErrors,
@@ -303,26 +299,13 @@ fn convert_resolution_errors(
     // convert test resolution errors
     for test_resolution_errors in resolution_errors.get_test_resolution_errors().values() {
         for test_resolution_error in test_resolution_errors {
-            match test_resolution_error {
-                TestResolutionError::DuplicateInput { .. } => {
-                    let error = OneilError::from_error_with_optional_source(
-                        test_resolution_error,
-                        path.to_path_buf(),
-                        source,
-                    );
-                    errors.push(error);
-                }
-                TestResolutionError::VariableResolution(variable_resolution_error) => {
-                    // we call `convert_variable_resolution_error` here rather than
-                    // `OneilError::from_error_with_optional_source` because it
-                    // skips certain errors that are not relevant to the user
-                    let error =
-                        convert_variable_resolution_error(path, source, variable_resolution_error);
+            // we call `convert_variable_resolution_error` here rather than
+            // `OneilError::from_error_with_optional_source` because it
+            // skips certain errors that are not relevant to the user
+            let error = convert_variable_resolution_error(path, source, test_resolution_error);
 
-                    if let Some(error) = error {
-                        errors.push(error);
-                    }
-                }
+            if let Some(error) = error {
+                errors.push(error);
             }
         }
     }

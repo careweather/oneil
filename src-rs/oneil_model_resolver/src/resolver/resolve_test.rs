@@ -7,7 +7,7 @@ use oneil_ir as ir;
 
 use crate::{
     BuiltinRef,
-    error::{self, TestResolutionError},
+    error::{self, VariableResolutionError},
     resolver::{
         resolve_expr::{get_expr_dependencies, resolve_expr},
         resolve_trace_level::resolve_trace_level,
@@ -23,7 +23,7 @@ pub fn resolve_tests(
     parameter_context: &ParameterContext<'_>,
 ) -> (
     IndexMap<ir::TestIndex, ir::Test>,
-    IndexMap<ir::TestIndex, Vec<TestResolutionError>>,
+    IndexMap<ir::TestIndex, Vec<VariableResolutionError>>,
 ) {
     let tests = tests.into_iter().enumerate().map(|(test_index, test)| {
         let test_index = ir::TestIndex::new(test_index);
@@ -213,10 +213,6 @@ mod tests {
 
         let error = &test_errors[0];
 
-        let TestResolutionError::VariableResolution(error) = error else {
-            panic!("expected variable resolution error, got {error:?}");
-        };
-
         let VariableResolutionError::UndefinedParameter {
             model_path,
             parameter_name,
@@ -277,10 +273,6 @@ mod tests {
         assert!(test_errors.len() == 1);
 
         let error = &test_errors[0];
-
-        let TestResolutionError::VariableResolution(error) = error else {
-            panic!("expected variable resolution error, got {error:?}");
-        };
 
         let VariableResolutionError::UndefinedParameter {
             model_path,
