@@ -213,4 +213,13 @@ impl AsOneilError for VariableResolutionError {
             }
         }
     }
+
+    fn should_show_to_user(&self) -> bool {
+        !matches!(
+            self,
+            Self::ModelHasError { .. }
+                | Self::ParameterHasError { .. }
+                | Self::ReferenceResolutionFailed { .. }
+        )
+    }
 }

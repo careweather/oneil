@@ -47,4 +47,13 @@ pub trait AsOneilError {
         let _ = source;
         vec![]
     }
+
+    /// Returns whether the error should be shown to the user.
+    ///
+    /// Some errors are not important for the user to see, such as errors
+    /// that are caused by other errors. In that case, it's most useful to
+    /// see only the first error.
+    fn should_show_to_user(&self) -> bool {
+        true
+    }
 }

@@ -236,4 +236,11 @@ impl AsOneilError for ModelImportResolutionError {
             Self::ModelHasError { .. } | Self::UndefinedSubmodel { .. } => vec![],
         }
     }
+
+    fn should_show_to_user(&self) -> bool {
+        !matches!(
+            self,
+            Self::ModelHasError { .. } | Self::UndefinedSubmodel { .. }
+        )
+    }
 }

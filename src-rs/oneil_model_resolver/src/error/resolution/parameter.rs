@@ -129,4 +129,11 @@ impl AsOneilError for ParameterResolutionError {
             Self::VariableResolution(error) => error.context_with_source(source),
         }
     }
+
+    fn should_show_to_user(&self) -> bool {
+        match self {
+            Self::VariableResolution(error) => error.should_show_to_user(),
+            Self::CircularDependency { .. } | Self::DuplicateParameter { .. } => true,
+        }
+    }
 }
