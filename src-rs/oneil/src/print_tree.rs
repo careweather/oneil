@@ -4,9 +4,12 @@ use std::{
 };
 
 use anstream::{print, println};
-use oneil_eval::output::{
-    dependency::{DependencyTreeValue, RequiresTreeValue},
-    tree::Tree,
+use oneil_eval::{
+    output::{
+        dependency::{DependencyTreeValue, RequiresTreeValue},
+        tree::Tree,
+    },
+    value::Value,
 };
 use oneil_shared::span::Span;
 
@@ -70,29 +73,48 @@ fn print_tree_node<T: PrintableTreeValue>(
     let (first_prefix, rest_prefix) = if current_depth == 0 {
         ("", "")
     } else if is_last {
-        ("└──", "    ")
+        ("└── ", "    ")
     } else {
-        ("├──", "│   ")
+        ("├── ", "│   ")
     };
     let indent = build_indent(parent_prefixes);
 
     // Print the parameter name and value
-    print!("{indent}{first_prefix} ");
-    value.print_tree_value();
+    let value_name = value.get_styled_value_name();
+    let styled_value_name = stylesheet::TREE_VALUE_NAME.style(&value_name);
+    print!("{indent}{first_prefix}");
+    print!("{styled_value_name} = ");
+    print_utils::print_value(value.get_value());
     println!();
 
     // Print the parameter equation
+    //
+    // The goal is for this to be printed as
+    //
+    // ```
+    // value_name = value
+    //            = equation
+    // ```
+    let (maybe_bar, equation_indent) = if children.is_empty() {
+        // replace the bar with a space if there are no children
+        ("", " ".repeat(value.get_value_name_len()))
+    } else {
+        // otherwise, include the bar
+        ("│", " ".repeat(value.get_value_name_len() - 1))
+    }; // -1 to account for the bar
+
     if let Some(display_info) = value.get_display_info() {
         let equation_str = get_equation_str(display_info, file_cache);
 
         match equation_str {
             Ok(equation_str) => {
+                let equation_str = format!(" = {equation_str}");
                 let equation_str = stylesheet::TREE_VALUE_EQUATION.style(equation_str);
-                println!("{indent}{rest_prefix} {equation_str}");
+                println!("{indent}{rest_prefix}{maybe_bar}{equation_indent}{equation_str}");
             }
             Err(error) => {
                 let error_label = stylesheet::ERROR_COLOR.style("error");
-                println!("{indent}{rest_prefix} {error_label}: {error}");
+                println!("{indent}{rest_prefix}{error_label}: {error}");
             }
         }
     }
@@ -188,18 +210,45 @@ fn get_equation_str(
 }
 
 trait PrintableTreeValue {
-    fn print_tree_value(&self);
+    /// Gets the name of the value, styled for display.
+    fn get_styled_value_name(&self) -> String;
+    /// Gets the length of the value name.
+    ///
+    /// This is necessary because the styled value name may include
+    /// ANSI escape codes, which would affect the length of the string.
+    fn get_value_name_len(&self) -> usize;
+    /// Gets the value.
+    fn get_value(&self) -> &Value;
+    /// Gets the display information for the value, if available.
+    ///
+    /// This is used to get the equation string from the source file.
     fn get_display_info(&self) -> Option<&(PathBuf, Span)>;
+    /// Checks if the value is outside the top model.
+    ///
+    /// This is used to determine whether to recursively print the
+    /// children of the value.
     fn is_outside_top_model(&self, top_model_path: &Path) -> bool;
 }
 
 impl PrintableTreeValue for RequiresTreeValue {
-    fn print_tree_value(&self) {
-        let model_path_display = self.model_path.display().to_string();
-        let styled_model_path = stylesheet::MODEL_LABEL.style(&model_path_display);
-        let styled_parameter_name = stylesheet::PARAMETER_IDENTIFIER.style(&self.parameter_name);
-        print!("{styled_model_path} {styled_parameter_name} = ");
-        print_utils::print_value(&self.parameter_value);
+    fn get_styled_value_name(&self) -> String {
+        let model_path = self.model_path.display();
+        let styled_model_path = stylesheet::MODEL_LABEL.style(model_path);
+
+        let param = &self.parameter_name;
+        let styled_param = stylesheet::PARAMETER_IDENTIFIER.style(param);
+
+        format!("{styled_model_path} {styled_param}")
+    }
+
+    fn get_value_name_len(&self) -> usize {
+        let model_path_len = self.model_path.as_os_str().len();
+        let param_name_len = self.parameter_name.len();
+        model_path_len + 1 + param_name_len // +1 for the space
+    }
+
+    fn get_value(&self) -> &Value {
+        &self.parameter_value
     }
 
     fn get_display_info(&self) -> Option<&(PathBuf, Span)> {
@@ -212,17 +261,24 @@ impl PrintableTreeValue for RequiresTreeValue {
 }
 
 impl PrintableTreeValue for DependencyTreeValue {
-    fn print_tree_value(&self) {
-        let name = self.reference_name.as_ref().map_or_else(
+    fn get_styled_value_name(&self) -> String {
+        let value_name = self.reference_name.as_ref().map_or_else(
             || self.parameter_name.clone(),
-            |reference_name| {
-                let parameter_name = &self.parameter_name;
-                format!("{parameter_name}.{reference_name}")
-            },
+            |reference_name| format!("{}.{reference_name}", &self.parameter_name),
         );
-        let styled_name = stylesheet::PARAMETER_IDENTIFIER.style(&name);
-        print!("{styled_name} = ");
-        print_utils::print_value(&self.parameter_value);
+        let styled_value_name = stylesheet::PARAMETER_IDENTIFIER.style(&value_name);
+        format!("{styled_value_name}")
+    }
+
+    fn get_value_name_len(&self) -> usize {
+        self.reference_name.as_ref().map_or_else(
+            || self.parameter_name.len(),
+            |reference_name| self.parameter_name.len() + 1 + reference_name.len(), // +1 for the dot
+        )
+    }
+
+    fn get_value(&self) -> &Value {
+        &self.parameter_value
     }
 
     fn get_display_info(&self) -> Option<&(PathBuf, Span)> {
