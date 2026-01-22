@@ -8,7 +8,7 @@
 use std::path::Path;
 
 use oneil_parser::error::ParserError;
-use oneil_shared::error::OneilError;
+use oneil_shared::error::{AsOneilError, OneilError};
 
 use crate::convert_error::file::convert as convert_file_error;
 
@@ -50,11 +50,16 @@ pub fn convert_all(path: &Path, parser_errors: &[ParserError]) -> Vec<OneilError
     };
 
     for parser_error in parser_errors {
+        if !parser_error.should_show_to_user() {
+            continue;
+        }
+
         let error = OneilError::from_error_with_optional_source(
             parser_error,
             path.to_path_buf(),
             file_contents.as_deref(),
         );
+
         errors.push(error);
     }
 

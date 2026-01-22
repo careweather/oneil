@@ -12,17 +12,14 @@
 //! - Resolution errors (undefined variables, parameters, submodels)
 //! - Test resolution errors
 
-use std::{fs, path::Path};
+use std::fs;
 
 use oneil_ir as ir;
 use oneil_model_resolver::{
     ModelErrorMap,
-    error::{
-        CircularDependencyError, ImportResolutionError, LoadError, ModelImportResolutionError,
-        ParameterResolutionError, ResolutionErrors, VariableResolutionError,
-    },
+    error::{CircularDependencyError, LoadError, ResolutionErrors},
 };
-use oneil_shared::error::{ErrorLocation, OneilError};
+use oneil_shared::error::{AsOneilError, ErrorLocation, OneilError};
 
 use crate::{
     convert_error::{file, parser},
@@ -54,12 +51,20 @@ pub fn convert_map(error_map: &ModelErrorMap<LoadingError, DoesNotExistError>) -
     let mut errors = Vec::new();
 
     for (path, import_error) in error_map.get_import_errors() {
+        if !import_error.should_show_to_user() {
+            continue;
+        }
+
         let error = convert_import_error(path, import_error);
         errors.push(error);
     }
 
     for (path, dep_errors) in error_map.get_circular_dependency_errors() {
         for dep_error in dep_errors {
+            if !dep_error.should_show_to_user() {
+                continue;
+            }
+
             let error = convert_circular_dependency_error(path, dep_error);
             errors.push(error);
         }
@@ -209,173 +214,75 @@ fn convert_resolution_errors(
 
     // convert import errors
     for import_error in resolution_errors.get_import_errors().values() {
-        match import_error {
-            ImportResolutionError::FailedValidation { .. } => {
-                // this error is intentionally ignored because it indicates that the
-                // python file failed to validate, which will be reported separately.
-                ignore_error();
-            }
-            ImportResolutionError::DuplicateImport { .. } => {
-                let error = OneilError::from_error_with_optional_source(
-                    import_error,
-                    path.to_path_buf(),
-                    source,
-                );
-                errors.push(error);
-            }
+        if !import_error.should_show_to_user() {
+            continue;
         }
+
+        let error =
+            OneilError::from_error_with_optional_source(import_error, path.to_path_buf(), source);
+        errors.push(error);
     }
 
     // convert submodel resolution errors
     for submodel_resolution_error in resolution_errors.get_submodel_resolution_errors().values() {
-        match submodel_resolution_error {
-            ModelImportResolutionError::ModelHasError { .. }
-            | ModelImportResolutionError::ParentModelHasError { .. } => {
-                ignore_error();
-            }
-
-            ModelImportResolutionError::UndefinedSubmodel { .. }
-            | ModelImportResolutionError::DuplicateSubmodel { .. }
-            | ModelImportResolutionError::DuplicateReference { .. } => {
-                let error = OneilError::from_error_with_optional_source(
-                    submodel_resolution_error,
-                    path.to_path_buf(),
-                    source,
-                );
-                errors.push(error);
-            }
+        if !submodel_resolution_error.should_show_to_user() {
+            continue;
         }
+
+        let error = OneilError::from_error_with_optional_source(
+            submodel_resolution_error,
+            path.to_path_buf(),
+            source,
+        );
+        errors.push(error);
     }
 
     // convert reference resolution errors
     for reference_resolution_error in resolution_errors.get_reference_resolution_errors().values() {
-        match reference_resolution_error {
-            ModelImportResolutionError::ModelHasError { .. }
-            | ModelImportResolutionError::ParentModelHasError { .. } => {
-                ignore_error();
-            }
-
-            ModelImportResolutionError::UndefinedSubmodel { .. }
-            | ModelImportResolutionError::DuplicateSubmodel { .. }
-            | ModelImportResolutionError::DuplicateReference { .. } => {
-                let error = OneilError::from_error_with_optional_source(
-                    reference_resolution_error,
-                    path.to_path_buf(),
-                    source,
-                );
-                errors.push(error);
-            }
+        if !reference_resolution_error.should_show_to_user() {
+            continue;
         }
+
+        let error = OneilError::from_error_with_optional_source(
+            reference_resolution_error,
+            path.to_path_buf(),
+            source,
+        );
+        errors.push(error);
     }
 
     // convert parameter resolution errors
     for parameter_resolution_errors in resolution_errors.get_parameter_resolution_errors().values()
     {
         for parameter_resolution_error in parameter_resolution_errors {
-            match parameter_resolution_error {
-                ParameterResolutionError::CircularDependency { .. }
-                | ParameterResolutionError::DuplicateParameter { .. } => {
-                    let error = OneilError::from_error_with_optional_source(
-                        parameter_resolution_error,
-                        path.to_path_buf(),
-                        source,
-                    );
-                    errors.push(error);
-                }
-                ParameterResolutionError::VariableResolution(variable_resolution_error) => {
-                    // we call `convert_variable_resolution_error` here rather than
-                    // `OneilError::from_error_with_optional_source` because it
-                    // skips certain errors that are not relevant to the user
-                    let error =
-                        convert_variable_resolution_error(path, source, variable_resolution_error);
-                    if let Some(error) = error {
-                        errors.push(error);
-                    }
-                }
+            if !parameter_resolution_error.should_show_to_user() {
+                continue;
             }
+
+            let error = OneilError::from_error_with_optional_source(
+                parameter_resolution_error,
+                path.to_path_buf(),
+                source,
+            );
+            errors.push(error);
         }
     }
 
     // convert test resolution errors
     for test_resolution_errors in resolution_errors.get_test_resolution_errors().values() {
         for test_resolution_error in test_resolution_errors {
-            // we call `convert_variable_resolution_error` here rather than
-            // `OneilError::from_error_with_optional_source` because it
-            // skips certain errors that are not relevant to the user
-            let error = convert_variable_resolution_error(path, source, test_resolution_error);
-
-            if let Some(error) = error {
-                errors.push(error);
+            if !test_resolution_error.should_show_to_user() {
+                continue;
             }
+
+            let error = OneilError::from_error_with_optional_source(
+                test_resolution_error,
+                path.to_path_buf(),
+                source,
+            );
+            errors.push(error);
         }
     }
 
     errors
 }
-
-/// Converts a variable resolution error into a unified CLI error format
-///
-/// Handles various types of variable resolution errors, including undefined variables,
-/// type mismatches, and other variable-related issues. Provides source location
-/// information when available.
-///
-/// # Arguments
-///
-/// * `path` - The path to the file containing the variable resolution error
-/// * `source` - Optional source file contents for location calculation
-/// * `variable_resolution_error` - The variable resolution error to convert
-///
-/// # Returns
-///
-/// Returns `Some(Error)` if the error should be reported, or `None` if the error
-/// should be ignored (e.g., for certain types of resolution errors that are
-/// handled elsewhere).
-///
-/// # Note
-///
-/// Some variable resolution errors are intentionally ignored because they are
-/// secondary to other errors or are handled by different error reporting mechanisms.
-fn convert_variable_resolution_error(
-    path: &Path,
-    source: Option<&str>,
-    variable_resolution_error: &VariableResolutionError,
-) -> Option<OneilError> {
-    match variable_resolution_error {
-        VariableResolutionError::UndefinedParameter { .. }
-        | VariableResolutionError::UndefinedReference { .. } => {
-            let error = OneilError::from_error_with_optional_source(
-                variable_resolution_error,
-                path.to_path_buf(),
-                source,
-            );
-            Some(error)
-        }
-        VariableResolutionError::ModelHasError { .. } => {
-            // This error is intentionally ignored because it indicates that the
-            // model being referenced has errors, which will be reported separately.
-            None
-        }
-        VariableResolutionError::ParameterHasError { .. } => {
-            // This error is intentionally ignored because it indicates that the
-            // parameter has errors, which will be reported separately.
-            None
-        }
-        VariableResolutionError::ReferenceResolutionFailed { .. } => {
-            // This error is intentionally ignored because it indicates that the
-            // submodel resolution failed, which will be reported separately.
-            None
-        }
-    }
-}
-
-/// Placeholder function for intentionally ignored errors
-///
-/// This function is used as a placeholder when certain errors are intentionally
-/// ignored during error conversion. It serves as documentation that the error
-/// is being handled elsewhere or is not relevant for user reporting.
-///
-/// # Note
-///
-/// This function does nothing and is used purely for documentation purposes
-/// to indicate where errors are intentionally ignored.
-pub const fn ignore_error() {}
