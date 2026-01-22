@@ -796,63 +796,168 @@ pub fn builtin_units_docs() -> IndexMap<&'static str, Vec<&'static str>> {
         .collect()
 }
 
+/// Information about a builtin function.
+pub struct StdBuiltinFunctionInfo {
+    name: &'static str,
+    args: &'static [&'static str],
+    description: &'static str,
+    function: StdBuiltinFunction,
+}
+
 /// Type alias for standard builtin function type
 pub type StdBuiltinFunction = fn(Span, Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>>;
 
-/// The builtin functions that come with Oneil:
-/// - `min` - minimum
-/// - `max` - maximum
-/// - `sin` - sine
-/// - `cos` - cosine
-/// - `tan` - tangent
-/// - `asin` - arcsine
-/// - `acos` - arccosine
-/// - `atan` - arctangent
-/// - `sqrt` - square root
-/// - `ln` - natural logarithm
-/// - `log` - logarithm
-/// - `log10` - base 10 logarithm
-/// - `floor` - floor
-/// - `ceiling` - ceiling
-/// - `extent` - extent
-/// - `range` - range
-/// - `abs` - absolute value
-/// - `sign` - sign
-/// - `mid` - midpoint
-/// - `strip` - strip units
-/// - `mnmx` - minimum and maximum
+#[expect(clippy::too_many_lines, reason = "this is a list of builtin functions")]
+fn builtin_functions_complete() -> impl Iterator<Item = StdBuiltinFunctionInfo> {
+    [
+        StdBuiltinFunctionInfo {
+            name: "min",
+            args: &["n", "..."],
+            description: fns::MIN_DESCRIPTION,
+            function: fns::min as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "max",
+            args: &["n", "..."],
+            description: fns::MAX_DESCRIPTION,
+            function: fns::max as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "sin",
+            args: &["x"],
+            description: fns::SIN_DESCRIPTION,
+            function: fns::sin as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "cos",
+            args: &["x"],
+            description: fns::COS_DESCRIPTION,
+            function: fns::cos as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "tan",
+            args: &["x"],
+            description: fns::TAN_DESCRIPTION,
+            function: fns::tan as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "asin",
+            args: &["x"],
+            description: fns::ASIN_DESCRIPTION,
+            function: fns::asin as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "acos",
+            args: &["x"],
+            description: fns::ACOS_DESCRIPTION,
+            function: fns::acos as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "atan",
+            args: &["x"],
+            description: fns::ATAN_DESCRIPTION,
+            function: fns::atan as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "sqrt",
+            args: &["x"],
+            description: fns::SQRT_DESCRIPTION,
+            function: fns::sqrt as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "ln",
+            args: &["x"],
+            description: fns::LN_DESCRIPTION,
+            function: fns::ln as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "log",
+            args: &["x"],
+            description: fns::LOG_DESCRIPTION,
+            function: fns::log as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "log10",
+            args: &["x"],
+            description: fns::LOG10_DESCRIPTION,
+            function: fns::log10 as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "floor",
+            args: &["x"],
+            description: fns::FLOOR_DESCRIPTION,
+            function: fns::floor as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "ceiling",
+            args: &["x"],
+            description: fns::CEILING_DESCRIPTION,
+            function: fns::ceiling as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "extent",
+            args: &["x"],
+            description: fns::EXTENT_DESCRIPTION,
+            function: fns::extent as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "range",
+            args: &["x", "y?"],
+            description: fns::RANGE_DESCRIPTION,
+            function: fns::range as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "abs",
+            args: &["x"],
+            description: fns::ABS_DESCRIPTION,
+            function: fns::abs as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "sign",
+            args: &["x"],
+            description: fns::SIGN_DESCRIPTION,
+            function: fns::sign as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "mid",
+            args: &["x", "y?"],
+            description: fns::MID_DESCRIPTION,
+            function: fns::mid as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "strip",
+            args: &["x"],
+            description: fns::STRIP_DESCRIPTION,
+            function: fns::strip as StdBuiltinFunction,
+        },
+        StdBuiltinFunctionInfo {
+            name: "mnmx",
+            args: &["n", "..."],
+            description: fns::MNMX_DESCRIPTION,
+            function: fns::mnmx as StdBuiltinFunction,
+        },
+    ]
+    .into_iter()
+}
+
+/// The builtin functions that come with Oneil.
 ///
 /// Note that some of these functions are not yet implemented and
 /// will return an `EvalError::Unsupported` error when called. However,
 /// we plan to implement them in the future.
 #[must_use]
 pub fn builtin_functions() -> IndexMap<String, StdBuiltinFunction> {
-    IndexMap::from(
-        [
-            ("min", fns::min as StdBuiltinFunction),
-            ("max", fns::max as StdBuiltinFunction),
-            ("sin", fns::sin as StdBuiltinFunction),
-            ("cos", fns::cos as StdBuiltinFunction),
-            ("tan", fns::tan as StdBuiltinFunction),
-            ("asin", fns::asin as StdBuiltinFunction),
-            ("acos", fns::acos as StdBuiltinFunction),
-            ("atan", fns::atan as StdBuiltinFunction),
-            ("sqrt", fns::sqrt as StdBuiltinFunction),
-            ("ln", fns::ln as StdBuiltinFunction),
-            ("log", fns::log as StdBuiltinFunction),
-            ("log10", fns::log10 as StdBuiltinFunction),
-            ("floor", fns::floor as StdBuiltinFunction),
-            ("ceiling", fns::ceiling as StdBuiltinFunction),
-            ("extent", fns::extent as StdBuiltinFunction),
-            ("range", fns::range as StdBuiltinFunction),
-            ("abs", fns::abs as StdBuiltinFunction),
-            ("sign", fns::sign as StdBuiltinFunction),
-            ("mid", fns::mid as StdBuiltinFunction),
-            ("strip", fns::strip as StdBuiltinFunction),
-            ("mnmx", fns::mnmx as StdBuiltinFunction),
-        ]
-        .map(|(k, v)| (k.to_string(), v)),
-    )
+    builtin_functions_complete()
+        .map(|info| (info.name.to_string(), info.function))
+        .collect()
+}
+
+/// The documentation for the builtin functions that come with Oneil.
+#[must_use]
+pub fn builtin_functions_docs() -> IndexMap<&'static str, (&'static [&'static str], &'static str)> {
+    builtin_functions_complete()
+        .map(|info| (info.name, (info.args, info.description)))
+        .collect()
 }
 
 mod fns {
@@ -866,6 +971,8 @@ mod fns {
             util::{HomogeneousNumberList, extract_homogeneous_numbers_list},
         },
     };
+
+    pub const MIN_DESCRIPTION: &str = "Find the minimum value of the given values. If a value is an interval, the minimum value of the interval is used.";
 
     #[expect(
         clippy::needless_pass_by_value,
@@ -929,6 +1036,8 @@ mod fns {
         }
     }
 
+    pub const MAX_DESCRIPTION: &str = "Find the maximum value of the given values. If a value is an interval, the maximum value of the interval is used.";
+
     #[expect(
         clippy::needless_pass_by_value,
         reason = "matches the expected signature"
@@ -991,6 +1100,8 @@ mod fns {
         }
     }
 
+    pub const SIN_DESCRIPTION: &str = "Compute the sine of an angle in radians.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn sin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1000,6 +1111,8 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const COS_DESCRIPTION: &str = "Compute the cosine of an angle in radians.";
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
@@ -1011,6 +1124,8 @@ mod fns {
         }])
     }
 
+    pub const TAN_DESCRIPTION: &str = "Compute the tangent of an angle in radians.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn tan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1020,6 +1135,9 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const ASIN_DESCRIPTION: &str =
+        "Compute the arcsine (inverse sine) of a value, returning an angle in radians.";
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
@@ -1031,6 +1149,9 @@ mod fns {
         }])
     }
 
+    pub const ACOS_DESCRIPTION: &str =
+        "Compute the arccosine (inverse cosine) of a value, returning an angle in radians.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn acos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1041,6 +1162,9 @@ mod fns {
         }])
     }
 
+    pub const ATAN_DESCRIPTION: &str =
+        "Compute the arctangent (inverse tangent) of a value, returning an angle in radians.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn atan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1050,6 +1174,8 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const SQRT_DESCRIPTION: &str = "Compute the square root of a value.";
 
     pub fn sqrt(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         if args.len() != 1 {
@@ -1069,6 +1195,8 @@ mod fns {
             .map_err(|error| vec![error.expect_only_lhs_error(arg_span)])
     }
 
+    pub const LN_DESCRIPTION: &str = "Compute the natural logarithm (base e) of a value.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn ln(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1078,6 +1206,8 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const LOG_DESCRIPTION: &str = "Compute the logarithm of a value.";
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
@@ -1089,6 +1219,8 @@ mod fns {
         }])
     }
 
+    pub const LOG10_DESCRIPTION: &str = "Compute the base-10 logarithm of a value.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn log10(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1099,6 +1231,8 @@ mod fns {
         }])
     }
 
+    pub const FLOOR_DESCRIPTION: &str = "Round a value down to the nearest integer.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn floor(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1108,6 +1242,8 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const CEILING_DESCRIPTION: &str = "Round a value up to the nearest integer.";
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
@@ -1122,6 +1258,8 @@ mod fns {
         }])
     }
 
+    pub const EXTENT_DESCRIPTION: &str = "Compute the extent of a value.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn extent(
@@ -1134,6 +1272,8 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const RANGE_DESCRIPTION: &str = "Compute the range of values. With one argument (an interval), returns the difference between the maximum and minimum. With two arguments, returns the difference between them.";
 
     pub fn range(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         match args.len() {
@@ -1192,6 +1332,8 @@ mod fns {
         }
     }
 
+    pub const ABS_DESCRIPTION: &str = "Compute the absolute value of a number.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn abs(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1202,6 +1344,9 @@ mod fns {
         }])
     }
 
+    pub const SIGN_DESCRIPTION: &str =
+        "Compute the sign of a number, returning -1 for negative, 0 for zero, or 1 for positive.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn sign(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1211,6 +1356,8 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const MID_DESCRIPTION: &str = "Compute the midpoint. With one argument (an interval), returns the midpoint of the interval. With two arguments, returns the midpoint between them.";
 
     pub fn mid(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
         match args.len() {
@@ -1270,6 +1417,9 @@ mod fns {
         }
     }
 
+    pub const STRIP_DESCRIPTION: &str =
+        "Strip units from a measured number, returning just the numeric value.";
+
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn strip(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
@@ -1279,6 +1429,9 @@ mod fns {
             will_be_supported: true,
         }])
     }
+
+    pub const MNMX_DESCRIPTION: &str =
+        "Return both the minimum and maximum values from the given values.";
 
     #[expect(unused_variables, reason = "not implemented")]
     #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
