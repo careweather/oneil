@@ -11,7 +11,7 @@ pub mod util;
 
 pub use resolution::{
     ImportResolutionError, ModelImportResolutionError, ParameterResolutionError, ResolutionErrors,
-    TestResolutionError, VariableResolutionError,
+    VariableResolutionError,
 };
 pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_errors};
 

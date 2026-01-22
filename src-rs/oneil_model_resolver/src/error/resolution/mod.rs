@@ -16,7 +16,6 @@
 mod import;
 mod parameter;
 mod submodel;
-mod test;
 mod variable;
 
 use indexmap::IndexMap;
@@ -26,7 +25,6 @@ use oneil_ir as ir;
 pub use import::ImportResolutionError;
 pub use parameter::ParameterResolutionError;
 pub use submodel::ModelImportResolutionError;
-pub use test::TestResolutionError;
 pub use variable::VariableResolutionError;
 
 /// A collection of all resolution errors that occurred during model loading.
@@ -36,7 +34,7 @@ pub struct ResolutionErrors {
     submodel_resolution: IndexMap<ir::SubmodelName, ModelImportResolutionError>,
     reference_resolution: IndexMap<ir::ReferenceName, ModelImportResolutionError>,
     parameter_resolution: IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
-    test_resolution: IndexMap<ir::TestIndex, Vec<TestResolutionError>>,
+    test_resolution: IndexMap<ir::TestIndex, Vec<VariableResolutionError>>,
 }
 
 impl ResolutionErrors {
@@ -47,7 +45,7 @@ impl ResolutionErrors {
         submodel_resolution_errors: IndexMap<ir::SubmodelName, ModelImportResolutionError>,
         reference_resolution_errors: IndexMap<ir::ReferenceName, ModelImportResolutionError>,
         parameter_resolution_errors: IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
-        test_resolution_errors: IndexMap<ir::TestIndex, Vec<TestResolutionError>>,
+        test_resolution_errors: IndexMap<ir::TestIndex, Vec<VariableResolutionError>>,
     ) -> Self {
         Self {
             import: import_errors,
@@ -106,7 +104,7 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn get_test_resolution_errors(
         &self,
-    ) -> &IndexMap<ir::TestIndex, Vec<TestResolutionError>> {
+    ) -> &IndexMap<ir::TestIndex, Vec<VariableResolutionError>> {
         &self.test_resolution
     }
 }
