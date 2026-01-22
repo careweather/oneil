@@ -595,24 +595,78 @@ fn handle_builtins_command(command: Option<BuiltinsCommand>) {
 }
 
 fn print_builtins_all() {
-    print_builtins_units();
-    print_builtins_functions();
     print_builtins_values();
+    println!();
     print_builtins_prefixes();
+    println!();
+    print_builtins_units();
+    println!();
+    print_builtins_functions();
 }
 
 fn print_builtins_units() {
-    todo!()
+    let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Units:");
+    println!("{header}");
+    println!();
+
+    let docs = oneil_std::builtin_units_docs();
+    for (name, aliases) in docs {
+        let styled_name = stylesheet::BUILTIN_NAME.style(name);
+        let aliases_str = aliases.join(", ");
+        let styled_aliases = stylesheet::BUILTIN_ALIASES.style(aliases_str);
+        println!("  {styled_name}: {styled_aliases}");
+    }
 }
 
 fn print_builtins_functions() {
-    todo!()
+    let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Functions:");
+    println!("{header}");
+    println!();
+
+    let docs = oneil_std::builtin_functions_docs();
+    for (name, (args, description)) in docs {
+        let styled_name = stylesheet::BUILTIN_NAME.style(name);
+        let args_str = args.join(", ");
+        let styled_args = stylesheet::BUILTIN_FUNCTION_ARGS.style(args_str);
+        let description = description.replace('\n', "\n    ");
+        let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(description);
+
+        println!("  {styled_name}({styled_args})");
+        println!();
+        println!("    {styled_description}");
+        println!();
+    }
 }
 
 fn print_builtins_values() {
-    todo!()
+    let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Values:");
+    println!("{header}");
+    println!();
+
+    let docs = oneil_std::builtin_values_docs();
+    for (name, (description, value)) in docs {
+        let styled_name = stylesheet::BUILTIN_NAME.style(name);
+        print!("  {styled_name} = ");
+        crate::print_utils::print_value(&value);
+        println!();
+        let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(description);
+        println!("    {styled_description}");
+        println!();
+    }
 }
 
 fn print_builtins_prefixes() {
-    todo!()
+    let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Prefixes:");
+    println!("{header}");
+    println!();
+
+    let docs = oneil_std::builtin_prefixes_docs();
+    for (name, (description, value)) in docs {
+        let styled_name = stylesheet::BUILTIN_NAME.style(name);
+        let description = format!("({description})");
+        let padded_description = format!("{description: <8}");
+        let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(padded_description);
+        let styled_value = stylesheet::BUILTIN_VALUE.style(format!("{value:e}"));
+        println!("  {styled_name} {styled_description} = {styled_value}");
+    }
 }
