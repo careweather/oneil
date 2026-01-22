@@ -29,3 +29,4 @@ pub const BUILTIN_DESCRIPTION: Style = Style::new().dimmed();
 pub const BUILTIN_ALIASES: Style = Style::new();
 pub const BUILTIN_FUNCTION_ARGS: Style = Style::new().blue();
 pub const BUILTIN_VALUE: Style = Style::new().cyan();
+pub const BUILTIN_NOT_FOUND: Style = Style::new().bold();

@@ -203,27 +203,43 @@ pub struct TreeArgs {
 }
 
 /// Available subcommands for the `Builtins` command
-#[derive(Subcommand, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum BuiltinsCommand {
     /// Print all the builtins
     #[command(name = "all")]
     All,
 
-    /// Print the builtin units
+    /// Print the builtin units or search for a specific unit
     #[command(name = "unit")]
-    Units,
+    Units {
+        /// The unit to search for
+        #[arg(value_name = "UNIT")]
+        unit_name: Option<String>,
+    },
 
-    /// Print the builtin functions
+    /// Print the builtin functions or search for a specific function
     #[command(name = "func")]
-    Functions,
+    Functions {
+        /// The function to search for
+        #[arg(value_name = "FUNCTION")]
+        function_name: Option<String>,
+    },
 
-    /// Print the builtin values
+    /// Print the builtin values or search for a specific value
     #[command(name = "value")]
-    Values,
+    Values {
+        /// The value to search for
+        #[arg(value_name = "VALUE")]
+        value_name: Option<String>,
+    },
 
-    /// Print the builtin unit prefixes
+    /// Print the builtin unit prefixes or search for a specific prefix
     #[command(name = "prefix")]
-    Prefixes,
+    Prefixes {
+        /// The prefix to search for
+        #[arg(value_name = "PREFIX")]
+        prefix_name: Option<String>,
+    },
 }
 
 /// Development-specific commands for the Oneil CLI

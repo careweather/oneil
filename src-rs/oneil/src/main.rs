@@ -24,6 +24,7 @@ use oneil_eval::{
         eval_result::EvalResult,
         tree::Tree,
     },
+    value::Value,
 };
 use oneil_ir as ir;
 use oneil_model_resolver::FileLoader;
@@ -587,10 +588,78 @@ fn print_param_not_found(param: &str) {
 fn handle_builtins_command(command: Option<BuiltinsCommand>) {
     match command {
         None | Some(BuiltinsCommand::All) => print_builtins_all(),
-        Some(BuiltinsCommand::Units) => print_builtins_units(),
-        Some(BuiltinsCommand::Functions) => print_builtins_functions(),
-        Some(BuiltinsCommand::Values) => print_builtins_values(),
-        Some(BuiltinsCommand::Prefixes) => print_builtins_prefixes(),
+        Some(BuiltinsCommand::Units {
+            unit_name: Some(unit_name),
+        }) => search_builtins_units(&unit_name),
+        Some(BuiltinsCommand::Units { unit_name: None }) => print_builtins_units(),
+        Some(BuiltinsCommand::Functions {
+            function_name: Some(function_name),
+        }) => search_builtins_functions(&function_name),
+        Some(BuiltinsCommand::Functions {
+            function_name: None,
+        }) => print_builtins_functions(),
+        Some(BuiltinsCommand::Values {
+            value_name: Some(value_name),
+        }) => search_builtins_values(&value_name),
+        Some(BuiltinsCommand::Values { value_name: None }) => print_builtins_values(),
+        Some(BuiltinsCommand::Prefixes {
+            prefix_name: Some(prefix_name),
+        }) => search_builtins_prefixes(&prefix_name),
+        Some(BuiltinsCommand::Prefixes { prefix_name: None }) => print_builtins_prefixes(),
+    }
+}
+
+fn search_builtins_units(unit_name: &str) {
+    let docs = oneil_std::builtin_units_docs();
+    let search_result = docs
+        .into_iter()
+        .find(|(name, aliases)| *name == unit_name || aliases.contains(&unit_name));
+
+    if let Some((name, aliases)) = search_result {
+        print_builtin_unit(name, &aliases);
+    } else {
+        let msg = format!("No builtin unit found for \"{unit_name}\"");
+        let msg = stylesheet::BUILTIN_NOT_FOUND.style(msg);
+        println!("{msg}");
+    }
+}
+
+fn search_builtins_functions(function_name: &str) {
+    let docs = oneil_std::builtin_functions_docs();
+    let search_result = docs.into_iter().find(|(name, _)| *name == function_name);
+
+    if let Some((name, (args, description))) = search_result {
+        print_builtin_function(name, args, description);
+    } else {
+        let msg = format!("No builtin function found for \"{function_name}\"");
+        let msg = stylesheet::BUILTIN_NOT_FOUND.style(msg);
+        println!("{msg}");
+    }
+}
+
+fn search_builtins_values(value_name: &str) {
+    let docs = oneil_std::builtin_values_docs();
+    let search_result = docs.into_iter().find(|(name, _)| *name == value_name);
+
+    if let Some((name, (description, value))) = search_result {
+        print_builtin_value(&name, &description, &value);
+    } else {
+        let msg = format!("No builtin value found for \"{value_name}\"");
+        let msg = stylesheet::BUILTIN_NOT_FOUND.style(msg);
+        println!("{msg}");
+    }
+}
+
+fn search_builtins_prefixes(prefix_name: &str) {
+    let docs = oneil_std::builtin_prefixes_docs();
+    let search_result = docs.into_iter().find(|(name, _)| *name == prefix_name);
+
+    if let Some((name, (description, value))) = search_result {
+        print_builtin_prefix(&name, &description, value);
+    } else {
+        let msg = format!("No builtin prefix found for \"{prefix_name}\"");
+        let msg = stylesheet::BUILTIN_NOT_FOUND.style(msg);
+        println!("{msg}");
     }
 }
 
@@ -611,11 +680,15 @@ fn print_builtins_units() {
 
     let docs = oneil_std::builtin_units_docs();
     for (name, aliases) in docs {
-        let styled_name = stylesheet::BUILTIN_NAME.style(name);
-        let aliases_str = aliases.join(", ");
-        let styled_aliases = stylesheet::BUILTIN_ALIASES.style(aliases_str);
-        println!("  {styled_name}: {styled_aliases}");
+        print_builtin_unit(name, &aliases);
     }
+}
+
+fn print_builtin_unit(name: &str, aliases: &[&str]) {
+    let styled_name = stylesheet::BUILTIN_NAME.style(name);
+    let aliases_str = aliases.join(", ");
+    let styled_aliases = stylesheet::BUILTIN_ALIASES.style(aliases_str);
+    println!("  {styled_name}: {styled_aliases}");
 }
 
 fn print_builtins_functions() {
@@ -625,17 +698,21 @@ fn print_builtins_functions() {
 
     let docs = oneil_std::builtin_functions_docs();
     for (name, (args, description)) in docs {
-        let styled_name = stylesheet::BUILTIN_NAME.style(name);
-        let args_str = args.join(", ");
-        let styled_args = stylesheet::BUILTIN_FUNCTION_ARGS.style(args_str);
-        let description = description.replace('\n', "\n    ");
-        let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(description);
-
-        println!("  {styled_name}({styled_args})");
-        println!();
-        println!("    {styled_description}");
-        println!();
+        print_builtin_function(name, args, description);
     }
+}
+
+fn print_builtin_function(name: &str, args: &[&str], description: &str) {
+    let styled_name = stylesheet::BUILTIN_NAME.style(name);
+    let args_str = args.join(", ");
+    let styled_args = stylesheet::BUILTIN_FUNCTION_ARGS.style(args_str);
+    let description = description.replace('\n', "\n    ");
+    let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(description);
+
+    println!("  {styled_name}({styled_args})");
+    println!();
+    println!("    {styled_description}");
+    println!();
 }
 
 fn print_builtins_values() {
@@ -645,14 +722,18 @@ fn print_builtins_values() {
 
     let docs = oneil_std::builtin_values_docs();
     for (name, (description, value)) in docs {
-        let styled_name = stylesheet::BUILTIN_NAME.style(name);
-        print!("  {styled_name} = ");
-        crate::print_utils::print_value(&value);
-        println!();
-        let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(description);
-        println!("    {styled_description}");
-        println!();
+        print_builtin_value(&name, &description, &value);
     }
+}
+
+fn print_builtin_value(name: &str, description: &str, value: &Value) {
+    let styled_name = stylesheet::BUILTIN_NAME.style(name);
+    print!("  {styled_name} = ");
+    crate::print_utils::print_value(value);
+    println!();
+    let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(description);
+    println!("    {styled_description}");
+    println!();
 }
 
 fn print_builtins_prefixes() {
@@ -662,11 +743,15 @@ fn print_builtins_prefixes() {
 
     let docs = oneil_std::builtin_prefixes_docs();
     for (name, (description, value)) in docs {
-        let styled_name = stylesheet::BUILTIN_NAME.style(name);
-        let description = format!("({description})");
-        let padded_description = format!("{description: <8}");
-        let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(padded_description);
-        let styled_value = stylesheet::BUILTIN_VALUE.style(format!("{value:e}"));
-        println!("  {styled_name} {styled_description} = {styled_value}");
+        print_builtin_prefix(&name, &description, value);
     }
+}
+
+fn print_builtin_prefix(name: &str, description: &str, value: f64) {
+    let styled_name = stylesheet::BUILTIN_NAME.style(name);
+    let description = format!("({description})");
+    let padded_description = format!("{description: <8}");
+    let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(padded_description);
+    let styled_value = stylesheet::BUILTIN_VALUE.style(format!("{value:e}"));
+    println!("  {styled_name} {styled_description} = {styled_value}");
 }
