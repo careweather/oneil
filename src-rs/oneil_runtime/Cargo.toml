@@ -1,0 +1,23 @@
+[package]
+name = "oneil_runtime"
+description = "Runtime for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+oneil_ast = { path = "../oneil_ast" }
+oneil_eval = { path = "../oneil_eval" }
+oneil_parser = { path = "../oneil_parser" }
+oneil_shared = { path = "../oneil_shared" }
+oneil_ir = { path = "../oneil_ir" }
+oneil_model_resolver = { path = "../oneil_model_resolver" }
+indexmap = { workspace = true }
+
+[lints]
+workspace = true
