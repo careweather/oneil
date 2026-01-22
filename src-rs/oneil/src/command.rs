@@ -31,7 +31,7 @@ pub enum Commands {
     #[clap(visible_alias = "t")]
     Test(TestArgs),
 
-    /// Print the dependency or "requires" tree for one or more parameters
+    /// Print the dependency or reference tree for one or more parameters
     Tree(TreeArgs),
 
     /// Print the builtins for the Oneil language
