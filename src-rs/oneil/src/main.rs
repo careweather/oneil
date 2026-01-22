@@ -34,7 +34,11 @@ use oneil_runner::{
 };
 
 use crate::{
-    command::{BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, TestArgs, TreeArgs},
+    command::{
+        BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, IndependentArgs, TestArgs,
+        TreeArgs,
+    },
+    print_independents::IndependentPrintConfig,
     print_model_result::{ModelPrintConfig, TestPrintConfig},
     print_tree::TreePrintConfig,
 };
@@ -43,6 +47,7 @@ mod command;
 mod convert_error;
 mod print_ast;
 mod print_error;
+mod print_independents;
 mod print_ir;
 mod print_model_result;
 mod print_tree;
@@ -64,6 +69,7 @@ fn main() {
         Commands::Test(args) => handle_test_command(args),
         Commands::Tree(args) => handle_tree_command(args),
         Commands::Builtins { command } => handle_builtins_command(command),
+        Commands::Independent(args) => handle_independent_command(args),
     }
 }
 
@@ -754,4 +760,28 @@ fn print_builtin_prefix(name: &str, description: &str, value: f64) {
     let styled_description = stylesheet::BUILTIN_DESCRIPTION.style(padded_description);
     let styled_value = stylesheet::BUILTIN_VALUE.style(format!("{value:e}"));
     println!("  {styled_name} {styled_description} = {styled_value}");
+}
+
+fn handle_independent_command(args: IndependentArgs) {
+    let IndependentArgs {
+        file,
+        recursive,
+        values: print_values,
+    } = args;
+
+    let independent_print_config = IndependentPrintConfig {
+        print_values,
+        recursive,
+    };
+
+    let builtins = create_builtins();
+    let (eval_context, _watch_paths) = eval_model(&file, &builtins);
+
+    if let Some(eval_context) = eval_context {
+        let model_result = eval_context
+            .get_model_result(&file)
+            .expect("model should be evaluated");
+
+        print_independents::print(&model_result, &independent_print_config);
+    }
 }

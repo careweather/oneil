@@ -41,6 +41,9 @@ pub enum Commands {
         command: Option<BuiltinsCommand>,
     },
 
+    /// Print the independent parameters in a model
+    Independent(IndependentArgs),
+
     /// Run the LSP
     Lsp {},
 
@@ -240,6 +243,21 @@ pub enum BuiltinsCommand {
         #[arg(value_name = "PREFIX")]
         prefix_name: Option<String>,
     },
+}
+
+#[derive(Args)]
+pub struct IndependentArgs {
+    /// Path to the Oneil model file to print the independent parameters for
+    #[arg(value_name = "FILE")]
+    pub file: PathBuf,
+
+    /// Print the independent parameters in submodels as well as the top model
+    #[arg(long)]
+    pub recursive: bool,
+
+    /// Print the parameter values
+    #[arg(long)]
+    pub values: bool,
 }
 
 /// Development-specific commands for the Oneil CLI
