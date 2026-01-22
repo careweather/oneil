@@ -35,9 +35,27 @@ pub fn print_requires_tree(
     );
 }
 
+/// Prints a dependency tree showing which parameters are required by a given parameter.
+pub fn print_dependency_tree(
+    top_model_path: &Path,
+    dependency_tree: &Tree<DependencyTreeValue>,
+    tree_print_config: &TreePrintConfig,
+    file_cache: &mut HashMap<PathBuf, String>,
+) {
+    print_tree_node(
+        dependency_tree,
+        tree_print_config,
+        0,
+        true,
+        top_model_path,
+        &mut Vec::new(),
+        file_cache,
+    );
+}
+
 /// Recursively prints a tree node with proper indentation and tree characters.
-fn print_tree_node(
-    tree: &Tree<RequiresTreeValue>,
+fn print_tree_node<T: PrintableTreeValue>(
+    tree: &Tree<T>,
     config: &TreePrintConfig,
     current_depth: usize,
     is_last: bool,
@@ -59,24 +77,23 @@ fn print_tree_node(
     let indent = build_indent(parent_prefixes);
 
     // Print the parameter name and value
-    let model_path_display = value.model_path.display().to_string();
-    let styled_model_path = stylesheet::MODEL_LABEL.style(&model_path_display);
-    let styled_parameter_name = stylesheet::PARAMETER_IDENTIFIER.style(&value.parameter_name);
-    print!("{indent}{first_prefix} {styled_model_path} {styled_parameter_name} = ");
-    print_utils::print_value(&value.parameter_value);
+    print!("{indent}{first_prefix} ");
+    value.print_tree_value();
     println!();
 
     // Print the parameter equation
-    let equation_str = get_equation_str(&value.display_info, file_cache);
+    if let Some(display_info) = value.get_display_info() {
+        let equation_str = get_equation_str(display_info, file_cache);
 
-    match equation_str {
-        Ok(equation_str) => {
-            let equation_str = stylesheet::TREE_VALUE_EQUATION.style(equation_str);
-            println!("{indent}{rest_prefix} {equation_str}");
-        }
-        Err(error) => {
-            let error_label = stylesheet::ERROR_COLOR.style("error");
-            println!("{indent}{rest_prefix} {error_label}: {error}");
+        match equation_str {
+            Ok(equation_str) => {
+                let equation_str = stylesheet::TREE_VALUE_EQUATION.style(equation_str);
+                println!("{indent}{rest_prefix} {equation_str}");
+            }
+            Err(error) => {
+                let error_label = stylesheet::ERROR_COLOR.style("error");
+                println!("{indent}{rest_prefix} {error_label}: {error}");
+            }
         }
     }
 
@@ -88,7 +105,7 @@ fn print_tree_node(
     }
 
     // Check if the parameter is outside the top model
-    if !config.recursive && value.model_path != top_model_path {
+    if !config.recursive && value.is_outside_top_model(top_model_path) {
         return;
     }
 
@@ -170,9 +187,49 @@ fn get_equation_str(
         })
 }
 
-pub(crate) fn print_dependency_tree(
-    dependency_tree: &Tree<DependencyTreeValue>,
-    tree_print_config: &TreePrintConfig,
-) {
-    todo!()
+trait PrintableTreeValue {
+    fn print_tree_value(&self);
+    fn get_display_info(&self) -> Option<&(PathBuf, Span)>;
+    fn is_outside_top_model(&self, top_model_path: &Path) -> bool;
+}
+
+impl PrintableTreeValue for RequiresTreeValue {
+    fn print_tree_value(&self) {
+        let model_path_display = self.model_path.display().to_string();
+        let styled_model_path = stylesheet::MODEL_LABEL.style(&model_path_display);
+        let styled_parameter_name = stylesheet::PARAMETER_IDENTIFIER.style(&self.parameter_name);
+        print!("{styled_model_path} {styled_parameter_name} = ");
+        print_utils::print_value(&self.parameter_value);
+    }
+
+    fn get_display_info(&self) -> Option<&(PathBuf, Span)> {
+        Some(&self.display_info)
+    }
+
+    fn is_outside_top_model(&self, top_model_path: &Path) -> bool {
+        self.model_path != top_model_path
+    }
+}
+
+impl PrintableTreeValue for DependencyTreeValue {
+    fn print_tree_value(&self) {
+        let name = self.reference_name.as_ref().map_or_else(
+            || self.parameter_name.clone(),
+            |reference_name| {
+                let parameter_name = &self.parameter_name;
+                format!("{parameter_name}.{reference_name}")
+            },
+        );
+        let styled_name = stylesheet::PARAMETER_IDENTIFIER.style(&name);
+        print!("{styled_name} = ");
+        print_utils::print_value(&self.parameter_value);
+    }
+
+    fn get_display_info(&self) -> Option<&(PathBuf, Span)> {
+        self.display_info.as_ref()
+    }
+
+    fn is_outside_top_model(&self, _top_model_path: &Path) -> bool {
+        self.reference_name.is_some()
+    }
 }

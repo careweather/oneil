@@ -19,7 +19,11 @@ use notify::Watcher;
 use oneil_eval::{
     EvalContext,
     builtin::{BuiltinFunction, std as oneil_std},
-    output::eval_result::EvalResult,
+    output::{
+        dependency::{DependencyTreeValue, RequiresTreeValue},
+        eval_result::EvalResult,
+        tree::Tree,
+    },
 };
 use oneil_ir as ir;
 use oneil_model_resolver::FileLoader;
@@ -471,6 +475,11 @@ fn handle_test_command(args: TestArgs) {
 }
 
 fn handle_tree_command(args: TreeArgs) {
+    enum TreeResults {
+        RequiresTrees(Vec<(String, Option<Tree<RequiresTreeValue>>)>),
+        DependencyTrees(Vec<(String, Option<Tree<DependencyTreeValue>>)>),
+    }
+
     let TreeArgs {
         file,
         params,
@@ -489,56 +498,87 @@ fn handle_tree_command(args: TreeArgs) {
         return;
     };
 
+    let (trees, errors) = if list_refs {
+        let mut trees = Vec::new();
+        let mut errors = Vec::new();
+
+        for param in params {
+            let (requires_tree, tree_errors) = eval_context.get_requires_tree(&file, &param);
+
+            trees.push((param, requires_tree));
+            errors.extend(tree_errors);
+        }
+
+        (TreeResults::RequiresTrees(trees), errors)
+    } else {
+        let mut trees = Vec::new();
+        let mut errors = Vec::new();
+
+        for param in params {
+            let (dependency_tree, tree_errors) = eval_context.get_dependency_tree(&file, &param);
+
+            trees.push((param, dependency_tree));
+            errors.extend(tree_errors);
+        }
+
+        (TreeResults::DependencyTrees(trees), errors)
+    };
+
+    for error in &errors {
+        let error = convert_error::eval::convert(error);
+
+        if let Some(error) = error {
+            print_error::print(&error, false);
+            eprintln!();
+        }
+        eprintln!();
+    }
+
+    if !errors.is_empty() && !partial {
+        return;
+    }
+
     let mut file_cache = std::collections::HashMap::new();
 
-    for param in params {
-        if list_refs {
-            let (requires_tree, errors) = eval_context.get_requires_tree(&file, &param);
-
-            for error in &errors {
-                let error = convert_error::eval::convert(error);
-
-                if let Some(error) = error {
-                    print_error::print(&error, false);
-                    eprintln!();
-                }
-                eprintln!();
-            }
-
-            if errors.is_empty() || partial {
-                if let Some(requires_tree) = requires_tree {
-                    print_tree::print_requires_tree(
-                        &file,
-                        &requires_tree,
-                        &tree_print_config,
-                        &mut file_cache,
-                    );
-                } else {
-                    let error_label = stylesheet::ERROR_COLOR.bold().style("error:");
-                    eprintln!("{error_label} parameter \"{param}\" not found in model");
+    match trees {
+        TreeResults::RequiresTrees(trees) => {
+            for (param, tree) in trees {
+                match tree {
+                    Some(requires_tree) => {
+                        print_tree::print_requires_tree(
+                            &file,
+                            &requires_tree,
+                            &tree_print_config,
+                            &mut file_cache,
+                        );
+                    }
+                    None => {
+                        print_param_not_found(&param);
+                    }
                 }
             }
-        } else {
-            let (dependency_tree, errors) = eval_context.get_dependency_tree(&file, &param);
-
-            for error in &errors {
-                let error = convert_error::eval::convert(error);
-
-                if let Some(error) = error {
-                    print_error::print(&error, false);
-                    eprintln!();
-                }
-                eprintln!();
-            }
-
-            if errors.is_empty() || partial {
-                if let Some(dependency_tree) = dependency_tree {
-                    print_tree::print_dependency_tree(&dependency_tree, &tree_print_config);
-                } else {
-                    let error_label = stylesheet::ERROR_COLOR.bold().style("error:");
-                    eprintln!("{error_label} parameter \"{param}\" not found in model");
+        }
+        TreeResults::DependencyTrees(trees) => {
+            for (param, tree) in trees {
+                match tree {
+                    Some(dependency_tree) => {
+                        print_tree::print_dependency_tree(
+                            &file,
+                            &dependency_tree,
+                            &tree_print_config,
+                            &mut file_cache,
+                        );
+                    }
+                    None => {
+                        print_param_not_found(&param);
+                    }
                 }
             }
         }
     }
+}
+
+fn print_param_not_found(param: &str) {
+    let error_label = stylesheet::ERROR_COLOR.bold().style("error:");
+    eprintln!("{error_label} parameter \"{param}\" not found in model");
 }
