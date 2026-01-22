@@ -513,7 +513,10 @@ impl<F: BuiltinFunction> EvalContext<F> {
 
             let deps = dependency_graph
                 .depends_on(model_path, parameter_name)
-                .expect("dependency graph should have parameter");
+                .cloned()
+                // if the parameter is not found, it has no dependencies
+                // so we return an empty dependency set
+                .unwrap_or_default();
 
             let builtin_deps = deps.builtin_dependencies.iter().map(|dep| {
                 let parameter_value =
@@ -640,7 +643,10 @@ impl<F: BuiltinFunction> EvalContext<F> {
 
             let deps = dependency_graph
                 .requires(model_path, parameter_name)
-                .expect("dependency graph should have parameter");
+                .cloned()
+                // if the parameter is not found, it has no requires
+                // so we return an empty requires set
+                .unwrap_or_default();
 
             let parameter_deps = deps
                 .parameter_requires
