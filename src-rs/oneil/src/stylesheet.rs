@@ -19,3 +19,4 @@ pub const PARAMETERS_NAME_LABEL: Style = Style::new().blue().bold();
 pub const PARAMETER_IDENTIFIER: Style = Style::new().green();
 pub const PARAMETER_LABEL: Style = Style::new().dimmed();
 pub const PARAMETER_UNIT: Style = Style::new().blue();
+pub const TREE_VALUE_EQUATION: Style = Style::new().blue();

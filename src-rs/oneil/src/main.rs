@@ -41,6 +41,7 @@ mod print_error;
 mod print_ir;
 mod print_model_result;
 mod print_tree;
+mod print_utils;
 mod stylesheet;
 
 /// Main entry point for the Oneil CLI application
@@ -479,11 +480,7 @@ fn handle_tree_command(args: TreeArgs) {
         partial,
     } = args;
 
-    let tree_print_config = TreePrintConfig {
-        recursive,
-        depth,
-        partial,
-    };
+    let tree_print_config = TreePrintConfig { recursive, depth };
 
     let builtins = create_builtins();
     let (eval_context, _watch_paths) = eval_model(&file, &builtins);
@@ -491,6 +488,8 @@ fn handle_tree_command(args: TreeArgs) {
     let Some(eval_context) = eval_context else {
         return;
     };
+
+    let mut file_cache = std::collections::HashMap::new();
 
     for param in params {
         if list_refs {
@@ -508,7 +507,12 @@ fn handle_tree_command(args: TreeArgs) {
 
             if errors.is_empty() || partial {
                 if let Some(requires_tree) = requires_tree {
-                    print_tree::print_requires_tree(&requires_tree, &tree_print_config);
+                    print_tree::print_requires_tree(
+                        &file,
+                        &requires_tree,
+                        &tree_print_config,
+                        &mut file_cache,
+                    );
                 } else {
                     let error_label = stylesheet::ERROR_COLOR.bold().style("error:");
                     eprintln!("{error_label} parameter \"{param}\" not found in model");

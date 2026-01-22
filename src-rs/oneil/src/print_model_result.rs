@@ -2,15 +2,12 @@ use std::path::Path;
 
 use anstream::{eprintln, print, println};
 use indexmap::{IndexMap, IndexSet};
-use oneil_eval::{
-    output::eval_result,
-    value::{self, Value},
-};
+use oneil_eval::{output::eval_result, value::Value};
 use oneil_shared::span::Span;
 
 use crate::{
     command::{PrintMode, Variable, VariableList},
-    stylesheet,
+    print_utils, stylesheet,
 };
 
 #[expect(
@@ -408,7 +405,7 @@ fn print_parameter(parameter: &eval_result::Parameter, should_print_debug_info: 
     let styled_ident = stylesheet::PARAMETER_IDENTIFIER.style(&parameter.ident);
     print!("{styled_ident} = ");
 
-    print_value(&parameter.value);
+    print_utils::print_value(&parameter.value);
 
     let styled_label = stylesheet::PARAMETER_LABEL.style(format!("# {}", parameter.label));
     println!("  {styled_label}");
@@ -438,33 +435,8 @@ fn print_variable_value(name: &str, value: &Value, indent: usize) {
     let indent = " ".repeat(indent);
     let styled_dependency_name = stylesheet::PARAMETER_IDENTIFIER.style(name);
     print!("{indent}- {styled_dependency_name} = ");
-    print_value(value);
+    print_utils::print_value(value);
     println!();
-}
-
-fn print_value(value: &Value) {
-    match value {
-        Value::String(string) => print!("'{}'", string),
-        Value::Boolean(boolean) => print!("{}", boolean),
-        Value::Number(number) => print_number_value(number),
-        Value::MeasuredNumber(number) => {
-            let (number, unit) = number.clone().into_number_and_unit();
-            print_number_value(&number);
-            print_number_unit(&unit);
-        }
-    }
-}
-
-fn print_number_value(value: &value::Number) {
-    match value {
-        value::Number::Scalar(scalar) => print!("{}", scalar),
-        value::Number::Interval(interval) => print!("{} | {}", interval.min(), interval.max()),
-    }
-}
-
-fn print_number_unit(unit: &value::Unit) {
-    let styled_display_unit = stylesheet::PARAMETER_UNIT.style(unit.display_unit.to_string());
-    print!(" :{styled_display_unit}");
 }
 
 fn print_all_tests(model_ref: eval_result::ModelReference<'_>, recursive: bool) {
