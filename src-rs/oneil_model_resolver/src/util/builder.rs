@@ -1,6 +1,8 @@
 //! Builder types for constructing model and parameter collections.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -22,7 +24,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelCollectionBuilder<Ps, Py> {
     initial_models: HashSet<ir::ModelPath>,
-    models: HashMap<ir::ModelPath, ir::Model>,
+    models: IndexMap<ir::ModelPath, ir::Model>,
     visited_models: HashSet<ir::ModelPath>,
     errors: ModelErrorMap<Ps, Py>,
 }
@@ -32,7 +34,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     pub fn new(initial_models: HashSet<ir::ModelPath>) -> Self {
         Self {
             initial_models,
-            models: HashMap::new(),
+            models: IndexMap::new(),
             visited_models: HashSet::new(),
             errors: ModelErrorMap::new(),
         }
@@ -50,7 +52,7 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
 
     /// Returns a reference to the map of loaded models.
     #[must_use]
-    pub const fn get_models(&self) -> &HashMap<ir::ModelPath, ir::Model> {
+    pub const fn get_models(&self) -> &IndexMap<ir::ModelPath, ir::Model> {
         &self.models
     }
 
@@ -96,14 +98,14 @@ impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     }
 
     #[cfg(test)]
-    pub const fn get_model_errors(&self) -> &HashMap<ir::ModelPath, LoadError<Ps>> {
+    pub const fn get_model_errors(&self) -> &IndexMap<ir::ModelPath, LoadError<Ps>> {
         self.errors.get_model_errors()
     }
 
     #[cfg(test)]
     pub const fn get_circular_dependency_errors(
         &self,
-    ) -> &HashMap<ir::ModelPath, Vec<CircularDependencyError>> {
+    ) -> &IndexMap<ir::ModelPath, Vec<CircularDependencyError>> {
         self.errors.get_circular_dependency_errors()
     }
 }
@@ -124,20 +126,20 @@ impl<Ps, Py> TryInto<ir::ModelCollection> for ModelCollectionBuilder<Ps, Py> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelImportsBuilder {
-    submodels: HashMap<ir::SubmodelName, ir::SubmodelImport>,
-    submodel_resolution_errors: HashMap<ir::SubmodelName, ModelImportResolutionError>,
-    references: HashMap<ir::ReferenceName, ir::ReferenceImport>,
-    reference_resolution_errors: HashMap<ir::ReferenceName, ModelImportResolutionError>,
+    submodels: IndexMap<ir::SubmodelName, ir::SubmodelImport>,
+    submodel_resolution_errors: IndexMap<ir::SubmodelName, ModelImportResolutionError>,
+    references: IndexMap<ir::ReferenceName, ir::ReferenceImport>,
+    reference_resolution_errors: IndexMap<ir::ReferenceName, ModelImportResolutionError>,
 }
 
 impl ModelImportsBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            submodels: HashMap::new(),
-            submodel_resolution_errors: HashMap::new(),
-            references: HashMap::new(),
-            reference_resolution_errors: HashMap::new(),
+            submodels: IndexMap::new(),
+            submodel_resolution_errors: IndexMap::new(),
+            references: IndexMap::new(),
+            reference_resolution_errors: IndexMap::new(),
         }
     }
 
@@ -213,16 +215,16 @@ impl ModelImportsBuilder {
 }
 
 pub struct ParameterBuilder {
-    parameters: HashMap<ir::ParameterName, ir::Parameter>,
-    parameter_errors: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+    parameters: IndexMap<ir::ParameterName, ir::Parameter>,
+    parameter_errors: IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
     visited: HashSet<ir::ParameterName>,
 }
 
 impl ParameterBuilder {
     pub fn new() -> Self {
         Self {
-            parameters: HashMap::new(),
-            parameter_errors: HashMap::new(),
+            parameters: IndexMap::new(),
+            parameter_errors: IndexMap::new(),
             visited: HashSet::new(),
         }
     }
@@ -231,7 +233,7 @@ impl ParameterBuilder {
         self.parameters.insert(parameter_name, parameter);
     }
 
-    pub const fn get_parameters(&self) -> &HashMap<ir::ParameterName, ir::Parameter> {
+    pub const fn get_parameters(&self) -> &IndexMap<ir::ParameterName, ir::Parameter> {
         &self.parameters
     }
 
@@ -248,7 +250,7 @@ impl ParameterBuilder {
 
     pub const fn get_parameter_errors(
         &self,
-    ) -> &HashMap<ir::ParameterName, Vec<ParameterResolutionError>> {
+    ) -> &IndexMap<ir::ParameterName, Vec<ParameterResolutionError>> {
         &self.parameter_errors
     }
 
@@ -263,8 +265,8 @@ impl ParameterBuilder {
     pub fn into_parameter_collection_and_errors(
         self,
     ) -> (
-        HashMap<ir::ParameterName, ir::Parameter>,
-        HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+        IndexMap<ir::ParameterName, ir::Parameter>,
+        IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
     ) {
         (self.parameters, self.parameter_errors)
     }

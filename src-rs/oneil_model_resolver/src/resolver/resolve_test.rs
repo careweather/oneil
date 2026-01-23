@@ -1,6 +1,6 @@
 //! Test resolution for the Oneil model loader
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_ast as ast;
 use oneil_ir as ir;
@@ -8,7 +8,10 @@ use oneil_ir as ir;
 use crate::{
     BuiltinRef,
     error::{self, TestResolutionError},
-    resolver::{resolve_expr::resolve_expr, resolve_trace_level::resolve_trace_level},
+    resolver::{
+        resolve_expr::{get_expr_dependencies, resolve_expr},
+        resolve_trace_level::resolve_trace_level,
+    },
     util::context::{ParameterContext, ReferenceContext},
 };
 
@@ -19,8 +22,8 @@ pub fn resolve_tests(
     reference_context: &ReferenceContext<'_, '_>,
     parameter_context: &ParameterContext<'_>,
 ) -> (
-    HashMap<ir::TestIndex, ir::Test>,
-    HashMap<ir::TestIndex, Vec<TestResolutionError>>,
+    IndexMap<ir::TestIndex, ir::Test>,
+    IndexMap<ir::TestIndex, Vec<TestResolutionError>>,
 ) {
     let tests = tests.into_iter().enumerate().map(|(test_index, test)| {
         let test_index = ir::TestIndex::new(test_index);
@@ -36,7 +39,12 @@ pub fn resolve_tests(
         )
         .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
-        Ok((test_index, ir::Test::new(test_span, trace_level, test_expr)))
+        let dependencies = get_expr_dependencies(&test_expr);
+
+        Ok((
+            test_index,
+            ir::Test::new(test_span, trace_level, test_expr, dependencies),
+        ))
     });
 
     error::split_ok_and_errors(tests)

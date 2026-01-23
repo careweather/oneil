@@ -3,7 +3,7 @@
 use oneil_shared::span::Span;
 
 use crate::{
-    ParameterName,
+    ParameterName, ReferenceName,
     reference::{Identifier, ModelPath},
 };
 
@@ -152,14 +152,21 @@ impl Expr {
     #[must_use]
     pub const fn external_variable(
         span: Span,
-        model: ModelPath,
-        model_span: Span,
+        model_path: ModelPath,
+        reference_name: ReferenceName,
+        reference_span: Span,
         parameter_name: ParameterName,
         parameter_span: Span,
     ) -> Self {
         Self::Variable {
             span,
-            variable: Variable::external(model, model_span, parameter_name, parameter_span),
+            variable: Variable::external(
+                model_path,
+                reference_name,
+                reference_span,
+                parameter_name,
+                parameter_span,
+            ),
         }
     }
 
@@ -169,29 +176,101 @@ impl Expr {
         Self::Literal { span, value }
     }
 
-    /// Returns the span of this expression.
+    /// Visits the expression with a visitor in pre-order
+    /// (parent nodes are visited before their children).
     #[must_use]
-    pub const fn span(&self) -> Span {
+    pub fn pre_order_visit<V: ExprVisitor>(&self, visitor: V) -> V {
         match self {
-            Self::ComparisonOp { span, .. }
-            | Self::BinaryOp { span, .. }
-            | Self::UnaryOp { span, .. }
-            | Self::FunctionCall { span, .. }
-            | Self::Variable { span, .. }
-            | Self::Literal { span, .. } => *span,
+            Self::ComparisonOp {
+                span,
+                op,
+                left,
+                right,
+                rest_chained,
+            } => {
+                let visitor = visitor.visit_comparison_op(*span, op, left, right, rest_chained);
+                let visitor = left.pre_order_visit(visitor);
+                let visitor = right.pre_order_visit(visitor);
+                rest_chained.iter().fold(visitor, |visitor, (_op, expr)| {
+                    expr.pre_order_visit(visitor)
+                })
+            }
+            Self::BinaryOp {
+                span,
+                op,
+                left,
+                right,
+            } => {
+                let visitor = visitor.visit_binary_op(*span, op, left, right);
+                let visitor = left.pre_order_visit(visitor);
+                right.pre_order_visit(visitor)
+            }
+            Self::UnaryOp { span, op, expr } => {
+                let visitor = visitor.visit_unary_op(*span, op, expr);
+                expr.pre_order_visit(visitor)
+            }
+            Self::FunctionCall {
+                span,
+                name_span,
+                name,
+                args,
+            } => {
+                let visitor = visitor.visit_function_call(*span, *name_span, name, args);
+                args.iter()
+                    .fold(visitor, |visitor, arg| arg.pre_order_visit(visitor))
+            }
+            Self::Variable { span, variable } => visitor.visit_variable(*span, variable),
+            Self::Literal { span, value } => visitor.visit_literal(*span, value),
         }
     }
 
-    /// Returns the span of the function name if this is a function call.
+    /// Visits the expression with a visitor in post-order
+    /// (parent nodes are visited after their children).
     #[must_use]
-    pub const fn function_name_span(&self) -> Option<Span> {
+    pub fn post_order_visit<V: ExprVisitor>(&self, visitor: V) -> V {
         match self {
-            Self::FunctionCall { name_span, .. } => Some(*name_span),
-            Self::ComparisonOp { .. }
-            | Self::BinaryOp { .. }
-            | Self::UnaryOp { .. }
-            | Self::Variable { .. }
-            | Self::Literal { .. } => None,
+            Self::ComparisonOp {
+                span,
+                op,
+                left,
+                right,
+                rest_chained,
+            } => {
+                let visitor = left.post_order_visit(visitor);
+                let visitor = right.post_order_visit(visitor);
+                let visitor = rest_chained.iter().fold(visitor, |visitor, (_op, expr)| {
+                    expr.post_order_visit(visitor)
+                });
+                visitor.visit_comparison_op(*span, op, left, right, rest_chained)
+            }
+            Self::BinaryOp {
+                span,
+                op,
+                left,
+                right,
+            } => {
+                let visitor = left.post_order_visit(visitor);
+                let visitor = right.post_order_visit(visitor);
+                visitor.visit_binary_op(*span, op, left, right)
+            }
+            Self::UnaryOp { span, op, expr } => {
+                let visitor = expr.post_order_visit(visitor);
+                visitor.visit_unary_op(*span, op, expr)
+            }
+            Self::FunctionCall {
+                span,
+                name_span,
+                name,
+                args,
+            } => {
+                let visitor = args
+                    .iter()
+                    .fold(visitor, |visitor, arg| arg.post_order_visit(visitor));
+
+                visitor.visit_function_call(*span, *name_span, name, args)
+            }
+            Self::Variable { span, variable } => visitor.visit_variable(*span, variable),
+            Self::Literal { span, value } => visitor.visit_literal(*span, value),
         }
     }
 }
@@ -293,22 +372,22 @@ pub enum UnaryOp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionName {
     /// Built-in mathematical function.
-    Builtin(Identifier),
+    Builtin(Identifier, Span),
     /// Function imported from a Python module.
-    Imported(Identifier),
+    Imported(Identifier, Span),
 }
 
 impl FunctionName {
     /// Creates a reference to a built-in function.
     #[must_use]
-    pub const fn builtin(name: Identifier) -> Self {
-        Self::Builtin(name)
+    pub const fn builtin(name: Identifier, name_span: Span) -> Self {
+        Self::Builtin(name, name_span)
     }
 
     /// Creates a reference to an imported Python function.
     #[must_use]
-    pub const fn imported(name: Identifier) -> Self {
-        Self::Imported(name)
+    pub const fn imported(name: Identifier, name_span: Span) -> Self {
+        Self::Imported(name, name_span)
     }
 }
 
@@ -332,9 +411,11 @@ pub enum Variable {
     /// Parameter defined in another model.
     External {
         /// The model where the parameter is defined.
-        model: ModelPath,
+        model_path: ModelPath,
+        /// The reference name of the model.
+        reference_name: ReferenceName,
         /// Span of the referenced model identifier.
-        model_span: Span,
+        reference_span: Span,
         /// The identifier of the parameter in that model.
         parameter_name: ParameterName,
         /// Span of the parameter identifier.
@@ -361,36 +442,18 @@ impl Variable {
     /// Creates an external variable reference.
     #[must_use]
     pub const fn external(
-        model: ModelPath,
-        model_span: Span,
+        model_path: ModelPath,
+        reference_name: ReferenceName,
+        reference_span: Span,
         parameter_name: ParameterName,
         parameter_span: Span,
     ) -> Self {
         Self::External {
-            model,
-            model_span,
+            model_path,
+            reference_name,
+            reference_span,
             parameter_name,
             parameter_span,
-        }
-    }
-
-    /// Returns the span of the referenced parameter identifier.
-    #[must_use]
-    pub const fn parameter_span(&self) -> Span {
-        match self {
-            Self::Builtin { ident_span, .. } => *ident_span,
-            Self::Parameter { parameter_span, .. } | Self::External { parameter_span, .. } => {
-                *parameter_span
-            }
-        }
-    }
-
-    /// Returns the span of the referenced model identifier, if any.
-    #[must_use]
-    pub const fn model_span(&self) -> Option<Span> {
-        match self {
-            Self::External { model_span, .. } => Some(*model_span),
-            Self::Builtin { .. } | Self::Parameter { .. } => None,
         }
     }
 }
@@ -423,5 +486,61 @@ impl Literal {
     #[must_use]
     pub const fn boolean(value: bool) -> Self {
         Self::Boolean(value)
+    }
+}
+
+#[expect(
+    unused_variables,
+    reason = "the default implementations ignore node data"
+)]
+/// Visitor trait for traversing and transforming expressions.
+pub trait ExprVisitor: Sized {
+    /// Visits a comparison operation expression.
+    #[must_use]
+    fn visit_comparison_op(
+        self,
+        span: Span,
+        op: &ComparisonOp,
+        left: &Expr,
+        right: &Expr,
+        rest_chained: &[(ComparisonOp, Expr)],
+    ) -> Self {
+        self
+    }
+
+    /// Visits a binary operation expression.
+    #[must_use]
+    fn visit_binary_op(self, span: Span, op: &BinaryOp, left: &Expr, right: &Expr) -> Self {
+        self
+    }
+
+    /// Visits a unary operation expression.
+    #[must_use]
+    fn visit_unary_op(self, span: Span, op: &UnaryOp, expr: &Expr) -> Self {
+        self
+    }
+
+    /// Visits a function call expression.
+    #[must_use]
+    fn visit_function_call(
+        self,
+        span: Span,
+        name_span: Span,
+        name: &FunctionName,
+        args: &[Expr],
+    ) -> Self {
+        self
+    }
+
+    /// Visits a variable reference expression.
+    #[must_use]
+    fn visit_variable(self, span: Span, variable: &Variable) -> Self {
+        self
+    }
+
+    /// Visits a literal value expression.
+    #[must_use]
+    fn visit_literal(self, span: Span, value: &Literal) -> Self {
+        self
     }
 }

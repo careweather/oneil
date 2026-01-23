@@ -18,6 +18,9 @@ keywords = [
 ]
 categories = ["compilers", "science", "simulation"]
 
+[workspace.dependencies]
+indexmap = "2.1"
+
 # Lints originally derived from https://medium.com/@carlmkadie/92bb899d47ef
 # 
 # To use the lints in VSCode with rust-analyzer, follow this:

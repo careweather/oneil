@@ -780,7 +780,7 @@ mod tests {
         };
 
         let ir::Variable::External {
-            model,
+            model_path: model,
             parameter_name,
             ..
         } = variable_expr

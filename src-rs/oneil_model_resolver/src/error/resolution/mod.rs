@@ -19,7 +19,7 @@ mod submodel;
 mod test;
 mod variable;
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 
@@ -32,22 +32,22 @@ pub use variable::VariableResolutionError;
 /// A collection of all resolution errors that occurred during model loading.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolutionErrors {
-    import: HashMap<ir::PythonPath, ImportResolutionError>,
-    submodel_resolution: HashMap<ir::SubmodelName, ModelImportResolutionError>,
-    reference_resolution: HashMap<ir::ReferenceName, ModelImportResolutionError>,
-    parameter_resolution: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
-    test_resolution: HashMap<ir::TestIndex, Vec<TestResolutionError>>,
+    import: IndexMap<ir::PythonPath, ImportResolutionError>,
+    submodel_resolution: IndexMap<ir::SubmodelName, ModelImportResolutionError>,
+    reference_resolution: IndexMap<ir::ReferenceName, ModelImportResolutionError>,
+    parameter_resolution: IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+    test_resolution: IndexMap<ir::TestIndex, Vec<TestResolutionError>>,
 }
 
 impl ResolutionErrors {
     /// Creates a new collection of resolution errors.
     #[must_use]
     pub const fn new(
-        import_errors: HashMap<ir::PythonPath, ImportResolutionError>,
-        submodel_resolution_errors: HashMap<ir::SubmodelName, ModelImportResolutionError>,
-        reference_resolution_errors: HashMap<ir::ReferenceName, ModelImportResolutionError>,
-        parameter_resolution_errors: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
-        test_resolution_errors: HashMap<ir::TestIndex, Vec<TestResolutionError>>,
+        import_errors: IndexMap<ir::PythonPath, ImportResolutionError>,
+        submodel_resolution_errors: IndexMap<ir::SubmodelName, ModelImportResolutionError>,
+        reference_resolution_errors: IndexMap<ir::ReferenceName, ModelImportResolutionError>,
+        parameter_resolution_errors: IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+        test_resolution_errors: IndexMap<ir::TestIndex, Vec<TestResolutionError>>,
     ) -> Self {
         Self {
             import: import_errors,
@@ -69,7 +69,7 @@ impl ResolutionErrors {
 
     /// Returns a reference to the map of import resolution errors.
     #[must_use]
-    pub const fn get_import_errors(&self) -> &HashMap<ir::PythonPath, ImportResolutionError> {
+    pub const fn get_import_errors(&self) -> &IndexMap<ir::PythonPath, ImportResolutionError> {
         &self.import
     }
 
@@ -77,7 +77,7 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn get_submodel_resolution_errors(
         &self,
-    ) -> &HashMap<ir::SubmodelName, ModelImportResolutionError> {
+    ) -> &IndexMap<ir::SubmodelName, ModelImportResolutionError> {
         &self.submodel_resolution
     }
 
@@ -87,7 +87,7 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn get_reference_resolution_errors(
         &self,
-    ) -> &HashMap<ir::ReferenceName, ModelImportResolutionError> {
+    ) -> &IndexMap<ir::ReferenceName, ModelImportResolutionError> {
         &self.reference_resolution
     }
 
@@ -98,7 +98,7 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn get_parameter_resolution_errors(
         &self,
-    ) -> &HashMap<ir::ParameterName, Vec<ParameterResolutionError>> {
+    ) -> &IndexMap<ir::ParameterName, Vec<ParameterResolutionError>> {
         &self.parameter_resolution
     }
 
@@ -106,7 +106,7 @@ impl ResolutionErrors {
     #[must_use]
     pub const fn get_test_resolution_errors(
         &self,
-    ) -> &HashMap<ir::TestIndex, Vec<TestResolutionError>> {
+    ) -> &IndexMap<ir::TestIndex, Vec<TestResolutionError>> {
         &self.test_resolution
     }
 }

@@ -1,10 +1,12 @@
 //! Parameter definitions and management for Oneil model IR.
 
-use std::collections::HashSet;
+use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
-use crate::{debug_info::TraceLevel, expr::Expr, unit::CompositeUnit};
+use crate::{
+    Identifier, ModelPath, ReferenceName, debug_info::TraceLevel, expr::Expr, unit::CompositeUnit,
+};
 
 /// A name for a parameter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -24,13 +26,32 @@ impl ParameterName {
     }
 }
 
+/// A label for a parameter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Label(String);
+
+impl Label {
+    /// Creates a new label with the given name.
+    #[must_use]
+    pub const fn new(name: String) -> Self {
+        Self(name)
+    }
+
+    /// Returns the label as a string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Represents a single parameter in an Oneil model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    dependencies: HashSet<ParameterName>,
+    dependencies: Dependencies,
     name: ParameterName,
     name_span: Span,
     span: Span,
+    label: Label,
     value: ParameterValue,
     limits: Limits,
     is_performance: bool,
@@ -39,12 +60,14 @@ pub struct Parameter {
 
 impl Parameter {
     /// Creates a new parameter with the specified properties.
+    #[expect(clippy::too_many_arguments, reason = "this is a constructor")]
     #[must_use]
     pub const fn new(
-        dependencies: HashSet<ParameterName>,
+        dependencies: Dependencies,
         name: ParameterName,
         name_span: Span,
         span: Span,
+        label: Label,
         value: ParameterValue,
         limits: Limits,
         is_performance: bool,
@@ -55,6 +78,7 @@ impl Parameter {
             name,
             name_span,
             span,
+            label,
             value,
             limits,
             is_performance,
@@ -64,7 +88,7 @@ impl Parameter {
 
     /// Returns a reference to the set of parameter dependencies.
     #[must_use]
-    pub const fn dependencies(&self) -> &HashSet<ParameterName> {
+    pub const fn dependencies(&self) -> &Dependencies {
         &self.dependencies
     }
 
@@ -84,6 +108,12 @@ impl Parameter {
     #[must_use]
     pub const fn span(&self) -> Span {
         self.span
+    }
+
+    /// Returns the label of this parameter.
+    #[must_use]
+    pub const fn label(&self) -> &Label {
+        &self.label
     }
 
     /// Returns the value of this parameter.
@@ -108,6 +138,82 @@ impl Parameter {
     #[must_use]
     pub const fn trace_level(&self) -> TraceLevel {
         self.trace_level
+    }
+}
+
+/// The dependencies of a parameter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dependencies {
+    /// The dependencies on builtin variables.
+    builtin: IndexMap<Identifier, Span>,
+    /// The dependencies on parameters defined in the current model.
+    parameter: IndexMap<ParameterName, Span>,
+    /// The dependencies on parameters defined in other models.
+    external: IndexMap<(ReferenceName, ParameterName), (ModelPath, Span)>,
+}
+
+impl Dependencies {
+    /// Creates new dependencies.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            builtin: IndexMap::new(),
+            parameter: IndexMap::new(),
+            external: IndexMap::new(),
+        }
+    }
+
+    /// Returns the dependencies on builtin variables.
+    #[must_use]
+    pub const fn builtin(&self) -> &IndexMap<Identifier, Span> {
+        &self.builtin
+    }
+
+    /// Returns the dependencies on parameters defined in the current model.
+    #[must_use]
+    pub const fn parameter(&self) -> &IndexMap<ParameterName, Span> {
+        &self.parameter
+    }
+
+    /// Returns the dependencies on parameters defined in other models.
+    #[must_use]
+    pub const fn external(&self) -> &IndexMap<(ReferenceName, ParameterName), (ModelPath, Span)> {
+        &self.external
+    }
+
+    /// Inserts a dependency on a builtin variable.
+    pub fn insert_builtin(&mut self, ident: Identifier, span: Span) {
+        self.builtin.insert(ident, span);
+    }
+
+    /// Inserts a dependency on a parameter defined in the current model.
+    pub fn insert_parameter(&mut self, parameter_name: ParameterName, span: Span) {
+        self.parameter.insert(parameter_name, span);
+    }
+
+    /// Inserts a dependency on a parameter defined in another model.
+    pub fn insert_external(
+        &mut self,
+        reference_name: ReferenceName,
+        parameter_name: ParameterName,
+        model_path: ModelPath,
+        full_span: Span,
+    ) {
+        self.external
+            .insert((reference_name, parameter_name), (model_path, full_span));
+    }
+
+    /// Extends the dependencies with the given dependencies.
+    pub fn extend(&mut self, other: Self) {
+        self.builtin.extend(other.builtin);
+        self.parameter.extend(other.parameter);
+        self.external.extend(other.external);
+    }
+}
+
+impl Default for Dependencies {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -169,14 +275,18 @@ pub enum Limits {
     /// Continuous range with minimum and maximum values.
     Continuous {
         /// The minimum allowed value expression.
-        min: Expr,
+        min: Box<Expr>,
         /// The maximum allowed value expression.
-        max: Expr,
+        max: Box<Expr>,
+        /// The span of the expression representing the limit.
+        limit_expr_span: Span,
     },
     /// Discrete set of allowed values.
     Discrete {
         /// Vector of expressions representing allowed values.
         values: Vec<Expr>,
+        /// The span of the expression representing the limit.
+        limit_expr_span: Span,
     },
 }
 
@@ -189,14 +299,21 @@ impl Limits {
 
     /// Creates continuous limits with minimum and maximum expressions.
     #[must_use]
-    pub const fn continuous(min: Expr, max: Expr) -> Self {
-        Self::Continuous { min, max }
+    pub fn continuous(min: Expr, max: Expr, limit_expr_span: Span) -> Self {
+        Self::Continuous {
+            min: Box::new(min),
+            max: Box::new(max),
+            limit_expr_span,
+        }
     }
 
     /// Creates discrete limits with a set of allowed values.
     #[must_use]
-    pub const fn discrete(values: Vec<Expr>) -> Self {
-        Self::Discrete { values }
+    pub const fn discrete(values: Vec<Expr>, limit_expr_span: Span) -> Self {
+        Self::Discrete {
+            values,
+            limit_expr_span,
+        }
     }
 }
 

@@ -1,9 +1,20 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::{IndexMap, IndexSet};
 
 use oneil_ir as ir;
+use oneil_shared::span::Span;
 
 use crate::{
-    EvalError, builtin::BuiltinFunction, context::EvalContext, eval_expr, eval_parameter,
+    EvalError,
+    builtin::BuiltinFunction,
+    context::EvalContext,
+    error::ExpectedType,
+    eval_expr, eval_parameter,
+    output::{
+        dependency::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency},
+        eval_result,
+    },
     value::Value,
 };
 
@@ -32,9 +43,10 @@ pub fn eval_model<F: BuiltinFunction>(
 
     // Bring references into scope
     let references = model.get_references();
-    for reference in references.values() {
-        let path = reference.path().as_ref().to_path_buf();
+    for (reference_name, reference_import) in references {
+        let path = reference_import.path().as_ref().to_path_buf();
         context.activate_reference(path);
+        context.add_reference(reference_name.as_str(), reference_import.path());
     }
 
     // Add submodels to the current model
@@ -52,19 +64,19 @@ pub fn eval_model<F: BuiltinFunction>(
             .get(&parameter_name)
             .expect("parameter should exist because it comes from the keys of the parameters map");
 
-        let value = eval_parameter(parameter, &context);
-        context.add_parameter_result(
-            parameter_name.as_str().to_string(),
-            // TODO: for now, we just discard the is_db flag, but we need to handle it eventually
-            value.map(|(value, _)| value),
-        );
+        let value = eval_parameter::eval_parameter(parameter, &context);
+
+        let parameter_result = value
+            .map(|value| parameter_result_from(value.value, value.expr_span, parameter, &context));
+
+        context.add_parameter_result(parameter_name.as_str().to_string(), parameter_result);
     }
 
     // Evaluate tests
     let tests = model.get_tests();
     for test in tests.values() {
-        let value = eval_test(test, &context);
-        context.add_test_result(value);
+        let test_result = eval_test(test, &context);
+        context.add_test_result(test_result);
     }
 
     context.clear_active_model();
@@ -72,8 +84,102 @@ pub fn eval_model<F: BuiltinFunction>(
     context
 }
 
+fn parameter_result_from<F: BuiltinFunction>(
+    value: Value,
+    expr_span: Span,
+    parameter: &ir::Parameter,
+    context: &EvalContext<F>,
+) -> eval_result::Parameter {
+    let (print_level, debug_info) = match parameter.trace_level() {
+        ir::TraceLevel::Debug if parameter.is_performance() => {
+            let builtin_dependency_values =
+                get_builtin_dependency_values(parameter.dependencies().builtin(), context);
+            let parameter_dependency_values =
+                get_parameter_dependency_values(parameter.dependencies().parameter(), context);
+            let external_dependency_values =
+                get_external_dependency_values(parameter.dependencies().external(), context);
+            (
+                eval_result::PrintLevel::Performance,
+                Some(eval_result::DebugInfo {
+                    builtin_dependency_values,
+                    parameter_dependency_values,
+                    external_dependency_values,
+                }),
+            )
+        }
+        ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
+            (eval_result::PrintLevel::Performance, None)
+        }
+        ir::TraceLevel::Debug => {
+            let builtin_dependency_values =
+                get_builtin_dependency_values(parameter.dependencies().builtin(), context);
+            let parameter_dependency_values =
+                get_parameter_dependency_values(parameter.dependencies().parameter(), context);
+            let external_dependency_values =
+                get_external_dependency_values(parameter.dependencies().external(), context);
+            (
+                eval_result::PrintLevel::Trace,
+                Some(eval_result::DebugInfo {
+                    builtin_dependency_values,
+                    parameter_dependency_values,
+                    external_dependency_values,
+                }),
+            )
+        }
+        ir::TraceLevel::Trace => (eval_result::PrintLevel::Trace, None),
+        ir::TraceLevel::None => (eval_result::PrintLevel::None, None),
+    };
+
+    let builtin_dependencies = parameter
+        .dependencies()
+        .builtin()
+        .keys()
+        .map(|builtin_ident| BuiltinDependency {
+            ident: builtin_ident.as_str().to_string(),
+        })
+        .collect::<IndexSet<_>>();
+
+    let parameter_dependencies = parameter
+        .dependencies()
+        .parameter()
+        .keys()
+        .map(|parameter_name| ParameterDependency {
+            parameter_name: parameter_name.as_str().to_string(),
+        })
+        .collect::<IndexSet<_>>();
+
+    let external_dependencies = parameter
+        .dependencies()
+        .external()
+        .iter()
+        .map(
+            |((reference_name, parameter_name), (model_path, _))| ExternalDependency {
+                model_path: model_path.as_ref().to_path_buf(),
+                reference_name: reference_name.as_str().to_string(),
+                parameter_name: parameter_name.as_str().to_string(),
+            },
+        )
+        .collect::<IndexSet<_>>();
+
+    let dependencies = DependencySet {
+        builtin_dependencies,
+        parameter_dependencies,
+        external_dependencies,
+    };
+
+    eval_result::Parameter {
+        ident: parameter.name().as_str().to_string(),
+        label: parameter.label().as_str().to_string(),
+        value,
+        print_level,
+        debug_info,
+        dependencies,
+        expr_span,
+    }
+}
+
 fn get_evaluation_order(
-    parameters: &HashMap<ir::ParameterName, ir::Parameter>,
+    parameters: &IndexMap<ir::ParameterName, ir::Parameter>,
 ) -> Vec<ir::ParameterName> {
     let mut evaluation_order = Vec::new();
     let mut visited = HashSet::new();
@@ -85,7 +191,7 @@ fn get_evaluation_order(
 
         (evaluation_order, visited) = process_parameter_dependencies(
             parameter_name,
-            parameter,
+            parameter.dependencies(),
             visited,
             evaluation_order,
             parameters,
@@ -100,12 +206,12 @@ fn get_evaluation_order(
 
 fn process_parameter_dependencies(
     parameter_name: &ir::ParameterName,
-    parameter: &ir::Parameter,
+    parameter_dependencies: &ir::Dependencies,
     mut visited: HashSet<ir::ParameterName>,
     mut evaluation_order: Vec<ir::ParameterName>,
-    parameters: &HashMap<ir::ParameterName, ir::Parameter>,
+    parameters: &IndexMap<ir::ParameterName, ir::Parameter>,
 ) -> (Vec<ir::ParameterName>, HashSet<ir::ParameterName>) {
-    for dependency in parameter.dependencies() {
+    for dependency in parameter_dependencies.parameter().keys() {
         if visited.contains(dependency) {
             continue;
         }
@@ -117,7 +223,7 @@ fn process_parameter_dependencies(
 
         (evaluation_order, visited) = process_parameter_dependencies(
             dependency,
-            dependency_parameter,
+            dependency_parameter.dependencies(),
             visited,
             evaluation_order,
             parameters,
@@ -133,6 +239,108 @@ fn process_parameter_dependencies(
 fn eval_test<F: BuiltinFunction>(
     test: &ir::Test,
     context: &EvalContext<F>,
-) -> Result<Value, Vec<EvalError>> {
-    eval_expr(test.test_expr(), context)
+) -> Result<eval_result::Test, Vec<EvalError>> {
+    let (test_result, expr_span) = eval_expr(test.expr(), context)?;
+
+    match test_result {
+        Value::Boolean(true) => Ok(eval_result::Test {
+            result: eval_result::TestResult::Passed,
+            expr_span: *expr_span,
+        }),
+        Value::Boolean(false) => {
+            let builtin_dependency_values =
+                get_builtin_dependency_values(test.dependencies().builtin(), context);
+            let parameter_dependency_values =
+                get_parameter_dependency_values(test.dependencies().parameter(), context);
+            let external_dependency_values =
+                get_external_dependency_values(test.dependencies().external(), context);
+
+            let debug_info = Box::new(eval_result::DebugInfo {
+                builtin_dependency_values,
+                parameter_dependency_values,
+                external_dependency_values,
+            });
+            Ok(eval_result::Test {
+                result: eval_result::TestResult::Failed { debug_info },
+                expr_span: *expr_span,
+            })
+        }
+        Value::String(_) | Value::Number(_) | Value::MeasuredNumber(_) => {
+            Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::Boolean,
+                found_type: test_result.type_(),
+                found_span: *expr_span,
+            }])
+        }
+    }
+}
+
+/// Gets the values of the builtin dependencies for debug reporting purposes.
+fn get_builtin_dependency_values<F: BuiltinFunction>(
+    dependencies: &IndexMap<ir::Identifier, Span>,
+    context: &EvalContext<F>,
+) -> IndexMap<String, Value> {
+    dependencies
+        .keys()
+        .map(|dependency| {
+            let value = context.lookup_builtin_variable(dependency);
+            (dependency.as_str().to_string(), value)
+        })
+        .collect::<IndexMap<_, _>>()
+}
+
+/// Gets the values of the dependencies for debug reporting purposes.
+///
+/// This should only be called on expressions that have already been evaluated successfully.
+///
+/// # Panics
+///
+/// This function will panic if any of the dependencies are not found.
+fn get_parameter_dependency_values<F: BuiltinFunction>(
+    dependencies: &IndexMap<ir::ParameterName, Span>,
+    context: &EvalContext<F>,
+) -> IndexMap<String, Value> {
+    dependencies
+        .iter()
+        .map(|(dependency, dependency_span)| {
+            let value = context
+                .lookup_parameter_value(dependency, *dependency_span)
+                .expect("dependency should be found because the expression evaluated successfully");
+
+            (dependency.as_str().to_string(), value)
+        })
+        .collect::<IndexMap<_, _>>()
+}
+
+/// Gets the values of the external dependencies for debug reporting purposes.
+///
+/// This should only be called on expressions that have already been evaluated successfully.
+///
+/// # Panics
+///
+/// This function will panic if any of the dependencies are not found.
+fn get_external_dependency_values<F: BuiltinFunction>(
+    dependencies: &IndexMap<(ir::ReferenceName, ir::ParameterName), (ir::ModelPath, Span)>,
+    context: &EvalContext<F>,
+) -> IndexMap<(String, String), Value> {
+    dependencies
+        .iter()
+        .map(
+            |((reference_name, parameter_name), (model_path, dependency_span))| {
+                let value = context.lookup_model_parameter_value(
+                    model_path,
+                    parameter_name,
+                    *dependency_span,
+                );
+
+                let reference_name = reference_name.as_str().to_string();
+                let parameter_name = parameter_name.as_str().to_string();
+                let value = value.expect(
+                    "dependency should be found because the expression evaluated successfully",
+                );
+
+                ((reference_name, parameter_name), value)
+            },
+        )
+        .collect::<IndexMap<_, _>>()
 }

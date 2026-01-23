@@ -1,7 +1,9 @@
 //! Expression resolution for the Oneil model loader
 
+use indexmap::IndexMap;
+
 use oneil_ast as ast;
-use oneil_ir as ir;
+use oneil_ir::{self as ir, Dependencies};
 use oneil_shared::span::Span;
 
 use crate::{
@@ -75,6 +77,10 @@ pub fn resolve_expr(
 }
 
 /// Resolves a comparison expression with optional chained comparisons.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "there are five important arguments (the first five), the rest are context"
+)]
 fn resolve_comparison_expression(
     span: Span,
     op: &ast::ComparisonOpNode,
@@ -232,12 +238,13 @@ fn resolve_function_name(
     name: &ast::IdentifierNode,
     builtin_ref: &impl BuiltinRef,
 ) -> ir::FunctionName {
+    let name_span = name.span();
     let name = ir::Identifier::new(name.as_str().to_string());
 
     if builtin_ref.has_builtin_function(&name) {
-        ir::FunctionName::builtin(name)
+        ir::FunctionName::builtin(name, name_span)
     } else {
-        ir::FunctionName::imported(name)
+        ir::FunctionName::imported(name, name_span)
     }
 }
 
@@ -248,6 +255,99 @@ fn resolve_literal(literal: &ast::LiteralNode) -> ir::Literal {
         ast::Literal::String(string) => ir::Literal::string(string.clone()),
         ast::Literal::Boolean(boolean) => ir::Literal::boolean(*boolean),
     }
+}
+
+/// Extracts internal dependencies from an expression.
+///
+/// Note that these dependencies include both parameters and builtin variables.
+pub fn get_expr_internal_dependencies(expr: &ast::ExprNode) -> IndexMap<ir::Identifier, Span> {
+    struct ExprInternalDependencyVisitor {
+        dependencies: IndexMap<ir::Identifier, Span>,
+    }
+
+    impl ast::ExprVisitor for ExprInternalDependencyVisitor {
+        fn visit_variable(mut self, _span: Span, var: &ast::VariableNode) -> Self {
+            match &**var {
+                ast::Variable::Identifier(identifier_node) => {
+                    let identifier = ir::Identifier::new(identifier_node.as_str().to_string());
+                    let identifier_span = identifier_node.span();
+                    self.dependencies.insert(identifier, identifier_span);
+                    self
+                }
+
+                ast::Variable::ModelParameter {
+                    reference_model: _,
+                    parameter: _,
+                } => {
+                    // an accessor implies that the dependency is on a parameter
+                    // outside of the current model, so it doesn't count as an
+                    // internal dependency
+                    self
+                }
+            }
+        }
+    }
+
+    let visitor = ExprInternalDependencyVisitor {
+        dependencies: IndexMap::new(),
+    };
+    let visitor = expr.pre_order_visit(visitor);
+    visitor.dependencies
+}
+
+/// Extracts dependencies from an expression.
+///
+/// This should only be called for expressions that are guaranteed to be valid and resolved.
+///
+/// # Panics
+///
+/// This function will panic if it encounters a variable that has not been completely resolved.
+pub fn get_expr_dependencies(expr: &ir::Expr) -> Dependencies {
+    struct ExprDependencyVisitor {
+        dependencies: Dependencies,
+    }
+
+    impl ir::ExprVisitor for ExprDependencyVisitor {
+        fn visit_variable(mut self, span: Span, variable: &ir::Variable) -> Self {
+            match variable {
+                ir::Variable::Builtin { ident, ident_span } => {
+                    self.dependencies.insert_builtin(ident.clone(), *ident_span);
+                    self
+                }
+
+                ir::Variable::Parameter {
+                    parameter_name,
+                    parameter_span,
+                } => {
+                    self.dependencies
+                        .insert_parameter(parameter_name.clone(), *parameter_span);
+                    self
+                }
+
+                ir::Variable::External {
+                    model_path,
+                    reference_name,
+                    reference_span: _,
+                    parameter_name,
+                    parameter_span: _,
+                } => {
+                    self.dependencies.insert_external(
+                        reference_name.clone(),
+                        parameter_name.clone(),
+                        model_path.clone(),
+                        span,
+                    );
+                    self
+                }
+            }
+        }
+    }
+
+    let visitor = ExprDependencyVisitor {
+        dependencies: Dependencies::new(),
+    };
+    let visitor = expr.pre_order_visit(visitor);
+    visitor.dependencies
 }
 
 #[cfg(test)]
@@ -481,10 +581,11 @@ mod tests {
             panic!("Expected function call, got {result:?}");
         };
 
-        assert_eq!(
-            name,
-            ir::FunctionName::builtin(ir::Identifier::new("foo".to_string()))
-        );
+        let ir::FunctionName::Builtin(name, _name_span) = name else {
+            panic!("Expected builtin function, got {name:?}");
+        };
+
+        assert_eq!(name.as_str(), "foo");
 
         assert_eq!(args.len(), 1);
 
@@ -529,10 +630,11 @@ mod tests {
             panic!("Expected function call, got {result:?}");
         };
 
-        assert_eq!(
-            name,
-            ir::FunctionName::imported(ir::Identifier::new("custom_function".to_string()))
-        );
+        let ir::FunctionName::Imported(name, _name_span) = name else {
+            panic!("Expected imported function, got {name:?}");
+        };
+
+        assert_eq!(name.as_str(), "custom_function");
 
         assert_eq!(args.len(), 1);
 
@@ -733,10 +835,11 @@ mod tests {
             panic!("Expected function call on right side, got {right:?}");
         };
 
-        assert_eq!(
-            name,
-            ir::FunctionName::imported(ir::Identifier::new("foo".to_string()))
-        );
+        let ir::FunctionName::Imported(name, _name_span) = name else {
+            panic!("Expected imported function, got {name:?}");
+        };
+
+        assert_eq!(name.as_str(), "foo");
 
         assert_eq!(args.len(), 1);
 
@@ -842,9 +945,11 @@ mod tests {
             let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
-            let expected_func_builtin =
-                ir::FunctionName::builtin(ir::Identifier::new(func_name.to_string()));
-            assert_eq!(result, expected_func_builtin);
+            let ir::FunctionName::Builtin(name, _name_span) = result else {
+                panic!("Expected builtin function, got {result:?}");
+            };
+
+            assert_eq!(name.as_str(), func_name);
         }
     }
 
@@ -869,7 +974,7 @@ mod tests {
             let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
 
             // check the result
-            let ir::FunctionName::Imported(name) = result else {
+            let ir::FunctionName::Imported(name, _name_span) = result else {
                 panic!("Expected imported function, got {result:?}");
             };
 

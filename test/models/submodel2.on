@@ -15,8 +15,8 @@ Variance: variance = (x - mean) ^ 2 + (y - mean) ^ 2 + (z - mean) ^ 2
 Standard deviation: std_dev = sqrt(variance)
 
 # Data processing functions
-Normalize: normalize = (x - mean) / std_dev
-Round: round = floor(x + 0.5)
+Normalize(-inf, inf): normalize = (x - mean) / std_dev
+#Round: round = floor(x + 0.5)
 
 # Aggregation functions
 Sum: sum = x + y + z

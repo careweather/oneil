@@ -1,6 +1,8 @@
 //! Model structures and collections for the Oneil programming language.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use crate::{
     model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
@@ -13,22 +15,22 @@ use crate::{
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
-    python_imports: HashMap<PythonPath, PythonImport>,
-    submodels: HashMap<SubmodelName, SubmodelImport>,
-    references: HashMap<ReferenceName, ReferenceImport>,
-    parameters: HashMap<ParameterName, Parameter>,
-    tests: HashMap<TestIndex, Test>,
+    python_imports: IndexMap<PythonPath, PythonImport>,
+    submodels: IndexMap<SubmodelName, SubmodelImport>,
+    references: IndexMap<ReferenceName, ReferenceImport>,
+    parameters: IndexMap<ParameterName, Parameter>,
+    tests: IndexMap<TestIndex, Test>,
 }
 
 impl Model {
     /// Creates a new model with the specified components.
     #[must_use]
     pub const fn new(
-        python_imports: HashMap<PythonPath, PythonImport>,
-        submodels: HashMap<SubmodelName, SubmodelImport>,
-        references: HashMap<ReferenceName, ReferenceImport>,
-        parameters: HashMap<ParameterName, Parameter>,
-        tests: HashMap<TestIndex, Test>,
+        python_imports: IndexMap<PythonPath, PythonImport>,
+        submodels: IndexMap<SubmodelName, SubmodelImport>,
+        references: IndexMap<ReferenceName, ReferenceImport>,
+        parameters: IndexMap<ParameterName, Parameter>,
+        tests: IndexMap<TestIndex, Test>,
     ) -> Self {
         Self {
             python_imports,
@@ -41,7 +43,7 @@ impl Model {
 
     /// Returns a reference to the set of Python imports for this model.
     #[must_use]
-    pub const fn get_python_imports(&self) -> &HashMap<PythonPath, PythonImport> {
+    pub const fn get_python_imports(&self) -> &IndexMap<PythonPath, PythonImport> {
         &self.python_imports
     }
 
@@ -53,7 +55,7 @@ impl Model {
 
     /// Returns a reference to all submodels in this model.
     #[must_use]
-    pub const fn get_submodels(&self) -> &HashMap<SubmodelName, SubmodelImport> {
+    pub const fn get_submodels(&self) -> &IndexMap<SubmodelName, SubmodelImport> {
         &self.submodels
     }
 
@@ -65,19 +67,19 @@ impl Model {
 
     /// Returns a reference to all parameters in this model.
     #[must_use]
-    pub const fn get_parameters(&self) -> &HashMap<ParameterName, Parameter> {
+    pub const fn get_parameters(&self) -> &IndexMap<ParameterName, Parameter> {
         &self.parameters
     }
 
     /// Returns a reference to all references in this model.
     #[must_use]
-    pub const fn get_references(&self) -> &HashMap<ReferenceName, ReferenceImport> {
+    pub const fn get_references(&self) -> &IndexMap<ReferenceName, ReferenceImport> {
         &self.references
     }
 
     /// Returns a reference to all tests in this model.
     #[must_use]
-    pub const fn get_tests(&self) -> &HashMap<TestIndex, Test> {
+    pub const fn get_tests(&self) -> &IndexMap<TestIndex, Test> {
         &self.tests
     }
 }
@@ -86,7 +88,7 @@ impl Model {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelCollection {
     initial_models: HashSet<ModelPath>,
-    models: HashMap<ModelPath, Model>,
+    models: IndexMap<ModelPath, Model>,
 }
 
 impl ModelCollection {
@@ -94,7 +96,7 @@ impl ModelCollection {
     #[must_use]
     pub const fn new(
         initial_models: HashSet<ModelPath>,
-        models: HashMap<ModelPath, Model>,
+        models: IndexMap<ModelPath, Model>,
     ) -> Self {
         Self {
             initial_models,
@@ -104,16 +106,16 @@ impl ModelCollection {
 
     /// Returns all Python imports from all models in the collection.
     #[must_use]
-    pub fn get_python_imports(&self) -> HashSet<&PythonPath> {
+    pub fn get_python_imports(&self) -> Vec<&PythonImport> {
         self.models
             .values()
-            .flat_map(|model| model.python_imports.keys())
+            .flat_map(|model| model.python_imports.values())
             .collect()
     }
 
     /// Returns all models in the collection.
     #[must_use]
-    pub const fn get_models(&self) -> &HashMap<ModelPath, Model> {
+    pub const fn get_models(&self) -> &IndexMap<ModelPath, Model> {
         &self.models
     }
 

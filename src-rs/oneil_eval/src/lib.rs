@@ -9,10 +9,11 @@ mod eval_model;
 mod eval_model_collection;
 mod eval_parameter;
 mod eval_unit;
-mod result;
+pub mod output;
 pub mod value;
 
-pub use error::EvalError;
+pub use context::EvalContext;
+pub use error::{EvalError, ModelError};
 pub use eval_expr::eval_expr;
 pub use eval_model::eval_model;
 pub use eval_model_collection::eval_model_collection;
@@ -48,20 +49,20 @@ mod test {
     /// Asserts that two units are equal.
     ///
     /// ```rust
-    /// # use std::collections::HashMap;
-    /// # use oneil_eval::{assert_units_eq, value::{Dimension, Unit}};
+    /// # use indexmap::IndexMap;
+    /// # use oneil_eval::{assert_units_eq, value::{Dimension, DimensionMap}};
     ///
-    /// let unit = Unit::new(HashMap::from([(Dimension::Time, 1.0)]));
-    /// assert_units_eq!([(Dimension::Time, 1.0)], unit);
+    /// let unit = DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)]));
+    /// assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
     /// ```
-    macro_rules! assert_units_eq {
+    macro_rules! assert_units_dimensionally_eq {
         ($expected_unit_list:expr, $actual_unit:expr) => {{
-            use std::collections::HashMap;
-            use $crate::value::Unit;
+            use indexmap::IndexMap;
+            use $crate::value::DimensionMap;
 
-            let expected: Unit = Unit::new(HashMap::from($expected_unit_list));
-            let actual: Unit = $actual_unit;
-            assert_eq!(expected, actual);
+            let expected: DimensionMap = DimensionMap::new(IndexMap::from($expected_unit_list));
+            let actual: &Unit = &$actual_unit;
+            assert_eq!(expected, actual.dimension_map);
         }};
     }
 }

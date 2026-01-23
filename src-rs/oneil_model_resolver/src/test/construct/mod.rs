@@ -3,7 +3,9 @@
 //! Creating test data can be a tedious and repetitive process, especially where `Span`s are
 //! involved. This module provides helper functions to create test data that can be used in tests.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::{SourceLocation, Span};
@@ -28,14 +30,14 @@ pub fn empty_model_collection_builder() -> ModelCollectionBuilder<(), ()> {
 }
 
 pub struct ModelContextBuilder {
-    models: HashMap<ir::ModelPath, ir::Model>,
+    models: IndexMap<ir::ModelPath, ir::Model>,
     model_errors: HashSet<ir::ModelPath>,
 }
 
 impl ModelContextBuilder {
     pub fn new() -> Self {
         Self {
-            models: HashMap::new(),
+            models: IndexMap::new(),
             model_errors: HashSet::new(),
         }
     }
@@ -62,19 +64,19 @@ impl ModelContextBuilder {
 }
 
 pub struct ReferenceContextBuilder {
-    models: HashMap<ir::ModelPath, ir::Model>,
+    models: IndexMap<ir::ModelPath, ir::Model>,
     model_errors: HashSet<ir::ModelPath>,
-    references: HashMap<ir::ReferenceName, ir::ReferenceImport>,
-    reference_errors: HashMap<ir::ReferenceName, ModelImportResolutionError>,
+    references: IndexMap<ir::ReferenceName, ir::ReferenceImport>,
+    reference_errors: IndexMap<ir::ReferenceName, ModelImportResolutionError>,
 }
 
 impl ReferenceContextBuilder {
     pub fn new() -> Self {
         Self {
-            models: HashMap::new(),
+            models: IndexMap::new(),
             model_errors: HashSet::new(),
-            references: HashMap::new(),
-            reference_errors: HashMap::new(),
+            references: IndexMap::new(),
+            reference_errors: IndexMap::new(),
         }
     }
 
@@ -82,7 +84,7 @@ impl ReferenceContextBuilder {
         mut self,
         reference_context: impl IntoIterator<Item = (ir::ReferenceName, ir::ModelPath, ir::Model)>,
     ) -> Self {
-        let (references, models): (HashMap<_, _>, HashMap<_, _>) = reference_context
+        let (references, models): (IndexMap<_, _>, IndexMap<_, _>) = reference_context
             .into_iter()
             .map(|(reference_name, model_path, model)| {
                 let reference_name_span = unimportant_span();
@@ -148,15 +150,15 @@ impl ReferenceContextBuilder {
 }
 
 pub struct ParameterContextBuilder {
-    parameters: HashMap<ir::ParameterName, ir::Parameter>,
-    parameter_errors: HashMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+    parameters: IndexMap<ir::ParameterName, ir::Parameter>,
+    parameter_errors: IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
 }
 
 impl ParameterContextBuilder {
     pub fn new() -> Self {
         Self {
-            parameters: HashMap::new(),
-            parameter_errors: HashMap::new(),
+            parameters: IndexMap::new(),
+            parameter_errors: IndexMap::new(),
         }
     }
 

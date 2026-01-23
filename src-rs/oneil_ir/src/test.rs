@@ -2,7 +2,7 @@
 
 use oneil_shared::span::Span;
 
-use crate::{debug_info::TraceLevel, expr::Expr};
+use crate::{Dependencies, debug_info::TraceLevel, expr::Expr};
 
 /// An index for identifying tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -21,17 +21,24 @@ impl TestIndex {
 pub struct Test {
     span: Span,
     trace_level: TraceLevel,
-    test_expr: Expr,
+    expr: Expr,
+    dependencies: Dependencies,
 }
 
 impl Test {
     /// Creates a new test with the specified properties.
     #[must_use]
-    pub const fn new(span: Span, trace_level: TraceLevel, test_expr: Expr) -> Self {
+    pub const fn new(
+        span: Span,
+        trace_level: TraceLevel,
+        expr: Expr,
+        dependencies: Dependencies,
+    ) -> Self {
         Self {
             span,
             trace_level,
-            test_expr,
+            expr,
+            dependencies,
         }
     }
 
@@ -49,7 +56,13 @@ impl Test {
 
     /// Returns the test expression that defines the expected behavior.
     #[must_use]
-    pub const fn test_expr(&self) -> &Expr {
-        &self.test_expr
+    pub const fn expr(&self) -> &Expr {
+        &self.expr
+    }
+
+    /// Returns the dependencies of this test.
+    #[must_use]
+    pub const fn dependencies(&self) -> &Dependencies {
+        &self.dependencies
     }
 }

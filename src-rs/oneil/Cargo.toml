@@ -20,8 +20,11 @@ oneil_model_resolver = { path = "../oneil_model_resolver" }
 oneil_parser = { path = "../oneil_parser" }
 oneil_shared = { path = "../oneil_shared" }
 oneil_runner = { path = "../oneil_runner" }
+anstream = "0.6.21"
 clap = { version = "4.5.1", features = ["derive"] }
-colored = "3.0.0"
+indexmap = { workspace = true }
+notify = "8.2.0"
+owo-colors = "4.2.3"
 
 [lints]
 workspace = true

@@ -13,6 +13,7 @@ readme = "README.md"
 
 [dependencies]
 oneil_shared = { path = "../oneil_shared" }
+indexmap = { workspace = true }
 
 [lints]
 workspace = true

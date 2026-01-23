@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 
@@ -21,8 +23,11 @@ pub fn eval_model_collection_with_context<F: BuiltinFunction>(
     model_collection: &ir::ModelCollection,
     mut context: EvalContext<F>,
 ) -> EvalContext<F> {
-    for python_path in model_collection.get_python_imports() {
-        context.load_python_import(python_path.as_ref().to_path_buf());
+    for python_import in model_collection.get_python_imports() {
+        context.load_python_import(
+            python_import.import_path().as_ref().to_path_buf(),
+            *python_import.import_path_span(),
+        );
     }
 
     let models = model_collection.get_models();
@@ -39,7 +44,7 @@ pub fn eval_model_collection_with_context<F: BuiltinFunction>(
     context
 }
 
-fn get_evaluation_order(models: &HashMap<ir::ModelPath, ir::Model>) -> Vec<ir::ModelPath> {
+fn get_evaluation_order(models: &IndexMap<ir::ModelPath, ir::Model>) -> Vec<ir::ModelPath> {
     let mut evaluation_order = Vec::new();
     let mut visited = HashSet::new();
 
@@ -60,7 +65,7 @@ fn process_model_dependencies(
     model: &ir::Model,
     mut visited: HashSet<ir::ModelPath>,
     mut evaluation_order: Vec<ir::ModelPath>,
-    models: &HashMap<ir::ModelPath, ir::Model>,
+    models: &IndexMap<ir::ModelPath, ir::Model>,
 ) -> (Vec<ir::ModelPath>, HashSet<ir::ModelPath>) {
     for reference_import in model.get_references().values() {
         let reference_model_path = reference_import.path();

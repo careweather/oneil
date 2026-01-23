@@ -115,24 +115,25 @@ fn find_symbol_in_expr(expr: &ir::Expr, offset: usize) -> Option<SymbolAtPositio
                     }
                 }),
                 ir::Variable::External {
-                    model,
-                    model_span,
+                    model_path,
+                    reference_name,
+                    reference_span,
                     parameter_name,
                     parameter_span,
                 } => {
                     // Check if cursor is on the model name or parameter name
-                    if span_contains_offset(*model_span, offset) {
+                    if span_contains_offset(*reference_span, offset) {
                         // Cursor is on the model name part
                         Some(SymbolAtPosition::ModelImport {
-                            name: model.as_ref().to_string_lossy().to_string(),
-                            span: *model_span,
-                            path: model.clone(),
+                            name: reference_name.to_string(),
+                            span: *reference_span,
+                            path: model_path.clone(),
                         })
                     } else if span_contains_offset(*parameter_span, offset) {
                         // Cursor is on the parameter name part
                         Some(SymbolAtPosition::ExternalReference {
-                            model_name: model.as_ref().to_string_lossy().to_string(),
-                            model_span: *model_span,
+                            model_name: reference_name.to_string(),
+                            model_span: *reference_span,
                             parameter_name: parameter_name.clone(),
                             parameter_span: *parameter_span,
                         })

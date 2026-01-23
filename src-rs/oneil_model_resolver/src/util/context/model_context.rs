@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 
@@ -6,14 +8,14 @@ use crate::util::context::lookup::{self, LookupResult};
 
 #[derive(Debug)]
 pub struct ModelContext<'model> {
-    models: &'model HashMap<ir::ModelPath, ir::Model>,
+    models: &'model IndexMap<ir::ModelPath, ir::Model>,
     model_errors: HashSet<&'model ir::ModelPath>,
 }
 
 impl<'model> ModelContext<'model> {
     #[must_use]
     pub const fn new(
-        models: &'model HashMap<ir::ModelPath, ir::Model>,
+        models: &'model IndexMap<ir::ModelPath, ir::Model>,
         model_errors: HashSet<&'model ir::ModelPath>,
     ) -> Self {
         Self {

@@ -1,5 +1,7 @@
 //! Expression constructs for the AST
 
+use oneil_shared::span::Span;
+
 use crate::{naming::IdentifierNode, node::Node};
 
 /// An expression in the Oneil language
@@ -364,5 +366,155 @@ impl Literal {
     #[must_use]
     pub const fn boolean(bool: bool) -> Self {
         Self::Boolean(bool)
+    }
+}
+
+#[expect(
+    unused_variables,
+    reason = "the default implementations ignore node data"
+)]
+/// Visitor trait for traversing and transforming expressions
+pub trait ExprVisitor: Sized {
+    /// Visits a comparison operation expression
+    #[must_use]
+    fn visit_comparison_op(
+        self,
+        span: Span,
+        left: &ExprNode,
+        op: &ComparisonOpNode,
+        right: &ExprNode,
+        rest_chained: &[(ComparisonOpNode, ExprNode)],
+    ) -> Self {
+        self
+    }
+
+    /// Visits a binary operation expression
+    #[must_use]
+    fn visit_binary_op(
+        self,
+        span: Span,
+        op: &BinaryOpNode,
+        left: &ExprNode,
+        right: &ExprNode,
+    ) -> Self {
+        self
+    }
+
+    /// Visits a unary operation expression
+    #[must_use]
+    fn visit_unary_op(self, span: Span, op: &UnaryOpNode, expr: &ExprNode) -> Self {
+        self
+    }
+
+    /// Visits a function call expression
+    #[must_use]
+    fn visit_function_call(self, span: Span, name: &IdentifierNode, args: &[ExprNode]) -> Self {
+        self
+    }
+
+    /// Visits a parenthesized expression
+    #[must_use]
+    fn visit_parenthesized(self, span: Span, expr: &ExprNode) -> Self {
+        self
+    }
+
+    /// Visits a variable reference expression
+    #[must_use]
+    fn visit_variable(self, span: Span, var: &VariableNode) -> Self {
+        self
+    }
+
+    /// Visits a literal value expression
+    #[must_use]
+    fn visit_literal(self, span: Span, lit: &LiteralNode) -> Self {
+        self
+    }
+}
+
+impl Node<Expr> {
+    /// Visits the expression with a visitor in pre-order
+    /// (parent nodes are visited before their children)
+    #[must_use]
+    pub fn pre_order_visit<V: ExprVisitor>(&self, visitor: V) -> V {
+        let span = self.span();
+        match &**self {
+            Expr::ComparisonOp {
+                left,
+                op,
+                right,
+                rest_chained,
+            } => {
+                let visitor = visitor.visit_comparison_op(span, left, op, right, rest_chained);
+                let visitor = left.pre_order_visit(visitor);
+                let visitor = right.pre_order_visit(visitor);
+                rest_chained.iter().fold(visitor, |visitor, (_op, expr)| {
+                    expr.pre_order_visit(visitor)
+                })
+            }
+            Expr::BinaryOp { op, left, right } => {
+                let visitor = visitor.visit_binary_op(span, op, left, right);
+                let visitor = left.pre_order_visit(visitor);
+                right.pre_order_visit(visitor)
+            }
+            Expr::UnaryOp { op, expr } => {
+                let visitor = visitor.visit_unary_op(span, op, expr);
+                expr.pre_order_visit(visitor)
+            }
+            Expr::FunctionCall { name, args } => {
+                let visitor = visitor.visit_function_call(span, name, args);
+                args.iter()
+                    .fold(visitor, |visitor, arg| arg.pre_order_visit(visitor))
+            }
+            Expr::Parenthesized { expr } => {
+                let visitor = visitor.visit_parenthesized(span, expr);
+                expr.pre_order_visit(visitor)
+            }
+            Expr::Variable(var) => visitor.visit_variable(span, var),
+            Expr::Literal(lit) => visitor.visit_literal(span, lit),
+        }
+    }
+
+    /// Visits the expression with a visitor in post-order
+    /// (parent nodes are visited after their children)
+    #[must_use]
+    pub fn post_order_visit<V: ExprVisitor>(&self, visitor: V) -> V {
+        let span = self.span();
+        match &**self {
+            Expr::ComparisonOp {
+                left,
+                op,
+                right,
+                rest_chained,
+            } => {
+                let visitor = left.post_order_visit(visitor);
+                let visitor = right.post_order_visit(visitor);
+                let visitor = rest_chained.iter().fold(visitor, |visitor, (_op, expr)| {
+                    expr.post_order_visit(visitor)
+                });
+                visitor.visit_comparison_op(span, left, op, right, rest_chained)
+            }
+            Expr::BinaryOp { op, left, right } => {
+                let visitor = left.post_order_visit(visitor);
+                let visitor = right.post_order_visit(visitor);
+                visitor.visit_binary_op(span, op, left, right)
+            }
+            Expr::UnaryOp { op, expr } => {
+                let visitor = expr.post_order_visit(visitor);
+                visitor.visit_unary_op(span, op, expr)
+            }
+            Expr::FunctionCall { name, args } => {
+                let visitor = args
+                    .iter()
+                    .fold(visitor, |visitor, arg| arg.post_order_visit(visitor));
+
+                visitor.visit_function_call(span, name, args)
+            }
+            Expr::Parenthesized { expr } => {
+                let visitor = expr.post_order_visit(visitor);
+                visitor.visit_parenthesized(span, expr)
+            }
+            Expr::Variable(var) => visitor.visit_variable(span, var),
+            Expr::Literal(lit) => visitor.visit_literal(span, lit),
+        }
     }
 }

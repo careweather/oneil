@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use indexmap::IndexMap;
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -24,32 +24,32 @@ pub fn expr_literal_number(value: f64) -> ir::Expr {
 
 pub fn empty_model() -> ir::Model {
     ir::Model::new(
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
+        IndexMap::new(),
     )
 }
 
 // BUILDERS
 
 pub struct ModelBuilder {
-    python_imports: HashMap<ir::PythonPath, ir::PythonImport>,
-    submodels: HashMap<ir::SubmodelName, ir::SubmodelImport>,
-    references: HashMap<ir::ReferenceName, ir::ReferenceImport>,
-    parameters: HashMap<ir::ParameterName, ir::Parameter>,
-    tests: HashMap<ir::TestIndex, ir::Test>,
+    python_imports: IndexMap<ir::PythonPath, ir::PythonImport>,
+    submodels: IndexMap<ir::SubmodelName, ir::SubmodelImport>,
+    references: IndexMap<ir::ReferenceName, ir::ReferenceImport>,
+    parameters: IndexMap<ir::ParameterName, ir::Parameter>,
+    tests: IndexMap<ir::TestIndex, ir::Test>,
 }
 
 impl ModelBuilder {
     pub fn new() -> Self {
         Self {
-            python_imports: HashMap::new(),
-            submodels: HashMap::new(),
-            references: HashMap::new(),
-            parameters: HashMap::new(),
-            tests: HashMap::new(),
+            python_imports: IndexMap::new(),
+            submodels: IndexMap::new(),
+            references: IndexMap::new(),
+            parameters: IndexMap::new(),
+            tests: IndexMap::new(),
         }
     }
 
@@ -89,7 +89,6 @@ impl ModelBuilder {
 }
 
 pub struct ParameterBuilder {
-    dependencies: HashSet<ir::ParameterName>,
     name: Option<ir::ParameterName>,
     name_span: Option<Span>,
     span: Option<Span>,
@@ -102,7 +101,6 @@ pub struct ParameterBuilder {
 impl ParameterBuilder {
     pub fn new() -> Self {
         Self {
-            dependencies: HashSet::new(),
             name: None,
             name_span: None,
             span: None,
@@ -135,16 +133,18 @@ impl ParameterBuilder {
         let name = self.name.expect("name must be set");
         let name_span = self.name_span.unwrap_or_else(unimportant_span);
         let span = self.span.unwrap_or_else(unimportant_span);
+        let label = ir::Label::new(name.as_str().to_string());
         let value = self.value.expect("value must be set");
         let limits = self.limits.unwrap_or_default();
         let is_performance = self.is_performance;
         let trace_level = self.trace_level;
 
         ir::Parameter::new(
-            self.dependencies,
+            ir::Dependencies::new(),
             name,
             name_span,
             span,
+            label,
             value,
             limits,
             is_performance,

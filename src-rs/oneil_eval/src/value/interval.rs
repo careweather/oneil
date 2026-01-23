@@ -254,7 +254,7 @@ impl Interval {
     ///
     /// If `self` is empty, then `self` cannot contain `rhs`.
     #[must_use]
-    pub fn contains(self, rhs: Self) -> bool {
+    pub fn contains(&self, rhs: &Self) -> bool {
         if rhs.is_empty() {
             return true;
         }
@@ -264,6 +264,79 @@ impl Interval {
         }
 
         self.min <= rhs.min && self.max >= rhs.max
+    }
+
+    /// Returns the square root of the interval
+    #[must_use]
+    pub fn sqrt(self) -> Self {
+        if self.is_empty() {
+            return Self::empty();
+        }
+
+        if self.max < 0.0 {
+            Self::empty()
+        } else if self.min <= 0.0 {
+            Self::new(0.0, self.max.sqrt())
+        } else {
+            Self::new(self.min.sqrt(), self.max.sqrt())
+        }
+    }
+
+    /// Returns the natural logarithm of the interval
+    ///
+    /// This is defined based on Brendon's reasoning and
+    /// could be incorrect.
+    #[must_use]
+    pub fn ln(self) -> Self {
+        if self.is_empty() {
+            return Self::empty();
+        }
+
+        if self.max <= 0.0 {
+            Self::empty()
+        } else if self.min <= 0.0 {
+            Self::new(f64::NEG_INFINITY, self.max.ln())
+        } else {
+            Self::new(self.min.ln(), self.max.ln())
+        }
+    }
+
+    /// Returns the base 10 logarithm of the interval
+    ///
+    /// This is defined based on Brendon's reasoning and
+    /// could be incorrect.
+    #[must_use]
+    pub fn log10(self) -> Self {
+        if self.is_empty() {
+            return Self::empty();
+        }
+
+        if self.max <= 0.0 {
+            Self::empty()
+        } else if self.min <= 0.0 {
+            Self::new(f64::NEG_INFINITY, self.max.log10())
+        } else {
+            Self::new(self.min.log10(), self.max.log10())
+        }
+    }
+
+    /// Returns the base 2 logarithm of the interval
+    ///
+    /// This is defined based on Brendon's reasoning and
+    /// could be incorrect.
+    #[must_use]
+    pub fn log2(self) -> Self {
+        if self.is_empty() {
+            return Self::empty();
+        }
+
+        if self.max <= 0.0 {
+            Self::empty()
+        } else if self.min <= 0.0 {
+            Self::new(f64::NEG_INFINITY, self.max.log2())
+        } else {
+            Self::new(self.min.log2(), self.max.log2())
+        }
     }
 }
 

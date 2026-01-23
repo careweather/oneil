@@ -4,6 +4,7 @@
 //! are represented, see the `README.md` for
 //! this crate.
 
+mod error;
 mod interval;
 mod number;
 mod type_;
@@ -11,10 +12,8 @@ mod unit;
 pub mod util;
 mod value_impl;
 
-use crate::EvalError;
-
 pub use self::interval::Interval;
 pub use self::number::{MeasuredNumber, Number};
 pub use self::type_::{NumberType, ValueType};
-pub use self::unit::{Dimension, SizedUnit, Unit};
+pub use self::unit::{Dimension, DimensionMap, DisplayUnit, Unit};
 pub use self::value_impl::Value;

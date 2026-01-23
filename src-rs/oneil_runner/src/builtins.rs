@@ -4,12 +4,11 @@
 //! required by `oneil_model_resolver`. It wraps a `BuiltinMap` and provides
 //! methods to check for the existence of builtin values and functions.
 
-use ::std::collections::HashMap;
-use std::sync::Arc;
+use indexmap::IndexMap;
 
 use oneil_eval::{
     builtin::{BuiltinFunction, BuiltinMap},
-    value::{SizedUnit, Value},
+    value::{Unit, Value},
 };
 use oneil_ir as ir;
 use oneil_model_resolver::BuiltinRef;
@@ -28,10 +27,10 @@ impl<F: BuiltinFunction> Builtins<F> {
     /// Creates a new `Builtins` instance with the provided builtin collections
     #[must_use]
     pub const fn new(
-        values: HashMap<String, Value>,
-        functions: HashMap<String, F>,
-        units: HashMap<String, Arc<SizedUnit>>,
-        prefixes: HashMap<String, f64>,
+        values: IndexMap<String, Value>,
+        functions: IndexMap<String, F>,
+        units: IndexMap<String, Unit>,
+        prefixes: IndexMap<String, f64>,
     ) -> Self {
         Self {
             builtin_map: BuiltinMap::new(values, functions, units, prefixes),
