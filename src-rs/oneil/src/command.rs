@@ -153,7 +153,7 @@ pub struct TestArgs {
     ///
     /// By default, only the top model test results are printed. When enabled,
     /// submodel test results are also printed.
-    #[arg(long)]
+    #[arg(long, short = 'r')]
     pub recursive: bool,
 
     /// Don't print the results header
@@ -187,7 +187,7 @@ pub struct TreeArgs {
     ///
     /// By default, only the top model values are included in the tree. When enabled,
     /// submodel values are also included in the tree.
-    #[arg(long)]
+    #[arg(long, short = 'r')]
     pub recursive: bool,
 
     /// Depth of the tree to print
@@ -252,7 +252,7 @@ pub struct IndependentArgs {
     pub file: PathBuf,
 
     /// Print the independent parameters in submodels as well as the top model
-    #[arg(long)]
+    #[arg(long, short = 'r')]
     pub recursive: bool,
 
     /// Print the parameter values
