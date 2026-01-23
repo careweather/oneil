@@ -605,6 +605,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil-fuzz"
+version = "0.0.0"
+dependencies = [
+ "libfuzzer-sys",
+ "oneil_runtime",
+]
+
+[[package]]
 name = "oneil_ast"
 version = "0.15.0"
 dependencies = [
