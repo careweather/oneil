@@ -5,4 +5,10 @@
 // TODO: remove this once the code is cleaned up
 
 mod cache;
+mod error;
 mod runtime;
+
+pub mod debug {
+    pub use oneil_ast as ast;
+    pub use oneil_ir as ir;
+}
