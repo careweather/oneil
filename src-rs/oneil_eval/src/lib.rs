@@ -3,7 +3,7 @@
 
 pub mod builtin;
 mod context;
-mod error;
+pub mod error;
 mod eval_expr;
 mod eval_model;
 mod eval_model_collection;

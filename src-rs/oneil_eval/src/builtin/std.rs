@@ -15,6 +15,7 @@ struct StdBuiltinValue {
     value: Value,
     description: &'static str,
 }
+
 fn builtin_values_complete() -> impl Iterator<Item = StdBuiltinValue> {
     [
         StdBuiltinValue {

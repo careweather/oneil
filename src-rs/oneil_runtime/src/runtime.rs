@@ -1,35 +1,289 @@
 use std::path::Path;
 
-use oneil_parser::{self as parser, Config};
-use oneil_shared::error::OneilError;
+use oneil_ast as ast;
+use oneil_ir as ir;
+use oneil_model_resolver::FileLoader;
+use oneil_parser::{self as parser, Config, error::ErrorsWithPartialResult};
+use oneil_shared::error::{AsOneilError, OneilError};
 
 use crate::{
-    cache::{AstCache, SourceCache},
-    debug::{ast, ir},
+    cache::{AstCache, IrCache, SourceCache},
+    debug,
     error::FileError,
+    std_builtin::StdBuiltins,
 };
 
+/// Error type for parser errors in the runtime
+#[derive(Debug)]
+pub struct ParseError(ErrorsWithPartialResult<Box<ast::Model>, parser::error::ParserError>);
+
+/// Error type for Python import validation errors in the runtime
+#[derive(Debug)]
+pub struct PythonError(PathBuf);
+
+impl std::fmt::Display for PythonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "python file '{}' does not exist", self.0.display())
+    }
+}
+
+impl AsOneilError for PythonError {
+    fn message(&self) -> String {
+        format!("python file '{}' does not exist", self.0.display())
+    }
+}
+
+use std::path::PathBuf;
+
 pub struct Runtime {
+    builtins: StdBuiltins,
     source_cache: SourceCache,
     ast_cache: AstCache,
+    ir_cache: IrCache,
+}
+
+impl FileLoader for Runtime {
+    type ParseError = ParseError;
+    type PythonError = PythonError;
+
+    /// Parses a Oneil file into an AST using the cached source and AST.
+    ///
+    /// This method reuses the existing source and AST caches to avoid
+    /// redundant file I/O and parsing operations. If the AST is not cached,
+    /// it will parse the file (but won't cache it since this is a read-only operation).
+    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
+        let path = path.as_ref();
+        let path_buf = path.to_path_buf();
+
+        // Check if AST is already cached
+        if let Some(cached_result) = self.ast_cache.get(&path_buf) {
+            match cached_result {
+                Ok(ast) => {
+                    // Clone the AST since we can't return a reference
+                    // This is acceptable since parse_ast is only called for dependencies
+                    // that weren't loaded via load_ast
+                    return Ok(ast.clone());
+                }
+                Err(_errors) => {
+                    // If there were cached errors, we need to re-parse to get
+                    // the proper ParseError type. This shouldn't happen in normal
+                    // flow since load_ast would have been called first.
+                    let content = std::fs::read_to_string(path).unwrap_or_else(|_| String::new());
+                    return parser::parse_model(&content, Some(Config::default()))
+                        .map_err(ParseError);
+                }
+            }
+        }
+
+        // If not cached, parse the file
+        // This happens when the model resolver loads dependencies
+        let content = std::fs::read_to_string(path).map_err(|_| {
+            // Create a parse error for file read failure
+            let content = String::new();
+            parser::parse_model(&content, Some(Config::default()))
+                .map_err(ParseError)
+                .unwrap_err()
+        })?;
+
+        parser::parse_model(&content, Some(Config::default())).map_err(ParseError)
+    }
+
+    /// Validates a Python import by checking if the file exists.
+    fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError> {
+        let path = path.as_ref();
+        if path.exists() {
+            Ok(())
+        } else {
+            Err(PythonError(path.to_path_buf()))
+        }
+    }
 }
 
 impl Runtime {
     pub fn new() -> Self {
         Self {
+            builtins: StdBuiltins::new(),
             source_cache: SourceCache::new(),
             ast_cache: AstCache::new(),
+            ir_cache: IrCache::new(),
         }
     }
 
     pub fn debug_load_ast(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<&ast::ModelNode, Vec<OneilError>> {
+    ) -> Result<&debug::ast::ModelNode, Vec<OneilError>> {
         self.load_ast(path)
     }
 
-    fn load_ast(&mut self, path: impl AsRef<Path>) -> Result<&ast::ModelNode, Vec<OneilError>> {
+    pub fn debug_load_ir(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<&debug::ir::Model, Vec<OneilError>> {
+        self.load_ir(path)
+    }
+
+    /// Loads the IR for a model, caching the result and reusing other caches.
+    ///
+    /// This method:
+    /// 1. Checks the IR cache first
+    /// 2. If not cached, loads the AST (which uses source and AST caches)
+    /// 3. Converts the AST to IR using the model resolver
+    /// 4. Caches the IR result
+    /// 5. Returns the cached IR
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if loading, parsing, or resolution fails.
+    fn load_ir(&mut self, path: impl AsRef<Path>) -> Result<&ir::Model, Vec<OneilError>> {
+        let path = path.as_ref();
+        let path_buf = path.to_path_buf();
+
+        // Check if IR is already cached - use `contains_model` to avoid borrow issues
+        if self.ir_cache.contains_model(&path_buf) {
+            // Now we can safely get it since we know it exists
+            let cached_result = self.ir_cache.get(&path_buf).expect("should exist");
+            match cached_result {
+                Ok(ir) => return Ok(ir),
+                Err(errors) => return Err(errors.to_vec()),
+            }
+        }
+
+        // Use model resolver to convert AST to IR
+        let model_collection_result = oneil_model_resolver::load_model(path, &self.builtins, self);
+
+        match model_collection_result {
+            Ok(model_collection) => {
+                self.ir_cache.insert_ir(*model_collection);
+                let ir = self.ir_cache.get(&path_buf).expect("should exist");
+                ir.map_err(|errors| errors.to_vec())
+            }
+            Err(error) => {
+                let (_partial_collection, error_map) = *error;
+                let errors = self.convert_ir_errors(error_map);
+
+                let errors = self.ir_cache.insert_errors(path_buf, errors);
+                let errors = errors.to_vec();
+
+                Err(errors)
+            }
+        }
+    }
+
+    fn convert_ir_errors(
+        &mut self,
+        error_map: oneil_model_resolver::ModelErrorMap<ParseError, PythonError>,
+    ) -> Vec<OneilError> {
+        // Convert model resolver errors to OneilErrors
+        let mut errors: Vec<OneilError> = Vec::new();
+
+        // Convert Python import errors first
+        for (python_path, python_error) in error_map.get_import_errors() {
+            let python_path_buf = python_path.as_ref().to_path_buf();
+            // PythonError implements AsOneilError
+            errors.push(OneilError::from_error(python_error, python_path_buf));
+        }
+
+        // Convert circular dependency errors
+        for (model_path, circular_errors) in error_map.get_circular_dependency_errors() {
+            let model_path_buf = model_path.as_ref().to_path_buf();
+            for circular_error in circular_errors {
+                errors.push(OneilError::from_error(
+                    circular_error,
+                    model_path_buf.clone(),
+                ));
+            }
+        }
+
+        // Convert model errors
+        for (model_path, load_error) in error_map.get_model_errors() {
+            let model_path_buf = model_path.as_ref().to_path_buf();
+            match load_error {
+                oneil_model_resolver::error::LoadError::ParseError(parse_error) => {
+                    // Convert ParseError to OneilErrors
+                    let parse_error = &parse_error.0;
+                    let parse_errors: Vec<OneilError> = parse_error
+                        .errors
+                        .iter()
+                        .map(|e| OneilError::from_error(e, model_path_buf.clone()))
+                        .collect();
+                    errors.extend(parse_errors);
+                }
+                oneil_model_resolver::error::LoadError::ResolutionErrors(resolution_errors) => {
+                    // Convert resolution errors to OneilErrors
+                    // Get source for location information
+                    let source = self.source_cache.get(&model_path_buf).and_then(|r| r.ok());
+
+                    // Convert each type of resolution error
+                    for import_error in resolution_errors.get_import_errors().values() {
+                        if import_error.should_show_to_user() {
+                            errors.push(OneilError::from_error_with_optional_source(
+                                import_error,
+                                model_path_buf.clone(),
+                                source,
+                            ));
+                        }
+                    }
+
+                    for submodel_error in
+                        resolution_errors.get_submodel_resolution_errors().values()
+                    {
+                        if submodel_error.should_show_to_user() {
+                            errors.push(OneilError::from_error_with_optional_source(
+                                submodel_error,
+                                model_path_buf.clone(),
+                                source,
+                            ));
+                        }
+                    }
+
+                    for reference_error in
+                        resolution_errors.get_reference_resolution_errors().values()
+                    {
+                        if reference_error.should_show_to_user() {
+                            errors.push(OneilError::from_error_with_optional_source(
+                                reference_error,
+                                model_path_buf.clone(),
+                                source,
+                            ));
+                        }
+                    }
+
+                    for parameter_errors in
+                        resolution_errors.get_parameter_resolution_errors().values()
+                    {
+                        for parameter_error in parameter_errors {
+                            if parameter_error.should_show_to_user() {
+                                errors.push(OneilError::from_error_with_optional_source(
+                                    parameter_error,
+                                    model_path_buf.clone(),
+                                    source,
+                                ));
+                            }
+                        }
+                    }
+
+                    for test_errors in resolution_errors.get_test_resolution_errors().values() {
+                        for test_error in test_errors {
+                            if test_error.should_show_to_user() {
+                                errors.push(OneilError::from_error_with_optional_source(
+                                    test_error,
+                                    model_path_buf.clone(),
+                                    source,
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        errors
+    }
+
+    fn load_ast(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<&debug::ast::ModelNode, Vec<OneilError>> {
         let content = self.load_source(&path).map_err(|e| vec![*e])?;
         let parse_result = parser::parse_model(content, Some(Config::default()));
 
