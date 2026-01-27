@@ -124,4 +124,27 @@ impl ModelCollection {
     pub const fn get_initial_models(&self) -> &HashSet<ModelPath> {
         &self.initial_models
     }
+
+    /// Merges another model collection into this one.
+    ///
+    /// NOTE: I just did a quick implementation here. If
+    /// this is being used frequently, we should probably
+    /// consider more efficient ways to merge the collections.
+    #[must_use]
+    pub fn merge(&self, other: &Self) -> Self {
+        Self {
+            initial_models: self
+                .initial_models
+                .union(&other.initial_models)
+                .cloned()
+                .collect(),
+
+            models: self
+                .models
+                .iter()
+                .chain(other.models.iter())
+                .map(|(path, model)| (path.clone(), model.clone()))
+                .collect(),
+        }
+    }
 }

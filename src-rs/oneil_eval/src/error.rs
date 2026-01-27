@@ -1,3 +1,5 @@
+//! Errors for the Oneil evaluator.
+
 use std::{fmt, path::PathBuf};
 
 use oneil_shared::{
