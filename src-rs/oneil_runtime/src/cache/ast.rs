@@ -20,8 +20,7 @@ impl AstCache {
     pub fn insert_ast(&mut self, path: PathBuf, ast: ast::ModelNode) -> &ast::ModelNode {
         self.asts.insert(path.clone(), ast);
 
-        &self
-            .asts
+        self.asts
             .get(&path)
             .expect("ast should be in cache after insertion")
     }
@@ -29,8 +28,7 @@ impl AstCache {
     pub fn insert_errors(&mut self, path: PathBuf, errors: Vec<OneilError>) -> &[OneilError] {
         self.errors.insert(path.clone(), errors);
 
-        &self
-            .errors
+        self.errors
             .get(&path)
             .expect("errors should be in cache after insertion")
     }
@@ -38,7 +36,7 @@ impl AstCache {
     pub fn get_result(&self, path: &PathBuf) -> Option<Result<&ast::ModelNode, &Vec<OneilError>>> {
         self.errors
             .get(path)
-            .map(|errors| Err(errors.as_ref()))
+            .map(Err)
             .or_else(|| self.asts.get(path).map(Ok))
     }
 

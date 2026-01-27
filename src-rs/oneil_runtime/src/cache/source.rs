@@ -16,14 +16,11 @@ impl SourceCache {
     pub fn insert_source(&mut self, path: PathBuf, content: String) -> &str {
         self.sources.insert(path.clone(), Ok(content));
 
-        let source = self
-            .sources
+        self.sources
             .get(&path)
             .expect("source should be in cache after insertion")
             .as_ref()
-            .expect("source should exist");
-
-        &source
+            .expect("source should exist")
     }
 
     pub fn insert_error(&mut self, path: PathBuf, error: OneilError) -> OneilError {
