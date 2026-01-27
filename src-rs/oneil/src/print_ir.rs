@@ -1,14 +1,12 @@
 //! Intermediate Representation (IR) printing functionality for the Oneil CLI
 
-use std::path::{Path, PathBuf};
-
 use indexmap::IndexMap;
 
 use anstream::println;
 use oneil_ir as ir;
 
 /// Prints the IR in a hierarchical tree format for debugging
-pub fn print(model_collection: &IndexMap<PathBuf, ir::Model>, print_debug: bool) {
+pub fn print(model_collection: &IndexMap<ir::ModelPath, ir::Model>, print_debug: bool) {
     if print_debug {
         println!("IR: {model_collection:?}");
         return;
@@ -30,12 +28,12 @@ pub fn print(model_collection: &IndexMap<PathBuf, ir::Model>, print_debug: bool)
 }
 
 /// Prints a single model with its components
-fn print_model(path: &Path, model: &ir::Model, indent: usize, prefix: &str) {
+fn print_model(path: &ir::ModelPath, model: &ir::Model, indent: usize, prefix: &str) {
     println!(
         "{}    {}Model: \"{}\"",
         "  ".repeat(indent),
         prefix,
-        path.display()
+        path.as_ref().display()
     );
 
     let indent = indent + 2;
