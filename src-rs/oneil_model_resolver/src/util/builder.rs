@@ -23,7 +23,6 @@ use crate::{
 /// methods for adding models and different types of errors.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelCollectionBuilder<Ps, Py> {
-    initial_models: HashSet<ir::ModelPath>,
     models: IndexMap<ir::ModelPath, ir::Model>,
     visited_models: HashSet<ir::ModelPath>,
     errors: ModelErrorMap<Ps, Py>,
@@ -31,9 +30,8 @@ pub struct ModelCollectionBuilder<Ps, Py> {
 
 impl<Ps, Py> ModelCollectionBuilder<Ps, Py> {
     /// Creates a new model collection builder.
-    pub fn new(initial_models: HashSet<ir::ModelPath>) -> Self {
+    pub fn new() -> Self {
         Self {
-            initial_models,
             models: IndexMap::new(),
             visited_models: HashSet::new(),
             errors: ModelErrorMap::new(),
@@ -115,7 +113,7 @@ impl<Ps, Py> TryInto<ir::ModelCollection> for ModelCollectionBuilder<Ps, Py> {
 
     /// Attempts to convert the builder into a model collection.
     fn try_into(self) -> Result<ir::ModelCollection, (ir::ModelCollection, ModelErrorMap<Ps, Py>)> {
-        let model_collection = ir::ModelCollection::new(self.initial_models, self.models);
+        let model_collection = ir::ModelCollection::new(self.models);
         if self.errors.is_empty() {
             Ok(model_collection)
         } else {

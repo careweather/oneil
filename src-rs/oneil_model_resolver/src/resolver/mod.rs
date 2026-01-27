@@ -275,7 +275,6 @@ mod tests {
         error::{CircularDependencyError, ModelImportResolutionError},
         test::{TestBuiltinRef, TestFileParser, construct::test_ast},
     };
-    use std::collections::HashSet;
 
     #[test]
     fn split_model_ast_empty() {
@@ -333,8 +332,7 @@ mod tests {
     fn load_model_success() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let builder = ModelCollectionBuilder::new(initial_models);
+        let builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
@@ -363,8 +361,7 @@ mod tests {
     fn load_model_parse_error() {
         // create initial context
         let model_path = ir::ModelPath::new("nonexistent");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let builder = ModelCollectionBuilder::new(initial_models);
+        let builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
@@ -395,8 +392,7 @@ mod tests {
     fn load_model_circular_dependency() {
         // create initial context
         let model_path = ir::ModelPath::new("main");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let builder = ModelCollectionBuilder::new(initial_models);
+        let builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
@@ -491,8 +487,7 @@ mod tests {
     fn load_model_already_visited() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let mut builder = ModelCollectionBuilder::new(initial_models);
+        let mut builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
@@ -527,7 +522,7 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
         let mut file_loader = TestFileParser::empty();
         let use_models = vec![];
-        let builder = ModelCollectionBuilder::new(HashSet::new());
+        let builder = ModelCollectionBuilder::new();
 
         // load the use models
         let result = load_use_models(
@@ -554,7 +549,7 @@ mod tests {
         let model_path = ir::ModelPath::new("parent");
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
-        let builder = ModelCollectionBuilder::new(HashSet::new());
+        let builder = ModelCollectionBuilder::new();
         let mut file_loader = TestFileParser::new([
             ("child1.on", test_ast::empty_model_node()),
             ("child2.on", test_ast::empty_model_node()),
@@ -608,7 +603,7 @@ mod tests {
             .build()];
         let use_models_ref = use_models.iter().collect::<Vec<_>>();
 
-        let builder = ModelCollectionBuilder::new(HashSet::new());
+        let builder = ModelCollectionBuilder::new();
 
         // load the use models
         let result = load_use_models(
@@ -636,8 +631,7 @@ mod tests {
     fn load_model_complex_dependency_chain() {
         // create initial context
         let model_path = ir::ModelPath::new("root");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let builder = ModelCollectionBuilder::new(initial_models);
+        let builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
@@ -681,8 +675,7 @@ mod tests {
     fn load_model_with_sections() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let builder = ModelCollectionBuilder::new(initial_models);
+        let builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
@@ -727,8 +720,7 @@ mod tests {
     fn load_model_with_reference() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let builder = ModelCollectionBuilder::new(initial_models);
+        let builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
@@ -798,8 +790,7 @@ mod tests {
     fn load_model_with_submodel_with_error() {
         // create initial context
         let model_path = ir::ModelPath::new("test");
-        let initial_models = HashSet::from([model_path.clone()]);
-        let builder = ModelCollectionBuilder::new(initial_models);
+        let builder = ModelCollectionBuilder::new();
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
