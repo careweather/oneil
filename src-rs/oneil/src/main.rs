@@ -186,7 +186,7 @@ fn load_model_collection<F: BuiltinFunction>(
     print_debug: bool,
 ) -> Option<Box<ir::ModelCollection>> {
     let model_collection =
-        oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
+        oneil_model_resolver::load_model(file, builtins, &mut file_parser::FileLoader);
     match model_collection {
         Ok(model_collection) => Some(model_collection),
         Err(error) => {
@@ -321,7 +321,7 @@ fn eval_model<F: BuiltinFunction + Clone>(
     builtins: &Builtins<F>,
 ) -> (Option<EvalContext<F>>, HashSet<PathBuf>) {
     let model_collection =
-        oneil_model_resolver::load_model(file, builtins, &file_parser::FileLoader);
+        oneil_model_resolver::load_model(file, builtins, &mut file_parser::FileLoader);
     let model_collection = match model_collection {
         Ok(model_collection) => model_collection,
         Err(error) => {

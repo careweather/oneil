@@ -215,7 +215,7 @@ impl LanguageServer for Backend {
         let Ok(model_collection) = oneil_model_resolver::load_model(
             &model_path,
             &builtin_variables,
-            &file_parser::FileLoader,
+            &mut file_parser::FileLoader,
         ) else {
             self.client
                 .log_message(MessageType::ERROR, "Failed to load model")

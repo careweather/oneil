@@ -1,6 +1,6 @@
 //! Utility types and traits for the Oneil model loader.
 
-use std::path::Path;
+use std::{borrow::Borrow, path::Path};
 
 use indexmap::IndexMap;
 
@@ -30,6 +30,8 @@ pub trait FileLoader {
     type ParseError: std::fmt::Debug;
     /// The error type returned when Python import validation fails.
     type PythonError: std::fmt::Debug;
+    /// The output type of the AST.
+    type AstOutput: Borrow<ast::ModelNode>;
 
     /// Parses a Oneil file into an AST.
     ///
@@ -49,7 +51,7 @@ pub trait FileLoader {
     ///
     /// Returns `Err(Self::ParseError)` if the file cannot be read, parsed, or if any other
     /// parsing-related error occurs.
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError>;
+    fn parse_ast(&mut self, path: impl AsRef<Path>) -> Result<Self::AstOutput, Self::ParseError>;
 
     /// Validates a Python import.
     ///
