@@ -1,9 +1,10 @@
 use std::path::Path;
 
+use indexmap::IndexMap;
 use oneil_ast as ast;
 use oneil_ir as ir;
-use oneil_model_resolver::FileLoader;
-use oneil_parser::{self as parser, Config, error::ErrorsWithPartialResult};
+use oneil_model_resolver as model_resolver;
+use oneil_parser::{self as parser, Config, error::ParserError};
 use oneil_shared::error::{AsOneilError, OneilError};
 
 use crate::{
@@ -12,10 +13,6 @@ use crate::{
     error::FileError,
     std_builtin::StdBuiltins,
 };
-
-/// Error type for parser errors in the runtime
-#[derive(Debug)]
-pub struct ParseError(ErrorsWithPartialResult<Box<ast::Model>, parser::error::ParserError>);
 
 /// Error type for Python import validation errors in the runtime
 #[derive(Debug)]
@@ -42,63 +39,6 @@ pub struct Runtime {
     ir_cache: IrCache,
 }
 
-impl FileLoader for Runtime {
-    type ParseError = ParseError;
-    type PythonError = PythonError;
-
-    /// Parses a Oneil file into an AST using the cached source and AST.
-    ///
-    /// This method reuses the existing source and AST caches to avoid
-    /// redundant file I/O and parsing operations. If the AST is not cached,
-    /// it will parse the file (but won't cache it since this is a read-only operation).
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
-        let path = path.as_ref();
-        let path_buf = path.to_path_buf();
-
-        // Check if AST is already cached
-        if let Some(cached_result) = self.ast_cache.get(&path_buf) {
-            match cached_result {
-                Ok(ast) => {
-                    // Clone the AST since we can't return a reference
-                    // This is acceptable since parse_ast is only called for dependencies
-                    // that weren't loaded via load_ast
-                    return Ok(ast.clone());
-                }
-                Err(_errors) => {
-                    // If there were cached errors, we need to re-parse to get
-                    // the proper ParseError type. This shouldn't happen in normal
-                    // flow since load_ast would have been called first.
-                    let content = std::fs::read_to_string(path).unwrap_or_else(|_| String::new());
-                    return parser::parse_model(&content, Some(Config::default()))
-                        .map_err(ParseError);
-                }
-            }
-        }
-
-        // If not cached, parse the file
-        // This happens when the model resolver loads dependencies
-        let content = std::fs::read_to_string(path).map_err(|_| {
-            // Create a parse error for file read failure
-            let content = String::new();
-            parser::parse_model(&content, Some(Config::default()))
-                .map_err(ParseError)
-                .unwrap_err()
-        })?;
-
-        parser::parse_model(&content, Some(Config::default())).map_err(ParseError)
-    }
-
-    /// Validates a Python import by checking if the file exists.
-    fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError> {
-        let path = path.as_ref();
-        if path.exists() {
-            Ok(())
-        } else {
-            Err(PythonError(path.to_path_buf()))
-        }
-    }
-}
-
 impl Runtime {
     pub fn new() -> Self {
         Self {
@@ -113,15 +53,19 @@ impl Runtime {
         &mut self,
         path: impl AsRef<Path>,
     ) -> Result<&debug::ast::ModelNode, Vec<OneilError>> {
-        self.load_ast(path)
+        self.load_ast(&path).map_err(|e| {
+            e.into_iter()
+                .map(|e| OneilError::from_error(&e, path.as_ref().to_path_buf()))
+                .collect()
+        })
     }
 
     pub fn debug_load_ir(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<&debug::ir::ModelCollection, Vec<OneilError>> {
+    ) -> Result<&IndexMap<PathBuf, ir::Model>, Vec<OneilError>> {
         let _model = self.load_ir(path)?;
-        Ok(self.ir_cache.get_model_collection())
+        Ok(self.ir_cache.ir_collection())
     }
 
     /// Loads the IR for a model, caching the result and reusing other caches.
@@ -151,7 +95,8 @@ impl Runtime {
         }
 
         // Use model resolver to convert AST to IR
-        let model_collection_result = oneil_model_resolver::load_model(path, &self.builtins, self);
+        let model_collection_result =
+            oneil_model_resolver::load_model(path, &self.builtins, &mut *self);
 
         match model_collection_result {
             Ok(model_collection) => {
@@ -172,8 +117,8 @@ impl Runtime {
     }
 
     fn convert_ir_errors(
-        &mut self,
-        error_map: oneil_model_resolver::ModelErrorMap<ParseError, PythonError>,
+        &self,
+        error_map: model_resolver::ModelErrorMap<Vec<OneilError>, PythonError>,
     ) -> Vec<OneilError> {
         // Convert model resolver errors to OneilErrors
         let mut errors: Vec<OneilError> = Vec::new();
@@ -200,15 +145,8 @@ impl Runtime {
         for (model_path, load_error) in error_map.get_model_errors() {
             let model_path_buf = model_path.as_ref().to_path_buf();
             match load_error {
-                oneil_model_resolver::error::LoadError::ParseError(parse_error) => {
-                    // Convert ParseError to OneilErrors
-                    let parse_error = &parse_error.0;
-                    let parse_errors: Vec<OneilError> = parse_error
-                        .errors
-                        .iter()
-                        .map(|e| OneilError::from_error(e, model_path_buf.clone()))
-                        .collect();
-                    errors.extend(parse_errors);
+                oneil_model_resolver::error::LoadError::ParseError(parse_errors) => {
+                    errors.extend(parse_errors.into_iter().cloned());
                 }
                 oneil_model_resolver::error::LoadError::ResolutionErrors(resolution_errors) => {
                     // Convert resolution errors to OneilErrors
@@ -305,9 +243,7 @@ impl Runtime {
                     .ast_cache
                     .insert_errors(path.as_ref().to_path_buf(), errors);
 
-                let errors = errors.to_vec();
-
-                Err(errors)
+                Err(errors.to_vec())
             }
         }
     }
@@ -324,12 +260,55 @@ impl Runtime {
             Err(error) => {
                 let error = FileError::new(path, &error);
                 let error = OneilError::from_error(&error, path.to_path_buf());
-                let error = self
-                    .source_cache
-                    .insert_error(path.to_path_buf(), error.clone());
+                let error = self.source_cache.insert_error(path.to_path_buf(), error);
 
                 Err(Box::new(error))
             }
+        }
+    }
+}
+
+impl model_resolver::FileLoader for Runtime {
+    type ParseError = Vec<OneilError>;
+    type PythonError = PythonError;
+    type AstOutput<'a> = &'a ast::ModelNode;
+
+    /// Parses a Oneil file into an AST using the cached source and AST.
+    ///
+    /// This method reuses the existing source and AST caches to avoid
+    /// redundant file I/O and parsing operations. If the AST is not cached,
+    /// it will parse the file (but won't cache it since this is a read-only operation).
+    fn parse_ast(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<Self::AstOutput<'_>, Self::ParseError> {
+        let path = path.as_ref();
+        let path_buf = path.to_path_buf();
+
+        // Check if AST is already cached
+        if let Some(cached_result) = self.ast_cache.get_result(&path_buf) {
+            match cached_result {
+                Ok(ast) => {
+                    return Ok(ast);
+                }
+                Err(errors) => {
+                    return Err(errors.to_vec());
+                }
+            }
+        }
+
+        let ast = self.load_ast(path)?;
+
+        Ok(ast)
+    }
+
+    /// Validates a Python import by checking if the file exists.
+    fn validate_python_import(&self, path: impl AsRef<Path>) -> Result<(), Self::PythonError> {
+        let path = path.as_ref();
+        if path.exists() {
+            Ok(())
+        } else {
+            Err(PythonError(path.to_path_buf()))
         }
     }
 }
