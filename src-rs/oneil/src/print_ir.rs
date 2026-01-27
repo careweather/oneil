@@ -1,70 +1,41 @@
 //! Intermediate Representation (IR) printing functionality for the Oneil CLI
 
+use std::path::{Path, PathBuf};
+
 use indexmap::IndexMap;
 
 use anstream::println;
 use oneil_ir as ir;
 
 /// Prints the IR in a hierarchical tree format for debugging
-pub fn print(ir: &ir::ModelCollection, print_debug: bool) {
+pub fn print(model_collection: &IndexMap<PathBuf, ir::Model>, print_debug: bool) {
     if print_debug {
-        println!("IR: {ir:?}");
+        println!("IR: {model_collection:?}");
         return;
     }
 
     println!("ModelCollection");
 
-    // Print Python imports
-    println!("├── Python Imports:");
-    let python_imports = ir.get_python_imports();
-    if python_imports.is_empty() {
-        println!("│   └── [none]");
-    } else {
-        for (i, import) in python_imports.iter().enumerate() {
-            let is_last = i == python_imports.len() - 1;
-            let prefix = if is_last { "└──" } else { "├──" };
-            println!(
-                "│   {}Import: \"{}\"",
-                prefix,
-                import.import_path().as_ref().display()
-            );
-        }
-    }
-
-    // Print initial models
-    println!("├── Initial Models:");
-    let initial_models = ir.get_initial_models();
-    if initial_models.is_empty() {
-        println!("│   └── [none]");
-    } else {
-        for (i, model_path) in initial_models.iter().enumerate() {
-            let is_last = i == initial_models.len() - 1;
-            let prefix = if is_last { "└──" } else { "├──" };
-            println!("│   {}Model: \"{}\"", prefix, model_path.as_ref().display());
-        }
-    }
-
     // Print all models
     println!("└── Models:");
-    let models = ir.get_models();
-    if models.is_empty() {
+    if model_collection.is_empty() {
         println!("    └── [none]");
     } else {
-        for (i, (model_path, model)) in models.iter().enumerate() {
-            let is_last = i == models.len() - 1;
+        for (i, (path, model)) in model_collection.iter().enumerate() {
+            let is_last = i == model_collection.len() - 1;
             let prefix = if is_last { "└──" } else { "├──" };
-            print_model(model_path, model, 2, prefix);
+            print_model(path, model, 2, prefix);
         }
     }
 }
 
 /// Prints a single model with its components
-fn print_model(model_path: &ir::ModelPath, model: &ir::Model, indent: usize, prefix: &str) {
+fn print_model(path: &Path, model: &ir::Model, indent: usize, prefix: &str) {
     println!(
         "{}    {}Model: \"{}\"",
         "  ".repeat(indent),
         prefix,
-        model_path.as_ref().display()
+        path.display()
     );
 
     let indent = indent + 2;
