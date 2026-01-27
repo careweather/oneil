@@ -48,10 +48,11 @@ impl TestPythonValidator {
 impl FileLoader for TestPythonValidator {
     type ParseError = ();
     type PythonError = ();
+    type AstOutput = ast::ModelNode;
 
     /// Attempts to parse an AST from a file path.
     #[expect(clippy::panic_in_result_fn, reason = "this is a test implementation")]
-    fn parse_ast(&self, _path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
+    fn parse_ast(&mut self, _path: impl AsRef<Path>) -> Result<Self::AstOutput, Self::ParseError> {
         panic!("TestPythonLoader does not support parsing ASTs");
     }
 
@@ -104,9 +105,10 @@ impl TestFileParser {
 impl FileLoader for TestFileParser {
     type ParseError = ();
     type PythonError = ();
+    type AstOutput = ast::ModelNode;
 
     /// Attempts to parse an AST from a file path.
-    fn parse_ast(&self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
+    fn parse_ast(&mut self, path: impl AsRef<Path>) -> Result<Self::AstOutput, Self::ParseError> {
         let path = path.as_ref().to_path_buf();
         self.models.get(&path).cloned().ok_or(())
     }

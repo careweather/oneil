@@ -33,7 +33,7 @@ type LoadModelErr<Ps, Py> = Box<(ir::ModelCollection, ModelErrorMap<Ps, Py>)>;
 pub fn load_model<F>(
     model_path: impl AsRef<Path>,
     builtin_ref: &impl BuiltinRef,
-    file_parser: &F,
+    file_parser: &mut F,
 ) -> Result<LoadModelOk, LoadModelErr<F::ParseError, F::PythonError>>
 where
     F: FileLoader,
@@ -49,7 +49,7 @@ where
 pub fn load_model_list<F>(
     model_paths: &[impl AsRef<Path>],
     builtin_ref: &impl BuiltinRef,
-    file_parser: &F,
+    file_parser: &mut F,
 ) -> Result<LoadModelOk, LoadModelErr<F::ParseError, F::PythonError>>
 where
     F: FileLoader,

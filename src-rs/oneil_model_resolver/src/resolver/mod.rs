@@ -11,6 +11,8 @@
 //! - Test resolution
 //!
 
+use std::borrow::Borrow;
+
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -39,7 +41,7 @@ pub fn load_model<F>(
     mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
     builtin_ref: &impl BuiltinRef,
     load_stack: &mut Stack<ir::ModelPath>,
-    file_loader: &F,
+    file_loader: &mut F,
 ) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
 where
     F: FileLoader,
@@ -72,7 +74,7 @@ where
     };
 
     // split model ast into imports, use models, parameters, and tests
-    let (imports, model_imports, parameters, tests) = split_model_ast(&model_ast);
+    let (imports, model_imports, parameters, tests) = split_model_ast(model_ast.borrow());
 
     // validate imports
     let (python_imports, import_resolution_errors, builder) =
@@ -233,7 +235,7 @@ fn load_use_models<F>(
     model_path: &ir::ModelPath,
     builtin_ref: &impl BuiltinRef,
     load_stack: &mut Stack<ir::ModelPath>,
-    file_loader: &F,
+    file_loader: &mut F,
     use_models: &[&ast::UseModelNode],
     builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
 ) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
@@ -336,7 +338,7 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
-        let file_loader = TestFileParser::new([("test.on", test_ast::empty_model_node())]);
+        let mut file_loader = TestFileParser::new([("test.on", test_ast::empty_model_node())]);
 
         // load the model
         let result = load_model(
@@ -344,7 +346,7 @@ mod tests {
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
@@ -366,7 +368,7 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
 
-        let file_loader = TestFileParser::empty();
+        let mut file_loader = TestFileParser::empty();
 
         // load the model
         let result = load_model(
@@ -374,7 +376,7 @@ mod tests {
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
@@ -405,7 +407,7 @@ mod tests {
         let sub_test_model = test_ast::ModelNodeBuilder::new()
             .with_submodel("main")
             .build();
-        let file_loader =
+        let mut file_loader =
             TestFileParser::new([("main.on", main_test_model), ("sub.on", sub_test_model)]);
 
         // load the model
@@ -414,7 +416,7 @@ mod tests {
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
@@ -498,14 +500,14 @@ mod tests {
         builder.mark_model_as_visited(&model_path);
 
         // load the model
-        let file_loader = TestFileParser::new([("test.on", test_ast::empty_model_node())]);
+        let mut file_loader = TestFileParser::new([("test.on", test_ast::empty_model_node())]);
 
         let result = load_model(
             model_path,
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
@@ -523,7 +525,7 @@ mod tests {
         let model_path = ir::ModelPath::new("parent");
         let mut load_stack = Stack::new();
         let builtin_ref = TestBuiltinRef::new();
-        let file_loader = TestFileParser::empty();
+        let mut file_loader = TestFileParser::empty();
         let use_models = vec![];
         let builder = ModelCollectionBuilder::new(HashSet::new());
 
@@ -532,7 +534,7 @@ mod tests {
             &model_path,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
             &use_models,
             builder,
         );
@@ -553,7 +555,7 @@ mod tests {
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
         let builder = ModelCollectionBuilder::new(HashSet::new());
-        let file_loader = TestFileParser::new([
+        let mut file_loader = TestFileParser::new([
             ("child1.on", test_ast::empty_model_node()),
             ("child2.on", test_ast::empty_model_node()),
         ]);
@@ -576,7 +578,7 @@ mod tests {
             &model_path,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
             &use_models_ref,
             builder,
         );
@@ -598,7 +600,7 @@ mod tests {
         let model_path = ir::ModelPath::new("parent");
         let builtin_ref = TestBuiltinRef::new();
         let mut load_stack = Stack::new();
-        let file_loader = TestFileParser::empty(); // No models available
+        let mut file_loader = TestFileParser::empty(); // No models available
 
         let use_models = [test_ast::ImportModelNodeBuilder::new()
             .with_top_component("nonexistent")
@@ -613,7 +615,7 @@ mod tests {
             &model_path,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
             &use_models_ref,
             builder,
         );
@@ -648,7 +650,7 @@ mod tests {
             .build();
         let level2_model = test_ast::empty_model_node();
 
-        let file_loader = TestFileParser::new([
+        let mut file_loader = TestFileParser::new([
             ("root.on", root_model),
             ("level1.on", level1_model),
             ("level2.on", level2_model),
@@ -660,7 +662,7 @@ mod tests {
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
@@ -698,7 +700,7 @@ mod tests {
             .with_section("section1", vec![use_model_decl])
             .build();
 
-        let file_loader =
+        let mut file_loader =
             TestFileParser::new([("test.on", model_node), ("submodel.on", submodel_node)]);
 
         // load the model
@@ -707,7 +709,7 @@ mod tests {
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
@@ -740,7 +742,7 @@ mod tests {
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
 
-        let file_loader =
+        let mut file_loader =
             TestFileParser::new([("test.on", model_node), ("reference.on", reference_node)]);
 
         // load the model
@@ -749,7 +751,7 @@ mod tests {
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
@@ -811,7 +813,7 @@ mod tests {
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
 
-        let file_loader =
+        let mut file_loader =
             TestFileParser::new([("test.on", model_node), ("submodel.on", submodel_node)]);
 
         // load the model
@@ -820,7 +822,7 @@ mod tests {
             builder,
             &builtin_ref,
             &mut load_stack,
-            &file_loader,
+            &mut file_loader,
         );
 
         // check the errors
