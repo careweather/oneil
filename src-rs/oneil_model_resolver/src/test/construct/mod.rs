@@ -26,7 +26,7 @@ pub fn unimportant_span() -> Span {
 }
 
 pub fn empty_model_collection_builder() -> ModelCollectionBuilder<(), ()> {
-    ModelCollectionBuilder::new(HashSet::new())
+    ModelCollectionBuilder::new()
 }
 
 pub struct ModelContextBuilder {

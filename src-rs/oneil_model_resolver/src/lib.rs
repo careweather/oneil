@@ -1,7 +1,7 @@
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 //! Model resolver for the Oneil programming language
 
-use std::{collections::HashSet, path::Path};
+use std::path::Path;
 
 use oneil_ir as ir;
 
@@ -54,13 +54,7 @@ pub fn load_model_list<F>(
 where
     F: FileLoader,
 {
-    let initial_model_paths: HashSet<_> = model_paths
-        .iter()
-        .map(AsRef::as_ref)
-        .map(ir::ModelPath::new)
-        .collect();
-
-    let builder = ModelCollectionBuilder::new(initial_model_paths);
+    let builder = ModelCollectionBuilder::new();
 
     let builder = model_paths.iter().fold(builder, |builder, model_path| {
         let model_path = ir::ModelPath::new(model_path.as_ref());

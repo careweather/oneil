@@ -1,7 +1,5 @@
 //! Model structures and collections for the Oneil programming language.
 
-use std::collections::HashSet;
-
 use indexmap::IndexMap;
 
 use crate::{
@@ -87,21 +85,14 @@ impl Model {
 /// A collection of models that can be managed together.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelCollection {
-    initial_models: HashSet<ModelPath>,
     models: IndexMap<ModelPath, Model>,
 }
 
 impl ModelCollection {
-    /// Creates a new model collection with the specified initial models and model mapping.
+    /// Creates a new model collection with the specified model mapping.
     #[must_use]
-    pub const fn new(
-        initial_models: HashSet<ModelPath>,
-        models: IndexMap<ModelPath, Model>,
-    ) -> Self {
-        Self {
-            initial_models,
-            models,
-        }
+    pub const fn new(models: IndexMap<ModelPath, Model>) -> Self {
+        Self { models }
     }
 
     /// Returns all Python imports from all models in the collection.
@@ -119,32 +110,9 @@ impl ModelCollection {
         &self.models
     }
 
-    /// Returns the initial models (entry points).
+    /// Converts the model collection into its internal representation.
     #[must_use]
-    pub const fn get_initial_models(&self) -> &HashSet<ModelPath> {
-        &self.initial_models
-    }
-
-    /// Merges another model collection into this one.
-    ///
-    /// NOTE: I just did a quick implementation here. If
-    /// this is being used frequently, we should probably
-    /// consider more efficient ways to merge the collections.
-    #[must_use]
-    pub fn merge(&self, other: &Self) -> Self {
-        Self {
-            initial_models: self
-                .initial_models
-                .union(&other.initial_models)
-                .cloned()
-                .collect(),
-
-            models: self
-                .models
-                .iter()
-                .chain(other.models.iter())
-                .map(|(path, model)| (path.clone(), model.clone()))
-                .collect(),
-        }
+    pub fn into_map(self) -> IndexMap<ModelPath, Model> {
+        self.models
     }
 }
