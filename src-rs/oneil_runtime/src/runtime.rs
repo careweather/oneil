@@ -150,66 +150,60 @@ impl Runtime {
                 oneil_model_resolver::error::LoadError::ResolutionErrors(resolution_errors) => {
                     // Convert resolution errors to OneilErrors
                     // Get source for location information
-                    let source = self.source_cache.get(&model_path_buf).and_then(|r| r.ok());
+                    let source = self
+                        .source_cache
+                        .get(&model_path_buf)
+                        .expect("should exist")
+                        .expect("should be have parsed correctly");
 
                     // Convert each type of resolution error
                     for import_error in resolution_errors.get_import_errors().values() {
-                        if import_error.should_show_to_user() {
-                            errors.push(OneilError::from_error_with_optional_source(
-                                import_error,
-                                model_path_buf.clone(),
-                                source,
-                            ));
-                        }
+                        errors.push(OneilError::from_error_with_source(
+                            import_error,
+                            model_path_buf.clone(),
+                            source,
+                        ));
                     }
 
                     for submodel_error in
                         resolution_errors.get_submodel_resolution_errors().values()
                     {
-                        if submodel_error.should_show_to_user() {
-                            errors.push(OneilError::from_error_with_optional_source(
-                                submodel_error,
-                                model_path_buf.clone(),
-                                source,
-                            ));
-                        }
+                        errors.push(OneilError::from_error_with_source(
+                            submodel_error,
+                            model_path_buf.clone(),
+                            source,
+                        ));
                     }
 
                     for reference_error in
                         resolution_errors.get_reference_resolution_errors().values()
                     {
-                        if reference_error.should_show_to_user() {
-                            errors.push(OneilError::from_error_with_optional_source(
-                                reference_error,
-                                model_path_buf.clone(),
-                                source,
-                            ));
-                        }
+                        errors.push(OneilError::from_error_with_source(
+                            reference_error,
+                            model_path_buf.clone(),
+                            source,
+                        ));
                     }
 
                     for parameter_errors in
                         resolution_errors.get_parameter_resolution_errors().values()
                     {
                         for parameter_error in parameter_errors {
-                            if parameter_error.should_show_to_user() {
-                                errors.push(OneilError::from_error_with_optional_source(
-                                    parameter_error,
-                                    model_path_buf.clone(),
-                                    source,
-                                ));
-                            }
+                            errors.push(OneilError::from_error_with_source(
+                                parameter_error,
+                                model_path_buf.clone(),
+                                source,
+                            ));
                         }
                     }
 
                     for test_errors in resolution_errors.get_test_resolution_errors().values() {
                         for test_error in test_errors {
-                            if test_error.should_show_to_user() {
-                                errors.push(OneilError::from_error_with_optional_source(
-                                    test_error,
-                                    model_path_buf.clone(),
-                                    source,
-                                ));
-                            }
+                            errors.push(OneilError::from_error_with_source(
+                                test_error,
+                                model_path_buf.clone(),
+                                source,
+                            ));
                         }
                     }
                 }
