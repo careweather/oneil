@@ -29,7 +29,7 @@ use crate::stylesheet;
 pub fn print(error: &OneilError, print_debug: bool) {
     if print_debug {
         eprintln!("{error:?}");
-    } else {
+    } else if error.should_show_to_user() {
         let error_string = error_to_string(error);
         eprintln!("{error_string}");
     }
