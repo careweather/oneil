@@ -27,11 +27,8 @@ use oneil_eval::{
     value::Value,
 };
 use oneil_ir as ir;
-use oneil_model_resolver::FileLoader;
-use oneil_runner::{
-    builtins::Builtins,
-    file_parser::{self, LoadingError},
-};
+use oneil_runner::{builtins::Builtins, file_parser};
+use oneil_runtime::Runtime;
 
 use crate::{
     command::{
@@ -96,29 +93,22 @@ fn handle_dev_command(command: DevCommand) {
 
 /// Handles the `dev print-ast` command.
 fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool) {
+    let mut runtime = Runtime::new();
+
     let is_multiple_files = files.len() > 1;
     for file in files {
         if is_multiple_files {
             println!("===== {} =====", file.display());
         }
 
-        let ast = file_parser::FileLoader.parse_ast(file);
+        let ast = runtime.debug_load_ast(file);
+        todo!("display partial ast");
         match ast {
-            Ok(ast) => print_ast::print(&ast, print_debug),
-            Err(LoadingError::InvalidFile(error)) => {
-                let error = convert_error::file::convert(file, &error);
-                print_error::print(&error, print_debug);
-            }
-            Err(LoadingError::Parser(error_with_partial)) => {
-                let errors = convert_error::parser::convert_all(file, &error_with_partial.errors);
-
+            Ok(ast) => print_ast::print(ast, print_debug),
+            Err(errors) => {
                 for error in errors {
                     print_error::print(&error, print_debug);
                     eprintln!();
-                }
-
-                if display_partial {
-                    print_ast::print(&error_with_partial.partial_result, print_debug);
                 }
             }
         }
@@ -127,23 +117,22 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
 
 /// Handles the `dev print-ir` command.
 fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
-    let builtin_variables = create_builtins();
+    let mut runtime = Runtime::new();
 
-    let model_collection =
-        oneil_model_resolver::load_model(file, &builtin_variables, &file_parser::FileLoader);
+    let model_collection = runtime.debug_load_ir(file);
     match model_collection {
-        Ok(model_collection) => print_ir::print(&model_collection, print_debug),
-        Err(error) => {
-            let (model_collection, error_map) = *error;
-            let errors = convert_error::loader::convert_map(&error_map);
+        Ok(model_collection) => print_ir::print(model_collection, print_debug),
+        Err(errors) => {
+            todo!("display partial ir");
+            // let (model_collection, error_map) = *error;
             for error in errors {
                 print_error::print(&error, print_debug);
                 eprintln!();
             }
 
-            if display_partial {
-                print_ir::print(&model_collection, print_debug);
-            }
+            // if display_partial {
+            // print_ir::print(&model_collection, print_debug);
+            // }
         }
     }
 }
