@@ -67,7 +67,7 @@ impl IrCache {
         self.get_errors(path).is_some()
     }
 
-    pub fn ir_collection(&self) -> &IndexMap<PathBuf, ir::Model> {
+    pub const fn ir_collection(&self) -> &IndexMap<PathBuf, ir::Model> {
         &self.ir_collection
     }
 }

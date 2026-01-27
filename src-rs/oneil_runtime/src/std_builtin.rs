@@ -53,15 +53,15 @@ struct StdBuiltinValue {
 }
 
 impl StdBuiltinValue {
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         self.name
     }
 
-    pub fn description(&self) -> &str {
+    pub const fn description(&self) -> &str {
         self.description
     }
 
-    pub fn value(&self) -> &Value {
+    pub const fn value(&self) -> &Value {
         &self.value
     }
 }
@@ -90,15 +90,15 @@ struct StdBuiltinPrefix {
 }
 
 impl StdBuiltinPrefix {
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         self.name
     }
 
-    pub fn value(&self) -> f64 {
+    pub const fn value(&self) -> f64 {
         self.value
     }
 
-    pub fn description(&self) -> &str {
+    pub const fn description(&self) -> &str {
         self.description
     }
 }
@@ -217,11 +217,11 @@ struct StdBuiltinUnit {
 }
 
 impl StdBuiltinUnit {
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         self.name
     }
 
-    pub fn aliases(&self) -> &IndexMap<&'static str, Unit> {
+    pub const fn aliases(&self) -> &IndexMap<&'static str, Unit> {
         &self.aliases
     }
 }

@@ -32,6 +32,10 @@ impl AsOneilError for PythonError {
 
 use std::path::PathBuf;
 
+/// Runtime for the Oneil programming language.
+///
+/// The runtime manages caches for source files, ASTs, and IR, and provides
+/// methods to load and process Oneil models.
 pub struct Runtime {
     builtins: StdBuiltins,
     source_cache: SourceCache,
@@ -39,7 +43,14 @@ pub struct Runtime {
     ir_cache: IrCache,
 }
 
+impl Default for Runtime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Runtime {
+    /// Creates a new runtime instance with empty caches.
     pub fn new() -> Self {
         Self {
             builtins: StdBuiltins::new(),
@@ -49,6 +60,10 @@ impl Runtime {
         }
     }
 
+    /// Loads the AST for a model for debugging purposes.
+    ///
+    /// This method loads and parses a Oneil file, returning the AST node
+    /// or a list of parsing errors.
     pub fn debug_load_ast(
         &mut self,
         path: impl AsRef<Path>,
@@ -56,6 +71,10 @@ impl Runtime {
         self.load_ast(&path)
     }
 
+    /// Loads the IR for a model for debugging purposes.
+    ///
+    /// This method loads, parses, and resolves a Oneil file, returning the IR
+    /// model collection or a list of errors.
     pub fn debug_load_ir(
         &mut self,
         path: impl AsRef<Path>,
