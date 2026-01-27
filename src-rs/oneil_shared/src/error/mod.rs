@@ -28,6 +28,8 @@ pub struct OneilError {
     context: Vec<Context>,
     /// Optional context information with source location
     context_with_source: Vec<(Context, ErrorLocation)>,
+    /// Whether the error should be shown to the user
+    should_show_to_user: bool,
 }
 
 impl OneilError {
@@ -68,6 +70,7 @@ impl OneilError {
         let location = None;
         let context = error.context();
         let context_with_source = vec![];
+        let should_show_to_user = error.should_show_to_user();
 
         Self {
             path,
@@ -75,6 +78,7 @@ impl OneilError {
             location,
             context,
             context_with_source,
+            should_show_to_user,
         }
     }
 
@@ -141,12 +145,15 @@ impl OneilError {
             }
         }
 
+        let should_show_to_user = error.should_show_to_user();
+
         Self {
             path,
             message,
             location,
             context,
             context_with_source,
+            should_show_to_user,
         }
     }
 
@@ -226,8 +233,8 @@ impl OneilError {
     ///
     /// Returns a reference to the error message string.
     #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
+    pub const fn message(&self) -> &str {
+        self.message.as_str()
     }
 
     /// Returns the optional source location information
@@ -246,8 +253,8 @@ impl OneilError {
     ///
     /// Returns a reference to the context information.
     #[must_use]
-    pub fn context(&self) -> &[Context] {
-        &self.context
+    pub const fn context(&self) -> &[Context] {
+        self.context.as_slice()
     }
 
     /// Returns the optional context information with source location
@@ -256,7 +263,17 @@ impl OneilError {
     ///
     /// Returns a reference to the context information with source location.
     #[must_use]
-    pub fn context_with_source(&self) -> &[(Context, ErrorLocation)] {
-        &self.context_with_source
+    pub const fn context_with_source(&self) -> &[(Context, ErrorLocation)] {
+        self.context_with_source.as_slice()
+    }
+
+    /// Returns whether the error should be shown to the user
+    ///
+    /// # Returns
+    ///
+    /// Returns a boolean indicating whether the error should be shown to the user.
+    #[must_use]
+    pub const fn should_show_to_user(&self) -> bool {
+        self.should_show_to_user
     }
 }
