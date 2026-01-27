@@ -119,8 +119,9 @@ impl Runtime {
     pub fn debug_load_ir(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<&debug::ir::Model, Vec<OneilError>> {
-        self.load_ir(path)
+    ) -> Result<&debug::ir::ModelCollection, Vec<OneilError>> {
+        let _model = self.load_ir(path)?;
+        Ok(self.ir_cache.get_model_collection())
     }
 
     /// Loads the IR for a model, caching the result and reusing other caches.

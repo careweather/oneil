@@ -49,4 +49,8 @@ impl IrCache {
     pub fn contains_model(&self, path: &PathBuf) -> bool {
         self.get(path).is_some()
     }
+
+    pub fn get_model_collection(&self) -> &ir::ModelCollection {
+        &self.ir_collection
+    }
 }

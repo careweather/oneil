@@ -600,6 +600,7 @@ dependencies = [
  "oneil_model_resolver",
  "oneil_parser",
  "oneil_runner",
+ "oneil_runtime",
  "oneil_shared",
  "owo-colors",
 ]
