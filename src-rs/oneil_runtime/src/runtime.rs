@@ -78,7 +78,7 @@ impl Runtime {
     pub fn debug_load_ir(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<&IndexMap<PathBuf, ir::Model>, Vec<OneilError>> {
+    ) -> Result<&IndexMap<debug::ir::ModelPath, debug::ir::Model>, Vec<OneilError>> {
         let _model = self.load_ir(path)?;
         Ok(self.ir_cache.ir_collection())
     }
@@ -96,13 +96,12 @@ impl Runtime {
     ///
     /// Returns errors if loading, parsing, or resolution fails.
     fn load_ir(&mut self, path: impl AsRef<Path>) -> Result<&ir::Model, Vec<OneilError>> {
-        let path = path.as_ref();
-        let path_buf = path.to_path_buf();
+        let path = ir::ModelPath::new(path);
 
         // Check if IR is already cached - use `contains_model` to avoid borrow issues
-        if self.ir_cache.contains_result(&path_buf) {
+        if self.ir_cache.contains_result(&path) {
             // Now we can safely get it since we know it exists
-            let cached_result = self.ir_cache.get_result(&path_buf).expect("should exist");
+            let cached_result = self.ir_cache.get_result(&path).expect("should exist");
             match cached_result {
                 Ok(ir) => return Ok(ir),
                 Err(errors) => return Err(errors.to_vec()),
@@ -112,12 +111,12 @@ impl Runtime {
         // Use model resolver to convert AST to IR
         // TODO: think about how to get rid of this clone
         let model_collection_result =
-            oneil_model_resolver::load_model(path, &self.builtins.clone(), self);
+            oneil_model_resolver::load_model(&path, &self.builtins.clone(), self);
 
         match model_collection_result {
             Ok(model_collection) => {
                 self.ir_cache.insert_ir(*model_collection);
-                let ir = self.ir_cache.get_result(&path_buf).expect("should exist");
+                let ir = self.ir_cache.get_result(&path).expect("should exist");
                 ir.map_err(|errors| errors.to_vec())
             }
             Err(error) => {
@@ -126,7 +125,7 @@ impl Runtime {
                 self.ir_cache.insert_ir(partial_collection);
 
                 let errors = self.convert_ir_errors(error_map);
-                let errors = self.ir_cache.insert_errors(path_buf, errors);
+                let errors = self.ir_cache.insert_errors(path, errors);
                 let errors = errors.to_vec();
 
                 Err(errors)
