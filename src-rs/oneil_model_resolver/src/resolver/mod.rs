@@ -11,8 +11,6 @@
 //! - Test resolution
 //!
 
-use std::borrow::Borrow;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -74,7 +72,7 @@ where
     };
 
     // split model ast into imports, use models, parameters, and tests
-    let (imports, model_imports, parameters, tests) = split_model_ast(model_ast.borrow());
+    let (imports, model_imports, parameters, tests) = split_model_ast(&model_ast);
 
     // validate imports
     let (python_imports, import_resolution_errors, builder) =

@@ -76,10 +76,9 @@ pub struct FileLoader;
 impl ModelFileLoader for FileLoader {
     type ParseError = LoadingError;
     type PythonError = DoesNotExistError;
-    type AstOutput = ast::ModelNode;
 
     /// Parses a Oneil source file into an AST
-    fn parse_ast(&mut self, path: impl AsRef<Path>) -> Result<Self::AstOutput, Self::ParseError> {
+    fn parse_ast(&mut self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
         let file_content = std::fs::read_to_string(path)?;
         let ast = parser::parse_model(&file_content, None)?;
         Ok(ast)

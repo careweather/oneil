@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_model_resolver as model_resolver;
-use oneil_parser::{self as parser, Config, error::ParserError};
+use oneil_parser::{self as parser, Config};
 use oneil_shared::error::{AsOneilError, OneilError};
 
 use crate::{
@@ -53,11 +53,7 @@ impl Runtime {
         &mut self,
         path: impl AsRef<Path>,
     ) -> Result<&debug::ast::ModelNode, Vec<OneilError>> {
-        self.load_ast(&path).map_err(|e| {
-            e.into_iter()
-                .map(|e| OneilError::from_error(&e, path.as_ref().to_path_buf()))
-                .collect()
-        })
+        self.load_ast(&path)
     }
 
     pub fn debug_load_ir(
@@ -85,9 +81,9 @@ impl Runtime {
         let path_buf = path.to_path_buf();
 
         // Check if IR is already cached - use `contains_model` to avoid borrow issues
-        if self.ir_cache.contains_model(&path_buf) {
+        if self.ir_cache.contains_result(&path_buf) {
             // Now we can safely get it since we know it exists
-            let cached_result = self.ir_cache.get(&path_buf).expect("should exist");
+            let cached_result = self.ir_cache.get_result(&path_buf).expect("should exist");
             match cached_result {
                 Ok(ir) => return Ok(ir),
                 Err(errors) => return Err(errors.to_vec()),
@@ -95,19 +91,22 @@ impl Runtime {
         }
 
         // Use model resolver to convert AST to IR
+        // TODO: think about how to get rid of this clone
         let model_collection_result =
-            oneil_model_resolver::load_model(path, &self.builtins, &mut *self);
+            oneil_model_resolver::load_model(path, &self.builtins.clone(), self);
 
         match model_collection_result {
             Ok(model_collection) => {
                 self.ir_cache.insert_ir(*model_collection);
-                let ir = self.ir_cache.get(&path_buf).expect("should exist");
+                let ir = self.ir_cache.get_result(&path_buf).expect("should exist");
                 ir.map_err(|errors| errors.to_vec())
             }
             Err(error) => {
-                let (_partial_collection, error_map) = *error;
-                let errors = self.convert_ir_errors(error_map);
+                let (partial_collection, error_map) = *error;
 
+                self.ir_cache.insert_ir(partial_collection);
+
+                let errors = self.convert_ir_errors(error_map);
                 let errors = self.ir_cache.insert_errors(path_buf, errors);
                 let errors = errors.to_vec();
 
@@ -146,7 +145,7 @@ impl Runtime {
             let model_path_buf = model_path.as_ref().to_path_buf();
             match load_error {
                 oneil_model_resolver::error::LoadError::ParseError(parse_errors) => {
-                    errors.extend(parse_errors.into_iter().cloned());
+                    errors.extend(parse_errors.iter().cloned());
                 }
                 oneil_model_resolver::error::LoadError::ResolutionErrors(resolution_errors) => {
                     // Convert resolution errors to OneilErrors
@@ -271,17 +270,13 @@ impl Runtime {
 impl model_resolver::FileLoader for Runtime {
     type ParseError = Vec<OneilError>;
     type PythonError = PythonError;
-    type AstOutput<'a> = &'a ast::ModelNode;
 
     /// Parses a Oneil file into an AST using the cached source and AST.
     ///
     /// This method reuses the existing source and AST caches to avoid
     /// redundant file I/O and parsing operations. If the AST is not cached,
     /// it will parse the file (but won't cache it since this is a read-only operation).
-    fn parse_ast(
-        &mut self,
-        path: impl AsRef<Path>,
-    ) -> Result<Self::AstOutput<'_>, Self::ParseError> {
+    fn parse_ast(&mut self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError> {
         let path = path.as_ref();
         let path_buf = path.to_path_buf();
 
@@ -289,7 +284,7 @@ impl model_resolver::FileLoader for Runtime {
         if let Some(cached_result) = self.ast_cache.get_result(&path_buf) {
             match cached_result {
                 Ok(ast) => {
-                    return Ok(ast);
+                    return Ok(ast.clone());
                 }
                 Err(errors) => {
                     return Err(errors.to_vec());
@@ -299,7 +294,7 @@ impl model_resolver::FileLoader for Runtime {
 
         let ast = self.load_ast(path)?;
 
-        Ok(ast)
+        Ok(ast.clone())
     }
 
     /// Validates a Python import by checking if the file exists.
