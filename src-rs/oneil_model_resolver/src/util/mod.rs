@@ -1,6 +1,6 @@
 //! Utility types and traits for the Oneil model loader.
 
-use std::{borrow::Borrow, path::Path};
+use std::path::Path;
 
 use indexmap::IndexMap;
 
@@ -30,14 +30,18 @@ pub trait FileLoader {
     type ParseError: std::fmt::Debug;
     /// The error type returned when Python import validation fails.
     type PythonError: std::fmt::Debug;
-    /// The output type of the AST.
-    type AstOutput: Borrow<ast::ModelNode>;
 
     /// Parses a Oneil file into an AST.
     ///
     /// This method should read the file at the given path and parse it into a Oneil AST.
     /// The implementation is responsible for handling file I/O, syntax parsing, and
     /// any other parsing-related tasks.
+    ///
+    /// NOTE: in the future, this should return `&ast::ModelNode` instead of `ast::ModelNode`.
+    ///       For now, this doesn't work because of lifetime issues, but it should be possible
+    ///       once the Polonius borrow checker is stable. See
+    ///       <https://docs.rs/polonius-the-crab/latest/polonius_the_crab/#rationale-limitations-of-the-nll-borrow-checker>
+    ///       for more details.
     ///
     /// # Arguments
     ///
@@ -51,7 +55,7 @@ pub trait FileLoader {
     ///
     /// Returns `Err(Self::ParseError)` if the file cannot be read, parsed, or if any other
     /// parsing-related error occurs.
-    fn parse_ast(&mut self, path: impl AsRef<Path>) -> Result<Self::AstOutput, Self::ParseError>;
+    fn parse_ast(&mut self, path: impl AsRef<Path>) -> Result<ast::ModelNode, Self::ParseError>;
 
     /// Validates a Python import.
     ///

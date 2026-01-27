@@ -12,6 +12,7 @@ use oneil_eval::{
     value::{Dimension, DimensionMap, DisplayUnit, Number, Unit, Value},
 };
 
+#[derive(Debug, Clone)]
 pub struct StdBuiltins {
     values: Vec<StdBuiltinValue>,
     functions: Vec<StdBuiltinFunctionInfo>,
@@ -44,6 +45,7 @@ impl BuiltinRef for StdBuiltins {
     }
 }
 
+#[derive(Debug, Clone)]
 struct StdBuiltinValue {
     name: &'static str,
     value: Value,
@@ -80,6 +82,7 @@ fn builtin_values_complete() -> impl Iterator<Item = StdBuiltinValue> {
     .into_iter()
 }
 
+#[derive(Debug, Clone)]
 struct StdBuiltinPrefix {
     name: &'static str,
     value: f64,
@@ -207,6 +210,7 @@ fn builtin_prefixes_complete() -> impl Iterator<Item = StdBuiltinPrefix> {
     .into_iter()
 }
 
+#[derive(Debug, Clone)]
 struct StdBuiltinUnit {
     name: &'static str,
     aliases: IndexMap<&'static str, Unit>,
@@ -804,6 +808,7 @@ fn builtin_units_complete() -> impl Iterator<Item = StdBuiltinUnit> {
 }
 
 /// Information about a builtin function.
+#[derive(Debug, Clone)]
 pub struct StdBuiltinFunctionInfo {
     name: &'static str,
     args: &'static [&'static str],
