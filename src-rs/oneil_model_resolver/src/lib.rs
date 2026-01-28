@@ -3,9 +3,8 @@
 
 use std::path::Path;
 
+use indexmap::IndexMap;
 use oneil_ir as ir;
-
-use crate::util::{Stack, builder::ModelCollectionBuilder};
 
 pub mod error;
 mod resolver;
@@ -14,60 +13,54 @@ mod util;
 #[cfg(test)]
 mod test;
 
-pub use crate::error::collection::ModelErrorMap;
-pub use crate::util::FileLoader;
-pub use crate::util::builtin_ref::BuiltinRef;
+pub use crate::error::{CircularDependencyError, ResolutionErrors};
+pub use crate::util::{
+    AstLoadingFailedError, ExternalResolutionContext, ModelResolutionResult,
+    PythonImportLoadingFailedError,
+};
 
-type LoadModelOk = Box<ir::ModelCollection>;
-type LoadModelErr<Ps, Py> = Box<(ir::ModelCollection, ModelErrorMap<Ps, Py>)>;
+use crate::util::ResolutionContext;
+
+/// Result of loading one or more models: resolved models and any per-model errors.
+#[derive(Debug)]
+pub struct LoadModelResult {
+    /// Resolved models by path.
+    pub models: IndexMap<ir::ModelPath, ir::Model>,
+    /// Per-model resolution errors (import, reference, submodel, parameter, test).
+    pub model_errors: IndexMap<ir::ModelPath, ResolutionErrors>,
+    /// Per-model circular dependency errors.
+    pub circular_dependency_errors: IndexMap<ir::ModelPath, Vec<CircularDependencyError>>,
+}
 
 /// Loads a single model and all its dependencies.
 ///
-/// This is the main entry point for loading a Oneil model. It loads the specified model
-/// and all of its dependencies, returning either a complete `ModelCollection` or a tuple
-/// containing a partial collection and any errors that occurred during loading.
-///
-/// # Errors
-///
-/// Returns an error if parsing fails, resolution errors occur, circular dependencies are detected, or files cannot be accessed.
-pub fn load_model<F>(
+/// Returns the resolved models, per-model resolution errors, and circular dependency errors.
+pub fn load_model<E>(
     model_path: impl AsRef<Path>,
-    builtin_ref: &impl BuiltinRef,
-    file_parser: &mut F,
-) -> Result<LoadModelOk, LoadModelErr<F::ParseError, F::PythonError>>
+    external_context: &mut E,
+) -> ModelResolutionResult
 where
-    F: FileLoader,
+    E: ExternalResolutionContext,
 {
-    load_model_list(&[model_path], builtin_ref, file_parser)
+    load_model_list(&[model_path], external_context)
 }
 
 /// Loads multiple models and all their dependencies.
 ///
-/// # Errors
-///
-/// Returns an error if parsing fails, resolution errors occur, circular dependencies are detected, or files cannot be accessed.
-pub fn load_model_list<F>(
+/// Returns the resolved models, per-model resolution errors, and circular dependency errors.
+pub fn load_model_list<E>(
     model_paths: &[impl AsRef<Path>],
-    builtin_ref: &impl BuiltinRef,
-    file_parser: &mut F,
-) -> Result<LoadModelOk, LoadModelErr<F::ParseError, F::PythonError>>
+    external_context: &mut E,
+) -> ModelResolutionResult
 where
-    F: FileLoader,
+    E: ExternalResolutionContext,
 {
-    let builder = ModelCollectionBuilder::new();
+    let mut resolution_context = ResolutionContext::new(external_context);
 
-    let builder = model_paths.iter().fold(builder, |builder, model_path| {
-        let model_path = ir::ModelPath::new(model_path.as_ref());
-        let mut load_stack = Stack::new();
+    for model_path in model_paths {
+        let model_path = ir::ModelPath::new(model_path);
+        resolver::load_model(&model_path, &mut resolution_context);
+    }
 
-        resolver::load_model(
-            model_path,
-            builder,
-            builtin_ref,
-            &mut load_stack,
-            file_parser,
-        )
-    });
-
-    builder.try_into().map(Box::new).map_err(Box::new)
+    resolution_context.into_result()
 }

@@ -52,7 +52,12 @@ pub fn eval_model<F: BuiltinFunction>(
     // Add submodels to the current model
     let submodels = model.get_submodels();
     for (submodel_name, submodel_import) in submodels {
-        context.add_submodel(submodel_name.as_str(), submodel_import.path());
+        let submodel_reference_path = model
+            .get_reference(submodel_import.reference_name())
+            .expect("submodel reference should be found")
+            .path();
+
+        context.add_submodel(submodel_name.as_str(), submodel_reference_path);
     }
 
     // Evaluate parameters

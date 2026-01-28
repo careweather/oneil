@@ -1,43 +1,29 @@
-use indexmap::IndexMap;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
 use crate::{
-    FileLoader, error::resolution::ImportResolutionError, util::builder::ModelCollectionBuilder,
+    ExternalResolutionContext, ResolutionContext, error::resolution::PythonImportResolutionError,
 };
 
-type ValidatedImports = IndexMap<ir::PythonPath, ir::PythonImport>;
-type ImportErrors = IndexMap<ir::PythonPath, ImportResolutionError>;
-
 /// Validates a list of Python import declarations for a given model.
-pub fn resolve_python_imports<F>(
+pub fn resolve_python_imports<E>(
     model_path: &ir::ModelPath,
-    mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
-    imports: Vec<&ast::ImportNode>,
-    file_loader: &F,
-) -> (
-    ValidatedImports,
-    ImportErrors,
-    ModelCollectionBuilder<F::ParseError, F::PythonError>,
-)
-where
-    F: FileLoader,
+    python_imports: Vec<&ast::ImportNode>,
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
 {
-    let mut python_imports: IndexMap<ir::PythonPath, ir::PythonImport> = IndexMap::new();
-    let mut import_resolution_errors = IndexMap::new();
-
-    for import in imports {
+    for import in python_imports {
         let python_path = model_path.get_sibling_path(import.path().as_str());
         let python_path = ir::PythonPath::new(python_path);
         let python_path_span = import.path().span();
 
         // check for duplicate imports
-        let original_import = python_imports.get(&python_path);
+        let original_import = resolution_context.get_python_import_from_active_model(&python_path);
         if let Some(original_import) = original_import {
-            import_resolution_errors.insert(
+            resolution_context.add_python_import_error_to_active_model(
                 python_path.clone(),
-                ImportResolutionError::duplicate_import(
+                PythonImportResolutionError::duplicate_import(
                     *original_import.import_path_span(),
                     python_path_span,
                     python_path,
@@ -47,25 +33,8 @@ where
             continue;
         }
 
-        let result = file_loader.validate_python_import(&python_path);
-        match result {
-            Ok(()) => {
-                python_imports.insert(
-                    python_path.clone(),
-                    ir::PythonImport::new(python_path, python_path_span),
-                );
-            }
-            Err(error) => {
-                builder.add_import_error(python_path.clone(), error);
-                import_resolution_errors.insert(
-                    python_path.clone(),
-                    ImportResolutionError::failed_validation(python_path_span, python_path),
-                );
-            }
-        }
+        resolution_context.load_python_import_to_active_model(&python_path, python_path_span);
     }
-
-    (python_imports, import_resolution_errors, builder)
 }
 
 #[cfg(test)]
@@ -74,452 +43,482 @@ mod tests {
 
     use super::*;
     use crate::test::{
-        TestPythonValidator,
-        construct::{self, test_ast},
+        external_context::TestExternalContext, resolution_context::ResolutionContextBuilder,
+        test_ast,
     };
 
-    #[test]
-    fn validate_imports_empty_list() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_all();
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports
-        let imports = vec![];
-
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, imports, &file_loader);
-
-        // check the imports
-        assert!(valid_imports.is_empty());
-
-        // check the errors
-        assert!(errors.is_empty());
+    fn python_path(s: &str) -> ir::PythonPath {
+        ir::PythonPath::new(PathBuf::from(s))
     }
 
     #[test]
-    fn validate_imports_single_valid_import() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_all();
+    fn resolve_python_imports_empty_list() {
+        // build the imports
+        let imports: Vec<&ast::ImportNode> = vec![];
         let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
 
-        // set up the imports
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        // run the resolution
+        resolve_python_imports(&model_path, imports, &mut resolution_context);
+
+        // check the imports
+        assert!(
+            resolution_context
+                .get_active_model_python_imports()
+                .is_empty()
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_python_import_errors()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn resolve_python_imports_single_valid_import() {
+        // build the imports
         let imports = [test_ast::ImportPythonNodeBuilder::build("my_python")];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context (external allows "my_python")
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new().with_python_imports_ok(["my_python"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
         // check the imports
-        assert_eq!(valid_imports.len(), 1);
-
-        let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        assert!(valid_imports.contains_key(&valid_path));
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&python_path("my_python")));
 
         // check the errors
-        assert!(errors.is_empty());
+        assert!(
+            resolution_context
+                .get_active_model_python_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
-    fn validate_imports_single_invalid_import() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_none();
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports
+    fn resolve_python_imports_single_invalid_import() {
+        // build the imports (external allows nothing)
         let imports = [test_ast::ImportPythonNodeBuilder::build("nonexistent")];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
         // check the imports
-        assert!(valid_imports.is_empty());
+        assert!(
+            resolution_context
+                .get_active_model_python_imports()
+                .is_empty()
+        );
 
         // check the errors
+        let errors = resolution_context.get_active_model_python_import_errors();
         assert_eq!(errors.len(), 1);
 
-        let error_path = ir::PythonPath::new(PathBuf::from("nonexistent"));
+        // check the invalid error
+        let error_path = python_path("nonexistent");
         let error = errors.get(&error_path).expect("error should be present");
-
-        let ImportResolutionError::FailedValidation {
-            ident_span: _,
+        let PythonImportResolutionError::FailedValidation {
             python_path: error_path_actual,
+            ..
         } = error
         else {
             panic!("error should be a failed validation error");
         };
-
         assert_eq!(error_path_actual, &error_path);
     }
 
     #[test]
-    fn validate_imports_mixed_valid_and_invalid() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_some(["my_python.py"]);
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports
+    fn resolve_python_imports_mixed_valid_and_invalid() {
+        // build the imports (external allows "my_python" only)
         let imports = [
             test_ast::ImportPythonNodeBuilder::build("my_python"),
             test_ast::ImportPythonNodeBuilder::build("nonexistent"),
         ];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new().with_python_imports_ok(["my_python"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
         // check the imports
-        assert_eq!(valid_imports.len(), 1);
-
-        let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        assert!(valid_imports.contains_key(&valid_path));
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&python_path("my_python")));
 
         // check the errors
+        let errors = resolution_context.get_active_model_python_import_errors();
         assert_eq!(errors.len(), 1);
 
-        let error_path = ir::PythonPath::new(PathBuf::from("nonexistent"));
+        // check the invalid error
+        let error_path = python_path("nonexistent");
         let error = errors.get(&error_path).expect("error should be present");
-
-        let ImportResolutionError::FailedValidation {
-            ident_span: _,
+        let PythonImportResolutionError::FailedValidation {
             python_path: error_path_actual,
+            ..
         } = error
         else {
             panic!("error should be a failed validation error");
         };
-
         assert_eq!(error_path_actual, &error_path);
     }
 
     #[test]
-    fn validate_imports_multiple_valid_imports() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_all();
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports
+    fn resolve_python_imports_multiple_valid_imports() {
+        // build the imports
         let imports = [
             test_ast::ImportPythonNodeBuilder::build("my_python1"),
             test_ast::ImportPythonNodeBuilder::build("my_python2"),
             test_ast::ImportPythonNodeBuilder::build("my_python3"),
         ];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new().with_python_imports_ok([
+            "my_python1",
+            "my_python2",
+            "my_python3",
+        ]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
         // check the imports
-        assert_eq!(valid_imports.len(), 3);
-        let valid_path1 = ir::PythonPath::new(PathBuf::from("my_python1"));
-        assert!(valid_imports.contains_key(&valid_path1));
-
-        let valid_path2 = ir::PythonPath::new(PathBuf::from("my_python2"));
-        assert!(valid_imports.contains_key(&valid_path2));
-
-        let valid_path3 = ir::PythonPath::new(PathBuf::from("my_python3"));
-        assert!(valid_imports.contains_key(&valid_path3));
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 3);
+        assert!(resolved.contains_key(&python_path("my_python1")));
+        assert!(resolved.contains_key(&python_path("my_python2")));
+        assert!(resolved.contains_key(&python_path("my_python3")));
 
         // check the errors
-        assert!(errors.is_empty());
+        assert!(
+            resolution_context
+                .get_active_model_python_import_errors()
+                .is_empty()
+        );
     }
 
+    #[expect(
+        clippy::similar_names,
+        reason = "the similar names should be clear from the test order"
+    )]
     #[test]
-    fn validate_imports_all_invalid() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_none();
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports
+    fn resolve_python_imports_all_invalid() {
+        // build the imports
         let imports = [
             test_ast::ImportPythonNodeBuilder::build("nonexistent1"),
             test_ast::ImportPythonNodeBuilder::build("nonexistent2"),
         ];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
         // check the imports
-        assert!(valid_imports.is_empty());
+        assert!(
+            resolution_context
+                .get_active_model_python_imports()
+                .is_empty()
+        );
 
         // check the errors
+        let errors = resolution_context.get_active_model_python_import_errors();
         assert_eq!(errors.len(), 2);
 
-        let error_path = ir::PythonPath::new(PathBuf::from("nonexistent1"));
-        let error = errors.get(&error_path).expect("error should be present");
-
-        let ImportResolutionError::FailedValidation {
-            ident_span: _,
-            python_path: error_path_actual,
-        } = error
+        // check the first invalid error
+        let error_path1 = python_path("nonexistent1");
+        let error1 = errors.get(&error_path1).expect("error should be present");
+        let PythonImportResolutionError::FailedValidation {
+            python_path: actual,
+            ..
+        } = error1
         else {
             panic!("error should be a failed validation error");
         };
+        assert_eq!(actual, &error_path1);
 
-        assert_eq!(error_path_actual, &error_path);
-
-        let error_path = ir::PythonPath::new(PathBuf::from("nonexistent2"));
-        let error = errors.get(&error_path).expect("error should be present");
-
-        let ImportResolutionError::FailedValidation {
-            ident_span: _,
-            python_path: error_path_actual,
-        } = error
+        // check the second invalid error
+        let error_path2 = python_path("nonexistent2");
+        let error2 = errors.get(&error_path2).expect("error should be present");
+        let PythonImportResolutionError::FailedValidation {
+            python_path: actual,
+            ..
+        } = error2
         else {
             panic!("error should be a failed validation error");
         };
-
-        assert_eq!(error_path_actual, &error_path);
+        assert_eq!(actual, &error_path2);
     }
 
     #[test]
-    fn validate_imports_builder_error_tracking() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_none();
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports
+    fn resolve_python_imports_error_tracking() {
+        // build the imports (invalid)
         let imports = [test_ast::ImportPythonNodeBuilder::build("nonexistent")];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (_valid_imports, _errors, builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        // check the builder
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
+
+        // check the context has the error for this path
+        let errors = resolution_context.get_active_model_python_import_errors();
+        assert!(errors.contains_key(&python_path("nonexistent")));
+    }
+
+    #[test]
+    fn resolve_python_imports_path_conversion() {
+        // build the imports (model in subdir, import "my_python" -> subdir/my_python)
+        let imports = [test_ast::ImportPythonNodeBuilder::build("my_python")];
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new(PathBuf::from("subdir/test_model"));
+
+        // build the context (allow subdir/my_python)
+        let active_path = ir::ModelPath::new(PathBuf::from("subdir/test_model"));
+        let mut external = TestExternalContext::new().with_python_imports_ok(["subdir/my_python"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
+
+        // check the imports
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&python_path("subdir/my_python")));
+
+        // check the errors
         assert!(
-            builder
-                .get_imports_with_errors()
-                .contains(&ir::PythonPath::new(PathBuf::from("nonexistent")))
+            resolution_context
+                .get_active_model_python_import_errors()
+                .is_empty()
         );
     }
 
     #[test]
-    fn validate_imports_path_conversion() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_some(["subdir/my_python.py"]);
-        let model_path = ir::ModelPath::new(PathBuf::from("subdir/test_model"));
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports
-        let imports = [test_ast::ImportPythonNodeBuilder::build("my_python")];
-        let import_refs = imports.iter().collect();
-
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
-
-        // check the imports
-        assert_eq!(valid_imports.len(), 1);
-
-        let valid_path = ir::PythonPath::new(PathBuf::from("subdir/my_python"));
-        assert!(valid_imports.contains_key(&valid_path));
-
-        // check the errors
-        assert!(errors.is_empty());
-    }
-
-    #[test]
-    fn validate_imports_duplicate_imports() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_all();
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports with different spans to simulate different positions in the file
+    fn resolve_python_imports_duplicate_imports() {
+        // build the imports (same path twice)
         let imports = [
-            // first import
             test_ast::ImportPythonNodeBuilder::build("my_python"),
-            // duplicate import
             test_ast::ImportPythonNodeBuilder::build("my_python"),
         ];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new().with_python_imports_ok(["my_python"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        // check the imports - only the first one should be valid
-        assert_eq!(valid_imports.len(), 1);
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
-        let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        assert!(valid_imports.contains_key(&valid_path));
+        // check the imports - only the first one is stored
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&python_path("my_python")));
 
-        // check the errors - should have one duplicate import error
+        // check the errors - one duplicate
+        let errors = resolution_context.get_active_model_python_import_errors();
         assert_eq!(errors.len(), 1);
 
-        let error_path = ir::PythonPath::new(PathBuf::from("my_python"));
+        // check the duplicate error
         let duplicate_error = errors
-            .get(&error_path)
-            .expect("duplicate error should be present");
-
-        let ImportResolutionError::DuplicateImport {
+            .get(&python_path("my_python"))
+            .expect("duplicate error");
+        let PythonImportResolutionError::DuplicateImport {
             python_path: duplicate_error_path,
             ..
         } = duplicate_error
         else {
             panic!("duplicate error should be a duplicate import error");
         };
-
-        assert_eq!(duplicate_error_path, &error_path);
+        assert_eq!(duplicate_error_path, &python_path("my_python"));
     }
 
     #[test]
-    fn validate_imports_multiple_duplicate_imports() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_all();
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports with multiple duplicates
+    fn resolve_python_imports_multiple_duplicate_imports() {
+        // build the imports (two paths, each duplicated)
         let imports = [
-            // first import
             test_ast::ImportPythonNodeBuilder::build("my_python"),
-            // different import
             test_ast::ImportPythonNodeBuilder::build("other_python"),
-            // duplicate of first
             test_ast::ImportPythonNodeBuilder::build("my_python"),
-            // duplicate of second
             test_ast::ImportPythonNodeBuilder::build("other_python"),
         ];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external =
+            TestExternalContext::new().with_python_imports_ok(["my_python", "other_python"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        // check the imports - only the first occurrence of each should be valid
-        assert_eq!(valid_imports.len(), 2);
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
-        let valid_path1 = ir::PythonPath::new(PathBuf::from("my_python"));
-        assert!(valid_imports.contains_key(&valid_path1));
+        // check the imports
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved.contains_key(&python_path("my_python")));
+        assert!(resolved.contains_key(&python_path("other_python")));
 
-        let valid_path2 = ir::PythonPath::new(PathBuf::from("other_python"));
-        assert!(valid_imports.contains_key(&valid_path2));
-
-        // check the errors - should have two duplicate import errors
+        // check the errors - two duplicate errors
+        let errors = resolution_context.get_active_model_python_import_errors();
         assert_eq!(errors.len(), 2);
 
-        let duplicate_error1 = errors
-            .get(&valid_path1)
-            .expect("duplicate error should be present");
-
-        let ImportResolutionError::DuplicateImport {
-            python_path: duplicate_error_path1,
-            ..
-        } = duplicate_error1
+        // check the first duplicate error
+        let dup1 = errors
+            .get(&python_path("my_python"))
+            .expect("duplicate error");
+        let PythonImportResolutionError::DuplicateImport {
+            python_path: path1, ..
+        } = dup1
         else {
-            panic!("duplicate error should be a duplicate import error");
+            panic!("duplicate error expected");
         };
+        assert_eq!(path1, &python_path("my_python"));
 
-        assert_eq!(duplicate_error_path1, &valid_path1);
-
-        let duplicate_error2 = errors
-            .get(&valid_path2)
-            .expect("duplicate error should be present");
-
-        let ImportResolutionError::DuplicateImport {
-            python_path: duplicate_error_path2,
-            ..
-        } = duplicate_error2
+        // check the second duplicate error
+        let dup2 = errors
+            .get(&python_path("other_python"))
+            .expect("duplicate error");
+        let PythonImportResolutionError::DuplicateImport {
+            python_path: path2, ..
+        } = dup2
         else {
-            panic!("duplicate error should be a duplicate import error");
+            panic!("duplicate error expected");
         };
-
-        assert_eq!(duplicate_error_path2, &valid_path2);
+        assert_eq!(path2, &python_path("other_python"));
     }
 
     #[test]
-    fn validate_imports_duplicate_imports_with_invalid_imports() {
-        // set up the context
-        let file_loader = TestPythonValidator::validate_some(["my_python.py"]);
-        let model_path = ir::ModelPath::new("test_model");
-        let builder = construct::empty_model_collection_builder();
-
-        // set up the imports with duplicates and invalid imports
+    fn resolve_python_imports_duplicate_imports_with_invalid_imports() {
+        // build the imports: valid, invalid, duplicate of valid, another invalid
         let imports = [
-            // valid import
             test_ast::ImportPythonNodeBuilder::build("my_python"),
-            // invalid import
             test_ast::ImportPythonNodeBuilder::build("nonexistent"),
-            // duplicate of first
             test_ast::ImportPythonNodeBuilder::build("my_python"),
-            // another invalid import
             test_ast::ImportPythonNodeBuilder::build("another_nonexistent"),
         ];
-        let import_refs = imports.iter().collect();
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = ir::ModelPath::new("test_model");
 
-        // validate the imports
-        let (valid_imports, errors, _builder) =
-            resolve_python_imports(&model_path, builder, import_refs, &file_loader);
+        // build the context (only "my_python" allowed)
+        let active_path = ir::ModelPath::new("test_model");
+        let mut external = TestExternalContext::new().with_python_imports_ok(["my_python"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        // check the imports - only the first valid import should be present
-        assert_eq!(valid_imports.len(), 1);
+        // run the resolution
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
 
-        let valid_path = ir::PythonPath::new(PathBuf::from("my_python"));
-        assert!(valid_imports.contains_key(&valid_path));
+        // check the imports - only the first valid
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&python_path("my_python")));
 
-        // check the errors - should have 3 errors: 1 duplicate + 2 invalid imports
+        // check the errors - 1 duplicate + 2 invalid
+        let errors = resolution_context.get_active_model_python_import_errors();
         assert_eq!(errors.len(), 3);
 
-        // Check duplicate import error
+        // check the duplicate error
         let duplicate_error = errors
-            .get(&valid_path)
-            .expect("duplicate error should be present");
-
-        let ImportResolutionError::DuplicateImport {
+            .get(&python_path("my_python"))
+            .expect("duplicate error");
+        let PythonImportResolutionError::DuplicateImport {
             python_path: duplicate_error_path,
             ..
         } = duplicate_error
         else {
-            panic!("duplicate error should be a duplicate import error");
+            panic!("duplicate error expected");
         };
+        assert_eq!(duplicate_error_path, &python_path("my_python"));
 
-        assert_eq!(duplicate_error_path, &valid_path);
-
-        // Check invalid import errors
-        let invalid_path1 = ir::PythonPath::new(PathBuf::from("nonexistent"));
-        let invalid_error1 = errors
-            .get(&invalid_path1)
-            .expect("invalid error should be present");
-
-        let ImportResolutionError::FailedValidation {
-            python_path: invalid_path1_actual,
-            ..
-        } = invalid_error1
-        else {
-            panic!("invalid error should be a failed validation error");
+        // check the first invalid error
+        let invalid1 = errors
+            .get(&python_path("nonexistent"))
+            .expect("invalid error");
+        let PythonImportResolutionError::FailedValidation { python_path: p, .. } = invalid1 else {
+            panic!("failed validation expected");
         };
+        assert_eq!(p, &python_path("nonexistent"));
 
-        assert_eq!(invalid_path1_actual, &invalid_path1);
-
-        let invalid_path2 = ir::PythonPath::new(PathBuf::from("another_nonexistent"));
-        let invalid_error2 = errors
-            .get(&invalid_path2)
-            .expect("invalid error should be present");
-
-        let ImportResolutionError::FailedValidation {
-            python_path: invalid_path2_actual,
-            ..
-        } = invalid_error2
-        else {
-            panic!("invalid error should be a failed validation error");
+        // check the second invalid error
+        let invalid2 = errors
+            .get(&python_path("another_nonexistent"))
+            .expect("invalid error");
+        let PythonImportResolutionError::FailedValidation { python_path: p, .. } = invalid2 else {
+            panic!("failed validation expected");
         };
-
-        assert_eq!(invalid_path2_actual, &invalid_path2);
+        assert_eq!(p, &python_path("another_nonexistent"));
     }
 }

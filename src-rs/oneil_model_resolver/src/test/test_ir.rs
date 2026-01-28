@@ -53,15 +53,25 @@ impl ModelBuilder {
         }
     }
 
-    pub fn with_submodel(mut self, submodel_name: &str, submodel_path: &str) -> Self {
+    pub fn with_submodel(mut self, submodel_name: &str, submodel_path: &ir::ModelPath) -> Self {
         let submodel_name = ir::SubmodelName::new(submodel_name.to_string());
         let submodel_name_span = unimportant_span();
-        let model_path = ir::ModelPath::new(submodel_path);
 
-        let submodel_import =
-            ir::SubmodelImport::new(submodel_name.clone(), submodel_name_span, model_path);
+        // the reference name is the same as the submodel name
+        let reference_name = ir::ReferenceName::new(submodel_name.to_string());
+        let reference_path = submodel_path.clone();
+
+        let submodel_import = ir::SubmodelImport::new(
+            submodel_name.clone(),
+            submodel_name_span,
+            reference_name.clone(),
+        );
+
+        let reference_import =
+            ir::ReferenceImport::new(reference_name.clone(), submodel_name_span, reference_path);
 
         self.submodels.insert(submodel_name, submodel_import);
+        self.references.insert(reference_name, reference_import);
         self
     }
 

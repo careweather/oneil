@@ -4,28 +4,27 @@ use oneil_ast as ast;
 use oneil_ir as ir;
 
 use crate::{
-    BuiltinRef,
+    ExternalResolutionContext, ResolutionContext,
     error::VariableResolutionError,
-    util::context::{
-        ParameterContext, ParameterContextResult, ReferenceContext, ReferenceContextResult,
-    },
+    util::{ParameterResult, ReferencePathResult},
 };
 
 /// Resolves a variable expression to its corresponding model expression.
-pub fn resolve_variable(
+pub fn resolve_variable<E>(
     variable: &ast::VariableNode,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, VariableResolutionError> {
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, VariableResolutionError>
+where
+    E: ExternalResolutionContext,
+{
     match &**variable {
         ast::Variable::Identifier(identifier) => {
             let var_identifier = ir::ParameterName::new(identifier.as_str().to_string());
             let variable_span = variable.span();
             let identifier_span = identifier.span();
 
-            match parameter_context.lookup_parameter(&var_identifier) {
-                ParameterContextResult::Found(_parameter) => {
+            match resolution_context.lookup_parameter_in_active_model(&var_identifier) {
+                ParameterResult::Found(_parameter) => {
                     let expr = ir::Expr::parameter_variable(
                         variable_span,
                         identifier_span,
@@ -33,12 +32,13 @@ pub fn resolve_variable(
                     );
                     Ok(expr)
                 }
-                ParameterContextResult::HasError => Err(
-                    VariableResolutionError::parameter_has_error(var_identifier, identifier_span),
-                ),
-                ParameterContextResult::NotFound => {
+                ParameterResult::HasError => Err(VariableResolutionError::parameter_has_error(
+                    var_identifier,
+                    identifier_span,
+                )),
+                ParameterResult::NotFound => {
                     let builtin_identifier = ir::Identifier::new(identifier.as_str().to_string());
-                    if builtin_ref.has_builtin_value(&builtin_identifier) {
+                    if resolution_context.has_builtin_value(&builtin_identifier) {
                         let expr = ir::Expr::builtin_variable(
                             variable_span,
                             identifier_span,
@@ -62,31 +62,31 @@ pub fn resolve_variable(
             let reference_name_span = reference_model.span();
             let variable_span = variable.span();
 
-            let (model, reference_path) = match reference_context.lookup_reference(&reference_name)
-            {
-                ReferenceContextResult::ReferenceHasResolutionError => {
-                    return Err(VariableResolutionError::reference_resolution_failed(
-                        reference_name,
-                        reference_name_span,
-                    ));
-                }
-                ReferenceContextResult::ReferenceNotFound => {
-                    return Err(VariableResolutionError::undefined_reference(
-                        reference_name,
-                        reference_name_span,
-                    ));
-                }
-                ReferenceContextResult::ModelHasResolutionError(reference_path) => {
-                    return Err(VariableResolutionError::model_has_error(
-                        reference_path.clone(),
-                        reference_name_span,
-                    ));
-                }
-                ReferenceContextResult::ModelNotFound(_reference_path) => {
-                    unreachable!("reference should have been visited already")
-                }
-                ReferenceContextResult::Found(model, reference_path) => (model, reference_path),
-            };
+            let (model, reference_path) =
+                match resolution_context.lookup_reference_path_in_active_model(&reference_name) {
+                    ReferencePathResult::ReferenceHasResolutionError => {
+                        return Err(VariableResolutionError::reference_resolution_failed(
+                            reference_name,
+                            reference_name_span,
+                        ));
+                    }
+                    ReferencePathResult::ReferenceNotFound => {
+                        return Err(VariableResolutionError::undefined_reference(
+                            reference_name,
+                            reference_name_span,
+                        ));
+                    }
+                    ReferencePathResult::ModelHasResolutionError(reference_path) => {
+                        return Err(VariableResolutionError::model_has_error(
+                            reference_path.clone(),
+                            reference_name_span,
+                        ));
+                    }
+                    ReferencePathResult::ModelNotFound(_reference_path) => {
+                        unreachable!("reference should have been visited already")
+                    }
+                    ReferencePathResult::Found(model, reference_path) => (model, reference_path),
+                };
 
             // ensure that the parameter is defined in the reference model
             let var_identifier = ir::ParameterName::new(parameter.as_str().to_string());
@@ -115,12 +115,13 @@ pub fn resolve_variable(
 #[cfg(test)]
 mod tests {
     use crate::test::{
-        TestBuiltinRef,
-        construct::{ParameterContextBuilder, ReferenceContextBuilder, test_ast, test_ir},
+        external_context::TestExternalContext, resolution_context::ResolutionContextBuilder,
+        test_ast, test_ir,
     };
 
     use super::*;
 
+    use crate::error::ModelImportResolutionError;
     use oneil_ir as ir;
 
     macro_rules! assert_var_is_builtin {
@@ -207,25 +208,19 @@ mod tests {
 
     #[test]
     fn resolve_builtin_variable() {
-        // create a local variable
+        // build the variable
         let variable = test_ast::identifier_variable_node("pi");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["pi"]);
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new().with_builtin_variables(["pi"]);
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let var = result.expect("variable should be resolved");
@@ -234,30 +229,24 @@ mod tests {
 
     #[test]
     fn resolve_parameter_variable() {
-        // create a parameter variable
+        // build the variable
         let variable = test_ast::identifier_variable_node("temperature");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["temperature"]);
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let params = [test_ir::ParameterBuilder::new()
+            .with_name_str("temperature")
+            .with_simple_number_value(42.0)
+            .build()];
+        let mut external = TestExternalContext::new();
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_parameters(params)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new().with_parameter_context([
-            test_ir::ParameterBuilder::new()
-                .with_name_str("temperature")
-                .with_simple_number_value(42.0)
-                .build(),
-        ]);
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let var = result.expect("variable should be resolved");
@@ -266,25 +255,19 @@ mod tests {
 
     #[test]
     fn resolve_undefined_parameter() {
-        // create a variable for undefined parameter
+        // build the variable
         let variable = test_ast::identifier_variable_node("undefined_param");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let Err(VariableResolutionError::UndefinedParameter {
@@ -305,26 +288,21 @@ mod tests {
 
     #[test]
     fn resolve_parameter_with_error() {
-        // create a variable for parameter with error
+        // build the variable
         let variable = test_ast::identifier_variable_node("error_param");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let parameter_errors = [ir::ParameterName::new("error_param".to_string())];
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_parameter_errors(parameter_errors)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new()
-            .with_parameter_error([ir::ParameterName::new("error_param".to_string())]);
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let Err(VariableResolutionError::ParameterHasError {
@@ -343,25 +321,19 @@ mod tests {
 
     #[test]
     fn resolve_undefined_reference() {
-        // create an accessor variable for undefined reference
+        // build the variable
         let variable = test_ast::model_parameter_variable_node("undefined_reference", "parameter");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let Err(VariableResolutionError::UndefinedReference {
@@ -380,26 +352,28 @@ mod tests {
 
     #[test]
     fn resolve_reference_with_error() {
-        // create an accessor variable for reference with error
+        // build the variable
         let variable = test_ast::model_parameter_variable_node("error_reference", "parameter");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let ref_name = ir::ReferenceName::new("error_reference".to_string());
+        let ref_errors = [(
+            ref_name.clone(),
+            ModelImportResolutionError::model_has_error(
+                ir::ModelPath::new("dummy"),
+                crate::test::unimportant_span(),
+            ),
+        )];
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_reference_errors(ref_errors)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new()
-            .with_reference_errors([ir::ReferenceName::new("error_reference".to_string())]);
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let Err(VariableResolutionError::ReferenceResolutionFailed {
@@ -410,43 +384,31 @@ mod tests {
             panic!("expected reference resolution failed, got {result:?}");
         };
 
-        assert_eq!(
-            identifier,
-            ir::ReferenceName::new("error_reference".to_string())
-        );
+        assert_eq!(identifier, ref_name);
     }
 
     #[test]
     fn resolve_nested_accessor() {
-        // create a model parameter variable: parameter.reference
+        // build the variable
         let variable = test_ast::model_parameter_variable_node("reference", "parameter");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
-
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
         let reference_path = ir::ModelPath::new("test_reference");
         let reference_name = test_ir::reference_name("reference");
         let reference_model = test_ir::ModelBuilder::new()
             .with_literal_number_parameter("parameter", 42.0)
             .build();
+        let references = [(reference_name, reference_path, reference_model)];
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_references(references)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new().with_reference_context([(
-            reference_name,
-            reference_path,
-            reference_model,
-        )]);
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let var = result.expect("variable should be resolved");
@@ -455,34 +417,24 @@ mod tests {
 
     #[test]
     fn resolve_undefined_parameter_in_reference() {
-        // create an accessor variable for undefined parameter in reference
-        // undefined_param.reference
+        // build the variable
         let variable = test_ast::model_parameter_variable_node("reference", "undefined_param");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
-
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
         let reference_path = ir::ModelPath::new("test_reference");
         let reference_name = test_ir::reference_name("reference");
         let reference_model = test_ir::empty_model();
+        let references = [(reference_name, reference_path.clone(), reference_model)];
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_references(references)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new().with_reference_context([(
-            reference_name,
-            reference_path.clone(),
-            reference_model,
-        )]);
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let Err(VariableResolutionError::UndefinedParameter {
@@ -503,33 +455,26 @@ mod tests {
 
     #[test]
     fn resolve_model_with_error() {
-        // create an model parameter variable for model with error
-        // parameter.reference
+        // build the variable
         let variable = test_ast::model_parameter_variable_node("reference", "parameter");
 
-        // create context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
-
-        // create submodel info
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
         let reference_path = ir::ModelPath::new("test_reference");
         let reference_name = test_ir::reference_name("reference");
         let reference_model = test_ir::empty_model();
+        let references = [(reference_name, reference_path.clone(), reference_model)];
+        let model_errors = [reference_path.clone()];
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_references(references)
+            .with_model_errors(model_errors)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new()
-            .with_reference_context([(reference_name, reference_path.clone(), reference_model)])
-            .with_model_error([reference_path.clone()]);
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
         // check the result
         let Err(VariableResolutionError::ModelHasError {
@@ -545,32 +490,26 @@ mod tests {
 
     #[test]
     fn parameter_takes_precedence_over_builtin() {
-        // create a variable that conflicts between builtin and parameter
+        // build the variable
         let variable = test_ast::identifier_variable_node("conflict");
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["conflict"]);
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new().with_builtin_variables(["conflict"]);
+        let params = [test_ir::ParameterBuilder::new()
+            .with_name_str("conflict")
+            .with_simple_number_value(42.0)
+            .build()];
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_parameters(params)
+            .with_external_context(&mut external)
+            .build();
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // run the variable resolution
+        let result = resolve_variable(&variable, &resolution_context);
 
-        let parameter_context_builder = ParameterContextBuilder::new().with_parameter_context([
-            test_ir::ParameterBuilder::new()
-                .with_name_str("conflict")
-                .with_simple_number_value(42.0)
-                .build(),
-        ]);
-        let parameter_context = parameter_context_builder.build();
-
-        // resolve the variable
-        let result = resolve_variable(
-            &variable,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
-
-        // check the result - parameter should take precedence
+        // check the result
         let var = result.expect("variable should be resolved");
         assert_var_is_parameter!(var, "conflict");
     }

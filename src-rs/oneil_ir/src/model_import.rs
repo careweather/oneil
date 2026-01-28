@@ -28,17 +28,18 @@ impl Deref for SubmodelName {
 pub struct SubmodelImport {
     name: SubmodelName,
     name_span: Span,
-    path: ModelPath,
+    /// the name of the reference that this submodel is associated with
+    reference_name: ReferenceName,
 }
 
 impl SubmodelImport {
     /// Creates a new submodel import with the given name and path.
     #[must_use]
-    pub const fn new(name: SubmodelName, name_span: Span, path: ModelPath) -> Self {
+    pub const fn new(name: SubmodelName, name_span: Span, reference_name: ReferenceName) -> Self {
         Self {
             name,
             name_span,
-            path,
+            reference_name,
         }
     }
 
@@ -56,8 +57,8 @@ impl SubmodelImport {
 
     /// Returns the path of the submodel.
     #[must_use]
-    pub const fn path(&self) -> &ModelPath {
-        &self.path
+    pub const fn reference_name(&self) -> &ReferenceName {
+        &self.reference_name
     }
 }
 

@@ -1,43 +1,32 @@
 //! Test resolution for the Oneil model loader
 
-use indexmap::IndexMap;
-
 use oneil_ast as ast;
 use oneil_ir as ir;
 
 use crate::{
-    BuiltinRef,
-    error::{self, VariableResolutionError},
+    ExternalResolutionContext, ResolutionContext,
+    error::{self},
     resolver::{
         resolve_expr::{get_expr_dependencies, resolve_expr},
         resolve_trace_level::resolve_trace_level,
     },
-    util::context::{ParameterContext, ReferenceContext},
 };
 
 /// Resolves tests from AST test declarations.
-pub fn resolve_tests(
+pub fn resolve_tests<E>(
     tests: Vec<&ast::TestNode>,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> (
-    IndexMap<ir::TestIndex, ir::Test>,
-    IndexMap<ir::TestIndex, Vec<VariableResolutionError>>,
-) {
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
+{
     let tests = tests.into_iter().enumerate().map(|(test_index, test)| {
         let test_index = ir::TestIndex::new(test_index);
         let test_span = test.span();
 
         let trace_level = resolve_trace_level(test.trace_level());
 
-        let test_expr = resolve_expr(
-            test.expr(),
-            builtin_ref,
-            reference_context,
-            parameter_context,
-        )
-        .map_err(|errors| (test_index, error::convert_errors(errors)))?;
+        let test_expr = resolve_expr(test.expr(), resolution_context)
+            .map_err(|errors| (test_index, error::convert_errors(errors)))?;
 
         let dependencies = get_expr_dependencies(&test_expr);
 
@@ -47,7 +36,17 @@ pub fn resolve_tests(
         ))
     });
 
-    error::split_ok_and_errors(tests)
+    let (resolved_tests, errors): (Vec<_>, _) = error::split_ok_and_errors(tests);
+
+    for (test_index, resolved_test) in resolved_tests {
+        resolution_context.add_test_to_active_model(test_index, resolved_test);
+    }
+
+    for (test_index, errors) in errors {
+        for error in errors {
+            resolution_context.add_test_error_to_active_model(test_index, error);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -55,8 +54,8 @@ mod tests {
     use crate::{
         error::VariableResolutionError,
         test::{
-            TestBuiltinRef,
-            construct::{ParameterContextBuilder, ReferenceContextBuilder, test_ast},
+            external_context::TestExternalContext, resolution_context::ResolutionContextBuilder,
+            test_ast,
         },
     };
 
@@ -66,77 +65,77 @@ mod tests {
 
     #[test]
     fn resolve_tests_empty() {
-        // create the tests
-        let tests = [];
-        let tests_refs = tests.iter().collect();
+        // build the tests
+        let tests: [ast::TestNode; 0] = [];
+        let tests_refs: Vec<&ast::TestNode> = tests.iter().collect();
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // run the test resolution
+        resolve_tests(tests_refs, &mut resolution_context);
 
         // check the errors
-        assert!(errors.is_empty());
+        let test_errors = resolution_context.get_active_model_test_errors();
+        assert!(
+            test_errors.is_empty(),
+            "expected no test errors, got {test_errors:?}"
+        );
 
         // check the tests
-        assert!(resolved_tests.is_empty());
+        assert!(resolution_context.get_active_model_tests().is_empty());
+
+        // check the errors
+        assert!(resolution_context.get_active_model_test_errors().is_empty());
     }
 
     #[test]
     fn resolve_tests_basic() {
-        // create the tests with various configurations
+        // build the tests
         let tests = [
             // > test: true
             test_ast::TestNodeBuilder::new()
                 .with_boolean_expr(true)
                 .build(),
         ];
-        let tests_refs = tests.iter().collect();
+        let tests_refs: Vec<&ast::TestNode> = tests.iter().collect();
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
-
-        // check the errors
-        assert!(errors.is_empty());
+        // run the test resolution
+        resolve_tests(tests_refs, &mut resolution_context);
 
         // check the resolved tests
+        let resolved_tests = resolution_context.get_active_model_tests();
         assert_eq!(resolved_tests.len(), 1);
 
         let test_0 = resolved_tests
             .get(&ir::TestIndex::new(0))
             .expect("test should exist");
         assert_eq!(test_0.trace_level(), ir::TraceLevel::None);
+
+        // check the errors
+        let test_errors = resolution_context.get_active_model_test_errors();
+        assert!(
+            test_errors.is_empty(),
+            "expected no test errors, got {test_errors:?}"
+        );
     }
 
     #[test]
     fn resolve_tests_with_debug_trace() {
-        // create the tests with debug trace level
+        // build the tests with debug trace level
         let tests = [
             // > ** test: true
             test_ast::TestNodeBuilder::new()
@@ -144,75 +143,67 @@ mod tests {
                 .with_debug_trace_level()
                 .build(),
         ];
-        let tests_refs = tests.iter().collect();
+        let tests_refs: Vec<&ast::TestNode> = tests.iter().collect();
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
-
-        // check the errors
-        assert!(errors.is_empty());
+        // run the test resolution
+        resolve_tests(tests_refs, &mut resolution_context);
 
         // check the resolved tests
+        let resolved_tests = resolution_context.get_active_model_tests();
         assert_eq!(resolved_tests.len(), 1);
         let test = resolved_tests
             .get(&ir::TestIndex::new(0))
             .expect("test should exist");
         assert_eq!(test.trace_level(), ir::TraceLevel::Debug);
+
+        // check the errors
+        let test_errors = resolution_context.get_active_model_test_errors();
+        assert!(test_errors.is_empty(), "expected no test errors");
     }
 
     #[test]
     fn resolve_tests_with_undefined_variable() {
-        // create the tests with undefined variable
+        // build the tests with undefined variable
         let tests = [
             // > test: undefined_var
             test_ast::TestNodeBuilder::new()
                 .with_variable_expr("undefined_var")
                 .build(),
         ];
-        let tests_refs = tests.iter().collect();
+        let tests_refs: Vec<&ast::TestNode> = tests.iter().collect();
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        // run the test resolution
+        resolve_tests(tests_refs, &mut resolution_context);
 
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // check the resolved tests
+        assert!(resolution_context.get_active_model_tests().is_empty());
 
         // check the errors
-        assert_eq!(errors.len(), 1);
+        let test_errors = resolution_context.get_active_model_test_errors();
+        assert_eq!(test_errors.len(), 1);
 
-        let test_errors = errors
+        let errors_for_test_0 = test_errors
             .get(&ir::TestIndex::new(0))
-            .expect("test errors should exist");
+            .expect("test 0 errors should exist");
+        assert_eq!(errors_for_test_0.len(), 1);
 
-        assert!(test_errors.len() == 1);
-
-        let error = &test_errors[0];
-
+        let error = &errors_for_test_0[0];
         let VariableResolutionError::UndefinedParameter {
             model_path,
             parameter_name,
@@ -227,14 +218,11 @@ mod tests {
             parameter_name,
             &ir::ParameterName::new("undefined_var".to_string())
         );
-
-        // check the resolved tests
-        assert!(resolved_tests.is_empty());
     }
 
     #[test]
     fn resolve_tests_mixed_success_and_error() {
-        // create the tests with mixed success and error cases
+        // build the tests with mixed success and error cases
         let tests = [
             // > test: true
             test_ast::TestNodeBuilder::new()
@@ -245,35 +233,37 @@ mod tests {
                 .with_variable_expr("undefined_var")
                 .build(),
         ];
-        let tests_refs = tests.iter().collect();
+        let tests_refs: Vec<&ast::TestNode> = tests.iter().collect();
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        // run the test resolution
+        resolve_tests(tests_refs, &mut resolution_context);
 
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the tests
-        let (resolved_tests, errors) = resolve_tests(
-            tests_refs,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        // check the resolved tests
+        let resolved_tests = resolution_context.get_active_model_tests();
+        assert_eq!(resolved_tests.len(), 1);
+        let test = resolved_tests
+            .get(&ir::TestIndex::new(0))
+            .expect("test should exist");
+        assert_eq!(test.trace_level(), ir::TraceLevel::None);
 
         // check the errors
-        assert_eq!(errors.len(), 1);
-        let test_errors = errors
+        let test_errors = resolution_context.get_active_model_test_errors();
+        assert_eq!(test_errors.len(), 1);
+
+        let errors_for_test_1 = test_errors
             .get(&ir::TestIndex::new(1))
-            .expect("test errors should exist");
+            .expect("test 1 errors should exist");
+        assert_eq!(errors_for_test_1.len(), 1);
 
-        assert!(test_errors.len() == 1);
-
-        let error = &test_errors[0];
-
+        let error = &errors_for_test_1[0];
         let VariableResolutionError::UndefinedParameter {
             model_path,
             parameter_name,
@@ -288,12 +278,5 @@ mod tests {
             parameter_name,
             &ir::ParameterName::new("undefined_var".to_string())
         );
-
-        // check the resolved tests
-        assert_eq!(resolved_tests.len(), 1);
-        let test = resolved_tests
-            .get(&ir::TestIndex::new(0))
-            .expect("test should exist");
-        assert_eq!(test.trace_level(), ir::TraceLevel::None);
     }
 }

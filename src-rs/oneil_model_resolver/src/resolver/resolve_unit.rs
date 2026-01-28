@@ -83,9 +83,10 @@ fn resolve_display_unit(unit: &ast::UnitExprNode) -> ir::DisplayCompositeUnit {
         ast::UnitExpr::Parenthesized { expr } => resolve_display_unit(expr),
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use crate::test::construct::test_ast;
+    use crate::test::test_ast;
 
     use super::*;
     use oneil_ast as ast;
