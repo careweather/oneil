@@ -10,6 +10,8 @@ import importlib
 from functools import partial
 import hashlib
 import pickle
+import json
+import time
 
 from . import bcolors
 from . import errors as err
@@ -19,26 +21,106 @@ from .errors import OneilError
 
 np.seterr(all='raise')
 
+# Cache directory name - can be version controlled and shared
+CACHE_DIR = "__oncache__"
+CACHE_INDEX_FILE = "index.json"
+CACHE_DATA_DIR = "data"
+CACHE_VERSION = 1
+
 
 class FunctionCache:
     """
-    Caches results of Python breakout functions to avoid re-running them
-    when inputs haven't changed.
+    Persistent file-based cache for Python breakout function results.
+    
+    Cache is stored in __oncache__/ directory which can be:
+    - Version controlled (committed to git)
+    - Shared with other users (works even without Python dependencies)
+    - Inspected (index.json shows what's cached in human-readable form)
     
     Cache invalidation occurs when:
-    1. The imported Python file(s) have changed (detected via content hash)
+    1. The Python source file has changed (detected via content hash)
     2. The input parameter values have changed
     
-    The cache persists across model reloads within the same REPL session.
+    Directory structure:
+        __oncache__/
+            index.json          # Human-readable index of cached functions
+            data/
+                {hash}.pkl      # Pickled result data
     """
     
-    def __init__(self):
-        # Maps (function_id, inputs_hash) -> result
-        self._cache = {}
-        # Maps module_name -> (file_path, content_hash)
+    def __init__(self, cache_dir=None):
+        self._cache_dir = cache_dir  # Set when model is loaded
+        self._index = {}  # Loaded from index.json
+        self._index_dirty = False
+        # In-memory cache for current session (avoids repeated disk reads)
+        self._memory_cache = {}
+        # Maps module_name -> (file_path, content_hash) for current session
         self._import_hashes = {}
-        # Maps function_id -> module_name (to find which imports a function came from)
+        # Maps function_id -> module_name
         self._function_modules = {}
+    
+    def set_cache_dir(self, model_dir):
+        """Set the cache directory based on the model's location."""
+        self._cache_dir = os.path.join(model_dir, CACHE_DIR)
+        self._load_index()
+    
+    def _ensure_cache_dirs(self):
+        """Create cache directories if they don't exist."""
+        if not self._cache_dir:
+            return False
+        
+        data_dir = os.path.join(self._cache_dir, CACHE_DATA_DIR)
+        os.makedirs(data_dir, exist_ok=True)
+        return True
+    
+    def _index_path(self):
+        """Get path to index.json."""
+        return os.path.join(self._cache_dir, CACHE_INDEX_FILE)
+    
+    def _data_path(self, data_hash):
+        """Get path to a data file."""
+        return os.path.join(self._cache_dir, CACHE_DATA_DIR, f"{data_hash}.pkl")
+    
+    def _load_index(self):
+        """Load the cache index from disk."""
+        if not self._cache_dir:
+            return
+        
+        index_path = self._index_path()
+        if os.path.exists(index_path):
+            try:
+                with open(index_path, 'r') as f:
+                    data = json.load(f)
+                    if data.get('version') == CACHE_VERSION:
+                        self._index = data.get('entries', {})
+                    else:
+                        # Version mismatch - clear cache
+                        self._index = {}
+            except (json.JSONDecodeError, IOError):
+                self._index = {}
+        else:
+            self._index = {}
+    
+    def _save_index(self):
+        """Save the cache index to disk."""
+        if not self._cache_dir or not self._index_dirty:
+            return
+        
+        if not self._ensure_cache_dirs():
+            return
+        
+        index_path = self._index_path()
+        data = {
+            'version': CACHE_VERSION,
+            'entries': self._index
+        }
+        
+        try:
+            with open(index_path, 'w') as f:
+                json.dump(data, f, indent=2, sort_keys=True)
+            self._index_dirty = False
+        except IOError:
+            pass
     
     def _compute_file_hash(self, filepath):
         """Compute SHA256 hash of a file's contents."""
@@ -54,14 +136,13 @@ class FunctionCache:
         Handles Parameter objects by extracting their min/max values.
         """
         try:
-            # Convert inputs to a hashable representation
             hashable_inputs = []
             for inp in inputs:
-                if hasattr(inp, 'min') and hasattr(inp, 'max'):
+                if hasattr(inp, 'min') and hasattr(inp, 'max') and hasattr(inp, 'units'):
                     # It's a Parameter - use its computed values
                     hashable_inputs.append((inp.min, inp.max, tuple(sorted(inp.units.items()))))
                 elif isinstance(inp, np.ndarray):
-                    hashable_inputs.append(inp.tobytes())
+                    hashable_inputs.append(('ndarray', inp.tobytes(), inp.shape, str(inp.dtype)))
                 elif isinstance(inp, (list, tuple)):
                     hashable_inputs.append(tuple(inp))
                 elif isinstance(inp, dict):
@@ -69,114 +150,272 @@ class FunctionCache:
                 else:
                     hashable_inputs.append(inp)
             
-            # Use pickle for robust serialization, then hash
             serialized = pickle.dumps(tuple(hashable_inputs), protocol=pickle.HIGHEST_PROTOCOL)
-            return hashlib.sha256(serialized).hexdigest()
+            return hashlib.sha256(serialized).hexdigest()[:16]  # Shorter hash for readability
         except Exception:
-            # If we can't hash the inputs, return None to skip caching
             return None
     
+    def _inputs_repr(self, inputs):
+        """Create a human-readable representation of inputs for the index."""
+        parts = []
+        for i, inp in enumerate(inputs):
+            if hasattr(inp, 'min') and hasattr(inp, 'max') and hasattr(inp, 'id'):
+                if inp.min == inp.max:
+                    parts.append(f"{inp.id}={inp.min}")
+                else:
+                    parts.append(f"{inp.id}={inp.min}|{inp.max}")
+            elif isinstance(inp, np.ndarray):
+                parts.append(f"array{inp.shape}")
+            else:
+                s = str(inp)
+                if len(s) > 20:
+                    s = s[:17] + "..."
+                parts.append(s)
+        return ", ".join(parts) if parts else "(no inputs)"
+    
     def _get_function_id(self, func):
-        """Get a unique identifier for a function based on its module and name."""
-        module = getattr(func, '__module__', None)
+        """Get a unique identifier for a function."""
+        module = getattr(func, '__module__', 'unknown')
         name = getattr(func, '__qualname__', getattr(func, '__name__', str(func)))
         return f"{module}.{name}"
     
+    def _get_cache_key(self, func_id, inputs_hash):
+        """Create a cache key for the index."""
+        return f"{func_id}|{inputs_hash}"
+    
     def register_import(self, module, filepath=None):
         """
-        Register an imported module and compute its content hash.
-        Returns True if the module is new or changed, False if unchanged.
+        Register an imported module and track its content hash.
+        Invalidates cached results if the source file changed.
+        Returns True if module is new/changed, False if unchanged.
         """
         module_name = module.__name__
         
-        # Find the file path if not provided
         if filepath is None:
             filepath = getattr(module, '__file__', None)
         
         if filepath is None:
-            # Can't track modules without files (built-ins)
             return True
         
         new_hash = self._compute_file_hash(filepath)
         
+        # Check if we have this module in our in-memory tracking
         if module_name in self._import_hashes:
             old_filepath, old_hash = self._import_hashes[module_name]
             if old_hash == new_hash and old_filepath == filepath:
-                return False  # Unchanged
-            else:
-                # Module changed - invalidate all cached results from this module
-                self._invalidate_module(module_name)
+                return False  # Unchanged this session
+        
+        # Module is new or changed - invalidate any cached results
+        self._invalidate_module_cache(module_name, new_hash, filepath)
         
         self._import_hashes[module_name] = (filepath, new_hash)
         
-        # Register all functions from this module
+        # Track functions from this module
         for name, obj in inspect.getmembers(module, inspect.isfunction):
             func_id = f"{module_name}.{name}"
             self._function_modules[func_id] = module_name
         
         return True
     
-    def _invalidate_module(self, module_name):
-        """Remove all cached results for functions from the given module."""
+    def _invalidate_module_cache(self, module_name, new_source_hash, filepath):
+        """Invalidate cached results for a module if its source changed."""
         keys_to_remove = []
-        for key in self._cache:
-            func_id, _ = key
-            if func_id in self._function_modules:
-                if self._function_modules[func_id] == module_name:
-                    keys_to_remove.append(key)
+        
+        for cache_key, entry in self._index.items():
+            if entry.get('module') == module_name:
+                # Check if source hash matches
+                if entry.get('source_hash') != new_source_hash:
+                    keys_to_remove.append(cache_key)
+                    # Also remove the data file
+                    data_file = entry.get('data_file')
+                    if data_file:
+                        data_path = self._data_path(data_file)
+                        try:
+                            os.remove(data_path)
+                        except OSError:
+                            pass
         
         for key in keys_to_remove:
-            del self._cache[key]
+            del self._index[key]
+            # Also remove from memory cache
+            if key in self._memory_cache:
+                del self._memory_cache[key]
+        
+        if keys_to_remove:
+            self._index_dirty = True
+            self._save_index()
     
     def get(self, func, inputs):
         """
         Try to get a cached result for the function with given inputs.
         Returns (True, result) if found, (False, None) if not.
         """
+        if not self._cache_dir:
+            return False, None
+        
         func_id = self._get_function_id(func)
         inputs_hash = self._compute_inputs_hash(inputs)
         
         if inputs_hash is None:
             return False, None
         
-        cache_key = (func_id, inputs_hash)
+        cache_key = self._get_cache_key(func_id, inputs_hash)
         
-        if cache_key in self._cache:
-            return True, self._cache[cache_key]
+        # Check memory cache first
+        if cache_key in self._memory_cache:
+            return True, self._memory_cache[cache_key]
+        
+        # Check disk cache
+        if cache_key in self._index:
+            entry = self._index[cache_key]
+            
+            # Verify source hash still matches
+            module_name = entry.get('module')
+            if module_name in self._import_hashes:
+                _, current_hash = self._import_hashes[module_name]
+                if entry.get('source_hash') != current_hash:
+                    # Source changed - invalidate this entry
+                    self._remove_entry(cache_key)
+                    return False, None
+            
+            # Load the result from disk
+            data_file = entry.get('data_file')
+            if data_file:
+                data_path = self._data_path(data_file)
+                try:
+                    with open(data_path, 'rb') as f:
+                        result = pickle.load(f)
+                    # Store in memory cache for future accesses
+                    self._memory_cache[cache_key] = result
+                    return True, result
+                except (IOError, pickle.UnpicklingError):
+                    # Data file corrupted or missing - remove entry
+                    self._remove_entry(cache_key)
         
         return False, None
     
+    def _remove_entry(self, cache_key):
+        """Remove a cache entry and its data file."""
+        if cache_key in self._index:
+            entry = self._index[cache_key]
+            data_file = entry.get('data_file')
+            if data_file:
+                try:
+                    os.remove(self._data_path(data_file))
+                except OSError:
+                    pass
+            del self._index[cache_key]
+            self._index_dirty = True
+        
+        if cache_key in self._memory_cache:
+            del self._memory_cache[cache_key]
+    
     def set(self, func, inputs, result):
-        """Store a result in the cache."""
+        """Store a result in the cache (both memory and disk)."""
+        if not self._cache_dir:
+            return
+        
+        if not self._ensure_cache_dirs():
+            return
+        
         func_id = self._get_function_id(func)
         inputs_hash = self._compute_inputs_hash(inputs)
         
         if inputs_hash is None:
-            return  # Can't cache if we can't hash inputs
+            return
         
-        cache_key = (func_id, inputs_hash)
-        self._cache[cache_key] = result
+        cache_key = self._get_cache_key(func_id, inputs_hash)
+        
+        # Get source hash for the function's module
+        module_name = self._function_modules.get(func_id)
+        source_hash = None
+        source_file = None
+        if module_name and module_name in self._import_hashes:
+            source_file, source_hash = self._import_hashes[module_name]
+        
+        # Generate a unique data file name
+        data_hash = hashlib.sha256(f"{cache_key}{time.time()}".encode()).hexdigest()[:12]
+        data_path = self._data_path(data_hash)
+        
+        # Write the result to disk
+        try:
+            with open(data_path, 'wb') as f:
+                pickle.dump(result, f, protocol=pickle.HIGHEST_PROTOCOL)
+        except (IOError, pickle.PicklingError) as e:
+            # Can't pickle the result - skip caching
+            return
+        
+        # Update the index
+        func_name = getattr(func, '__name__', str(func))
+        self._index[cache_key] = {
+            'function': func_name,
+            'module': module_name,
+            'source_hash': source_hash,
+            'source_file': os.path.basename(source_file) if source_file else None,
+            'inputs_hash': inputs_hash,
+            'inputs_repr': self._inputs_repr(inputs),
+            'data_file': data_hash,
+            'cached_at': time.strftime('%Y-%m-%dT%H:%M:%S'),
+        }
+        self._index_dirty = True
+        
+        # Store in memory cache
+        self._memory_cache[cache_key] = result
+        
+        # Save index to disk
+        self._save_index()
     
     def clear(self):
-        """Clear all cached results but keep import tracking."""
-        self._cache.clear()
+        """Clear all cached results (both memory and disk)."""
+        # Clear memory
+        self._memory_cache.clear()
+        
+        # Clear disk
+        if self._cache_dir and os.path.exists(self._cache_dir):
+            data_dir = os.path.join(self._cache_dir, CACHE_DATA_DIR)
+            if os.path.exists(data_dir):
+                for f in os.listdir(data_dir):
+                    try:
+                        os.remove(os.path.join(data_dir, f))
+                    except OSError:
+                        pass
+        
+        self._index.clear()
+        self._index_dirty = True
+        self._save_index()
     
     def clear_all(self):
         """Clear everything including import tracking."""
-        self._cache.clear()
+        self.clear()
         self._import_hashes.clear()
         self._function_modules.clear()
     
     def stats(self):
-        """Return cache statistics for debugging."""
+        """Return cache statistics."""
+        disk_entries = len(self._index)
+        memory_entries = len(self._memory_cache)
+        
+        # Calculate total cache size
+        cache_size = 0
+        if self._cache_dir:
+            data_dir = os.path.join(self._cache_dir, CACHE_DATA_DIR)
+            if os.path.exists(data_dir):
+                for f in os.listdir(data_dir):
+                    try:
+                        cache_size += os.path.getsize(os.path.join(data_dir, f))
+                    except OSError:
+                        pass
+        
         return {
-            'cached_results': len(self._cache),
+            'disk_entries': disk_entries,
+            'memory_entries': memory_entries,
             'tracked_imports': len(self._import_hashes),
-            'tracked_functions': len(self._function_modules),
+            'cache_size_bytes': cache_size,
+            'cache_dir': self._cache_dir,
         }
 
 
-# Global function cache instance - persists across model reloads within REPL session
+# Global function cache instance
 _function_cache = FunctionCache()
 
 def isfloat(num):
@@ -1810,6 +2049,10 @@ class Parameter:
 
 class Model:
     def __init__(self, model_filename, design_filename=None):
+        # Set up the function cache directory based on model location
+        model_dir = os.path.dirname(os.path.abspath(model_filename)) or os.getcwd()
+        _function_cache.set_cache_dir(model_dir)
+        
         self.note, self.parameters, self.submodels, self.tests, _ = parse_file(model_filename)
 
         self.name = model_filename.replace(".on", "")
@@ -2717,7 +2960,13 @@ class Model:
             # if self.parameters[parameter_ID].error:
             #     return self.parameters[parameter_ID].error
 
-def handler(model: Model, inpt: str):
+def handler(model: Model, inpt: str) -> Model:
+    """
+    Handle a command input and return the (possibly new) model.
+    
+    Commands like 'load' and 'reload' create a new model, so the returned
+    model should be used by the caller.
+    """
     args = inpt.strip().split(" ")
     cmd = args.pop(0)
     opt_list = [arg for arg in args if "=" in arg]
@@ -2749,10 +2998,10 @@ def handler(model: Model, inpt: str):
         elif cmd == "design":
             if any([arg for arg in args if "." in arg and ".on" not in arg]):
                 print("Only .on files are allowed.")
-                return
+                return model
             if model.name in [arg.strip(".on") for arg in args]:
                 print("Cannot overwrite model with itself.")
-                return
+                return model
             args = [arg if "." in arg else arg + ".on" for arg in args]
             model.overwrite(args)
         elif cmd == "test":
@@ -2766,7 +3015,7 @@ def handler(model: Model, inpt: str):
 
             for command in commands:
                 print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
-                handler(model, command)
+                model = handler(model, command)
 
         elif cmd == "reload":
             if model.design == "default":
@@ -2779,13 +3028,16 @@ def handler(model: Model, inpt: str):
                 print("Function cache cleared.")
             else:
                 stats = _function_cache.stats()
+                cache_kb = stats['cache_size_bytes'] / 1024
                 print(f"Function cache statistics:")
-                print(f"  Cached results: {stats['cached_results']}")
+                print(f"  Cache directory: {stats['cache_dir']}")
+                print(f"  Cached results (disk): {stats['disk_entries']}")
+                print(f"  Cached results (memory): {stats['memory_entries']}")
                 print(f"  Tracked imports: {stats['tracked_imports']}")
-                print(f"  Tracked functions: {stats['tracked_functions']}")
+                print(f"  Cache size: {cache_kb:.1f} KB")
         elif cmd == "help":
             print(help_text)
-            return
+            return model
         elif cmd == "units":
             print(un.print_all())
         elif cmd == "quit":
@@ -2831,10 +3083,12 @@ def handler(model: Model, inpt: str):
                 raise TypeError("Invalid result type: " + str(type(result)))
         else:
             print(f"Command {inpt} not found. Type 'help' for a list of commands.")
-            return
+            return model
     except OneilError as err:
         console.print_error(err)
-        return
+        return model
+    
+    return model
             
 
 help_text = """
@@ -2876,6 +3130,8 @@ Commands:
 
     cache [clear]
         Show function cache statistics. Use 'cache clear' to clear the cache.
+        Cache is stored in __oncache__/ directory and persists across sessions.
+        The cache can be version-controlled and shared with other users.
 
     help
         Print this help text.
@@ -2953,14 +3209,14 @@ loader_help = """"
 def interpreter(model):
     while True:
         if model.design == "default":
-            handler(model, input(f"({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
+            model = handler(model, input(f"({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
         else:
-            handler(model, input(f"({bcolors.ORANGE}{model.design}@{bcolors.ENDC}{bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
+            model = handler(model, input(f"({bcolors.ORANGE}{model.design}@{bcolors.ENDC}{bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
 
 def debugger(model):
     print("Enterring debug mode. Type 'quit' to exit.")
     while True:
-        handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
+        model = handler(model, input(f"{bcolors.FAIL}debugger{bcolors.ENDC} ({bcolors.OKBLUE}{model.name}{bcolors.ENDC}) >>> "))
 
 def parse_args(args: list[str]) -> tuple[str, list[str], list[str]]:
     # if there are no arguments, then the user needs to be prompted for details
@@ -3016,7 +3272,7 @@ def main(args=sys.argv[1:]):
             # Handle commands after the first as cli commands.
             for command in commands:
                 print("(" + bcolors.OKBLUE + model.name + bcolors.ENDC + ") >>> " + command)
-                handler(model, command)
+                model = handler(model, command)
 
             if len(args) > 2:
                 quit() 
