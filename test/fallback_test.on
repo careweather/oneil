@@ -1,0 +1,19 @@
+import fallback_test_funcs
+
+Input value: x = 10
+
+# Working function - no fallback needed
+Working result: y_work = working_function(x)
+
+# Broken function with fallback
+Broken with fallback: y_broken = broken_function(x) ? x * 2
+
+# Missing dependency with fallback expression
+Missing dep with fallback: y_missing = missing_dependency_function(x) ? x + 5
+
+# Broken function with min/max fallback using | operator
+Min max fallback: y_minmax = broken_function(x) ? x * 1 | x * 3
+
+# Broken function with function in fallback
+Func in fallback: y_func = broken_function(x) ? sqrt(x)
+

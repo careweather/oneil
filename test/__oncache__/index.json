@@ -1,24 +1,24 @@
 {
   "entries": {
-    "cache_test_funcs.expensive_calculation|2396c2db594a8d31": {
-      "cached_at": "2026-01-27T19:23:07",
-      "data_file": "52222081ec32",
-      "function": "expensive_calculation",
-      "inputs_hash": "2396c2db594a8d31",
-      "inputs_repr": "x=10",
-      "module": "cache_test_funcs",
-      "source_file": "cache_test_funcs.py",
-      "source_hash": "6da4412a2ef0f88f0b529c28bf8a8a4ba3b1509fe4c7336da292dbe0c07e7e25"
-    },
     "cache_test_funcs.expensive_calculation|3fa978005983e4f2": {
-      "cached_at": "2026-01-27T19:23:07",
-      "data_file": "85ecd5bd72e0",
+      "cached_at": "2026-01-27T20:36:46",
+      "data_file": "1b50a26e3879",
       "function": "expensive_calculation",
       "inputs_hash": "3fa978005983e4f2",
       "inputs_repr": "x=5",
       "module": "cache_test_funcs",
       "source_file": "cache_test_funcs.py",
       "source_hash": "6da4412a2ef0f88f0b529c28bf8a8a4ba3b1509fe4c7336da292dbe0c07e7e25"
+    },
+    "fallback_test_funcs.working_function|2396c2db594a8d31": {
+      "cached_at": "2026-01-27T20:36:46",
+      "data_file": "790bbe0057f2",
+      "function": "working_function",
+      "inputs_hash": "2396c2db594a8d31",
+      "inputs_repr": "x=10",
+      "module": "fallback_test_funcs",
+      "source_file": "fallback_test_funcs.py",
+      "source_hash": "734aa9c305e6e9e9eb0eee95d9a9af13c3330e0313286e0ff250ceef375e1362"
     }
   },
   "version": 1

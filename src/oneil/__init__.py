@@ -598,10 +598,10 @@ def parse_file(file_name):
                 last_line_blank = False
                 unit_fx = lambda x:x
 
-                id, equation, arguments, units, unit_fx, hrunits, pointer = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
+                id, equation, arguments, units, unit_fx, hrunits, pointer, fallback_param = parse_body(line.split(":"), line, i+1, file_name.replace(".on", ""), imports)
                 isdiscrete = True if not pointer and isinstance(equation, str) else False
                 options = [equation] if not pointer and isinstance(equation, str) else None
-                design_overrides[id] = Parameter(equation, units, id, hr_units=hrunits, model=file_name.replace(".on", ""), line_no=i+1, line=line, name=f"{id} from {file_name}", options=options, section=section, pointer=pointer)
+                design_overrides[id] = Parameter(equation, units, id, hr_units=hrunits, model=file_name.replace(".on", ""), line_no=i+1, line=line, name=f"{id} from {file_name}", options=options, section=section, pointer=pointer, fallback_param=fallback_param)
                 
                 prev_line='design'
             elif re.search(r"^[^\s]+[^:]*:\s*\w+\s*=[^:]+(:.*)?$", line):
@@ -642,7 +642,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     body = line.split(':')[1:]
 
     # Parse the body
-    id, equation, arguments, units, unit_fx, hrunits, pointer = parse_body(body, line, line_number, file_name, imports)
+    id, equation, arguments, units, unit_fx, hrunits, pointer, fallback_param = parse_body(body, line, line_number, file_name, imports)
 
     # Parse the preamble
     if '(' and ')' in preamble:
@@ -671,7 +671,7 @@ def parse_parameter(line, line_number, file_name, imports, section=""):
     if not name:
         raise SyntaxError(file_name, line_number, line, "Parse parameter: name cannot be empty.")
 
-    return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance, pointer=pointer), unit_fx
+    return Parameter(equation, units, id, hr_units=hrunits, model=file_name, line_no=line_number, line=line, name=name, options=options, arguments=arguments, trace=trace, section=section, performance=performance, pointer=pointer, fallback_param=fallback_param), unit_fx
 
 def parse_body(body, line, line_number, file_name, imports):
     
@@ -699,11 +699,50 @@ def parse_body(body, line, line_number, file_name, imports):
         unit_fx = lambda x:x
         hrunits=''
 
-    equation, arguments = parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer=pointer)
+    equation, arguments, fallback_param = parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer=pointer)
 
-    return id, equation, arguments, units, unit_fx, hrunits, pointer
+    return id, equation, arguments, units, unit_fx, hrunits, pointer, fallback_param
 
 def parse_equation(assignment, units, id, imports, file_name, line_number, unit_fx, pointer):
+    fallback_param = None
+    
+    # Check for fallback operator (?) - must be outside of function calls
+    # We need to find '?' that's not inside parentheses
+    if '?' in assignment:
+        paren_depth = 0
+        fallback_idx = None
+        for i, char in enumerate(assignment):
+            if char == '(':
+                paren_depth += 1
+            elif char == ')':
+                paren_depth -= 1
+            elif char == '?' and paren_depth == 0:
+                fallback_idx = i
+                break
+        
+        if fallback_idx is not None:
+            primary_assignment = assignment[:fallback_idx].strip()
+            fallback_assignment = assignment[fallback_idx + 1:].strip()
+            
+            # Parse the fallback as a complete Parameter using the same logic
+            fallback_eq, fallback_args = _parse_equation_inner(
+                fallback_assignment, units, id + ":fallback", imports, file_name, line_number, unit_fx, pointer
+            )
+            # Create a full Parameter for the fallback - it will be calculated using normal flow
+            fallback_param = Parameter(
+                fallback_eq, units, id + ":fallback",
+                model=file_name, line_no=line_number,
+                arguments=fallback_args, pointer=pointer
+            )
+            assignment = primary_assignment
+    
+    equation, arguments = _parse_equation_inner(assignment, units, id, imports, file_name, line_number, unit_fx, pointer)
+    
+    return equation, arguments, fallback_param
+
+
+def _parse_equation_inner(assignment, units, id, imports, file_name, line_number, unit_fx, pointer):
+    """Inner parsing logic for equations (without fallback handling)."""
     
     if assignment.strip()[0] == '{':
         equation, arguments = parse_piecewise(assignment, units, id, imports, file_name, line_number, unit_fx, pointer)
@@ -750,8 +789,9 @@ def parse_piecewise(assignment, units, id, imports, file_name, line_number, unit
     if '{' not in assignment: raise SyntaxError(file_name, line_number, assignment, "Missing { from piecewise definition.")
     assignment = assignment.strip().strip('{')
     if 'if' not in assignment: raise SyntaxError(file_name, line_number, assignment, "Missing condition (\"if\") from piecewise definition.")
-    equation, eargs = parse_equation(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
-    condition, cargs = parse_equation(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
+    # Use inner parsing for piecewise parts (no fallback support within pieces)
+    equation, eargs = _parse_equation_inner(assignment.split('if')[0].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
+    condition, cargs = _parse_equation_inner(assignment.split('if')[1].strip(), units, id, imports, file_name, line_number, unit_fx, pointer)
     return (Parameter(equation, units, id + ":eqpiece", pointer=pointer), Parameter(condition, {}, id + ":condpiece")), eargs + cargs
 
 def convert_functions(assignment, imports, file_name, line_number):
@@ -1322,7 +1362,7 @@ class Test:
 
 
 class Parameter:
-    def __init__(self, equation, units, id, hr_units="", model="", line_no=None, line="", name=None, options=None, performance=False, trace=False, section="", arguments=[], pointer=False):
+    def __init__(self, equation, units, id, hr_units="", model="", line_no=None, line="", name=None, options=None, performance=False, trace=False, section="", arguments=[], pointer=False, fallback_param=None):
         if trace:            
             import pdb
             breakpoint()
@@ -1346,6 +1386,16 @@ class Parameter:
         self.piecewise = True if isinstance(equation, list) else False
         self.minmax_equation = False
         self.hr_units = hr_units
+        self.used_fallback = False  # Track if fallback was used for this parameter
+        
+        # Fallback Parameter (used if primary callable fails)
+        # This is a complete Parameter that gets calculated using normal flow
+        self.fallback_param = fallback_param
+        # Include fallback args in main args so they're calculated
+        if self.fallback_param and self.fallback_param.args:
+            for arg in self.fallback_param.args:
+                if arg not in self.args:
+                    self.args.append(arg)
         
         # note
         self.notes = []
@@ -1556,6 +1606,7 @@ class Parameter:
             except OneilError as e:
                 raise e
             except Exception as e:
+                # Re-raise with context - fallback handling is done at Model level
                 raise ImportedFunctionError(self, e)
         else:
             try:
@@ -2799,6 +2850,10 @@ class Model:
                 else:
                     new_trail = [parameter.id]
 
+                # Initialize variables that may not be set in all branches
+                expression = None
+                calc_args = []
+                
                 # If parameter has subparameters (piecewise, minmax), calculate them, else, calculate this parameter directly.
                 if parameter.piecewise:
                     piece_equations = {}
@@ -2869,21 +2924,88 @@ class Model:
 
                 # Calculate the parameter
                 calculation = None
-                if parameter.piecewise:
-                    for piece in parameter.equation:
-                        if piece[1].min and piece[1].max:
-                            calculation = piece[0]
-                            break
-                    if calculation is None or calculation.min is None or calculation.max is None:
-                        raise ParameterError("No piecewise condition was met.", parameter)
-                elif parameter.minmax_equation:
-                    calculation = (parameter.equation[0].min, parameter.equation[1].max)
-                else:
-                    if parameter.pointer:
-                        calculation = (self.parameters | submodel_parameters | self.constants)[expression]
+                try:
+                    calculation = self._compute_parameter_value(
+                        parameter, expression, submodel_parameters, calc_args
+                    )
+                except (ImportedFunctionError, Exception) as e:
+                    # If primary calculation failed and we have a fallback, try it
+                    if parameter.fallback_param is not None:
+                        calculation = self._compute_fallback(parameter, submodel_parameters, e, new_trail)
                     else:
-                        calculation = parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)                    
+                        raise
                 parameter.assign(calculation)
+
+    def _compute_parameter_value(self, parameter, expression, submodel_parameters, calc_args):
+        """
+        Compute a single parameter's value. Extracted from _calculate_parameters_recursively
+        so it can be reused for fallback calculations.
+        """
+        if parameter.piecewise:
+            for piece in parameter.equation:
+                if piece[1].min and piece[1].max:
+                    calculation = piece[0]
+                    break
+            else:
+                calculation = None
+            if calculation is None or calculation.min is None or calculation.max is None:
+                raise ParameterError("No piecewise condition was met.", parameter)
+            return calculation
+        elif parameter.minmax_equation:
+            return (parameter.equation[0].min, parameter.equation[1].max)
+        else:
+            if parameter.pointer:
+                return (self.parameters | submodel_parameters | self.constants)[expression]
+            else:
+                return parameter.calculate(expression, globals(), self.parameters | submodel_parameters | self.constants, calc_args)
+
+    def _compute_fallback(self, parameter, submodel_parameters, original_error, trail):
+        """
+        Compute a fallback when primary calculation fails.
+        Uses the same recursive machinery as normal parameter calculation.
+        """
+        parameter.used_fallback = True
+        func_name = getattr(parameter.equation, '__name__', str(parameter.equation))
+        
+        # Print warning about using fallback
+        print(f"{bcolors.YELLOW}Warning: Python function '{func_name}' failed for parameter '{parameter.id}'.{bcolors.ENDC}")
+        if original_error:
+            print(f"{bcolors.YELLOW}  Error: {original_error}{bcolors.ENDC}")
+        print(f"{bcolors.YELLOW}  Using fallback calculation. Run the Python function for greater accuracy.{bcolors.ENDC}")
+        
+        fb = parameter.fallback_param
+        
+        try:
+            # Use the same recursive calculation machinery
+            # First, calculate any sub-parameters (for piecewise/minmax)
+            if fb.piecewise:
+                piece_equations = {}
+                piece_conditions = {}
+                for i, piece in enumerate(fb.equation):
+                    piece_equations.update({piece[0].id + str(i): piece[0]})
+                    piece_conditions.update({piece[1].id + str(i): piece[1]})
+                self._calculate_parameters_recursively(piece_conditions, trail)
+                true_equations = {}
+                for cond in piece_conditions:
+                    if piece_conditions[cond].min and piece_conditions[cond].max:
+                        true_equations.update({cond.replace("cond", "eq"): piece_equations[cond.replace("cond", "eq")]})
+                self._calculate_parameters_recursively(true_equations, trail)
+            elif fb.minmax_equation:
+                minmax_params = {}
+                for i, eq in enumerate(fb.equation):
+                    minmax_params.update({eq.id + str(i): eq})
+                self._calculate_parameters_recursively(minmax_params, trail)
+            
+            # Build expression for fallback (FUNCTIONS already substituted in Parameter.__init__)
+            expression = fb.equation
+            if isinstance(expression, str):
+                for old, new in OPERATOR_OVERRIDES.items():
+                    expression = expression.replace(old, new)
+            
+            # Compute the fallback value using the same logic
+            return self._compute_parameter_value(fb, expression, submodel_parameters, fb.args)
+        except Exception as e:
+            raise ParameterError(f"Both primary and fallback calculations failed. Fallback error: {e}", parameter)
 
     def retrieve_parameter_from_submodel(self, ID):
         parameter_ID, submodel_ID = ID.split(".")

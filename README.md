@@ -332,6 +332,32 @@ Temperature: T = temperature(D) :K
 
 Multiplying a python function by another parameter is not currently supported. Specify the factors as separate parameters and use another parameter to multiply them.
 
+#### Fallback Calculations
+
+Python functions may have dependencies that aren't always available, or may take a long time to run. You can specify a fallback calculation using the `?` operator. If the Python function fails (e.g., missing dependencies, runtime errors), Oneil will use the fallback and warn the user:
+
+``` { .on }
+Temperature: T = expensive_simulation(D) ? D * 0.5 + 273 :K
+```
+
+In this example, if `expensive_simulation` fails, Oneil will calculate `D * 0.5 + 273` instead and display a warning that the Python function should be run for greater accuracy.
+
+This is particularly useful for:
+- Sharing models with users who may not have all Python dependencies installed
+- Providing quick approximations during iterative design
+- Graceful degradation when simulations fail
+
+#### Function Caching
+
+Python function results are automatically cached to avoid re-running expensive calculations. The cache:
+
+- **Persists across REPL sessions** - Close and reopen Oneil, cached results remain
+- **Is version-controllable** - Stored in `__oncache__/` directory that can be committed to git
+- **Is shareable** - Other users can use cached results even without Python dependencies
+- **Auto-invalidates** when Python source files change or input values change
+
+Use the `cache` command in the CLI to view cache statistics or `cache clear` to clear it.
+
 ## Submodels
 
 A model can use parameters from a submodel:
