@@ -163,7 +163,11 @@ def parse_file(file_name):
                 module = line.replace("import", "").strip()
 
                 try:
-                    imports.append(importlib.import_module(module))
+                    # Reload module if already loaded to pick up changes
+                    if module in sys.modules:
+                        imports.append(importlib.reload(sys.modules[module]))
+                    else:
+                        imports.append(importlib.import_module(module))
                 except Exception as e:
                     raise ImportError(file_name, i+1, line, module + ".py", e)
 
