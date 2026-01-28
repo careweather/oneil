@@ -31,7 +31,6 @@ BASE_UNITS = {
     "$"         :({"$": 1}, 1, {"alt":["dollar"], "SI min": 1, "SI max": 1}),
     "cap"       :({"cap": 1}, 1, {"alt":[("capacity", "capacities")], "SI min": 1, "SI max": 1}),
     "cd"        :({"cd": 1}, 1, {"alt":["candela"]}),
-    "sr"        :({"sr": 1}, 1, {"alt":["steradian"]}),
     "mol"       :({"mol": 1}, 1, {"alt":["mole"]}),
 }
 
@@ -136,8 +135,8 @@ SI_UNITS = {
     "Ohm": ({"kg": 1, "m": 2, "s": -3, "A": -2}, 1, {"alt": ["Ohm"]}),
     "N": ({"kg": 1, "m": 1, "s": -2}, 1, {"alt": ["Newton"]}),
     "Gs": ({"kg": 1, "s": -2, "A": -1}, 0.0001, {"alt": ["Gauss"]}),
-    "lm": ({"cd": 1, "sr": 1}, 1, {"alt": ["lumen"]}),
-    "lx": ({"cd": 1, "sr": 1, "m": -2}, 1, {"alt": [("lux", "lux")]}),
+    "lm": ({"cd": 1}, 1, {"alt": ["lumen"]}),
+    "lx": ({"cd": 1, "m": -2}, 1, {"alt": [("lux", "lux")]}),
     "bps": ({"b": 1, "s": -1}, 1, {"alt": [("bit/second", "bits/second")], "SI min": 1}),
     "B": ({"b": 1}, 8, {"alt": ["byte"], "SI min": 1}),
     # "W/m^2": ({"kg": 1, "s": -3}, 1, {"alt": [("Watt/meter^2", "Watts/meter^2")]}),

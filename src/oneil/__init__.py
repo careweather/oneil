@@ -3140,6 +3140,9 @@ def handler(model: Model, inpt: str) -> Model:
                 model = handler(model, command)
 
         elif cmd == "reload":
+            if args and args[0] == "hard":
+                _function_cache.clear_all()
+                print("Cache cleared for hard reload.")
             if model.design == "default":
                 model = loader(model.name, [], capture_errors=False)
             else:
@@ -3245,10 +3248,11 @@ Commands:
     load model
         Load a new model (starting over from scratch).
 
-    reload
+    reload [hard]
         Reload the current model with all designs (starting over from scratch).
         Note: Python function results are cached and only re-run if the Python
         source files or input values have changed.
+        Use 'reload hard' to clear all caches and force re-running all functions.
 
     cache [clear]
         Show function cache statistics. Use 'cache clear' to clear the cache.
