@@ -5,72 +5,69 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    error::ModelImportResolutionError,
-    util::{
-        ReferenceMap, ReferenceResolutionErrors, SubmodelMap, SubmodelResolutionErrors,
-        builder::ModelImportsBuilder,
-        context::{ModelContext, ModelContextResult},
-    },
+    ExternalResolutionContext, ResolutionContext, error::ModelImportResolutionError,
+    util::ModelResult,
 };
 
 /// Resolves submodels and their associated tests from use model declarations.
-pub fn resolve_model_imports(
-    use_models: Vec<&ast::UseModelNode>,
+pub fn resolve_model_imports<E>(
     model_path: &ir::ModelPath,
-    context: &ModelContext<'_>,
-) -> (
-    SubmodelMap,
-    ReferenceMap,
-    SubmodelResolutionErrors,
-    ReferenceResolutionErrors,
-) {
-    let mut builder = ModelImportsBuilder::new();
-
-    for use_model in use_models {
-        let import_path = calc_import_path(model_path, use_model);
+    model_imports: Vec<&ast::UseModelNode>,
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
+{
+    for model_import in model_imports {
+        let import_path = calc_import_path(model_path, model_import);
 
         let (reference_name, reference_name_span) =
-            get_reference_name_and_span(use_model.model_info());
+            get_reference_name_and_span(model_import.model_info());
         let (submodel_name, submodel_name_span) =
-            get_submodel_name_and_span(use_model.model_info());
+            get_submodel_name_and_span(model_import.model_info());
 
-        let is_submodel = use_model.model_kind() == ast::ModelKind::Submodel;
+        let is_submodel = model_import.model_kind() == ast::ModelKind::Submodel;
 
         // check for duplicates
-        let maybe_reference_duplicate_error =
-            builder
-                .get_reference(&reference_name)
-                .map(|original_reference| {
-                    ModelImportResolutionError::duplicate_reference(
-                        reference_name.clone(),
-                        *original_reference.name_span(),
-                        reference_name_span,
-                    )
-                });
+        let maybe_reference_duplicate_error = resolution_context
+            .get_reference_from_active_model(&reference_name)
+            .map(|original_reference| {
+                ModelImportResolutionError::duplicate_reference(
+                    reference_name.clone(),
+                    *original_reference.name_span(),
+                    reference_name_span,
+                )
+            });
 
-        let maybe_submodel_duplicate_error =
-            builder
-                .get_submodel(&submodel_name)
-                .map(|original_submodel| {
-                    ModelImportResolutionError::duplicate_submodel(
-                        submodel_name.clone(),
-                        *original_submodel.name_span(),
-                        submodel_name_span,
-                    )
-                });
+        let maybe_submodel_duplicate_error = resolution_context
+            .get_submodel_from_active_model(&submodel_name)
+            .map(|original_submodel| {
+                ModelImportResolutionError::duplicate_submodel(
+                    submodel_name.clone(),
+                    *original_submodel.name_span(),
+                    submodel_name_span,
+                )
+            });
 
         let had_duplicate = maybe_reference_duplicate_error.is_some()
             || (is_submodel && maybe_submodel_duplicate_error.is_some());
 
         // handle duplicate references
         if let Some(reference_duplicate_error) = maybe_reference_duplicate_error {
-            builder
-                .add_reference_resolution_error(reference_name.clone(), reference_duplicate_error);
+            let submodel_name = (is_submodel).then(|| submodel_name.clone());
+            resolution_context.add_model_import_resolution_error_to_active_model(
+                reference_name.clone(),
+                submodel_name,
+                reference_duplicate_error,
+            );
         }
 
         // handle duplicate submodels if the use model is a submodel
-        if is_submodel && let Some(submodel_duplicate_error) = maybe_submodel_duplicate_error {
-            builder.add_submodel_resolution_error(submodel_name.clone(), submodel_duplicate_error);
+        if let Some(submodel_duplicate_error) = maybe_submodel_duplicate_error {
+            resolution_context.add_model_import_resolution_error_to_active_model(
+                reference_name.clone(),
+                Some(submodel_name.clone()),
+                submodel_duplicate_error,
+            );
         }
 
         // if there were any duplicates, stop processing this use model
@@ -79,10 +76,14 @@ pub fn resolve_model_imports(
         }
 
         // resolve the path for the use model
-        let subcomponents = use_model.model_info().subcomponents();
+        let subcomponents = model_import.model_info().subcomponents();
         let model_name_span = submodel_name_span;
-        let resolved_path =
-            resolve_model_path(import_path, model_name_span, subcomponents, context);
+        let resolved_path = resolve_model_path(
+            import_path,
+            model_name_span,
+            subcomponents,
+            resolution_context,
+        );
 
         // handle the error if there was one
         let resolved_path = match resolved_path {
@@ -90,43 +91,50 @@ pub fn resolve_model_imports(
             Err(error) => {
                 handle_resolution_error(
                     *error,
-                    use_model,
+                    model_import,
                     reference_name,
                     submodel_name,
                     submodel_name_span,
                     is_submodel,
-                    &mut builder,
+                    resolution_context,
                 );
 
                 continue;
             }
         };
 
-        // add the reference to the builder
-        builder.add_reference(reference_name, reference_name_span, resolved_path.clone());
-
-        // add the submodel to the builder if it's a submodel
+        // add the submodel to the active model if it's a submodel
         if is_submodel {
-            builder.add_submodel(submodel_name, submodel_name_span, resolved_path.clone());
+            resolution_context.add_submodel_to_active_model(
+                submodel_name,
+                submodel_name_span,
+                reference_name.clone(),
+            );
         }
 
-        let Some(submodel_list) = use_model.submodels() else {
-            // if we don't have any submodels, we're done
+        // add the reference to the active model
+        resolution_context.add_reference_to_active_model(
+            reference_name,
+            reference_name_span,
+            resolved_path.clone(),
+        );
+
+        let Some(submodel_list) = model_import.imported_submodels() else {
+            // if we don't have any imported submodels, we're done
             continue;
         };
 
-        resolve_sumbodels(&resolved_path, submodel_list, context, &mut builder);
+        resolve_sumbodels(&resolved_path, submodel_list, resolution_context);
     }
-
-    builder.into_submodels_and_references_and_resolution_errors()
 }
 
-fn resolve_sumbodels(
+fn resolve_sumbodels<E>(
     resolved_path: &ir::ModelPath,
     submodel_list: &oneil_ast::Node<oneil_ast::SubmodelList>,
-    context: &ModelContext<'_>,
-    builder: &mut ModelImportsBuilder,
-) {
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
+{
     for submodel_info in submodel_list.iter() {
         // get the subcomponents relative to the main model being imported
         let mut submodel_subcomponents = submodel_info.subcomponents().to_vec();
@@ -136,7 +144,8 @@ fn resolve_sumbodels(
         let (reference_name, reference_name_span) = get_reference_name_and_span(submodel_info);
 
         // check for duplicate references
-        let maybe_original_reference = builder.get_reference(&reference_name);
+        let maybe_original_reference =
+            resolution_context.get_reference_from_active_model(&reference_name);
         if let Some(original_reference) = maybe_original_reference {
             // if there is a duplicate, add the error and continue
             let error = ModelImportResolutionError::duplicate_reference(
@@ -145,7 +154,11 @@ fn resolve_sumbodels(
                 reference_name_span,
             );
 
-            builder.add_reference_resolution_error(reference_name.clone(), error);
+            resolution_context.add_model_import_resolution_error_to_active_model(
+                reference_name.clone(),
+                None,
+                error,
+            );
 
             continue;
         }
@@ -155,15 +168,23 @@ fn resolve_sumbodels(
             resolved_path.clone(),
             reference_name_span,
             &submodel_subcomponents,
-            context,
+            resolution_context,
         );
 
         match resolved_reference_path {
             Ok(resolved_reference_path) => {
-                builder.add_reference(reference_name, reference_name_span, resolved_reference_path);
+                resolution_context.add_reference_to_active_model(
+                    reference_name,
+                    reference_name_span,
+                    resolved_reference_path,
+                );
             }
             Err(error) => {
-                builder.add_reference_resolution_error(reference_name, *error);
+                resolution_context.add_model_import_resolution_error_to_active_model(
+                    reference_name,
+                    None,
+                    *error,
+                );
             }
         }
     }
@@ -183,11 +204,11 @@ fn get_reference_name_and_span(model_info: &ast::ModelInfo) -> (ir::ReferenceNam
     (name, span)
 }
 
-fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -> ir::ModelPath {
-    let use_model_relative_path = use_model.get_model_relative_path();
-    let use_model_path = model_path.get_sibling_path(&use_model_relative_path);
+fn calc_import_path(model_path: &ir::ModelPath, model_import: &ast::UseModelNode) -> ir::ModelPath {
+    let model_import_relative_path = model_import.get_model_relative_path();
+    let model_import_path = model_path.get_sibling_path(&model_import_relative_path);
 
-    ir::ModelPath::new(use_model_path)
+    ir::ModelPath::new(model_import_path)
 }
 
 /// Recursively resolves a model path by traversing subcomponents.
@@ -209,23 +230,26 @@ fn calc_import_path(model_path: &ir::ModelPath, use_model: &ast::UseModelNode) -
 /// This function assumes that models referenced in `model_info` have been
 /// properly loaded and validated. If this assumption is violated, the function
 /// will panic, indicating a bug in the model loading process.
-fn resolve_model_path(
+fn resolve_model_path<E>(
     model_path: ir::ModelPath,
     model_name_span: Span,
     model_subcomponents: &[ast::IdentifierNode],
-    context: &ModelContext<'_>,
-) -> Result<ir::ModelPath, Box<ModelImportResolutionError>> {
+    resolution_context: &mut ResolutionContext<'_, E>,
+) -> Result<ir::ModelPath, Box<ModelImportResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
     // if the model that we are trying to resolve has had an error, this
     // operation should fail
-    let model = match context.lookup_model(&model_path) {
-        ModelContextResult::Found(model) => model,
-        ModelContextResult::HasError => {
+    let model = match resolution_context.lookup_model(&model_path) {
+        ModelResult::Found(model) => model,
+        ModelResult::HasError => {
             return Err(Box::new(ModelImportResolutionError::model_has_error(
                 model_path,
                 model_name_span,
             )));
         }
-        ModelContextResult::NotFound => unreachable!("model should have been visited already"),
+        ModelResult::NotFound => unreachable!("model should have been visited already"),
     };
 
     // if there are no more subcomponents, we have resolved the model path
@@ -235,9 +259,8 @@ fn resolve_model_path(
 
     let submodel_name = ir::SubmodelName::new(model_subcomponents[0].as_str().to_string());
     let submodel_name_span = model_subcomponents[0].span();
-    let submodel_path = model
-        .get_submodel(&submodel_name)
-        .map(ir::SubmodelImport::path)
+    let submodel_reference = model
+        .get_submodel_reference(&submodel_name)
         .ok_or_else(|| {
             ModelImportResolutionError::undefined_submodel_in_submodel(
                 model_path,
@@ -250,37 +273,39 @@ fn resolve_model_path(
     let submodel_subcomponents = &model_subcomponents[1..];
 
     resolve_model_path(
-        submodel_path,
+        submodel_reference.path().clone(),
         submodel_name_span,
         submodel_subcomponents,
-        context,
+        resolution_context,
     )
 }
 
-fn handle_resolution_error(
+fn handle_resolution_error<E>(
     error: ModelImportResolutionError,
-    use_model: &oneil_ast::Node<oneil_ast::UseModel>,
+    model_import: &oneil_ast::Node<oneil_ast::UseModel>,
     reference_name: oneil_ir::ReferenceName,
     submodel_name: oneil_ir::SubmodelName,
     submodel_name_span: Span,
     is_submodel: bool,
-    builder: &mut ModelImportsBuilder,
-) {
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
+{
     if is_submodel {
-        builder.add_submodel_resolution_error(submodel_name.clone(), error.clone());
-
-        // It's currently necessary to add submodel errors to the reference
-        // resolution errors because otherwise, variable resolution will
-        // assume that the reference is not defined in the current model,
-        // not that the reference resolution failed
-        // TODO: figure out how to remove this duplication - maybe
-        // submodels point to references, since a reference will always
-        // exist for every submodel?
+        resolution_context.add_model_import_resolution_error_to_active_model(
+            reference_name,
+            Some(submodel_name.clone()),
+            error,
+        );
+    } else {
+        resolution_context.add_model_import_resolution_error_to_active_model(
+            reference_name,
+            None,
+            error,
+        );
     }
 
-    builder.add_reference_resolution_error(reference_name, error);
-
-    let Some(submodel_list) = use_model.submodels() else {
+    let Some(submodel_list) = model_import.imported_submodels() else {
         // if we don't have any submodels, we're done
         return;
     };
@@ -299,7 +324,11 @@ fn handle_resolution_error(
             reference_name_span,
         );
 
-        builder.add_reference_resolution_error(reference_name, error);
+        resolution_context.add_model_import_resolution_error_to_active_model(
+            reference_name.clone(),
+            Some(parent_model_name.clone()),
+            error,
+        );
     }
 }
 
@@ -307,44 +336,44 @@ fn handle_resolution_error(
 mod tests {
     use indexmap::IndexMap;
 
-    use crate::test::construct::{ModelContextBuilder, test_ast, test_ir};
+    use crate::test::{
+        external_context::TestExternalContext, resolution_context::ResolutionContextBuilder,
+        test_ast, test_ir,
+    };
 
     use super::*;
     use oneil_ast as ast;
     use oneil_ir as ir;
 
-    // This is a macro, as opposed to a function, because we want the error
-    // location to show the line in the test where the assertion failed, rather
-    // than some line in an `assert_has_submodels` function
+    /// Asserts that the submodel map contains exactly the expected submodels.
+    /// Uses the reference map to resolve each submodel's path via its reference name.
     macro_rules! assert_has_submodels {
-        ($actual_submodel_map:expr, $expected_submodels:expr $(,)?) => {
-            let actual_submodel_map: &IndexMap<ir::SubmodelName, ir::SubmodelImport> =
-                $actual_submodel_map;
+        ($submodel_map:expr, $reference_map:expr, $expected_submodels:expr $(,)?) => {
+            let submodel_map: &IndexMap<ir::SubmodelName, ir::SubmodelImport> = $submodel_map;
+            let reference_map: &IndexMap<ir::ReferenceName, ir::ReferenceImport> = $reference_map;
             let expected_submodels: Vec<(&'static str, &ir::ModelPath)> =
                 $expected_submodels.into_iter().collect();
 
             // check that the submodel map length is the same as the number of submodels
             assert_eq!(
-                actual_submodel_map.len(),
+                submodel_map.len(),
                 expected_submodels.len(),
                 "length of *actual* submodel map differs from *expected* submodel map",
             );
 
-            // check that the submodel map contains the expected submodels
-            for (submodel_name, expected_submodel_path) in expected_submodels {
+            for (submodel_name, expected_path) in expected_submodels {
                 let submodel_name = ir::SubmodelName::new(submodel_name.to_string());
-                let submodel_import = actual_submodel_map.get(&submodel_name).expect(
-                    format!(
-                        "did not find submodel path for '{}'",
-                        submodel_name.as_str()
-                    )
-                    .as_str(),
+                let submodel_import = submodel_map.get(&submodel_name).expect(
+                    format!("did not find submodel for '{}'", submodel_name.as_str()).as_str(),
                 );
+                let reference_import = reference_map
+                    .get(submodel_import.reference_name())
+                    .expect("submodel's reference should exist");
 
                 assert_eq!(
-                    submodel_import.path(),
-                    expected_submodel_path,
-                    "actual submodel path for '{}' differs from expected submodel path",
+                    reference_import.path(),
+                    expected_path,
+                    "actual submodel path for '{}' differs from expected",
                     submodel_name.as_str(),
                 );
             }
@@ -389,45 +418,52 @@ mod tests {
 
     #[test]
     fn resolve_simple_submodel() {
-        // create the model import list
+        // build the model import list:
         // > use temperature as temp
         let model_import = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("temperature")
             .with_alias("temp")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&model_import];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&model_import];
 
-        // create the current model path
+        // build the context (temperature at sibling path so lookup finds it)
         let model_path = ir::ModelPath::new("/parent_model");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(temperature_path.clone(), test_ir::empty_model())])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
-        let context = context_builder.build();
+        // check the resolved submodels
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved references
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path)],
+        );
 
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
-
-        // check the references
-        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
     fn resolve_nested_submodel() {
-        // create the use model list with nested subcomponents
+        // build the model import list:
         // > use weather.atmosphere.temperature as temp
         let model_import = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("weather")
@@ -435,176 +471,198 @@ mod tests {
             .with_alias("temp")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&model_import];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&model_import];
 
-        // create the current model path
+        // build the context (models in dependency order; paths as siblings so lookup finds them)
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-
-        let atmosphere_path = ir::ModelPath::new("/atmosphere");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let atmosphere_path = ir::ModelPath::new(weather_path.get_sibling_path("atmosphere"));
+        let temperature_path = ir::ModelPath::new(atmosphere_path.get_sibling_path("temperature"));
         let atmosphere_model = test_ir::ModelBuilder::new()
-            .with_submodel("temperature", "/temperature")
+            .with_submodel("temperature", &temperature_path)
             .build();
-
-        let weather_path = ir::ModelPath::new("/weather");
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("atmosphere", "/atmosphere")
+            .with_submodel("atmosphere", &atmosphere_path)
+            .build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (atmosphere_path, atmosphere_model),
+                (weather_path, weather_model),
+            ])
+            .with_external_context(&mut external)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (atmosphere_path, atmosphere_model),
-            (weather_path, weather_model),
-        ]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved submodels
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
 
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
+        // check the resolved references
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path)],
+        );
 
-        // check the reference errors
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
-
-        // check the references
-        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
     fn resolve_submodel_without_alias() {
-        // create the use model list without alias
-        // > use temperature
+        // build the model import list:
+        // > use temperature  # (no alias, reference name is "temperature")
         let model_import = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("temperature")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&model_import];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&model_import];
 
-        // create the current model path
+        // build the context (temperature at sibling path)
         let model_path = ir::ModelPath::new("/parent_model");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(temperature_path.clone(), test_ir::empty_model())])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
-        let context = context_builder.build();
+        // check the resolved submodels
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved references
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
 
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
-
-        // check the references
-        assert_has_references!(&reference_map, [("temperature", &temperature_path)]);
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
     fn resolve_submodel_with_subcomponent_alias() {
-        // create the use model list with subcomponent as alias
-        // > use weather.atmosphere
+        // build the model import list:
+        // > use weather.atmosphere  # (subcomponent name as alias)
         let model_import = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("weather")
             .with_subcomponents(["atmosphere"])
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&model_import];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&model_import];
 
-        // create the current model path
+        // build the context (weather and atmosphere at sibling paths)
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let atmosphere_path = ir::ModelPath::new("/atmosphere");
-
-        let weather_path = ir::ModelPath::new("/weather");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let atmosphere_path = ir::ModelPath::new(weather_path.get_sibling_path("atmosphere"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("atmosphere", "/atmosphere")
+            .with_submodel("atmosphere", &atmosphere_path)
+            .build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (atmosphere_path.clone(), test_ir::empty_model()),
+                (weather_path, weather_model),
+            ])
+            .with_external_context(&mut external)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (atmosphere_path.clone(), test_ir::empty_model()),
-            (weather_path, weather_model),
-        ]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved submodels
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("atmosphere", &atmosphere_path)],
+        );
+
+        // check the resolved references
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("atmosphere", &atmosphere_path)],
+        );
 
         // check the errors
-        assert!(submodel_errors.is_empty());
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("atmosphere", &atmosphere_path)]);
-
-        // check the references
-        assert_has_references!(&reference_map, [("atmosphere", &atmosphere_path)]);
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
     fn resolve_model_with_error() {
-        // create the use model list with error model
-        // > use error_model as error
+        // build the model import list:
+        // > use error_model as error  # (model has error)
         let model_import = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("error_model")
             .with_alias("error")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&model_import];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&model_import];
 
-        // create the current model path
+        // build the context (error_model at sibling path, marked as having an error)
         let model_path = ir::ModelPath::new("/parent_model");
+        let error_path = ir::ModelPath::new(model_path.get_sibling_path("error_model"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(error_path.clone(), test_ir::empty_model())])
+            .with_model_errors([error_path.clone()])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let error_path = ir::ModelPath::new("/error_model");
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(error_path.clone(), test_ir::empty_model())])
-            .with_model_error_context([error_path.clone()]);
-        let context = context_builder.build();
+        // check the resolved submodels (none; import failed)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved references (none; import failed)
+        assert_has_references!(resolution_context.get_active_model_references(), []);
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 1);
-        let error = submodel_errors
-            .get(&ir::SubmodelName::new("error_model".to_string()))
-            .expect("error should exist");
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
 
-        let ModelImportResolutionError::ModelHasError {
-            model_path,
-            reference_span: _,
-        } = error
-        else {
-            panic!("Expected ModelHasError, got {error:?}");
-        };
-
-        assert_eq!(model_path, &error_path);
-
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-        let error = reference_errors
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("error".to_string()))
             .expect("error should exist");
 
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("error_model".to_string()))
+        );
+
         let ModelImportResolutionError::ModelHasError {
             model_path,
             reference_span: _,
@@ -612,65 +670,54 @@ mod tests {
         else {
             panic!("Expected ModelHasError, got {error:?}");
         };
-
         assert_eq!(model_path, &error_path);
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, []);
-
-        // check the references
-        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn resolve_undefined_submodel() {
-        // create the use model list with undefined submodel
-        // > use weather.undefined_submodel
+        // build the model import list:
+        // > use weather.undefined_submodel  # (weather has no such submodel)
         let model_import = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("weather")
             .with_subcomponents(["undefined_submodel"])
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&model_import];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&model_import];
 
-        // create the current model path
+        // build the context (weather at sibling path, empty so no undefined_submodel)
         let model_path = ir::ModelPath::new("/parent_model");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(weather_path.clone(), test_ir::empty_model())])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let weather_path = ir::ModelPath::new("/weather");
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(weather_path.clone(), test_ir::empty_model())]);
-        let context = context_builder.build();
+        // check the resolved submodels (none; import failed)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved references (none; import failed)
+        assert_has_references!(resolution_context.get_active_model_references(), []);
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 1);
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
 
-        let error = submodel_errors
-            .get(&ir::SubmodelName::new("undefined_submodel".to_string()))
-            .expect("error should exist");
-
-        let ModelImportResolutionError::UndefinedSubmodel {
-            parent_model_path,
-            submodel,
-            reference_span: _,
-        } = error
-        else {
-            panic!("Expected UndefinedSubmodel, got {error:?}");
-        };
-
-        assert_eq!(parent_model_path, &weather_path);
-        assert_eq!(submodel.as_str(), "undefined_submodel");
-
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-        let error = reference_errors
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("undefined_submodel".to_string()))
             .expect("error should exist");
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("undefined_submodel".to_string()))
+        );
 
         let ModelImportResolutionError::UndefinedSubmodel {
             parent_model_path,
@@ -680,74 +727,62 @@ mod tests {
         else {
             panic!("Expected UndefinedSubmodel, got {error:?}");
         };
-
         assert_eq!(parent_model_path, &weather_path);
         assert_eq!(submodel.as_str(), "undefined_submodel");
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, []);
-
-        // check the references
-        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn resolve_undefined_submodel_in_submodel() {
-        // create the use model list with nested undefined submodel
-        // > use weather.atmosphere.undefined
+        // build the model import list:
+        // > use weather.atmosphere.undefined  # (atmosphere has no "undefined")
         let model_import = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("weather")
             .with_subcomponents(["atmosphere", "undefined"])
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&model_import];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&model_import];
 
-        // create the current model path
+        // build the context (weather and atmosphere at sibling paths; atmosphere has no "undefined")
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let atmosphere_path = ir::ModelPath::new("/atmosphere");
-
-        let weather_path = ir::ModelPath::new("/weather");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let atmosphere_path = ir::ModelPath::new(weather_path.get_sibling_path("atmosphere"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("atmosphere", "/atmosphere")
+            .with_submodel("atmosphere", &atmosphere_path)
+            .build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (atmosphere_path.clone(), test_ir::empty_model()),
+                (weather_path, weather_model),
+            ])
+            .with_external_context(&mut external)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (atmosphere_path.clone(), test_ir::empty_model()),
-            (weather_path, weather_model),
-        ]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved submodels (none; import failed)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
+
+        // check the resolved references (none; import failed)
+        assert_has_references!(resolution_context.get_active_model_references(), []);
 
         // check the errors
-        assert_eq!(submodel_errors.len(), 1);
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
 
-        let error = submodel_errors
-            .get(&ir::SubmodelName::new("undefined".to_string()))
-            .expect("error should exist");
-
-        let ModelImportResolutionError::UndefinedSubmodel {
-            parent_model_path,
-            submodel,
-            reference_span: _,
-        } = error
-        else {
-            panic!("Expected UndefinedSubmodel, got {error:?}");
-        };
-
-        assert_eq!(parent_model_path, &atmosphere_path);
-        assert_eq!(submodel.as_str(), "undefined");
-
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-
-        let error = reference_errors
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("undefined".to_string()))
             .expect("error should exist");
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("undefined".to_string()))
+        );
 
         let ModelImportResolutionError::UndefinedSubmodel {
             parent_model_path,
@@ -757,304 +792,300 @@ mod tests {
         else {
             panic!("Expected UndefinedSubmodel, got {error:?}");
         };
-
         assert_eq!(parent_model_path, &atmosphere_path);
         assert_eq!(submodel.as_str(), "undefined");
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, []);
-
-        // check the references
-        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn resolve_multiple_submodels() {
-        // create the use model list with multiple submodels
+        // build the model import list:
         // > use temperature as temp
+        // > use pressure as press
         let temp_model = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("temperature")
             .with_alias("temp")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-
-        // > use pressure as press
         let press_model = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("pressure")
             .with_alias("press")
             .with_kind(ast::ModelKind::Submodel)
             .build();
+        let model_imports: Vec<&ast::UseModelNode> = vec![&temp_model, &press_model];
 
-        let model_imports = vec![&temp_model, &press_model];
-
-        // create the current model path
+        // build the context (temperature and pressure at sibling paths)
         let model_path = ir::ModelPath::new("/parent_model");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
+        let pressure_path = ir::ModelPath::new(model_path.get_sibling_path("pressure"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (pressure_path.clone(), test_ir::empty_model()),
+            ])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        let pressure_path = ir::ModelPath::new("/pressure");
-
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (pressure_path.clone(), test_ir::empty_model()),
-        ]);
-        let context = context_builder.build();
-
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
-
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
+        // check the resolved submodels
         assert_has_submodels!(
-            &submodel_map,
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
             [
                 ("temperature", &temperature_path),
                 ("pressure", &pressure_path),
             ],
         );
 
-        // check the references
+        // check the resolved references
         assert_has_references!(
-            &reference_map,
+            resolution_context.get_active_model_references(),
             [("temp", &temperature_path), ("press", &pressure_path)],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
         );
     }
 
     #[test]
     fn resolve_mixed_success_and_error() {
-        // create the use model list with mixed success and error cases
-        // > use temperature as temp
+        // build the model import list:
+        // > use temperature as temp  # (success)
+        // > use error_model as error  # (error)
         let temp_model = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("temperature")
             .with_alias("temp")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-
-        // > use error_model as error
         let error_model = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("error_model")
             .with_alias("error")
             .with_kind(ast::ModelKind::Submodel)
             .build();
+        let model_imports: Vec<&ast::UseModelNode> = vec![&temp_model, &error_model];
 
-        let model_imports = vec![&temp_model, &error_model];
-
-        // create the current model path
+        // build the context (temperature and error_model at sibling paths; error_model marked as having error)
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-
-        let error_path = ir::ModelPath::new("/error_model");
-
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
+        let error_path = ir::ModelPath::new(model_path.get_sibling_path("error_model"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
                 (temperature_path.clone(), test_ir::empty_model()),
                 (error_path.clone(), test_ir::empty_model()),
             ])
-            .with_model_error_context([error_path.clone()]);
-        let context = context_builder.build();
+            .with_model_errors([error_path.clone()])
+            .with_external_context(&mut external)
+            .build();
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 1);
+        // check the resolved submodels (only temperature)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
 
-        let error = submodel_errors
-            .get(&ir::SubmodelName::new("error_model".to_string()))
-            .expect("error should exist");
+        // check the resolved references (only temp)
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path)],
+        );
 
-        let ModelImportResolutionError::ModelHasError {
-            model_path,
-            reference_span: _,
-        } = error
-        else {
-            panic!("Expected ModelHasError, got {error:?}");
-        };
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
 
-        assert_eq!(model_path, &error_path);
-
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-
-        let error = reference_errors
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("error".to_string()))
             .expect("error should exist");
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("error_model".to_string()))
+        );
 
         let ModelImportResolutionError::ModelHasError {
-            model_path,
+            model_path: err_path,
             reference_span: _,
         } = error
         else {
             panic!("Expected ModelHasError, got {error:?}");
         };
-
-        assert_eq!(model_path, &error_path);
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
-
-        // check the references
-        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
+        assert_eq!(err_path, &error_path);
     }
 
     #[test]
     fn resolve_submodel_with_directory_path_success() {
-        // create the use model list with directory path that exists
-        // > use utils/math as math
+        // build the model import list:
+        // > use utils/math as math  # (directory path)
         let math_model = test_ast::ImportModelNodeBuilder::new()
             .with_directory_path(["utils"])
             .with_top_component("math")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&math_model];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&math_model];
 
-        // create the current model path
+        // build the context (math at sibling path utils/math)
         let model_path = ir::ModelPath::new("/parent_model");
+        let math_path = ir::ModelPath::new(model_path.get_sibling_path("utils/math"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(math_path.clone(), test_ir::empty_model())])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let math_path = ir::ModelPath::new("/utils/math");
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(math_path.clone(), test_ir::empty_model())]);
-        let context = context_builder.build();
+        // check the resolved submodels
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("math", &math_path)],
+        );
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved references
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("math", &math_path)],
+        );
 
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("math", &math_path)]);
-
-        // check the references
-        assert_has_references!(&reference_map, [("math", &math_path)]);
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
     fn resolve_submodel_with_directory_path_error() {
-        // create the use model list with directory path that doesn't exist
-        // > use nonexistent/math as math
+        // build the model import list:
+        // > use nonexistent/math as math  # (model has error)
         let math_model = test_ast::ImportModelNodeBuilder::new()
             .with_directory_path(["nonexistent"])
             .with_top_component("math")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let model_imports = vec![&math_model];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&math_model];
 
-        // create the current model path
+        // build the context (math at sibling path nonexistent/math, marked as having error)
         let model_path = ir::ModelPath::new("/parent_model");
+        let math_path = ir::ModelPath::new(model_path.get_sibling_path("nonexistent/math"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(math_path.clone(), test_ir::empty_model())])
+            .with_model_errors([math_path.clone()])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let math_path = ir::ModelPath::new("/nonexistent/math");
-        let context_builder =
-            ModelContextBuilder::new().with_model_error_context([math_path.clone()]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved submodels (none; import failed)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 1);
+        // check the resolved references (none; import failed)
+        assert_has_references!(resolution_context.get_active_model_references(), []);
 
-        let error = submodel_errors
-            .get(&ir::SubmodelName::new("math".to_string()))
-            .expect("error should exist");
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
 
-        let ModelImportResolutionError::ModelHasError {
-            model_path,
-            reference_span: _,
-        } = error
-        else {
-            panic!("Expected ModelHasError, got {error:?}");
-        };
-
-        assert_eq!(model_path, &math_path);
-
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-
-        let error = reference_errors
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("math".to_string()))
             .expect("error should exist");
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("math".to_string()))
+        );
 
         let ModelImportResolutionError::ModelHasError {
-            model_path,
+            model_path: err_path,
             reference_span: _,
         } = error
         else {
             panic!("Expected ModelHasError, got {error:?}");
         };
-
-        assert_eq!(model_path, &math_path);
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, []);
-
-        // check the references
-        assert_has_references!(&reference_map, []);
+        assert_eq!(err_path, &math_path);
     }
 
     #[test]
     fn resolve_duplicate_submodel_aliases() {
-        // create the use model list with duplicate submodel names
+        // build the model import list:
         // > use temperature as temp
+        // > use other_temperature as temp  # (duplicate alias)
         let temp_model1 = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("temperature")
             .with_alias("temp")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-
-        // > use pressure as temp (duplicate alias)
         let temp_model2 = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("other_temperature")
             .with_alias("temp")
             .with_kind(ast::ModelKind::Submodel)
             .build();
+        let model_imports: Vec<&ast::UseModelNode> = vec![&temp_model1, &temp_model2];
 
-        let use_models = vec![&temp_model1, &temp_model2];
-
-        // create the current model path
+        // build the context (temperature and other_temperature at sibling paths)
         let model_path = ir::ModelPath::new("/parent_model");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
+        let other_temperature_path =
+            ir::ModelPath::new(model_path.get_sibling_path("other_temperature"));
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (other_temperature_path, test_ir::empty_model()),
+            ])
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        let other_temperature_path = ir::ModelPath::new("/other_temperature");
+        // check the resolved submodels (only first; second failed due to duplicate alias)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (other_temperature_path, test_ir::empty_model()),
-        ]);
-        let context = context_builder.build();
+        // check the resolved references (only temp -> temperature)
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path)],
+        );
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(use_models, &model_path, &context);
+        // check the errors (duplicate reference "temp")
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
+        let (submodel_name, error) = model_import_errors
+            .get(&ir::ReferenceName::new("temp".to_string()))
+            .expect("error should exist");
 
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("other_temperature".to_string()))
+        );
 
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-
-        let temp_id = ir::ReferenceName::new("temp".to_string());
-        let error = reference_errors.get(&temp_id).expect("error should exist");
         let ModelImportResolutionError::DuplicateReference {
             reference,
             original_span: _,
@@ -1063,74 +1094,60 @@ mod tests {
         else {
             panic!("Expected DuplicateReference, got {error:?}");
         };
-
         assert_eq!(reference.as_str(), "temp");
-
-        // check the submodels - should contain only the successful one
-        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path),],);
-
-        // check the references - should only contain one reference
-        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
     }
 
     #[test]
     fn resolve_use_declaration_with_failing_submodel() {
-        // create the use model list with a submodel that fails to resolve
-        // > use weather.atmosphere.temperature
-        let weather_model = test_ast::ImportModelNodeBuilder::new()
+        // build the model import list:
+        // > use weather.atmosphere.temperature  # (atmosphere has no temperature)
+        let weather_model_ast = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("weather")
             .with_subcomponents(["atmosphere", "temperature"])
             .with_kind(ast::ModelKind::Submodel)
             .build();
+        let model_imports: Vec<&ast::UseModelNode> = vec![&weather_model_ast];
 
-        let model_imports = vec![&weather_model];
-
-        // create the current model path
+        // build the context (weather and atmosphere at sibling paths; atmosphere has no temperature)
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let atmosphere_path = ir::ModelPath::new("/atmosphere");
-
-        let weather_path = ir::ModelPath::new("/weather");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let atmosphere_path = ir::ModelPath::new(weather_path.get_sibling_path("atmosphere"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("atmosphere", "/atmosphere")
+            .with_submodel("atmosphere", &atmosphere_path)
+            .build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (atmosphere_path.clone(), test_ir::empty_model()),
+                (weather_path, weather_model),
+            ])
+            .with_external_context(&mut external)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (weather_path, weather_model),
-            (atmosphere_path.clone(), test_ir::empty_model()),
-        ]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved submodels (none; import failed)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 1);
+        // check the resolved references (none; import failed)
+        assert_has_references!(resolution_context.get_active_model_references(), []);
 
-        let error = submodel_errors
-            .get(&ir::SubmodelName::new("temperature".to_string()))
-            .expect("error should exist");
-
-        let ModelImportResolutionError::UndefinedSubmodel {
-            parent_model_path,
-            submodel,
-            reference_span: _,
-        } = error
-        else {
-            panic!("Expected UndefinedSubmodel, got {error:?}");
-        };
-
-        assert_eq!(parent_model_path, &atmosphere_path);
-        assert_eq!(submodel.as_str(), "temperature");
-
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-
-        let error = reference_errors
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("temperature".to_string()))
             .expect("error should exist");
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("temperature".to_string()))
+        );
 
         let ModelImportResolutionError::UndefinedSubmodel {
             parent_model_path,
@@ -1140,67 +1157,72 @@ mod tests {
         else {
             panic!("Expected UndefinedSubmodel, got {error:?}");
         };
-
         assert_eq!(parent_model_path, &atmosphere_path);
         assert_eq!(submodel.as_str(), "temperature");
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, []);
-
-        // check the references
-        assert_has_references!(&reference_map, []);
     }
 
     #[test]
     fn resolve_use_declaration_with_successful_and_failing_submodels() {
-        // create the use model list with both successful and failing submodels
-        // > use temperature as temp  # successful
+        // build the model import list:
+        // > use temperature as temp  # (success)
+        // > use weather.atmosphere.undefined  # (fail)
         let temp_model = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("temperature")
             .with_alias("temp")
             .with_kind(ast::ModelKind::Submodel)
             .build();
-
-        // > use weather.atmosphere.undefined  # failing
         let undefined_model = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("weather")
             .with_subcomponents(["atmosphere", "undefined"])
             .with_kind(ast::ModelKind::Submodel)
             .build();
+        let model_imports: Vec<&ast::UseModelNode> = vec![&temp_model, &undefined_model];
 
-        let model_imports = vec![&temp_model, &undefined_model];
-
-        // create the current model path
+        // build the context (temperature, weather, atmosphere at sibling paths; atmosphere has no "undefined")
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-
-        let atmosphere_path = ir::ModelPath::new("/atmosphere");
-
-        let weather_path = ir::ModelPath::new("/weather");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let atmosphere_path = ir::ModelPath::new(weather_path.get_sibling_path("atmosphere"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("atmosphere", "/atmosphere")
+            .with_submodel("atmosphere", &atmosphere_path)
+            .build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (atmosphere_path.clone(), test_ir::empty_model()),
+                (weather_path, weather_model),
+            ])
+            .with_external_context(&mut external)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (atmosphere_path.clone(), test_ir::empty_model()),
-            (weather_path, weather_model),
-        ]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved submodels (only temperature)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 1);
+        // check the resolved references (only temp)
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path)],
+        );
 
-        let submodel_name = ir::SubmodelName::new("undefined".to_string());
-        let error = submodel_errors
-            .get(&submodel_name)
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
+        let (submodel_name, error) = model_import_errors
+            .get(&ir::ReferenceName::new("undefined".to_string()))
             .expect("error should exist");
+        assert_eq!(
+            submodel_name,
+            &Some(ir::SubmodelName::new("undefined".to_string()))
+        );
 
         let ModelImportResolutionError::UndefinedSubmodel {
             parent_model_path,
@@ -1210,94 +1232,69 @@ mod tests {
         else {
             panic!("Expected UndefinedSubmodel, got {error:?}");
         };
-
         assert_eq!(parent_model_path, &atmosphere_path);
         assert_eq!(submodel.as_str(), "undefined");
-
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
-
-        let reference_name = ir::ReferenceName::new("undefined".to_string());
-        let error = reference_errors
-            .get(&reference_name)
-            .expect("error should exist");
-
-        let ModelImportResolutionError::UndefinedSubmodel {
-            parent_model_path,
-            submodel,
-            reference_span: _,
-        } = error
-        else {
-            panic!("Expected UndefinedSubmodel, got {error:?}");
-        };
-
-        assert_eq!(parent_model_path, &atmosphere_path);
-        assert_eq!(submodel.as_str(), "undefined");
-
-        // check the submodels - should only contain the successful one
-        assert_has_submodels!(&submodel_map, [("temperature", &temperature_path)]);
-
-        // check the references - should only contain the successful one
-        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
     }
 
     #[test]
     fn resolve_use_declaration_with_single_submodel() {
-        // create the use model list with a single submodel in the with clause
+        // build the model import list:
         // > use weather with temperature as temp
         let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
             .with_top_component("temperature")
             .with_alias("temp")
             .build();
-
-        let weather_model = test_ast::ImportModelNodeBuilder::new()
+        let weather_model_ast = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("weather")
             .with_submodels([temperature_submodel])
             .with_kind(ast::ModelKind::Submodel)
             .build();
+        let model_imports: Vec<&ast::UseModelNode> = vec![&weather_model_ast];
 
-        let model_imports = vec![&weather_model];
-
-        // create the current model path
+        // build the context (weather and temperature at sibling paths)
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-
-        let weather_path = ir::ModelPath::new("/weather");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let temperature_path = ir::ModelPath::new(weather_path.get_sibling_path("temperature"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("temperature", "/temperature")
+            .with_submodel("temperature", &temperature_path)
+            .build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (weather_path.clone(), weather_model),
+            ])
+            .with_external_context(&mut external)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (weather_path.clone(), weather_model),
-        ]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        // check the resolved submodels (weather as submodel)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("weather", &weather_path)],
+        );
 
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
-
-        // check the references
+        // check the resolved references (temp -> temperature, weather -> weather_path)
         assert_has_references!(
-            &reference_map,
+            resolution_context.get_active_model_references(),
             [("temp", &temperature_path), ("weather", &weather_path)],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
         );
     }
 
     #[test]
     fn resolve_use_declaration_with_multiple_submodels() {
-        // create the use model list with multiple submodels in the with clause
+        // build the model import list:
         // > use weather with [temperature as temp, pressure as press]
         let temperature_submodel = test_ast::ModelInfoNodeBuilder::new()
             .with_top_component("temperature")
@@ -1312,48 +1309,53 @@ mod tests {
             .with_submodels([temperature_submodel, pressure_submodel])
             .with_kind(ast::ModelKind::Submodel)
             .build();
-        let use_models = vec![&use_model];
+        let model_imports: Vec<&ast::UseModelNode> = vec![&use_model];
 
-        // create the current model path
+        // build the context (weather, temperature, pressure at sibling paths)
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-        let pressure_path = ir::ModelPath::new("/pressure");
-        let weather_path = ir::ModelPath::new("/weather");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let temperature_path = ir::ModelPath::new(weather_path.get_sibling_path("temperature"));
+        let pressure_path = ir::ModelPath::new(weather_path.get_sibling_path("pressure"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("temperature", "/temperature")
-            .with_submodel("pressure", "/pressure")
+            .with_submodel("temperature", &temperature_path)
+            .with_submodel("pressure", &pressure_path)
+            .build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (pressure_path.clone(), test_ir::empty_model()),
+                (weather_path.clone(), weather_model),
+            ])
+            .with_external_context(&mut external)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (pressure_path.clone(), test_ir::empty_model()),
-            (weather_path.clone(), weather_model),
-        ]);
-        let context = context_builder.build();
+        // run the resolution
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(use_models, &model_path, &context);
+        // check the resolved submodels (weather as submodel)
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("weather", &weather_path)],
+        );
 
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
-
-        // check the references
+        // check the resolved references (temp, press, weather)
         assert_has_references!(
-            &reference_map,
+            resolution_context.get_active_model_references(),
             [
                 ("temp", &temperature_path),
                 ("press", &pressure_path),
                 ("weather", &weather_path),
             ],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
         );
     }
 
@@ -1375,46 +1377,51 @@ mod tests {
 
         let model_imports = vec![&weather_model];
 
-        // create the current model path
+        // create the current model path and sibling paths used by the resolver
         let model_path = ir::ModelPath::new("/parent_model");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let atmosphere_path = ir::ModelPath::new(weather_path.get_sibling_path("atmosphere"));
+        let temperature_path = ir::ModelPath::new(atmosphere_path.get_sibling_path("temperature"));
 
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-
-        let atmosphere_path = ir::ModelPath::new("/atmosphere");
         let atmosphere_model = test_ir::ModelBuilder::new()
-            .with_submodel("temperature", "/temperature")
+            .with_submodel("temperature", &temperature_path)
             .build();
-
-        let weather_path = ir::ModelPath::new("/weather");
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("atmosphere", "/atmosphere")
+            .with_submodel("atmosphere", &atmosphere_path)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (atmosphere_path, atmosphere_model),
-            (weather_path.clone(), weather_model),
-        ]);
-        let context = context_builder.build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (atmosphere_path, atmosphere_model),
+                (weather_path.clone(), weather_model),
+            ])
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
-
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
         // check the submodels
-        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("weather", &weather_path)],
+        );
 
         // check the references
         assert_has_references!(
-            &reference_map,
+            resolution_context.get_active_model_references(),
             [("temp", &temperature_path), ("weather", &weather_path)],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
         );
     }
 
@@ -1434,29 +1441,41 @@ mod tests {
 
         let model_imports = vec![&weather_model];
 
-        // create the current model path
+        // create the current model path and sibling path for weather
         let model_path = ir::ModelPath::new("/parent_model");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
 
-        // create the context
-        let weather_path = ir::ModelPath::new("/weather");
-
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(weather_path.clone(), test_ir::empty_model())]);
-        let context = context_builder.build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(weather_path.clone(), test_ir::empty_model())])
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 0);
+        // check the submodels
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("weather", &weather_path)],
+        );
 
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
+        // check the references
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("weather", &weather_path)],
+        );
 
-        let error = reference_errors
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
+
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("undefined".to_string()))
             .expect("error should exist");
+        assert_eq!(submodel_name, &None); // because it is in a with clause and therefore is a reference
 
         let ModelImportResolutionError::UndefinedSubmodel {
             parent_model_path,
@@ -1469,12 +1488,6 @@ mod tests {
 
         assert_eq!(parent_model_path, &weather_path);
         assert_eq!(submodel.as_str(), "undefined");
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
-
-        // check the references
-        assert_has_references!(&reference_map, [("weather", &weather_path)]);
     }
 
     #[test]
@@ -1496,35 +1509,47 @@ mod tests {
 
         let model_imports = vec![&weather_model];
 
-        // create the current model path
+        // create the current model path and sibling paths
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-        let weather_path = ir::ModelPath::new("/weather");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let temperature_path = ir::ModelPath::new(weather_path.get_sibling_path("temperature"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("temperature", "/temperature")
+            .with_submodel("temperature", &temperature_path)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (weather_path.clone(), weather_model),
-            (temperature_path.clone(), test_ir::empty_model()),
-        ]);
-        let context = context_builder.build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (weather_path.clone(), weather_model),
+                (temperature_path.clone(), test_ir::empty_model()),
+            ])
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
-        // check the submodel errors
-        assert_eq!(submodel_errors.len(), 0);
+        // check the submodels
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("weather", &weather_path)],
+        );
 
-        // check the reference errors
-        assert_eq!(reference_errors.len(), 1);
+        // check the references
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path), ("weather", &weather_path)],
+        );
 
-        let error = reference_errors
+        // check the errors
+        let model_import_errors = resolution_context.get_active_model_model_import_errors();
+        assert_eq!(model_import_errors.len(), 1);
+        let (submodel_name, error) = model_import_errors
             .get(&ir::ReferenceName::new("undefined".to_string()))
             .expect("error should exist");
+        assert_eq!(submodel_name, &None); // because it is in a with clause and therefore is a reference
 
         let ModelImportResolutionError::UndefinedSubmodel {
             parent_model_path,
@@ -1534,18 +1559,8 @@ mod tests {
         else {
             panic!("Expected UndefinedSubmodel, got {error:?}");
         };
-
         assert_eq!(parent_model_path, &weather_path);
         assert_eq!(submodel.as_str(), "undefined");
-
-        // check the submodels
-        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
-
-        // check the references
-        assert_has_references!(
-            &reference_map,
-            [("temp", &temperature_path), ("weather", &weather_path)],
-        );
     }
 
     #[test]
@@ -1569,46 +1584,52 @@ mod tests {
 
         let import_models = vec![&use_model];
 
-        // create the current model path
+        // create the current model path and sibling paths
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-        let pressure_path = ir::ModelPath::new("/pressure");
-        let weather_path = ir::ModelPath::new("/weather");
+        let weather_path = ir::ModelPath::new(model_path.get_sibling_path("weather"));
+        let temperature_path = ir::ModelPath::new(weather_path.get_sibling_path("temperature"));
+        let pressure_path = ir::ModelPath::new(weather_path.get_sibling_path("pressure"));
         let weather_model = test_ir::ModelBuilder::new()
-            .with_submodel("temperature", "/temperature")
-            .with_submodel("pressure", "/pressure")
+            .with_submodel("temperature", &temperature_path)
+            .with_submodel("pressure", &pressure_path)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (temperature_path.clone(), test_ir::empty_model()),
-            (pressure_path.clone(), test_ir::empty_model()),
-            (weather_path.clone(), weather_model),
-        ]);
-        let context = context_builder.build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (temperature_path.clone(), test_ir::empty_model()),
+                (pressure_path.clone(), test_ir::empty_model()),
+                (weather_path.clone(), weather_model),
+            ])
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(import_models, &model_path, &context);
-
-        // check the errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
+        resolve_model_imports(&model_path, import_models, &mut resolution_context);
 
         // check the submodels
-        assert_has_submodels!(&submodel_map, [("weather", &weather_path)]);
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [("weather", &weather_path)],
+        );
 
         // check the references
         assert_has_references!(
-            &reference_map,
+            resolution_context.get_active_model_references(),
             [
                 ("temp", &temperature_path),
                 ("press", &pressure_path),
                 ("weather_model", &weather_path),
             ],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
         );
     }
 
@@ -1623,31 +1644,39 @@ mod tests {
 
         let model_imports = vec![&temp_model];
 
-        // create the current model path
+        // create the current model path and sibling path for the ref target
         let model_path = ir::ModelPath::new("/parent_model");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
 
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
-        let context = context_builder.build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(temperature_path.clone(), test_ir::empty_model())])
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
-
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
         // check the submodels
-        assert_has_submodels!(&submodel_map, []);
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
 
         // check the references
-        assert_has_references!(&reference_map, [("temperature", &temperature_path)]);
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temperature", &temperature_path)],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1662,31 +1691,39 @@ mod tests {
 
         let model_imports = vec![&temp_model];
 
-        // create the current model path
+        // create the current model path and sibling path for the ref target
         let model_path = ir::ModelPath::new("/parent_model");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
 
-        // create the context
-        let temperature_path = ir::ModelPath::new("/temperature");
-
-        let context_builder = ModelContextBuilder::new()
-            .with_model_context([(temperature_path.clone(), test_ir::empty_model())]);
-        let context = context_builder.build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([(temperature_path.clone(), test_ir::empty_model())])
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
-
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-
-        // check the reference errors
-        assert!(reference_errors.is_empty());
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
         // check the submodels
-        assert_has_submodels!(&submodel_map, []);
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
 
         // check the references
-        assert_has_references!(&reference_map, [("temp", &temperature_path)]);
+        assert_has_references!(
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path)],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1707,36 +1744,45 @@ mod tests {
 
         let model_imports = vec![&temp_model];
 
-        // create the current model path
+        // create the current model path and sibling paths (ref target temperature, then pressure under it)
         let model_path = ir::ModelPath::new("/parent_model");
-
-        // create the context
-        let pressure_path = ir::ModelPath::new("/pressure");
-        let temperature_path = ir::ModelPath::new("/temperature");
+        let temperature_path = ir::ModelPath::new(model_path.get_sibling_path("temperature"));
+        let pressure_path = ir::ModelPath::new(temperature_path.get_sibling_path("pressure"));
         let temperature_model = test_ir::ModelBuilder::new()
-            .with_submodel("pressure", "/pressure")
+            .with_submodel("pressure", &pressure_path)
             .build();
 
-        let context_builder = ModelContextBuilder::new().with_model_context([
-            (pressure_path.clone(), test_ir::empty_model()),
-            (temperature_path.clone(), temperature_model),
-        ]);
-        let context = context_builder.build();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(model_path.clone())
+            .with_models([
+                (pressure_path.clone(), test_ir::empty_model()),
+                (temperature_path.clone(), temperature_model),
+            ])
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the submodels
-        let (submodel_map, reference_map, submodel_errors, reference_errors) =
-            resolve_model_imports(model_imports, &model_path, &context);
-
-        // check the submodel errors
-        assert!(submodel_errors.is_empty());
-        assert!(reference_errors.is_empty());
+        resolve_model_imports(&model_path, model_imports, &mut resolution_context);
 
         // check the submodels
-        assert_has_submodels!(&submodel_map, []);
+        assert_has_submodels!(
+            resolution_context.get_active_model_submodels(),
+            resolution_context.get_active_model_references(),
+            [],
+        );
+
         // check the references
         assert_has_references!(
-            &reference_map,
-            [("temp", &temperature_path), ("press", &pressure_path)]
+            resolution_context.get_active_model_references(),
+            [("temp", &temperature_path), ("press", &pressure_path)],
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_model_import_errors()
+                .is_empty()
         );
     }
 }

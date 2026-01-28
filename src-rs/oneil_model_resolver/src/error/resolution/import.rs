@@ -8,7 +8,7 @@ use oneil_shared::{
 
 /// Represents an error that occurred during Python import validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ImportResolutionError {
+pub enum PythonImportResolutionError {
     /// A duplicate import was detected.
     DuplicateImport {
         /// The span of the original import declaration.
@@ -27,7 +27,7 @@ pub enum ImportResolutionError {
     },
 }
 
-impl ImportResolutionError {
+impl PythonImportResolutionError {
     /// Creates a new import resolution error indicating that a duplicate import was detected.
     #[must_use]
     pub const fn duplicate_import(
@@ -52,7 +52,7 @@ impl ImportResolutionError {
     }
 }
 
-impl Display for ImportResolutionError {
+impl Display for PythonImportResolutionError {
     /// Converts the import resolution error to a string representation.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -68,7 +68,7 @@ impl Display for ImportResolutionError {
     }
 }
 
-impl AsOneilError for ImportResolutionError {
+impl AsOneilError for PythonImportResolutionError {
     fn message(&self) -> String {
         self.to_string()
     }

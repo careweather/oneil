@@ -51,6 +51,21 @@ impl Model {
         self.submodels.get(identifier)
     }
 
+    /// Returns the reference that a submodel is associated with.
+    #[must_use]
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "the panic is only caused by breaking an internal invariant"
+    )]
+    pub fn get_submodel_reference(&self, identifier: &SubmodelName) -> Option<&ReferenceImport> {
+        let submodel = self.submodels.get(identifier)?;
+        let reference = self
+            .references
+            .get(submodel.reference_name())
+            .expect("reference corresponding to submodel should exist");
+        Some(reference)
+    }
+
     /// Returns a reference to all submodels in this model.
     #[must_use]
     pub const fn get_submodels(&self) -> &IndexMap<SubmodelName, SubmodelImport> {
@@ -69,6 +84,12 @@ impl Model {
         &self.parameters
     }
 
+    /// Looks up a reference by its identifier.
+    #[must_use]
+    pub fn get_reference(&self, identifier: &ReferenceName) -> Option<&ReferenceImport> {
+        self.references.get(identifier)
+    }
+
     /// Returns a reference to all references in this model.
     #[must_use]
     pub const fn get_references(&self) -> &IndexMap<ReferenceName, ReferenceImport> {
@@ -79,6 +100,31 @@ impl Model {
     #[must_use]
     pub const fn get_tests(&self) -> &IndexMap<TestIndex, Test> {
         &self.tests
+    }
+
+    /// Adds a Python import to this model.
+    pub fn add_python_import(&mut self, path: PythonPath, import: PythonImport) {
+        self.python_imports.insert(path, import);
+    }
+
+    /// Adds a reference to this model.
+    pub fn add_reference(&mut self, name: ReferenceName, import: ReferenceImport) {
+        self.references.insert(name, import);
+    }
+
+    /// Adds a submodel to this model.
+    pub fn add_submodel(&mut self, name: SubmodelName, import: SubmodelImport) {
+        self.submodels.insert(name, import);
+    }
+
+    /// Adds a parameter to this model.
+    pub fn add_parameter(&mut self, name: ParameterName, parameter: Parameter) {
+        self.parameters.insert(name, parameter);
+    }
+
+    /// Adds a test to this model.
+    pub fn add_test(&mut self, index: TestIndex, test: Test) {
+        self.tests.insert(index, test);
     }
 }
 

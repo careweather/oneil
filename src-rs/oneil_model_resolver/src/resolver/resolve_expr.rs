@@ -7,19 +7,19 @@ use oneil_ir::{self as ir, Dependencies};
 use oneil_shared::span::Span;
 
 use crate::{
-    BuiltinRef,
+    ExternalResolutionContext, ResolutionContext,
     error::{self, VariableResolutionError},
     resolver::resolve_variable::resolve_variable,
-    util::context::{ParameterContext, ReferenceContext},
 };
 
 /// Resolves an AST expression into a model expression.
-pub fn resolve_expr(
+pub fn resolve_expr<E>(
     value: &ast::ExprNode,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, Vec<VariableResolutionError>> {
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
     let span = value.span();
 
     match &**value {
@@ -28,76 +28,43 @@ pub fn resolve_expr(
             left,
             right,
             rest_chained,
-        } => resolve_comparison_expression(
-            span,
-            op,
-            left,
-            right,
-            rest_chained,
-            builtin_ref,
-            reference_context,
-            parameter_context,
-        ),
-        ast::Expr::BinaryOp { op, left, right } => resolve_binary_expression(
-            span,
-            op,
-            left,
-            right,
-            builtin_ref,
-            reference_context,
-            parameter_context,
-        ),
-        ast::Expr::UnaryOp { op, expr } => resolve_unary_expression(
-            span,
-            op,
-            expr,
-            builtin_ref,
-            reference_context,
-            parameter_context,
-        ),
-        ast::Expr::FunctionCall { name, args } => resolve_function_call_expression(
-            span,
-            name,
-            args,
-            builtin_ref,
-            reference_context,
-            parameter_context,
-        ),
-        ast::Expr::Variable(variable) => {
-            resolve_variable_expression(variable, builtin_ref, reference_context, parameter_context)
+        } => resolve_comparison_expression(span, op, left, right, rest_chained, resolution_context),
+        ast::Expr::BinaryOp { op, left, right } => {
+            resolve_binary_expression(span, op, left, right, resolution_context)
         }
+        ast::Expr::UnaryOp { op, expr } => {
+            resolve_unary_expression(span, op, expr, resolution_context)
+        }
+        ast::Expr::FunctionCall { name, args } => {
+            resolve_function_call_expression(span, name, args, resolution_context)
+        }
+        ast::Expr::Variable(variable) => resolve_variable_expression(variable, resolution_context),
         ast::Expr::Literal(literal) => Ok(resolve_literal_expression(span, literal)),
-        ast::Expr::Parenthesized { expr } => resolve_parenthesized_expression(
-            expr,
-            builtin_ref,
-            reference_context,
-            parameter_context,
-        ),
+        ast::Expr::Parenthesized { expr } => {
+            resolve_parenthesized_expression(expr, resolution_context)
+        }
     }
 }
 
 /// Resolves a comparison expression with optional chained comparisons.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "there are five important arguments (the first five), the rest are context"
-)]
-fn resolve_comparison_expression(
+fn resolve_comparison_expression<E>(
     span: Span,
     op: &ast::ComparisonOpNode,
     left: &ast::ExprNode,
     right: &ast::ExprNode,
     rest_chained: &[(ast::ComparisonOpNode, ast::ExprNode)],
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, Vec<VariableResolutionError>> {
-    let left = resolve_expr(left, builtin_ref, reference_context, parameter_context);
-    let right = resolve_expr(right, builtin_ref, reference_context, parameter_context);
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    let left = resolve_expr(left, resolution_context);
+    let right = resolve_expr(right, resolution_context);
     let op_with_span = resolve_comparison_op(op);
 
     // Resolve the chained comparisons
     let rest_chained = rest_chained.iter().map(|(op, expr)| {
-        let expr = resolve_expr(expr, builtin_ref, reference_context, parameter_context);
+        let expr = resolve_expr(expr, resolution_context);
         let op_with_span = resolve_comparison_op(op);
         expr.map(|expr| (op_with_span, expr))
     });
@@ -112,17 +79,18 @@ fn resolve_comparison_expression(
 }
 
 /// Resolves a binary operation expression.
-fn resolve_binary_expression(
+fn resolve_binary_expression<E>(
     span: Span,
     op: &ast::BinaryOpNode,
     left: &ast::ExprNode,
     right: &ast::ExprNode,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, Vec<VariableResolutionError>> {
-    let left = resolve_expr(left, builtin_ref, reference_context, parameter_context);
-    let right = resolve_expr(right, builtin_ref, reference_context, parameter_context);
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    let left = resolve_expr(left, resolution_context);
+    let right = resolve_expr(right, resolution_context);
     let op_with_span = resolve_binary_op(op);
 
     let (left, right) = error::combine_errors(left, right)?;
@@ -132,15 +100,16 @@ fn resolve_binary_expression(
 }
 
 /// Resolves a unary operation expression.
-fn resolve_unary_expression(
+fn resolve_unary_expression<E>(
     span: Span,
     op: &ast::UnaryOpNode,
     expr: &ast::ExprNode,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, Vec<VariableResolutionError>> {
-    let expr = resolve_expr(expr, builtin_ref, reference_context, parameter_context);
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    let expr = resolve_expr(expr, resolution_context);
     let op_with_span = resolve_unary_op(op);
 
     match expr {
@@ -150,18 +119,17 @@ fn resolve_unary_expression(
 }
 
 /// Resolves a function call expression.
-fn resolve_function_call_expression(
+fn resolve_function_call_expression<E>(
     span: Span,
     name: &ast::IdentifierNode,
     args: &[ast::ExprNode],
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, Vec<VariableResolutionError>> {
-    let name_with_span = resolve_function_name(name, builtin_ref);
-    let args = args
-        .iter()
-        .map(|arg| resolve_expr(arg, builtin_ref, reference_context, parameter_context));
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    let name_with_span = resolve_function_name(name, resolution_context);
+    let args = args.iter().map(|arg| resolve_expr(arg, resolution_context));
 
     let args = error::combine_error_list(args)?;
 
@@ -170,14 +138,14 @@ fn resolve_function_call_expression(
 }
 
 /// Resolves a variable expression.
-fn resolve_variable_expression(
+fn resolve_variable_expression<E>(
     variable: &ast::VariableNode,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, Vec<VariableResolutionError>> {
-    resolve_variable(variable, builtin_ref, reference_context, parameter_context)
-        .map_err(|error| vec![error])
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    resolve_variable(variable, resolution_context).map_err(|error| vec![error])
 }
 
 /// Resolves a literal expression.
@@ -187,13 +155,14 @@ fn resolve_literal_expression(span: Span, literal: &ast::LiteralNode) -> ir::Exp
 }
 
 /// Resolves a parenthesized expression.
-fn resolve_parenthesized_expression(
+fn resolve_parenthesized_expression<E>(
     expr: &ast::ExprNode,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Expr, Vec<VariableResolutionError>> {
-    resolve_expr(expr, builtin_ref, reference_context, parameter_context)
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    resolve_expr(expr, resolution_context)
 }
 
 /// Converts an AST comparison operation to a model comparison operation.
@@ -234,14 +203,17 @@ fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::UnaryOp {
 }
 
 /// Resolves a function name to a model function name.
-fn resolve_function_name(
+fn resolve_function_name<E>(
     name: &ast::IdentifierNode,
-    builtin_ref: &impl BuiltinRef,
-) -> ir::FunctionName {
+    resolution_context: &ResolutionContext<'_, E>,
+) -> ir::FunctionName
+where
+    E: ExternalResolutionContext,
+{
     let name_span = name.span();
     let name = ir::Identifier::new(name.as_str().to_string());
 
-    if builtin_ref.has_builtin_function(&name) {
+    if resolution_context.has_builtin_function(&name) {
         ir::FunctionName::builtin(name, name_span)
     } else {
         ir::FunctionName::imported(name, name_span)
@@ -354,34 +326,35 @@ pub fn get_expr_dependencies(expr: &ir::Expr) -> Dependencies {
 mod tests {
     use super::*;
     use crate::test::{
-        TestBuiltinRef,
-        construct::{ParameterContextBuilder, ReferenceContextBuilder, test_ast, test_ir},
+        external_context::TestExternalContext, resolution_context::ResolutionContextBuilder,
+        test_ast, test_ir,
     };
 
     use oneil_ast as ast;
     use oneil_ir as ir;
+
+    fn make_resolution_context(
+        external: &mut TestExternalContext,
+        parameters: Vec<ir::Parameter>,
+    ) -> ResolutionContext<'_, TestExternalContext> {
+        let model_path = ir::ModelPath::new("/test");
+        ResolutionContextBuilder::new()
+            .with_active_model(model_path)
+            .with_parameters(parameters)
+            .with_external_context(external)
+            .build()
+    }
 
     #[test]
     fn resolve_literal_number() {
         // create the expression
         let literal = test_ast::literal_number_expr_node(42.0);
 
-        // create the builtin ref and contexts
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &literal,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        let result = resolve_expr(&literal, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -400,22 +373,11 @@ mod tests {
         // create the expression
         let literal = test_ast::literal_string_expr_node("hello");
 
-        // create the builtin ref and context
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &literal,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        let result = resolve_expr(&literal, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -434,22 +396,11 @@ mod tests {
         // create the expression
         let literal = test_ast::literal_boolean_expr_node(true);
 
-        // create the builtin ref and context
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(
-            &literal,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        let result = resolve_expr(&literal, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -471,17 +422,11 @@ mod tests {
         let ast_op = test_ast::binary_op_node(ast::BinaryOp::Add);
         let expr = test_ast::binary_op_expr_node(ast_op, ast_left, ast_right);
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -518,17 +463,11 @@ mod tests {
         let ast_op = test_ast::unary_op_node(ast::UnaryOp::Neg);
         let expr = test_ast::unary_op_expr_node(ast_op, ast_inner_expr);
 
-        // create the builtin ref and contexts
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -554,17 +493,11 @@ mod tests {
         let ast_name = test_ast::identifier_node("foo");
         let expr = test_ast::function_call_expr_node(ast_name, vec![ast_arg]);
 
-        // create the builtin ref and contexts
-        let builtin_ref = TestBuiltinRef::new().with_builtin_functions(["foo"]);
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        let mut external = TestExternalContext::new().with_builtin_functions(["foo"]);
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -603,17 +536,11 @@ mod tests {
         let ast_name = test_ast::identifier_node("custom_function");
         let expr = test_ast::function_call_expr_node(ast_name, vec![ast_arg]);
 
-        // create the builtin ref and contexts
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -651,17 +578,11 @@ mod tests {
         let ast_variable = test_ast::identifier_variable_node("x");
         let expr = test_ast::variable_expr_node(ast_variable);
 
-        // create the builtin ref and context
-        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new().with_builtin_variables(["x"]);
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -685,23 +606,16 @@ mod tests {
         let variable_ast = test_ast::identifier_variable_node("param");
         let expr = test_ast::variable_expr_node(variable_ast);
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
         let parameter = test_ir::ParameterBuilder::new()
             .with_name_str("param")
             .with_simple_number_value(42.0)
             .build();
 
-        let parameter_context_builder =
-            ParameterContextBuilder::new().with_parameter_context([parameter]);
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![parameter]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -725,17 +639,11 @@ mod tests {
         let variable_ast = test_ast::identifier_variable_node("undefined");
         let expr = test_ast::variable_expr_node(variable_ast);
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Err(errors) = result else {
@@ -772,17 +680,11 @@ mod tests {
         let ast_mul_op = test_ast::binary_op_node(ast::BinaryOp::Mul);
         let expr = test_ast::binary_op_expr_node(ast_mul_op, inner_binary, func_call);
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -824,7 +726,7 @@ mod tests {
         };
         assert_eq!(value, ir::Literal::Number(2.0));
 
-        // check right side (foo(3.14))
+        // check right side (foo(1))
         let ir::Expr::FunctionCall {
             span: _,
             name_span: _,
@@ -934,7 +836,8 @@ mod tests {
         // create the builtin functions
         let builtin_functions = ["min", "max", "sin", "cos", "tan"];
 
-        let builtin_ref = TestBuiltinRef::new().with_builtin_functions(builtin_functions);
+        let mut external = TestExternalContext::new().with_builtin_functions(builtin_functions);
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the function names
         for func_name in builtin_functions {
@@ -942,7 +845,7 @@ mod tests {
             let ast_func_name_node = test_ast::identifier_node(func_name);
 
             // resolve the function name
-            let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
+            let result = resolve_function_name(&ast_func_name_node, &resolution_context);
 
             // check the result
             let ir::FunctionName::Builtin(name, _name_span) = result else {
@@ -963,7 +866,8 @@ mod tests {
             "user_defined_function",
         ];
 
-        let builtin_ref = TestBuiltinRef::new();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the function names
         for func_name in imported_functions {
@@ -971,7 +875,7 @@ mod tests {
             let ast_func_name_node = test_ast::identifier_node(func_name);
 
             // resolve the function name
-            let result = resolve_function_name(&ast_func_name_node, &builtin_ref);
+            let result = resolve_function_name(&ast_func_name_node, &resolution_context);
 
             // check the result
             let ir::FunctionName::Imported(name, _name_span) = result else {
@@ -1010,17 +914,11 @@ mod tests {
         let ast_add_op = test_ast::binary_op_node(ast::BinaryOp::Add);
         let expr = test_ast::binary_op_expr_node(ast_add_op, ast_left_expr, ast_right_expr);
 
-        // create the builtin ref and context
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Err(errors) = result else {
@@ -1058,17 +956,11 @@ mod tests {
         let inner_expr = test_ast::binary_op_expr_node(ast_add_op, ast_left, ast_right);
         let expr = test_ast::parenthesized_expr_node(inner_expr);
 
-        // create the builtin ref and context
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -1110,17 +1002,11 @@ mod tests {
         let ast_mul_op = test_ast::binary_op_node(ast::BinaryOp::Mul);
         let expr = test_ast::binary_op_expr_node(ast_mul_op, inner_parenthesized, ast_outer_right);
 
-        // create the context
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -1172,17 +1058,11 @@ mod tests {
         let first_parentheses = test_ast::parenthesized_expr_node(ast_inner_literal);
         let expr = test_ast::parenthesized_expr_node(first_parentheses);
 
-        // create the builtin ref and context
-        let builtin_ref = TestBuiltinRef::new();
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -1206,17 +1086,11 @@ mod tests {
 
         let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, rest_chained);
 
-        // create the context
-        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new().with_builtin_variables(["x"]);
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -1265,17 +1139,11 @@ mod tests {
         let expr =
             test_ast::comparison_op_expr_node(op1, left_expr, middle_expr, [(op2, right_expr)]);
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new().with_builtin_variables(["x"]);
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
+        let mut external = TestExternalContext::new().with_builtin_variables(["x"]);
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
         // resolve the expression
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         // check the result
         let Ok(result) = result else {
@@ -1329,16 +1197,10 @@ mod tests {
 
         let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, rest_chained);
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         let Err(errors) = result else {
             panic!("Expected error, got {result:?}");
@@ -1369,16 +1231,10 @@ mod tests {
 
         let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, []);
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         let Err(errors) = result else {
             panic!("Expected error, got {result:?}");
@@ -1413,16 +1269,10 @@ mod tests {
         let expr =
             test_ast::comparison_op_expr_node(op1, left_expr, middle_expr, [(op2, chained_expr)]);
 
-        // create the context and builtin ref
-        let builtin_ref = TestBuiltinRef::new();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         let Err(errors) = result else {
             panic!("Expected error, got {result:?}");
@@ -1459,15 +1309,10 @@ mod tests {
         let expr =
             test_ast::comparison_op_expr_node(op1, left_expr, right_expr, [(op2, chained_expr)]);
 
-        let builtin_ref = TestBuiltinRef::new();
+        let mut external = TestExternalContext::new();
+        let resolution_context = make_resolution_context(&mut external, vec![]);
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let result = resolve_expr(&expr, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_expr(&expr, &resolution_context);
 
         let Err(errors) = result else {
             panic!("Expected error, got {result:?}");

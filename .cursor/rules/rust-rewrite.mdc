@@ -29,6 +29,9 @@ Write a documentation comment for every function. If the function is public-faci
 ## Good tests
 Write tests to test the code. This includes both unit tests and integration tests.
 
+## Test Refactoring
+When refactoring tests that don't compile, do not do anything more than getting them to compile unless explicitly directed. If a test is failing after it compiles, then the developer should be the one to figure out why.
+
 
 # Oneil Rules
 

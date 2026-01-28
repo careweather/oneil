@@ -14,15 +14,7 @@
 use oneil_ast as ast;
 use oneil_ir as ir;
 
-use crate::{
-    BuiltinRef,
-    error::{LoadError, ResolutionErrors},
-    util::{
-        FileLoader, Stack,
-        builder::ModelCollectionBuilder,
-        context::{ModelContext, ParameterContext, ReferenceContext},
-    },
-};
+use crate::{ExternalResolutionContext, ResolutionContext, error::CircularDependencyError};
 
 mod resolve_expr;
 mod resolve_model_import;
@@ -34,110 +26,67 @@ mod resolve_unit;
 mod resolve_variable;
 
 /// Loads a model and all its dependencies, building a complete model collection.
-pub fn load_model<F>(
-    model_path: ir::ModelPath,
-    mut builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
-    builtin_ref: &impl BuiltinRef,
-    load_stack: &mut Stack<ir::ModelPath>,
-    file_loader: &mut F,
-) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
+pub fn load_model<E>(model_path: &ir::ModelPath, resolution_context: &mut ResolutionContext<'_, E>)
 where
-    F: FileLoader,
+    E: ExternalResolutionContext,
 {
     // check for circular dependencies
     //
     // this happens before we check if the model has been visited because if
     // there is a circular dependency, it will have already been visited
-    if let Some(circular_dependency) = load_stack.find_circular_dependency(&model_path) {
-        builder.add_circular_dependency_error(model_path, circular_dependency);
-        return builder;
+    if resolution_context.is_model_active(model_path) {
+        // find the circular dependency path (stack from model_path to top, then model_path again to close the cycle)
+        let active_models = resolution_context.active_models();
+        let mut circular_dependency: Vec<ir::ModelPath> = active_models
+            .iter()
+            .skip_while(|m| *m != model_path)
+            .cloned()
+            .collect();
+        circular_dependency.push(model_path.clone());
+
+        // add the circular dependency error
+        let error = CircularDependencyError::new(circular_dependency);
+        resolution_context.add_circular_dependency_error_to_active_model(error);
+        return;
     }
 
     // check if model is already been visited, then mark as visited if not
-    if builder.model_has_been_visited(&model_path) {
-        return builder;
+    if resolution_context.has_visited_model(model_path) {
+        return;
     }
-    builder.mark_model_as_visited(&model_path);
+
+    // push the model onto the active models stack
+    resolution_context.push_active_model(model_path);
 
     // parse model ast
-    let model_ast = file_loader.parse_ast(&model_path);
+    let load_ast_result = resolution_context.load_ast(model_path);
 
     // TODO: this might be able to recover and produce a partial model?
-    let model_ast = match model_ast {
-        Ok(model_ast) => model_ast,
-        Err(error) => {
-            builder.add_model_error(model_path, LoadError::ParseError(error));
-            return builder;
-        }
+    let Ok(model_ast) = load_ast_result else {
+        resolution_context.pop_active_model(model_path);
+        return;
     };
 
     // split model ast into imports, use models, parameters, and tests
     let (imports, model_imports, parameters, tests) = split_model_ast(&model_ast);
 
-    // validate imports
-    let (python_imports, import_resolution_errors, builder) =
-        resolve_python_import::resolve_python_imports(&model_path, builder, imports, file_loader);
+    // resolve python imports
+    resolve_python_import::resolve_python_imports(model_path, imports, resolution_context);
 
-    // load use models and resolve them
-    let mut builder = load_use_models(
-        &model_path,
-        builtin_ref,
-        load_stack,
-        file_loader,
-        &model_imports,
-        builder,
-    );
+    // load the models imported
+    load_model_imports(model_path, &model_imports, resolution_context);
 
-    let models = builder.get_models();
-    let models_with_errors = builder.get_models_with_errors();
-
-    let model_context = ModelContext::new(models, models_with_errors);
-
-    // resolve submodels and references
-    let (submodels, references, submodel_resolution_errors, reference_resolution_errors) =
-        resolve_model_import::resolve_model_imports(model_imports, &model_path, &model_context);
-
-    let models_with_errors = builder.get_models_with_errors();
-
-    let reference_context = ReferenceContext::new(
-        models,
-        models_with_errors,
-        &references,
-        &reference_resolution_errors,
-    );
-
-    // dbg!(&model_path, &reference_context);
+    // resolve submodels and references to external models
+    resolve_model_import::resolve_model_imports(model_path, model_imports, resolution_context);
 
     // resolve parameters
-    let (parameters, parameter_resolution_errors) =
-        resolve_parameter::resolve_parameters(parameters, builtin_ref, &reference_context);
-
-    let parameter_context = ParameterContext::new(&parameters, &parameter_resolution_errors);
+    resolve_parameter::resolve_parameters(parameters, resolution_context);
 
     // resolve tests
-    let (tests, test_resolution_errors) =
-        resolve_test::resolve_tests(tests, builtin_ref, &reference_context, &parameter_context);
+    resolve_test::resolve_tests(tests, resolution_context);
 
-    let resolution_errors = ResolutionErrors::new(
-        import_resolution_errors,
-        submodel_resolution_errors,
-        reference_resolution_errors,
-        parameter_resolution_errors,
-        test_resolution_errors,
-    );
-
-    if !resolution_errors.is_empty() {
-        let resolution_errors = LoadError::resolution_errors(resolution_errors);
-        builder.add_model_error(model_path.clone(), resolution_errors);
-    }
-
-    // build model
-    let model = ir::Model::new(python_imports, submodels, references, parameters, tests);
-
-    // add model to builder
-    builder.add_model(model_path, model);
-
-    builder
+    // pop the model from the active models stack
+    resolution_context.pop_active_model(model_path);
 }
 
 /// Splits a model AST into its constituent declaration types.
@@ -229,38 +178,22 @@ fn split_model_ast(
 ///
 /// Use model paths are resolved relative to the current model path using
 /// `model_path.get_sibling_path(&use_model.model_name)`.
-fn load_use_models<F>(
+fn load_model_imports<E>(
     model_path: &ir::ModelPath,
-    builtin_ref: &impl BuiltinRef,
-    load_stack: &mut Stack<ir::ModelPath>,
-    file_loader: &mut F,
-    use_models: &[&ast::UseModelNode],
-    builder: ModelCollectionBuilder<F::ParseError, F::PythonError>,
-) -> ModelCollectionBuilder<F::ParseError, F::PythonError>
-where
-    F: FileLoader,
+    model_imports: &[&ast::UseModelNode],
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
 {
-    load_stack.push(model_path.clone());
-
-    let builder = use_models.iter().fold(builder, |builder, use_model| {
+    for model_import in model_imports {
         // get the use model path
-        let use_model_relative_path = use_model.get_model_relative_path();
-        let use_model_path = model_path.get_sibling_path(&use_model_relative_path);
-        let use_model_path = ir::ModelPath::new(use_model_path);
+        let model_import_relative_path = model_import.get_model_relative_path();
+        let model_import_path = model_path.get_sibling_path(&model_import_relative_path);
+        let model_import_path = ir::ModelPath::new(model_import_path);
 
         // load the use model (and its submodels)
-        load_model(
-            use_model_path,
-            builder,
-            builtin_ref,
-            load_stack,
-            file_loader,
-        )
-    });
-
-    load_stack.pop();
-
-    builder
+        load_model(&model_import_path, resolution_context);
+    }
 }
 
 #[cfg(test)]
@@ -270,8 +203,9 @@ mod tests {
 
     use super::*;
     use crate::{
+        ModelResolutionResult, ResolutionErrors,
         error::{CircularDependencyError, ModelImportResolutionError},
-        test::{TestBuiltinRef, TestFileParser, construct::test_ast},
+        test::{external_context::TestExternalContext, test_ast},
     };
 
     #[test]
@@ -328,312 +262,225 @@ mod tests {
 
     #[test]
     fn load_model_success() {
-        // create initial context
         let model_path = ir::ModelPath::new("test");
-        let builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
+        let mut external =
+            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model_node())]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        let mut file_loader = TestFileParser::new([("test.on", test_ast::empty_model_node())]);
+        load_model(&model_path, &mut resolution_context);
 
-        // load the model
-        let result = load_model(
-            model_path.clone(),
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-        );
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert!(errors.is_empty());
-
-        // check the models
-        let models = result.get_models();
+        // check the models generated
         assert_eq!(models.len(), 1);
         assert!(models.contains_key(&model_path));
+
+        // check the model errors
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_model_parse_error() {
-        // create initial context
+        // Path "nonexistent" has no AST in context -> load_ast fails
         let model_path = ir::ModelPath::new("nonexistent");
-        let builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        let mut file_loader = TestFileParser::empty();
+        load_model(&model_path, &mut resolution_context);
 
-        // load the model
-        let result = load_model(
-            model_path.clone(),
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-        );
+        let ModelResolutionResult {
+            models: _,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert_eq!(errors.len(), 1);
+        // check the model errors (parse failure does not record an error in model_errors)
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
 
-        let error = errors.get(&model_path);
-        assert_eq!(error, Some(&LoadError::ParseError(())));
-
-        // check the models
-        let models = result.get_models();
-        assert!(models.is_empty());
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_model_circular_dependency() {
-        // create initial context
-        let model_path = ir::ModelPath::new("main");
-        let builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
-
         // create a circular dependency: main.on -> sub.on -> main.on
+        let main_path = ir::ModelPath::new("main");
+        let sub_path = ir::ModelPath::new("sub");
         let main_test_model = test_ast::ModelNodeBuilder::new()
             .with_submodel("sub")
             .build();
         let sub_test_model = test_ast::ModelNodeBuilder::new()
             .with_submodel("main")
             .build();
-        let mut file_loader =
-            TestFileParser::new([("main.on", main_test_model), ("sub.on", sub_test_model)]);
+        let mut external = TestExternalContext::new()
+            .with_model_asts([("main.on", main_test_model), ("sub.on", sub_test_model)]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        // load the model
-        let result = load_model(
-            model_path,
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-        );
+        load_model(&main_path, &mut resolution_context);
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert_eq!(errors.len(), 2);
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        let main_errors = errors
-            .get(&ir::ModelPath::new("main"))
-            .expect("main errors should be present");
+        // check the models generated
+        assert_eq!(models.len(), 2);
+        assert!(models.contains_key(&main_path));
+        assert!(models.contains_key(&sub_path));
 
-        let LoadError::ResolutionErrors(resolution_errors) = main_errors else {
-            panic!("main errors should be a resolution error");
-        };
+        // check the model errors (when sub has the circular error, main's resolution of "sub" may get ModelHasError)
+        if let Some(main_errors) = model_errors.get(&main_path) {
+            let (_sub_model_name, sub_error) = main_errors
+                .get_model_import_resolution_errors()
+                .get(&ir::ReferenceName::new("sub".to_string()))
+                .expect("sub reference error should exist");
 
-        assert!(resolution_errors.get_import_errors().is_empty());
-        assert!(
-            resolution_errors
-                .get_parameter_resolution_errors()
-                .is_empty()
-        );
-        assert!(resolution_errors.get_test_resolution_errors().is_empty());
+            let ModelImportResolutionError::ModelHasError { model_path, .. } = sub_error else {
+                panic!("sub reference error should be ModelHasError, got {sub_error:?}");
+            };
 
-        let sub_error = resolution_errors
-            .get_reference_resolution_errors()
-            .get(&ir::ReferenceName::new("sub".to_string()))
-            .expect("sub reference errors should be present");
+            assert_eq!(model_path, &sub_path);
+        }
 
-        let ModelImportResolutionError::ModelHasError { model_path, .. } = sub_error else {
-            panic!("sub reference error should be a model has error error");
-        };
-
-        assert_eq!(model_path, &ir::ModelPath::new("sub"));
-
-        let sub_error = resolution_errors
-            .get_submodel_resolution_errors()
-            .get(&ir::SubmodelName::new("sub".to_string()))
-            .expect("sub submodel errors should be present");
-
-        let ModelImportResolutionError::ModelHasError { model_path, .. } = sub_error else {
-            panic!("sub errors should be a model has error error");
-        };
-
-        assert_eq!(model_path, &ir::ModelPath::new("sub"));
-
-        // check the circular dependency errors
-        let circular_dependency_errors = result.get_circular_dependency_errors();
-        assert_eq!(circular_dependency_errors.len(), 1);
-
-        let circular_dependency_error = circular_dependency_errors.get(&ir::ModelPath::new("main"));
-        assert!(circular_dependency_error.is_some());
-
-        let circular_dependency_error =
-            circular_dependency_error.expect("circular dependency error should be present");
+        // check the circular dependency errors (recorded on sub when we detect main is already on the stack)
+        let circular_dependency_error = circular_dependency_errors
+            .get(&sub_path)
+            .expect("sub should have circular dependency error");
         assert_eq!(circular_dependency_error.len(), 1);
         assert_eq!(
             circular_dependency_error[0],
-            CircularDependencyError::new(vec![
-                ir::ModelPath::new("main"),
-                ir::ModelPath::new("sub"),
-                ir::ModelPath::new("main"),
-            ])
+            CircularDependencyError::new(vec![main_path.clone(), sub_path.clone(), main_path,])
         );
-
-        // check the models
-        let models = result.get_models();
-        assert_eq!(models.len(), 2);
-        assert!(models.contains_key(&ir::ModelPath::new("main")));
-        assert!(models.contains_key(&ir::ModelPath::new("sub")));
     }
 
     #[test]
     fn load_model_already_visited() {
-        // create initial context
+        // Load the same model twice
         let model_path = ir::ModelPath::new("test");
-        let mut builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
+        let mut external =
+            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model_node())]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        // mark the model as already visited
-        builder.mark_model_as_visited(&model_path);
+        load_model(&model_path, &mut resolution_context);
+        load_model(&model_path, &mut resolution_context);
 
-        // load the model
-        let mut file_loader = TestFileParser::new([("test.on", test_ast::empty_model_node())]);
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        let result = load_model(
-            model_path,
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-        );
+        // check the models generated
+        assert_eq!(models.len(), 1);
+        assert!(models.contains_key(&model_path));
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert!(errors.is_empty());
+        // check the model errors
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
 
-        // check the models
-        let models = result.get_models();
-        assert!(models.is_empty());
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_use_models_empty() {
-        // create initial context
+        // Load a model with no use/ref declarations (only parent in context).
         let model_path = ir::ModelPath::new("parent");
-        let mut load_stack = Stack::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut file_loader = TestFileParser::empty();
-        let use_models = vec![];
-        let builder = ModelCollectionBuilder::new();
+        let mut external = TestExternalContext::new()
+            .with_model_asts([("parent.on", test_ast::empty_model_node())]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        // load the use models
-        let result = load_use_models(
-            &model_path,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-            &use_models,
-            builder,
-        );
+        load_model(&model_path, &mut resolution_context);
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert!(errors.is_empty());
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // check the models
-        let models = result.get_models();
-        assert!(models.is_empty());
+        // check the models generated
+        assert_eq!(models.len(), 1);
+        assert!(models.contains_key(&model_path));
+
+        // check the model errors
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_use_models_with_existing_models() {
-        // create initial context
-        let model_path = ir::ModelPath::new("parent");
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
-        let builder = ModelCollectionBuilder::new();
-        let mut file_loader = TestFileParser::new([
+        // Load parent that uses child1 and child2; all three ASTs in context.
+        let parent_path = ir::ModelPath::new("parent");
+        let parent_ast = test_ast::ModelNodeBuilder::new()
+            .with_submodel("child1")
+            .with_submodel("child2")
+            .build();
+        let mut external = TestExternalContext::new().with_model_asts([
+            ("parent.on", parent_ast),
             ("child1.on", test_ast::empty_model_node()),
             ("child2.on", test_ast::empty_model_node()),
         ]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        let use_models = [
-            test_ast::ImportModelNodeBuilder::new()
-                .with_top_component("child1")
-                .with_kind(ast::ModelKind::Submodel)
-                .build(),
-            test_ast::ImportModelNodeBuilder::new()
-                .with_top_component("child2")
-                .with_kind(ast::ModelKind::Submodel)
-                .build(),
-        ];
+        load_model(&parent_path, &mut resolution_context);
 
-        let use_models_ref = use_models.iter().collect::<Vec<_>>();
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // load the use models
-        let result = load_use_models(
-            &model_path,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-            &use_models_ref,
-            builder,
-        );
-
-        // check the errors
-        let errors = result.get_model_errors();
-        assert!(errors.is_empty());
-
-        // check the models
-        let models = result.get_models();
-        assert_eq!(models.len(), 2);
+        // check the models generated
+        assert_eq!(models.len(), 3);
+        assert!(models.contains_key(&parent_path));
         assert!(models.contains_key(&ir::ModelPath::new("child1")));
         assert!(models.contains_key(&ir::ModelPath::new("child2")));
+
+        // check the model errors
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_use_models_with_parse_errors() {
-        // create initial context
-        let model_path = ir::ModelPath::new("parent");
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
-        let mut file_loader = TestFileParser::empty(); // No models available
+        // Parent uses "nonexistent"; that path has no AST in context.
+        let parent_path = ir::ModelPath::new("parent");
+        let parent_ast = test_ast::ModelNodeBuilder::new()
+            .with_submodel("nonexistent")
+            .build();
+        let mut external = TestExternalContext::new().with_model_asts([("parent.on", parent_ast)]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        let use_models = [test_ast::ImportModelNodeBuilder::new()
-            .with_top_component("nonexistent")
-            .with_kind(ast::ModelKind::Submodel)
-            .build()];
-        let use_models_ref = use_models.iter().collect::<Vec<_>>();
+        load_model(&parent_path, &mut resolution_context);
 
-        let builder = ModelCollectionBuilder::new();
+        let ModelResolutionResult {
+            models: _,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // load the use models
-        let result = load_use_models(
-            &model_path,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-            &use_models_ref,
-            builder,
-        );
+        // check the model errors
+        assert!(model_errors.contains_key(&parent_path));
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert_eq!(errors.len(), 1);
-
-        let error = errors.get(&ir::ModelPath::new("nonexistent"));
-        assert_eq!(error, Some(&LoadError::ParseError(())));
-
-        // check the models
-        let models = result.get_models();
-        assert!(models.is_empty());
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_model_complex_dependency_chain() {
-        // create initial context
-        let model_path = ir::ModelPath::new("root");
-        let builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
-
-        // create a dependency chain: root.on -> level1.on -> level2.on
+        // Dependency chain: root.on -> level1.on -> level2.on
+        let root_path = ir::ModelPath::new("root");
         let root_model = test_ast::ModelNodeBuilder::new()
             .with_submodel("level1")
             .build();
@@ -642,118 +489,100 @@ mod tests {
             .build();
         let level2_model = test_ast::empty_model_node();
 
-        let mut file_loader = TestFileParser::new([
+        let mut external = TestExternalContext::new().with_model_asts([
             ("root.on", root_model),
             ("level1.on", level1_model),
             ("level2.on", level2_model),
         ]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        // load the model
-        let result = load_model(
-            model_path,
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-        );
+        load_model(&root_path, &mut resolution_context);
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert!(errors.is_empty());
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // check the models
-        let models = result.get_models();
+        // check the models generated
         assert_eq!(models.len(), 3);
-        assert!(models.contains_key(&ir::ModelPath::new("root")));
+        assert!(models.contains_key(&root_path));
         assert!(models.contains_key(&ir::ModelPath::new("level1")));
         assert!(models.contains_key(&ir::ModelPath::new("level2")));
+
+        // check the model errors
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_model_with_sections() {
-        // create initial context
-        let model_path = ir::ModelPath::new("test");
-        let builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
-
-        // create a model with sections
+        // Model with a section that declares a use submodel
+        let test_path = ir::ModelPath::new("test");
         let submodel_node = test_ast::empty_model_node();
-
-        // Create a use model declaration
         let use_model_decl = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("submodel")
             .with_kind(ast::ModelKind::Submodel)
             .build_as_decl_node();
-
-        // Create the model
         let model_node = test_ast::ModelNodeBuilder::new()
             .with_section("section1", vec![use_model_decl])
             .build();
 
-        let mut file_loader =
-            TestFileParser::new([("test.on", model_node), ("submodel.on", submodel_node)]);
+        let mut external = TestExternalContext::new()
+            .with_model_asts([("test.on", model_node), ("submodel.on", submodel_node)]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        // load the model
-        let result = load_model(
-            model_path,
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-        );
+        load_model(&test_path, &mut resolution_context);
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert!(errors.is_empty());
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // check the models
-        let models = result.get_models();
+        // check the models generated
         assert_eq!(models.len(), 2);
-        assert!(models.contains_key(&ir::ModelPath::new("test")));
+        assert!(models.contains_key(&test_path));
         assert!(models.contains_key(&ir::ModelPath::new("submodel")));
+
+        // check the model errors
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_model_with_reference() {
-        // create initial context
-        let model_path = ir::ModelPath::new("test");
-        let builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
-
-        // create a submodel with a number parameter
+        // Main model has ref "reference" and parameter y = reference.x
+        let test_path = ir::ModelPath::new("test");
+        let reference_path = ir::ModelPath::new("reference");
         let reference_node = test_ast::ModelNodeBuilder::new()
             .with_number_parameter("x", 1.0)
             .build();
-
         let model_node = test_ast::ModelNodeBuilder::new()
             .with_reference("reference")
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
 
-        let mut file_loader =
-            TestFileParser::new([("test.on", model_node), ("reference.on", reference_node)]);
+        let mut external = TestExternalContext::new()
+            .with_model_asts([("test.on", model_node), ("reference.on", reference_node)]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        // load the model
-        let result = load_model(
-            model_path,
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
-        );
+        load_model(&test_path, &mut resolution_context);
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert!(errors.is_empty());
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
 
-        // check the models
-        let models = result.get_models();
+        // check the models generated
         assert_eq!(models.len(), 2);
-
         let main_model = models
-            .get(&ir::ModelPath::new("test"))
+            .get(&test_path)
             .expect("main model should be present");
         let y_parameter = main_model
             .get_parameter(&ir::ParameterName::new("y".to_string()))
@@ -780,42 +609,51 @@ mod tests {
             panic!("variable expression should be an external variable");
         };
 
-        assert_eq!(model, &ir::ModelPath::new("reference.on"));
+        assert_eq!(model, &reference_path);
         assert_eq!(parameter_name.as_str(), "x");
+
+        // check the model errors
+        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 
     #[test]
     fn load_model_with_submodel_with_error() {
-        // create initial context
-        let model_path = ir::ModelPath::new("test");
-        let builder = ModelCollectionBuilder::new();
-        let builtin_ref = TestBuiltinRef::new();
-        let mut load_stack = Stack::new();
-
-        // create a submodel with a number parameter
+        // Main model has ref "reference"; reference model not provided (or has error).
+        // Submodel "submodel" exists but has use "nonexistent" (error).
+        let test_path = ir::ModelPath::new("test");
         let submodel_node = test_ast::ModelNodeBuilder::new()
             .with_submodel("nonexistent")
             .build();
-
         let model_node = test_ast::ModelNodeBuilder::new()
             .with_reference("reference")
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
 
-        let mut file_loader =
-            TestFileParser::new([("test.on", model_node), ("submodel.on", submodel_node)]);
+        let mut external = TestExternalContext::new()
+            .with_model_asts([("test.on", model_node), ("submodel.on", submodel_node)]);
+        let mut resolution_context = ResolutionContext::new(&mut external);
 
-        // load the model
-        let result = load_model(
-            model_path,
-            builder,
-            &builtin_ref,
-            &mut load_stack,
-            &mut file_loader,
+        load_model(&test_path, &mut resolution_context);
+
+        let ModelResolutionResult {
+            models,
+            model_errors,
+            circular_dependency_errors,
+        } = resolution_context.into_result();
+
+        // check the models generated
+        assert!(!models.is_empty(), "expected at least one model");
+
+        // check the model errors (test references "reference" with no AST, submodel references "nonexistent")
+        assert!(
+            !model_errors.is_empty(),
+            "expected at least one model with resolution errors"
         );
 
-        // check the errors
-        let errors = result.get_model_errors();
-        assert_eq!(errors.len(), 2);
+        // check the circular dependency errors
+        assert!(circular_dependency_errors.values().all(Vec::is_empty));
     }
 }

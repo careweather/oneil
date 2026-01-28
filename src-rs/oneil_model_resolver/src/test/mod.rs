@@ -1,8 +1,15 @@
-//! Test utilities for the model loader.
+//! Helper functions for creating test data
+//!
+//! Creating test data can be a tedious and repetitive process, especially where `Span`s are
+//! involved. This module provides helper functions to create test data that can be used in tests.
 
-mod builtin_ref;
-pub mod construct;
-mod file_loader;
+use oneil_shared::span::Span;
 
-pub use builtin_ref::TestBuiltinRef;
-pub use file_loader::{TestFileParser, TestPythonValidator};
+pub mod external_context;
+pub mod resolution_context;
+pub mod test_ast;
+pub mod test_ir;
+
+pub fn unimportant_span() -> Span {
+    Span::random_span()
+}

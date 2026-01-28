@@ -32,7 +32,7 @@ mod tests {
         let expected_model_level = ir::TraceLevel::Trace;
 
         // Create a trace level node
-        let trace_level_node = crate::test::construct::test_ast::trace_level_trace_node();
+        let trace_level_node = crate::test::test_ast::trace_level_trace_node();
         let result = resolve_trace_level(Some(&trace_level_node));
         assert_eq!(
             result,
@@ -50,7 +50,7 @@ mod tests {
             let expected_model_level = ir::TraceLevel::Debug;
 
             // Create a trace level node
-            let trace_level_node = crate::test::construct::test_ast::trace_level_debug_node();
+            let trace_level_node = crate::test::test_ast::trace_level_debug_node();
             let result = resolve_trace_level(Some(&trace_level_node));
             assert_eq!(
                 result,

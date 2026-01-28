@@ -119,9 +119,9 @@ impl UseModel {
         &self.model
     }
 
-    /// Returns the list of submodels being used
+    /// Returns the list of submodels being imported
     #[must_use]
-    pub const fn submodels(&self) -> Option<&SubmodelListNode> {
+    pub const fn imported_submodels(&self) -> Option<&SubmodelListNode> {
         self.submodel_list.as_ref()
     }
 

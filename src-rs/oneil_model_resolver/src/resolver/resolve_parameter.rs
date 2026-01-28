@@ -2,47 +2,40 @@
 
 use std::ops::Deref;
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    BuiltinRef,
+    ExternalResolutionContext, ResolutionContext,
     error::{self, ParameterResolutionError},
     resolver::{
         resolve_expr::{get_expr_dependencies, get_expr_internal_dependencies, resolve_expr},
         resolve_trace_level::resolve_trace_level,
         resolve_unit::resolve_unit,
     },
-    util::{
-        Stack,
-        builder::ParameterBuilder,
-        context::{ParameterContext, ReferenceContext},
-    },
+    util::Stack,
 };
 
-pub type ParameterMap = IndexMap<ir::ParameterName, ir::Parameter>;
-pub type ParameterErrorMap = IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>;
-
 /// Resolves a collection of AST parameters into resolved model parameters.
-pub fn resolve_parameters(
+pub fn resolve_parameters<E>(
     parameters: Vec<&ast::ParameterNode>,
-    builtin_ref: &impl BuiltinRef,
-    context: &ReferenceContext<'_, '_>,
-) -> (ParameterMap, ParameterErrorMap) {
-    let mut parameter_builder = ParameterBuilder::new();
-
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
+{
     let mut parameter_map = IndexMap::new();
 
+    // collect all parameters and check for duplicates
     for parameter in parameters {
         let ident = ir::ParameterName::new(parameter.ident().as_str().to_string());
         let ident_span = parameter.ident().span();
 
         let maybe_original_parameter = parameter_map.get(&ident);
         if let Some((original_ident_span, _)) = maybe_original_parameter {
-            parameter_builder.add_parameter_error(
+            resolution_context.add_parameter_error_to_active_model(
                 ident.clone(),
                 ParameterResolutionError::duplicate_parameter(
                     ident,
@@ -55,33 +48,34 @@ pub fn resolve_parameters(
         }
     }
 
-    // Convert parameter nodes into a map
+    // Drop the ident_span from the map
+    //
+    // It's main purpose was for duplicate parameter reporting, which is done.
     let parameter_ast_map: IndexMap<_, &ast::ParameterNode> = parameter_map
         .into_iter()
-        .map(|(ident, (_, ast))| (ident, ast))
+        .map(|(ident, (_ident_span, ast))| (ident, ast))
         .collect();
 
     // note that an 'internal dependency' is a dependency on a parameter
     // that is defined within the current model
     let dependencies = get_all_parameter_internal_dependencies(&parameter_ast_map);
 
+    let mut parameters_visited = IndexSet::new();
+
     for parameter_identifier in parameter_ast_map.keys() {
         let parameter_identifier = ir::Identifier::new(parameter_identifier.as_str().to_string());
 
         let mut parameter_stack = Stack::new();
 
-        parameter_builder = try_resolve_identifier_as_parameter(
+        try_resolve_identifier_as_parameter(
             &parameter_identifier.clone(),
             &parameter_ast_map,
             &dependencies,
             &mut parameter_stack,
-            builtin_ref,
-            context,
-            parameter_builder,
+            &mut parameters_visited,
+            resolution_context,
         );
     }
-
-    parameter_builder.into_parameter_collection_and_errors()
 }
 
 /// Analyzes all parameters to extract their internal dependencies.
@@ -155,17 +149,16 @@ fn get_parameter_internal_dependencies(
 /// case that the identifier is a builtin, it is considered to be already resolved.
 /// Otherwise, the error will show up later when attempting to resolve the identifier as
 /// a "parameter not found" error.
-fn try_resolve_identifier_as_parameter(
+fn try_resolve_identifier_as_parameter<E>(
     parameter_identifier: &ir::Identifier,
-    // context
     parameter_ast_map: &IndexMap<ir::ParameterName, &ast::ParameterNode>,
     dependencies: &IndexMap<&ir::ParameterName, IndexMap<ir::Identifier, Span>>,
     parameter_stack: &mut Stack<ir::ParameterName>,
-    builtin_ref: &impl BuiltinRef,
-    context: &ReferenceContext<'_, '_>,
-    // builder
-    mut parameter_builder: ParameterBuilder,
-) -> ParameterBuilder {
+    parameters_visited: &mut IndexSet<ir::ParameterName>,
+    resolution_context: &mut ResolutionContext<'_, E>,
+) where
+    E: ExternalResolutionContext,
+{
     let parameter_name = ir::ParameterName::new(parameter_identifier.as_str().to_string());
 
     // check that the parameter exists
@@ -176,7 +169,7 @@ fn try_resolve_identifier_as_parameter(
         // handle the "not found" error
         //
         // This also accounts for the fact that the parameter may be a builtin
-        return parameter_builder;
+        return;
     };
 
     let parameter_identifier_span = param.ident().span();
@@ -189,18 +182,18 @@ fn try_resolve_identifier_as_parameter(
     // check for circular dependencies
     if let Some(circular_dependency) = parameter_stack.find_circular_dependency(&parameter_name) {
         let reference_span = parameter_identifier_span;
-        parameter_builder.add_parameter_error(
+        resolution_context.add_parameter_error_to_active_model(
             parameter_name,
             ParameterResolutionError::circular_dependency(circular_dependency, reference_span),
         );
-        return parameter_builder;
+        return;
     }
 
     // check if the parameter has already been visited
-    if parameter_builder.has_visited(&parameter_name) {
-        return parameter_builder;
+    if parameters_visited.contains(&parameter_name) {
+        return;
     }
-    parameter_builder.mark_as_visited(parameter_name.clone());
+    parameters_visited.insert(parameter_name.clone());
 
     // resolve the parameter dependencies
     let parameter_dependencies = dependencies
@@ -212,14 +205,13 @@ fn try_resolve_identifier_as_parameter(
 
     // resolve the parameter dependencies
     for dependency_identifier in parameter_dependencies.keys() {
-        parameter_builder = try_resolve_identifier_as_parameter(
+        try_resolve_identifier_as_parameter(
             dependency_identifier,
             parameter_ast_map,
             dependencies,
             parameter_stack,
-            builtin_ref,
-            context,
-            parameter_builder,
+            parameters_visited,
+            resolution_context,
         );
     }
 
@@ -231,17 +223,11 @@ fn try_resolve_identifier_as_parameter(
         .get(&parameter_name)
         .expect("parameter should exist");
 
-    let parameter_context = ParameterContext::new(
-        parameter_builder.get_parameters(),
-        parameter_builder.get_parameter_errors(),
-    );
-
     let label = ir::Label::new(parameter.label().as_str().to_string());
 
-    let value =
-        resolve_parameter_value(parameter.value(), builtin_ref, context, &parameter_context);
+    let value = resolve_parameter_value(parameter.value(), resolution_context);
 
-    let limits = resolve_limits(parameter.limits(), builtin_ref, context, &parameter_context);
+    let limits = resolve_limits(parameter.limits(), resolution_context);
 
     let is_performance = parameter.performance_marker().is_some();
 
@@ -265,30 +251,29 @@ fn try_resolve_identifier_as_parameter(
             );
 
             // add the parameter to the parameter builder
-            parameter_builder.add_parameter(parameter_name, parameter);
+            resolution_context.add_parameter_to_active_model(parameter_name, parameter);
         }
         Err(errors) => {
             // add the errors to the parameter builder
             for error in errors {
-                parameter_builder.add_parameter_error(parameter_name.clone(), error);
+                resolution_context
+                    .add_parameter_error_to_active_model(parameter_name.clone(), error);
             }
         }
     }
-
-    parameter_builder
 }
 
 /// Resolves a parameter value expression.
-fn resolve_parameter_value(
+fn resolve_parameter_value<E>(
     value: &ast::ParameterValue,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::ParameterValue, Vec<ParameterResolutionError>> {
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::ParameterValue, Vec<ParameterResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
     match value {
         ast::ParameterValue::Simple(expr, unit) => {
-            let expr = resolve_expr(expr, builtin_ref, reference_context, parameter_context)
-                .map_err(error::convert_errors)?;
+            let expr = resolve_expr(expr, resolution_context).map_err(error::convert_errors)?;
 
             let unit = unit.as_ref().map(resolve_unit);
 
@@ -297,21 +282,11 @@ fn resolve_parameter_value(
 
         ast::ParameterValue::Piecewise(piecewise, unit) => {
             let exprs = piecewise.iter().map(|part| {
-                let expr = resolve_expr(
-                    part.expr(),
-                    builtin_ref,
-                    reference_context,
-                    parameter_context,
-                )
-                .map_err(error::convert_errors);
+                let expr =
+                    resolve_expr(part.expr(), resolution_context).map_err(error::convert_errors);
 
-                let if_expr = resolve_expr(
-                    part.if_expr(),
-                    builtin_ref,
-                    reference_context,
-                    parameter_context,
-                )
-                .map_err(error::convert_errors);
+                let if_expr =
+                    resolve_expr(part.if_expr(), resolution_context).map_err(error::convert_errors);
 
                 let (expr, if_expr) = error::combine_errors(expr, if_expr)?;
 
@@ -328,19 +303,18 @@ fn resolve_parameter_value(
 }
 
 /// Resolves parameter limits.
-fn resolve_limits(
+fn resolve_limits<E>(
     limits: Option<&ast::LimitsNode>,
-    builtin_ref: &impl BuiltinRef,
-    reference_context: &ReferenceContext<'_, '_>,
-    parameter_context: &ParameterContext<'_>,
-) -> Result<ir::Limits, Vec<ParameterResolutionError>> {
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Limits, Vec<ParameterResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
     match limits.map(|limits| (&**limits, limits.span())) {
         Some((ast::Limits::Continuous { min, max }, span)) => {
-            let min = resolve_expr(min, builtin_ref, reference_context, parameter_context)
-                .map_err(error::convert_errors);
+            let min = resolve_expr(min, resolution_context).map_err(error::convert_errors);
 
-            let max = resolve_expr(max, builtin_ref, reference_context, parameter_context)
-                .map_err(error::convert_errors);
+            let max = resolve_expr(max, resolution_context).map_err(error::convert_errors);
 
             let (min, max) = error::combine_errors(min, max)?;
 
@@ -348,8 +322,7 @@ fn resolve_limits(
         }
         Some((ast::Limits::Discrete { values }, span)) => {
             let values = values.iter().map(|value| {
-                resolve_expr(value, builtin_ref, reference_context, parameter_context)
-                    .map_err(error::convert_errors)
+                resolve_expr(value, resolution_context).map_err(error::convert_errors)
             });
 
             let values = error::combine_error_list(values)?;
@@ -414,8 +387,8 @@ mod tests {
     use crate::{
         error::VariableResolutionError,
         test::{
-            TestBuiltinRef,
-            construct::{ParameterContextBuilder, ReferenceContextBuilder, test_ast},
+            external_context::TestExternalContext, resolution_context::ResolutionContextBuilder,
+            test_ast,
         },
     };
 
@@ -423,73 +396,84 @@ mod tests {
     use oneil_ast as ast;
     use oneil_ir as ir;
 
+    fn param_name(s: &str) -> ir::ParameterName {
+        ir::ParameterName::new(s.to_string())
+    }
+
     #[test]
     fn resolve_parameters_empty() {
-        // create the parameters
-        let parameters = vec![];
+        // build the parameters
+        let parameters: Vec<&ast::ParameterNode> = vec![];
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
-
-        // check the errors
-        assert!(errors.is_empty());
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
         // check the resolved parameters
-        assert!(resolved_params.is_empty());
+        assert!(resolution_context.get_active_model_parameters().is_empty());
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_parameter_errors()
+                .is_empty()
+        );
     }
 
     #[test]
     fn resolve_parameters_simple() {
-        // create the parameters
+        // build the parameters
         let param_a = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
             .with_number_value(10.0)
             .build();
-
         let param_b = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("b")
             .with_number_value(20.0)
             .build();
+        let parameters: Vec<&ast::ParameterNode> = vec![&param_a, &param_b];
 
-        let parameters = vec![&param_a, &param_b];
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
-
-        // check the errors
-        assert!(errors.is_empty());
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
         // check the resolved parameters
-        assert_eq!(resolved_params.len(), 2);
-
-        let param_a = resolved_params
-            .get(&ir::ParameterName::new("a".to_string()))
+        let resolved = resolution_context.get_active_model_parameters();
+        assert_eq!(resolved.len(), 2);
+        let param_a = resolved
+            .get(&param_name("a"))
             .expect("param a should exist");
-        let param_b = resolved_params
-            .get(&ir::ParameterName::new("b".to_string()))
+        let param_b = resolved
+            .get(&param_name("b"))
             .expect("param b should exist");
-
         assert!(param_a.dependencies().parameter().is_empty());
         assert!(param_b.dependencies().parameter().is_empty());
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_parameter_errors()
+                .is_empty()
+        );
     }
 
     #[test]
     fn resolve_parameters_with_dependencies() {
-        // create the parameters
+        // build the parameters
         let param_a = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
             .with_number_value(10.0)
@@ -498,43 +482,47 @@ mod tests {
             .with_ident_and_label("b")
             .with_dependent_parameter_values(["a"])
             .build();
-        let parameters = vec![&param_a, &param_b];
+        let parameters: Vec<&ast::ParameterNode> = vec![&param_a, &param_b];
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let builtin_ref = TestBuiltinRef::new();
-
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
-
-        // check the errors
-        assert!(errors.is_empty());
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
         // check the resolved parameters
-        assert_eq!(resolved_params.len(), 2);
-
-        let param_a = resolved_params
-            .get(&ir::ParameterName::new("a".to_string()))
+        let resolved = resolution_context.get_active_model_parameters();
+        assert_eq!(resolved.len(), 2);
+        let param_a = resolved
+            .get(&param_name("a"))
             .expect("param a should exist");
-        let param_b = resolved_params
-            .get(&ir::ParameterName::new("b".to_string()))
+        let param_b = resolved
+            .get(&param_name("b"))
             .expect("param b should exist");
-
         assert!(param_a.dependencies().parameter().is_empty());
         assert!(
             param_b
                 .dependencies()
                 .parameter()
-                .contains_key(&ir::ParameterName::new("a".to_string()))
+                .contains_key(&param_name("a"))
+        );
+
+        // check the errors
+        assert!(
+            resolution_context
+                .get_active_model_parameter_errors()
+                .is_empty()
         );
     }
 
     #[test]
     fn resolve_parameters_circular_dependency() {
-        // create the parameters with circular dependency
+        // build the parameters with circular dependency
         let param_a = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
             .with_dependent_parameter_values(["b"])
@@ -543,33 +531,32 @@ mod tests {
             .with_ident_and_label("b")
             .with_dependent_parameter_values(["a"])
             .build();
-        let parameters = vec![&param_a, &param_b];
+        let parameters: Vec<&ast::ParameterNode> = vec![&param_a, &param_b];
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let builtin_ref = TestBuiltinRef::new();
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
+        // check the resolved parameters
+        assert!(resolution_context.get_active_model_parameters().is_empty());
 
         // check the errors
+        let errors = resolution_context.get_active_model_parameter_errors();
         assert!(!errors.is_empty());
-
-        assert!(errors.contains_key(&ir::ParameterName::new("a".to_string())));
-        assert!(errors.contains_key(&ir::ParameterName::new("b".to_string())));
-
-        let a_errors = errors
-            .get(&ir::ParameterName::new("a".to_string()))
-            .expect("a errors should exist");
-        let b_errors = errors
-            .get(&ir::ParameterName::new("b".to_string()))
-            .expect("b errors should exist");
+        assert!(errors.contains_key(&param_name("a")));
+        assert!(errors.contains_key(&param_name("b")));
 
         // check that both parameters have errors, one is a circular dependency
         // error and both have a "parameter had error" error
+        let a_errors = errors.get(&param_name("a")).expect("a errors should exist");
+        let b_errors = errors.get(&param_name("b")).expect("b errors should exist");
         assert_eq!(a_errors.len() + b_errors.len(), 3);
 
         // the order in which parameters are resolved is non-deterministic,
@@ -589,10 +576,8 @@ mod tests {
                     parameter_name,
                     reference_span: _,
                 }
-            )
-            if parameter_name.as_str() == "b",
+            ) if parameter_name.as_str() == "b",
         )));
-
         assert!(b_errors.iter().any(|e| matches!(
             e,
             ParameterResolutionError::VariableResolution(
@@ -600,12 +585,8 @@ mod tests {
                     parameter_name,
                     reference_span: _,
                 }
-            )
-            if parameter_name.as_str() == "a",
+            ) if parameter_name.as_str() == "a",
         )));
-
-        // check the resolved parameters
-        assert!(resolved_params.is_empty());
     }
 
     #[test]
@@ -741,25 +722,20 @@ mod tests {
 
     #[test]
     fn resolve_parameter_value_simple() {
-        // create a simple parameter value
+        // build the parameter value node
         let expr = test_ast::literal_number_expr_node(42.0);
         let value_node = test_ast::simple_parameter_value_node(expr);
 
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the parameter value
-        let result = resolve_parameter_value(
-            &value_node,
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        let result = resolve_parameter_value(&value_node, &resolution_context);
 
         // check the result
         assert!(matches!(result, Ok(ir::ParameterValue::Simple(_, None))));
@@ -767,17 +743,16 @@ mod tests {
 
     #[test]
     fn resolve_limits_none() {
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the limits
-        let result = resolve_limits(None, &builtin_ref, &reference_context, &parameter_context);
+        let result = resolve_limits(None, &resolution_context);
 
         // check the result
         assert_eq!(result, Ok(ir::Limits::default()));
@@ -785,24 +760,17 @@ mod tests {
 
     #[test]
     fn resolve_limits_continuous() {
-        // create continuous limits with literal values
+        // build the limits node and context
         let limits_node = test_ast::continuous_limits_node(0.0, 100.0);
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the limits
-        let result = resolve_limits(
-            Some(&limits_node),
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        let result = resolve_limits(Some(&limits_node), &resolution_context);
 
         // check the result
         assert!(matches!(result, Ok(ir::Limits::Continuous { .. })));
@@ -810,24 +778,17 @@ mod tests {
 
     #[test]
     fn resolve_limits_discrete() {
-        // create discrete limits with literal values
+        // build the limits node and context
         let limits_node = test_ast::discrete_limits_node([1.0, 2.0, 3.0]);
-
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
-
-        let parameter_context_builder = ParameterContextBuilder::new();
-        let parameter_context = parameter_context_builder.build();
-
-        let builtin_ref = TestBuiltinRef::new();
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
         // resolve the limits
-        let result = resolve_limits(
-            Some(&limits_node),
-            &builtin_ref,
-            &reference_context,
-            &parameter_context,
-        );
+        let result = resolve_limits(Some(&limits_node), &resolution_context);
 
         // check the result
         assert!(matches!(result, Ok(ir::Limits::Discrete { .. })));
@@ -835,7 +796,7 @@ mod tests {
 
     #[test]
     fn resolve_parameters_duplicate_parameters() {
-        // create the parameters with duplicate identifiers
+        // build the parameters with duplicate identifiers
         let param_a1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
             .with_number_value(10.0)
@@ -844,44 +805,42 @@ mod tests {
             .with_ident_and_label("a")
             .with_number_value(20.0)
             .build();
-        let parameters = vec![&param_a1, &param_a2];
+        let parameters: Vec<&ast::ParameterNode> = vec![&param_a1, &param_a2];
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let builtin_ref = TestBuiltinRef::new();
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
+        // check the resolved parameters
+        let resolved = resolution_context.get_active_model_parameters();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&param_name("a")));
 
-        // check the errors - should have one duplicate parameter error
+        // check the errors
+        let errors = resolution_context.get_active_model_parameter_errors();
         assert_eq!(errors.len(), 1);
 
-        let a_errors = errors
-            .get(&ir::ParameterName::new("a".to_string()))
-            .expect("a errors should exist");
+        // check the first duplicate error
+        let a_errors = errors.get(&param_name("a")).expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
-        // check that the error is a duplicate parameter error
-        let duplicate_error = &a_errors[0];
-
-        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = duplicate_error
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = &a_errors[0]
         else {
             panic!("duplicate error should be a duplicate parameter error");
         };
         assert_eq!(parameter_name.as_str(), "a");
-
-        // check the resolved parameters - should have one parameter, the
-        //     parameter that is present is left unspecified
-        assert_eq!(resolved_params.len(), 1);
-        assert!(resolved_params.contains_key(&ir::ParameterName::new("a".to_string())));
     }
 
     #[test]
     fn resolve_parameters_multiple_duplicate_parameters() {
-        // create the parameters with multiple duplicates
+        // build the parameters with multiple duplicates
         let param_foo1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("foo")
             .with_number_value(10.0)
@@ -898,57 +857,55 @@ mod tests {
             .with_ident_and_label("bar")
             .with_number_value(40.0)
             .build();
-        let parameters = vec![&param_foo1, &param_bar1, &param_foo2, &param_bar2];
+        let parameters: Vec<&ast::ParameterNode> =
+            vec![&param_foo1, &param_bar1, &param_foo2, &param_bar2];
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let builtin_ref = TestBuiltinRef::new();
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
+        // check the resolved parameters
+        let resolved = resolution_context.get_active_model_parameters();
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved.contains_key(&param_name("foo")));
+        assert!(resolved.contains_key(&param_name("bar")));
 
-        // check the errors - should have two duplicate parameter errors
+        // check the errors
+        let errors = resolution_context.get_active_model_parameter_errors();
         assert_eq!(errors.len(), 2);
 
         let foo_errors = errors
-            .get(&ir::ParameterName::new("foo".to_string()))
+            .get(&param_name("foo"))
             .expect("foo errors should exist");
         let bar_errors = errors
-            .get(&ir::ParameterName::new("bar".to_string()))
+            .get(&param_name("bar"))
             .expect("bar errors should exist");
         assert_eq!(foo_errors.len(), 1);
         assert_eq!(bar_errors.len(), 1);
 
-        // check that both errors are duplicate parameter errors
-        let foo_duplicate_error = &foo_errors[0];
-        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } =
-            foo_duplicate_error
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = &foo_errors[0]
         else {
             panic!("foo duplicate error should be a duplicate parameter error");
         };
         assert_eq!(parameter_name.as_str(), "foo");
 
-        let bar_duplicate_error = &bar_errors[0];
-        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } =
-            bar_duplicate_error
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = &bar_errors[0]
         else {
             panic!("bar duplicate error should be a duplicate parameter error");
         };
         assert_eq!(parameter_name.as_str(), "bar");
-
-        // check the resolved parameters - should have two parameters, the
-        //     parameters that are present are left unspecified
-        assert_eq!(resolved_params.len(), 2);
-        assert!(resolved_params.contains_key(&ir::ParameterName::new("foo".to_string())));
-        assert!(resolved_params.contains_key(&ir::ParameterName::new("bar".to_string())));
     }
 
     #[test]
     fn resolve_parameters_duplicate_parameters_with_valid_parameters() {
-        // create the parameters with duplicates and valid parameters
+        // build the parameters with duplicates and valid parameters
         let param_a1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
             .with_number_value(10.0)
@@ -965,44 +922,43 @@ mod tests {
             .with_ident_and_label("c")
             .with_number_value(40.0)
             .build();
-        let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
+        let parameters: Vec<&ast::ParameterNode> = vec![&param_a1, &param_b, &param_a2, &param_c];
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let builtin_ref = TestBuiltinRef::new();
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
+        // check the resolved parameters
+        let resolved = resolution_context.get_active_model_parameters();
+        assert_eq!(resolved.len(), 3);
+        assert!(resolved.contains_key(&param_name("a")));
+        assert!(resolved.contains_key(&param_name("b")));
+        assert!(resolved.contains_key(&param_name("c")));
 
-        // check the errors - should have one duplicate parameter error
+        // check the errors
+        let errors = resolution_context.get_active_model_parameter_errors();
         assert_eq!(errors.len(), 1);
 
-        let a_errors = errors
-            .get(&ir::ParameterName::new("a".to_string()))
-            .expect("a errors should exist");
+        let a_errors = errors.get(&param_name("a")).expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
-        // check that the error is a duplicate parameter error
-        let duplicate_error = &a_errors[0];
-        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = duplicate_error
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = &a_errors[0]
         else {
             panic!("duplicate error should be a duplicate parameter error");
         };
         assert_eq!(parameter_name.as_str(), "a");
-
-        // check the resolved parameters
-        assert_eq!(resolved_params.len(), 3);
-        assert!(resolved_params.contains_key(&ir::ParameterName::new("a".to_string())));
-        assert!(resolved_params.contains_key(&ir::ParameterName::new("b".to_string())));
-        assert!(resolved_params.contains_key(&ir::ParameterName::new("c".to_string())));
     }
 
     #[test]
     fn resolve_parameters_duplicate_parameters_with_dependencies() {
-        // create the parameters with duplicates and dependencies
+        // build the parameters with duplicates and dependencies
         let param_a1 = test_ast::ParameterNodeBuilder::new()
             .with_ident_and_label("a")
             .with_number_value(10.0)
@@ -1019,68 +975,58 @@ mod tests {
             .with_ident_and_label("c")
             .with_dependent_parameter_values(["b"])
             .build();
-        let parameters = vec![&param_a1, &param_b, &param_a2, &param_c];
+        let parameters: Vec<&ast::ParameterNode> = vec![&param_a1, &param_b, &param_a2, &param_c];
 
-        // create the context and builtin ref
-        let reference_context_builder = ReferenceContextBuilder::new();
-        let reference_context = reference_context_builder.build();
+        // build the context
+        let active_path = ir::ModelPath::new("main");
+        let mut external = TestExternalContext::new();
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
 
-        let builtin_ref = TestBuiltinRef::new();
+        // run the resolution
+        resolve_parameters(parameters, &mut resolution_context);
 
-        // resolve the parameters
-        let (resolved_params, errors) =
-            resolve_parameters(parameters, &builtin_ref, &reference_context);
+        // check the resolved parameters
+        let resolved = resolution_context.get_active_model_parameters();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&param_name("a")));
 
         // check the errors
+        let errors = resolution_context.get_active_model_parameter_errors();
         assert_eq!(errors.len(), 3);
 
-        // check the a error for "duplicate parameter"
-        let a_errors = errors
-            .get(&ir::ParameterName::new("a".to_string()))
-            .expect("a errors should exist");
+        let a_errors = errors.get(&param_name("a")).expect("a errors should exist");
         assert_eq!(a_errors.len(), 1);
 
-        let duplicate_error = &a_errors[0];
-        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = duplicate_error
+        let ParameterResolutionError::DuplicateParameter { parameter_name, .. } = &a_errors[0]
         else {
             panic!("duplicate error should be a duplicate parameter error");
         };
         assert_eq!(parameter_name.as_str(), "a");
 
-        // check the b error for "parameter has error"
-        assert!(errors.contains_key(&ir::ParameterName::new("b".to_string())));
-        let b_errors = errors
-            .get(&ir::ParameterName::new("b".to_string()))
-            .expect("b errors should exist");
+        let b_errors = errors.get(&param_name("b")).expect("b errors should exist");
         assert_eq!(b_errors.len(), 1);
 
-        let parameter_has_error = &b_errors[0];
         let ParameterResolutionError::VariableResolution(
             VariableResolutionError::ParameterHasError { parameter_name, .. },
-        ) = parameter_has_error
+        ) = &b_errors[0]
         else {
             panic!("parameter has error should be a parameter has error");
         };
         assert_eq!(parameter_name.as_str(), "a");
 
-        // check the c error for "parameter has error"
-        let c_errors = errors
-            .get(&ir::ParameterName::new("c".to_string()))
-            .expect("c errors should exist");
+        let c_errors = errors.get(&param_name("c")).expect("c errors should exist");
         assert_eq!(c_errors.len(), 1);
 
-        let parameter_has_error = &c_errors[0];
         let ParameterResolutionError::VariableResolution(
             VariableResolutionError::ParameterHasError { parameter_name, .. },
-        ) = parameter_has_error
+        ) = &c_errors[0]
         else {
             panic!("parameter has error should be a parameter has error");
         };
         assert_eq!(parameter_name.as_str(), "b");
-
-        // check the resolved parameters - only the first "a" parameter is resolved
-        assert_eq!(resolved_params.len(), 1);
-        assert!(resolved_params.contains_key(&ir::ParameterName::new("a".to_string())));
     }
 
     #[test]
