@@ -58,6 +58,16 @@ class FunctionCache:
         self._import_hashes = {}
         # Maps function_id -> module_name
         self._function_modules = {}
+        # Verbose mode - pass verbose=True to Python functions
+        self._verbose_mode = False
+    
+    def set_verbose(self, enabled):
+        """Enable or disable verbose mode for Python function calls."""
+        self._verbose_mode = enabled
+    
+    def is_verbose(self):
+        """Check if verbose mode is enabled."""
+        return self._verbose_mode
     
     def set_cache_dir(self, model_dir):
         """Set the cache directory based on the model's location."""
@@ -1432,11 +1442,11 @@ class Parameter:
             self.pointer = False
         elif isinstance(equation, str):
             if any(character in EQUATION_OPERATORS + list(OPERATOR_OVERRIDES.keys()) for character in equation):
-                # Find parameter names including "." imports
+                # Find parameter names including "." imports (in equation order)
                 self.args = [x for x in re.findall(r"(?!\d+)\w+\.?\w*", re.sub('[\'|\"].*[\'|\"]','',equation)) if x not in FUNCTIONS]
 
-                # Trim duplicate args
-                self.args = list(set(self.args))
+                # Trim duplicate args while preserving order
+                self.args = list(dict.fromkeys(self.args))
 
                 for old, new in FUNCTIONS.items():
                     if "." + old not in equation:
@@ -1466,7 +1476,9 @@ class Parameter:
             else:
                 self.minmax_equation = True
                 self.equation = equation
-                self.args.extend(list(set(equation[0].args + equation[1].args)))
+                # Preserve order while removing duplicates
+                combined_args = equation[0].args + equation[1].args
+                self.args.extend(list(dict.fromkeys(combined_args)))
         elif isinstance(equation, list):
             self.equation=[]
             for piece in equation:
@@ -1599,7 +1611,18 @@ class Parameter:
                 return cached_result
 
             try:
-                result = self.equation(*function_args)
+                # If verbose mode is enabled, try calling with verbose=True first
+                if _function_cache.is_verbose():
+                    try:
+                        result = self.equation(*function_args, verbose=True)
+                    except TypeError as te:
+                        # Function doesn't accept verbose argument, call without it
+                        if "verbose" in str(te) or "unexpected keyword argument" in str(te):
+                            result = self.equation(*function_args)
+                        else:
+                            raise
+                else:
+                    result = self.equation(*function_args)
                 # Cache the result for future calls
                 _function_cache.set(self.equation, function_args, result)
                 return result
@@ -2755,12 +2778,11 @@ class Model:
                 if parameter_ID in self.parameters:
                     parameter = self.parameters[parameter_ID]
                 elif "." in parameter_ID:
-                    result, _ = self.retrieve_parameter_from_submodel(parameter_ID)
-
-                    if isinstance(result, Parameter):
-                        parameter = result
-                    else:
-                        raise TypeError("Invalid result type: " + str(type(result)))
+                    # Delegate to the submodel for proper context
+                    param_name, submodel_name = parameter_ID.split(".")
+                    submodel = self._retrieve_model(self.submodels[submodel_name]['path'])
+                    submodel._tree_recursively([param_name], indent=indent, sigfigs=sigfigs, levels=levels, verbose=verbose, up=up, trail=trail, turtles=turtles, submodel_id=submodel_name)
+                    continue  # Skip the rest of the loop - submodel handles it
                 else:
                     raise IDError(self, parameter_ID, "Parameter not found in model.")
 
@@ -2834,7 +2856,7 @@ class Model:
                         submodel._tree_recursively([arg.split(".")[0]], indent + 1, levels=levels, verbose=verbose, trail=new_trail, turtles=turtles, submodel_id=arg.split(".")[1])
         else:
             [self.parameters[ID].short_print(sigfigs, indent=indent * 4, verbose=verbose, submodel_id=submodel_id, level=indent) for ID in parameter_IDs if ID in self.parameters | self.constants]
-            if any([self.parameters[ID].args for ID in parameter_IDs if ID in self.parameters]) and turtles: print("    " * indent + "🐢🐢🐢")
+            if any([self.parameters[ID].args for ID in parameter_IDs if ID in self.parameters]) and turtles: print("    " * (indent + 1) + "🐢🐢🐢")
 
     def _calculate_parameters_recursively(self, parameters, trail=[]):
         for parameter in parameters.values():
@@ -3140,9 +3162,14 @@ def handler(model: Model, inpt: str) -> Model:
                 model = handler(model, command)
 
         elif cmd == "reload":
-            if args and args[0] == "hard":
+            if "hard" in args:
                 _function_cache.clear_all()
                 print("Cache cleared for hard reload.")
+            if opts.get("verbose", False):
+                _function_cache.set_verbose(True)
+                print("Verbose mode enabled for Python functions.")
+            else:
+                _function_cache.set_verbose(False)
             if model.design == "default":
                 model = loader(model.name, [], capture_errors=False)
             else:
@@ -3248,11 +3275,13 @@ Commands:
     load model
         Load a new model (starting over from scratch).
 
-    reload [hard]
+    reload [hard] [verbose]
         Reload the current model with all designs (starting over from scratch).
         Note: Python function results are cached and only re-run if the Python
         source files or input values have changed.
         Use 'reload hard' to clear all caches and force re-running all functions.
+        Use 'reload verbose' to pass verbose=True to Python functions (for
+        functions that support it). Can be combined: 'reload hard verbose'.
 
     cache [clear]
         Show function cache statistics. Use 'cache clear' to clear the cache.

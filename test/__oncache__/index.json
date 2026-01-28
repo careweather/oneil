@@ -1,8 +1,8 @@
 {
   "entries": {
     "cache_test_funcs.expensive_calculation|3fa978005983e4f2": {
-      "cached_at": "2026-01-28T08:12:54",
-      "data_file": "85c4522686bc",
+      "cached_at": "2026-01-28T08:43:20",
+      "data_file": "4fae2736173f",
       "function": "expensive_calculation",
       "inputs_hash": "3fa978005983e4f2",
       "inputs_repr": "x=5",
