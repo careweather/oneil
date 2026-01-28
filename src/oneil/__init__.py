@@ -1,4 +1,5 @@
 import re
+import readline  # Enables arrow keys for history and cursor movement in REPL
 import numpy as np
 import inspect
 from pytexit import py2tex
