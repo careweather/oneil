@@ -1150,11 +1150,19 @@ class Parameter:
 
     # Parameter Printing
 
-    def __repr__(self, sigfigs=4, indent=0, verbose=False, submodel_id=""):
+    def __repr__(self, sigfigs=4, indent=0, verbose=False, submodel_id="", level=0):
         output = " " * indent
-        output += self.id + "." + submodel_id if submodel_id else self.id
-        output += ": " + self.human_readable(sigfigs)
-        output += " -- " + self.name if verbose else ""
+        # Color-code the ID based on level (bold + level color)
+        param_id = self.id + "." + submodel_id if submodel_id else self.id
+        if level > 0:
+            color = bcolors.level_color(level)
+            output += bcolors.BOLD + color + param_id + bcolors.ENDC
+            output += ": " + self.human_readable(sigfigs)
+            output += ' -- ' + color + '"' + self.name + '"' + bcolors.ENDC if verbose else ""
+        else:
+            output += param_id
+            output += ": " + self.human_readable(sigfigs)
+            output += ' -- "' + self.name + '"' if verbose else ""
         output += " (" + self.model + ")" if verbose and self.model else ""
         return output
 
@@ -1164,8 +1172,8 @@ class Parameter:
             print(key + ": " + self)
         print("\n")
 
-    def short_print(self, sigfigs=4, indent=0, verbose=False, submodel_id=""):
-        print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose, submodel_id=submodel_id))
+    def short_print(self, sigfigs=4, indent=0, verbose=False, submodel_id="", level=0):
+        print(self.__repr__(sigfigs=sigfigs, indent=indent, verbose=verbose, submodel_id=submodel_id, level=level))
 
     def long_print(self, sigfigs=8, indent=0, pref=None):
         output = " " * indent + self.name + ": "
@@ -2268,7 +2276,7 @@ class Model:
         else:
             raise TypeError("parameter_IDs must be a string or list.")
 
-    def _tree_recursively(self, parameter_IDs=[], indent=0, sigfigs=4, levels=12, verbose=False, up=False, trail=[], turtles=True, submodel_id=""):
+    def _tree_recursively(self, parameter_IDs=[], indent=0, sigfigs=4, levels=999, verbose=False, up=False, trail=[], turtles=True, submodel_id=""):
         if indent < levels:
             for parameter_ID in parameter_IDs:
                 if parameter_ID in self.parameters:
@@ -2286,11 +2294,12 @@ class Model:
                 if indent == 0:
                     parameter.hprint(sigfigs)
                 else:
-                    parameter.short_print(sigfigs, indent=indent * 4, verbose=verbose, submodel_id=submodel_id)
+                    parameter.short_print(sigfigs, indent=indent * 4, verbose=verbose, submodel_id=submodel_id, level=indent)
 
                 # For dependent parameters, continue the recursion
                 if parameter.equation:
                     arg_params = []
+                    submodel_args = []
                     print("    " * indent + "=", end="")
                     if parameter.callable:
                         header_side = "-"*((80 - len(str(parameter.equation.__name__))) // 2)
@@ -2301,6 +2310,7 @@ class Model:
                         print(str(code))
                         print(" " + "    " * indent + "-" * 80)
                         arg_params = [arg for arg in parameter.args if arg in self.parameters]
+                        submodel_args = [arg for arg in parameter.args if "." in arg]
                     elif parameter.piecewise:
                         print("{" + str(parameter.equation[0][0].equation)  + " if " + str(parameter.equation[0][1].equation), end="")
                         for i, piece in enumerate(parameter.equation):
@@ -2312,6 +2322,7 @@ class Model:
                                 
                             if piece[1].min and piece[1].max:
                                 arg_params = [arg for arg in piece[0].args if arg in self.parameters]
+                                submodel_args = [arg for arg in piece[0].args if "." in arg]
                                 print(" <------")
                             else:
                                 print("")
@@ -2319,9 +2330,11 @@ class Model:
                     elif parameter.minmax_equation:
                         print(str(parameter.equation[0].equation) + " | " + str(parameter.equation[1].equation))
                         arg_params = [arg for arg in parameter.args if arg in self.parameters]
+                        submodel_args = [arg for arg in parameter.args if "." in arg]
                     else:
                         print(f"{parameter.equation}")
                         arg_params = [arg for arg in parameter.args if arg in self.parameters]
+                        submodel_args = [arg for arg in parameter.args if "." in arg]
             
                     # Update the trail to catch circular dependencies
                     new_trail = copy.copy(trail)
@@ -2338,18 +2351,17 @@ class Model:
                         new_trail = [parameter_trail_id]
                             
                     # Recursively continue tree for args in model self
-                    self._tree_recursively(arg_params, indent + 1, levels=levels, verbose=verbose, trail=new_trail, submodel_id=submodel_id)
+                    self._tree_recursively(arg_params, indent + 1, levels=levels, verbose=verbose, trail=new_trail, turtles=turtles, submodel_id=submodel_id)
                     [print("    " * (indent + 1) + arg + ": " + str(self.constants[arg])) for arg in parameter.args if arg in self.constants]
 
                     # Recursively continue tree for args in self's submodels
                     # The submodel key is given in the form "parameter.submodel"
-                    for arg in arg_params:
-                        if "." in arg:
-                            submodel = self._retrieve_model(self.submodels[arg.split(".")[1]]['path'])
-                            submodel._tree_recursively([arg.split(".")[0]], indent + 1, levels=levels, verbose=verbose, trail=new_trail, submodel_id=arg.split(".")[1])
+                    for arg in submodel_args:
+                        submodel = self._retrieve_model(self.submodels[arg.split(".")[1]]['path'])
+                        submodel._tree_recursively([arg.split(".")[0]], indent + 1, levels=levels, verbose=verbose, trail=new_trail, turtles=turtles, submodel_id=arg.split(".")[1])
         else:
-            [self.parameters[ID].short_print(sigfigs, indent=indent * 4, verbose=verbose) for ID in parameter_IDs if ID in self.parameters | self.constants]
-            if any([self.parameters[ID].args for ID in parameter_IDs]) and turtles: print("    " * indent + "🐢🐢🐢")
+            [self.parameters[ID].short_print(sigfigs, indent=indent * 4, verbose=verbose, submodel_id=submodel_id, level=indent) for ID in parameter_IDs if ID in self.parameters | self.constants]
+            if any([self.parameters[ID].args for ID in parameter_IDs if ID in self.parameters]) and turtles: print("    " * indent + "🐢🐢🐢")
 
     def _calculate_parameters_recursively(self, parameters, trail=[]):
         for parameter in parameters.values():
@@ -2537,6 +2549,13 @@ def handler(model: Model, inpt: str):
         arg_value = float(arg_value) if isfloat(arg_value) else arg_value
         opts[arg.split("=")[0]] = arg_value
     
+    # Handle flag-style arguments (e.g., "verbose" without "=")
+    flag_args = ["verbose", "turtles", "up"]
+    for flag in flag_args:
+        if flag in args:
+            args.remove(flag)
+            opts[flag] = True
+    
     try:
         if cmd == "tree":
             model.tree(args, **opts)
@@ -2631,8 +2650,11 @@ def handler(model: Model, inpt: str):
 
 help_text = """
 Commands:
-    tree [param 1] [param 2] ... [param n]
+    tree [param 1] [param 2] ... [param n] [options]
         Print a tree for the entire model or just for the specified parameters.
+        Options:
+            verbose     Show parameter names (e.g., U: 0.2 -- "Uptime")
+            levels=N    Limit tree depth to N levels (default: 3)
 
     summarize
         Print a summary of the model.

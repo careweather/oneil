@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name="oneil"
-version="0.13.1"
+version="0.14.0"
 authors=[
   { name="Patrick Walton", email="m.patrick.walton@gmail.com" },
   { name="Brendon Bown", email="brendon.bown@gmail.com" },
