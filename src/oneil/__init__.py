@@ -8,6 +8,8 @@ import copy
 from beautifultable import BeautifulTable
 import importlib
 from functools import partial
+import hashlib
+import pickle
 
 from . import bcolors
 from . import errors as err
@@ -16,6 +18,166 @@ from . import units as un
 from .errors import OneilError
 
 np.seterr(all='raise')
+
+
+class FunctionCache:
+    """
+    Caches results of Python breakout functions to avoid re-running them
+    when inputs haven't changed.
+    
+    Cache invalidation occurs when:
+    1. The imported Python file(s) have changed (detected via content hash)
+    2. The input parameter values have changed
+    
+    The cache persists across model reloads within the same REPL session.
+    """
+    
+    def __init__(self):
+        # Maps (function_id, inputs_hash) -> result
+        self._cache = {}
+        # Maps module_name -> (file_path, content_hash)
+        self._import_hashes = {}
+        # Maps function_id -> module_name (to find which imports a function came from)
+        self._function_modules = {}
+    
+    def _compute_file_hash(self, filepath):
+        """Compute SHA256 hash of a file's contents."""
+        try:
+            with open(filepath, 'rb') as f:
+                return hashlib.sha256(f.read()).hexdigest()
+        except (IOError, OSError):
+            return None
+    
+    def _compute_inputs_hash(self, inputs):
+        """
+        Compute a hash of the input parameter values.
+        Handles Parameter objects by extracting their min/max values.
+        """
+        try:
+            # Convert inputs to a hashable representation
+            hashable_inputs = []
+            for inp in inputs:
+                if hasattr(inp, 'min') and hasattr(inp, 'max'):
+                    # It's a Parameter - use its computed values
+                    hashable_inputs.append((inp.min, inp.max, tuple(sorted(inp.units.items()))))
+                elif isinstance(inp, np.ndarray):
+                    hashable_inputs.append(inp.tobytes())
+                elif isinstance(inp, (list, tuple)):
+                    hashable_inputs.append(tuple(inp))
+                elif isinstance(inp, dict):
+                    hashable_inputs.append(tuple(sorted(inp.items())))
+                else:
+                    hashable_inputs.append(inp)
+            
+            # Use pickle for robust serialization, then hash
+            serialized = pickle.dumps(tuple(hashable_inputs), protocol=pickle.HIGHEST_PROTOCOL)
+            return hashlib.sha256(serialized).hexdigest()
+        except Exception:
+            # If we can't hash the inputs, return None to skip caching
+            return None
+    
+    def _get_function_id(self, func):
+        """Get a unique identifier for a function based on its module and name."""
+        module = getattr(func, '__module__', None)
+        name = getattr(func, '__qualname__', getattr(func, '__name__', str(func)))
+        return f"{module}.{name}"
+    
+    def register_import(self, module, filepath=None):
+        """
+        Register an imported module and compute its content hash.
+        Returns True if the module is new or changed, False if unchanged.
+        """
+        module_name = module.__name__
+        
+        # Find the file path if not provided
+        if filepath is None:
+            filepath = getattr(module, '__file__', None)
+        
+        if filepath is None:
+            # Can't track modules without files (built-ins)
+            return True
+        
+        new_hash = self._compute_file_hash(filepath)
+        
+        if module_name in self._import_hashes:
+            old_filepath, old_hash = self._import_hashes[module_name]
+            if old_hash == new_hash and old_filepath == filepath:
+                return False  # Unchanged
+            else:
+                # Module changed - invalidate all cached results from this module
+                self._invalidate_module(module_name)
+        
+        self._import_hashes[module_name] = (filepath, new_hash)
+        
+        # Register all functions from this module
+        for name, obj in inspect.getmembers(module, inspect.isfunction):
+            func_id = f"{module_name}.{name}"
+            self._function_modules[func_id] = module_name
+        
+        return True
+    
+    def _invalidate_module(self, module_name):
+        """Remove all cached results for functions from the given module."""
+        keys_to_remove = []
+        for key in self._cache:
+            func_id, _ = key
+            if func_id in self._function_modules:
+                if self._function_modules[func_id] == module_name:
+                    keys_to_remove.append(key)
+        
+        for key in keys_to_remove:
+            del self._cache[key]
+    
+    def get(self, func, inputs):
+        """
+        Try to get a cached result for the function with given inputs.
+        Returns (True, result) if found, (False, None) if not.
+        """
+        func_id = self._get_function_id(func)
+        inputs_hash = self._compute_inputs_hash(inputs)
+        
+        if inputs_hash is None:
+            return False, None
+        
+        cache_key = (func_id, inputs_hash)
+        
+        if cache_key in self._cache:
+            return True, self._cache[cache_key]
+        
+        return False, None
+    
+    def set(self, func, inputs, result):
+        """Store a result in the cache."""
+        func_id = self._get_function_id(func)
+        inputs_hash = self._compute_inputs_hash(inputs)
+        
+        if inputs_hash is None:
+            return  # Can't cache if we can't hash inputs
+        
+        cache_key = (func_id, inputs_hash)
+        self._cache[cache_key] = result
+    
+    def clear(self):
+        """Clear all cached results but keep import tracking."""
+        self._cache.clear()
+    
+    def clear_all(self):
+        """Clear everything including import tracking."""
+        self._cache.clear()
+        self._import_hashes.clear()
+        self._function_modules.clear()
+    
+    def stats(self):
+        """Return cache statistics for debugging."""
+        return {
+            'cached_results': len(self._cache),
+            'tracked_imports': len(self._import_hashes),
+            'tracked_functions': len(self._function_modules),
+        }
+
+
+# Global function cache instance - persists across model reloads within REPL session
+_function_cache = FunctionCache()
 
 def isfloat(num):
     try:
@@ -165,9 +327,14 @@ def parse_file(file_name):
                 try:
                     # Reload module if already loaded to pick up changes
                     if module in sys.modules:
-                        imports.append(importlib.reload(sys.modules[module]))
+                        imported_module = importlib.reload(sys.modules[module])
                     else:
-                        imports.append(importlib.import_module(module))
+                        imported_module = importlib.import_module(module)
+                    
+                    imports.append(imported_module)
+                    
+                    # Register with function cache and check if module changed
+                    _function_cache.register_import(imported_module)
                 except Exception as e:
                     raise ImportError(file_name, i+1, line, module + ".py", e)
 
@@ -1137,8 +1304,15 @@ class Parameter:
 
             function_args = [eval_params[arg] for arg in eval_args]
 
+            # Try to get cached result first
+            cache_hit, cached_result = _function_cache.get(self.equation, function_args)
+            if cache_hit:
+                return cached_result
+
             try:
                 result = self.equation(*function_args)
+                # Cache the result for future calls
+                _function_cache.set(self.equation, function_args, result)
                 return result
             except OneilError as e:
                 raise e
@@ -2599,6 +2773,16 @@ def handler(model: Model, inpt: str):
                 model = loader(model.name, [], capture_errors=False)
             else:
                 model = loader(model.name, [model.design], capture_errors=False)
+        elif cmd == "cache":
+            if args and args[0] == "clear":
+                _function_cache.clear()
+                print("Function cache cleared.")
+            else:
+                stats = _function_cache.stats()
+                print(f"Function cache statistics:")
+                print(f"  Cached results: {stats['cached_results']}")
+                print(f"  Tracked imports: {stats['tracked_imports']}")
+                print(f"  Tracked functions: {stats['tracked_functions']}")
         elif cmd == "help":
             print(help_text)
             return
@@ -2687,6 +2871,11 @@ Commands:
 
     reload
         Reload the current model with all designs (starting over from scratch).
+        Note: Python function results are cached and only re-run if the Python
+        source files or input values have changed.
+
+    cache [clear]
+        Show function cache statistics. Use 'cache clear' to clear the cache.
 
     help
         Print this help text.

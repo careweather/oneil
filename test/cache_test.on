@@ -1,0 +1,5 @@
+import cache_test_funcs
+
+Input value: x = 5
+Calculated value: y = expensive_calculation(x)
+
