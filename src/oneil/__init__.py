@@ -2672,7 +2672,11 @@ class Model:
                         passthrough_path = copy.copy(self.submodels[source]['path'])
                         end_model = passthrough_path.pop()
                         passthrough_model = self._retrieve_model(passthrough_path)
-                        end_model_ID = [k for k, v in passthrough_model.submodels.items() if v['path'] == [end_model]][0]
+                        # Match by last element of path to handle both 'use' and 'from' imports
+                        matching = [k for k, v in passthrough_model.submodels.items() if v['path'][-1] == end_model]
+                        if not matching:
+                            raise ModelError(end_model, trail + [self.name, passthrough_model.name])
+                        end_model_ID = matching[0]
                         passthrough_model.submodels[end_model_ID]['inputs'][arg_ID] = test_inputs[arg]
                         del test_inputs[arg]
 
