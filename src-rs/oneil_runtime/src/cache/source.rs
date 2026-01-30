@@ -13,32 +13,25 @@ impl SourceCache {
         }
     }
 
-    pub fn insert_source(&mut self, path: PathBuf, content: String) -> &str {
-        self.sources.insert(path.clone(), Ok(content));
-
-        self.sources
-            .get(&path)
-            .expect("source should be in cache after insertion")
-            .as_ref()
-            .expect("source should exist")
+    pub fn insert_source(&mut self, path: PathBuf, content: String) {
+        self.sources.insert(path, Ok(content));
     }
 
-    pub fn insert_error(&mut self, path: PathBuf, error: OneilError) -> OneilError {
-        self.sources.insert(path.clone(), Err(error));
-
-        let error = self
-            .sources
-            .get(&path)
-            .expect("error should be in cache after insertion")
-            .as_ref()
-            .expect_err("should be an error result");
-
-        error.clone()
+    pub fn insert_error(&mut self, path: PathBuf, error: OneilError) {
+        self.sources.insert(path, Err(error));
     }
 
     pub fn get(&self, path: &PathBuf) -> Option<Result<&str, &OneilError>> {
         self.sources
             .get(path)
             .map(|result| result.as_ref().map(|source| source.as_ref()))
+    }
+
+    pub fn get_all_errors(&self) -> Vec<OneilError> {
+        self.sources
+            .values()
+            .filter_map(|result| result.as_ref().err())
+            .cloned()
+            .collect()
     }
 }

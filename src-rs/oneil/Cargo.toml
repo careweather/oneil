@@ -13,14 +13,7 @@ categories.workspace = true
 
 [dependencies]
 oneil_runtime = { path = "../oneil_runtime" }
-oneil_ast = { path = "../oneil_ast" }
-oneil_eval = { path = "../oneil_eval" }
-oneil_ir = { path = "../oneil_ir" }
 oneil_lsp = { path = "../oneil_lsp" }
-oneil_model_resolver = { path = "../oneil_model_resolver" }
-oneil_parser = { path = "../oneil_parser" }
-oneil_shared = { path = "../oneil_shared" }
-oneil_runner = { path = "../oneil_runner" }
 anstream = "0.6.21"
 clap = { version = "4.5.1", features = ["derive"] }
 indexmap = { workspace = true }

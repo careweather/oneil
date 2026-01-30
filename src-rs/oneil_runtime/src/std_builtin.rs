@@ -3,8 +3,6 @@
 
 use indexmap::IndexMap;
 
-use oneil_ir as ir;
-use oneil_model_resolver::BuiltinRef;
 use oneil_shared::span::Span;
 
 use oneil_eval::{
@@ -29,19 +27,15 @@ impl StdBuiltins {
             prefixes: builtin_prefixes_complete().collect(),
         }
     }
-}
 
-impl BuiltinRef for StdBuiltins {
-    fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool {
-        self.values
-            .iter()
-            .any(|value| value.name == identifier.as_str())
+    pub fn has_builtin_value(&self, identifier: &str) -> bool {
+        self.values.iter().any(|value| value.name == identifier)
     }
 
-    fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
+    pub fn has_builtin_function(&self, identifier: &str) -> bool {
         self.functions
             .iter()
-            .any(|function| function.name == identifier.as_str())
+            .any(|function| function.name == identifier)
     }
 }
 

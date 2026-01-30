@@ -1,5 +1,3 @@
-use std::path::{Path, PathBuf};
-
 use indexmap::IndexMap;
 use oneil_ir::{self as ir, ModelPath};
 use oneil_shared::error::OneilError;
@@ -17,20 +15,17 @@ impl IrCache {
         }
     }
 
-    pub fn insert_ir(&mut self, ir: ir::ModelCollection) -> &IndexMap<ModelPath, ir::Model> {
-        let ir_map = ir.into_map();
-
-        self.ir_collection.extend(ir_map);
+    pub fn insert_ir(
+        &mut self,
+        models: IndexMap<ModelPath, ir::Model>,
+    ) -> &IndexMap<ModelPath, ir::Model> {
+        self.ir_collection.extend(models);
 
         &self.ir_collection
     }
 
-    pub fn insert_errors(&mut self, path: ModelPath, errors: Vec<OneilError>) -> &[OneilError] {
-        self.errors.insert(path.clone(), errors);
-
-        self.errors
-            .get(&path)
-            .expect("errors should be in cache after insertion")
+    pub fn insert_errors(&mut self, errors: IndexMap<ModelPath, Vec<OneilError>>) {
+        self.errors.extend(errors);
     }
 
     pub fn get_result(&self, path: &ModelPath) -> Option<Result<&ir::Model, &[OneilError]>> {
@@ -62,5 +57,9 @@ impl IrCache {
 
     pub const fn ir_collection(&self) -> &IndexMap<ModelPath, ir::Model> {
         &self.ir_collection
+    }
+
+    pub fn get_all_errors(&self) -> Vec<OneilError> {
+        self.errors.values().flatten().cloned().collect()
     }
 }
