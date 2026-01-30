@@ -1,12 +1,10 @@
 //! Error handling for the Oneil model loader.
 
 pub mod circular_dependency;
-pub mod load;
 pub mod resolution;
 pub mod util;
 
 pub use circular_dependency::CircularDependencyError;
-pub use load::LoadError;
 pub use resolution::{
     ModelImportResolutionError, ParameterResolutionError, PythonImportResolutionError,
     ResolutionErrors, VariableResolutionError,
