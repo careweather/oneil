@@ -38,7 +38,7 @@ pub struct LoadModelResult {
 pub fn load_model<E>(
     model_path: impl AsRef<Path>,
     external_context: &mut E,
-) -> ModelResolutionResult
+) -> IndexMap<ir::ModelPath, ModelResolutionResult>
 where
     E: ExternalResolutionContext,
 {
@@ -51,7 +51,7 @@ where
 pub fn load_model_list<E>(
     model_paths: &[impl AsRef<Path>],
     external_context: &mut E,
-) -> ModelResolutionResult
+) -> IndexMap<ir::ModelPath, ModelResolutionResult>
 where
     E: ExternalResolutionContext,
 {

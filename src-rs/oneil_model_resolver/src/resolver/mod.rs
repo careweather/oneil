@@ -203,7 +203,6 @@ mod tests {
 
     use super::*;
     use crate::{
-        ModelResolutionResult, ResolutionErrors,
         error::{CircularDependencyError, ModelImportResolutionError},
         test::{external_context::TestExternalContext, test_ast},
     };
@@ -269,21 +268,21 @@ mod tests {
 
         load_model(&model_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 1);
-        assert!(models.contains_key(&model_path));
+        assert_eq!(results.len(), 1);
+        assert!(results.contains_key(&model_path));
 
         // check the model errors
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -295,17 +294,17 @@ mod tests {
 
         load_model(&model_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models: _,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the model errors (parse failure does not record an error in model_errors)
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -325,19 +324,16 @@ mod tests {
 
         load_model(&main_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 2);
-        assert!(models.contains_key(&main_path));
-        assert!(models.contains_key(&sub_path));
+        assert_eq!(results.len(), 2);
+        assert!(results.contains_key(&main_path));
+        assert!(results.contains_key(&sub_path));
 
         // check the model errors (when sub has the circular error, main's resolution of "sub" may get ModelHasError)
-        if let Some(main_errors) = model_errors.get(&main_path) {
+        if let Some(main_result) = results.get(&main_path) {
+            let main_errors = main_result.model_errors();
             let (_sub_model_name, sub_error) = main_errors
                 .get_model_import_resolution_errors()
                 .get(&ir::ReferenceName::new("sub".to_string()))
@@ -351,9 +347,10 @@ mod tests {
         }
 
         // check the circular dependency errors (recorded on sub when we detect main is already on the stack)
-        let circular_dependency_error = circular_dependency_errors
+        let circular_dependency_error = results
             .get(&sub_path)
-            .expect("sub should have circular dependency error");
+            .expect("sub should have circular dependency error")
+            .circular_dependency_errors();
         assert_eq!(circular_dependency_error.len(), 1);
         assert_eq!(
             circular_dependency_error[0],
@@ -372,21 +369,21 @@ mod tests {
         load_model(&model_path, &mut resolution_context);
         load_model(&model_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 1);
-        assert!(models.contains_key(&model_path));
+        assert_eq!(results.len(), 1);
+        assert!(results.contains_key(&model_path));
 
         // check the model errors
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -399,21 +396,21 @@ mod tests {
 
         load_model(&model_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 1);
-        assert!(models.contains_key(&model_path));
+        assert_eq!(results.len(), 1);
+        assert!(results.contains_key(&model_path));
 
         // check the model errors
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -433,23 +430,23 @@ mod tests {
 
         load_model(&parent_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 3);
-        assert!(models.contains_key(&parent_path));
-        assert!(models.contains_key(&ir::ModelPath::new("child1")));
-        assert!(models.contains_key(&ir::ModelPath::new("child2")));
+        assert_eq!(results.len(), 3);
+        assert!(results.contains_key(&parent_path));
+        assert!(results.contains_key(&ir::ModelPath::new("child1")));
+        assert!(results.contains_key(&ir::ModelPath::new("child2")));
 
         // check the model errors
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -464,17 +461,17 @@ mod tests {
 
         load_model(&parent_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models: _,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the model errors
-        assert!(model_errors.contains_key(&parent_path));
+        assert!(results.contains_key(&parent_path));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -498,23 +495,23 @@ mod tests {
 
         load_model(&root_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 3);
-        assert!(models.contains_key(&root_path));
-        assert!(models.contains_key(&ir::ModelPath::new("level1")));
-        assert!(models.contains_key(&ir::ModelPath::new("level2")));
+        assert_eq!(results.len(), 3);
+        assert!(results.contains_key(&root_path));
+        assert!(results.contains_key(&ir::ModelPath::new("level1")));
+        assert!(results.contains_key(&ir::ModelPath::new("level2")));
 
         // check the model errors
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -536,22 +533,22 @@ mod tests {
 
         load_model(&test_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 2);
-        assert!(models.contains_key(&test_path));
-        assert!(models.contains_key(&ir::ModelPath::new("submodel")));
+        assert_eq!(results.len(), 2);
+        assert!(results.contains_key(&test_path));
+        assert!(results.contains_key(&ir::ModelPath::new("submodel")));
 
         // check the model errors
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -573,17 +570,14 @@ mod tests {
 
         load_model(&test_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert_eq!(models.len(), 2);
-        let main_model = models
+        assert_eq!(results.len(), 2);
+        let main_model = results
             .get(&test_path)
-            .expect("main model should be present");
+            .expect("main model should be present")
+            .model();
         let y_parameter = main_model
             .get_parameter(&ir::ParameterName::new("y".to_string()))
             .expect("y parameter should be present");
@@ -613,10 +607,14 @@ mod tests {
         assert_eq!(parameter_name.as_str(), "x");
 
         // check the model errors
-        assert!(model_errors.values().all(ResolutionErrors::is_empty));
+        assert!(results.values().all(|r| r.model_errors().is_empty()));
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 
     #[test]
@@ -638,22 +636,22 @@ mod tests {
 
         load_model(&test_path, &mut resolution_context);
 
-        let ModelResolutionResult {
-            models,
-            model_errors,
-            circular_dependency_errors,
-        } = resolution_context.into_result();
+        let results = resolution_context.into_result();
 
         // check the models generated
-        assert!(!models.is_empty(), "expected at least one model");
+        assert!(!results.is_empty(), "expected at least one model");
 
         // check the model errors (test references "reference" with no AST, submodel references "nonexistent")
         assert!(
-            !model_errors.is_empty(),
+            results.values().any(|r| !r.model_errors().is_empty()),
             "expected at least one model with resolution errors"
         );
 
         // check the circular dependency errors
-        assert!(circular_dependency_errors.values().all(Vec::is_empty));
+        assert!(
+            results
+                .values()
+                .all(|r| r.circular_dependency_errors().is_empty())
+        );
     }
 }
