@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use oneil_ast as ast;
 use oneil_shared::error::OneilError;
 
+#[derive(Debug)]
 pub struct AstCache {
     asts: IndexMap<PathBuf, ast::ModelNode>,
     errors: IndexMap<PathBuf, Vec<OneilError>>,
@@ -18,11 +19,11 @@ impl AstCache {
     }
 
     pub fn insert_ast(&mut self, path: PathBuf, ast: ast::ModelNode) {
-        self.asts.insert(path.clone(), ast);
+        self.asts.insert(path, ast);
     }
 
     pub fn insert_errors(&mut self, path: PathBuf, errors: Vec<OneilError>) {
-        self.errors.insert(path.clone(), errors);
+        self.errors.insert(path, errors);
     }
 
     pub fn get_result(&self, path: &PathBuf) -> Option<Result<&ast::ModelNode, &Vec<OneilError>>> {

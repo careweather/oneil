@@ -595,6 +595,7 @@ dependencies = [
  "notify",
  "oneil_lsp",
  "oneil_runtime",
+ "oneil_shared",
  "owo-colors",
 ]
 
@@ -636,6 +637,7 @@ name = "oneil_lsp"
 version = "0.15.0"
 dependencies = [
  "oneil_runtime",
+ "oneil_shared",
  "tokio",
  "tower-lsp-server",
 ]

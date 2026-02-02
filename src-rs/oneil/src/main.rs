@@ -16,18 +16,6 @@ use std::{
 use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use notify::Watcher;
-use oneil_eval::{
-    EvalContext,
-    builtin::{BuiltinFunction, std as oneil_std},
-    output::{
-        dependency::{DependencyTreeValue, ReferenceTreeValue},
-        eval_result::EvalResult,
-        tree::Tree,
-    },
-    value::Value,
-};
-use oneil_ir as ir;
-use oneil_runner::{builtins::Builtins, file_parser};
 use oneil_runtime::Runtime;
 
 use crate::{
@@ -41,7 +29,6 @@ use crate::{
 };
 
 mod command;
-mod convert_error;
 mod print_ast;
 mod print_error;
 mod print_independents;
@@ -101,14 +88,26 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
             println!("===== {} =====", file.display());
         }
 
-        let ast = runtime.debug_load_ast(file);
-        todo!("display partial ast");
+        runtime.load_ast(file);
+
+        let ast = runtime
+            .get_ast_or_error(file)
+            .expect("it should have been loaded");
+
         match ast {
             Ok(ast) => print_ast::print(ast, print_debug),
             Err(errors) => {
                 for error in errors {
                     print_error::print(&error, print_debug);
                     eprintln!();
+                }
+
+                if display_partial {
+                    let partial_ast = runtime
+                        .get_ast_maybe_partial(file)
+                        .expect("it should have been loaded");
+
+                    print_ast::print(partial_ast, print_debug);
                 }
             }
         }
@@ -119,8 +118,11 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
 fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
     let mut runtime = Runtime::new();
 
-    let model_collection = runtime.debug_load_ir(file);
-    match model_collection {
+    runtime.load_ir(file);
+
+    let ir_result = runtime.get_ir(file);
+
+    match ir_result {
         Ok(model_collection) => print_ir::print(model_collection, print_debug),
         Err(errors) => {
             todo!("display partial ir");
