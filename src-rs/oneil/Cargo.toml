@@ -12,8 +12,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-oneil_runtime = { path = "../oneil_runtime" }
 oneil_lsp = { path = "../oneil_lsp" }
+oneil_runtime = { path = "../oneil_runtime" }
+oneil_shared = { path = "../oneil_shared" }
 anstream = "0.6.21"
 clap = { version = "4.5.1", features = ["derive"] }
 indexmap = { workspace = true }

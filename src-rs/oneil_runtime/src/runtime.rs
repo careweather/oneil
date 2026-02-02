@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 use oneil_ast as ast;
@@ -9,15 +9,41 @@ use oneil_shared::error::OneilError;
 
 use crate::{
     cache::{AstCache, IrCache, SourceCache},
-    debug,
     error::FileError,
     std_builtin::StdBuiltins,
 };
+
+/// A result type for the runtime.
+///
+/// This type is used to return the result of a runtime operation, including
+/// the result itself, any partial result, and any errors that occurred.
+#[derive(Debug)]
+pub enum RuntimeResult<T, E> {
+    Ok(T),
+    ErrWithPartial { partial_result: T, errors: E },
+    None,
+}
+
+impl<T, E> RuntimeResult<T, E> {
+    /// Returns the result if it exists. The result may be a partial result
+    /// if there were errors.
+    ///
+    /// This method is useful for getting the result if it exists, without having
+    /// to handle the errors.
+    pub const fn get_maybe_partial_ir(&self) -> Option<&T> {
+        match self {
+            Self::Ok(value) => Some(value),
+            Self::ErrWithPartial { partial_result, .. } => Some(partial_result),
+            Self::None => None,
+        }
+    }
+}
 
 /// Runtime for the Oneil programming language.
 ///
 /// The runtime manages caches for source files, ASTs, and IR, and provides
 /// methods to load and process Oneil models.
+#[derive(Debug)]
 pub struct Runtime {
     builtins: StdBuiltins,
     source_cache: SourceCache,
@@ -42,39 +68,7 @@ impl Runtime {
         }
     }
 
-    /// Loads the AST for a model for debugging purposes.
-    ///
-    /// This method loads and parses a Oneil file, returning the AST node
-    /// or a list of parsing errors.
-    pub fn debug_load_ast(
-        &mut self,
-        path: impl AsRef<Path>,
-    ) -> Result<&debug::ast::ModelNode, Vec<OneilError>> {
-        self.load_ast(&path);
-        self.ast_cache
-            .get_result(&path.as_ref().to_path_buf())
-            .expect("should exist")
-            .map_err(|errors| errors.to_vec())
-    }
-
-    /// Loads the IR for a model for debugging purposes.
-    ///
-    /// This method loads, parses, and resolves a Oneil file, returning the IR
-    /// model collection or a list of errors.
-    pub fn debug_load_ir(
-        &mut self,
-        path: impl AsRef<Path>,
-    ) -> Result<&IndexMap<debug::ir::ModelPath, debug::ir::Model>, Vec<OneilError>> {
-        self.load_ir(path);
-
-        let errors = self.get_all_errors();
-
-        if errors.is_empty() {
-            Ok(self.ir_cache.ir_collection())
-        } else {
-            Err(errors.to_vec())
-        }
-    }
+    // ===== LOADING FUNCTIONS =====
 
     /// Loads the IR for a model, caching the result and reusing other caches.
     ///
@@ -83,7 +77,7 @@ impl Runtime {
     /// 2. If not cached, loads the AST (which uses source and AST caches)
     /// 3. Converts the AST to IR using the model resolver
     /// 4. Caches the IR result
-    fn load_ir(&mut self, path: impl AsRef<Path>) {
+    pub fn load_ir(&mut self, path: impl AsRef<Path>) {
         let path = ir::ModelPath::new(path);
 
         // Check if IR is already cached - use `contains_model` to avoid borrow issues
@@ -110,6 +104,110 @@ impl Runtime {
         self.ir_cache.insert_errors(circular_dependency_errors);
         self.ir_cache.insert_errors(resolution_errors);
     }
+
+    /// Loads the AST for a model, caching the result and reusing other caches.
+    ///
+    /// This method:
+    /// 1. Checks the AST cache first
+    /// 2. If not cached, loads the source (which uses source cache)
+    /// 3. Parses the source to AST using the parser
+    /// 4. Caches the AST result
+    ///
+    /// To get the loaded AST, use either `get_ast_or_error` or `get_ast`.
+    pub fn load_ast(&mut self, path: impl AsRef<Path>) {
+        self.load_source(&path);
+
+        let content = self
+            .source_cache
+            .get(&path.as_ref().to_path_buf())
+            .expect("should exist");
+
+        let Ok(content) = content else {
+            return;
+        };
+
+        let parse_result = parser::parse_model(content, Some(Config::default()));
+
+        match parse_result {
+            Ok(ast) => {
+                self.ast_cache.insert_ast(path.as_ref().to_path_buf(), ast);
+            }
+            Err(e) => {
+                let errors = e
+                    .errors
+                    .into_iter()
+                    .map(|e| OneilError::from_error(&e, path.as_ref().to_path_buf()))
+                    .collect();
+
+                self.ast_cache
+                    .insert_errors(path.as_ref().to_path_buf(), errors);
+            }
+        }
+    }
+
+    fn load_source(&mut self, path: impl AsRef<Path>) {
+        let path = path.as_ref();
+        let content = std::fs::read_to_string(path);
+
+        match content {
+            Ok(content) => {
+                self.source_cache.insert_source(path.to_path_buf(), content);
+            }
+            Err(error) => {
+                let error = FileError::new(path, &error);
+                let error = OneilError::from_error(&error, path.to_path_buf());
+                self.source_cache.insert_error(path.to_path_buf(), error);
+            }
+        }
+    }
+
+    // ===== GETTERS =====
+
+    /// Returns the IR for a model.
+    ///
+    /// _This will return `Some(ir_model)` even if there were errors during model
+    /// resolution._ If there were errors during model resolution, the IR model may
+    /// be partially constructed, but all references in the IR model will be valid.
+    pub fn get_ir(&self, path: &ir::ModelPath) -> RuntimeResult<&ir::Model, Vec<OneilError>> {
+        let errors = self.get_all_errors();
+        let ir = self.ir_cache.get_model(path);
+
+        match ir {
+            Some(ir) if errors.is_empty() => RuntimeResult::Ok(ir),
+            Some(ir) => RuntimeResult::ErrWithPartial {
+                partial_result: ir,
+                errors,
+            },
+            None => RuntimeResult::None,
+        }
+    }
+
+    /// Returns the AST for a model, or errors if there were errors during AST loading.
+    pub fn get_ast(&self, path: &PathBuf) -> RuntimeResult<&ast::ModelNode, Vec<OneilError>> {
+        let errors = self.get_all_errors();
+        let ast = self.ast_cache.get_ast(path);
+
+        match ast {
+            Some(ast) if errors.is_empty() => RuntimeResult::Ok(ast),
+            Some(ast) => RuntimeResult::ErrWithPartial {
+                partial_result: ast,
+                errors,
+            },
+            None => RuntimeResult::None,
+        }
+    }
+
+    fn get_all_errors(&self) -> Vec<OneilError> {
+        let mut errors = Vec::new();
+
+        errors.extend(self.source_cache.get_all_errors());
+        errors.extend(self.ast_cache.get_all_errors());
+        errors.extend(self.ir_cache.get_all_errors());
+
+        errors
+    }
+
+    // ===== HELPER FUNCTIONS =====
 
     fn convert_circular_dependency_errors(
         &self,
@@ -197,63 +295,6 @@ impl Runtime {
                 (model_path, errors)
             })
             .collect()
-    }
-
-    fn load_ast(&mut self, path: impl AsRef<Path>) {
-        self.load_source(&path);
-
-        let content = self
-            .source_cache
-            .get(&path.as_ref().to_path_buf())
-            .expect("should exist");
-
-        let Ok(content) = content else {
-            return;
-        };
-
-        let parse_result = parser::parse_model(content, Some(Config::default()));
-
-        match parse_result {
-            Ok(ast) => {
-                self.ast_cache.insert_ast(path.as_ref().to_path_buf(), ast);
-            }
-            Err(e) => {
-                let errors = e
-                    .errors
-                    .into_iter()
-                    .map(|e| OneilError::from_error(&e, path.as_ref().to_path_buf()))
-                    .collect();
-
-                self.ast_cache
-                    .insert_errors(path.as_ref().to_path_buf(), errors);
-            }
-        }
-    }
-
-    fn load_source(&mut self, path: impl AsRef<Path>) {
-        let path = path.as_ref();
-        let content = std::fs::read_to_string(path);
-
-        match content {
-            Ok(content) => {
-                self.source_cache.insert_source(path.to_path_buf(), content);
-            }
-            Err(error) => {
-                let error = FileError::new(path, &error);
-                let error = OneilError::from_error(&error, path.to_path_buf());
-                self.source_cache.insert_error(path.to_path_buf(), error);
-            }
-        }
-    }
-
-    fn get_all_errors(&self) -> Vec<OneilError> {
-        let mut errors = Vec::new();
-
-        errors.extend(self.source_cache.get_all_errors());
-        errors.extend(self.ast_cache.get_all_errors());
-        errors.extend(self.ir_cache.get_all_errors());
-
-        errors
     }
 }
 

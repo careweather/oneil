@@ -7,12 +7,11 @@
 mod doc_store;
 mod symbol_lookup;
 
-use oneil_eval::builtin;
-use oneil_runner::{builtins, file_parser};
-
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use oneil_runtime::data::ir;
+use oneil_runtime::{Runtime as OneilRuntime, RuntimeResult};
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
@@ -30,6 +29,10 @@ use doc_store::DocumentStore;
 struct Backend {
     client: Client,
     docs: Arc<DocumentStore>,
+    // TODO: figure out how to handle async runtime operations better.
+    //
+    //       Right now, only one thing can use the runtime at a time.
+    runtime: Mutex<OneilRuntime>,
 }
 
 impl LanguageServer for Backend {
@@ -203,55 +206,71 @@ impl LanguageServer for Backend {
             )
             .await;
 
-        // Load and resolve the model
-        let model_path = PathBuf::from(uri.path().as_str());
-        let builtin_variables = builtins::Builtins::new(
-            builtin::std::builtin_values(),
-            builtin::std::builtin_functions(),
-            builtin::std::builtin_units(),
-            builtin::std::builtin_prefixes(),
-        );
+        // Load and resolve the model. Keep the mutex guard in a block so it is
+        // dropped before any .await; MutexGuard is !Send and cannot be held across await.
+        let current_model_path = PathBuf::from(uri.path().as_str());
+        let current_model_path = ir::ModelPath::new(&current_model_path);
 
-        let Ok(model_collection) = oneil_model_resolver::load_model(
-            &model_path,
-            &builtin_variables,
-            &mut file_parser::FileLoader,
-        ) else {
-            self.client
-                .log_message(MessageType::ERROR, "Failed to load model")
-                .await;
+        // To avoid async problems with holding a mutex guard across an await,
+        // we return a tuple of the result and maybe a log message.
+        //
+        // Each `break 'complete (result, maybe_log_message);` can be thought of as
+        // `log(log_message); return result;`
+        let (result, maybe_log_message) = 'complete: {
+            let mut runtime = self
+                .runtime
+                .lock()
+                .expect("if the runtime has panicked elsewhere, it is not in a useful state");
 
-            return Ok(None);
+            runtime.load_ir(&current_model_path);
+
+            let Some(ir_model) = runtime.get_ir(&current_model_path).get_maybe_partial_ir() else {
+                break 'complete (
+                    Ok(None),
+                    Some(format!("Model not found in IR: {current_model_path:?}")),
+                );
+            };
+            let ir_model = match runtime.get_ir(&current_model_path) {
+                RuntimeResult::None => {
+                    break 'complete (
+                        Ok(None),
+                        Some(format!("Model not found in IR: {current_model_path:?}")),
+                    );
+                }
+                RuntimeResult::Ok(ir_model)
+                | RuntimeResult::ErrWithPartial {
+                    partial_result: ir_model,
+                    errors: _,
+                } => ir_model,
+            };
+
+            // Find the symbol at the cursor position
+            let Some(symbol) =
+                symbol_lookup::find_symbol_at_offset(ir_model, &current_model_path, offset)
+            else {
+                break 'complete (Ok(None), Some("No symbol found at position".to_string()));
+            };
+
+            // Resolve the symbol to its definition location
+            let location =
+                symbol_lookup::resolve_definition(&symbol, &runtime, &current_model_path);
+
+            let log_message =
+                format!("Found symbol: {symbol:?}, definition location: {location:?}");
+
+            (
+                Ok(location.map(GotoDefinitionResponse::Scalar)),
+                Some(log_message),
+            )
         };
 
-        // Get the current model
-        let current_model_path = oneil_ir::ModelPath::new(&model_path);
-        let Some(model) = model_collection.get_models().get(&current_model_path) else {
+        if let Some(log_message) = maybe_log_message {
             self.client
-                .log_message(MessageType::ERROR, "Model not found in collection")
+                .log_message(MessageType::INFO, log_message)
                 .await;
+        }
 
-            return Ok(None);
-        };
-
-        // Find the symbol at the cursor position
-        let Some(symbol) = symbol_lookup::find_symbol_at_offset(model, &current_model_path, offset)
-        else {
-            self.client
-                .log_message(MessageType::INFO, "No symbol found at position")
-                .await;
-            return Ok(None);
-        };
-
-        self.client
-            .log_message(MessageType::INFO, format!("Found symbol: {symbol:?}"))
-            .await;
-
-        // Resolve the symbol to its definition location
-        let location =
-            symbol_lookup::resolve_definition(&symbol, &model_collection, &current_model_path);
-
-        Ok(location.map(GotoDefinitionResponse::Scalar))
+        result
     }
 }
 
@@ -260,10 +279,12 @@ pub async fn run() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
+    let runtime = Mutex::new(OneilRuntime::new());
     let docs = Arc::new(DocumentStore::new());
     let (service, socket) = LspService::new(|client| Backend {
         client,
         docs: Arc::clone(&docs),
+        runtime,
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }

@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 
 use anstream::println;
-use oneil_ir as ir;
+use oneil_runtime::data::ir;
 
 /// Prints the IR in a hierarchical tree format for debugging
 pub fn print(model_collection: &IndexMap<ir::ModelPath, ir::Model>, print_debug: bool) {

@@ -1,15 +1,17 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
+use indexmap::IndexMap;
 use oneil_shared::error::OneilError;
 
+#[derive(Debug)]
 pub struct SourceCache {
-    sources: HashMap<PathBuf, Result<String, OneilError>>,
+    sources: IndexMap<PathBuf, Result<String, OneilError>>,
 }
 
 impl SourceCache {
     pub fn new() -> Self {
         Self {
-            sources: HashMap::new(),
+            sources: IndexMap::new(),
         }
     }
 

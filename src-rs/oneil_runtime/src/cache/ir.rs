@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 use oneil_ir::{self as ir, ModelPath};
 use oneil_shared::error::OneilError;
 
+#[derive(Debug)]
 pub struct IrCache {
     ir_collection: IndexMap<ModelPath, ir::Model>,
     errors: IndexMap<ModelPath, Vec<OneilError>>,

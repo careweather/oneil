@@ -11,9 +11,9 @@ mod std_builtin;
 
 /// Re-exports for tools that are useful for debugging
 /// the runtime.
-pub mod debug {
+pub mod data {
     pub use oneil_ast as ast;
     pub use oneil_ir as ir;
 }
 
-pub use runtime::Runtime;
+pub use runtime::{Runtime, RuntimeResult};
