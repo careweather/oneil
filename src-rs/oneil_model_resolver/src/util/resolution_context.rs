@@ -16,12 +16,72 @@ pub struct PythonImportLoadingFailedError;
 
 /// Result of resolving one or more models: resolved models and per-model errors.
 pub struct ModelResolutionResult {
-    /// Resolved models by path.
-    pub models: IndexMap<ir::ModelPath, ir::Model>,
-    /// Per-model resolution errors.
-    pub model_errors: IndexMap<ir::ModelPath, ResolutionErrors>,
-    /// Per-model circular dependency errors.
-    pub circular_dependency_errors: IndexMap<ir::ModelPath, Vec<CircularDependencyError>>,
+    /// Resolved model.
+    model: ir::Model,
+    /// Model resolution errors.
+    model_errors: ResolutionErrors,
+    /// Circular dependency errors.
+    circular_dependency_errors: Vec<CircularDependencyError>,
+}
+
+impl Default for ModelResolutionResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ModelResolutionResult {
+    /// Creates an empty resolution result with an empty model and
+    /// no resolution or circular dependency errors.
+    #[must_use]
+    pub fn new() -> Self {
+        let empty_model = ir::Model::new(
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+        );
+
+        Self {
+            model: empty_model,
+            model_errors: ResolutionErrors::empty(),
+            circular_dependency_errors: Vec::new(),
+        }
+    }
+
+    /// Returns a reference to the resolved model.
+    #[must_use]
+    pub const fn model(&self) -> &ir::Model {
+        &self.model
+    }
+
+    /// Returns a mutable reference to the resolved model.
+    pub const fn model_mut(&mut self) -> &mut ir::Model {
+        &mut self.model
+    }
+
+    /// Returns a reference to the model resolution errors.
+    #[must_use]
+    pub const fn model_errors(&self) -> &ResolutionErrors {
+        &self.model_errors
+    }
+
+    /// Returns a mutable reference to the model resolution errors.
+    pub const fn model_errors_mut(&mut self) -> &mut ResolutionErrors {
+        &mut self.model_errors
+    }
+
+    /// Returns a reference to the circular dependency errors.
+    #[must_use]
+    pub const fn circular_dependency_errors(&self) -> &Vec<CircularDependencyError> {
+        &self.circular_dependency_errors
+    }
+
+    /// Returns a mutable reference to the circular dependency errors.
+    pub const fn circular_dependency_errors_mut(&mut self) -> &mut Vec<CircularDependencyError> {
+        &mut self.circular_dependency_errors
+    }
 }
 
 /// Context provided by the environment for resolving models (builtins, AST loading, Python imports).
@@ -57,15 +117,8 @@ pub struct ResolutionContext<'external, E: ExternalResolutionContext> {
     active_models: Vec<ir::ModelPath>,
     /// Set of models that have been visited.
     visited_models: IndexSet<ir::ModelPath>,
-    /// Map of model path to model IR.
-    ///
-    /// Models are created empty in `push_active_model` and populated
-    /// as resolution proceeds.
-    models: IndexMap<ir::ModelPath, ir::Model>,
-    /// Per-model resolution errors (import, reference, submodel, parameter, test).
-    model_errors: IndexMap<ir::ModelPath, ResolutionErrors>,
-    /// Per-model circular dependency errors.
-    circular_dependency_errors: IndexMap<ir::ModelPath, Vec<CircularDependencyError>>,
+    /// Map of model results.
+    model_results: IndexMap<ir::ModelPath, ModelResolutionResult>,
 }
 
 /// A trait for providing resolution context to the model resolver.
@@ -77,20 +130,14 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             external_context,
             active_models: Vec::new(),
             visited_models: IndexSet::new(),
-            models: IndexMap::new(),
-            model_errors: IndexMap::new(),
-            circular_dependency_errors: IndexMap::new(),
+            model_results: IndexMap::new(),
         }
     }
 
     /// Consumes the context and returns the accumulated models and errors.
     #[must_use]
-    pub fn into_result(self) -> ModelResolutionResult {
-        ModelResolutionResult {
-            models: self.models,
-            model_errors: self.model_errors,
-            circular_dependency_errors: self.circular_dependency_errors,
-        }
+    pub fn into_result(self) -> IndexMap<ir::ModelPath, ModelResolutionResult> {
+        self.model_results
     }
 
     // ===== MODEL LOADING =====
@@ -105,22 +152,10 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     /// This assumes stack-like behavior, where the most recently
     /// activated model is the current model.
     pub fn push_active_model(&mut self, model_path: &ir::ModelPath) {
-        let model_path = model_path.clone();
         self.active_models.push(model_path.clone());
         self.visited_models.insert(model_path.clone());
-
-        let empty_model = ir::Model::new(
-            IndexMap::new(),
-            IndexMap::new(),
-            IndexMap::new(),
-            IndexMap::new(),
-            IndexMap::new(),
-        );
-        self.models.insert(model_path.clone(), empty_model);
-        self.model_errors
-            .insert(model_path.clone(), ResolutionErrors::empty());
-        self.circular_dependency_errors
-            .insert(model_path, Vec::new());
+        self.model_results
+            .insert(model_path.clone(), ModelResolutionResult::new());
     }
 
     /// Deactivates a model.
@@ -169,9 +204,10 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     /// Panics if there is no active model or if the active model is not in the model map.
     fn active_model(&self) -> &ir::Model {
         let path = self.active_models.last().expect("no active model");
-        self.models
+        self.model_results
             .get(path)
-            .expect("active model not in model map")
+            .expect("active model not in model results map")
+            .model()
     }
 
     /// Returns a mutable reference to the current active model.
@@ -181,9 +217,10 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     /// Panics if there is no active model or if the active model is not in the model map.
     fn active_model_mut(&mut self) -> &mut ir::Model {
         let path = self.active_models.last().expect("no active model");
-        self.models
+        self.model_results
             .get_mut(path)
-            .expect("active model not in model map")
+            .expect("active model not in model results map")
+            .model_mut()
     }
 
     /// Returns a mutable reference to the resolution errors for the current active model.
@@ -193,9 +230,10 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     /// Panics if there is no active model or if the active model has no error entry.
     fn active_model_errors_mut(&mut self) -> &mut ResolutionErrors {
         let path = self.active_models.last().expect("no active model");
-        self.model_errors
+        self.model_results
             .get_mut(path)
-            .expect("active model not in model errors map")
+            .expect("active model not in model results map")
+            .model_errors_mut()
     }
 
     /// Returns a mutable reference to the circular dependency errors for the current active model.
@@ -205,24 +243,17 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     /// Panics if there is no active model or if the active model has no circular dependency error entry.
     fn active_model_circular_dependency_errors_mut(&mut self) -> &mut Vec<CircularDependencyError> {
         let path = self.active_models.last().expect("no active model");
-        self.circular_dependency_errors
+        self.model_results
             .get_mut(path)
-            .expect("active model not in circular dependency errors map")
+            .expect("active model not in model results map")
+            .circular_dependency_errors_mut()
     }
 
     /// Returns whether the given model path has any resolution or circular dependency errors.
     fn model_has_errors(&self, model_path: &ir::ModelPath) -> bool {
-        let has_resolution_errors = self
-            .model_errors
-            .get(model_path)
-            .is_some_and(|e| !e.is_empty());
-
-        let has_circular_errors = self
-            .circular_dependency_errors
-            .get(model_path)
-            .is_some_and(|v| !v.is_empty());
-
-        has_resolution_errors || has_circular_errors
+        self.model_results.get(model_path).is_some_and(|r| {
+            !r.model_errors().is_empty() || !r.circular_dependency_errors().is_empty()
+        })
     }
 
     // ===== BUILTINS =====
@@ -347,9 +378,9 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             return ModelResult::HasError;
         }
 
-        self.models
+        self.model_results
             .get(model_path)
-            .map_or(ModelResult::NotFound, ModelResult::Found)
+            .map_or(ModelResult::NotFound, |r| ModelResult::Found(r.model()))
     }
 
     /// Looks up the path to a reference in the active model.
@@ -358,7 +389,10 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         reference_name: &ir::ReferenceName,
     ) -> ReferencePathResult<'_, '_> {
         let active_path = self.active_models.last().expect("no active model");
-        let errors = self.model_errors.get(active_path);
+        let errors = self
+            .model_results
+            .get(active_path)
+            .map(ModelResolutionResult::model_errors);
 
         if let Some(errors) = errors
             && errors
@@ -378,7 +412,11 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             return ReferencePathResult::ModelHasResolutionError(reference_path);
         }
 
-        let Some(target_model) = self.models.get(reference_path) else {
+        let Some(target_model) = self
+            .model_results
+            .get(reference_path)
+            .map(ModelResolutionResult::model)
+        else {
             return ReferencePathResult::ModelNotFound(reference_path);
         };
 
@@ -423,7 +461,10 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         parameter_name: &ir::ParameterName,
     ) -> ParameterResult<'_> {
         let active_path = self.active_models.last().expect("no active model");
-        if let Some(errors) = self.model_errors.get(active_path)
+        if let Some(errors) = self
+            .model_results
+            .get(active_path)
+            .map(ModelResolutionResult::model_errors)
             && errors
                 .get_parameter_resolution_errors()
                 .contains_key(parameter_name)
@@ -476,9 +517,10 @@ impl<E: ExternalResolutionContext> ResolutionContext<'_, E> {
     #[cfg(test)]
     fn active_model_errors(&self) -> &ResolutionErrors {
         let path = self.active_models.last().expect("no active model");
-        self.model_errors
+        self.model_results
             .get(path)
             .expect("active model not in model errors map")
+            .model_errors()
     }
 
     /// Returns the resolved tests for the active model.
