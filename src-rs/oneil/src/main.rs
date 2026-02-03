@@ -46,7 +46,9 @@ fn main() {
 
     match cli.command {
         Commands::Lsp {} => {
-            oneil_lsp::run();
+            // TODO: uncomment this when we're ready to deal with
+            //       the LSP
+            //oneil_lsp::run();
         }
         Commands::Dev { command } => handle_dev_command(command),
         Commands::Eval(args) => handle_eval_command(args),
@@ -141,13 +143,16 @@ fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
 
 /// Handles the `dev print-model-result` command.
 fn handle_print_model_result(file: &Path, display_partial: bool) {
-    let builtins = create_builtins();
+    let runtime = Runtime::new();
+
+    let eval_result = runtime.eval_model(file);
 
     let Some(model_collection) = load_model_collection(file, &builtins, false) else {
         return;
     };
 
-    let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
+    // let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
+    let eval_context = todo!();
 
     let model_result = eval_context
         .get_model_result(file)
@@ -156,8 +161,6 @@ fn handle_print_model_result(file: &Path, display_partial: bool) {
     let errors = model_result.get_errors();
 
     for error in &errors {
-        let error = convert_error::eval::convert(error);
-
         if let Some(error) = error {
             print_error::print(&error, false);
             eprintln!();
@@ -167,16 +170,6 @@ fn handle_print_model_result(file: &Path, display_partial: bool) {
     if errors.is_empty() || display_partial {
         println!("{:?}", model_result);
     }
-}
-
-/// Creates a new `Builtins` instance with standard library builtins.
-fn create_builtins() -> Builtins<oneil_std::StdBuiltinFunction> {
-    Builtins::new(
-        oneil_std::builtin_values(),
-        oneil_std::builtin_functions(),
-        oneil_std::builtin_units(),
-        oneil_std::builtin_prefixes(),
-    )
 }
 
 /// Loads a model collection, printing errors if loading fails.
