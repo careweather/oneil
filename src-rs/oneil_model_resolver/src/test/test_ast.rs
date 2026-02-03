@@ -24,6 +24,10 @@ pub fn empty_model_node() -> ast::ModelNode {
     ast::Node::new(model, unimportant_span(), unimportant_span())
 }
 
+pub fn empty_model() -> ast::Model {
+    ast::Model::new(None, vec![], vec![])
+}
+
 pub fn identifier_node(identifier: &'static str) -> ast::Node<ast::Identifier> {
     let identifier = ast::Identifier::new(identifier.to_string());
     ast::Node::new(identifier, unimportant_span(), unimportant_span())
@@ -226,13 +230,13 @@ pub fn unit_one_node() -> ast::Node<ast::UnitExpr> {
 
 // BUILDERS
 
-pub struct ModelNodeBuilder {
+pub struct ModelBuilder {
     note: Option<ast::NoteNode>,
     decls: Vec<ast::DeclNode>,
     sections: Vec<ast::SectionNode>,
 }
 
-impl ModelNodeBuilder {
+impl ModelBuilder {
     pub fn new() -> Self {
         Self {
             note: None,
@@ -308,9 +312,8 @@ impl ModelNodeBuilder {
         self
     }
 
-    pub fn build(self) -> ast::ModelNode {
-        let model = ast::Model::new(self.note, self.decls, self.sections);
-        ast::Node::new(model, unimportant_span(), unimportant_span())
+    pub fn build(self) -> ast::Model {
+        ast::Model::new(self.note, self.decls, self.sections)
     }
 }
 

@@ -116,7 +116,7 @@ where
 ///
 /// This separation is necessary for the different processing steps in model loading.
 fn split_model_ast(
-    model_ast: &ast::ModelNode,
+    model_ast: &ast::Model,
 ) -> (
     Vec<&ast::ImportNode>,
     Vec<&ast::UseModelNode>,
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn split_model_ast_with_all_declarations() {
-        let model = test_ast::ModelNodeBuilder::new()
+        let model = test_ast::ModelBuilder::new()
             .with_submodel("submodel")
             .build();
         let (imports, use_models, parameters, tests) = split_model_ast(&model);
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn split_model_ast_use_model_only() {
-        let model = test_ast::ModelNodeBuilder::new()
+        let model = test_ast::ModelBuilder::new()
             .with_submodel("submodel1")
             .with_submodel("submodel2")
             .build();
@@ -264,7 +264,7 @@ mod tests {
     fn load_model_success() {
         let model_path = ir::ModelPath::new("test");
         let mut external =
-            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model_node())]);
+            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model())]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&model_path, &mut resolution_context);
@@ -313,12 +313,8 @@ mod tests {
         // create a circular dependency: main.on -> sub.on -> main.on
         let main_path = ir::ModelPath::new("main");
         let sub_path = ir::ModelPath::new("sub");
-        let main_test_model = test_ast::ModelNodeBuilder::new()
-            .with_submodel("sub")
-            .build();
-        let sub_test_model = test_ast::ModelNodeBuilder::new()
-            .with_submodel("main")
-            .build();
+        let main_test_model = test_ast::ModelBuilder::new().with_submodel("sub").build();
+        let sub_test_model = test_ast::ModelBuilder::new().with_submodel("main").build();
         let mut external = TestExternalContext::new()
             .with_model_asts([("main.on", main_test_model), ("sub.on", sub_test_model)]);
         let mut resolution_context = ResolutionContext::new(&mut external);
@@ -364,7 +360,7 @@ mod tests {
         // Load the same model twice
         let model_path = ir::ModelPath::new("test");
         let mut external =
-            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model_node())]);
+            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model())]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&model_path, &mut resolution_context);
@@ -391,8 +387,8 @@ mod tests {
     fn load_use_models_empty() {
         // Load a model with no use/ref declarations (only parent in context).
         let model_path = ir::ModelPath::new("parent");
-        let mut external = TestExternalContext::new()
-            .with_model_asts([("parent.on", test_ast::empty_model_node())]);
+        let mut external =
+            TestExternalContext::new().with_model_asts([("parent.on", test_ast::empty_model())]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&model_path, &mut resolution_context);
@@ -418,14 +414,14 @@ mod tests {
     fn load_use_models_with_existing_models() {
         // Load parent that uses child1 and child2; all three ASTs in context.
         let parent_path = ir::ModelPath::new("parent");
-        let parent_ast = test_ast::ModelNodeBuilder::new()
+        let parent_ast = test_ast::ModelBuilder::new()
             .with_submodel("child1")
             .with_submodel("child2")
             .build();
         let mut external = TestExternalContext::new().with_model_asts([
             ("parent.on", parent_ast),
-            ("child1.on", test_ast::empty_model_node()),
-            ("child2.on", test_ast::empty_model_node()),
+            ("child1.on", test_ast::empty_model()),
+            ("child2.on", test_ast::empty_model()),
         ]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
@@ -454,7 +450,7 @@ mod tests {
     fn load_use_models_with_parse_errors() {
         // Parent uses "nonexistent"; that path has no AST in context.
         let parent_path = ir::ModelPath::new("parent");
-        let parent_ast = test_ast::ModelNodeBuilder::new()
+        let parent_ast = test_ast::ModelBuilder::new()
             .with_submodel("nonexistent")
             .build();
         let mut external = TestExternalContext::new().with_model_asts([("parent.on", parent_ast)]);
@@ -479,13 +475,13 @@ mod tests {
     fn load_model_complex_dependency_chain() {
         // Dependency chain: root.on -> level1.on -> level2.on
         let root_path = ir::ModelPath::new("root");
-        let root_model = test_ast::ModelNodeBuilder::new()
+        let root_model = test_ast::ModelBuilder::new()
             .with_submodel("level1")
             .build();
-        let level1_model = test_ast::ModelNodeBuilder::new()
+        let level1_model = test_ast::ModelBuilder::new()
             .with_submodel("level2")
             .build();
-        let level2_model = test_ast::empty_model_node();
+        let level2_model = test_ast::empty_model();
 
         let mut external = TestExternalContext::new().with_model_asts([
             ("root.on", root_model),
@@ -519,12 +515,12 @@ mod tests {
     fn load_model_with_sections() {
         // Model with a section that declares a use submodel
         let test_path = ir::ModelPath::new("test");
-        let submodel_node = test_ast::empty_model_node();
+        let submodel_node = test_ast::empty_model();
         let use_model_decl = test_ast::ImportModelNodeBuilder::new()
             .with_top_component("submodel")
             .with_kind(ast::ModelKind::Submodel)
             .build_as_decl_node();
-        let model_node = test_ast::ModelNodeBuilder::new()
+        let model_node = test_ast::ModelBuilder::new()
             .with_section("section1", vec![use_model_decl])
             .build();
 
@@ -557,10 +553,10 @@ mod tests {
         // Main model has ref "reference" and parameter y = reference.x
         let test_path = ir::ModelPath::new("test");
         let reference_path = ir::ModelPath::new("reference");
-        let reference_node = test_ast::ModelNodeBuilder::new()
+        let reference_node = test_ast::ModelBuilder::new()
             .with_number_parameter("x", 1.0)
             .build();
-        let model_node = test_ast::ModelNodeBuilder::new()
+        let model_node = test_ast::ModelBuilder::new()
             .with_reference("reference")
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
@@ -623,10 +619,10 @@ mod tests {
         // Main model has ref "reference"; reference model not provided (or has error).
         // Submodel "submodel" exists but has use "nonexistent" (error).
         let test_path = ir::ModelPath::new("test");
-        let submodel_node = test_ast::ModelNodeBuilder::new()
+        let submodel_node = test_ast::ModelBuilder::new()
             .with_submodel("nonexistent")
             .build();
-        let model_node = test_ast::ModelNodeBuilder::new()
+        let model_node = test_ast::ModelBuilder::new()
             .with_reference("reference")
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
