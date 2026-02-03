@@ -296,7 +296,7 @@ def _parse_compound_units(unit_str):
     def get_exponent(start_pos):
         for v_idx, v_span in enumerate(value_indices):
             if v_span[0] == start_pos:
-                return int(value_list[v_idx])
+                return float(value_list[v_idx])
         raise ValueError(f"Missing exponent after ^ in unit string: {unit_str}")
 
     # Initialize zero unit
