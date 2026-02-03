@@ -90,26 +90,21 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
             println!("===== {} =====", file.display());
         }
 
-        runtime.load_ast(file);
+        let ast_result = runtime.load_ast(file);
 
-        let ast = runtime
-            .get_ast_or_error(file)
-            .expect("it should have been loaded");
-
-        match ast {
+        match ast_result {
             Ok(ast) => print_ast::print(ast, print_debug),
-            Err(errors) => {
+            Err(partial_result_with_errors) => {
+                let partial_result = partial_result_with_errors.result;
+                let errors = partial_result_with_errors.errors;
+
                 for error in errors {
                     print_error::print(&error, print_debug);
                     eprintln!();
                 }
 
-                if display_partial {
-                    let partial_ast = runtime
-                        .get_ast_maybe_partial(file)
-                        .expect("it should have been loaded");
-
-                    print_ast::print(partial_ast, print_debug);
+                if display_partial && let Some(partial_result) = partial_result {
+                    print_ast::print(&partial_result, print_debug);
                 }
             }
         }
@@ -120,23 +115,22 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
 fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
     let mut runtime = Runtime::new();
 
-    runtime.load_ir(file);
-
-    let ir_result = runtime.get_ir(file);
+    let ir_result = runtime.load_ir_for_model_and_dependencies(file);
 
     match ir_result {
-        Ok(model_collection) => print_ir::print(model_collection, print_debug),
-        Err(errors) => {
-            todo!("display partial ir");
-            // let (model_collection, error_map) = *error;
+        Ok(ir_models) => print_ir::print(ir_models, print_debug),
+        Err(partial_result_with_errors) => {
+            let partial_result = partial_result_with_errors.result;
+            let errors = partial_result_with_errors.errors;
+
             for error in errors {
                 print_error::print(&error, print_debug);
                 eprintln!();
             }
 
-            // if display_partial {
-            // print_ir::print(&model_collection, print_debug);
-            // }
+            if display_partial {
+                print_ir::print(partial_result, print_debug);
+            }
         }
     }
 }
