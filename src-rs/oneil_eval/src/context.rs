@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 
@@ -9,7 +6,6 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    builtin::{BuiltinFunction, BuiltinMap},
     error::{EvalError, ModelError},
     output::{
         dependency::{DependencyGraph, DependencyTreeValue, ReferenceTreeValue},
@@ -18,6 +14,33 @@ use crate::{
     },
     value::{Unit, Value},
 };
+
+/// Context provided by the runtime for resolving IR, builtins, and units during evaluation.
+pub trait ExternalResolutionContext {
+    /// Returns the IR model at the given path if it has been loaded.
+    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<&ir::Model>;
+
+    /// Returns the value of a builtin variable by identifier, if it exists.
+    fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&Value>;
+
+    /// Evaluates a builtin function by identifier with the given arguments.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there was an error evaluating the builtin function.
+    fn evaluate_builtin_function(
+        &self,
+        identifier: &ir::Identifier,
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+    ) -> Result<Value, Vec<EvalError>>;
+
+    /// Returns a unit by name if it is defined in the builtin context.
+    fn lookup_unit(&self, name: &str) -> Option<&Unit>;
+
+    /// Returns the map of available unit prefixes (e.g. "k" -> 1000.0).
+    fn available_prefixes(&self) -> &IndexMap<String, f64>;
+}
 
 /// Represents a model with its evaluated parameters, submodels, references, and tests.
 #[derive(Debug, Clone)]
@@ -40,36 +63,54 @@ impl Model {
     }
 }
 
+impl Default for Model {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Evaluation context that tracks models, their parameters, dependencies, and builtin functions.
 ///
 /// The context maintains state during evaluation, including:
 /// - Evaluated models and their parameters
-/// - Python imports and their results
-/// - Active models, references, and imports
-/// - Builtin functions and values
-#[derive(Debug, Clone)]
-pub struct EvalContext<F: BuiltinFunction> {
+/// - Active models
+/// - External context
+#[derive(Debug)]
+pub struct EvalContext<'external, E: ExternalResolutionContext> {
     models: IndexMap<PathBuf, Model>,
-    // TODO: update this to hold the actual Python import results
-    python_imports: IndexMap<PathBuf, Result<(), EvalError>>,
-    current_model: Option<PathBuf>,
-    active_python_imports: HashSet<PathBuf>,
-    active_references: HashSet<PathBuf>,
-    builtins: BuiltinMap<F>,
+    active_models: Vec<PathBuf>,
+    external_context: &'external mut E,
 }
 
-impl<F: BuiltinFunction> EvalContext<F> {
+impl<'external, E: ExternalResolutionContext> EvalContext<'external, E> {
     /// Creates a new evaluation context with the given builtin functions.
     #[must_use]
-    pub(crate) fn new(builtins: BuiltinMap<F>) -> Self {
+    pub fn new(external_context: &'external mut E) -> Self {
         Self {
             models: IndexMap::new(),
-            python_imports: IndexMap::new(),
-            current_model: None,
-            active_python_imports: HashSet::new(),
-            active_references: HashSet::new(),
-            builtins,
+            active_models: Vec::new(),
+            external_context,
         }
+    }
+
+    /// Consumes the context and returns the accumulated models and errors.
+    #[must_use]
+    pub fn into_result(self) -> IndexMap<PathBuf, Model> {
+        self.models
+    }
+
+    /// Looks up an IR model by path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the model is not found. This should never be the case.
+    #[must_use]
+    pub fn get_ir(&self, path: impl AsRef<Path>) -> ir::Model {
+        self.external_context
+            .lookup_ir(path)
+            .expect("model should be found")
+            // TODO: figure out how to get rid of this clone
+            .clone()
     }
 
     /// Looks up the given builtin variable and returns the corresponding value.
@@ -80,10 +121,9 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// If it is, then there is a bug either in the model resolver when it resolves builtin variables
     /// or in the builtin map when it defines the builtin values.
     #[must_use]
-    pub(crate) fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
-        self.builtins
-            .values
-            .get(identifier.as_str())
+    pub fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
+        self.external_context
+            .lookup_builtin_variable(identifier)
             .expect("builtin value should be defined")
             .clone()
     }
@@ -93,21 +133,21 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// # Panics
     ///
     /// Panics if no current model is set or if the parameter is not defined in the model.
-    pub(crate) fn lookup_parameter_value(
+    pub fn lookup_parameter_value(
         &self,
         parameter_name: &ir::ParameterName,
         variable_span: Span,
     ) -> Result<Value, Vec<EvalError>> {
         let current_model = self
-            .current_model
-            .as_ref()
+            .active_models
+            .last()
             .expect("current model should be set when looking up a parameter");
 
         self.lookup_model_parameter_value_internal(current_model, parameter_name, variable_span)
     }
 
     /// Looks up a parameter value in a specific model.
-    pub(crate) fn lookup_model_parameter_value(
+    pub fn lookup_model_parameter_value(
         &self,
         model: &ir::ModelPath,
         parameter_name: &ir::ParameterName,
@@ -146,23 +186,20 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// # Panics
     ///
     /// Panics if the builtin function is not defined. This should never be the case.
-    pub(crate) fn evaluate_builtin_function(
+    pub fn evaluate_builtin_function(
         &self,
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(Value, Span)>,
     ) -> Result<Value, Vec<EvalError>> {
-        self.builtins
-            .functions
-            .get(identifier.as_str())
-            .expect("builtin function should be defined")
-            .call(identifier_span, args)
+        self.external_context
+            .evaluate_builtin_function(identifier, identifier_span, args)
     }
 
     /// Evaluates an imported function with the given arguments.
     ///
     /// Currently unsupported and always returns an error.
-    pub(crate) fn evaluate_imported_function(
+    pub fn evaluate_imported_function(
         &self,
         identifier: &ir::Identifier,
         identifier_span: Span,
@@ -182,56 +219,30 @@ impl<F: BuiltinFunction> EvalContext<F> {
     ///
     /// Panics if the unit is not defined. This should never be the case.
     #[must_use]
-    pub(crate) fn lookup_unit(&self, name: &str) -> Option<Unit> {
-        self.builtins.units.get(name).cloned()
+    pub fn lookup_unit(&self, name: &str) -> Option<Unit> {
+        self.external_context.lookup_unit(name).cloned()
     }
 
     /// Returns the available unit prefixes.
     #[must_use]
-    pub(crate) const fn available_prefixes(&self) -> &IndexMap<String, f64> {
-        &self.builtins.prefixes
+    pub fn available_prefixes(&self) -> &IndexMap<String, f64> {
+        self.external_context.available_prefixes()
     }
 
-    /// Loads a Python import into the context.
-    ///
-    /// Currently unsupported and always stores an error result.
-    pub(crate) fn load_python_import(&mut self, python_path: PathBuf, python_import_span: Span) {
-        self.python_imports.insert(
-            python_path,
-            Err(EvalError::Unsupported {
-                relevant_span: python_import_span,
-                feature_name: Some("Python import".to_string()),
-                will_be_supported: true,
-            }),
-        );
-    }
-
-    /// Sets the active model for evaluation.
+    /// Pushes the active model for evaluation.
     ///
     /// Creates a new model entry if it doesn't exist.
-    pub(crate) fn set_active_model(&mut self, model_path: PathBuf) {
-        self.models
-            .entry(model_path.clone())
-            .or_insert_with(Model::new);
+    pub fn push_active_model(&mut self, model_path: PathBuf) {
+        self.models.entry(model_path.clone()).or_default();
 
-        self.current_model = Some(model_path);
+        self.active_models.push(model_path);
     }
 
     /// Clears the active model.
-    ///
-    /// After calling this, no model will be active until `set_active_model` is called again.
-    pub(crate) fn clear_active_model(&mut self) {
-        self.current_model = None;
-    }
+    pub fn pop_active_model(&mut self, model_path: &Path) {
+        assert_eq!(self.active_models.last(), Some(&model_path.to_path_buf()));
 
-    /// Clears all active Python imports.
-    pub(crate) fn clear_active_python_imports(&mut self) {
-        self.active_python_imports.clear();
-    }
-
-    /// Activates a Python import for the current evaluation.
-    pub(crate) fn activate_python_import(&mut self, python_import: PathBuf) {
-        self.active_python_imports.insert(python_import);
+        self.active_models.pop();
     }
 
     /// Adds a parameter evaluation result to the current model.
@@ -239,13 +250,13 @@ impl<F: BuiltinFunction> EvalContext<F> {
     /// # Panics
     ///
     /// Panics if no current model is set or if the current model was not created.
-    pub(crate) fn add_parameter_result(
+    pub fn add_parameter_result(
         &mut self,
         parameter_name: String,
         result: Result<eval_result::Parameter, Vec<EvalError>>,
     ) {
         // TODO: Maybe use type state pattern to enforce this?
-        let Some(current_model) = self.current_model.as_ref() else {
+        let Some(current_model) = self.active_models.last() else {
             panic!("current model should be set when adding a parameter result");
         };
 
@@ -263,7 +274,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     ///
     /// Panics if no current model is set or if the current model was not created.
     pub(crate) fn add_submodel(&mut self, submodel_name: &str, submodel_import: &ir::ModelPath) {
-        let Some(current_model) = self.current_model.as_ref() else {
+        let Some(current_model) = self.active_models.last() else {
             panic!("current model should be set when adding a submodel");
         };
 
@@ -284,7 +295,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
     ///
     /// Panics if no current model is set or if the current model was not created.
     pub(crate) fn add_reference(&mut self, reference_name: &str, reference_path: &ir::ModelPath) {
-        let Some(current_model) = self.current_model.as_ref() else {
+        let Some(current_model) = self.active_models.last() else {
             panic!("current model should be set when adding a reference");
         };
 
@@ -308,7 +319,7 @@ impl<F: BuiltinFunction> EvalContext<F> {
         &mut self,
         test_result: Result<eval_result::Test, Vec<EvalError>>,
     ) {
-        let Some(current_model) = self.current_model.as_ref() else {
+        let Some(current_model) = self.active_models.last() else {
             panic!("current model should be set when adding a test result");
         };
 
@@ -318,11 +329,6 @@ impl<F: BuiltinFunction> EvalContext<F> {
             .expect("current model should be created when set");
 
         model.tests.push(test_result);
-    }
-
-    /// Activates a reference for the current evaluation.
-    pub(crate) fn activate_reference(&mut self, reference: PathBuf) {
-        self.active_references.insert(reference);
     }
 
     /// Gets the result of a model.
@@ -498,8 +504,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
             clippy::items_after_statements,
             reason = "this is an internal recursive function, we keep it here for clarity"
         )]
-        fn recurse<F: BuiltinFunction>(
-            context: &EvalContext<F>,
+        fn recurse<E: ExternalResolutionContext>(
+            context: &EvalContext<'_, E>,
             model_path: &Path,
             reference_name: Option<&str>,
             parameter_name: &str,
@@ -631,8 +637,8 @@ impl<F: BuiltinFunction> EvalContext<F> {
             clippy::items_after_statements,
             reason = "this is an internal recursive function, we keep it here for clarity"
         )]
-        fn recurse<F: BuiltinFunction>(
-            context: &EvalContext<F>,
+        fn recurse<E: ExternalResolutionContext>(
+            context: &EvalContext<'_, E>,
             model_path: &Path,
             parameter_name: &str,
             dependency_graph: &DependencyGraph,

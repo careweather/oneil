@@ -1,5 +1,6 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use indexmap::{IndexMap, IndexSet};
 use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_model_resolver as model_resolver;
@@ -32,11 +33,21 @@ impl Runtime {
         }
     }
 
-    /// Loads IR for a model.
-    pub fn load_ir(&mut self, path: impl AsRef<Path>) -> Result<&ir::Model, Vec<OneilError>> {
+    /// Evaluates a model and returns the result.
+    pub fn eval_model(&mut self, path: impl AsRef<Path>) -> Result<(), Vec<OneilError>> {
+        todo!()
+    }
+
+    /// Loads the IR for a model and all of its dependencies.
+    pub fn load_ir_for_model_and_dependencies(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<IrModelMap<'_>, PartialResultWithErrors<IrModelMap<'_>>> {
         let results = model_resolver::load_model(&path, self);
 
+        let mut models = IndexSet::new();
         let mut errors = Vec::new();
+
         for (model_path, result) in results {
             let model_path = model_path.as_ref().to_path_buf();
 
@@ -44,6 +55,8 @@ impl Runtime {
 
             // push the model IR to the cache
             self.ir_cache.insert(model_path.clone(), model);
+
+            models.insert(model_path.clone());
 
             // if the AST for the model has not been loaded,
             // return the source and AST errors
@@ -104,22 +117,42 @@ impl Runtime {
             }
         }
 
-        if errors.is_empty() {
-            let ir_model = self
-                .ir_cache
-                .get(path.as_ref())
-                .expect("it has already been loaded previously");
+        let models = models
+            .into_iter()
+            .map(|model_path| {
+                let model = self
+                    .ir_cache
+                    .get(&model_path)
+                    .expect("it has already been loaded previously");
+                (model_path, model)
+            })
+            .collect::<IndexMap<PathBuf, &ir::Model>>();
 
-            Ok(ir_model)
+        if errors.is_empty() {
+            Ok(models)
         } else {
-            Err(errors)
+            Err(PartialResultWithErrors {
+                result: models,
+                errors,
+            })
         }
     }
 
     /// Loads AST for a model.
-    pub fn load_ast(&mut self, path: impl AsRef<Path>) -> Result<&ast::Model, Vec<OneilError>> {
+    ///
+    /// On success, returns the AST. On failure, returns the errors
+    /// and a partial AST if available.
+    pub fn load_ast(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<&ast::Model, PartialResultWithErrors<Option<&ast::Model>>> {
         let path = path.as_ref();
-        let source = self.load_source(path).map_err(|e| vec![*e])?;
+        let source = self
+            .load_source(path)
+            .map_err(|e| PartialResultWithErrors {
+                result: None,
+                errors: vec![*e],
+            })?;
 
         // parse the model and return an error if it fails
         match parser::parse_model(source, None) {
@@ -131,24 +164,31 @@ impl Runtime {
                 Ok(ast)
             }
             Err(e) => {
-                let partial_ast = e.partial_result;
-
                 // need to reload the source for lifetime reasons
                 // TODO: maybe another call to `load_source` once caching works would make more sense?
                 let source = self
                     .source_cache
                     .get(path)
                     .expect("it has already been loaded previously");
-
                 let errors = e
                     .errors
                     .into_iter()
                     .map(|e| OneilError::from_error_with_source(&e, path.to_path_buf(), source))
                     .collect::<Vec<OneilError>>();
+
+                let partial_ast = e.partial_result;
                 self.ast_cache
                     .insert_err(path.to_path_buf(), *partial_ast, errors.clone());
 
-                Err(errors)
+                let ast = self
+                    .ast_cache
+                    .get(path)
+                    .expect("it has already been loaded previously");
+
+                Err(PartialResultWithErrors {
+                    result: Some(ast),
+                    errors,
+                })
             }
         }
     }
@@ -210,4 +250,11 @@ impl model_resolver::ExternalResolutionContext for Runtime {
     ) -> Result<(), model_resolver::PythonImportLoadingFailedError> {
         todo!()
     }
+}
+
+type IrModelMap<'runtime> = IndexMap<PathBuf, &'runtime ir::Model>;
+
+pub struct PartialResultWithErrors<T> {
+    pub result: T,
+    pub errors: Vec<OneilError>,
 }

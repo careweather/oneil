@@ -4,8 +4,7 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    builtin::BuiltinFunction,
-    context::EvalContext,
+    context::{EvalContext, ExternalResolutionContext},
     error::EvalError,
     value::{Number, Value},
 };
@@ -15,9 +14,9 @@ use crate::{
 /// # Errors
 ///
 /// Returns an error if the expression is invalid.
-pub fn eval_expr<'a, F: BuiltinFunction>(
+pub fn eval_expr<'a, E: ExternalResolutionContext>(
     expr: &'a ir::Expr,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<(Value, &'a Span), Vec<EvalError>> {
     match expr {
         ir::Expr::ComparisonOp {
@@ -85,12 +84,12 @@ struct ComparisonSubexpressionsResult {
     rest_results: Vec<(ir::ComparisonOp, (Value, Span))>,
 }
 
-fn eval_comparison_subexpressions<F: BuiltinFunction>(
+fn eval_comparison_subexpressions<E: ExternalResolutionContext>(
     left: &ir::Expr,
     op: ir::ComparisonOp,
     right: &ir::Expr,
     rest_chained: &[(ir::ComparisonOp, ir::Expr)],
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<ComparisonSubexpressionsResult, Vec<EvalError>> {
     let left_result = eval_expr(left, context);
     let rest_results = iter::once((op, right))
@@ -245,10 +244,10 @@ struct BinaryOpSubexpressionsResult {
     right_result_span: Span,
 }
 
-fn eval_binary_op_subexpressions<F: BuiltinFunction>(
+fn eval_binary_op_subexpressions<E: ExternalResolutionContext>(
     left: &ir::Expr,
     right: &ir::Expr,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<BinaryOpSubexpressionsResult, Vec<EvalError>> {
     let left_result = eval_expr(left, context);
     let right_result = eval_expr(right, context);
@@ -307,9 +306,9 @@ fn eval_unary_op(
     result.map_err(|error| vec![error.into_eval_error(expr_result_span)])
 }
 
-fn eval_function_call_args<F: BuiltinFunction>(
+fn eval_function_call_args<E: ExternalResolutionContext>(
     args: &[ir::Expr],
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Vec<(Value, Span)>, Vec<EvalError>> {
     let args_results = args.iter().map(|arg| eval_expr(arg, context));
 
@@ -330,10 +329,10 @@ fn eval_function_call_args<F: BuiltinFunction>(
     Ok(args)
 }
 
-fn eval_function_call<F: BuiltinFunction>(
+fn eval_function_call<E: ExternalResolutionContext>(
     name: &ir::FunctionName,
     args: Vec<(Value, Span)>,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {
     match name {
         ir::FunctionName::Builtin(fn_identifier, fn_identifier_span) => {
@@ -345,9 +344,9 @@ fn eval_function_call<F: BuiltinFunction>(
     }
 }
 
-fn eval_variable<F: BuiltinFunction>(
+fn eval_variable<E: ExternalResolutionContext>(
     variable: &ir::Variable,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {
     match variable {
         ir::Variable::Builtin {

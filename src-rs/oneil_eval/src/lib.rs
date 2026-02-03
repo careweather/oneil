@@ -1,24 +1,21 @@
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 //! Evaluator for the Oneil programming language
 
-pub mod builtin;
 mod context;
 pub mod error;
 mod eval_expr;
 mod eval_model;
-mod eval_model_collection;
 mod eval_parameter;
 mod eval_unit;
 pub mod output;
 pub mod value;
 
-pub use context::EvalContext;
+pub use context::ExternalResolutionContext;
 pub use error::{EvalError, ModelError};
-pub use eval_expr::eval_expr;
 pub use eval_model::eval_model;
-pub use eval_model_collection::eval_model_collection;
-pub use eval_parameter::eval_parameter;
-pub use eval_unit::eval_unit;
+
+#[cfg(test)]
+mod test_context;
 
 #[cfg(test)]
 mod test {
