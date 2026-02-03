@@ -129,7 +129,7 @@ pub trait ExternalResolutionContext {
     /// # Errors
     ///
     /// Returns `Err(AstLoadingFailedError)` when the model file cannot be read or parsed.
-    fn load_ast(&mut self, path: &ir::ModelPath) -> Result<&ast::ModelNode, AstLoadingFailedError>;
+    fn load_ast(&mut self, path: &ir::ModelPath) -> Result<&ast::Model, AstLoadingFailedError>;
 
     /// Loads a Python import.
     ///
@@ -313,10 +313,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     /// Loads the AST for a model.
     ///
     /// Returns `Ok(ast)` if parsing succeeds, or `Err(())` if parsing fails.
-    pub fn load_ast(
-        &mut self,
-        path: &ir::ModelPath,
-    ) -> Result<ast::ModelNode, AstLoadingFailedError> {
+    pub fn load_ast(&mut self, path: &ir::ModelPath) -> Result<ast::Model, AstLoadingFailedError> {
         self.external_context.load_ast(path).cloned()
     }
 

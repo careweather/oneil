@@ -7,7 +7,7 @@ use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
 use oneil_shared::error::OneilError;
 
-use crate::error::FileError;
+use crate::{error::FileError, std_builtin::StdBuiltins};
 
 /// Runtime for the Oneil programming language.
 ///
@@ -21,6 +21,7 @@ pub struct Runtime {
     ast_errors: IndexMap<PathBuf, Vec<OneilError>>,
     ir_cache: IndexMap<PathBuf, ir::Model>,
     ir_errors: IndexMap<PathBuf, Vec<OneilError>>,
+    builtins: StdBuiltins,
 }
 
 impl Runtime {
@@ -33,6 +34,7 @@ impl Runtime {
             ast_errors: IndexMap::new(),
             ir_cache: IndexMap::new(),
             ir_errors: IndexMap::new(),
+            builtins: StdBuiltins::new(),
         }
     }
 
@@ -191,18 +193,19 @@ impl Default for Runtime {
 
 impl model_resolver::ExternalResolutionContext for Runtime {
     fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool {
-        todo!()
+        self.builtins.has_builtin_value(identifier.as_str())
     }
 
     fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
-        todo!()
+        self.builtins.has_builtin_function(identifier.as_str())
     }
 
     fn load_ast(
         &mut self,
         path: &ir::ModelPath,
-    ) -> Result<&ast::ModelNode, model_resolver::AstLoadingFailedError> {
-        todo!()
+    ) -> Result<&ast::Model, model_resolver::AstLoadingFailedError> {
+        self.load_ast(path)
+            .map_err(|_e| model_resolver::AstLoadingFailedError)
     }
 
     fn load_python_import(

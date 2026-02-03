@@ -29,7 +29,7 @@ pub struct TestExternalContext {
     builtin_functions: HashSet<String>,
 
     /// Model path -> AST; paths are derived from the given path's stem (e.g. "test.on" -> ModelPath("test.on")).
-    model_asts: IndexMap<ir::ModelPath, ast::ModelNode>,
+    model_asts: IndexMap<ir::ModelPath, ast::Model>,
 
     /// Python paths for which `load_python_import` should return `Ok(())`.
     /// Stored as path strings (e.g. `my_python` or `subdir/my_python`) that are
@@ -75,12 +75,12 @@ impl TestExternalContext {
     #[must_use]
     pub fn with_model_asts(
         mut self,
-        models: impl IntoIterator<Item = (impl AsRef<std::path::Path>, ast::ModelNode)>,
+        models: impl IntoIterator<Item = (impl AsRef<std::path::Path>, ast::Model)>,
     ) -> Self {
-        for (path, node) in models {
+        for (path, model) in models {
             let path = path.as_ref().to_path_buf();
             let stem = path.file_stem().map_or_else(|| path.clone(), PathBuf::from);
-            self.model_asts.insert(ir::ModelPath::new(stem), node);
+            self.model_asts.insert(ir::ModelPath::new(stem), model);
         }
         self
     }
@@ -113,7 +113,7 @@ impl ExternalResolutionContext for TestExternalContext {
         self.builtin_functions.contains(identifier.as_str())
     }
 
-    fn load_ast(&mut self, path: &ir::ModelPath) -> Result<&ast::ModelNode, AstLoadingFailedError> {
+    fn load_ast(&mut self, path: &ir::ModelPath) -> Result<&ast::Model, AstLoadingFailedError> {
         self.model_asts.get(path).ok_or(AstLoadingFailedError)
     }
 
