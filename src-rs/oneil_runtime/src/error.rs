@@ -4,11 +4,11 @@ use oneil_shared::error::AsOneilError;
 
 pub struct FileError<'a> {
     path: &'a Path,
-    error: &'a IoError,
+    error: IoError,
 }
 
 impl<'a> FileError<'a> {
-    pub const fn new(path: &'a Path, error: &'a IoError) -> Self {
+    pub const fn new(path: &'a Path, error: IoError) -> Self {
         Self { path, error }
     }
 }

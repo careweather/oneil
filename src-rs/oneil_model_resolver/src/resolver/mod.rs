@@ -63,6 +63,7 @@ where
 
     // TODO: this might be able to recover and produce a partial model?
     let Ok(model_ast) = load_ast_result else {
+        resolution_context.mark_ast_not_loaded(model_path);
         resolution_context.pop_active_model(model_path);
         return;
     };

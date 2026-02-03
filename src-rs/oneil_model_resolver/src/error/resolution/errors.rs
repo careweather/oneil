@@ -74,15 +74,12 @@ impl ResolutionErrors {
 
     /// Adds a test resolution error.
     pub fn add_test_error(&mut self, test_index: ir::TestIndex, error: VariableResolutionError) {
-        self.test
-            .entry(test_index)
-            .or_default()
-            .push(error);
+        self.test.entry(test_index).or_default().push(error);
     }
 
     /// Returns a reference to the map of import resolution errors.
     #[must_use]
-    pub const fn get_import_errors(
+    pub const fn get_python_import_resolution_errors(
         &self,
     ) -> &IndexMap<ir::PythonPath, PythonImportResolutionError> {
         &self.python_import
@@ -113,5 +110,27 @@ impl ResolutionErrors {
         &self,
     ) -> &IndexMap<ir::TestIndex, Vec<VariableResolutionError>> {
         &self.test
+    }
+
+    /// Breaks the errors into its components.
+    #[expect(
+        clippy::type_complexity,
+        reason = "this is just a tuple of the error maps"
+    )]
+    #[must_use]
+    pub fn into_parts(
+        self,
+    ) -> (
+        IndexMap<ir::PythonPath, PythonImportResolutionError>,
+        IndexMap<ir::ReferenceName, (Option<ir::SubmodelName>, ModelImportResolutionError)>,
+        IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
+        IndexMap<ir::TestIndex, Vec<VariableResolutionError>>,
+    ) {
+        (
+            self.python_import,
+            self.model_import,
+            self.parameter,
+            self.test,
+        )
     }
 }
