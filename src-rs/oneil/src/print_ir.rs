@@ -163,7 +163,7 @@ fn print_parameter(
     );
 }
 
-fn print_dependencies(indent: usize, dependencies: &oneil_ir::Dependencies) {
+fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
     let builtin_deps = dependencies.builtin();
     let parameter_deps = dependencies.parameter();
     let external_deps = dependencies.external();
