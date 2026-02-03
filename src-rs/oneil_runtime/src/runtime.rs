@@ -1,12 +1,12 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use indexmap::IndexMap;
 use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
 use oneil_shared::error::OneilError;
 
+use crate::cache::{AstCache, IrCache, SourceCache};
 use crate::{error::FileError, std_builtin::StdBuiltins};
 
 /// Runtime for the Oneil programming language.
@@ -15,12 +15,9 @@ use crate::{error::FileError, std_builtin::StdBuiltins};
 /// methods to load and process Oneil models.
 #[derive(Debug)]
 pub struct Runtime {
-    source_cache: IndexMap<PathBuf, String>,
-    source_errors: IndexMap<PathBuf, OneilError>,
-    ast_cache: IndexMap<PathBuf, ast::Model>,
-    ast_errors: IndexMap<PathBuf, Vec<OneilError>>,
-    ir_cache: IndexMap<PathBuf, ir::Model>,
-    ir_errors: IndexMap<PathBuf, Vec<OneilError>>,
+    source_cache: SourceCache,
+    ast_cache: AstCache,
+    ir_cache: IrCache,
     builtins: StdBuiltins,
 }
 
@@ -28,12 +25,9 @@ impl Runtime {
     /// Creates a new runtime instance with empty caches.
     pub fn new() -> Self {
         Self {
-            source_cache: IndexMap::new(),
-            source_errors: IndexMap::new(),
-            ast_cache: IndexMap::new(),
-            ast_errors: IndexMap::new(),
-            ir_cache: IndexMap::new(),
-            ir_errors: IndexMap::new(),
+            source_cache: SourceCache::new(),
+            ast_cache: AstCache::new(),
+            ir_cache: IrCache::new(),
             builtins: StdBuiltins::new(),
         }
     }
@@ -54,8 +48,8 @@ impl Runtime {
             // if the AST for the model has not been loaded,
             // return the source and AST errors
             if !ast_loaded {
-                let source_error = self.source_errors.get(&model_path).cloned();
-                let ast_errors = self.ast_errors.get(&model_path).cloned();
+                let source_error = self.source_cache.get_error(&model_path).cloned();
+                let ast_errors = self.ast_cache.get_errors(&model_path).map(Vec::from);
 
                 errors.extend(source_error.iter().cloned());
                 errors.extend(ast_errors.iter().flatten().cloned());
@@ -104,8 +98,8 @@ impl Runtime {
             // if there are any model errors,
             // add them to the cache and to the overall error collection
             if !model_errors_as_oneil.is_empty() {
-                self.ir_errors
-                    .insert(model_path.clone(), model_errors_as_oneil.clone());
+                self.ir_cache
+                    .insert_errors(model_path.clone(), model_errors_as_oneil.clone());
                 errors.extend(model_errors_as_oneil);
             }
         }
@@ -113,7 +107,7 @@ impl Runtime {
         if errors.is_empty() {
             let ir_model = self
                 .ir_cache
-                .get(&path.as_ref().to_path_buf())
+                .get(path.as_ref())
                 .expect("it has already been loaded previously");
 
             Ok(ir_model)
@@ -130,14 +124,14 @@ impl Runtime {
         // parse the model and return an error if it fails
         match parser::parse_model(source, None) {
             Ok(ast) => {
-                self.ast_cache.insert(path.to_path_buf(), ast.take_value());
+                self.ast_cache
+                    .insert_ok(path.to_path_buf(), ast.take_value());
                 let ast = self.ast_cache.get(path).expect("it was just inserted");
 
                 Ok(ast)
             }
             Err(e) => {
-                let ast = e.partial_result;
-                self.ast_cache.insert(path.to_path_buf(), *ast);
+                let partial_ast = e.partial_result;
 
                 // need to reload the source for lifetime reasons
                 // TODO: maybe another call to `load_source` once caching works would make more sense?
@@ -151,7 +145,8 @@ impl Runtime {
                     .into_iter()
                     .map(|e| OneilError::from_error_with_source(&e, path.to_path_buf(), source))
                     .collect::<Vec<OneilError>>();
-                self.ast_errors.insert(path.to_path_buf(), errors.clone());
+                self.ast_cache
+                    .insert_err(path.to_path_buf(), *partial_ast, errors.clone());
 
                 Err(errors)
             }
@@ -167,7 +162,7 @@ impl Runtime {
             Ok(source) => {
                 // If it's found, insert it into the loaded models map
                 // and return it
-                self.source_cache.insert(path.to_path_buf(), source);
+                self.source_cache.insert_ok(path.to_path_buf(), source);
 
                 let source = self.source_cache.get(path).expect("it was just inserted");
 
@@ -177,7 +172,8 @@ impl Runtime {
                 let error = FileError::new(path, e);
                 let error = OneilError::from_error(&error, path.to_path_buf());
 
-                self.source_errors.insert(path.to_path_buf(), error.clone());
+                self.source_cache
+                    .insert_err(path.to_path_buf(), error.clone());
 
                 Err(Box::new(error))
             }
