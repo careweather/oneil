@@ -6,7 +6,7 @@ use crate::{
     model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
     parameter::{Parameter, ParameterName},
     python_import::PythonImport,
-    reference::{ModelPath, PythonPath},
+    reference::PythonPath,
     test::{Test, TestIndex},
 };
 
@@ -125,40 +125,5 @@ impl Model {
     /// Adds a test to this model.
     pub fn add_test(&mut self, index: TestIndex, test: Test) {
         self.tests.insert(index, test);
-    }
-}
-
-/// A collection of models that can be managed together.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelCollection {
-    models: IndexMap<ModelPath, Model>,
-}
-
-impl ModelCollection {
-    /// Creates a new model collection with the specified model mapping.
-    #[must_use]
-    pub const fn new(models: IndexMap<ModelPath, Model>) -> Self {
-        Self { models }
-    }
-
-    /// Returns all Python imports from all models in the collection.
-    #[must_use]
-    pub fn get_python_imports(&self) -> Vec<&PythonImport> {
-        self.models
-            .values()
-            .flat_map(|model| model.python_imports.values())
-            .collect()
-    }
-
-    /// Returns all models in the collection.
-    #[must_use]
-    pub const fn get_models(&self) -> &IndexMap<ModelPath, Model> {
-        &self.models
-    }
-
-    /// Converts the model collection into its internal representation.
-    #[must_use]
-    pub fn into_map(self) -> IndexMap<ModelPath, Model> {
-        self.models
     }
 }

@@ -2,8 +2,7 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    builtin::BuiltinFunction,
-    context::EvalContext,
+    context::{EvalContext, ExternalResolutionContext},
     error::EvalError,
     value::{DisplayUnit, Unit},
 };
@@ -15,9 +14,9 @@ use crate::{
 /// # Errors
 ///
 /// Returns an error if the unit is not found.
-pub fn eval_unit<F: BuiltinFunction>(
+pub fn eval_unit<E: ExternalResolutionContext>(
     unit: &ir::CompositeUnit,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Option<(Unit, Span)>, Vec<EvalError>> {
     let units = unit
         .units()
@@ -60,9 +59,9 @@ pub fn eval_unit<F: BuiltinFunction>(
     }
 }
 
-fn eval_unit_component<F: BuiltinFunction>(
+fn eval_unit_component<E: ExternalResolutionContext>(
     unit: &ir::Unit,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Unit, Box<EvalError>> {
     let unit_name_span = unit.name_span();
 
@@ -137,9 +136,8 @@ mod test {
     use oneil_shared::span::SourceLocation;
 
     use crate::{
-        assert_is_close, assert_units_dimensionally_eq,
-        builtin::{self, BuiltinMap, std::StdBuiltinFunction},
-        value::Dimension,
+        assert_is_close, assert_units_dimensionally_eq, context::EvalContext,
+        test_context::TestExternalContext, value::Dimension,
     };
 
     use super::*;
@@ -161,16 +159,6 @@ mod test {
             column: 0,
         };
         Span::new(start, end)
-    }
-
-    fn create_eval_context() -> EvalContext<StdBuiltinFunction> {
-        let builtins = BuiltinMap::new(
-            builtin::std::builtin_values(),
-            builtin::std::builtin_functions(),
-            builtin::std::builtin_units(),
-            builtin::std::builtin_prefixes(),
-        );
-        EvalContext::new(builtins)
     }
 
     /// Returns a display unit that isn't intended to be tested.
@@ -204,7 +192,8 @@ mod test {
         fn eval_unitless() {
             // setup unit and context
             let unit = ir_composite_unit([]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -219,7 +208,8 @@ mod test {
         fn eval_simple() {
             // setup unit and context
             let unit = ir_composite_unit([("s", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -240,7 +230,8 @@ mod test {
         fn eval_simple_with_prefix() {
             // setup unit and context
             let unit = ir_composite_unit([("ms", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -261,7 +252,8 @@ mod test {
         fn eval_simple_with_prefix_and_exponent() {
             // setup unit and context
             let unit = ir_composite_unit([("ms", 2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -282,7 +274,8 @@ mod test {
         fn eval_db() {
             // setup unit and context
             let unit = ir_composite_unit([("dB", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -303,7 +296,8 @@ mod test {
         fn eval_db_watts() {
             // setup unit and context
             let unit = ir_composite_unit([("dBW", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -331,7 +325,8 @@ mod test {
         fn eval_db_watts_per_meter_squared_per_hertz() {
             // setup unit and context
             let unit = ir_composite_unit([("dBW", 1.0), ("m", -2.0), ("Hz", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -357,7 +352,8 @@ mod test {
         fn eval_kilometers() {
             // setup unit and context
             let unit = ir_composite_unit([("km", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -378,7 +374,8 @@ mod test {
         fn eval_square_kilometers() {
             // setup unit and context
             let unit = ir_composite_unit([("km", 2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -399,7 +396,8 @@ mod test {
         fn eval_gigahertz() {
             // setup unit and context
             let unit = ir_composite_unit([("GHz", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -421,7 +419,8 @@ mod test {
         fn eval_kilohertz() {
             // setup unit and context
             let unit = ir_composite_unit([("kHz", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -443,7 +442,8 @@ mod test {
         fn eval_megahertz() {
             // setup unit and context
             let unit = ir_composite_unit([("MHz", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -465,7 +465,8 @@ mod test {
         fn eval_microseconds() {
             // setup unit and context
             let unit = ir_composite_unit([("us", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -486,7 +487,8 @@ mod test {
         fn eval_volts() {
             // setup unit and context
             let unit = ir_composite_unit([("V", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -515,7 +517,8 @@ mod test {
         fn eval_millivolts() {
             // setup unit and context
             let unit = ir_composite_unit([("mV", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -544,7 +547,8 @@ mod test {
         fn eval_ohms() {
             // setup unit and context
             let unit = ir_composite_unit([("Ohm", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -573,7 +577,8 @@ mod test {
         fn eval_watts() {
             // setup unit and context
             let unit = ir_composite_unit([("W", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -601,7 +606,8 @@ mod test {
         fn eval_watts_per_square_meter() {
             // setup unit and context
             let unit = ir_composite_unit([("W", 1.0), ("m", -2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -622,7 +628,8 @@ mod test {
         fn eval_kelvin() {
             // setup unit and context
             let unit = ir_composite_unit([("K", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -643,7 +650,8 @@ mod test {
         fn eval_amperes() {
             // setup unit and context
             let unit = ir_composite_unit([("A", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -664,7 +672,8 @@ mod test {
         fn eval_milliampere_hours() {
             // setup unit and context
             let unit = ir_composite_unit([("mAh", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -689,7 +698,8 @@ mod test {
         fn eval_joules() {
             // setup unit and context
             let unit = ir_composite_unit([("J", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -717,7 +727,8 @@ mod test {
         fn eval_hours() {
             // setup unit and context
             let unit = ir_composite_unit([("hr", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -739,7 +750,8 @@ mod test {
         fn eval_minutes() {
             // setup unit and context
             let unit = ir_composite_unit([("min", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -761,7 +773,8 @@ mod test {
         fn eval_revolutions_per_minute() {
             // setup unit and context
             let unit = ir_composite_unit([("rpm", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -783,7 +796,8 @@ mod test {
         fn eval_degrees() {
             // setup unit and context
             let unit = ir_composite_unit([("deg", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -805,7 +819,8 @@ mod test {
         fn eval_percent() {
             // setup unit and context
             let unit = ir_composite_unit([("%", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -827,7 +842,8 @@ mod test {
         fn eval_megabits_per_second() {
             // setup unit and context
             let unit = ir_composite_unit([("Mbps", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -852,7 +868,8 @@ mod test {
         fn eval_kilobytes() {
             // setup unit and context
             let unit = ir_composite_unit([("kB", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -875,7 +892,8 @@ mod test {
             // setup unit and context
             // m^2*kg/s^2/K - the unit of Boltzmann's constant
             let unit = ir_composite_unit([("m", 2.0), ("kg", 1.0), ("s", -2.0), ("K", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -905,7 +923,8 @@ mod test {
         fn eval_meters_per_second() {
             // setup unit and context
             let unit = ir_composite_unit([("m", 1.0), ("s", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -929,7 +948,8 @@ mod test {
         fn eval_meters_per_second_squared() {
             // setup unit and context
             let unit = ir_composite_unit([("m", 1.0), ("s", -2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate unit
             let result = eval_unit(&unit, &context);
@@ -958,7 +978,8 @@ mod test {
             // setup unit and context
             let newton_unit = ir_composite_unit([("N", 1.0)]);
             let kg_m_s_2_unit = ir_composite_unit([("kg", 1.0), ("m", 1.0), ("s", -2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate newton unit
             let result = eval_unit(&newton_unit, &context);
@@ -983,7 +1004,8 @@ mod test {
             // setup unit and context
             let joule_unit = ir_composite_unit([("J", 1.0)]);
             let newton_meter_unit = ir_composite_unit([("N", 1.0), ("m", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate joule unit
             let result = eval_unit(&joule_unit, &context);
@@ -1008,7 +1030,8 @@ mod test {
             // setup unit and context
             let joule_unit = ir_composite_unit([("J", 1.0)]);
             let kg_m2_s2_unit = ir_composite_unit([("kg", 1.0), ("m", 2.0), ("s", -2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate joule unit
             let result = eval_unit(&joule_unit, &context);
@@ -1033,7 +1056,8 @@ mod test {
             // setup unit and context
             let watt_unit = ir_composite_unit([("W", 1.0)]);
             let joule_per_second_unit = ir_composite_unit([("J", 1.0), ("s", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
@@ -1059,7 +1083,8 @@ mod test {
             let watt_unit = ir_composite_unit([("W", 1.0)]);
             let newton_meter_per_second_unit =
                 ir_composite_unit([("N", 1.0), ("m", 1.0), ("s", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
@@ -1085,7 +1110,8 @@ mod test {
             // setup unit and context
             let watt_unit = ir_composite_unit([("W", 1.0)]);
             let kg_m2_s3_unit = ir_composite_unit([("kg", 1.0), ("m", 2.0), ("s", -3.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate watt unit
             let result = eval_unit(&watt_unit, &context);
@@ -1110,7 +1136,8 @@ mod test {
             // setup unit and context
             let volt_unit = ir_composite_unit([("V", 1.0)]);
             let watt_per_ampere_unit = ir_composite_unit([("W", 1.0), ("A", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate volt unit
             let result = eval_unit(&volt_unit, &context);
@@ -1136,7 +1163,8 @@ mod test {
             let volt_unit = ir_composite_unit([("V", 1.0)]);
             let kg_m2_s3_a_unit =
                 ir_composite_unit([("kg", 1.0), ("m", 2.0), ("s", -3.0), ("A", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate volt unit
             let result = eval_unit(&volt_unit, &context);
@@ -1161,7 +1189,8 @@ mod test {
             // setup unit and context
             let ohm_unit = ir_composite_unit([("Ohm", 1.0)]);
             let volt_per_ampere_unit = ir_composite_unit([("V", 1.0), ("A", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate ohm unit
             let result = eval_unit(&ohm_unit, &context);
@@ -1187,7 +1216,8 @@ mod test {
             let ohm_unit = ir_composite_unit([("Ohm", 1.0)]);
             let kg_m2_s3_a2_unit =
                 ir_composite_unit([("kg", 1.0), ("m", 2.0), ("s", -3.0), ("A", -2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate ohm unit
             let result = eval_unit(&ohm_unit, &context);
@@ -1212,7 +1242,8 @@ mod test {
             // setup unit and context
             let pascal_unit = ir_composite_unit([("Pa", 1.0)]);
             let newton_per_square_meter_unit = ir_composite_unit([("N", 1.0), ("m", -2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate pascal unit
             let result = eval_unit(&pascal_unit, &context);
@@ -1238,7 +1269,8 @@ mod test {
             // setup unit and context
             let pascal_unit = ir_composite_unit([("Pa", 1.0)]);
             let kg_m_s2_unit = ir_composite_unit([("kg", 1.0), ("m", -1.0), ("s", -2.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate pascal unit
             let result = eval_unit(&pascal_unit, &context);
@@ -1264,7 +1296,8 @@ mod test {
             // Wh = W * hr
             let watt_hour_unit = ir_composite_unit([("Wh", 1.0)]);
             let watt_times_hour_unit = ir_composite_unit([("W", 1.0), ("hr", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate watt_hour unit
             let result = eval_unit(&watt_hour_unit, &context);
@@ -1290,7 +1323,8 @@ mod test {
             // Ah = A * hr
             let amp_hour_unit = ir_composite_unit([("Ah", 1.0)]);
             let ampere_times_hour_unit = ir_composite_unit([("A", 1.0), ("hr", 1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate amp_hour unit
             let result = eval_unit(&amp_hour_unit, &context);
@@ -1315,7 +1349,8 @@ mod test {
             // setup unit and context
             let tesla_unit = ir_composite_unit([("T", 1.0)]);
             let kg_s2_a_unit = ir_composite_unit([("kg", 1.0), ("s", -2.0), ("A", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate tesla unit
             let result = eval_unit(&tesla_unit, &context);
@@ -1341,7 +1376,8 @@ mod test {
             // Hz has magnitude 2π, so we need to account for that
             let hertz_unit = ir_composite_unit([("Hz", 1.0)]);
             let per_second_unit = ir_composite_unit([("s", -1.0)]);
-            let context = create_eval_context();
+            let mut external = TestExternalContext::new();
+            let context = EvalContext::new(&mut external);
 
             // evaluate hertz unit
             let result = eval_unit(&hertz_unit, &context);
