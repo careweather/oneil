@@ -22,6 +22,8 @@ pub struct ModelResolutionResult {
     model_errors: ResolutionErrors,
     /// Circular dependency errors.
     circular_dependency_errors: Vec<CircularDependencyError>,
+    /// Whether the AST for the model has been loaded.
+    ast_loaded: bool,
 }
 
 impl Default for ModelResolutionResult {
@@ -47,6 +49,7 @@ impl ModelResolutionResult {
             model: empty_model,
             model_errors: ResolutionErrors::empty(),
             circular_dependency_errors: Vec::new(),
+            ast_loaded: true,
         }
     }
 
@@ -81,6 +84,35 @@ impl ModelResolutionResult {
     /// Returns a mutable reference to the circular dependency errors.
     pub const fn circular_dependency_errors_mut(&mut self) -> &mut Vec<CircularDependencyError> {
         &mut self.circular_dependency_errors
+    }
+
+    /// Returns whether the AST for the model has been loaded.
+    #[must_use]
+    pub const fn ast_loaded(&self) -> bool {
+        self.ast_loaded
+    }
+
+    /// Returns a mutable reference to the AST loaded flag.
+    pub const fn ast_loaded_mut(&mut self) -> &mut bool {
+        &mut self.ast_loaded
+    }
+
+    /// Breaks the result into its components.
+    #[must_use]
+    pub fn into_parts(
+        self,
+    ) -> (
+        ir::Model,
+        ResolutionErrors,
+        Vec<CircularDependencyError>,
+        bool,
+    ) {
+        (
+            self.model,
+            self.model_errors,
+            self.circular_dependency_errors,
+            self.ast_loaded,
+        )
     }
 }
 
@@ -176,6 +208,14 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             &popped, model_path,
             "popped model path does not match the given model path"
         );
+    }
+
+    /// Marks the AST for a model as not loaded.
+    pub fn mark_ast_not_loaded(&mut self, model_path: &ir::ModelPath) {
+        self.model_results
+            .get_mut(model_path)
+            .expect("model not found")
+            .ast_loaded = false;
     }
 
     /// Checks if the given model is active.
@@ -548,7 +588,8 @@ impl<E: ExternalResolutionContext> ResolutionContext<'_, E> {
     pub fn get_active_model_python_import_errors(
         &self,
     ) -> &IndexMap<ir::PythonPath, PythonImportResolutionError> {
-        self.active_model_errors().get_import_errors()
+        self.active_model_errors()
+            .get_python_import_resolution_errors()
     }
 
     /// Returns the resolved parameters for the active model.
