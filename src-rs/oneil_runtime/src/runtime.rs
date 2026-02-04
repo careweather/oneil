@@ -10,7 +10,7 @@ use oneil_parser as parser;
 use oneil_shared::error::OneilError;
 use oneil_shared::span::Span;
 
-use crate::cache::{AstCache, IrCache, SourceCache};
+use crate::cache::{AstCache, EvalCache, IrCache, SourceCache};
 use crate::{error::FileError, std_builtin::StdBuiltins};
 
 /// Runtime for the Oneil programming language.
@@ -22,6 +22,7 @@ pub struct Runtime {
     source_cache: SourceCache,
     ast_cache: AstCache,
     ir_cache: IrCache,
+    eval_cache: EvalCache,
     builtins: StdBuiltins,
 }
 
@@ -32,6 +33,7 @@ impl Runtime {
             source_cache: SourceCache::new(),
             ast_cache: AstCache::new(),
             ir_cache: IrCache::new(),
+            eval_cache: EvalCache::new(),
             builtins: StdBuiltins::new(),
         }
     }
@@ -39,6 +41,8 @@ impl Runtime {
     /// Evaluates a model and returns the result.
     pub fn eval_model(&mut self, path: impl AsRef<Path>) -> Result<(), Vec<OneilError>> {
         let model_map = eval::eval_model(path, self);
+        self.eval_cache.insert_all(model_map);
+
         todo!()
     }
 
