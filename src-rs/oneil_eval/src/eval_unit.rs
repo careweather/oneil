@@ -2,7 +2,7 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    context::{EvalContext, ExternalResolutionContext},
+    context::{EvalContext, ExternalEvaluationContext},
     error::EvalError,
     value::{DisplayUnit, Unit},
 };
@@ -14,7 +14,7 @@ use crate::{
 /// # Errors
 ///
 /// Returns an error if the unit is not found.
-pub fn eval_unit<E: ExternalResolutionContext>(
+pub fn eval_unit<E: ExternalEvaluationContext>(
     unit: &ir::CompositeUnit,
     context: &EvalContext<'_, E>,
 ) -> Result<Option<(Unit, Span)>, Vec<EvalError>> {
@@ -59,7 +59,7 @@ pub fn eval_unit<E: ExternalResolutionContext>(
     }
 }
 
-fn eval_unit_component<E: ExternalResolutionContext>(
+fn eval_unit_component<E: ExternalEvaluationContext>(
     unit: &ir::Unit,
     context: &EvalContext<'_, E>,
 ) -> Result<Unit, Box<EvalError>> {
