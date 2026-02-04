@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use indexmap::IndexMap;
 
 use anstream::println;
-use oneil_runtime::data::ir;
+use oneil_runtime::output::ir;
 
 /// Prints the IR in a hierarchical tree format for debugging
 pub fn print(model_collection: IndexMap<PathBuf, &ir::Model>, print_debug: bool) {

@@ -10,7 +10,7 @@ mod symbol_lookup;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use oneil_runtime::data::ir;
+use oneil_runtime::output::ir;
 use oneil_runtime::{Runtime as OneilRuntime, RuntimeResult};
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::{

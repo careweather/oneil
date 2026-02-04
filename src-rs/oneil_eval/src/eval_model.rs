@@ -9,11 +9,12 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    EvalError,
-    context::{EvalContext, ExternalEvaluationContext, Model},
+    EvalError, ModelError,
+    context::{EvalContext, ExternalEvaluationContext},
     error::ExpectedType,
     eval_expr, eval_parameter,
     output::{
+        Model,
         dependency::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency},
         eval_result,
     },
@@ -25,7 +26,7 @@ use crate::{
 pub fn eval_model<E: ExternalEvaluationContext>(
     model_path: impl AsRef<Path>,
     external_context: &mut E,
-) -> IndexMap<PathBuf, Model> {
+) -> IndexMap<PathBuf, (Model, Vec<ModelError>)> {
     let model_path = ir::ModelPath::new(model_path);
     let mut context = EvalContext::new(external_context);
 

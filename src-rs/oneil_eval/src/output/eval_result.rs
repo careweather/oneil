@@ -177,7 +177,7 @@ impl<'result> ModelReference<'result> {
 /// the evaluation process and can be used for output, further processing, or
 /// analysis.
 #[derive(Debug, Clone)]
-pub(crate) struct Model {
+pub struct Model {
     /// The file path of the model that was evaluated.
     pub path: PathBuf,
     /// A map of submodel names to their evaluated results.
