@@ -2,10 +2,13 @@ use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_ast as ast;
+use oneil_eval::value::{Unit, Value};
+use oneil_eval::{self as eval, EvalError};
 use oneil_ir as ir;
 use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
 use oneil_shared::error::OneilError;
+use oneil_shared::span::Span;
 
 use crate::cache::{AstCache, IrCache, SourceCache};
 use crate::{error::FileError, std_builtin::StdBuiltins};
@@ -35,6 +38,7 @@ impl Runtime {
 
     /// Evaluates a model and returns the result.
     pub fn eval_model(&mut self, path: impl AsRef<Path>) -> Result<(), Vec<OneilError>> {
+        let model_map = eval::eval_model(path, self);
         todo!()
     }
 
@@ -249,6 +253,34 @@ impl model_resolver::ExternalResolutionContext for Runtime {
         python_path: &ir::PythonPath,
     ) -> Result<(), model_resolver::PythonImportLoadingFailedError> {
         todo!()
+    }
+}
+
+impl eval::ExternalEvaluationContext for Runtime {
+    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<&ir::Model> {
+        self.ir_cache.get(path.as_ref())
+    }
+
+    fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&Value> {
+        self.builtins.get_value(identifier.as_str())
+    }
+
+    fn evaluate_builtin_function(
+        &self,
+        identifier: &ir::Identifier,
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+    ) -> Option<Result<Value, Vec<EvalError>>> {
+        let function = self.builtins.get_function(identifier.as_str())?;
+        Some(function(identifier_span, args))
+    }
+
+    fn lookup_unit(&self, name: &str) -> Option<&Unit> {
+        self.builtins.get_unit(name)
+    }
+
+    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
+        self.builtins.builtin_prefixes()
     }
 }
 

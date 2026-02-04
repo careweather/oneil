@@ -23,7 +23,9 @@ pub trait ExternalEvaluationContext {
     /// Returns the value of a builtin variable by identifier, if it exists.
     fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&Value>;
 
-    /// Evaluates a builtin function by identifier with the given arguments.
+    /// Evaluates a builtin function by identifier with the given arguments, if it exists.
+    ///
+    /// If the function does not exist, returns `None`.
     ///
     /// # Errors
     ///
@@ -33,13 +35,13 @@ pub trait ExternalEvaluationContext {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(Value, Span)>,
-    ) -> Result<Value, Vec<EvalError>>;
+    ) -> Option<Result<Value, Vec<EvalError>>>;
 
     /// Returns a unit by name if it is defined in the builtin context.
     fn lookup_unit(&self, name: &str) -> Option<&Unit>;
 
     /// Returns the map of available unit prefixes (e.g. "k" -> 1000.0).
-    fn available_prefixes(&self) -> &IndexMap<String, f64>;
+    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)>;
 }
 
 /// Represents a model with its evaluated parameters, submodels, references, and tests.
@@ -124,7 +126,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     pub fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
         self.external_context
             .lookup_builtin_variable(identifier)
-            .expect("builtin value should be defined")
+            .expect("builtin value should be defined (checked during resolution)")
             .clone()
     }
 
@@ -194,6 +196,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     ) -> Result<Value, Vec<EvalError>> {
         self.external_context
             .evaluate_builtin_function(identifier, identifier_span, args)
+            .expect("builtin function should be defined (checked during resolution)")
     }
 
     /// Evaluates an imported function with the given arguments.
@@ -225,7 +228,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
     /// Returns the available unit prefixes.
     #[must_use]
-    pub fn available_prefixes(&self) -> &IndexMap<String, f64> {
+    pub fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
         self.external_context.available_prefixes()
     }
 

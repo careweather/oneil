@@ -12,10 +12,10 @@ use oneil_eval::{
 
 #[derive(Debug, Clone)]
 pub struct StdBuiltins {
-    values: Vec<StdBuiltinValue>,
-    functions: Vec<StdBuiltinFunctionInfo>,
-    units: Vec<StdBuiltinUnit>,
-    prefixes: Vec<StdBuiltinPrefix>,
+    values: IndexMap<&'static str, BuiltinValue>,
+    functions: IndexMap<&'static str, BuiltinFunction>,
+    units: IndexMap<&'static str, BuiltinUnit>,
+    prefixes: IndexMap<&'static str, BuiltinPrefix>,
 }
 
 impl StdBuiltins {
@@ -29,201 +29,184 @@ impl StdBuiltins {
     }
 
     pub fn has_builtin_value(&self, identifier: &str) -> bool {
-        self.values.iter().any(|value| value.name == identifier)
+        self.values.contains_key(identifier)
     }
 
     pub fn has_builtin_function(&self, identifier: &str) -> bool {
+        self.functions.contains_key(identifier)
+    }
+
+    pub fn get_value(&self, identifier: &str) -> Option<&Value> {
+        self.values.get(identifier).map(|value| &value.value)
+    }
+
+    pub fn get_function(&self, identifier: &str) -> Option<BuiltinFunctionFn> {
         self.functions
+            .get(identifier)
+            .map(|function| function.function)
+    }
+
+    pub fn get_unit(&self, name: &str) -> Option<&Unit> {
+        self.units.get(name).map(|unit| &unit.unit)
+    }
+
+    pub fn builtin_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
+        self.prefixes
             .iter()
-            .any(|function| function.name == identifier)
+            .map(|(name, prefix)| (*name, prefix.value))
     }
 }
 
 #[derive(Debug, Clone)]
-struct StdBuiltinValue {
+struct BuiltinValue {
     name: &'static str,
     value: Value,
     description: &'static str,
 }
 
-impl StdBuiltinValue {
-    pub const fn name(&self) -> &str {
-        self.name
-    }
-
-    pub const fn description(&self) -> &str {
-        self.description
-    }
-
-    pub const fn value(&self) -> &Value {
-        &self.value
-    }
-}
-
-fn builtin_values_complete() -> impl Iterator<Item = StdBuiltinValue> {
+fn builtin_values_complete() -> impl Iterator<Item = (&'static str, BuiltinValue)> {
     [
-        StdBuiltinValue {
+        BuiltinValue {
             name: "pi",
             value: Value::Number(Number::Scalar(std::f64::consts::PI)),
             description: "The mathematical constant π",
         },
-        StdBuiltinValue {
+        BuiltinValue {
             name: "e",
             value: Value::Number(Number::Scalar(std::f64::consts::E)),
             description: "The mathematical constant e",
         },
     ]
     .into_iter()
+    .map(|value| (value.name, value))
 }
 
 #[derive(Debug, Clone)]
-struct StdBuiltinPrefix {
-    name: &'static str,
+pub struct BuiltinPrefix {
+    prefix: &'static str,
     value: f64,
     description: &'static str,
 }
 
-impl StdBuiltinPrefix {
-    pub const fn name(&self) -> &str {
-        self.name
-    }
-
-    pub const fn value(&self) -> f64 {
-        self.value
-    }
-
-    pub const fn description(&self) -> &str {
-        self.description
-    }
-}
-
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin prefixes")]
-fn builtin_prefixes_complete() -> impl Iterator<Item = StdBuiltinPrefix> {
+fn builtin_prefixes_complete() -> impl Iterator<Item = (&'static str, BuiltinPrefix)> {
     [
-        StdBuiltinPrefix {
-            name: "q",
+        BuiltinPrefix {
+            prefix: "q",
             value: 1e-30,
             description: "quecto",
         },
-        StdBuiltinPrefix {
-            name: "r",
+        BuiltinPrefix {
+            prefix: "r",
             value: 1e-27,
             description: "ronto",
         },
-        StdBuiltinPrefix {
-            name: "y",
+        BuiltinPrefix {
+            prefix: "y",
             value: 1e-24,
             description: "yocto",
         },
-        StdBuiltinPrefix {
-            name: "z",
+        BuiltinPrefix {
+            prefix: "z",
             value: 1e-21,
             description: "zepto",
         },
-        StdBuiltinPrefix {
-            name: "a",
+        BuiltinPrefix {
+            prefix: "a",
             value: 1e-18,
             description: "atto",
         },
-        StdBuiltinPrefix {
-            name: "f",
+        BuiltinPrefix {
+            prefix: "f",
             value: 1e-15,
             description: "femto",
         },
-        StdBuiltinPrefix {
-            name: "p",
+        BuiltinPrefix {
+            prefix: "p",
             value: 1e-12,
             description: "pico",
         },
-        StdBuiltinPrefix {
-            name: "n",
+        BuiltinPrefix {
+            prefix: "n",
             value: 1e-9,
             description: "nano",
         },
-        StdBuiltinPrefix {
-            name: "u",
+        BuiltinPrefix {
+            prefix: "u",
             value: 1e-6,
             description: "micro",
         },
-        StdBuiltinPrefix {
-            name: "m",
+        BuiltinPrefix {
+            prefix: "m",
             value: 1e-3,
             description: "milli",
         },
-        StdBuiltinPrefix {
-            name: "k",
+        BuiltinPrefix {
+            prefix: "k",
             value: 1e3,
             description: "kilo",
         },
-        StdBuiltinPrefix {
-            name: "M",
+        BuiltinPrefix {
+            prefix: "M",
             value: 1e6,
             description: "mega",
         },
-        StdBuiltinPrefix {
-            name: "G",
+        BuiltinPrefix {
+            prefix: "G",
             value: 1e9,
             description: "giga",
         },
-        StdBuiltinPrefix {
-            name: "T",
+        BuiltinPrefix {
+            prefix: "T",
             value: 1e12,
             description: "tera",
         },
-        StdBuiltinPrefix {
-            name: "P",
+        BuiltinPrefix {
+            prefix: "P",
             value: 1e15,
             description: "peta",
         },
-        StdBuiltinPrefix {
-            name: "E",
+        BuiltinPrefix {
+            prefix: "E",
             value: 1e18,
             description: "exa",
         },
-        StdBuiltinPrefix {
-            name: "Z",
+        BuiltinPrefix {
+            prefix: "Z",
             value: 1e21,
             description: "zetta",
         },
-        StdBuiltinPrefix {
-            name: "Y",
+        BuiltinPrefix {
+            prefix: "Y",
             value: 1e24,
             description: "yotta",
         },
-        StdBuiltinPrefix {
-            name: "R",
+        BuiltinPrefix {
+            prefix: "R",
             value: 1e27,
             description: "ronna",
         },
-        StdBuiltinPrefix {
-            name: "Q",
+        BuiltinPrefix {
+            prefix: "Q",
             value: 1e30,
             description: "quetta",
         },
     ]
     .into_iter()
+    .map(|prefix| (prefix.prefix, prefix))
 }
 
 #[derive(Debug, Clone)]
-struct StdBuiltinUnit {
-    name: &'static str,
-    aliases: IndexMap<&'static str, Unit>,
-}
-
-impl StdBuiltinUnit {
-    pub const fn name(&self) -> &str {
-        self.name
-    }
-
-    pub const fn aliases(&self) -> &IndexMap<&'static str, Unit> {
-        &self.aliases
-    }
+struct BuiltinUnit {
+    alias: &'static str,
+    unit: Unit,
+    readable_name: &'static str,
 }
 
 /// The builtin units that come with Oneil.
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin units")]
 #[expect(clippy::unreadable_literal, reason = "this is a list of builtin units")]
-fn builtin_units_complete() -> impl Iterator<Item = StdBuiltinUnit> {
+fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUnit)> {
     /// Information about a builtin unit.
     ///
     /// This is only used in this function to avoid code duplication.
@@ -772,7 +755,7 @@ fn builtin_units_complete() -> impl Iterator<Item = StdBuiltinUnit> {
         },
     ];
 
-    units.into_iter().map(
+    units.into_iter().flat_map(
         |UnitInfo {
              name,
              aliases,
@@ -780,170 +763,173 @@ fn builtin_units_complete() -> impl Iterator<Item = StdBuiltinUnit> {
              dimensions,
              is_db,
          }| {
-            let aliases = aliases
-                .iter()
-                .map(move |alias| {
-                    let unit = Unit {
-                        dimension_map: dimensions.clone(),
-                        magnitude,
-                        is_db,
-                        display_unit: DisplayUnit::Unit {
-                            name: (*alias).to_string(),
-                            exponent: 1.0,
-                        },
-                    };
-                    (*alias, unit)
-                })
-                .collect();
-
-            StdBuiltinUnit { name, aliases }
+            aliases.iter().map(move |alias| {
+                let unit = Unit {
+                    dimension_map: dimensions.clone(),
+                    magnitude,
+                    is_db,
+                    display_unit: DisplayUnit::Unit {
+                        name: (*alias).to_string(),
+                        exponent: 1.0,
+                    },
+                };
+                (
+                    *alias,
+                    BuiltinUnit {
+                        alias,
+                        unit,
+                        readable_name: name,
+                    },
+                )
+            })
         },
     )
 }
 
 /// Information about a builtin function.
 #[derive(Debug, Clone)]
-pub struct StdBuiltinFunctionInfo {
+pub struct BuiltinFunction {
     name: &'static str,
     args: &'static [&'static str],
     description: &'static str,
-    function: StdBuiltinFunction,
+    function: BuiltinFunctionFn,
 }
 
 /// Type alias for standard builtin function type
-pub type StdBuiltinFunction = fn(Span, Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>>;
+pub type BuiltinFunctionFn = fn(Span, Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>>;
 
 #[expect(clippy::too_many_lines, reason = "this is a list of builtin functions")]
-fn builtin_functions_complete() -> impl Iterator<Item = StdBuiltinFunctionInfo> {
+fn builtin_functions_complete() -> impl Iterator<Item = (&'static str, BuiltinFunction)> {
     [
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "min",
             args: &["n", "..."],
             description: fns::MIN_DESCRIPTION,
-            function: fns::min as StdBuiltinFunction,
+            function: fns::min as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "max",
             args: &["n", "..."],
             description: fns::MAX_DESCRIPTION,
-            function: fns::max as StdBuiltinFunction,
+            function: fns::max as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "sin",
             args: &["x"],
             description: fns::SIN_DESCRIPTION,
-            function: fns::sin as StdBuiltinFunction,
+            function: fns::sin as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "cos",
             args: &["x"],
             description: fns::COS_DESCRIPTION,
-            function: fns::cos as StdBuiltinFunction,
+            function: fns::cos as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "tan",
             args: &["x"],
             description: fns::TAN_DESCRIPTION,
-            function: fns::tan as StdBuiltinFunction,
+            function: fns::tan as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "asin",
             args: &["x"],
             description: fns::ASIN_DESCRIPTION,
-            function: fns::asin as StdBuiltinFunction,
+            function: fns::asin as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "acos",
             args: &["x"],
             description: fns::ACOS_DESCRIPTION,
-            function: fns::acos as StdBuiltinFunction,
+            function: fns::acos as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "atan",
             args: &["x"],
             description: fns::ATAN_DESCRIPTION,
-            function: fns::atan as StdBuiltinFunction,
+            function: fns::atan as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "sqrt",
             args: &["x"],
             description: fns::SQRT_DESCRIPTION,
-            function: fns::sqrt as StdBuiltinFunction,
+            function: fns::sqrt as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "ln",
             args: &["x"],
             description: fns::LN_DESCRIPTION,
-            function: fns::ln as StdBuiltinFunction,
+            function: fns::ln as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "log",
             args: &["x"],
             description: fns::LOG_DESCRIPTION,
-            function: fns::log as StdBuiltinFunction,
+            function: fns::log as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "log10",
             args: &["x"],
             description: fns::LOG10_DESCRIPTION,
-            function: fns::log10 as StdBuiltinFunction,
+            function: fns::log10 as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "floor",
             args: &["x"],
             description: fns::FLOOR_DESCRIPTION,
-            function: fns::floor as StdBuiltinFunction,
+            function: fns::floor as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "ceiling",
             args: &["x"],
             description: fns::CEILING_DESCRIPTION,
-            function: fns::ceiling as StdBuiltinFunction,
+            function: fns::ceiling as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "extent",
             args: &["x"],
             description: fns::EXTENT_DESCRIPTION,
-            function: fns::extent as StdBuiltinFunction,
+            function: fns::extent as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "range",
             args: &["x", "y?"],
             description: fns::RANGE_DESCRIPTION,
-            function: fns::range as StdBuiltinFunction,
+            function: fns::range as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "abs",
             args: &["x"],
             description: fns::ABS_DESCRIPTION,
-            function: fns::abs as StdBuiltinFunction,
+            function: fns::abs as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "sign",
             args: &["x"],
             description: fns::SIGN_DESCRIPTION,
-            function: fns::sign as StdBuiltinFunction,
+            function: fns::sign as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "mid",
             args: &["x", "y?"],
             description: fns::MID_DESCRIPTION,
-            function: fns::mid as StdBuiltinFunction,
+            function: fns::mid as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "strip",
             args: &["x"],
             description: fns::STRIP_DESCRIPTION,
-            function: fns::strip as StdBuiltinFunction,
+            function: fns::strip as BuiltinFunctionFn,
         },
-        StdBuiltinFunctionInfo {
+        BuiltinFunction {
             name: "mnmx",
             args: &["n", "..."],
             description: fns::MNMX_DESCRIPTION,
-            function: fns::mnmx as StdBuiltinFunction,
+            function: fns::mnmx as BuiltinFunctionFn,
         },
     ]
     .into_iter()
+    .map(|function| (function.name, function))
 }
 
 mod fns {

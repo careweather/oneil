@@ -67,25 +67,20 @@ impl ExternalEvaluationContext for TestExternalContext {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(Value, Span)>,
-    ) -> Result<Value, Vec<EvalError>> {
-        self.builtin_functions.get(identifier.as_str()).map_or_else(
-            || {
-                Err(vec![EvalError::Unsupported {
-                    relevant_span: identifier_span,
-                    feature_name: Some(format!("builtin function {}", identifier.as_str())),
-                    will_be_supported: false,
-                }])
-            },
-            |f| f(identifier_span, args),
-        )
+    ) -> Option<Result<Value, Vec<EvalError>>> {
+        self.builtin_functions
+            .get(identifier.as_str())
+            .map(|f| f(identifier_span, args))
     }
 
     fn lookup_unit(&self, name: &str) -> Option<&Unit> {
         self.builtin_units.get(name)
     }
 
-    fn available_prefixes(&self) -> &IndexMap<String, f64> {
-        &self.builtin_prefixes
+    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
+        self.builtin_prefixes
+            .iter()
+            .map(|(name, value)| (name.as_str(), *value))
     }
 }
 
