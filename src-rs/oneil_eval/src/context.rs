@@ -96,9 +96,66 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     }
 
     /// Consumes the context and returns the accumulated models and errors.
+    ///
+    /// Each entry maps a model path to its evaluated [`output::Model`] and any
+    /// [`ModelError`]s that occurred during evaluation (e.g. from parameters or
+    /// tests that failed).
     #[must_use]
     pub fn into_result(self) -> IndexMap<PathBuf, (output::Model, Vec<ModelError>)> {
-        todo!()
+        let mut result = IndexMap::new();
+
+        // for each model, collect the parameters and tests, and any errors
+        for (path, model) in self.models {
+            let mut errors = Vec::new();
+
+            // collect the parameters and any errors
+            let mut parameters = IndexMap::new();
+            for (name, result) in model.parameters {
+                match result {
+                    Ok(param) => {
+                        parameters.insert(name, param);
+                    }
+
+                    Err(errs) => {
+                        for e in errs {
+                            errors.push(ModelError {
+                                model_path: path.clone(),
+                                error: e,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // collect the tests and any errors
+            let mut tests = Vec::new();
+            for test in model.tests {
+                match test {
+                    Ok(test) => tests.push(test),
+                    Err(errs) => {
+                        for e in errs {
+                            errors.push(ModelError {
+                                model_path: path.clone(),
+                                error: e,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // create the output model
+            let output_model = output::Model {
+                path: path.clone(),
+                submodels: model.submodels,
+                references: model.references,
+                parameters,
+                tests,
+            };
+
+            result.insert(path, (output_model, errors));
+        }
+
+        result
     }
 
     /// Looks up an IR model by path.
