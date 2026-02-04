@@ -282,6 +282,10 @@ impl Runtime {
             }
         }
     }
+
+    pub fn get_dependency_graph(&self) -> output::DependencyGraph {
+        todo!()
+    }
 }
 
 impl Default for Runtime {

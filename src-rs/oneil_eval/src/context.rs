@@ -10,7 +10,6 @@ use crate::{
     output::{
         self,
         dependency::{DependencyGraph, DependencyTreeValue, ReferenceTreeValue},
-        eval_result,
         tree::Tree,
     },
     value::{Unit, Value},
@@ -48,10 +47,10 @@ pub trait ExternalEvaluationContext {
 /// Represents a model in progress of being evaluated.
 #[derive(Debug, Clone)]
 struct ModelInProgress {
-    parameters: IndexMap<String, Result<eval_result::Parameter, Vec<EvalError>>>,
+    parameters: IndexMap<String, Result<output::Parameter, Vec<EvalError>>>,
     submodels: IndexMap<String, PathBuf>,
     references: IndexMap<String, PathBuf>,
-    tests: Vec<Result<eval_result::Test, Vec<EvalError>>>,
+    tests: Vec<Result<output::Test, Vec<EvalError>>>,
 }
 
 impl ModelInProgress {
@@ -256,7 +255,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     pub fn add_parameter_result(
         &mut self,
         parameter_name: String,
-        result: Result<eval_result::Parameter, Vec<EvalError>>,
+        result: Result<output::Parameter, Vec<EvalError>>,
     ) {
         // TODO: Maybe use type state pattern to enforce this?
         let Some(current_model) = self.active_models.last() else {
@@ -318,10 +317,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// # Panics
     ///
     /// Panics if no current model is set or if the current model was not created.
-    pub(crate) fn add_test_result(
-        &mut self,
-        test_result: Result<eval_result::Test, Vec<EvalError>>,
-    ) {
+    pub(crate) fn add_test_result(&mut self, test_result: Result<output::Test, Vec<EvalError>>) {
         let Some(current_model) = self.active_models.last() else {
             panic!("current model should be set when adding a test result");
         };
@@ -332,120 +328,6 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             .expect("current model should be created when set");
 
         model.tests.push(test_result);
-    }
-
-    /// Gets the result of a model.
-    ///
-    /// Returns a model with all valid results, as well as
-    /// a list of any errors that occurred during evaluation.
-    ///
-    /// If no errors occurred, the list of errors will be empty.
-    #[must_use]
-    pub fn get_model_result(&self, model_path: &Path) -> Option<eval_result::EvalResult> {
-        if !self.models.contains_key(model_path) {
-            return None;
-        }
-
-        let mut eval_result = eval_result::EvalResult::new(model_path.to_path_buf());
-
-        self.collect_model_info(model_path, &mut eval_result);
-
-        Some(eval_result)
-    }
-
-    fn collect_model_info(&self, model_path: &Path, eval_result: &mut eval_result::EvalResult) {
-        if eval_result.model_is_visited(model_path) {
-            return;
-        }
-
-        let Some(model) = self.models.get(model_path) else {
-            panic!("model should exist");
-        };
-
-        // NOTE: we only need to do references because all submodels are also references
-        for reference_path in model.references.values() {
-            self.collect_model_info(reference_path, eval_result);
-        }
-
-        let submodels = model.submodels.clone();
-        let references = model.references.clone();
-
-        let (parameters, parameter_errors) = Self::collect_parameters(model, model_path);
-        let (tests, test_errors) = Self::collect_tests(model, model_path);
-
-        let model_result = eval_result::Model {
-            path: model_path.to_path_buf(),
-            submodels,
-            references,
-            parameters,
-            tests,
-        };
-
-        let errors = [parameter_errors, test_errors].concat();
-
-        eval_result.add_model(model_path.to_path_buf(), model_result, errors);
-    }
-
-    /// Collects parameter results.
-    ///
-    /// Returns a tuple of (successful parameters, errors).
-    fn collect_parameters(
-        model: &ModelInProgress,
-        model_path: &Path,
-    ) -> (IndexMap<String, eval_result::Parameter>, Vec<ModelError>) {
-        model
-            .parameters
-            .iter()
-            .map(|(name, parameter_result)| {
-                parameter_result
-                    .clone()
-                    .map(|parameter_result| (name.clone(), parameter_result))
-            })
-            .fold(
-                (IndexMap::new(), Vec::new()),
-                |(mut parameters, mut parameter_errors), result| match result {
-                    Ok((name, parameter_result)) => {
-                        parameters.insert(name, parameter_result);
-                        (parameters, parameter_errors)
-                    }
-                    Err(errors) => {
-                        let errors = errors.into_iter().map(|error| ModelError {
-                            model_path: model_path.to_path_buf(),
-                            error,
-                        });
-
-                        parameter_errors.extend(errors);
-                        (parameters, parameter_errors)
-                    }
-                },
-            )
-    }
-
-    /// Collects test results.
-    ///
-    /// Returns a tuple of (successful tests, errors).
-    fn collect_tests(
-        model: &ModelInProgress,
-        model_path: &Path,
-    ) -> (Vec<eval_result::Test>, Vec<ModelError>) {
-        model.tests.iter().fold(
-            (Vec::new(), Vec::new()),
-            |(mut tests, mut test_errors), test_result| match test_result.clone() {
-                Ok(test_result) => {
-                    tests.push(test_result);
-                    (tests, test_errors)
-                }
-                Err(errors) => {
-                    let errors = errors.into_iter().map(|error| ModelError {
-                        model_path: model_path.to_path_buf(),
-                        error,
-                    });
-
-                    test_errors.extend(errors);
-                    (tests, test_errors)
-                }
-            },
-        )
     }
 
     /// Gets the dependency graph for all models in the context.
