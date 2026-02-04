@@ -141,13 +141,6 @@ fn handle_print_model_result(file: &Path, display_partial: bool) {
 
     let eval_result = runtime.eval_model(file);
 
-    let Some(model_collection) = load_model_collection(file, &builtins, false) else {
-        return;
-    };
-
-    // let eval_context = oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map);
-    let eval_context = todo!();
-
     let model_result = eval_context
         .get_model_result(file)
         .expect("model should be evaluated");
@@ -163,30 +156,6 @@ fn handle_print_model_result(file: &Path, display_partial: bool) {
 
     if errors.is_empty() || display_partial {
         println!("{:?}", model_result);
-    }
-}
-
-/// Loads a model collection, printing errors if loading fails.
-///
-/// Returns `Some(model_collection)` if loading succeeds, otherwise prints errors and returns `None`.
-fn load_model_collection<F: BuiltinFunction>(
-    file: &Path,
-    builtins: &Builtins<F>,
-    print_debug: bool,
-) -> Option<Box<ir::ModelCollection>> {
-    let model_collection =
-        oneil_model_resolver::load_model(file, builtins, &mut file_parser::FileLoader);
-    match model_collection {
-        Ok(model_collection) => Some(model_collection),
-        Err(error) => {
-            let (_model_collection, error_map) = *error;
-            let errors = convert_error::loader::convert_map(&error_map);
-            for error in errors {
-                print_error::print(&error, print_debug);
-                eprintln!();
-            }
-            None
-        }
     }
 }
 
