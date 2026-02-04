@@ -44,4 +44,9 @@ impl EvalCache {
     pub fn insert_errors(&mut self, models: impl IntoIterator<Item = (PathBuf, Vec<OneilError>)>) {
         self.errors.extend(models);
     }
+
+    /// Returns an iterator over all cached model paths and their evaluated results.
+    pub fn models_iter(&self) -> impl Iterator<Item = (&PathBuf, &output::Model)> {
+        self.results.iter()
+    }
 }

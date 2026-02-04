@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
-use oneil_eval::value::{Unit, Value};
-use oneil_eval::{self as eval, EvalError};
+use oneil_eval::value::{Number, Unit, Value};
+use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext};
 use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
 use oneil_shared::error::OneilError;
@@ -283,8 +283,286 @@ impl Runtime {
         }
     }
 
+    /// Gets the dependency graph for all models in the evaluation cache.
+    ///
+    /// The graph is built from the cached evaluation results. The cache must
+    /// have been populated by a prior call to [`eval_model`](Self::eval_model).
+    #[must_use]
     pub fn get_dependency_graph(&self) -> output::DependencyGraph {
-        todo!()
+        let mut dependency_graph = output::DependencyGraph::new();
+
+        for (model_path, model) in self.eval_cache.models_iter() {
+            for parameter in model.parameters.values() {
+                let dependencies = &parameter.dependencies;
+
+                for dependency in &dependencies.builtin_dependencies {
+                    dependency_graph.add_depends_on_builtin(
+                        model_path.clone(),
+                        parameter.ident.clone(),
+                        output::dependency::BuiltinDependency {
+                            ident: dependency.ident.clone(),
+                        },
+                    );
+                }
+
+                for dependency in &dependencies.parameter_dependencies {
+                    dependency_graph.add_depends_on_parameter(
+                        model_path.clone(),
+                        parameter.ident.clone(),
+                        output::dependency::ParameterDependency {
+                            parameter_name: dependency.parameter_name.clone(),
+                        },
+                    );
+                }
+
+                for dependency in &dependencies.external_dependencies {
+                    dependency_graph.add_depends_on_external(
+                        model_path.clone(),
+                        parameter.ident.clone(),
+                        output::dependency::ExternalDependency {
+                            model_path: dependency.model_path.clone(),
+                            reference_name: dependency.reference_name.clone(),
+                            parameter_name: dependency.parameter_name.clone(),
+                        },
+                    );
+                }
+            }
+        }
+
+        dependency_graph
+    }
+
+    /// Gets the dependency tree for a specific parameter.
+    ///
+    /// The tree shows all parameters, builtin values, and external dependencies
+    /// that the specified parameter depends on, recursively.
+    #[must_use]
+    pub fn get_dependency_tree(
+        &self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> (
+        Option<output::Tree<output::dependency::DependencyTreeValue>>,
+        Vec<OneilError>,
+    ) {
+        let dependency_graph = self.get_dependency_graph();
+        return recurse(self, model_path, None, parameter_name, &dependency_graph);
+
+        #[expect(
+            clippy::items_after_statements,
+            reason = "this is an internal recursive function, we keep it here for clarity"
+        )]
+        fn recurse(
+            runtime: &Runtime,
+            model_path: &Path,
+            reference_name: Option<&str>,
+            parameter_name: &str,
+            dependency_graph: &output::DependencyGraph,
+        ) -> (
+            Option<output::Tree<output::dependency::DependencyTreeValue>>,
+            Vec<OneilError>,
+        ) {
+            let Some(value) =
+                runtime.get_dependency_tree_value(model_path, reference_name, parameter_name)
+            else {
+                return (None, Vec::new());
+            };
+
+            let deps = dependency_graph
+                .depends_on(model_path, parameter_name)
+                .cloned()
+                // if the parameter is not found, it has no dependencies
+                // so we return an empty set
+                .unwrap_or_default();
+
+            let builtin_deps = deps.builtin_dependencies.iter().map(|dep| {
+                let parameter_value = runtime
+                    .lookup_builtin_variable(&ir::Identifier::new(dep.ident.clone()))
+                    .cloned()
+                    .expect("the builtin value should be defined");
+
+                let tree_value = output::dependency::DependencyTreeValue {
+                    reference_name: None,
+                    parameter_name: dep.ident.clone(),
+                    parameter_value,
+                    display_info: None,
+                };
+
+                output::Tree::new(tree_value, Vec::new())
+            });
+
+            let parameter_deps = deps.parameter_dependencies.iter().map(|dep| {
+                recurse(
+                    runtime,
+                    model_path,
+                    reference_name,
+                    &dep.parameter_name,
+                    dependency_graph,
+                )
+            });
+
+            let external_deps = deps.external_dependencies.iter().map(|dep| {
+                recurse(
+                    runtime,
+                    &dep.model_path,
+                    Some(&dep.reference_name),
+                    &dep.parameter_name,
+                    dependency_graph,
+                )
+            });
+
+            let (param_children, errors): (Vec<_>, Vec<_>) =
+                parameter_deps.chain(external_deps).unzip();
+
+            let param_children = param_children.into_iter().flatten();
+            let errors = errors.into_iter().flatten().collect();
+
+            let children = builtin_deps.chain(param_children).collect();
+
+            match value {
+                Ok(value) => (Some(output::Tree::new(value, children)), errors),
+                Err(value_errors) => {
+                    let mut all_errors = value_errors;
+                    all_errors.extend(errors);
+
+                    (None, all_errors)
+                }
+            }
+        }
+    }
+
+    fn get_dependency_tree_value(
+        &self,
+        model_path: &Path,
+        reference_name: Option<&str>,
+        parameter_name: &str,
+    ) -> Option<Result<output::dependency::DependencyTreeValue, Vec<OneilError>>> {
+        let model = self.eval_cache.get(model_path)?;
+        let parameter = model.parameters.get(parameter_name)?;
+
+        // TODO: this should only get errors for the parameter, not the entire model
+        if let Some(errors) = self.eval_cache.get_errors(model_path) {
+            return Some(Err(errors.to_vec()));
+        }
+
+        let reference_name = reference_name.map(str::to_string);
+        let parameter_name = parameter_name.to_string();
+
+        let parameter_value = parameter.value.clone();
+
+        let span = parameter.expr_span;
+        let display_info = Some((model_path.to_path_buf(), span));
+
+        let tree_value = output::dependency::DependencyTreeValue {
+            reference_name,
+            parameter_name,
+            parameter_value,
+            display_info,
+        };
+
+        Some(Ok(tree_value))
+    }
+
+    /// Gets the reference tree for a specific parameter.
+    ///
+    /// The tree shows all parameters that depend on the specified parameter, recursively.
+    /// This is the inverse of the dependency tree.
+    #[must_use]
+    pub fn get_reference_tree(
+        &self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> (
+        Option<output::Tree<output::dependency::ReferenceTreeValue>>,
+        Vec<OneilError>,
+    ) {
+        let dependency_graph = self.get_dependency_graph();
+        return recurse(self, model_path, parameter_name, &dependency_graph);
+
+        #[expect(
+            clippy::items_after_statements,
+            reason = "this is an internal recursive function, we keep it here for clarity"
+        )]
+        fn recurse(
+            runtime: &Runtime,
+            model_path: &Path,
+            parameter_name: &str,
+            dependency_graph: &output::DependencyGraph,
+        ) -> (
+            Option<output::Tree<output::dependency::ReferenceTreeValue>>,
+            Vec<OneilError>,
+        ) {
+            let Some(value) = runtime.get_reference_tree_value(model_path, parameter_name) else {
+                return (None, Vec::new());
+            };
+
+            let deps = dependency_graph
+                .references(model_path, parameter_name)
+                .cloned()
+                // if the parameter is not found, it has no references
+                // so we return an empty set
+                .unwrap_or_default();
+
+            let parameter_deps = deps
+                .parameter_references
+                .iter()
+                .map(|dep| recurse(runtime, model_path, &dep.parameter_name, dependency_graph));
+
+            let external_deps = deps.external_references.iter().map(|dep| {
+                recurse(
+                    runtime,
+                    &dep.model_path,
+                    &dep.parameter_name,
+                    dependency_graph,
+                )
+            });
+
+            let (children, errors): (Vec<_>, Vec<_>) = parameter_deps.chain(external_deps).unzip();
+            let children = children.into_iter().flatten().collect();
+            let errors = errors.into_iter().flatten().collect();
+
+            match value {
+                Ok(value) => (Some(output::Tree::new(value, children)), errors),
+                Err(value_errors) => {
+                    let mut all_errors = value_errors;
+                    all_errors.extend(errors);
+
+                    (None, all_errors)
+                }
+            }
+        }
+    }
+
+    fn get_reference_tree_value(
+        &self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> Option<Result<output::dependency::ReferenceTreeValue, Vec<OneilError>>> {
+        let model = self.eval_cache.get(model_path)?;
+        let parameter = model.parameters.get(parameter_name)?;
+
+        // TODO: this should only get errors for the parameter, not the entire model
+        if let Some(errors) = self.eval_cache.get_errors(model_path) {
+            return Some(Err(errors.to_vec()));
+        }
+
+        let model_path = model_path.to_path_buf();
+
+        let parameter_name = parameter_name.to_string();
+
+        let parameter_value = parameter.value.clone();
+
+        let span = parameter.expr_span;
+        let display_info = (model_path.clone(), span);
+
+        let tree_value = output::dependency::ReferenceTreeValue {
+            model_path,
+            parameter_name,
+            parameter_value,
+            display_info,
+        };
+
+        Some(Ok(tree_value))
     }
 }
 

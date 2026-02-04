@@ -1,11 +1,12 @@
 //! Output types for the Oneil runtime.
 
-mod dependency;
+pub mod dependency;
 mod model_reference;
 mod tree;
 
 pub use dependency::DependencyGraph;
 pub use model_reference::ModelReference;
+pub use tree::Tree;
 
 pub use oneil_ast as ast;
 pub use oneil_eval::value;
