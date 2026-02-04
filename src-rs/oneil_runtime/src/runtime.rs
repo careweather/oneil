@@ -1,17 +1,19 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
-use oneil_ast as ast;
 use oneil_eval::value::{Unit, Value};
 use oneil_eval::{self as eval, EvalError};
-use oneil_ir as ir;
 use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
 use oneil_shared::error::OneilError;
 use oneil_shared::span::Span;
 
-use crate::cache::{AstCache, EvalCache, IrCache, ModelReference, SourceCache};
-use crate::{error::FileError, std_builtin::StdBuiltins};
+use crate::{
+    cache::{AstCache, EvalCache, IrCache, SourceCache},
+    error::FileError,
+    output::{self, ast, ir},
+    std_builtin::StdBuiltins,
+};
 
 /// Runtime for the Oneil programming language.
 ///
@@ -42,7 +44,10 @@ impl Runtime {
     pub fn eval_model(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<ModelReference<'_>, PartialResultWithErrors<Option<ModelReference<'_>>>> {
+    ) -> Result<
+        output::ModelReference<'_>,
+        PartialResultWithErrors<Option<output::ModelReference<'_>>>,
+    > {
         // make sure the IR is loaded for the model and its dependencies
         self.load_ir_for_model_and_dependencies(&path)
             .map_err(|e| PartialResultWithErrors {
@@ -81,15 +86,16 @@ impl Runtime {
         self.eval_cache.insert_errors(errors);
 
         // return the evaluation result
-        let result = self
+        let model_reference = self
             .eval_cache
             .get(path.as_ref())
+            .map(|model| output::ModelReference::new(model, &self.eval_cache))
             .expect("it has already been loaded previously");
         let errors = self.eval_cache.get_errors(path.as_ref());
 
-        errors.map_or(Ok(result), |errors| {
+        errors.map_or(Ok(model_reference), |errors| {
             Err(PartialResultWithErrors {
-                result: Some(result),
+                result: Some(model_reference),
                 errors: errors.to_vec(),
             })
         })
