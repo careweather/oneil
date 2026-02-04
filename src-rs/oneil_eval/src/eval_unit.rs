@@ -94,7 +94,7 @@ fn eval_unit_component<E: ExternalEvaluationContext>(
 
         let unit = context.lookup_unit(stripped_name);
         if let Some(unit) = unit {
-            let unit = unit.mul_magnitude(*prefix_magnitude).with_is_db_as(is_db);
+            let unit = unit.mul_magnitude(prefix_magnitude).with_is_db_as(is_db);
             return Ok(unit.pow(exponent));
         }
     }
