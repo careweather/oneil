@@ -137,25 +137,31 @@ fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
 
 /// Handles the `dev print-model-result` command.
 fn handle_print_model_result(file: &Path, display_partial: bool) {
-    let runtime = Runtime::new();
+    let mut runtime = Runtime::new();
 
     let eval_result = runtime.eval_model(file);
 
-    let model_result = eval_context
-        .get_model_result(file)
-        .expect("model should be evaluated");
+    let (model_reference, errors) = match eval_result {
+        Ok(model_reference) => (Some(model_reference), None),
+        Err(partial_result_with_errors) => {
+            let partial_result = partial_result_with_errors.result;
+            let errors = partial_result_with_errors.errors;
 
-    let errors = model_result.get_errors();
+            (partial_result, Some(errors))
+        }
+    };
 
-    for error in &errors {
-        if let Some(error) = error {
+    if let Some(errors) = errors.as_ref() {
+        for error in errors {
             print_error::print(&error, false);
             eprintln!();
         }
     }
 
-    if errors.is_empty() || display_partial {
-        println!("{:?}", model_result);
+    if let Some(model_reference) = model_reference
+        && (errors.is_none() || display_partial)
+    {
+        println!("{:?}", model_reference);
     }
 }
 

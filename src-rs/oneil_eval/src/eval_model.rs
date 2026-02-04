@@ -14,9 +14,8 @@ use crate::{
     error::ExpectedType,
     eval_expr, eval_parameter,
     output::{
-        Model,
+        self, Model,
         dependency::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency},
-        eval_result,
     },
     value::Value,
 };
@@ -101,7 +100,7 @@ fn parameter_result_from<E: ExternalEvaluationContext>(
     expr_span: Span,
     parameter: &ir::Parameter,
     context: &EvalContext<'_, E>,
-) -> eval_result::Parameter {
+) -> output::Parameter {
     let (print_level, debug_info) = match parameter.trace_level() {
         ir::TraceLevel::Debug if parameter.is_performance() => {
             let builtin_dependency_values =
@@ -111,8 +110,8 @@ fn parameter_result_from<E: ExternalEvaluationContext>(
             let external_dependency_values =
                 get_external_dependency_values(parameter.dependencies().external(), context);
             (
-                eval_result::PrintLevel::Performance,
-                Some(eval_result::DebugInfo {
+                output::PrintLevel::Performance,
+                Some(output::DebugInfo {
                     builtin_dependency_values,
                     parameter_dependency_values,
                     external_dependency_values,
@@ -120,7 +119,7 @@ fn parameter_result_from<E: ExternalEvaluationContext>(
             )
         }
         ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
-            (eval_result::PrintLevel::Performance, None)
+            (output::PrintLevel::Performance, None)
         }
         ir::TraceLevel::Debug => {
             let builtin_dependency_values =
@@ -130,16 +129,16 @@ fn parameter_result_from<E: ExternalEvaluationContext>(
             let external_dependency_values =
                 get_external_dependency_values(parameter.dependencies().external(), context);
             (
-                eval_result::PrintLevel::Trace,
-                Some(eval_result::DebugInfo {
+                output::PrintLevel::Trace,
+                Some(output::DebugInfo {
                     builtin_dependency_values,
                     parameter_dependency_values,
                     external_dependency_values,
                 }),
             )
         }
-        ir::TraceLevel::Trace => (eval_result::PrintLevel::Trace, None),
-        ir::TraceLevel::None => (eval_result::PrintLevel::None, None),
+        ir::TraceLevel::Trace => (output::PrintLevel::Trace, None),
+        ir::TraceLevel::None => (output::PrintLevel::None, None),
     };
 
     let builtin_dependencies = parameter
@@ -179,7 +178,7 @@ fn parameter_result_from<E: ExternalEvaluationContext>(
         external_dependencies,
     };
 
-    eval_result::Parameter {
+    output::Parameter {
         ident: parameter.name().as_str().to_string(),
         label: parameter.label().as_str().to_string(),
         value,
@@ -251,12 +250,12 @@ fn process_parameter_dependencies(
 fn eval_test<E: ExternalEvaluationContext>(
     test: &ir::Test,
     context: &EvalContext<'_, E>,
-) -> Result<eval_result::Test, Vec<EvalError>> {
+) -> Result<output::Test, Vec<EvalError>> {
     let (test_result, expr_span) = eval_expr::eval_expr(test.expr(), context)?;
 
     match test_result {
-        Value::Boolean(true) => Ok(eval_result::Test {
-            result: eval_result::TestResult::Passed,
+        Value::Boolean(true) => Ok(output::Test {
+            result: output::TestResult::Passed,
             expr_span: *expr_span,
         }),
         Value::Boolean(false) => {
@@ -267,13 +266,13 @@ fn eval_test<E: ExternalEvaluationContext>(
             let external_dependency_values =
                 get_external_dependency_values(test.dependencies().external(), context);
 
-            let debug_info = Box::new(eval_result::DebugInfo {
+            let debug_info = Box::new(output::DebugInfo {
                 builtin_dependency_values,
                 parameter_dependency_values,
                 external_dependency_values,
             });
-            Ok(eval_result::Test {
-                result: eval_result::TestResult::Failed { debug_info },
+            Ok(output::Test {
+                result: output::TestResult::Failed { debug_info },
                 expr_span: *expr_span,
             })
         }

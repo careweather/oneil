@@ -1609,8 +1609,8 @@ mod tests {
         use super::*;
 
         use crate::context::EvalContext;
+        use crate::output;
         use crate::output::dependency::DependencySet;
-        use crate::output::eval_result;
         use crate::test_context::TestExternalContext;
 
         use oneil_ir::DisplayCompositeUnit;
@@ -2333,12 +2333,12 @@ mod tests {
             }
         }
 
-        pub fn build_parameter_result(name: &str, value: Value) -> eval_result::Parameter {
-            eval_result::Parameter {
+        pub fn build_parameter_result(name: &str, value: Value) -> output::Parameter {
+            output::Parameter {
                 value,
                 ident: name.to_string(),
                 label: name.to_string(),
-                print_level: eval_result::PrintLevel::None,
+                print_level: output::PrintLevel::None,
                 debug_info: None,
                 dependencies: DependencySet::default(),
                 expr_span: random_span(),
