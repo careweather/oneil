@@ -6,6 +6,6 @@ mod ir;
 mod source;
 
 pub use ast::AstCache;
-pub use eval::EvalCache;
+pub use eval::{EvalCache, ModelReference};
 pub use ir::IrCache;
 pub use source::SourceCache;

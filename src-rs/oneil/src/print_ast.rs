@@ -1,6 +1,6 @@
 //! Abstract Syntax Tree (AST) printing functionality for the Oneil CLI
 
-use oneil_runtime::data::ast;
+use oneil_runtime::output::ast;
 
 use anstream::println;
 

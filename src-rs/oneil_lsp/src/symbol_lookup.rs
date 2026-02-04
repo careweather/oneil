@@ -1,7 +1,7 @@
 //! Symbol lookup utilities for finding definitions in Oneil models
 
 use oneil_runtime::Runtime;
-use oneil_runtime::data::ir;
+use oneil_runtime::output::ir;
 use oneil_shared::span::Span;
 use tower_lsp_server::UriExt;
 use tower_lsp_server::lsp_types::{Location, Position, Range, Uri};

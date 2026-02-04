@@ -6,3 +6,5 @@
 pub mod dependency;
 pub mod eval_result;
 pub mod tree;
+
+pub use eval_result::{Model, Parameter, Test};

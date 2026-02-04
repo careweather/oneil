@@ -8,6 +8,7 @@ use oneil_shared::span::Span;
 use crate::{
     error::{EvalError, ModelError},
     output::{
+        self,
         dependency::{DependencyGraph, DependencyTreeValue, ReferenceTreeValue},
         eval_result,
         tree::Tree,
@@ -44,16 +45,16 @@ pub trait ExternalEvaluationContext {
     fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)>;
 }
 
-/// Represents a model with its evaluated parameters, submodels, references, and tests.
+/// Represents a model in progress of being evaluated.
 #[derive(Debug, Clone)]
-pub struct Model {
+struct ModelInProgress {
     parameters: IndexMap<String, Result<eval_result::Parameter, Vec<EvalError>>>,
     submodels: IndexMap<String, PathBuf>,
     references: IndexMap<String, PathBuf>,
     tests: Vec<Result<eval_result::Test, Vec<EvalError>>>,
 }
 
-impl Model {
+impl ModelInProgress {
     /// Creates a new empty model.
     pub fn new() -> Self {
         Self {
@@ -65,7 +66,7 @@ impl Model {
     }
 }
 
-impl Default for Model {
+impl Default for ModelInProgress {
     fn default() -> Self {
         Self::new()
     }
@@ -79,7 +80,7 @@ impl Default for Model {
 /// - External context
 #[derive(Debug)]
 pub struct EvalContext<'external, E: ExternalEvaluationContext> {
-    models: IndexMap<PathBuf, Model>,
+    models: IndexMap<PathBuf, ModelInProgress>,
     active_models: Vec<PathBuf>,
     external_context: &'external mut E,
 }
@@ -97,8 +98,8 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
     /// Consumes the context and returns the accumulated models and errors.
     #[must_use]
-    pub fn into_result(self) -> IndexMap<PathBuf, Model> {
-        self.models
+    pub fn into_result(self) -> IndexMap<PathBuf, (output::Model, Vec<ModelError>)> {
+        todo!()
     }
 
     /// Looks up an IR model by path.
@@ -227,7 +228,6 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     }
 
     /// Returns the available unit prefixes.
-    #[must_use]
     pub fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
         self.external_context.available_prefixes()
     }
@@ -390,7 +390,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     ///
     /// Returns a tuple of (successful parameters, errors).
     fn collect_parameters(
-        model: &Model,
+        model: &ModelInProgress,
         model_path: &Path,
     ) -> (IndexMap<String, eval_result::Parameter>, Vec<ModelError>) {
         model
@@ -425,7 +425,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     ///
     /// Returns a tuple of (successful tests, errors).
     fn collect_tests(
-        model: &Model,
+        model: &ModelInProgress,
         model_path: &Path,
     ) -> (Vec<eval_result::Test>, Vec<ModelError>) {
         model.tests.iter().fold(

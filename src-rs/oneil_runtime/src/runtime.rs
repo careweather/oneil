@@ -10,7 +10,7 @@ use oneil_parser as parser;
 use oneil_shared::error::OneilError;
 use oneil_shared::span::Span;
 
-use crate::cache::{AstCache, EvalCache, IrCache, SourceCache};
+use crate::cache::{AstCache, EvalCache, IrCache, ModelReference, SourceCache};
 use crate::{error::FileError, std_builtin::StdBuiltins};
 
 /// Runtime for the Oneil programming language.
@@ -39,11 +39,60 @@ impl Runtime {
     }
 
     /// Evaluates a model and returns the result.
-    pub fn eval_model(&mut self, path: impl AsRef<Path>) -> Result<(), Vec<OneilError>> {
-        let model_map = eval::eval_model(path, self);
-        self.eval_cache.insert_all(model_map);
+    pub fn eval_model(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<ModelReference<'_>, PartialResultWithErrors<Option<ModelReference<'_>>>> {
+        // make sure the IR is loaded for the model and its dependencies
+        self.load_ir_for_model_and_dependencies(&path)
+            .map_err(|e| PartialResultWithErrors {
+                result: None,
+                errors: e.errors,
+            })?;
 
-        todo!()
+        // evaluate the model and its dependencies
+        let eval_result = eval::eval_model(&path, self);
+
+        // collect the evaluation results and errors
+        let (models, errors): (IndexMap<_, _>, IndexMap<_, _>) = eval_result
+            .into_iter()
+            .map(|(path, (model, errors))| ((path.clone(), model), (path, errors)))
+            .unzip();
+
+        // convert the errors to OneilErrors
+        let source = self
+            .source_cache
+            .get(path.as_ref())
+            .expect("it has already been loaded previously");
+        let errors = errors
+            .into_iter()
+            .map(|(path, errors)| {
+                let errors = errors
+                    .into_iter()
+                    .map(|e| OneilError::from_error_with_source(&e.error, path.clone(), source))
+                    .collect::<Vec<OneilError>>();
+
+                (path, errors)
+            })
+            .collect::<IndexMap<_, _>>();
+
+        // insert the evaluation results and errors into the cache
+        self.eval_cache.insert_all(models);
+        self.eval_cache.insert_errors(errors);
+
+        // return the evaluation result
+        let result = self
+            .eval_cache
+            .get(path.as_ref())
+            .expect("it has already been loaded previously");
+        let errors = self.eval_cache.get_errors(path.as_ref());
+
+        errors.map_or(Ok(result), |errors| {
+            Err(PartialResultWithErrors {
+                result: Some(result),
+                errors: errors.to_vec(),
+            })
+        })
     }
 
     /// Loads the IR for a model and all of its dependencies.
