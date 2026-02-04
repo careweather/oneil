@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Context provided by the runtime for resolving IR, builtins, and units during evaluation.
-pub trait ExternalResolutionContext {
+pub trait ExternalEvaluationContext {
     /// Returns the IR model at the given path if it has been loaded.
     fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<&ir::Model>;
 
@@ -76,13 +76,13 @@ impl Default for Model {
 /// - Active models
 /// - External context
 #[derive(Debug)]
-pub struct EvalContext<'external, E: ExternalResolutionContext> {
+pub struct EvalContext<'external, E: ExternalEvaluationContext> {
     models: IndexMap<PathBuf, Model>,
     active_models: Vec<PathBuf>,
     external_context: &'external mut E,
 }
 
-impl<'external, E: ExternalResolutionContext> EvalContext<'external, E> {
+impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// Creates a new evaluation context with the given builtin functions.
     #[must_use]
     pub fn new(external_context: &'external mut E) -> Self {
@@ -504,7 +504,7 @@ impl<'external, E: ExternalResolutionContext> EvalContext<'external, E> {
             clippy::items_after_statements,
             reason = "this is an internal recursive function, we keep it here for clarity"
         )]
-        fn recurse<E: ExternalResolutionContext>(
+        fn recurse<E: ExternalEvaluationContext>(
             context: &EvalContext<'_, E>,
             model_path: &Path,
             reference_name: Option<&str>,
@@ -637,7 +637,7 @@ impl<'external, E: ExternalResolutionContext> EvalContext<'external, E> {
             clippy::items_after_statements,
             reason = "this is an internal recursive function, we keep it here for clarity"
         )]
-        fn recurse<E: ExternalResolutionContext>(
+        fn recurse<E: ExternalEvaluationContext>(
             context: &EvalContext<'_, E>,
             model_path: &Path,
             parameter_name: &str,

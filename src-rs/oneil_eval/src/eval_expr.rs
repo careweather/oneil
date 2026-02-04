@@ -4,7 +4,7 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    context::{EvalContext, ExternalResolutionContext},
+    context::{EvalContext, ExternalEvaluationContext},
     error::EvalError,
     value::{Number, Value},
 };
@@ -14,7 +14,7 @@ use crate::{
 /// # Errors
 ///
 /// Returns an error if the expression is invalid.
-pub fn eval_expr<'a, E: ExternalResolutionContext>(
+pub fn eval_expr<'a, E: ExternalEvaluationContext>(
     expr: &'a ir::Expr,
     context: &EvalContext<'_, E>,
 ) -> Result<(Value, &'a Span), Vec<EvalError>> {
@@ -84,7 +84,7 @@ struct ComparisonSubexpressionsResult {
     rest_results: Vec<(ir::ComparisonOp, (Value, Span))>,
 }
 
-fn eval_comparison_subexpressions<E: ExternalResolutionContext>(
+fn eval_comparison_subexpressions<E: ExternalEvaluationContext>(
     left: &ir::Expr,
     op: ir::ComparisonOp,
     right: &ir::Expr,
@@ -244,7 +244,7 @@ struct BinaryOpSubexpressionsResult {
     right_result_span: Span,
 }
 
-fn eval_binary_op_subexpressions<E: ExternalResolutionContext>(
+fn eval_binary_op_subexpressions<E: ExternalEvaluationContext>(
     left: &ir::Expr,
     right: &ir::Expr,
     context: &EvalContext<'_, E>,
@@ -306,7 +306,7 @@ fn eval_unary_op(
     result.map_err(|error| vec![error.into_eval_error(expr_result_span)])
 }
 
-fn eval_function_call_args<E: ExternalResolutionContext>(
+fn eval_function_call_args<E: ExternalEvaluationContext>(
     args: &[ir::Expr],
     context: &EvalContext<'_, E>,
 ) -> Result<Vec<(Value, Span)>, Vec<EvalError>> {
@@ -329,7 +329,7 @@ fn eval_function_call_args<E: ExternalResolutionContext>(
     Ok(args)
 }
 
-fn eval_function_call<E: ExternalResolutionContext>(
+fn eval_function_call<E: ExternalEvaluationContext>(
     name: &ir::FunctionName,
     args: Vec<(Value, Span)>,
     context: &EvalContext<'_, E>,
@@ -344,7 +344,7 @@ fn eval_function_call<E: ExternalResolutionContext>(
     }
 }
 
-fn eval_variable<E: ExternalResolutionContext>(
+fn eval_variable<E: ExternalEvaluationContext>(
     variable: &ir::Variable,
     context: &EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {

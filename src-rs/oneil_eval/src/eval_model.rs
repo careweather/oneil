@@ -10,7 +10,7 @@ use oneil_shared::span::Span;
 
 use crate::{
     EvalError,
-    context::{EvalContext, ExternalResolutionContext, Model},
+    context::{EvalContext, ExternalEvaluationContext, Model},
     error::ExpectedType,
     eval_expr, eval_parameter,
     output::{
@@ -22,7 +22,7 @@ use crate::{
 
 /// Evaluates the model at the given path and all its dependencies, returning a map of
 /// path to evaluated model result for each model that was evaluated.
-pub fn eval_model<E: ExternalResolutionContext>(
+pub fn eval_model<E: ExternalEvaluationContext>(
     model_path: impl AsRef<Path>,
     external_context: &mut E,
 ) -> IndexMap<PathBuf, Model> {
@@ -35,7 +35,7 @@ pub fn eval_model<E: ExternalResolutionContext>(
 }
 
 /// Evaluates a model and returns the context with the results of the model.
-fn eval_model_from_context<E: ExternalResolutionContext>(
+fn eval_model_from_context<E: ExternalEvaluationContext>(
     model_path: &ir::ModelPath,
     context: &mut EvalContext<'_, E>,
 ) {
@@ -95,7 +95,7 @@ fn eval_model_from_context<E: ExternalResolutionContext>(
     context.pop_active_model(&model_path);
 }
 
-fn parameter_result_from<E: ExternalResolutionContext>(
+fn parameter_result_from<E: ExternalEvaluationContext>(
     value: Value,
     expr_span: Span,
     parameter: &ir::Parameter,
@@ -247,7 +247,7 @@ fn process_parameter_dependencies(
     (evaluation_order, visited)
 }
 
-fn eval_test<E: ExternalResolutionContext>(
+fn eval_test<E: ExternalEvaluationContext>(
     test: &ir::Test,
     context: &EvalContext<'_, E>,
 ) -> Result<eval_result::Test, Vec<EvalError>> {
@@ -287,7 +287,7 @@ fn eval_test<E: ExternalResolutionContext>(
 }
 
 /// Gets the values of the builtin dependencies for debug reporting purposes.
-fn get_builtin_dependency_values<E: ExternalResolutionContext>(
+fn get_builtin_dependency_values<E: ExternalEvaluationContext>(
     dependencies: &IndexMap<ir::Identifier, Span>,
     context: &EvalContext<'_, E>,
 ) -> IndexMap<String, Value> {
@@ -307,7 +307,7 @@ fn get_builtin_dependency_values<E: ExternalResolutionContext>(
 /// # Panics
 ///
 /// This function will panic if any of the dependencies are not found.
-fn get_parameter_dependency_values<E: ExternalResolutionContext>(
+fn get_parameter_dependency_values<E: ExternalEvaluationContext>(
     dependencies: &IndexMap<ir::ParameterName, Span>,
     context: &EvalContext<'_, E>,
 ) -> IndexMap<String, Value> {
@@ -330,7 +330,7 @@ fn get_parameter_dependency_values<E: ExternalResolutionContext>(
 /// # Panics
 ///
 /// This function will panic if any of the dependencies are not found.
-fn get_external_dependency_values<E: ExternalResolutionContext>(
+fn get_external_dependency_values<E: ExternalEvaluationContext>(
     dependencies: &IndexMap<(ir::ReferenceName, ir::ParameterName), (ir::ModelPath, Span)>,
     context: &EvalContext<'_, E>,
 ) -> IndexMap<(String, String), Value> {

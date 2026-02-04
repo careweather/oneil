@@ -4,7 +4,7 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    context::{EvalContext, ExternalResolutionContext},
+    context::{EvalContext, ExternalEvaluationContext},
     error::EvalError,
     eval_expr, eval_unit,
     value::{MeasuredNumber, Number, Unit, Value},
@@ -24,7 +24,7 @@ pub struct EvalParameterResult {
 /// - The parameter value does not match the given unit, if there is one.
 /// - The parameter value is outside the limits.
 /// - The parameter unit does not match the limit.
-pub fn eval_parameter<E: ExternalResolutionContext>(
+pub fn eval_parameter<E: ExternalEvaluationContext>(
     parameter: &ir::Parameter,
     context: &EvalContext<'_, E>,
 ) -> Result<EvalParameterResult, Vec<EvalError>> {
@@ -109,7 +109,7 @@ pub fn eval_parameter<E: ExternalResolutionContext>(
     })
 }
 
-fn get_piecewise_result<'a, E: ExternalResolutionContext>(
+fn get_piecewise_result<'a, E: ExternalEvaluationContext>(
     piecewise: &'a [ir::PiecewiseExpr],
     param_ident: &str,
     param_ident_span: Span,
@@ -207,7 +207,7 @@ enum Limits {
     },
 }
 
-fn eval_limits<E: ExternalResolutionContext>(
+fn eval_limits<E: ExternalEvaluationContext>(
     limits: &ir::Limits,
     context: &EvalContext<'_, E>,
 ) -> Result<Limits, Vec<EvalError>> {
@@ -225,7 +225,7 @@ fn eval_limits<E: ExternalResolutionContext>(
     }
 }
 
-fn eval_continuous_limits<E: ExternalResolutionContext>(
+fn eval_continuous_limits<E: ExternalEvaluationContext>(
     min: &oneil_ir::Expr,
     max: &oneil_ir::Expr,
     limit_expr_span: &Span,
@@ -302,7 +302,7 @@ fn eval_continuous_limits<E: ExternalResolutionContext>(
     clippy::panic_in_result_fn,
     reason = "enforcing an invariant that should always hold"
 )]
-fn eval_discrete_limits<E: ExternalResolutionContext>(
+fn eval_discrete_limits<E: ExternalEvaluationContext>(
     values: &[ir::Expr],
     limit_expr_span: &Span,
     context: &EvalContext<'_, E>,
