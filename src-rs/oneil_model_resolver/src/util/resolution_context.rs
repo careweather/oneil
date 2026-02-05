@@ -5,7 +5,7 @@ use oneil_shared::span::Span;
 
 use crate::error::{
     CircularDependencyError, ModelImportResolutionError, ParameterResolutionError,
-    PythonImportResolutionError, VariableResolutionError, resolution::ResolutionErrors,
+    PythonImportResolutionError, ResolutionErrorCollection, VariableResolutionError,
 };
 
 /// Error indicating that loading/parsing a model's AST failed.
@@ -18,10 +18,8 @@ pub struct PythonImportLoadingFailedError;
 pub struct ModelResolutionResult {
     /// Resolved model.
     model: ir::Model,
-    /// Model resolution errors.
-    model_errors: ResolutionErrors,
-    /// Circular dependency errors.
-    circular_dependency_errors: Vec<CircularDependencyError>,
+    /// Model resolution errors (including circular dependency errors).
+    model_errors: ResolutionErrorCollection,
     /// Whether the AST for the model has been loaded.
     ast_loaded: bool,
 }
@@ -47,8 +45,7 @@ impl ModelResolutionResult {
 
         Self {
             model: empty_model,
-            model_errors: ResolutionErrors::empty(),
-            circular_dependency_errors: Vec::new(),
+            model_errors: ResolutionErrorCollection::empty(),
             ast_loaded: true,
         }
     }
@@ -66,24 +63,13 @@ impl ModelResolutionResult {
 
     /// Returns a reference to the model resolution errors.
     #[must_use]
-    pub const fn model_errors(&self) -> &ResolutionErrors {
+    pub const fn model_errors(&self) -> &ResolutionErrorCollection {
         &self.model_errors
     }
 
     /// Returns a mutable reference to the model resolution errors.
-    pub const fn model_errors_mut(&mut self) -> &mut ResolutionErrors {
+    pub const fn model_errors_mut(&mut self) -> &mut ResolutionErrorCollection {
         &mut self.model_errors
-    }
-
-    /// Returns a reference to the circular dependency errors.
-    #[must_use]
-    pub const fn circular_dependency_errors(&self) -> &Vec<CircularDependencyError> {
-        &self.circular_dependency_errors
-    }
-
-    /// Returns a mutable reference to the circular dependency errors.
-    pub const fn circular_dependency_errors_mut(&mut self) -> &mut Vec<CircularDependencyError> {
-        &mut self.circular_dependency_errors
     }
 
     /// Returns whether the AST for the model has been loaded.
@@ -99,20 +85,8 @@ impl ModelResolutionResult {
 
     /// Breaks the result into its components.
     #[must_use]
-    pub fn into_parts(
-        self,
-    ) -> (
-        ir::Model,
-        ResolutionErrors,
-        Vec<CircularDependencyError>,
-        bool,
-    ) {
-        (
-            self.model,
-            self.model_errors,
-            self.circular_dependency_errors,
-            self.ast_loaded,
-        )
+    pub fn into_parts(self) -> (ir::Model, ResolutionErrorCollection, bool) {
+        (self.model, self.model_errors, self.ast_loaded)
     }
 }
 
@@ -268,7 +242,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     /// # Panics
     ///
     /// Panics if there is no active model or if the active model has no error entry.
-    fn active_model_errors_mut(&mut self) -> &mut ResolutionErrors {
+    fn active_model_errors_mut(&mut self) -> &mut ResolutionErrorCollection {
         let path = self.active_models.last().expect("no active model");
         self.model_results
             .get_mut(path)
@@ -276,24 +250,11 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             .model_errors_mut()
     }
 
-    /// Returns a mutable reference to the circular dependency errors for the current active model.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no active model or if the active model has no circular dependency error entry.
-    fn active_model_circular_dependency_errors_mut(&mut self) -> &mut Vec<CircularDependencyError> {
-        let path = self.active_models.last().expect("no active model");
-        self.model_results
-            .get_mut(path)
-            .expect("active model not in model results map")
-            .circular_dependency_errors_mut()
-    }
-
-    /// Returns whether the given model path has any resolution or circular dependency errors.
+    /// Returns whether the given model path has any resolution errors.
     fn model_has_errors(&self, model_path: &ir::ModelPath) -> bool {
-        self.model_results.get(model_path).is_some_and(|r| {
-            !r.model_errors().is_empty() || !r.circular_dependency_errors().is_empty()
-        })
+        self.model_results
+            .get(model_path)
+            .is_some_and(|r| !r.model_errors().is_empty())
     }
 
     // ===== BUILTINS =====
@@ -465,8 +426,8 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         &mut self,
         circular_dependency: CircularDependencyError,
     ) {
-        self.active_model_circular_dependency_errors_mut()
-            .push(circular_dependency);
+        self.active_model_errors_mut()
+            .add_circular_dependency_error(circular_dependency);
     }
 
     /// Adds a reference resolution error to the active model.
@@ -552,7 +513,7 @@ impl<E: ExternalResolutionContext> ResolutionContext<'_, E> {
     ///
     /// Panics if there is no active model or if the active model is not in the model map.
     #[cfg(test)]
-    fn active_model_errors(&self) -> &ResolutionErrors {
+    fn active_model_errors(&self) -> &ResolutionErrorCollection {
         let path = self.active_models.last().expect("no active model");
         self.model_results
             .get(path)

@@ -2,8 +2,9 @@ use std::path::Path;
 
 use indexmap::IndexMap;
 use oneil_eval::output;
+use oneil_shared::error::OneilError;
 
-use crate::cache::EvalCache;
+use crate::{cache::EvalCache, output::error::EvalError};
 
 /// A reference to an evaluated model within a model hierarchy.
 ///
@@ -102,5 +103,57 @@ impl<'result> ModelReference<'result> {
     #[must_use]
     pub fn tests(&self) -> Vec<&'result output::Test> {
         self.model.tests.iter().collect()
+    }
+}
+
+pub struct EvalErrorReference<'result> {
+    eval_error: &'result EvalError,
+    eval_cache: &'result EvalCache,
+}
+
+impl<'result> EvalErrorReference<'result> {
+    /// Creates a new `EvalErrorReference` for the given evaluation error and evaluation cache.
+    #[must_use]
+    pub const fn new(eval_error: &'result EvalError, eval_cache: &'result EvalCache) -> Self {
+        Self {
+            eval_error,
+            eval_cache,
+        }
+    }
+
+    /// Returns the partial evaluation result for this model, if any.
+    #[must_use]
+    pub fn partial_result(&self) -> Option<ModelReference<'result>> {
+        match self.eval_error {
+            EvalError::EvalErrors { partial_result, .. } => {
+                Some(ModelReference::new(partial_result, self.eval_cache))
+            }
+            EvalError::Resolution(_) => panic!("evaluation failed"),
+        }
+    }
+
+    /// Returns the parameter errors for this model, if any.
+    #[must_use]
+    pub fn parameter_errors(&self) -> Option<IndexMap<&'result str, Vec<&'result OneilError>>> {
+        match self.eval_error {
+            EvalError::EvalErrors {
+                parameter_errors, ..
+            } => Some(
+                parameter_errors
+                    .iter()
+                    .map(|(name, errors)| (name.as_str(), errors.iter().collect()))
+                    .collect(),
+            ),
+            EvalError::Resolution(_) => panic!("evaluation failed"),
+        }
+    }
+
+    /// Returns the test errors for this model, if any.
+    #[must_use]
+    pub fn test_errors(&self) -> Option<Vec<&'result OneilError>> {
+        match self.eval_error {
+            EvalError::EvalErrors { test_errors, .. } => Some(test_errors.iter().collect()),
+            EvalError::Resolution(_) => panic!("evaluation failed"),
+        }
     }
 }

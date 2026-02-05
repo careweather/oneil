@@ -1,3 +1,4 @@
+use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
@@ -5,12 +6,12 @@ use oneil_eval::value::{Unit, Value};
 use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext};
 use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
-use oneil_shared::error::OneilError;
+use oneil_shared::error::{AsOneilError, OneilError};
 use oneil_shared::span::Span;
 
+use crate::output::PartialResultWithErrors;
 use crate::{
     cache::{AstCache, EvalCache, IrCache, SourceCache},
-    error::FileError,
     output::{self, ast, ir},
     std_builtin::StdBuiltins,
 };
@@ -44,16 +45,10 @@ impl Runtime {
     pub fn eval_model(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<
-        output::ModelReference<'_>,
-        PartialResultWithErrors<Option<output::ModelReference<'_>>>,
-    > {
+    ) -> Result<output::ModelReference<'_>, output::error::EvalError> {
         // make sure the IR is loaded for the model and its dependencies
-        self.load_ir_for_model_and_dependencies(&path)
-            .map_err(|e| PartialResultWithErrors {
-                result: None,
-                errors: e.errors,
-            })?;
+        let ir_results = self.load_ir_for_model_and_dependencies(&path);
+        let path_buf = path.as_ref().to_path_buf();
 
         // evaluate the model and its dependencies
         let eval_result = eval::eval_model(&path, self);
@@ -69,11 +64,38 @@ impl Runtime {
             .source_cache
             .get(path.as_ref())
             .expect("it has already been loaded previously");
+
         let errors = errors
             .into_iter()
             .map(|(path, errors)| {
-                let errors =
-                    errors.map(|e| OneilError::from_error_with_source(&e, path.clone(), source));
+                let model = models.get(&path).expect("model should be present");
+
+                // convert the parameter errors to OneilErrors
+                let parameter_errors = errors
+                    .parameters
+                    .into_iter()
+                    .map(|(name, errors)| {
+                        let errors = errors
+                            .iter()
+                            .map(|e| OneilError::from_error_with_source(e, path.clone(), source))
+                            .collect();
+
+                        (name, errors)
+                    })
+                    .collect();
+
+                // convert the test errors to OneilErrors
+                let test_errors = errors
+                    .tests
+                    .iter()
+                    .map(|e| OneilError::from_error_with_source(e, path.clone(), source))
+                    .collect();
+
+                let eval_error = output::error::EvalError::EvalErrors {
+                    partial_result: model.clone(),
+                    parameter_errors,
+                    test_errors,
+                };
 
                 (path, errors)
             })
@@ -81,7 +103,7 @@ impl Runtime {
 
         // insert the evaluation results and errors into the cache
         self.eval_cache.insert_all(models);
-        self.eval_cache.insert_errors(errors);
+        self.eval_cache.insert_errors(errors.clone());
 
         // return the evaluation result
         let model_reference = self
@@ -89,114 +111,142 @@ impl Runtime {
             .get(path.as_ref())
             .map(|model| output::ModelReference::new(model, &self.eval_cache))
             .expect("it has already been loaded previously");
-        let errors = self.eval_cache.get_errors(path.as_ref());
 
-        errors.map_or(Ok(model_reference), |errors| {
+        if errors.is_empty() {
+            Ok(model_reference)
+        } else {
             Err(PartialResultWithErrors {
                 result: Some(model_reference),
-                errors: errors.clone(),
+                errors,
             })
-        })
+        }
     }
 
     /// Loads the IR for a model and all of its dependencies.
+    ///
+    /// Returns a map from each loaded model path to either a reference to its IR
+    /// or a [`ResolutionError`](output::error::ResolutionError) if that model had
+    /// parse or resolution errors.
     pub fn load_ir_for_model_and_dependencies(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<IrModelMap<'_>, PartialResultWithErrors<IrModelMap<'_>>> {
+    ) -> IndexMap<PathBuf, Result<&ir::Model, output::error::ResolutionError>> {
         let results = model_resolver::load_model(&path, self);
 
-        let mut models = IndexSet::new();
-        let mut errors = Vec::new();
+        let mut model_paths = IndexSet::new();
 
         for (model_path, result) in results {
             let model_path = model_path.as_ref().to_path_buf();
 
-            let (model, model_errors, circular_dependency_errors, ast_loaded) = result.into_parts();
+            let (model, model_errors, ast_loaded) = result.into_parts();
 
-            // push the model IR to the cache
-            self.ir_cache.insert(model_path.clone(), model);
-
-            models.insert(model_path.clone());
-
-            // if the AST for the model has not been loaded,
-            // return the source and AST errors
             if !ast_loaded {
-                let source_error = self.source_cache.get_error(&model_path).cloned();
-                let ast_errors = self.ast_cache.get_errors(&model_path).map(Vec::from);
+                let parse_err = self
+                    .ast_cache
+                    .get_errors(&model_path)
+                    .expect("should have ast error");
 
-                errors.extend(source_error.iter().cloned());
-                errors.extend(ast_errors.iter().flatten().cloned());
-
+                self.ir_cache.insert_err(
+                    model_path.clone(),
+                    output::error::ResolutionError::Parse(parse_err.clone()),
+                );
+                model_paths.insert(model_path);
                 continue;
             }
-
-            // otherwise, get the model resolution and circular dependency errors, if any
-            let mut model_errors_as_oneil = Vec::new();
 
             let source = self
                 .source_cache
                 .get(&model_path)
                 .expect("it has already been loaded previously");
 
-            let (python_import_errors, model_import_errors, parameter_errors, test_errors) =
-                model_errors.into_parts();
+            let (
+                circular_dependency_errors,
+                python_import_errors,
+                model_import_errors,
+                parameter_errors,
+                test_errors,
+            ) = model_errors.into_parts();
 
-            let import_errors = python_import_errors
-                .into_values()
-                .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source));
-            model_errors_as_oneil.extend(import_errors);
-
-            let model_import_errors = model_import_errors
-                .into_values()
-                .map(|(_, e)| OneilError::from_error_with_source(&e, model_path.clone(), source));
-            model_errors_as_oneil.extend(model_import_errors);
-
-            let parameter_errors = parameter_errors
-                .into_values()
-                .flatten()
-                .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source));
-            model_errors_as_oneil.extend(parameter_errors);
-
-            let test_errors = test_errors
-                .into_values()
-                .flatten()
-                .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source));
-            model_errors_as_oneil.extend(test_errors);
-
-            let circular_dependency_errors = circular_dependency_errors
+            let circular_dependency_oneil: Vec<OneilError> = circular_dependency_errors
                 .into_iter()
-                .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source));
-            model_errors_as_oneil.extend(circular_dependency_errors);
+                .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source))
+                .collect();
 
-            // if there are any model errors,
-            // add them to the cache and to the overall error collection
-            if !model_errors_as_oneil.is_empty() {
-                self.ir_cache
-                    .insert_errors(model_path.clone(), model_errors_as_oneil.clone());
-                errors.extend(model_errors_as_oneil);
+            let python_import_oneil: Vec<OneilError> = python_import_errors
+                .into_values()
+                .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source))
+                .collect();
+
+            let model_import_oneil: Vec<OneilError> = model_import_errors
+                .into_values()
+                .map(|(_, e)| OneilError::from_error_with_source(&e, model_path.clone(), source))
+                .collect();
+
+            let parameter_errors_oneil: IndexMap<String, Vec<OneilError>> = parameter_errors
+                .into_iter()
+                .map(|(name, errs)| {
+                    (
+                        name.as_str().to_string(),
+                        errs.into_iter()
+                            .map(|e| {
+                                OneilError::from_error_with_source(&e, model_path.clone(), source)
+                            })
+                            .collect(),
+                    )
+                })
+                .collect();
+
+            let test_errors_oneil: Vec<OneilError> = test_errors
+                .into_iter()
+                .flat_map(|(_test_index, errors)| {
+                    errors
+                        .into_iter()
+                        .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source))
+                })
+                .collect();
+
+            let has_errors = !circular_dependency_oneil.is_empty()
+                || !python_import_oneil.is_empty()
+                || !model_import_oneil.is_empty()
+                || !parameter_errors_oneil.is_empty()
+                || !test_errors_oneil.is_empty();
+
+            if has_errors {
+                let python_map = IndexMap::from_iter([(model_path.clone(), python_import_oneil)]);
+                let model_import_map =
+                    IndexMap::from_iter([(model_path.clone(), model_import_oneil)]);
+
+                self.ir_cache.insert_err(
+                    model_path.clone(),
+                    output::error::ResolutionError::ResolutionErrors {
+                        partial_ir: model,
+                        circular_dependency_errors: circular_dependency_oneil,
+                        python_import_errors: python_map,
+                        model_import_errors: model_import_map,
+                        parameter_errors: parameter_errors_oneil,
+                        test_errors: test_errors_oneil,
+                    },
+                );
+            } else {
+                self.ir_cache.insert_ok(model_path.clone(), model);
             }
+            model_paths.insert(model_path);
         }
 
-        let models = models
+        model_paths
             .into_iter()
             .map(|model_path| {
-                let model = self
+                let entry = self
                     .ir_cache
-                    .get(&model_path)
-                    .expect("it has already been loaded previously");
-                (model_path, model)
+                    .get_entry(&model_path)
+                    .expect("entry was inserted in this function");
+                let result = match entry {
+                    Ok(m) => Ok(m),
+                    Err(e) => Err(e.clone()),
+                };
+                (model_path, result)
             })
-            .collect::<IndexMap<PathBuf, &ir::Model>>();
-
-        if errors.is_empty() {
-            Ok(models)
-        } else {
-            Err(PartialResultWithErrors {
-                result: models,
-                errors,
-            })
-        }
+            .collect()
     }
 
     /// Loads AST for a model.
@@ -206,14 +256,11 @@ impl Runtime {
     pub fn load_ast(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<&ast::Model, PartialResultWithErrors<Option<&ast::Model>>> {
+    ) -> Result<&ast::Model, output::error::ParseError> {
         let path = path.as_ref();
         let source = self
             .load_source(path)
-            .map_err(|e| PartialResultWithErrors {
-                result: None,
-                errors: vec![*e],
-            })?;
+            .map_err(output::error::ParseError::File)?;
 
         // parse the model and return an error if it fails
         match parser::parse_model(source, None) {
@@ -234,28 +281,27 @@ impl Runtime {
                 let errors = e
                     .errors
                     .into_iter()
-                    .map(|e| OneilError::from_error_with_source(&e, path.to_path_buf(), source))
+                    .map(|err| OneilError::from_error_with_source(&err, path.to_path_buf(), source))
                     .collect::<Vec<OneilError>>();
 
-                let partial_ast = e.partial_result;
+                let partial_ast = *e.partial_result;
+                let partial_ast_for_error = partial_ast.clone();
                 self.ast_cache
-                    .insert_err(path.to_path_buf(), *partial_ast, errors.clone());
+                    .insert_err(path.to_path_buf(), partial_ast, errors.clone());
 
-                let ast = self
-                    .ast_cache
-                    .get(path)
-                    .expect("it has already been loaded previously");
-
-                Err(PartialResultWithErrors {
-                    result: Some(ast),
+                Err(output::error::ParseError::ParseErrors {
                     errors,
+                    partial_ast: Box::new(partial_ast_for_error),
                 })
             }
         }
     }
 
     /// Loads source code from a file.
-    pub fn load_source(&mut self, path: impl AsRef<Path>) -> Result<&str, Box<OneilError>> {
+    pub fn load_source(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<&str, output::error::FileError> {
         let path = path.as_ref();
 
         // Read the source code from the file
@@ -270,13 +316,15 @@ impl Runtime {
                 Ok(source)
             }
             Err(e) => {
-                let error = FileError::new(path, e);
+                let error = InternalIoError::new(path, e);
                 let error = OneilError::from_error(&error, path.to_path_buf());
 
                 self.source_cache
                     .insert_err(path.to_path_buf(), error.clone());
 
-                Err(Box::new(error))
+                Err(output::error::FileError {
+                    error: Box::new(error),
+                })
             }
         }
     }
@@ -434,7 +482,7 @@ impl Runtime {
         model_path: &Path,
         reference_name: Option<&str>,
         parameter_name: &str,
-    ) -> Option<Result<output::dependency::DependencyTreeValue, Vec<OneilError>>> {
+    ) -> Option<Result<output::dependency::DependencyTreeValue, output::error::TreeError>> {
         let model = self.eval_cache.get(model_path)?;
         let parameter = model.parameters.get(parameter_name)?;
 
@@ -535,7 +583,7 @@ impl Runtime {
         &self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> Option<Result<output::dependency::ReferenceTreeValue, Vec<OneilError>>> {
+    ) -> Option<Result<output::dependency::ReferenceTreeValue, output::error::TreeError>> {
         let model = self.eval_cache.get(model_path)?;
         let parameter = model.parameters.get(parameter_name)?;
 
@@ -624,3 +672,22 @@ impl eval::ExternalEvaluationContext for Runtime {
 }
 
 type IrModelMap<'runtime> = IndexMap<PathBuf, &'runtime ir::Model>;
+
+/// Error type for file loading failures.
+struct InternalIoError<'a> {
+    path: &'a Path,
+    error: IoError,
+}
+
+impl<'a> InternalIoError<'a> {
+    /// Creates a new file error from a path and I/O error.
+    pub const fn new(path: &'a Path, error: IoError) -> Self {
+        Self { path, error }
+    }
+}
+
+impl AsOneilError for InternalIoError<'_> {
+    fn message(&self) -> String {
+        format!("couldn't read `{}` - {}", self.path.display(), self.error)
+    }
+}

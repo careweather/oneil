@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use oneil_ir as ir;
 
+use super::circular_dependency::CircularDependencyError;
 use super::import::PythonImportResolutionError;
 use super::parameter::ParameterResolutionError;
 use super::submodel::ModelImportResolutionError;
@@ -11,7 +12,8 @@ use super::variable::VariableResolutionError;
 
 /// A collection of all resolution errors that occurred during model loading.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResolutionErrors {
+pub struct ResolutionErrorCollection {
+    circular_dependency: Vec<CircularDependencyError>,
     python_import: IndexMap<ir::PythonPath, PythonImportResolutionError>,
     model_import:
         IndexMap<ir::ReferenceName, (Option<ir::SubmodelName>, ModelImportResolutionError)>,
@@ -19,11 +21,12 @@ pub struct ResolutionErrors {
     test: IndexMap<ir::TestIndex, Vec<VariableResolutionError>>,
 }
 
-impl ResolutionErrors {
+impl ResolutionErrorCollection {
     /// Creates an empty collection of resolution errors.
     #[must_use]
     pub fn empty() -> Self {
         Self {
+            circular_dependency: Vec::new(),
             python_import: IndexMap::new(),
             model_import: IndexMap::new(),
             parameter: IndexMap::new(),
@@ -34,10 +37,16 @@ impl ResolutionErrors {
     /// Returns whether there are any resolution errors.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.python_import.is_empty()
+        self.circular_dependency.is_empty()
+            && self.python_import.is_empty()
             && self.model_import.is_empty()
             && self.parameter.is_empty()
             && self.test.is_empty()
+    }
+
+    /// Adds a circular dependency error.
+    pub fn add_circular_dependency_error(&mut self, error: CircularDependencyError) {
+        self.circular_dependency.push(error);
     }
 
     /// Adds a Python import resolution error.
@@ -75,6 +84,12 @@ impl ResolutionErrors {
     /// Adds a test resolution error.
     pub fn add_test_error(&mut self, test_index: ir::TestIndex, error: VariableResolutionError) {
         self.test.entry(test_index).or_default().push(error);
+    }
+
+    /// Returns a reference to the list of circular dependency errors.
+    #[must_use]
+    pub const fn get_circular_dependency_errors(&self) -> &[CircularDependencyError] {
+        self.circular_dependency.as_slice()
     }
 
     /// Returns a reference to the map of import resolution errors.
@@ -121,12 +136,14 @@ impl ResolutionErrors {
     pub fn into_parts(
         self,
     ) -> (
+        Vec<CircularDependencyError>,
         IndexMap<ir::PythonPath, PythonImportResolutionError>,
         IndexMap<ir::ReferenceName, (Option<ir::SubmodelName>, ModelImportResolutionError)>,
         IndexMap<ir::ParameterName, Vec<ParameterResolutionError>>,
         IndexMap<ir::TestIndex, Vec<VariableResolutionError>>,
     ) {
         (
+            self.circular_dependency,
             self.python_import,
             self.model_import,
             self.parameter,

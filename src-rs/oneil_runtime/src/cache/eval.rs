@@ -3,18 +3,21 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use oneil_eval::{error, output};
-use oneil_shared::error::OneilError;
+use oneil_eval::output;
 
-/// Cache of evaluated model results keyed by the root path passed to `eval_model`.
+use crate::output::error::EvalError;
+
+/// Result of evaluating a model: either the evaluated [`Model`](output::Model) or an [`EvalError`].
+pub type EvalLoadResult = Result<output::Model, EvalError>;
+
+/// Cache of evaluated model results keyed by path.
 ///
-/// Each entry stores the full result of evaluating a model and its dependencies:
-/// a map from each model path to its evaluated [`Model`] and any errors that occurred.
+/// Each entry is the result of evaluating that model: either a successfully
+/// evaluated [`Model`](output::Model) or an [`EvalError`] (resolution failure or
+/// partial result with parameter/test errors).
 #[derive(Debug, Default)]
 pub struct EvalCache {
-    /// Evaluated model results keyed by the root path used in `eval_model`.
-    results: IndexMap<PathBuf, output::Model>,
-    errors: IndexMap<PathBuf, error::ModelErrors<OneilError>>,
+    entries: IndexMap<PathBuf, EvalLoadResult>,
 }
 
 impl EvalCache {
@@ -23,33 +26,46 @@ impl EvalCache {
         Self::default()
     }
 
-    /// Returns the cached evaluation result for the given root `path`, if present.
+    /// Returns the cached evaluation result for the given `path`, if present.
     ///
-    /// The returned map associates each model path (root and dependencies) with its evaluated result.
+    /// Returns the model for `Ok` entries and for `Err(EvalError::EvalErrors { partial_result, .. })`;
+    /// returns `None` for `Err(EvalError::Resolution(_))` (no model available).
     pub fn get(&self, path: &Path) -> Option<&output::Model> {
-        self.results.get(path)
+        self.entries.get(path).and_then(|r| match r {
+            Ok(m) => Some(m),
+            Err(EvalError::EvalErrors { partial_result, .. }) => Some(partial_result),
+            Err(EvalError::Resolution(_)) => None,
+        })
     }
 
-    /// Returns the cached evaluation errors for the given `path`, if present.
-    pub fn get_errors(&self, path: &Path) -> Option<&error::ModelErrors<OneilError>> {
-        self.errors.get(path)
+    /// Returns the cached evaluation error for `path`, if present.
+    pub fn get_error(&self, path: &Path) -> Option<&EvalError> {
+        self.entries.get(path).and_then(|r| r.as_ref().err())
     }
 
-    /// Stores the evaluation `result` for each model.
-    pub fn insert_all(&mut self, models: impl IntoIterator<Item = (PathBuf, output::Model)>) {
-        self.results.extend(models);
+    /// Returns the full cached entry for `path`.
+    pub fn get_entry(&self, path: &Path) -> Option<&EvalLoadResult> {
+        self.entries.get(path)
     }
 
-    /// Stores the evaluation `errors` for each model.
-    pub fn insert_errors(
-        &mut self,
-        models: impl IntoIterator<Item = (PathBuf, error::ModelErrors<OneilError>)>,
-    ) {
-        self.errors.extend(models);
+    /// Stores a successfully evaluated `model` for `path`.
+    pub fn insert_ok(&mut self, path: PathBuf, model: output::Model) {
+        self.entries.insert(path, Ok(model));
     }
 
-    /// Returns an iterator over all cached model paths and their evaluated results.
+    /// Stores an `EvalError` for `path`.
+    pub fn insert_err(&mut self, path: PathBuf, error: EvalError) {
+        self.entries.insert(path, Err(error));
+    }
+
+    /// Returns an iterator over all cached paths and their evaluated model (when present).
+    ///
+    /// Skips entries that are `Err(EvalError::Resolution(_))` (no model).
     pub fn models_iter(&self) -> impl Iterator<Item = (&PathBuf, &output::Model)> {
-        self.results.iter()
+        self.entries.iter().filter_map(|(path, r)| match r {
+            Ok(m) => Some((path, m)),
+            Err(EvalError::EvalErrors { partial_result, .. }) => Some((path, partial_result)),
+            Err(EvalError::Resolution(_)) => None,
+        })
     }
 }

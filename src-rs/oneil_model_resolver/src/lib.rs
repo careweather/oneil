@@ -13,7 +13,7 @@ mod util;
 #[cfg(test)]
 mod test;
 
-pub use crate::error::{CircularDependencyError, ResolutionErrors};
+pub use crate::error::{CircularDependencyError, ResolutionErrorCollection};
 pub use crate::util::{
     AstLoadingFailedError, ExternalResolutionContext, ModelResolutionResult,
     PythonImportLoadingFailedError,
@@ -26,10 +26,8 @@ use crate::util::ResolutionContext;
 pub struct LoadModelResult {
     /// Resolved models by path.
     pub models: IndexMap<ir::ModelPath, ir::Model>,
-    /// Per-model resolution errors (import, reference, submodel, parameter, test).
-    pub model_errors: IndexMap<ir::ModelPath, ResolutionErrors>,
-    /// Per-model circular dependency errors.
-    pub circular_dependency_errors: IndexMap<ir::ModelPath, Vec<CircularDependencyError>>,
+    /// Per-model resolution errors (import, reference, submodel, parameter, test, circular dependency).
+    pub model_errors: IndexMap<ir::ModelPath, ResolutionErrorCollection>,
 }
 
 /// Loads a single model and all its dependencies.

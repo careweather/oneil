@@ -6,7 +6,7 @@ use oneil_shared::{
     span::Span,
 };
 
-use crate::error::VariableResolutionError;
+use super::variable::VariableResolutionError;
 
 /// Represents an error that occurred during parameter resolution.
 #[derive(Debug, Clone, PartialEq, Eq)]
