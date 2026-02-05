@@ -4,15 +4,19 @@ use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
-use oneil_shared::error::OneilError;
 
-/// Cache of resolved IR models and per-file resolution errors.
+use crate::output::error::{ParseError, ResolutionError};
+
+/// Result of loading IR for a model: either the resolved model or a [`ResolutionError`].
+pub type IrLoadResult = Result<ir::Model, ResolutionError>;
+
+/// Cache of resolved IR models keyed by path.
+///
+/// Each entry is the result of loading that model's IR: either a successfully
+/// resolved model or a [`ResolutionError`] (parse or resolution errors).
 #[derive(Debug, Default)]
 pub struct IrCache {
-    /// Resolved IR models keyed by path.
-    models: IndexMap<PathBuf, ir::Model>,
-    /// Resolution errors for a path, when resolution produced errors.
-    errors: IndexMap<PathBuf, Vec<OneilError>>,
+    entries: IndexMap<PathBuf, IrLoadResult>,
 }
 
 impl IrCache {
@@ -22,22 +26,38 @@ impl IrCache {
     }
 
     /// Returns the cached IR model for `path`, if present.
+    ///
+    /// Returns the model for `Ok` entries and for `Err(ResolutionError::ResolutionErrors { partial_ir, .. })`;
+    /// returns `None` for `Err(ResolutionError::Parse(_))` (no IR available).
     pub fn get(&self, path: &Path) -> Option<&ir::Model> {
-        self.models.get(path)
+        let entry = self.entries.get(path)?;
+        match entry {
+            Ok(m) => Some(m),
+            Err(ResolutionError::ResolutionErrors { partial_ir, .. }) => Some(partial_ir),
+            Err(ResolutionError::Parse(error)) => match error {
+                ParseError::ParseErrors { .. } => None,
+                ParseError::File(_) => None,
+            },
+        }
     }
 
-    /// Returns the cached resolution errors for `path`, if present.
-    pub fn get_errors(&self, path: &Path) -> Option<&[OneilError]> {
-        self.errors.get(path).map(Vec::as_slice)
+    /// Returns the cached resolution error for `path`, if present.
+    pub fn get_error(&self, path: &Path) -> Option<&ResolutionError> {
+        self.entries.get(path).and_then(|r| r.as_ref().err())
     }
 
-    /// Stores a resolved `model` for `path`.
-    pub fn insert(&mut self, path: PathBuf, model: ir::Model) {
-        self.models.insert(path, model);
+    /// Returns the full cached entry for `path`.
+    pub fn get_entry(&self, path: &Path) -> Option<&IrLoadResult> {
+        self.entries.get(path)
     }
 
-    /// Stores resolution `errors` for `path`.
-    pub fn insert_errors(&mut self, path: PathBuf, errors: Vec<OneilError>) {
-        self.errors.insert(path, errors);
+    /// Stores a successfully resolved `model` for `path`.
+    pub fn insert_ok(&mut self, path: PathBuf, model: ir::Model) {
+        self.entries.insert(path, Ok(model));
+    }
+
+    /// Stores a `ResolutionError` for `path`.
+    pub fn insert_err(&mut self, path: PathBuf, error: ResolutionError) {
+        self.entries.insert(path, Err(error));
     }
 }

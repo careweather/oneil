@@ -2,12 +2,29 @@
 
 use std::fmt;
 
+use indexmap::IndexMap;
 use oneil_shared::{
     error::{AsOneilError, Context as ErrorContext, ErrorLocation},
     span::Span,
 };
 
-use crate::value::{DisplayUnit, Interval, NumberType, Value, ValueType};
+use crate::{
+    output::Model,
+    value::{DisplayUnit, Interval, NumberType, Value, ValueType},
+};
+
+/// Errors that occurred during evaluation of a model.
+#[derive(Debug, Clone)]
+pub struct EvalErrors {
+    /// Had resolution errors
+    pub had_resolution_errors: bool,
+    /// Partial evaluation result.
+    pub partial_result: Option<Model>,
+    /// Errors that occurred during evaluation of the parameters.
+    pub parameters: IndexMap<String, Vec<EvalError>>,
+    /// Errors that occurred during evaluation of the tests.
+    pub tests: Vec<EvalError>,
+}
 
 /// Represents the expected type for type checking operations.
 ///

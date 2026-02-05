@@ -1,9 +1,7 @@
 use oneil_ast as ast;
 use oneil_ir as ir;
 
-use crate::{
-    ExternalResolutionContext, ResolutionContext, error::resolution::PythonImportResolutionError,
-};
+use crate::{ExternalResolutionContext, ResolutionContext, error::PythonImportResolutionError};
 
 /// Validates a list of Python import declarations for a given model.
 pub fn resolve_python_imports<E>(

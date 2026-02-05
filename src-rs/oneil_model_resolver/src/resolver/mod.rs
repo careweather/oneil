@@ -204,7 +204,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        error::{CircularDependencyError, ModelImportResolutionError},
+        error::ModelImportResolutionError,
         test::{external_context::TestExternalContext, test_ast},
     };
 
@@ -277,13 +277,6 @@ mod tests {
 
         // check the model errors
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -299,13 +292,6 @@ mod tests {
 
         // check the model errors (parse failure does not record an error in model_errors)
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -347,7 +333,8 @@ mod tests {
         let circular_dependency_error = results
             .get(&sub_path)
             .expect("sub should have circular dependency error")
-            .circular_dependency_errors();
+            .model_errors()
+            .get_circular_dependency_errors();
         assert_eq!(circular_dependency_error.len(), 1);
         assert_eq!(
             circular_dependency_error[0],
@@ -374,13 +361,6 @@ mod tests {
 
         // check the model errors
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -401,13 +381,6 @@ mod tests {
 
         // check the model errors
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -437,13 +410,6 @@ mod tests {
 
         // check the model errors
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -462,13 +428,6 @@ mod tests {
 
         // check the model errors
         assert!(results.contains_key(&parent_path));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -502,13 +461,6 @@ mod tests {
 
         // check the model errors
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -539,13 +491,6 @@ mod tests {
 
         // check the model errors
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -605,13 +550,6 @@ mod tests {
 
         // check the model errors
         assert!(results.values().all(|r| r.model_errors().is_empty()));
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
-        );
     }
 
     #[test]
@@ -642,13 +580,6 @@ mod tests {
         assert!(
             results.values().any(|r| !r.model_errors().is_empty()),
             "expected at least one model with resolution errors"
-        );
-
-        // check the circular dependency errors
-        assert!(
-            results
-                .values()
-                .all(|r| r.circular_dependency_errors().is_empty())
         );
     }
 }

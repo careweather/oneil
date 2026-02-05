@@ -1,0 +1,11 @@
+//! Error type for file loading failures.
+
+use oneil_shared::error::OneilError;
+
+/// Error type for file loading failures.
+///
+/// Holds a single [`OneilError`] (e.g. from I/O failure) in a [`Box`].
+#[derive(Clone, Debug)]
+pub struct FileError {
+    pub error: Box<OneilError>,
+}

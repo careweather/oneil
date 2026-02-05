@@ -6,12 +6,12 @@ use std::{
 use indexmap::{IndexMap, IndexSet};
 
 use oneil_ir as ir;
-use oneil_shared::{error::ModelErrors, span::Span};
+use oneil_shared::span::Span;
 
 use crate::{
     EvalError,
     context::{EvalContext, ExternalEvaluationContext},
-    error::ExpectedType,
+    error::{EvalErrors, ExpectedType},
     eval_expr, eval_parameter,
     output::{
         self, Model,
@@ -25,7 +25,7 @@ use crate::{
 pub fn eval_model<E: ExternalEvaluationContext>(
     model_path: impl AsRef<Path>,
     external_context: &mut E,
-) -> IndexMap<PathBuf, (Model, ModelErrors<EvalError>)> {
+) -> IndexMap<PathBuf, Result<Model, EvalErrors>> {
     let model_path = ir::ModelPath::new(model_path);
     let mut context = EvalContext::new(external_context);
 

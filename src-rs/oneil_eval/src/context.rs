@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 
 use oneil_ir as ir;
-use oneil_shared::{error::ModelErrors, span::Span};
+use oneil_shared::span::Span;
 
 use crate::{
-    error::EvalError,
+    error::{EvalError, EvalErrors},
     output::{self},
     value::{Unit, Value},
 };
@@ -97,7 +97,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// [`ModelError`]s that occurred during evaluation (e.g. from parameters or
     /// tests that failed).
     #[must_use]
-    pub fn into_result(self) -> IndexMap<PathBuf, (output::Model, ModelErrors<EvalError>)> {
+    pub fn into_result(self) -> IndexMap<PathBuf, Result<output::Model, EvalErrors>> {
         let mut result = IndexMap::new();
 
         // for each model, collect the parameters and tests, and any errors
@@ -138,17 +138,19 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                 tests,
             };
 
-            // create the output errors
-            let errors = ModelErrors {
-                // there will never be any Python or model import errors
-                python_imports: IndexMap::new(),
-                model_imports: IndexMap::new(),
-
-                parameters: parameter_errors,
-                tests: test_errors,
-            };
-
-            result.insert(path, (output_model, errors));
+            if parameter_errors.is_empty() && test_errors.is_empty() {
+                result.insert(path, Ok(output_model));
+            } else {
+                result.insert(
+                    path,
+                    Err(EvalErrors {
+                        partial_result: Some(output_model),
+                        had_resolution_errors: todo!(),
+                        parameters: parameter_errors,
+                        tests: test_errors,
+                    }),
+                );
+            }
         }
 
         result
