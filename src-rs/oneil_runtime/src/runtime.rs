@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
-use oneil_eval::value::{Number, Unit, Value};
+use oneil_eval::value::{Unit, Value};
 use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext};
 use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
@@ -72,10 +72,8 @@ impl Runtime {
         let errors = errors
             .into_iter()
             .map(|(path, errors)| {
-                let errors = errors
-                    .into_iter()
-                    .map(|e| OneilError::from_error_with_source(&e.error, path.clone(), source))
-                    .collect::<Vec<OneilError>>();
+                let errors =
+                    errors.map(|e| OneilError::from_error_with_source(&e, path.clone(), source));
 
                 (path, errors)
             })
@@ -96,7 +94,7 @@ impl Runtime {
         errors.map_or(Ok(model_reference), |errors| {
             Err(PartialResultWithErrors {
                 result: Some(model_reference),
-                errors: errors.to_vec(),
+                errors: errors.clone(),
             })
         })
     }
@@ -626,8 +624,3 @@ impl eval::ExternalEvaluationContext for Runtime {
 }
 
 type IrModelMap<'runtime> = IndexMap<PathBuf, &'runtime ir::Model>;
-
-pub struct PartialResultWithErrors<T> {
-    pub result: T,
-    pub errors: Vec<OneilError>,
-}

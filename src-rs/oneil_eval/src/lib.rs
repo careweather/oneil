@@ -11,7 +11,7 @@ pub mod output;
 pub mod value;
 
 pub use context::ExternalEvaluationContext;
-pub use error::{EvalError, ModelError};
+pub use error::EvalError;
 pub use eval_model::eval_model;
 
 #[cfg(test)]

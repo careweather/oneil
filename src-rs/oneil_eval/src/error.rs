@@ -1,6 +1,6 @@
 //! Errors for the Oneil evaluator.
 
-use std::{fmt, path::PathBuf};
+use std::fmt;
 
 use oneil_shared::{
     error::{AsOneilError, Context as ErrorContext, ErrorLocation},
@@ -8,18 +8,6 @@ use oneil_shared::{
 };
 
 use crate::value::{DisplayUnit, Interval, NumberType, Value, ValueType};
-
-/// An error that occurred during model evaluation.
-///
-/// This error type associates an evaluation error with the path to the model file
-/// where the error occurred.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelError {
-    /// The path to the model file where the error occurred.
-    pub model_path: PathBuf,
-    /// The evaluation error that occurred.
-    pub error: EvalError,
-}
 
 /// Represents the expected type for type checking operations.
 ///

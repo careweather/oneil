@@ -2,12 +2,14 @@
 
 mod context;
 mod location;
+mod model_errors;
 mod traits;
 
 use std::path::PathBuf;
 
 pub use context::Context;
 pub use location::ErrorLocation;
+pub use model_errors::ModelErrors;
 pub use traits::AsOneilError;
 
 /// Unified error representation for Oneil

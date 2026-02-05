@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use oneil_eval::output;
+use oneil_eval::{error, output};
 use oneil_shared::error::OneilError;
 
 /// Cache of evaluated model results keyed by the root path passed to `eval_model`.
@@ -14,7 +14,7 @@ use oneil_shared::error::OneilError;
 pub struct EvalCache {
     /// Evaluated model results keyed by the root path used in `eval_model`.
     results: IndexMap<PathBuf, output::Model>,
-    errors: IndexMap<PathBuf, Vec<OneilError>>,
+    errors: IndexMap<PathBuf, error::ModelErrors<OneilError>>,
 }
 
 impl EvalCache {
@@ -31,8 +31,8 @@ impl EvalCache {
     }
 
     /// Returns the cached evaluation errors for the given `path`, if present.
-    pub fn get_errors(&self, path: &Path) -> Option<&[OneilError]> {
-        self.errors.get(path).map(Vec::as_slice)
+    pub fn get_errors(&self, path: &Path) -> Option<&error::ModelErrors<OneilError>> {
+        self.errors.get(path)
     }
 
     /// Stores the evaluation `result` for each model.
@@ -41,7 +41,10 @@ impl EvalCache {
     }
 
     /// Stores the evaluation `errors` for each model.
-    pub fn insert_errors(&mut self, models: impl IntoIterator<Item = (PathBuf, Vec<OneilError>)>) {
+    pub fn insert_errors(
+        &mut self,
+        models: impl IntoIterator<Item = (PathBuf, error::ModelErrors<OneilError>)>,
+    ) {
         self.errors.extend(models);
     }
 

@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 
 use oneil_ir as ir;
-use oneil_shared::span::Span;
+use oneil_shared::{error::ModelErrors, span::Span};
 
 use crate::{
-    error::{EvalError, ModelError},
+    error::EvalError,
     output::{self},
     value::{Unit, Value},
 };
@@ -97,15 +97,14 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// [`ModelError`]s that occurred during evaluation (e.g. from parameters or
     /// tests that failed).
     #[must_use]
-    pub fn into_result(self) -> IndexMap<PathBuf, (output::Model, Vec<ModelError>)> {
+    pub fn into_result(self) -> IndexMap<PathBuf, (output::Model, ModelErrors<EvalError>)> {
         let mut result = IndexMap::new();
 
         // for each model, collect the parameters and tests, and any errors
         for (path, model) in self.models {
-            let mut errors = Vec::new();
-
             // collect the parameters and any errors
             let mut parameters = IndexMap::new();
+            let mut parameter_errors = IndexMap::new();
             for (name, result) in model.parameters {
                 match result {
                     Ok(param) => {
@@ -113,28 +112,19 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                     }
 
                     Err(errs) => {
-                        for e in errs {
-                            errors.push(ModelError {
-                                model_path: path.clone(),
-                                error: e,
-                            });
-                        }
+                        parameter_errors.insert(name, errs);
                     }
                 }
             }
 
             // collect the tests and any errors
             let mut tests = Vec::new();
+            let mut test_errors = Vec::new();
             for test in model.tests {
                 match test {
                     Ok(test) => tests.push(test),
                     Err(errs) => {
-                        for e in errs {
-                            errors.push(ModelError {
-                                model_path: path.clone(),
-                                error: e,
-                            });
-                        }
+                        test_errors.extend(errs);
                     }
                 }
             }
@@ -146,6 +136,16 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                 references: model.references,
                 parameters,
                 tests,
+            };
+
+            // create the output errors
+            let errors = ModelErrors {
+                // there will never be any Python or model import errors
+                python_imports: IndexMap::new(),
+                model_imports: IndexMap::new(),
+
+                parameters: parameter_errors,
+                tests: test_errors,
             };
 
             result.insert(path, (output_model, errors));
