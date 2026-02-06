@@ -97,7 +97,7 @@ fn print_submodels(submodels: &IndexMap<ir::SubmodelName, ir::SubmodelImport>, i
             "  ".repeat(indent),
             prefix,
             identifier.as_str(),
-            submodel.path().as_ref().display()
+            submodel.reference_name().as_str()
         );
     }
 }

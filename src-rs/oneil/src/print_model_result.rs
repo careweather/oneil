@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anstream::{eprintln, print, println};
 use indexmap::{IndexMap, IndexSet};
-use oneil_eval::{output::eval_result, value::Value};
+use oneil_runtime::output::{reference::ModelReference, value::Value};
 use oneil_shared::span::Span;
 
 use crate::{
@@ -30,8 +30,7 @@ fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print_eval_result(model_result: &eval_result::EvalResult, model_config: &ModelPrintConfig) {
-    let top_model = model_result.get_top_model();
+pub fn print_eval_result(top_model: ModelReference<'_>, model_config: &ModelPrintConfig) {
     let test_info = get_model_tests(top_model, model_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
@@ -61,8 +60,7 @@ pub struct TestPrintConfig {
     pub recursive: bool,
 }
 
-pub fn print_test_results(model_result: &eval_result::EvalResult, test_config: &TestPrintConfig) {
-    let top_model = model_result.get_top_model();
+pub fn print_test_results(top_model: ModelReference<'_>, test_config: &TestPrintConfig) {
     let test_info = get_model_tests(top_model, test_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
@@ -81,11 +79,11 @@ pub fn print_test_results(model_result: &eval_result::EvalResult, test_config: &
 struct TestInfo<'result> {
     pub test_count: usize,
     pub passed_count: usize,
-    pub failed_tests: IndexMap<&'result Path, Vec<(Span, &'result eval_result::DebugInfo)>>,
+    pub failed_tests: IndexMap<&'result Path, Vec<(Span, &'result DebugInfo)>>,
 }
 
 fn get_model_tests<'result>(
-    model_ref: eval_result::ModelReference<'result>,
+    model_ref: ModelReference<'result>,
     recursive: bool,
     mut test_info: TestInfo<'result>,
 ) -> TestInfo<'result> {
@@ -94,8 +92,8 @@ fn get_model_tests<'result>(
     let failed_tests = tests
         .iter()
         .filter_map(|test| match &test.result {
-            eval_result::TestResult::Failed { debug_info } => Some((test.expr_span, &**debug_info)),
-            eval_result::TestResult::Passed => None,
+            TestResult::Failed { debug_info } => Some((test.expr_span, &**debug_info)),
+            TestResult::Passed => None,
         })
         .collect::<Vec<_>>();
 
@@ -141,7 +139,7 @@ fn print_failing_tests(test_info: &TestInfo<'_>) {
     println!("{divider_line}");
 }
 
-fn print_model_failing_tests(model_path: &Path, failing_tests: &[(Span, &eval_result::DebugInfo)]) {
+fn print_model_failing_tests(model_path: &Path, failing_tests: &[(Span, &DebugInfo)]) {
     let file_contents = std::fs::read_to_string(model_path);
 
     let file_contents = match file_contents {
@@ -209,7 +207,7 @@ fn print_model_path_header(model_path: &Path) {
 }
 
 fn print_parameters_by_list(
-    model_ref: eval_result::ModelReference<'_>,
+    model_ref: ModelReference<'_>,
     print_debug_info: bool,
     variables: &VariableList,
 ) {
@@ -239,12 +237,12 @@ fn print_parameters_by_list(
 }
 
 struct ModelParametersToPrint<'result> {
-    pub parameters: IndexMap<String, &'result eval_result::Parameter>,
+    pub parameters: IndexMap<String, &'result Parameter>,
     pub parameters_not_found: IndexSet<String>,
 }
 
 fn get_model_parameters_by_list<'result>(
-    model_ref: eval_result::ModelReference<'result>,
+    model_ref: ModelReference<'result>,
     variables: &VariableList,
 ) -> ModelParametersToPrint<'result> {
     let mut parameters = IndexMap::new();
@@ -271,9 +269,9 @@ fn get_model_parameters_by_list<'result>(
 }
 
 fn get_parameter_from_model<'result>(
-    model_ref: eval_result::ModelReference<'result>,
+    model_ref: ModelReference<'result>,
     param: &Variable,
-) -> Option<&'result eval_result::Parameter> {
+) -> Option<&'result Parameter> {
     let mut param_vec = param.to_vec();
 
     let parameter = param_vec.remove(0);
