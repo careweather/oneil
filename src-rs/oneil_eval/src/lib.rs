@@ -10,7 +10,7 @@ mod eval_unit;
 pub mod output;
 pub mod value;
 
-pub use context::ExternalEvaluationContext;
+pub use context::{ExternalEvaluationContext, IrLoadError};
 pub use error::EvalError;
 pub use eval_model::eval_model;
 

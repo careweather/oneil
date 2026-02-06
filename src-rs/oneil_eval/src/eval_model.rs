@@ -39,12 +39,20 @@ fn eval_model_from_context<E: ExternalEvaluationContext>(
     model_path: &ir::ModelPath,
     context: &mut EvalContext<'_, E>,
 ) {
-    let model = context.get_ir(model_path.as_ref());
-
     // Set the current model
     let model_path = model_path.as_ref().to_path_buf();
-    // TODO: push rather than set
     context.push_active_model(model_path.clone());
+
+    let model = context.get_ir(&model_path);
+
+    // TODO: maybe there's an opportunity for partial recovery here?
+    let model = match model {
+        Ok(model) => model,
+        Err(_error) => {
+            context.mark_ir_load_error_for_active_model();
+            return;
+        }
+    };
 
     // Recursively evaluate references
     let references = model.get_references();

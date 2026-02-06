@@ -34,3 +34,28 @@ pub enum ResolutionError {
         test_errors: Vec<OneilError>,
     },
 }
+
+impl ResolutionError {
+    /// Returns all underlying errors as a list of [`OneilError`]s.
+    #[must_use]
+    pub fn to_vec(&self) -> Vec<OneilError> {
+        match self {
+            ResolutionError::Parse(p) => p.to_vec(),
+            ResolutionError::ResolutionErrors {
+                circular_dependency_errors,
+                python_import_errors,
+                model_import_errors,
+                parameter_errors,
+                test_errors,
+                ..
+            } => {
+                let mut v = circular_dependency_errors.clone();
+                v.extend(python_import_errors.values().flatten().cloned());
+                v.extend(model_import_errors.values().flatten().cloned());
+                v.extend(parameter_errors.values().flatten().cloned());
+                v.extend(test_errors.iter().cloned());
+                v
+            }
+        }
+    }
+}

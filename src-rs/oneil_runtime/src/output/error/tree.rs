@@ -1,4 +1,6 @@
 //! Error type for dependency tree operations.
 
+use oneil_shared::error::OneilError;
+
 /// Error type for dependency tree operations.
-pub struct TreeError;
+pub type TreeError = Vec<OneilError>;

@@ -19,7 +19,7 @@ pub struct EvalErrors {
     /// Had resolution errors
     pub had_resolution_errors: bool,
     /// Partial evaluation result.
-    pub partial_result: Option<Model>,
+    pub partial_result: Model,
     /// Errors that occurred during evaluation of the parameters.
     pub parameters: IndexMap<String, Vec<EvalError>>,
     /// Errors that occurred during evaluation of the tests.

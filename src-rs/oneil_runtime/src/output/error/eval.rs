@@ -25,3 +25,22 @@ pub enum EvalError {
         test_errors: Vec<OneilError>,
     },
 }
+
+impl EvalError {
+    /// Returns all underlying errors as a list of [`OneilError`]s.
+    #[must_use]
+    pub fn to_vec(&self) -> Vec<OneilError> {
+        match self {
+            EvalError::Resolution(r) => r.to_vec(),
+            EvalError::EvalErrors {
+                parameter_errors,
+                test_errors,
+                ..
+            } => {
+                let mut v = test_errors.clone();
+                v.extend(parameter_errors.values().flatten().cloned());
+                v
+            }
+        }
+    }
+}

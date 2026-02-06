@@ -9,3 +9,11 @@ use oneil_shared::error::OneilError;
 pub struct FileError {
     pub error: Box<OneilError>,
 }
+
+impl FileError {
+    /// Returns the underlying error(s) as a list of [`OneilError`]s.
+    #[must_use]
+    pub fn to_vec(&self) -> Vec<OneilError> {
+        vec![(*self.error).clone()]
+    }
+}

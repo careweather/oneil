@@ -3,13 +3,12 @@ use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_eval::value::{Unit, Value};
-use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext};
+use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext, IrLoadError};
 use oneil_model_resolver as model_resolver;
 use oneil_parser as parser;
 use oneil_shared::error::{AsOneilError, OneilError};
 use oneil_shared::span::Span;
 
-use crate::output::PartialResultWithErrors;
 use crate::{
     cache::{AstCache, EvalCache, IrCache, SourceCache},
     output::{self, ast, ir},
@@ -45,80 +44,74 @@ impl Runtime {
     pub fn eval_model(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<output::ModelReference<'_>, output::error::EvalError> {
+    ) -> Result<output::reference::ModelReference<'_>, output::reference::EvalErrorReference<'_>>
+    {
         // make sure the IR is loaded for the model and its dependencies
-        let ir_results = self.load_ir_for_model_and_dependencies(&path);
-        let path_buf = path.as_ref().to_path_buf();
+        // TODO: once caching works, evaluating the model should load the IR as it goes
+        let _ir_results = self.load_ir_for_model_and_dependencies(&path);
 
         // evaluate the model and its dependencies
         let eval_result = eval::eval_model(&path, self);
 
-        // collect the evaluation results and errors
-        let (models, errors): (IndexMap<_, _>, IndexMap<_, _>) = eval_result
-            .into_iter()
-            .map(|(path, (model, errors))| ((path.clone(), model), (path, errors)))
-            .unzip();
+        for (model_path, result) in eval_result {
+            let source = self.source_cache.get(&model_path).unwrap_or("");
 
-        // convert the errors to OneilErrors
-        let source = self
-            .source_cache
-            .get(path.as_ref())
-            .expect("it has already been loaded previously");
+            match result {
+                Ok(model) => {
+                    self.eval_cache.insert_ok(model_path, model);
+                }
+                Err(eval_errors) => {
+                    let parameter_errors = eval_errors
+                        .parameters
+                        .into_iter()
+                        .map(|(name, errs)| {
+                            (
+                                name,
+                                errs.into_iter()
+                                    .map(|e| {
+                                        OneilError::from_error_with_source(
+                                            &e,
+                                            model_path.clone(),
+                                            source,
+                                        )
+                                    })
+                                    .collect(),
+                            )
+                        })
+                        .collect();
 
-        let errors = errors
-            .into_iter()
-            .map(|(path, errors)| {
-                let model = models.get(&path).expect("model should be present");
+                    let test_errors = eval_errors
+                        .tests
+                        .into_iter()
+                        .map(|e| OneilError::from_error_with_source(&e, model_path.clone(), source))
+                        .collect();
 
-                // convert the parameter errors to OneilErrors
-                let parameter_errors = errors
-                    .parameters
-                    .into_iter()
-                    .map(|(name, errors)| {
-                        let errors = errors
-                            .iter()
-                            .map(|e| OneilError::from_error_with_source(e, path.clone(), source))
-                            .collect();
+                    self.eval_cache.insert_err(
+                        model_path,
+                        output::error::EvalError::EvalErrors {
+                            partial_result: eval_errors.partial_result,
+                            parameter_errors,
+                            test_errors,
+                        },
+                    );
+                }
+            }
+        }
 
-                        (name, errors)
-                    })
-                    .collect();
-
-                // convert the test errors to OneilErrors
-                let test_errors = errors
-                    .tests
-                    .iter()
-                    .map(|e| OneilError::from_error_with_source(e, path.clone(), source))
-                    .collect();
-
-                let eval_error = output::error::EvalError::EvalErrors {
-                    partial_result: model.clone(),
-                    parameter_errors,
-                    test_errors,
-                };
-
-                (path, errors)
-            })
-            .collect::<IndexMap<_, _>>();
-
-        // insert the evaluation results and errors into the cache
-        self.eval_cache.insert_all(models);
-        self.eval_cache.insert_errors(errors.clone());
-
-        // return the evaluation result
-        let model_reference = self
+        let model = self
             .eval_cache
-            .get(path.as_ref())
-            .map(|model| output::ModelReference::new(model, &self.eval_cache))
-            .expect("it has already been loaded previously");
+            .get_entry(path.as_ref())
+            .expect("eval_model populates cache for requested path and dependencies");
 
-        if errors.is_empty() {
-            Ok(model_reference)
-        } else {
-            Err(PartialResultWithErrors {
-                result: Some(model_reference),
-                errors,
-            })
+        match model {
+            Ok(model) => {
+                let model_ref = output::reference::ModelReference::new(model, &self.eval_cache);
+                Ok(model_ref)
+            }
+            Err(err) => {
+                let err_ref = output::reference::EvalErrorReference::new(err, &self.eval_cache);
+                Err(err_ref)
+            }
         }
     }
 
@@ -389,7 +382,7 @@ impl Runtime {
         parameter_name: &str,
     ) -> (
         Option<output::Tree<output::dependency::DependencyTreeValue>>,
-        Vec<OneilError>,
+        output::error::TreeError,
     ) {
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, None, parameter_name, &dependency_graph);
@@ -406,12 +399,12 @@ impl Runtime {
             dependency_graph: &output::DependencyGraph,
         ) -> (
             Option<output::Tree<output::dependency::DependencyTreeValue>>,
-            Vec<OneilError>,
+            output::error::TreeError,
         ) {
             let Some(value) =
                 runtime.get_dependency_tree_value(model_path, reference_name, parameter_name)
             else {
-                return (None, Vec::new());
+                return (None, output::error::TreeError::default());
             };
 
             let deps = dependency_graph
@@ -461,7 +454,7 @@ impl Runtime {
                 parameter_deps.chain(external_deps).unzip();
 
             let param_children = param_children.into_iter().flatten();
-            let errors = errors.into_iter().flatten().collect();
+            let errors: output::error::TreeError = errors.into_iter().flatten().collect();
 
             let children = builtin_deps.chain(param_children).collect();
 
@@ -483,7 +476,7 @@ impl Runtime {
         reference_name: Option<&str>,
         parameter_name: &str,
     ) -> Option<Result<output::dependency::DependencyTreeValue, output::error::TreeError>> {
-        let model = self.eval_cache.get(model_path)?;
+        let model = self.eval_cache.get_entry(model_path)?;
         let parameter = model.parameters.get(parameter_name)?;
 
         // TODO: this should only get errors for the parameter, not the entire model
@@ -520,7 +513,7 @@ impl Runtime {
         parameter_name: &str,
     ) -> (
         Option<output::Tree<output::dependency::ReferenceTreeValue>>,
-        Vec<OneilError>,
+        output::error::TreeError,
     ) {
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, parameter_name, &dependency_graph);
@@ -536,10 +529,10 @@ impl Runtime {
             dependency_graph: &output::DependencyGraph,
         ) -> (
             Option<output::Tree<output::dependency::ReferenceTreeValue>>,
-            Vec<OneilError>,
+            output::error::TreeError,
         ) {
             let Some(value) = runtime.get_reference_tree_value(model_path, parameter_name) else {
-                return (None, Vec::new());
+                return (None, output::error::TreeError::default());
             };
 
             let deps = dependency_graph
@@ -565,7 +558,7 @@ impl Runtime {
 
             let (children, errors): (Vec<_>, Vec<_>) = parameter_deps.chain(external_deps).unzip();
             let children = children.into_iter().flatten().collect();
-            let errors = errors.into_iter().flatten().collect();
+            let errors: output::error::TreeError = errors.into_iter().flatten().collect();
 
             match value {
                 Ok(value) => (Some(output::Tree::new(value, children)), errors),
@@ -584,7 +577,7 @@ impl Runtime {
         model_path: &Path,
         parameter_name: &str,
     ) -> Option<Result<output::dependency::ReferenceTreeValue, output::error::TreeError>> {
-        let model = self.eval_cache.get(model_path)?;
+        let model = self.eval_cache.get_entry(model_path)?;
         let parameter = model.parameters.get(parameter_name)?;
 
         // TODO: this should only get errors for the parameter, not the entire model
@@ -644,8 +637,12 @@ impl model_resolver::ExternalResolutionContext for Runtime {
 }
 
 impl eval::ExternalEvaluationContext for Runtime {
-    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<&ir::Model> {
-        self.ir_cache.get(path.as_ref())
+    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<Result<&ir::Model, IrLoadError>> {
+        let result = self.ir_cache.get_entry(path.as_ref())?;
+        match result {
+            Ok(ir) => Some(Ok(ir)),
+            Err(_error) => Some(Err(IrLoadError)),
+        }
     }
 
     fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&Value> {
