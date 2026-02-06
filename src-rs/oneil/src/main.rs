@@ -23,18 +23,18 @@ use crate::{
         BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, IndependentArgs, TestArgs,
         TreeArgs,
     },
+    print_debug_ir::IrPrintConfig,
     print_independents::IndependentPrintConfig,
-    print_ir::IrPrintConfig,
     print_model_result::{ModelPrintConfig, TestPrintConfig},
     print_tree::TreePrintConfig,
 };
 
 mod command;
-mod print_ast;
+mod print_debug_ast;
+mod print_debug_ir;
 mod print_debug_model_result;
 mod print_error;
 mod print_independents;
-mod print_ir;
 mod print_model_result;
 mod print_tree;
 mod print_utils;
@@ -96,7 +96,7 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
         let ast_result = runtime.load_ast(file);
 
         match ast_result {
-            Ok(ast) => print_ast::print(ast, print_debug),
+            Ok(ast) => print_debug_ast::print(ast, print_debug),
             Err(output::error::ParseError::ParseErrors {
                 partial_ast,
                 errors,
@@ -107,7 +107,7 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
                 }
 
                 if display_partial {
-                    print_ast::print(&partial_ast, print_debug);
+                    print_debug_ast::print(&partial_ast, print_debug);
                 }
             }
             Err(output::error::ParseError::File(error)) => {
@@ -129,7 +129,7 @@ fn handle_print_ir(file: &Path, display_partial: bool, recursive: bool) {
 
     let ir_result = runtime.load_ir(file);
 
-    print_ir::print(ir_result, &ir_print_config);
+    print_debug_ir::print(ir_result, &ir_print_config);
 }
 
 /// Handles the `dev print-model-result` command.
