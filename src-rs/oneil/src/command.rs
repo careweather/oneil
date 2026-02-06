@@ -322,6 +322,13 @@ pub enum DevCommand {
         /// before encountering errors. Useful for debugging model evaluation issues.
         #[arg(long)]
         display_partial: bool,
+
+        /// Print submodel and reference results recursively
+        ///
+        /// By default, only the top model result is printed. When enabled,
+        /// nested model results are also printed.
+        #[arg(long, short = 'r', default_value_t = false)]
+        recursive: bool,
     },
 }
 

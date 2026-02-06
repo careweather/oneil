@@ -174,6 +174,12 @@ impl<'result> EvalErrorReference<'result> {
             EvalError::Resolution(_) => panic!("evaluation failed"),
         }
     }
+
+    /// Returns all underlying evaluation errors for this model as a list of [`OneilError`]s.
+    #[must_use]
+    pub fn model_errors(&self) -> Vec<OneilError> {
+        self.eval_error.to_vec()
+    }
 }
 
 /// A reference to a resolved IR model within a model hierarchy.
