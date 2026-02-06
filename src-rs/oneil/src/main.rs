@@ -119,7 +119,7 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
 fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
     let mut runtime = Runtime::new();
 
-    let ir_result = runtime.load_ir_for_model_and_dependencies(file);
+    let ir_result = runtime.load_ir(file);
 
     match ir_result {
         Ok(ir_models) => print_ir::print(ir_models, print_debug),
