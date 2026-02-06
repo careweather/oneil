@@ -24,18 +24,13 @@ pub struct ModelResolutionResult {
     ast_loaded: bool,
 }
 
-impl Default for ModelResolutionResult {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ModelResolutionResult {
     /// Creates an empty resolution result with an empty model and
     /// no resolution or circular dependency errors.
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(model_path: ir::ModelPath) -> Self {
         let empty_model = ir::Model::new(
+            model_path,
             IndexMap::new(),
             IndexMap::new(),
             IndexMap::new(),
@@ -160,8 +155,10 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     pub fn push_active_model(&mut self, model_path: &ir::ModelPath) {
         self.active_models.push(model_path.clone());
         self.visited_models.insert(model_path.clone());
-        self.model_results
-            .insert(model_path.clone(), ModelResolutionResult::new());
+        self.model_results.insert(
+            model_path.clone(),
+            ModelResolutionResult::new(model_path.clone()),
+        );
     }
 
     /// Deactivates a model.

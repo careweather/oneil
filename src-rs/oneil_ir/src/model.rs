@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 
 use crate::{
+    ModelPath,
     model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
     parameter::{Parameter, ParameterName},
     python_import::PythonImport,
@@ -13,6 +14,7 @@ use crate::{
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
+    path: ModelPath,
     python_imports: IndexMap<PythonPath, PythonImport>,
     submodels: IndexMap<SubmodelName, SubmodelImport>,
     references: IndexMap<ReferenceName, ReferenceImport>,
@@ -24,6 +26,7 @@ impl Model {
     /// Creates a new model with the specified components.
     #[must_use]
     pub const fn new(
+        path: ModelPath,
         python_imports: IndexMap<PythonPath, PythonImport>,
         submodels: IndexMap<SubmodelName, SubmodelImport>,
         references: IndexMap<ReferenceName, ReferenceImport>,
@@ -31,12 +34,19 @@ impl Model {
         tests: IndexMap<TestIndex, Test>,
     ) -> Self {
         Self {
+            path,
             python_imports,
             submodels,
             references,
             parameters,
             tests,
         }
+    }
+
+    /// Returns the path of this model.
+    #[must_use]
+    pub const fn get_path(&self) -> &ModelPath {
+        &self.path
     }
 
     /// Returns a reference to the set of Python imports for this model.

@@ -1,66 +1,129 @@
 //! Intermediate Representation (IR) printing functionality for the Oneil CLI
 
-use std::path::PathBuf;
-
-use indexmap::IndexMap;
-
 use anstream::println;
-use oneil_runtime::output::ir;
+use indexmap::IndexMap;
+use oneil_runtime::output::{
+    ir,
+    reference::{ModelIrReference, ResolutionErrorReference},
+};
 
-/// Prints the IR in a hierarchical tree format for debugging
-pub fn print(model_collection: IndexMap<PathBuf, &ir::Model>, print_debug: bool) {
-    if print_debug {
-        println!("IR: {model_collection:?}");
+use crate::print_error;
+
+pub struct IrPrintConfig {
+    pub display_partial: bool,
+    pub recursive: bool,
+}
+
+/// Prints the IR in a hierarchical tree format for debugging.
+///
+/// Collects all errors from the model IR by traversing the hierarchy. If there are errors, they
+/// are printed. If there are no errors or `display_partial` is true, the IR is displayed.
+/// When displaying, only the top-level model IR is shown unless `recursive` is true.
+pub fn print(
+    ir_result: Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>,
+    ir_print_config: &IrPrintConfig,
+) {
+    let errors = collect_errors(&ir_result);
+
+    if !errors.is_empty() {
+        for error in &errors {
+            print_error::print(error, false);
+        }
+    }
+
+    let should_display_ir = errors.is_empty() || ir_print_config.display_partial;
+    if !should_display_ir {
         return;
     }
 
-    println!("ModelCollection");
+    let model_ref = match &ir_result {
+        Ok(r) => Some(*r),
+        Err(e) => e.partial_ir(),
+    };
 
-    // Print all models
-    println!("└── Models:");
-    if model_collection.is_empty() {
-        println!("    └── [none]");
-    } else {
-        for (i, (path, model)) in model_collection.iter().enumerate() {
-            let is_last = i == model_collection.len() - 1;
-            let prefix = if is_last { "└──" } else { "├──" };
-            print_model(path, model, 2, prefix);
-        }
+    if let Some(model_ref) = model_ref {
+        println!("ModelCollection");
+        println!("└── Models:");
+        let prefix = "└──";
+        print_model(model_ref, 2, prefix, ir_print_config.recursive);
     }
 }
 
-/// Prints a single model with its components
-fn print_model(path: &PathBuf, model: &ir::Model, indent: usize, prefix: &str) {
+/// Collects all errors from the IR result by traversing the model hierarchy.
+///
+/// It does a breadth-first search.
+fn collect_errors(
+    ir_result: &Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>,
+) -> Vec<oneil_shared::error::OneilError> {
+    let mut errors = Vec::new();
+
+    let mut queue: Vec<Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>> = match ir_result
+    {
+        Ok(r) => vec![Ok(*r)],
+        Err(e) => {
+            errors.extend(e.model_errors());
+            if let Some(partial) = e.partial_ir() {
+                vec![Ok(partial)]
+            } else {
+                vec![]
+            }
+        }
+    };
+
+    while let Some(r) = queue.pop() {
+        match r {
+            Err(e) => {
+                errors.extend(e.model_errors());
+                if let Some(partial) = e.partial_ir() {
+                    queue.push(Ok(partial));
+                }
+            }
+            Ok(model_ref) => {
+                // We only need to print the references, since every submodel is a reference
+                for nested in model_ref.references().values() {
+                    queue.push(*nested);
+                }
+            }
+        }
+    }
+
+    errors
+}
+
+/// Prints a single model with its components.
+///
+/// When `recursive` is true and `model_ref` is `Some`, also prints nested submodels and references.
+fn print_model(model_ref: ModelIrReference<'_>, indent: usize, prefix: &str, recursive: bool) {
     println!(
         "{}    {}Model: \"{}\"",
         "  ".repeat(indent),
         prefix,
-        path.display()
+        model_ref.path().as_ref().display()
     );
 
     let indent = indent + 2;
     let mut sections = Vec::new();
 
     // Collect submodels
-    let submodels = model.get_submodels();
+    let submodels = model_ref.submodels();
     if !submodels.is_empty() {
         sections.push(("Submodels", submodels.len()));
     }
 
     // Collect parameters
-    let parameters = model.get_parameters();
+    let parameters = model_ref.parameters();
     if !parameters.is_empty() {
         sections.push(("Parameters", parameters.len()));
     }
 
     // Collect references
-    let references = model.get_references();
+    let references = model_ref.references();
     if !references.is_empty() {
         sections.push(("References", references.len()));
     }
 
     // Collect tests
-    let tests = model.get_tests();
+    let tests = model_ref.tests();
     if !tests.is_empty() {
         sections.push(("Tests", tests.len()));
     }
@@ -78,17 +141,36 @@ fn print_model(path: &PathBuf, model: &ir::Model, indent: usize, prefix: &str) {
         );
 
         match *section_name {
-            "Submodels" => print_submodels(submodels, indent + 2),
-            "Parameters" => print_parameters(parameters, indent + 2),
-            "References" => print_references(references, indent + 2),
-            "Tests" => print_tests(tests, indent + 2),
+            "Submodels" => print_submodels(&submodels, indent + 2),
+            "Parameters" => print_parameters(&parameters, indent + 2),
+            "References" => print_references(&references, indent + 2),
+            "Tests" => print_tests(&tests, indent + 2),
             _ => {}
+        }
+    }
+
+    if recursive {
+        // Get all the references that have valid IR
+        let refs_to_print: Vec<_> = model_ref
+            .references()
+            .values()
+            .filter_map(|r| match r {
+                Ok(m) => Some(*m),
+                Err(e) => e.partial_ir(),
+            })
+            .collect();
+
+        // Print the references
+        for (i, nested_ref) in refs_to_print.iter().enumerate() {
+            let is_last = i == refs_to_print.len() - 1;
+            let nested_prefix = if is_last { "└──" } else { "├──" };
+            print_model(*nested_ref, indent + 2, nested_prefix, recursive);
         }
     }
 }
 
-/// Prints submodels
-fn print_submodels(submodels: &IndexMap<ir::SubmodelName, ir::SubmodelImport>, indent: usize) {
+/// Prints submodels, showing the reference path each submodel refers to.
+fn print_submodels(submodels: &IndexMap<&ir::SubmodelName, &ir::SubmodelImport>, indent: usize) {
     for (i, (identifier, submodel)) in submodels.iter().enumerate() {
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -103,22 +185,35 @@ fn print_submodels(submodels: &IndexMap<ir::SubmodelName, ir::SubmodelImport>, i
 }
 
 /// Prints submodels
-fn print_references(references: &IndexMap<ir::ReferenceName, ir::ReferenceImport>, indent: usize) {
+fn print_references(
+    references: &IndexMap<
+        &ir::ReferenceName,
+        Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>,
+    >,
+    indent: usize,
+) {
     for (i, (identifier, reference)) in references.iter().enumerate() {
-        let is_last = i == references.len() - 1;
-        let prefix = if is_last { "└──" } else { "├──" };
-        println!(
-            "{}    {}Reference: \"{}\" -> \"{}\"",
-            "  ".repeat(indent),
-            prefix,
-            identifier.as_str(),
-            reference.path().as_ref().display()
-        );
+        let path = match reference {
+            Ok(reference) => Some(reference.path()),
+            Err(e) => e.partial_ir().map(|r| r.path()),
+        };
+
+        if let Some(path) = path {
+            let is_last = i == references.len() - 1;
+            let prefix = if is_last { "└──" } else { "├──" };
+            println!(
+                "{}    {}Reference: \"{}\" -> \"{}\"",
+                "  ".repeat(indent),
+                prefix,
+                identifier.as_str(),
+                path.as_ref().display()
+            );
+        }
     }
 }
 
 /// Prints parameters
-fn print_parameters(parameters: &IndexMap<ir::ParameterName, ir::Parameter>, indent: usize) {
+fn print_parameters(parameters: &IndexMap<&ir::ParameterName, &ir::Parameter>, indent: usize) {
     for (i, (parameter_name, parameter)) in parameters.iter().enumerate() {
         let is_last = i == parameters.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -396,16 +491,11 @@ fn print_unit(unit: &ir::CompositeUnit, indent: usize) {
 }
 
 /// Prints tests
-fn print_tests(tests: &IndexMap<ir::TestIndex, ir::Test>, indent: usize) {
-    for (i, (test_index, test)) in tests.iter().enumerate() {
+fn print_tests(tests: &Vec<&ir::Test>, indent: usize) {
+    for (i, test) in tests.iter().enumerate() {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        println!(
-            "{}    {}Test {:?}:",
-            "  ".repeat(indent),
-            prefix,
-            test_index
-        );
+        println!("{}    {}Test {:?}:", "  ".repeat(indent), prefix, i + 1);
         print_test(test, indent + 2);
     }
 }
