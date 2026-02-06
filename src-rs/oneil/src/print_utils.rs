@@ -1,7 +1,7 @@
 //! Shared printing utilities for the Oneil CLI
 
 use anstream::print;
-use oneil_eval::value::{self, Value};
+use oneil_runtime::output::value::{self, Value};
 
 use crate::stylesheet;
 

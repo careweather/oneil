@@ -16,7 +16,7 @@ use std::{
 use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use notify::Watcher;
-use oneil_runtime::Runtime;
+use oneil_runtime::{Runtime, output};
 
 use crate::{
     command::{
@@ -94,18 +94,22 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
 
         match ast_result {
             Ok(ast) => print_ast::print(ast, print_debug),
-            Err(partial_result_with_errors) => {
-                let partial_result = partial_result_with_errors.result;
-                let errors = partial_result_with_errors.errors;
-
+            Err(output::error::ParseError::ParseErrors {
+                partial_ast,
+                errors,
+            }) => {
                 for error in errors {
                     print_error::print(&error, print_debug);
                     eprintln!();
                 }
 
-                if display_partial && let Some(partial_result) = partial_result {
-                    print_ast::print(&partial_result, print_debug);
+                if display_partial {
+                    print_ast::print(&partial_ast, print_debug);
                 }
+            }
+            Err(output::error::ParseError::File(error)) => {
+                print_error::print(&error.error, print_debug);
+                eprintln!();
             }
         }
     }
@@ -190,12 +194,12 @@ fn handle_eval_command(args: EvalArgs) {
         no_parameters,
     };
 
-    let builtins = create_builtins();
+    let mut runtime = Runtime::new();
 
     if watch {
-        watch_model(&file, &builtins, &model_print_config);
+        watch_model(&file, &mut runtime, &model_print_config);
     } else {
-        let (eval_context, _watch_paths) = eval_model(&file, &builtins);
+        let (eval_context, _watch_paths) = eval_model(&file, &mut runtime);
 
         if let Some(eval_context) = eval_context {
             let model_result = eval_context
@@ -207,11 +211,7 @@ fn handle_eval_command(args: EvalArgs) {
     }
 }
 
-fn watch_model<F: BuiltinFunction + Clone>(
-    file: &Path,
-    builtins: &Builtins<F>,
-    model_print_config: &ModelPrintConfig,
-) {
+fn watch_model(file: &Path, runtime: &mut Runtime, model_print_config: &ModelPrintConfig) {
     let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
 
     let mut watcher = match notify::recommended_watcher(tx) {
@@ -229,7 +229,7 @@ fn watch_model<F: BuiltinFunction + Clone>(
     clear_screen();
     let mut watch_paths = HashSet::new();
 
-    let (eval_context, new_watch_paths) = eval_model(file, builtins);
+    let (eval_context, new_watch_paths) = eval_model(file, runtime);
 
     if let Some(eval_context) = eval_context {
         let model_result = eval_context
@@ -250,7 +250,7 @@ fn watch_model<F: BuiltinFunction + Clone>(
                 notify::EventKind::Modify(_) => {
                     clear_screen();
 
-                    let (eval_context, new_watch_paths) = eval_model(file, builtins);
+                    let (eval_context, new_watch_paths) = eval_model(file, runtime);
 
                     if let Some(eval_context) = eval_context {
                         let model_result = eval_context
@@ -280,10 +280,13 @@ fn watch_model<F: BuiltinFunction + Clone>(
     }
 }
 
-fn eval_model<F: BuiltinFunction + Clone>(
+fn eval_model(
     file: &Path,
-    builtins: &Builtins<F>,
-) -> (Option<EvalContext<F>>, HashSet<PathBuf>) {
+    runtime: &mut Runtime,
+) -> (
+    Option<output::reference::ModelReference<'_>>,
+    HashSet<PathBuf>,
+) {
     let model_collection =
         oneil_model_resolver::load_model(file, builtins, &mut file_parser::FileLoader);
     let model_collection = match model_collection {
