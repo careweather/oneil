@@ -2,7 +2,11 @@ use std::path::Path;
 
 use anstream::{eprintln, print, println};
 use indexmap::{IndexMap, IndexSet};
-use oneil_runtime::output::{reference::ModelReference, value::Value};
+use oneil_runtime::output::{
+    eval::{DebugInfo, Parameter, PrintLevel, TestResult},
+    reference::ModelReference,
+    value::Value,
+};
 use oneil_shared::span::Span;
 
 use crate::{
@@ -283,10 +287,10 @@ fn get_parameter_from_model<'result>(
         reason = "this is an internal recursive function, we keep it here for clarity"
     )]
     fn recurse(
-        model_ref: eval_result::ModelReference<'_>,
+        model_ref: ModelReference<'_>,
         parameter: String,
         mut param_vec: Vec<String>,
-    ) -> Option<&eval_result::Parameter> {
+    ) -> Option<&Parameter> {
         // note that we're popping the last submodel since that's the
         // top-most submodel
         let Some(submodel) = param_vec.pop() else {
@@ -307,7 +311,7 @@ fn get_parameter_from_model<'result>(
 }
 
 fn print_parameters_by_filter(
-    model_ref: eval_result::ModelReference<'_>,
+    model_ref: ModelReference<'_>,
     print_debug_info: bool,
     model_config: &ModelPrintConfig,
 ) {
@@ -346,10 +350,10 @@ fn print_parameters_by_filter(
 }
 
 fn get_model_parameters_by_filter(
-    model_ref: eval_result::ModelReference<'_>,
+    model_ref: ModelReference<'_>,
     print_level: PrintMode,
     recursive: bool,
-) -> IndexMap<&Path, Vec<&eval_result::Parameter>> {
+) -> IndexMap<&Path, Vec<&Parameter>> {
     return recurse(model_ref, print_level, recursive, IndexMap::new());
 
     #[expect(
@@ -357,11 +361,11 @@ fn get_model_parameters_by_filter(
         reason = "this is an internal recursive function, we keep it here for clarity"
     )]
     fn recurse<'result>(
-        model_ref: eval_result::ModelReference<'result>,
+        model_ref: ModelReference<'result>,
         print_level: PrintMode,
         recursive: bool,
-        mut parameters: IndexMap<&'result Path, Vec<&'result eval_result::Parameter>>,
-    ) -> IndexMap<&'result Path, Vec<&'result eval_result::Parameter>> {
+        mut parameters: IndexMap<&'result Path, Vec<&'result Parameter>>,
+    ) -> IndexMap<&'result Path, Vec<&'result Parameter>> {
         let model_parameters = model_ref.parameters();
         let parameters_to_print: Vec<_> = match print_level {
             PrintMode::All => model_parameters
@@ -371,12 +375,12 @@ fn get_model_parameters_by_filter(
                 .collect(),
             PrintMode::Trace => model_parameters
                 .values()
-                .filter(|parameter| parameter.should_print(eval_result::PrintLevel::Trace))
+                .filter(|parameter| parameter.should_print(PrintLevel::Trace))
                 .map(|p| &**p)
                 .collect(),
             PrintMode::Performance => model_parameters
                 .values()
-                .filter(|parameter| parameter.should_print(eval_result::PrintLevel::Performance))
+                .filter(|parameter| parameter.should_print(PrintLevel::Performance))
                 .map(|p| &**p)
                 .collect(),
         };
@@ -399,7 +403,7 @@ fn get_model_parameters_by_filter(
     }
 }
 
-fn print_parameter(parameter: &eval_result::Parameter, should_print_debug_info: bool) {
+fn print_parameter(parameter: &Parameter, should_print_debug_info: bool) {
     let styled_ident = stylesheet::PARAMETER_IDENTIFIER.style(&parameter.ident);
     print!("{styled_ident} = ");
 
@@ -413,7 +417,7 @@ fn print_parameter(parameter: &eval_result::Parameter, should_print_debug_info: 
     }
 }
 
-fn print_debug_info(debug_info: &eval_result::DebugInfo) {
+fn print_debug_info(debug_info: &DebugInfo) {
     let indent = 2;
     for (dependency_name, dependency_value) in &debug_info.builtin_dependency_values {
         print_variable_value(dependency_name, dependency_value, indent);
@@ -437,7 +441,7 @@ fn print_variable_value(name: &str, value: &Value, indent: usize) {
     println!();
 }
 
-fn print_all_tests(model_ref: eval_result::ModelReference<'_>, recursive: bool) {
+fn print_all_tests(model_ref: ModelReference<'_>, recursive: bool) {
     let model_path = model_ref.path();
     let tests = model_ref.tests();
 
@@ -482,11 +486,11 @@ fn print_all_tests(model_ref: eval_result::ModelReference<'_>, recursive: bool) 
         }
 
         match &test.result {
-            eval_result::TestResult::Passed => {
+            TestResult::Passed => {
                 let test_result_str = stylesheet::TESTS_PASS_COLOR.style("PASS");
                 println!("  Result: {test_result_str}");
             }
-            eval_result::TestResult::Failed { debug_info } => {
+            TestResult::Failed { debug_info } => {
                 let test_result_str = stylesheet::TESTS_FAIL_COLOR.style("FAIL");
                 println!("  Result: {test_result_str}");
                 print_debug_info(debug_info);
