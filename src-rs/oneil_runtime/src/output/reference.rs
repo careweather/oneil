@@ -34,7 +34,7 @@ impl<'result> ModelReference<'result> {
         self.model.path.as_path()
     }
 
-    /// Returns a map of submodel names to their model references.
+    /// Returns a map of submodel names to their model references or evaluation errors.
     ///
     /// # Panics
     ///
@@ -43,28 +43,30 @@ impl<'result> ModelReference<'result> {
     /// the case as long as creating the `EvalResult`
     /// resolves successfully.
     #[must_use]
-    pub fn submodels(&self) -> IndexMap<&'result str, Self> {
+    pub fn submodels(&self) -> IndexMap<&'result str, Result<Self, EvalErrorReference<'result>>> {
         self.model
             .submodels
             .iter()
             .map(|(name, path)| {
-                let model = self
+                let entry = self
                     .eval_cache
-                    .get(path)
-                    .expect("submodel should be visited");
+                    .get_entry(path)
+                    .expect("submodel should be in cache");
 
-                (
-                    name.as_str(),
-                    Self {
+                let result = entry
+                    .as_ref()
+                    .map(|model| Self {
                         model,
                         eval_cache: self.eval_cache,
-                    },
-                )
+                    })
+                    .map_err(|eval_error| EvalErrorReference::new(eval_error, self.eval_cache));
+
+                (name.as_str(), result)
             })
             .collect()
     }
 
-    /// Returns a map of reference names to their model references.
+    /// Returns a map of reference names to their model references or evaluation errors.
     ///
     /// # Panics
     ///
@@ -73,23 +75,23 @@ impl<'result> ModelReference<'result> {
     /// the case as long as creating the `EvalResult`
     /// resolves successfully.
     #[must_use]
-    pub fn references(&self) -> IndexMap<&'result str, Self> {
+    pub fn references(&self) -> IndexMap<&'result str, Result<Self, EvalErrorReference<'result>>> {
         self.model
             .references
             .iter()
             .map(|(name, path)| {
-                let model = self
+                let entry = self
                     .eval_cache
-                    .get(path)
-                    .expect("reference should be visited");
-
-                (
-                    name.as_str(),
-                    Self {
+                    .get_entry(path)
+                    .expect("reference should be in cache");
+                let result = entry
+                    .as_ref()
+                    .map(|model| Self {
                         model,
                         eval_cache: self.eval_cache,
-                    },
-                )
+                    })
+                    .map_err(|eval_error| EvalErrorReference::new(eval_error, self.eval_cache));
+                (name.as_str(), result)
             })
             .collect()
     }
