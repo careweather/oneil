@@ -24,6 +24,7 @@ use crate::{
         TreeArgs,
     },
     print_independents::IndependentPrintConfig,
+    print_ir::IrPrintConfig,
     print_model_result::{ModelPrintConfig, TestPrintConfig},
     print_tree::TreePrintConfig,
 };
@@ -69,8 +70,8 @@ fn handle_dev_command(command: DevCommand) {
         DevCommand::PrintIr {
             file,
             display_partial,
-            print_debug,
-        } => handle_print_ir(&file, display_partial, print_debug),
+            recursive,
+        } => handle_print_ir(&file, display_partial, recursive),
         DevCommand::PrintModelResult {
             file,
             display_partial,
@@ -116,27 +117,17 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
 }
 
 /// Handles the `dev print-ir` command.
-fn handle_print_ir(file: &Path, display_partial: bool, print_debug: bool) {
+fn handle_print_ir(file: &Path, display_partial: bool, recursive: bool) {
+    let ir_print_config = IrPrintConfig {
+        display_partial,
+        recursive,
+    };
+
     let mut runtime = Runtime::new();
 
     let ir_result = runtime.load_ir(file);
 
-    match ir_result {
-        Ok(ir_models) => print_ir::print(ir_models, print_debug),
-        Err(partial_result_with_errors) => {
-            let partial_result = partial_result_with_errors.result;
-            let errors = partial_result_with_errors.errors;
-
-            for error in errors {
-                print_error::print(&error, print_debug);
-                eprintln!();
-            }
-
-            if display_partial {
-                print_ir::print(partial_result, print_debug);
-            }
-        }
-    }
+    print_ir::print(ir_result, &ir_print_config);
 }
 
 /// Handles the `dev print-model-result` command.

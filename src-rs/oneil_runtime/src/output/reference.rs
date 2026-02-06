@@ -193,6 +193,12 @@ impl<'result> ModelIrReference<'result> {
         Self { model, ir_cache }
     }
 
+    /// Returns the path of this model.
+    #[must_use]
+    pub const fn path(&self) -> &'result ir::ModelPath {
+        self.model.get_path()
+    }
+
     /// Returns a map of submodel names to their IR model references or resolution errors.
     ///
     /// # Panics
@@ -200,33 +206,8 @@ impl<'result> ModelIrReference<'result> {
     /// Panics if any submodel's reference has not been visited and
     /// added to the IR cache.
     #[must_use]
-    pub fn submodels(
-        &self,
-    ) -> IndexMap<&'result str, Result<Self, ResolutionErrorReference<'result>>> {
-        self.model
-            .get_submodels()
-            .iter()
-            .map(|(name, submodel_import)| {
-                let ref_import = self
-                    .model
-                    .get_reference(submodel_import.reference_name())
-                    .expect("submodel should have reference");
-                let entry = self
-                    .ir_cache
-                    .get_entry(ref_import.path().as_ref())
-                    .expect("submodel should be in cache");
-                let result = entry
-                    .as_ref()
-                    .map(|model| Self {
-                        model,
-                        ir_cache: self.ir_cache,
-                    })
-                    .map_err(|resolution_error| {
-                        ResolutionErrorReference::new(resolution_error, self.ir_cache)
-                    });
-                (name.as_str(), result)
-            })
-            .collect()
+    pub fn submodels(&self) -> IndexMap<&'result ir::SubmodelName, &'result ir::SubmodelImport> {
+        self.model.get_submodels().iter().collect()
     }
 
     /// Returns a map of reference names to their IR model references or resolution errors.
@@ -238,7 +219,7 @@ impl<'result> ModelIrReference<'result> {
     #[must_use]
     pub fn references(
         &self,
-    ) -> IndexMap<&'result str, Result<Self, ResolutionErrorReference<'result>>> {
+    ) -> IndexMap<&'result ir::ReferenceName, Result<Self, ResolutionErrorReference<'result>>> {
         self.model
             .get_references()
             .iter()
@@ -247,6 +228,7 @@ impl<'result> ModelIrReference<'result> {
                     .ir_cache
                     .get_entry(ref_import.path().as_ref())
                     .expect("reference should be in cache");
+
                 let result = entry
                     .as_ref()
                     .map(|model| Self {
@@ -256,7 +238,8 @@ impl<'result> ModelIrReference<'result> {
                     .map_err(|resolution_error| {
                         ResolutionErrorReference::new(resolution_error, self.ir_cache)
                     });
-                (name.as_str(), result)
+
+                (name, result)
             })
             .collect()
     }
@@ -306,5 +289,11 @@ impl<'result> ResolutionErrorReference<'result> {
             }
             ResolutionError::Parse(_) => None,
         }
+    }
+
+    /// Returns all underlying resolution errors for this model as a list of [`OneilError`]s.
+    #[must_use]
+    pub fn model_errors(&self) -> Vec<OneilError> {
+        self.resolution_error.to_vec()
     }
 }

@@ -300,9 +300,12 @@ pub enum DevCommand {
         #[arg(long)]
         display_partial: bool,
 
-        /// Print the output in debug format
-        #[arg(long)]
-        print_debug: bool,
+        /// Print submodel IR recursively
+        ///
+        /// By default, only the top model IR is printed. When enabled,
+        /// submodel IR is also printed.
+        #[arg(long, short = 'r')]
+        recursive: bool,
     },
     /// Print the results of evaluating an Oneil model
     ///
