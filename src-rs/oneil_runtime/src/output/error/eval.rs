@@ -18,7 +18,7 @@ pub enum EvalError {
     /// Evaluation produced a partial result and parameter/test errors for one model.
     EvalErrors {
         /// The partial evaluation result for the model.
-        partial_result: output::Model,
+        partial_result: Box<output::Model>,
         /// Parameter errors (parameter name to list of errors).
         parameter_errors: IndexMap<String, Vec<OneilError>>,
         /// Test errors for the model.
@@ -31,8 +31,8 @@ impl EvalError {
     #[must_use]
     pub fn to_vec(&self) -> Vec<OneilError> {
         match self {
-            EvalError::Resolution(r) => r.to_vec(),
-            EvalError::EvalErrors {
+            Self::Resolution(r) => r.to_vec(),
+            Self::EvalErrors {
                 parameter_errors,
                 test_errors,
                 ..

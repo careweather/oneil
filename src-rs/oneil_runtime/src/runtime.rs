@@ -89,7 +89,7 @@ impl Runtime {
                     self.eval_cache.insert_err(
                         model_path,
                         output::error::EvalError::EvalErrors {
-                            partial_result: eval_errors.partial_result,
+                            partial_result: Box::new(eval_errors.partial_result),
                             parameter_errors,
                             test_errors,
                         },
@@ -212,7 +212,7 @@ impl Runtime {
                 self.ir_cache.insert_err(
                     model_path.clone(),
                     output::error::ResolutionError::ResolutionErrors {
-                        partial_ir: model,
+                        partial_ir: Box::new(model),
                         circular_dependency_errors: circular_dependency_oneil,
                         python_import_errors: python_map,
                         model_import_errors: model_import_map,
@@ -476,13 +476,37 @@ impl Runtime {
         reference_name: Option<&str>,
         parameter_name: &str,
     ) -> Option<Result<output::dependency::DependencyTreeValue, output::error::TreeError>> {
-        let model = self.eval_cache.get_entry(model_path)?;
-        let parameter = model.parameters.get(parameter_name)?;
+        let eval_result = self.eval_cache.get_entry(model_path)?;
 
-        // TODO: this should only get errors for the parameter, not the entire model
-        if let Some(errors) = self.eval_cache.get_errors(model_path) {
-            return Some(Err(errors.to_vec()));
-        }
+        // get the parameter from the model if it exists,
+        // or return parameter errors if they exist
+        let parameter = match eval_result {
+            Ok(model) => model.parameters.get(parameter_name)?,
+            Err(output::error::EvalError::Resolution(resolution_error)) => match resolution_error {
+                output::error::ResolutionError::ResolutionErrors {
+                    parameter_errors, ..
+                } => {
+                    return parameter_errors
+                        .get(parameter_name)
+                        .map(|errors| Err(errors.to_vec()));
+                }
+                output::error::ResolutionError::Parse(parse_error) => {
+                    return Some(Err(parse_error.to_vec()));
+                }
+            },
+            // it may be possible to recover the parameter from the partial result
+            Err(output::error::EvalError::EvalErrors {
+                partial_result,
+                parameter_errors,
+                ..
+            }) => {
+                if let Some(errors) = parameter_errors.get(parameter_name) {
+                    return Some(Err(errors.to_vec()));
+                }
+
+                partial_result.parameters.get(parameter_name)?
+            }
+        };
 
         let reference_name = reference_name.map(str::to_string);
         let parameter_name = parameter_name.to_string();
@@ -577,13 +601,37 @@ impl Runtime {
         model_path: &Path,
         parameter_name: &str,
     ) -> Option<Result<output::dependency::ReferenceTreeValue, output::error::TreeError>> {
-        let model = self.eval_cache.get_entry(model_path)?;
-        let parameter = model.parameters.get(parameter_name)?;
+        let eval_result = self.eval_cache.get_entry(model_path)?;
 
-        // TODO: this should only get errors for the parameter, not the entire model
-        if let Some(errors) = self.eval_cache.get_errors(model_path) {
-            return Some(Err(errors.to_vec()));
-        }
+        // get the parameter from the model if it exists,
+        // or return parameter errors if they exist
+        let parameter = match eval_result {
+            Ok(model) => model.parameters.get(parameter_name)?,
+            Err(output::error::EvalError::Resolution(resolution_error)) => match resolution_error {
+                output::error::ResolutionError::ResolutionErrors {
+                    parameter_errors, ..
+                } => {
+                    return parameter_errors
+                        .get(parameter_name)
+                        .map(|errors| Err(errors.to_vec()));
+                }
+                output::error::ResolutionError::Parse(parse_error) => {
+                    return Some(Err(parse_error.to_vec()));
+                }
+            },
+            // it may be possible to recover the parameter from the partial result
+            Err(output::error::EvalError::EvalErrors {
+                partial_result,
+                parameter_errors,
+                ..
+            }) => {
+                if let Some(errors) = parameter_errors.get(parameter_name) {
+                    return Some(Err(errors.to_vec()));
+                }
+
+                partial_result.parameters.get(parameter_name)?
+            }
+        };
 
         let model_path = model_path.to_path_buf();
 
@@ -667,8 +715,6 @@ impl eval::ExternalEvaluationContext for Runtime {
         self.builtins.builtin_prefixes()
     }
 }
-
-type IrModelMap<'runtime> = IndexMap<PathBuf, &'runtime ir::Model>;
 
 /// Error type for file loading failures.
 struct InternalIoError<'a> {

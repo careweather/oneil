@@ -1,6 +1,6 @@
 //! Error types for runtime output operations.
 
-mod eval;
+pub mod eval;
 mod file;
 mod parse;
 mod resolution;

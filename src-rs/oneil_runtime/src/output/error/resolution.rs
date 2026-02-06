@@ -13,6 +13,10 @@ use super::parse::ParseError;
 /// Either a parse error (e.g. source or AST could not be loaded) or a partial
 /// IR model together with circular dependency, python import, model import,
 /// parameter, and test resolution errors (as [`OneilError`]s).
+#[expect(
+    clippy::large_enum_variant,
+    reason = "aside from creating a whole new struct for `ResolutionErrors`, there is no other way to represent this error"
+)]
 #[derive(Clone, Debug)]
 pub enum ResolutionError {
     /// Resolution failed due to a parse error (source or AST loading).
@@ -21,7 +25,7 @@ pub enum ResolutionError {
     /// Resolution produced a (possibly partial) IR model and resolution errors.
     ResolutionErrors {
         /// The IR model (possibly partial).
-        partial_ir: ir::Model,
+        partial_ir: Box<ir::Model>,
         /// Circular dependency errors.
         circular_dependency_errors: Vec<OneilError>,
         /// Python import resolution errors.
@@ -40,8 +44,8 @@ impl ResolutionError {
     #[must_use]
     pub fn to_vec(&self) -> Vec<OneilError> {
         match self {
-            ResolutionError::Parse(p) => p.to_vec(),
-            ResolutionError::ResolutionErrors {
+            Self::Parse(p) => p.to_vec(),
+            Self::ResolutionErrors {
                 circular_dependency_errors,
                 python_import_errors,
                 model_import_errors,

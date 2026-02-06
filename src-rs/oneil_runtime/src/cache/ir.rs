@@ -43,7 +43,8 @@ impl IrCache {
 
     /// Returns the cached resolution error for `path`, if present.
     pub fn get_error(&self, path: &Path) -> Option<&ResolutionError> {
-        self.entries.get(path).and_then(|r| r.as_ref().err())
+        let r = self.entries.get(path)?;
+        r.as_ref().err()
     }
 
     /// Returns the full cached entry for `path`.

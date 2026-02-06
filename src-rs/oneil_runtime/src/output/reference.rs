@@ -1,3 +1,8 @@
+//! References into evaluation results and error contexts.
+//!
+//! Provides [`ModelReference`] for navigating evaluated models and
+//! [`EvalErrorReference`] for inspecting evaluation failures.
+
 use std::path::Path;
 
 use indexmap::IndexMap;
@@ -106,6 +111,11 @@ impl<'result> ModelReference<'result> {
     }
 }
 
+/// A reference to an evaluation error within a model hierarchy.
+///
+/// Allows inspecting partial results and error details (e.g. parameter
+/// or test errors) when evaluation of a model fails.
+#[derive(Debug, Clone, Copy)]
 pub struct EvalErrorReference<'result> {
     eval_error: &'result EvalError,
     eval_cache: &'result EvalCache,
