@@ -66,8 +66,7 @@ fn handle_dev_command(command: DevCommand) {
         DevCommand::PrintAst {
             files,
             display_partial,
-            print_debug,
-        } => handle_print_ast(&files, display_partial, print_debug),
+        } => handle_print_ast(&files, display_partial),
         DevCommand::PrintIr {
             file,
             display_partial,
@@ -84,7 +83,7 @@ fn handle_dev_command(command: DevCommand) {
 }
 
 /// Handles the `dev print-ast` command.
-fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool) {
+fn handle_print_ast(files: &[PathBuf], display_partial: bool) {
     let mut runtime = Runtime::new();
 
     let is_multiple_files = files.len() > 1;
@@ -96,22 +95,22 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, print_debug: bool)
         let ast_result = runtime.load_ast(file);
 
         match ast_result {
-            Ok(ast) => print_debug_ast::print(ast, print_debug),
+            Ok(ast) => print_debug_ast::print(ast),
             Err(output::error::ParseError::ParseErrors {
                 partial_ast,
                 errors,
             }) => {
                 for error in errors {
-                    print_error::print(&error, print_debug);
+                    print_error::print(&error, false);
                     eprintln!();
                 }
 
                 if display_partial {
-                    print_debug_ast::print(&partial_ast, print_debug);
+                    print_debug_ast::print(&partial_ast);
                 }
             }
             Err(output::error::ParseError::File(error)) => {
-                print_error::print(&error.error, print_debug);
+                print_error::print(&error.error, false);
                 eprintln!();
             }
         }

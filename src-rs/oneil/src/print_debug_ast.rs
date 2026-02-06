@@ -5,12 +5,8 @@ use oneil_runtime::output::ast;
 use anstream::println;
 
 /// Prints the AST in a hierarchical tree format for debugging
-pub fn print(ast: &ast::Model, print_debug: bool) {
-    if print_debug {
-        println!("AST: {ast:?}");
-    } else {
-        print_model(ast, 0);
-    }
+pub fn print(ast: &ast::Model) {
+    print_model(ast, 0);
 }
 
 /// Prints a model node with its declarations and sections
