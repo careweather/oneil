@@ -1,7 +1,7 @@
 use std::io::Error as IoError;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use oneil_eval::value::{Unit, Value};
 use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext, IrLoadError};
 use oneil_model_resolver as model_resolver;
@@ -48,7 +48,7 @@ impl Runtime {
     {
         // make sure the IR is loaded for the model and its dependencies
         // TODO: once caching works, evaluating the model should load the IR as it goes
-        let _ir_results = self.load_ir_for_model_and_dependencies(&path);
+        let _ir_results = self.load_ir(&path);
 
         // evaluate the model and its dependencies
         let eval_result = eval::eval_model(&path, self);
@@ -117,22 +117,26 @@ impl Runtime {
 
     /// Loads the IR for a model and all of its dependencies.
     ///
-    /// Returns a map from each loaded model path to either a reference to its IR
-    /// or a [`ResolutionError`](output::error::ResolutionError) if that model had
-    /// parse or resolution errors.
-    pub fn load_ir_for_model_and_dependencies(
+    /// Returns a [`ModelIrReference`](output::reference::ModelIrReference) for the
+    /// requested model on success, or a
+    /// [`ResolutionErrorReference`](output::reference::ResolutionErrorReference) if that
+    /// model had parse or resolution errors.
+    pub fn load_ir(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> IndexMap<PathBuf, Result<&ir::Model, output::error::ResolutionError>> {
+    ) -> Result<
+        output::reference::ModelIrReference<'_>,
+        output::reference::ResolutionErrorReference<'_>,
+    > {
         let results = model_resolver::load_model(&path, self);
-
-        let mut model_paths = IndexSet::new();
 
         for (model_path, result) in results {
             let model_path = model_path.as_ref().to_path_buf();
 
             let (model, model_errors, ast_loaded) = result.into_parts();
 
+            // If the AST failed to load during resolution, we insert
+            // the parse error that caused it to fail
             if !ast_loaded {
                 let parse_err = self
                     .ast_cache
@@ -143,7 +147,6 @@ impl Runtime {
                     model_path.clone(),
                     output::error::ResolutionError::Parse(parse_err.clone()),
                 );
-                model_paths.insert(model_path);
                 continue;
             }
 
@@ -223,23 +226,24 @@ impl Runtime {
             } else {
                 self.ir_cache.insert_ok(model_path.clone(), model);
             }
-            model_paths.insert(model_path);
         }
 
-        model_paths
-            .into_iter()
-            .map(|model_path| {
-                let entry = self
-                    .ir_cache
-                    .get_entry(&model_path)
-                    .expect("entry was inserted in this function");
-                let result = match entry {
-                    Ok(m) => Ok(m),
-                    Err(e) => Err(e.clone()),
-                };
-                (model_path, result)
-            })
-            .collect()
+        let entry = self
+            .ir_cache
+            .get_entry(path.as_ref())
+            .expect("entry was inserted in this function for the requested path");
+
+        match entry.as_ref() {
+            Ok(model) => Ok(output::reference::ModelIrReference::new(
+                model,
+                &self.ir_cache,
+            )),
+
+            Err(resolution_error) => Err(output::reference::ResolutionErrorReference::new(
+                resolution_error,
+                &self.ir_cache,
+            )),
+        }
     }
 
     /// Loads AST for a model.

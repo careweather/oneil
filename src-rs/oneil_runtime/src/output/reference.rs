@@ -184,28 +184,13 @@ impl<'result> EvalErrorReference<'result> {
 pub struct ModelIrReference<'result> {
     model: &'result ir::Model,
     ir_cache: &'result IrCache,
-    path: &'result Path,
 }
 
 impl<'result> ModelIrReference<'result> {
     /// Creates a new `ModelIrReference` for the given model, IR cache, and path.
     #[must_use]
-    pub const fn new(
-        model: &'result ir::Model,
-        ir_cache: &'result IrCache,
-        path: &'result Path,
-    ) -> Self {
-        Self {
-            model,
-            ir_cache,
-            path,
-        }
-    }
-
-    /// Returns the file path of this model.
-    #[must_use]
-    pub const fn path(&self) -> &'result Path {
-        self.path
+    pub const fn new(model: &'result ir::Model, ir_cache: &'result IrCache) -> Self {
+        Self { model, ir_cache }
     }
 
     /// Returns a map of submodel names to their IR model references or resolution errors.
@@ -226,20 +211,18 @@ impl<'result> ModelIrReference<'result> {
                     .model
                     .get_reference(submodel_import.reference_name())
                     .expect("submodel should have reference");
-                let path = ref_import.path().as_ref();
                 let entry = self
                     .ir_cache
-                    .get_entry(path)
+                    .get_entry(ref_import.path().as_ref())
                     .expect("submodel should be in cache");
                 let result = entry
                     .as_ref()
                     .map(|model| Self {
                         model,
                         ir_cache: self.ir_cache,
-                        path,
                     })
                     .map_err(|resolution_error| {
-                        ResolutionErrorReference::new(resolution_error, self.ir_cache, path)
+                        ResolutionErrorReference::new(resolution_error, self.ir_cache)
                     });
                 (name.as_str(), result)
             })
@@ -260,20 +243,18 @@ impl<'result> ModelIrReference<'result> {
             .get_references()
             .iter()
             .map(|(name, ref_import)| {
-                let path = ref_import.path().as_ref();
                 let entry = self
                     .ir_cache
-                    .get_entry(path)
+                    .get_entry(ref_import.path().as_ref())
                     .expect("reference should be in cache");
                 let result = entry
                     .as_ref()
                     .map(|model| Self {
                         model,
                         ir_cache: self.ir_cache,
-                        path,
                     })
                     .map_err(|resolution_error| {
-                        ResolutionErrorReference::new(resolution_error, self.ir_cache, path)
+                        ResolutionErrorReference::new(resolution_error, self.ir_cache)
                     });
                 (name.as_str(), result)
             })
@@ -301,7 +282,6 @@ impl<'result> ModelIrReference<'result> {
 pub struct ResolutionErrorReference<'result> {
     resolution_error: &'result ResolutionError,
     ir_cache: &'result IrCache,
-    path: &'result Path,
 }
 
 impl<'result> ResolutionErrorReference<'result> {
@@ -310,12 +290,10 @@ impl<'result> ResolutionErrorReference<'result> {
     pub const fn new(
         resolution_error: &'result ResolutionError,
         ir_cache: &'result IrCache,
-        path: &'result Path,
     ) -> Self {
         Self {
             resolution_error,
             ir_cache,
-            path,
         }
     }
 
@@ -323,85 +301,8 @@ impl<'result> ResolutionErrorReference<'result> {
     #[must_use]
     pub fn partial_ir(&self) -> Option<ModelIrReference<'result>> {
         match self.resolution_error {
-            ResolutionError::ResolutionErrors { partial_ir, .. } => Some(ModelIrReference::new(
-                partial_ir.as_ref(),
-                self.ir_cache,
-                self.path,
-            )),
-            ResolutionError::Parse(_) => None,
-        }
-    }
-
-    /// Returns the circular dependency errors for this model, if any.
-    #[must_use]
-    pub fn circular_dependency_errors(&self) -> Option<Vec<&'result OneilError>> {
-        match self.resolution_error {
-            ResolutionError::ResolutionErrors {
-                circular_dependency_errors,
-                ..
-            } => Some(circular_dependency_errors.iter().collect()),
-            ResolutionError::Parse(_) => None,
-        }
-    }
-
-    /// Returns the Python import errors for this model, if any.
-    #[must_use]
-    pub fn python_import_errors(
-        &self,
-    ) -> Option<IndexMap<&'result Path, Vec<&'result OneilError>>> {
-        match self.resolution_error {
-            ResolutionError::ResolutionErrors {
-                python_import_errors,
-                ..
-            } => Some(
-                python_import_errors
-                    .iter()
-                    .map(|(path, errors)| (path.as_ref(), errors.iter().collect()))
-                    .collect(),
-            ),
-            ResolutionError::Parse(_) => None,
-        }
-    }
-
-    /// Returns the model import errors for this model, if any.
-    #[must_use]
-    pub fn model_import_errors(&self) -> Option<IndexMap<&'result Path, Vec<&'result OneilError>>> {
-        match self.resolution_error {
-            ResolutionError::ResolutionErrors {
-                model_import_errors,
-                ..
-            } => Some(
-                model_import_errors
-                    .iter()
-                    .map(|(path, errors)| (path.as_ref(), errors.iter().collect()))
-                    .collect(),
-            ),
-            ResolutionError::Parse(_) => None,
-        }
-    }
-
-    /// Returns the parameter errors for this model, if any.
-    #[must_use]
-    pub fn parameter_errors(&self) -> Option<IndexMap<&'result str, Vec<&'result OneilError>>> {
-        match self.resolution_error {
-            ResolutionError::ResolutionErrors {
-                parameter_errors, ..
-            } => Some(
-                parameter_errors
-                    .iter()
-                    .map(|(name, errors)| (name.as_str(), errors.iter().collect()))
-                    .collect(),
-            ),
-            ResolutionError::Parse(_) => None,
-        }
-    }
-
-    /// Returns the test errors for this model, if any.
-    #[must_use]
-    pub fn test_errors(&self) -> Option<Vec<&'result OneilError>> {
-        match self.resolution_error {
-            ResolutionError::ResolutionErrors { test_errors, .. } => {
-                Some(test_errors.iter().collect())
+            ResolutionError::ResolutionErrors { partial_ir, .. } => {
+                Some(ModelIrReference::new(partial_ir.as_ref(), self.ir_cache))
             }
             ResolutionError::Parse(_) => None,
         }
