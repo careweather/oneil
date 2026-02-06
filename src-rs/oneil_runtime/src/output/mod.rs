@@ -3,12 +3,11 @@
 pub mod dependency;
 pub mod error;
 mod partial;
-mod reference;
+pub mod reference;
 mod tree;
 
 pub use dependency::DependencyGraph;
 pub use partial::PartialResultWithErrors;
-pub use reference::ModelReference;
 pub use tree::Tree;
 
 pub use oneil_ast as ast;

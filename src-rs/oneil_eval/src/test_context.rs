@@ -13,7 +13,7 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    context::ExternalEvaluationContext,
+    context::{ExternalEvaluationContext, IrLoadError},
     error::EvalError,
     value::{Unit, Value},
 };
@@ -54,7 +54,7 @@ impl Default for TestExternalContext {
 }
 
 impl ExternalEvaluationContext for TestExternalContext {
-    fn lookup_ir(&self, _path: impl AsRef<Path>) -> Option<&ir::Model> {
+    fn lookup_ir(&self, _path: impl AsRef<Path>) -> Option<Result<&ir::Model, IrLoadError>> {
         panic!("no tests currently use this method")
     }
 

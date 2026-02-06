@@ -23,3 +23,14 @@ pub enum ParseError {
         partial_ast: Box<Model>,
     },
 }
+
+impl ParseError {
+    /// Returns all underlying errors as a list of [`OneilError`]s.
+    #[must_use]
+    pub fn to_vec(&self) -> Vec<OneilError> {
+        match self {
+            ParseError::File(f) => f.to_vec(),
+            ParseError::ParseErrors { errors, .. } => errors.clone(),
+        }
+    }
+}
