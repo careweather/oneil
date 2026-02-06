@@ -1,7 +1,7 @@
 //! Print independent parameters from evaluated models.
 
 use anstream::{print, println};
-use oneil_eval::output::eval_result::{self, EvalResult};
+use oneil_runtime::output::reference::{self, ModelReference};
 
 use crate::{print_utils, stylesheet};
 
@@ -22,14 +22,13 @@ pub struct IndependentPrintConfig {
 /// * `dependency_graph` - The dependency graph to determine which parameters are independent
 /// * `print_values` - Whether to print the parameter values
 /// * `recursive` - Whether to print independent parameters in submodels as well
-pub fn print(model_result: &EvalResult, independent_print_config: &IndependentPrintConfig) {
-    let top_model = model_result.get_top_model();
-    print_model_independents(top_model, independent_print_config);
+pub fn print(model_result: &ModelReference<'_>, independent_print_config: &IndependentPrintConfig) {
+    print_model_independents(model_result, independent_print_config);
 }
 
 /// Recursively prints independent parameters for a model and its submodels.
 fn print_model_independents(
-    model_ref: eval_result::ModelReference<'_>,
+    model_ref: &ModelReference<'_>,
     independent_print_config: &IndependentPrintConfig,
 ) {
     if independent_print_config.recursive {
@@ -60,9 +59,7 @@ fn print_model_independents(
 ///
 /// A parameter is independent if it doesn't have any parameter dependencies
 /// or external dependencies (it may still have builtin dependencies).
-fn get_independent_parameters(
-    model_ref: eval_result::ModelReference<'_>,
-) -> Vec<&eval_result::Parameter> {
+fn get_independent_parameters(model_ref: ModelReference<'_>) -> Vec<&output::Parameter> {
     let parameters = model_ref.parameters();
 
     parameters
