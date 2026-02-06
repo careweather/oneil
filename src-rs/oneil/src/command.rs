@@ -279,13 +279,6 @@ pub enum DevCommand {
         /// parsed. Useful for debugging incomplete or malformed code.
         #[arg(long)]
         display_partial: bool,
-
-        /// Print the output in debug format
-        ///
-        /// When enabled, displays the raw debug representation of the AST instead
-        /// of the formatted tree structure. Useful for detailed internal analysis.
-        #[arg(long)]
-        print_debug: bool,
     },
     /// Print the Intermediate Representation (IR) of a Oneil source file
     PrintIr {
