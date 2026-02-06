@@ -31,6 +31,7 @@ use crate::{
 
 mod command;
 mod print_ast;
+mod print_debug_model_result;
 mod print_error;
 mod print_independents;
 mod print_ir;
@@ -75,8 +76,9 @@ fn handle_dev_command(command: DevCommand) {
         DevCommand::PrintModelResult {
             file,
             display_partial,
+            recursive,
         } => {
-            handle_print_model_result(&file, display_partial);
+            handle_print_model_result(&file, display_partial, recursive);
         }
     }
 }
@@ -131,33 +133,16 @@ fn handle_print_ir(file: &Path, display_partial: bool, recursive: bool) {
 }
 
 /// Handles the `dev print-model-result` command.
-fn handle_print_model_result(file: &Path, display_partial: bool) {
-    let mut runtime = Runtime::new();
-
-    let eval_result = runtime.eval_model(file);
-
-    let (model_reference, errors) = match eval_result {
-        Ok(model_reference) => (Some(model_reference), None),
-        Err(partial_result_with_errors) => {
-            let partial_result = partial_result_with_errors.result;
-            let errors = partial_result_with_errors.errors;
-
-            (partial_result, Some(errors))
-        }
+fn handle_print_model_result(file: &Path, display_partial: bool, recursive: bool) {
+    let config = print_debug_model_result::DebugModelResultPrintConfig {
+        display_partial,
+        recursive,
     };
 
-    if let Some(errors) = errors.as_ref() {
-        for error in errors {
-            print_error::print(&error, false);
-            eprintln!();
-        }
-    }
+    let mut runtime = Runtime::new();
+    let eval_result = runtime.eval_model(file);
 
-    if let Some(model_reference) = model_reference
-        && (errors.is_none() || display_partial)
-    {
-        println!("{:?}", model_reference);
-    }
+    print_debug_model_result::print(eval_result, &config);
 }
 
 fn handle_eval_command(args: EvalArgs) {
