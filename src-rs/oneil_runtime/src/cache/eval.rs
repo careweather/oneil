@@ -31,16 +31,18 @@ impl EvalCache {
     /// Returns the model for `Ok` entries and for `Err(EvalError::EvalErrors { partial_result, .. })`;
     /// returns `None` for `Err(EvalError::Resolution(_))` (no model available).
     pub fn get(&self, path: &Path) -> Option<&output::Model> {
-        self.entries.get(path).and_then(|r| match r {
+        let r = self.entries.get(path)?;
+        match r {
             Ok(m) => Some(m),
             Err(EvalError::EvalErrors { partial_result, .. }) => Some(partial_result),
             Err(EvalError::Resolution(_)) => None,
-        })
+        }
     }
 
     /// Returns the cached evaluation error for `path`, if present.
     pub fn get_error(&self, path: &Path) -> Option<&EvalError> {
-        self.entries.get(path).and_then(|r| r.as_ref().err())
+        let r = self.entries.get(path)?;
+        r.as_ref().err()
     }
 
     /// Returns the full cached entry for `path`.

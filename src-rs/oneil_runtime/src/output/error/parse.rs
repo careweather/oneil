@@ -29,8 +29,8 @@ impl ParseError {
     #[must_use]
     pub fn to_vec(&self) -> Vec<OneilError> {
         match self {
-            ParseError::File(f) => f.to_vec(),
-            ParseError::ParseErrors { errors, .. } => errors.clone(),
+            Self::File(f) => f.to_vec(),
+            Self::ParseErrors { errors, .. } => errors.clone(),
         }
     }
 }
