@@ -95,12 +95,7 @@ fn collect_errors(
 /// Prints a single evaluated model with its components.
 ///
 /// When `recursive` is true, also prints nested references (and submodels as references).
-fn print_model(
-    model_ref: ModelReference<'_>,
-    indent: usize,
-    prefix: &str,
-    recursive: bool,
-) {
+fn print_model(model_ref: ModelReference<'_>, indent: usize, prefix: &str, recursive: bool) {
     println!(
         "{}    {}Model: \"{}\"",
         "  ".repeat(indent),
@@ -165,25 +160,16 @@ fn print_model(
     }
 }
 
-fn print_submodels(
-    submodels: &IndexMap<&str, Result<ModelReference<'_>, EvalErrorReference<'_>>>,
-    indent: usize,
-) {
-    for (i, (name, result)) in submodels.iter().enumerate() {
+fn print_submodels(submodels: &IndexMap<&str, &str>, indent: usize) {
+    for (i, (name, reference_name)) in submodels.iter().enumerate() {
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        let path_str = match result {
-            Ok(r) => r.path().display().to_string(),
-            Err(e) => e.partial_result()
-                .map(|r| r.path().display().to_string())
-                .unwrap_or_else(|| "<error>".to_string()),
-        };
         println!(
             "{}    {}Submodel: \"{}\" -> \"{}\"",
             "  ".repeat(indent),
             prefix,
             name,
-            path_str
+            reference_name
         );
     }
 }
@@ -214,7 +200,8 @@ fn print_references(
         let prefix = if is_last { "└──" } else { "├──" };
         let path_str = match result {
             Ok(r) => r.path().display().to_string(),
-            Err(e) => e.partial_result()
+            Err(e) => e
+                .partial_result()
                 .map(|r| r.path().display().to_string())
                 .unwrap_or_else(|| "<error>".to_string()),
         };
@@ -228,10 +215,7 @@ fn print_references(
     }
 }
 
-fn print_tests(
-    tests: &[&oneil_runtime::output::eval::Test],
-    indent: usize,
-) {
+fn print_tests(tests: &[&oneil_runtime::output::eval::Test], indent: usize) {
     for (i, test) in tests.iter().enumerate() {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -239,11 +223,6 @@ fn print_tests(
             oneil_runtime::output::eval::TestResult::Passed => "passed",
             oneil_runtime::output::eval::TestResult::Failed { .. } => "failed",
         };
-        println!(
-            "{}    {}Test: {}",
-            "  ".repeat(indent),
-            prefix,
-            result_str
-        );
+        println!("{}    {}Test: {}", "  ".repeat(indent), prefix, result_str);
     }
 }
