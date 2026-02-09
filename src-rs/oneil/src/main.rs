@@ -22,6 +22,7 @@ use oneil_runtime::{
         Tree,
         dependency::{DependencyTreeValue, ReferenceTreeValue},
         error::TreeError,
+        value::Value,
     },
 };
 
@@ -426,33 +427,33 @@ fn print_param_not_found(param: &str) {
 }
 
 fn handle_builtins_command(command: Option<BuiltinsCommand>) {
+    let runtime = Runtime::new();
     match command {
-        None | Some(BuiltinsCommand::All) => print_builtins_all(),
+        None | Some(BuiltinsCommand::All) => print_builtins_all(&runtime),
         Some(BuiltinsCommand::Units {
             unit_name: Some(unit_name),
-        }) => search_builtins_units(&unit_name),
-        Some(BuiltinsCommand::Units { unit_name: None }) => print_builtins_units(),
+        }) => search_builtins_units(&runtime, &unit_name),
+        Some(BuiltinsCommand::Units { unit_name: None }) => print_builtins_units(&runtime),
         Some(BuiltinsCommand::Functions {
             function_name: Some(function_name),
-        }) => search_builtins_functions(&function_name),
+        }) => search_builtins_functions(&runtime, &function_name),
         Some(BuiltinsCommand::Functions {
             function_name: None,
-        }) => print_builtins_functions(),
+        }) => print_builtins_functions(&runtime),
         Some(BuiltinsCommand::Values {
             value_name: Some(value_name),
-        }) => search_builtins_values(&value_name),
-        Some(BuiltinsCommand::Values { value_name: None }) => print_builtins_values(),
+        }) => search_builtins_values(&runtime, &value_name),
+        Some(BuiltinsCommand::Values { value_name: None }) => print_builtins_values(&runtime),
         Some(BuiltinsCommand::Prefixes {
             prefix_name: Some(prefix_name),
-        }) => search_builtins_prefixes(&prefix_name),
-        Some(BuiltinsCommand::Prefixes { prefix_name: None }) => print_builtins_prefixes(),
+        }) => search_builtins_prefixes(&runtime, &prefix_name),
+        Some(BuiltinsCommand::Prefixes { prefix_name: None }) => print_builtins_prefixes(&runtime),
     }
 }
 
-fn search_builtins_units(unit_name: &str) {
-    let docs = oneil_std::builtin_units_docs();
-    let search_result = docs
-        .into_iter()
+fn search_builtins_units(runtime: &Runtime, unit_name: &str) {
+    let search_result = runtime
+        .builtin_units_docs()
         .find(|(name, aliases)| *name == unit_name || aliases.contains(&unit_name));
 
     if let Some((name, aliases)) = search_result {
@@ -464,9 +465,10 @@ fn search_builtins_units(unit_name: &str) {
     }
 }
 
-fn search_builtins_functions(function_name: &str) {
-    let docs = oneil_std::builtin_functions_docs();
-    let search_result = docs.into_iter().find(|(name, _)| *name == function_name);
+fn search_builtins_functions(runtime: &Runtime, function_name: &str) {
+    let search_result = runtime
+        .builtin_functions_docs()
+        .find(|(name, _)| *name == function_name);
 
     if let Some((name, (args, description))) = search_result {
         print_builtin_function(name, args, description);
@@ -477,9 +479,10 @@ fn search_builtins_functions(function_name: &str) {
     }
 }
 
-fn search_builtins_values(value_name: &str) {
-    let docs = oneil_std::builtin_values_docs();
-    let search_result = docs.into_iter().find(|(name, _)| *name == value_name);
+fn search_builtins_values(runtime: &Runtime, value_name: &str) {
+    let search_result = runtime
+        .builtin_values_docs()
+        .find(|(name, _)| *name == value_name);
 
     if let Some((name, (description, value))) = search_result {
         print_builtin_value(&name, &description, &value);
@@ -490,9 +493,10 @@ fn search_builtins_values(value_name: &str) {
     }
 }
 
-fn search_builtins_prefixes(prefix_name: &str) {
-    let docs = oneil_std::builtin_prefixes_docs();
-    let search_result = docs.into_iter().find(|(name, _)| *name == prefix_name);
+fn search_builtins_prefixes(runtime: &Runtime, prefix_name: &str) {
+    let search_result = runtime
+        .builtin_prefixes_docs()
+        .find(|(name, _)| *name == prefix_name);
 
     if let Some((name, (description, value))) = search_result {
         print_builtin_prefix(&name, &description, value);
@@ -503,23 +507,22 @@ fn search_builtins_prefixes(prefix_name: &str) {
     }
 }
 
-fn print_builtins_all() {
-    print_builtins_values();
+fn print_builtins_all(runtime: &Runtime) {
+    print_builtins_values(runtime);
     println!();
-    print_builtins_prefixes();
+    print_builtins_prefixes(runtime);
     println!();
-    print_builtins_units();
+    print_builtins_units(runtime);
     println!();
-    print_builtins_functions();
+    print_builtins_functions(runtime);
 }
 
-fn print_builtins_units() {
+fn print_builtins_units(runtime: &Runtime) {
     let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Units:");
     println!("{header}");
     println!();
 
-    let docs = oneil_std::builtin_units_docs();
-    for (name, aliases) in docs {
+    for (name, aliases) in runtime.builtin_units_docs() {
         print_builtin_unit(name, &aliases);
     }
 }
@@ -531,13 +534,12 @@ fn print_builtin_unit(name: &str, aliases: &[&str]) {
     println!("  {styled_name}: {styled_aliases}");
 }
 
-fn print_builtins_functions() {
+fn print_builtins_functions(runtime: &Runtime) {
     let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Functions:");
     println!("{header}");
     println!();
 
-    let docs = oneil_std::builtin_functions_docs();
-    for (name, (args, description)) in docs {
+    for (name, (args, description)) in runtime.builtin_functions_docs() {
         print_builtin_function(name, args, description);
     }
 }
@@ -555,13 +557,12 @@ fn print_builtin_function(name: &str, args: &[&str], description: &str) {
     println!();
 }
 
-fn print_builtins_values() {
+fn print_builtins_values(runtime: &Runtime) {
     let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Values:");
     println!("{header}");
     println!();
 
-    let docs = oneil_std::builtin_values_docs();
-    for (name, (description, value)) in docs {
+    for (name, (description, value)) in runtime.builtin_values_docs() {
         print_builtin_value(&name, &description, &value);
     }
 }
@@ -576,13 +577,12 @@ fn print_builtin_value(name: &str, description: &str, value: &Value) {
     println!();
 }
 
-fn print_builtins_prefixes() {
+fn print_builtins_prefixes(runtime: &Runtime) {
     let header = stylesheet::BUILTIN_SECTION_HEADER.style("Builtin Prefixes:");
     println!("{header}");
     println!();
 
-    let docs = oneil_std::builtin_prefixes_docs();
-    for (name, (description, value)) in docs {
+    for (name, (description, value)) in runtime.builtin_prefixes_docs() {
         print_builtin_prefix(&name, &description, value);
     }
 }
