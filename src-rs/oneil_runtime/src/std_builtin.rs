@@ -55,6 +55,54 @@ impl StdBuiltins {
             .iter()
             .map(|(name, prefix)| (*name, prefix.value))
     }
+
+    /// Returns documentation for all builtin units.
+    ///
+    /// Each item is the canonical unit name and a list of all aliases
+    /// (which may not include the canonical name).
+    pub fn builtin_units_docs(&self) -> impl Iterator<Item = (&'static str, Vec<&'static str>)> {
+        let mut by_name: IndexMap<&'static str, Vec<&'static str>> = IndexMap::new();
+        for unit in self.units.values() {
+            by_name
+                .entry(unit.readable_name)
+                .or_default()
+                .push(unit.alias);
+        }
+        by_name.into_iter()
+    }
+
+    /// Returns documentation for all builtin functions.
+    ///
+    /// Each item is the function name, its argument names, and its description.
+    pub fn builtin_functions_docs(
+        &self,
+    ) -> impl Iterator<Item = (&'static str, (&'static [&'static str], &'static str))> + '_ {
+        self.functions
+            .iter()
+            .map(|(name, f)| (*name, (f.args, f.description)))
+    }
+
+    /// Returns documentation for all builtin values.
+    ///
+    /// Each item is the value name, its description, and the value itself.
+    pub fn builtin_values_docs(
+        &self,
+    ) -> impl Iterator<Item = (&'static str, (&'static str, Value))> + '_ {
+        self.values
+            .iter()
+            .map(|(name, v)| (*name, (v.description, v.value.clone())))
+    }
+
+    /// Returns documentation for all builtin prefixes.
+    ///
+    /// Each item is the prefix name, its description, and its numeric value.
+    pub fn builtin_prefixes_docs(
+        &self,
+    ) -> impl Iterator<Item = (&'static str, (&'static str, f64))> + '_ {
+        self.prefixes
+            .iter()
+            .map(|(name, p)| (*name, (p.description, p.value)))
+    }
 }
 
 #[derive(Debug, Clone)]
