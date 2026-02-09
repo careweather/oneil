@@ -459,40 +459,190 @@ impl Runtime {
         Option<output::Tree<output::dependency::DependencyTreeValue>>,
         IndexMap<PathBuf, output::error::TreeError>,
     ) {
-        let _ = self.eval_model(model_path);
+        let location = TreeValueLocation {
+            model_path: model_path.to_path_buf(),
+            reference_name: None,
+            parameter_name: parameter_name.to_string(),
+        };
 
+        self.get_parameter_tree(
+            &location,
+            |runtime, location| {
+                runtime.get_dependency_tree_value(
+                    &location.model_path,
+                    location.reference_name.as_deref(),
+                    &location.parameter_name,
+                )
+            },
+            |runtime, dependency_graph, location| {
+                Self::get_dependency_tree_children(
+                    runtime,
+                    dependency_graph,
+                    &location.model_path,
+                    location.reference_name.as_deref(),
+                    &location.parameter_name,
+                )
+            },
+        )
+    }
+
+    /// Gets the reference tree for a specific parameter.
+    ///
+    /// The tree shows all parameters that depend on the specified parameter, recursively.
+    /// This is the inverse of the dependency tree.
+    #[must_use]
+    pub fn get_reference_tree(
+        &mut self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> (
+        Option<output::Tree<output::dependency::ReferenceTreeValue>>,
+        IndexMap<PathBuf, output::error::TreeError>,
+    ) {
+        let location = TreeValueLocation {
+            model_path: model_path.to_path_buf(),
+            reference_name: None,
+            parameter_name: parameter_name.to_string(),
+        };
+
+        self.get_parameter_tree(
+            &location,
+            |runtime, location| {
+                runtime.get_reference_tree_value(&location.model_path, &location.parameter_name)
+            },
+            |_runtime, dependency_graph, location| {
+                Self::get_reference_tree_children(
+                    dependency_graph,
+                    &location.model_path,
+                    &location.parameter_name,
+                )
+            },
+        )
+    }
+
+    /// Unified implementation for dependency and reference trees.
+    ///
+    /// Recursively builds a tree of parameter values, using `get_value` to resolve
+    /// each node and `get_children` to determine the values for the children.
+    fn get_parameter_tree<V, GetVal, GetChildren>(
+        &mut self,
+        location: &TreeValueLocation,
+        get_value: GetVal,
+        get_children: GetChildren,
+    ) -> (
+        Option<output::Tree<V>>,
+        IndexMap<PathBuf, output::error::TreeError>,
+    )
+    where
+        GetVal: Fn(&Self, &TreeValueLocation) -> Option<GetValueResult<V>>,
+        GetChildren:
+            Fn(&Self, &output::DependencyGraph, &TreeValueLocation) -> GetChildrenResult<V>,
+    {
+        let _ = self.eval_model(&location.model_path);
         let dependency_graph = self.get_dependency_graph();
-        return recurse(self, model_path, None, parameter_name, &dependency_graph);
+
+        return recurse(self, location, &dependency_graph, &get_value, &get_children);
 
         #[expect(
             clippy::items_after_statements,
             reason = "this is an internal recursive function, we keep it here for clarity"
         )]
-        fn recurse(
+        fn recurse<V, GetVal, GetChildren>(
             runtime: &Runtime,
-            model_path: &Path,
-            reference_name: Option<&str>,
-            parameter_name: &str,
+            location: &TreeValueLocation,
             dependency_graph: &output::DependencyGraph,
+            get_value: &GetVal,
+            get_children: &GetChildren,
         ) -> (
-            Option<output::Tree<output::dependency::DependencyTreeValue>>,
+            Option<output::Tree<V>>,
             IndexMap<PathBuf, output::error::TreeError>,
-        ) {
-            let Some(value) =
-                runtime.get_dependency_tree_value(model_path, reference_name, parameter_name)
-            else {
+        )
+        where
+            GetVal: Fn(&Runtime, &TreeValueLocation) -> Option<GetValueResult<V>>,
+            GetChildren:
+                Fn(&Runtime, &output::DependencyGraph, &TreeValueLocation) -> GetChildrenResult<V>,
+        {
+            // get the value for the current location
+            let Some(value) = get_value(runtime, location) else {
+                // if it doesn't exist, return no tree and no errors
                 return (None, IndexMap::new());
             };
 
-            let deps = dependency_graph
-                .depends_on(model_path, parameter_name)
-                .cloned()
-                // if the parameter is not found, it has no dependencies
-                // so we return an empty set
-                .unwrap_or_default();
+            // get the children for the current location
+            let GetChildrenResult {
+                builtin_children,
+                parameter_children,
+            } = get_children(runtime, dependency_graph, location);
 
-            let builtin_deps = deps.builtin_dependencies.iter().map(|dep| {
-                let parameter_value = runtime
+            // recurse on the parameter children
+            let (parameter_children, errors): (Vec<_>, Vec<_>) = parameter_children
+                .into_iter()
+                .map(|location| {
+                    recurse(
+                        runtime,
+                        &location,
+                        dependency_graph,
+                        get_value,
+                        get_children,
+                    )
+                })
+                .unzip();
+
+            let parameter_children = parameter_children.into_iter().flatten();
+            let mut errors = errors.into_iter().fold(
+                IndexMap::<PathBuf, output::error::TreeError>::new(),
+                |mut acc, error_map| {
+                    for (path, tree_error) in error_map {
+                        acc.entry(path).or_default().insert_all(tree_error);
+                    }
+                    acc
+                },
+            );
+
+            let children = builtin_children
+                .into_iter()
+                .chain(parameter_children)
+                .collect();
+
+            match value {
+                GetValueResult::ValidTree(value) => {
+                    (Some(output::Tree::new(value, children)), errors)
+                }
+
+                GetValueResult::ParseError(parse_error) => {
+                    let model_error = output::error::TreeError::Parse(parse_error);
+                    errors.insert(location.model_path.clone(), model_error);
+                    (None, errors)
+                }
+
+                GetValueResult::ParameterErrors(parameter_errors) => {
+                    errors
+                        .entry(location.model_path.clone())
+                        .or_default()
+                        .insert_parameter_errors(location.parameter_name.clone(), parameter_errors);
+                    (None, errors)
+                }
+            }
+        }
+    }
+
+    fn get_dependency_tree_children(
+        &self,
+        dependency_graph: &output::DependencyGraph,
+        model_path: &Path,
+        reference_name: Option<&str>,
+        parameter_name: &str,
+    ) -> GetChildrenResult<output::dependency::DependencyTreeValue> {
+        let deps = dependency_graph
+            .depends_on(model_path, parameter_name)
+            .cloned()
+            .unwrap_or_default();
+
+        let builtin_children = deps
+            .builtin_dependencies
+            .iter()
+            .map(|dep| {
+                let parameter_value = self
                     .lookup_builtin_variable(&ir::Identifier::new(dep.ident.clone()))
                     .cloned()
                     .expect("the builtin value should be defined");
@@ -505,66 +655,69 @@ impl Runtime {
                 };
 
                 output::Tree::new(tree_value, Vec::new())
+            })
+            .collect();
+
+        let parameter_args = deps
+            .parameter_dependencies
+            .iter()
+            .map(|dep| TreeValueLocation {
+                model_path: model_path.to_path_buf(),
+                reference_name: reference_name.map(String::from),
+                parameter_name: dep.parameter_name.clone(),
             });
 
-            let parameter_deps = deps.parameter_dependencies.iter().map(|dep| {
-                recurse(
-                    runtime,
-                    model_path,
-                    reference_name,
-                    &dep.parameter_name,
-                    dependency_graph,
-                )
+        let external_args = deps
+            .external_dependencies
+            .iter()
+            .map(|dep| TreeValueLocation {
+                model_path: dep.model_path.clone(),
+                reference_name: Some(dep.reference_name.clone()),
+                parameter_name: dep.parameter_name.clone(),
             });
 
-            let external_deps = deps.external_dependencies.iter().map(|dep| {
-                recurse(
-                    runtime,
-                    &dep.model_path,
-                    Some(&dep.reference_name),
-                    &dep.parameter_name,
-                    dependency_graph,
-                )
+        let parameter_children = parameter_args.chain(external_args).collect();
+
+        GetChildrenResult {
+            builtin_children,
+            parameter_children,
+        }
+    }
+
+    fn get_reference_tree_children(
+        dependency_graph: &output::DependencyGraph,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> GetChildrenResult<output::dependency::ReferenceTreeValue> {
+        let deps = dependency_graph
+            .references(model_path, parameter_name)
+            .cloned()
+            .unwrap_or_default();
+
+        let parameter_args = deps
+            .parameter_references
+            .iter()
+            .map(|dep| TreeValueLocation {
+                model_path: model_path.to_path_buf(),
+                reference_name: None,
+                parameter_name: dep.parameter_name.clone(),
             });
 
-            let (param_children, errors): (Vec<_>, Vec<_>) =
-                parameter_deps.chain(external_deps).unzip();
+        let external_args = deps
+            .external_references
+            .iter()
+            .map(|dep| TreeValueLocation {
+                model_path: dep.model_path.clone(),
+                reference_name: None,
+                parameter_name: dep.parameter_name.clone(),
+            });
 
-            let param_children = param_children.into_iter().flatten();
-            let mut errors = errors.into_iter().fold(
-                IndexMap::<PathBuf, output::error::TreeError>::new(),
-                |mut acc, error_map| {
-                    for (path, tree_error) in error_map {
-                        acc.entry(path).or_default().insert_all(tree_error);
-                    }
+        let recurse_args = parameter_args.chain(external_args).collect();
 
-                    acc
-                },
-            );
-
-            let children = builtin_deps.chain(param_children).collect();
-
-            match value {
-                GetValueResult::ValidTree(value) => {
-                    (Some(output::Tree::new(value, children)), errors)
-                }
-
-                GetValueResult::ParseError(parse_error) => {
-                    let model_error = output::error::TreeError::Parse(parse_error);
-                    errors.insert(model_path.to_path_buf(), model_error);
-
-                    (None, errors)
-                }
-
-                GetValueResult::ParameterErrors(parameter_errors) => {
-                    errors
-                        .entry(model_path.to_path_buf())
-                        .or_default()
-                        .insert_parameter_errors(parameter_name.to_string(), parameter_errors);
-
-                    (None, errors)
-                }
-            }
+        GetChildrenResult {
+            // no builtins reference other parameters
+            builtin_children: Vec::new(),
+            parameter_children: recurse_args,
         }
     }
 
@@ -622,99 +775,6 @@ impl Runtime {
         };
 
         Some(GetValueResult::ValidTree(tree_value))
-    }
-
-    /// Gets the reference tree for a specific parameter.
-    ///
-    /// The tree shows all parameters that depend on the specified parameter, recursively.
-    /// This is the inverse of the dependency tree.
-    #[must_use]
-    pub fn get_reference_tree(
-        &mut self,
-        model_path: &Path,
-        parameter_name: &str,
-    ) -> (
-        Option<output::Tree<output::dependency::ReferenceTreeValue>>,
-        IndexMap<PathBuf, output::error::TreeError>,
-    ) {
-        let _ = self.eval_model(model_path);
-
-        let dependency_graph = self.get_dependency_graph();
-        return recurse(self, model_path, parameter_name, &dependency_graph);
-
-        #[expect(
-            clippy::items_after_statements,
-            reason = "this is an internal recursive function, we keep it here for clarity"
-        )]
-        fn recurse(
-            runtime: &Runtime,
-            model_path: &Path,
-            parameter_name: &str,
-            dependency_graph: &output::DependencyGraph,
-        ) -> (
-            Option<output::Tree<output::dependency::ReferenceTreeValue>>,
-            IndexMap<PathBuf, output::error::TreeError>,
-        ) {
-            let Some(value) = runtime.get_reference_tree_value(model_path, parameter_name) else {
-                return (None, IndexMap::new());
-            };
-
-            let deps = dependency_graph
-                .references(model_path, parameter_name)
-                .cloned()
-                // if the parameter is not found, it has no references
-                // so we return an empty set
-                .unwrap_or_default();
-
-            let parameter_deps = deps
-                .parameter_references
-                .iter()
-                .map(|dep| recurse(runtime, model_path, &dep.parameter_name, dependency_graph));
-
-            let external_deps = deps.external_references.iter().map(|dep| {
-                recurse(
-                    runtime,
-                    &dep.model_path,
-                    &dep.parameter_name,
-                    dependency_graph,
-                )
-            });
-
-            let (children, errors): (Vec<_>, Vec<_>) = parameter_deps.chain(external_deps).unzip();
-            let children = children.into_iter().flatten().collect();
-            let mut errors = errors.into_iter().fold(
-                IndexMap::<PathBuf, output::error::TreeError>::new(),
-                |mut acc, error_map| {
-                    for (path, errors) in error_map {
-                        acc.entry(path).or_default().insert_all(errors);
-                    }
-
-                    acc
-                },
-            );
-
-            match value {
-                GetValueResult::ValidTree(value) => {
-                    (Some(output::Tree::new(value, children)), errors)
-                }
-
-                GetValueResult::ParseError(parse_error) => {
-                    let model_error = output::error::TreeError::Parse(parse_error);
-                    errors.insert(model_path.to_path_buf(), model_error);
-
-                    (None, errors)
-                }
-
-                GetValueResult::ParameterErrors(parameter_errors) => {
-                    errors
-                        .entry(model_path.to_path_buf())
-                        .or_default()
-                        .insert_parameter_errors(parameter_name.to_string(), parameter_errors);
-
-                    (None, errors)
-                }
-            }
-        }
     }
 
     fn get_reference_tree_value(
@@ -857,8 +917,19 @@ impl AsOneilError for InternalIoError<'_> {
     }
 }
 
+struct TreeValueLocation {
+    pub model_path: PathBuf,
+    pub reference_name: Option<String>,
+    pub parameter_name: String,
+}
+
 enum GetValueResult<T> {
     ValidTree(T),
     ParseError(output::error::ParseError),
     ParameterErrors(Vec<OneilError>),
+}
+
+struct GetChildrenResult<T> {
+    builtin_children: Vec<output::Tree<T>>,
+    parameter_children: Vec<TreeValueLocation>,
 }
