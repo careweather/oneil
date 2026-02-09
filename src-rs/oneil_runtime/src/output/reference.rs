@@ -131,32 +131,7 @@ impl<'result> EvalErrorReference<'result> {
             EvalError::EvalErrors { partial_result, .. } => {
                 Some(ModelReference::new(partial_result, self.eval_cache))
             }
-            EvalError::Resolution(_) => panic!("evaluation failed"),
-        }
-    }
-
-    /// Returns the parameter errors for this model, if any.
-    #[must_use]
-    pub fn parameter_errors(&self) -> Option<IndexMap<&'result str, Vec<&'result OneilError>>> {
-        match self.eval_error {
-            EvalError::EvalErrors {
-                parameter_errors, ..
-            } => Some(
-                parameter_errors
-                    .iter()
-                    .map(|(name, errors)| (name.as_str(), errors.iter().collect()))
-                    .collect(),
-            ),
-            EvalError::Resolution(_) => panic!("evaluation failed"),
-        }
-    }
-
-    /// Returns the test errors for this model, if any.
-    #[must_use]
-    pub fn test_errors(&self) -> Option<Vec<&'result OneilError>> {
-        match self.eval_error {
-            EvalError::EvalErrors { test_errors, .. } => Some(test_errors.iter().collect()),
-            EvalError::Resolution(_) => panic!("evaluation failed"),
+            EvalError::Resolution(_) => None,
         }
     }
 
