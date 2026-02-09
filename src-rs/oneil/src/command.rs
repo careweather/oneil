@@ -143,6 +143,10 @@ pub struct EvalArgs {
     pub no_parameters: bool,
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "this is a configuration struct for running tests in a model"
+)]
 #[derive(Args)]
 pub struct TestArgs {
     /// Path to the Oneil model file to run tests in
