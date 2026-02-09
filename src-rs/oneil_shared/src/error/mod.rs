@@ -28,8 +28,8 @@ pub struct OneilError {
     context: Vec<Context>,
     /// Optional context information with source location
     context_with_source: Vec<(Context, ErrorLocation)>,
-    /// Whether the error should be shown to the user
-    should_show_to_user: bool,
+    /// Whether the error is an internal error.
+    is_internal_error: bool,
 }
 
 impl OneilError {
@@ -70,7 +70,7 @@ impl OneilError {
         let location = None;
         let context = error.context();
         let context_with_source = vec![];
-        let should_show_to_user = error.should_show_to_user();
+        let is_internal_error = error.is_internal_error();
 
         Self {
             path,
@@ -78,7 +78,7 @@ impl OneilError {
             location,
             context,
             context_with_source,
-            should_show_to_user,
+            is_internal_error,
         }
     }
 
@@ -145,7 +145,7 @@ impl OneilError {
             }
         }
 
-        let should_show_to_user = error.should_show_to_user();
+        let is_internal_error = error.is_internal_error();
 
         Self {
             path,
@@ -153,7 +153,7 @@ impl OneilError {
             location,
             context,
             context_with_source,
-            should_show_to_user,
+            is_internal_error,
         }
     }
 
@@ -267,13 +267,13 @@ impl OneilError {
         self.context_with_source.as_slice()
     }
 
-    /// Returns whether the error should be shown to the user
+    /// Returns whether the error is an internal error.
     ///
-    /// # Returns
-    ///
-    /// Returns a boolean indicating whether the error should be shown to the user.
+    /// Internal errors are errors that are not important for the user to see,
+    /// such as errors that are caused by other errors. In that case, it's most
+    /// useful to see only the first error.
     #[must_use]
-    pub const fn should_show_to_user(&self) -> bool {
-        self.should_show_to_user
+    pub const fn is_internal_error(&self) -> bool {
+        self.is_internal_error
     }
 }

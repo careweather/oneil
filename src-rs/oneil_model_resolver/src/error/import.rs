@@ -99,7 +99,7 @@ impl AsOneilError for PythonImportResolutionError {
         }
     }
 
-    fn should_show_to_user(&self) -> bool {
-        !matches!(self, Self::FailedValidation { .. })
+    fn is_internal_error(&self) -> bool {
+        matches!(self, Self::FailedValidation { .. })
     }
 }

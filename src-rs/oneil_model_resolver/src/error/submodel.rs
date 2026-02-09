@@ -237,7 +237,7 @@ impl AsOneilError for ModelImportResolutionError {
         }
     }
 
-    fn should_show_to_user(&self) -> bool {
-        !matches!(self, Self::ModelHasError { .. })
+    fn is_internal_error(&self) -> bool {
+        matches!(self, Self::ModelHasError { .. })
     }
 }

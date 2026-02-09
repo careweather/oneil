@@ -214,8 +214,8 @@ impl AsOneilError for VariableResolutionError {
         }
     }
 
-    fn should_show_to_user(&self) -> bool {
-        !matches!(
+    fn is_internal_error(&self) -> bool {
+        matches!(
             self,
             Self::ModelHasError { .. }
                 | Self::ParameterHasError { .. }
