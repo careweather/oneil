@@ -62,11 +62,8 @@ fn collect_errors(
         Ok(r) => vec![Ok(*r)],
         Err(e) => {
             errors.extend(e.model_errors());
-            if let Some(partial) = e.partial_ir() {
-                vec![Ok(partial)]
-            } else {
-                vec![]
-            }
+            e.partial_ir()
+                .map_or_else(Vec::new, |partial| vec![Ok(partial)])
         }
     };
 

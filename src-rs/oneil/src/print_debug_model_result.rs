@@ -65,11 +65,8 @@ fn collect_errors(
         Ok(r) => vec![Ok(*r)],
         Err(e) => {
             errors.extend(e.model_errors());
-            if let Some(partial) = e.partial_result() {
-                vec![Ok(partial)]
-            } else {
-                vec![]
-            }
+            e.partial_result()
+                .map_or_else(Vec::new, |partial| vec![Ok(partial)])
         }
     };
 
@@ -202,8 +199,7 @@ fn print_references(
             Ok(r) => r.path().display().to_string(),
             Err(e) => e
                 .partial_result()
-                .map(|r| r.path().display().to_string())
-                .unwrap_or_else(|| "<error>".to_string()),
+                .map_or_else(|| "<error>".to_string(), |r| r.path().display().to_string()),
         };
         println!(
             "{}    {}Reference: \"{}\" -> \"{}\"",

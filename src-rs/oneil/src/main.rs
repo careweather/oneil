@@ -367,12 +367,11 @@ fn handle_tree_command(args: TreeArgs) {
 
     let errors = errors
         .into_values()
-        .map(|errors| errors.to_vec())
-        .flatten()
+        .flat_map(|errors| errors.to_vec())
         .collect::<Vec<_>>();
 
     for error in &errors {
-        print_error::print(&error, false);
+        print_error::print(error, false);
         eprintln!();
     }
 
@@ -484,7 +483,7 @@ fn search_builtins_values(runtime: &Runtime, value_name: &str) {
         .find(|(name, _)| *name == value_name);
 
     if let Some((name, (description, value))) = search_result {
-        print_builtin_value(&name, &description, &value);
+        print_builtin_value(name, description, &value);
     } else {
         let msg = format!("No builtin value found for \"{value_name}\"");
         let msg = stylesheet::BUILTIN_NOT_FOUND.style(msg);
@@ -498,7 +497,7 @@ fn search_builtins_prefixes(runtime: &Runtime, prefix_name: &str) {
         .find(|(name, _)| *name == prefix_name);
 
     if let Some((name, (description, value))) = search_result {
-        print_builtin_prefix(&name, &description, value);
+        print_builtin_prefix(name, description, value);
     } else {
         let msg = format!("No builtin prefix found for \"{prefix_name}\"");
         let msg = stylesheet::BUILTIN_NOT_FOUND.style(msg);
@@ -562,7 +561,7 @@ fn print_builtins_values(runtime: &Runtime) {
     println!();
 
     for (name, (description, value)) in runtime.builtin_values_docs() {
-        print_builtin_value(&name, &description, &value);
+        print_builtin_value(name, description, &value);
     }
 }
 
@@ -582,7 +581,7 @@ fn print_builtins_prefixes(runtime: &Runtime) {
     println!();
 
     for (name, (description, value)) in runtime.builtin_prefixes_docs() {
-        print_builtin_prefix(&name, &description, value);
+        print_builtin_prefix(name, description, value);
     }
 }
 

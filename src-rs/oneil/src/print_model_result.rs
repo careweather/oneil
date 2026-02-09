@@ -70,6 +70,10 @@ pub fn print_eval_result(
     }
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "this is a configuration struct for printing test results"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestPrintConfig {
     pub no_header: bool,
@@ -139,12 +143,10 @@ fn extract_errors(
         Ok(r) => vec![Ok(*r)],
         Err(e) => {
             errors.extend(e.model_errors());
-            if let Some(partial) = e.partial_result() {
+            e.partial_result().map_or_else(Vec::new, |partial| {
                 let queue = vec![Ok(partial)];
                 queue
-            } else {
-                vec![]
-            }
+            })
         }
     };
 

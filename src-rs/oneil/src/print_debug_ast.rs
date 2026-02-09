@@ -2,7 +2,7 @@
 
 use oneil_runtime::output::{self, ast};
 
-use anstream::println;
+use anstream::{eprintln, println};
 
 use crate::print_error;
 
@@ -24,7 +24,7 @@ pub fn print(ast_result: Result<&ast::Model, output::error::ParseError>, config:
             }
 
             if config.display_partial {
-                print_model(&*partial_ast, 0);
+                print_model(&partial_ast, 0);
             }
         }
         Err(output::error::ParseError::File(error)) => {
