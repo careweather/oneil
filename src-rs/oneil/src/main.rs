@@ -334,7 +334,6 @@ fn handle_tree_command(args: TreeArgs) {
     let tree_print_config = TreePrintConfig { recursive, depth };
 
     let mut runtime = Runtime::new();
-    runtime.eval_model(&file);
 
     let (trees, errors) = if list_refs {
         let mut trees = Vec::new();
