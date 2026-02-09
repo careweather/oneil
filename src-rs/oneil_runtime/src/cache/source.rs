@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use oneil_shared::error::OneilError;
 
 /// Cache of loaded source file contents and per-file load errors.
@@ -28,6 +28,11 @@ impl SourceCache {
     /// Returns the cached load error for `path`, if present.
     pub fn get_error(&self, path: &Path) -> Option<&OneilError> {
         self.errors.get(path)
+    }
+
+    /// Returns the paths to the files that the source cache relies on.
+    pub fn get_paths(&self) -> IndexSet<PathBuf> {
+        self.contents.keys().cloned().collect()
     }
 
     /// Stores successfully loaded `source` for `path`.

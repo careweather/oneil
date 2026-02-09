@@ -1,7 +1,7 @@
 use std::io::Error as IoError;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use oneil_eval::value::{Unit, Value};
 use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext, IrLoadError};
 use oneil_model_resolver as model_resolver;
@@ -38,6 +38,11 @@ impl Runtime {
             eval_cache: EvalCache::new(),
             builtins: StdBuiltins::new(),
         }
+    }
+
+    /// Gets the paths to files that the runtime relies on.
+    pub fn get_watch_paths(&self) -> IndexSet<PathBuf> {
+        self.source_cache.get_paths()
     }
 
     /// Evaluates a model and returns the result.
