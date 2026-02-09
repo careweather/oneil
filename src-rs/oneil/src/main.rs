@@ -601,21 +601,17 @@ fn handle_independent_command(args: IndependentArgs) {
         file,
         recursive,
         values: print_values,
+        partial: display_partial_results,
     } = args;
 
     let independent_print_config = IndependentPrintConfig {
         print_values,
         recursive,
+        display_partial_results,
     };
 
-    let builtins = create_builtins();
-    let (eval_context, _watch_paths) = eval_model(&file, &builtins);
+    let mut runtime = Runtime::new();
+    let model_result = runtime.eval_model(&file);
 
-    if let Some(eval_context) = eval_context {
-        let model_result = eval_context
-            .get_model_result(&file)
-            .expect("model should be evaluated");
-
-        print_independents::print(&model_result, &independent_print_config);
-    }
+    print_independents::print(model_result, &independent_print_config);
 }

@@ -1,34 +1,93 @@
 //! Print independent parameters from evaluated models.
 
 use anstream::{print, println};
-use oneil_runtime::output::reference::{self, ModelReference};
+use oneil_runtime::output::{
+    eval,
+    reference::{EvalErrorReference, ModelReference},
+};
+use oneil_shared::error::OneilError;
 
-use crate::{print_utils, stylesheet};
+use crate::{print_error, print_utils, stylesheet};
 
 pub struct IndependentPrintConfig {
     pub print_values: bool,
     pub recursive: bool,
+    pub display_partial_results: bool,
 }
 
 /// Prints all independent parameters from the model result.
 ///
-/// Independent parameters are those that don't depend on other parameters
-/// (they may still depend on builtin values). This function prints them
-/// in a hierarchical format, optionally including submodels recursively.
+/// First collects and displays any evaluation errors from the models. Then prints
+/// independent parameters if there were no errors or if `display_partial_results`
+/// is true. Independent parameters are those that don't depend on other parameters
+/// (they may still depend on builtin values).
 ///
 /// # Arguments
 ///
 /// * `model_result` - The evaluation result containing all models
-/// * `dependency_graph` - The dependency graph to determine which parameters are independent
-/// * `print_values` - Whether to print the parameter values
-/// * `recursive` - Whether to print independent parameters in submodels as well
-pub fn print(model_result: &ModelReference<'_>, independent_print_config: &IndependentPrintConfig) {
-    print_model_independents(model_result, independent_print_config);
+/// * `independent_print_config` - Configuration for printing
+pub fn print(
+    model_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
+    independent_print_config: &IndependentPrintConfig,
+) {
+    let errors = collect_all_errors(&model_result);
+
+    for error in &errors {
+        print_error::print(error, false);
+    }
+
+    let show_independents = errors.is_empty() || independent_print_config.display_partial_results;
+
+    if show_independents {
+        let top_model = match &model_result {
+            Ok(model_ref) => Some(*model_ref),
+            Err(err_ref) => err_ref.partial_result(),
+        };
+
+        if let Some(model_ref) = top_model {
+            print_model_independents(model_ref, independent_print_config);
+        }
+    }
+}
+
+/// Collects all evaluation errors from the model result and its nested references.
+///
+/// Uses a depth-first traversal; errors from failed reference evaluations are included.
+fn collect_all_errors(
+    model_result: &Result<ModelReference<'_>, EvalErrorReference<'_>>,
+) -> Vec<OneilError> {
+    let mut errors = Vec::new();
+    let mut stack: Vec<Result<ModelReference<'_>, EvalErrorReference<'_>>> = match model_result {
+        Ok(r) => vec![Ok(*r)],
+        Err(e) => {
+            errors.extend(e.model_errors());
+            e.partial_result()
+                .map_or(vec![], |partial| vec![Ok(partial)])
+        }
+    };
+
+    while let Some(r) = stack.pop() {
+        match r {
+            Err(e) => {
+                errors.extend(e.model_errors());
+                if let Some(partial) = e.partial_result() {
+                    stack.push(Ok(partial));
+                }
+            }
+            Ok(model_ref) => {
+                for nested in model_ref.references().values() {
+                    stack.push(*nested);
+                }
+            }
+        }
+    }
+
+    errors
 }
 
 /// Recursively prints independent parameters for a model and its submodels.
 fn print_model_independents(
-    model_ref: &ModelReference<'_>,
+    model_ref: ModelReference<'_>,
     independent_print_config: &IndependentPrintConfig,
 ) {
     if independent_print_config.recursive {
@@ -45,12 +104,16 @@ fn print_model_independents(
 
     if independent_print_config.recursive {
         // Print references
-        //
-        // This includes submodels because submodels are also
-        // references, so we can simply use the references map
         for reference in model_ref.references().values() {
-            println!();
-            print_model_independents(*reference, independent_print_config);
+            let nested_ref = match reference {
+                Ok(r) => Some(*r),
+                Err(e) => e.partial_result(),
+            };
+
+            if let Some(nested_ref) = nested_ref {
+                println!();
+                print_model_independents(nested_ref, independent_print_config);
+            }
         }
     }
 }
@@ -59,7 +122,7 @@ fn print_model_independents(
 ///
 /// A parameter is independent if it doesn't have any parameter dependencies
 /// or external dependencies (it may still have builtin dependencies).
-fn get_independent_parameters(model_ref: ModelReference<'_>) -> Vec<&output::Parameter> {
+fn get_independent_parameters(model_ref: ModelReference<'_>) -> Vec<&eval::Parameter> {
     let parameters = model_ref.parameters();
 
     parameters
@@ -74,7 +137,7 @@ fn get_independent_parameters(model_ref: ModelReference<'_>) -> Vec<&output::Par
 }
 
 /// Prints a single parameter.
-fn print_parameter(parameter: &eval_result::Parameter, print_values: bool) {
+fn print_parameter(parameter: &eval::Parameter, print_values: bool) {
     let styled_ident = stylesheet::PARAMETER_IDENTIFIER.style(&parameter.ident);
 
     if print_values {
