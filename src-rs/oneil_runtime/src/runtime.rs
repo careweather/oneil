@@ -391,7 +391,7 @@ impl Runtime {
         parameter_name: &str,
     ) -> (
         Option<output::Tree<output::dependency::DependencyTreeValue>>,
-        output::error::TreeError,
+        IndexMap<PathBuf, output::error::TreeError>,
     ) {
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, None, parameter_name, &dependency_graph);
@@ -408,12 +408,12 @@ impl Runtime {
             dependency_graph: &output::DependencyGraph,
         ) -> (
             Option<output::Tree<output::dependency::DependencyTreeValue>>,
-            output::error::TreeError,
+            IndexMap<PathBuf, output::error::TreeError>,
         ) {
             let Some(value) =
                 runtime.get_dependency_tree_value(model_path, reference_name, parameter_name)
             else {
-                return (None, output::error::TreeError::default());
+                return (None, IndexMap::new());
             };
 
             let deps = dependency_graph
@@ -463,17 +463,38 @@ impl Runtime {
                 parameter_deps.chain(external_deps).unzip();
 
             let param_children = param_children.into_iter().flatten();
-            let errors: output::error::TreeError = errors.into_iter().flatten().collect();
+            let mut errors = errors.into_iter().fold(
+                IndexMap::<PathBuf, output::error::TreeError>::new(),
+                |mut acc, error_map| {
+                    for (path, tree_error) in error_map {
+                        acc.entry(path).or_default().insert_all(tree_error);
+                    }
+
+                    acc
+                },
+            );
 
             let children = builtin_deps.chain(param_children).collect();
 
             match value {
-                Ok(value) => (Some(output::Tree::new(value, children)), errors),
-                Err(value_errors) => {
-                    let mut all_errors = value_errors;
-                    all_errors.extend(errors);
+                GetValueResult::ValidTree(value) => {
+                    (Some(output::Tree::new(value, children)), errors)
+                }
 
-                    (None, all_errors)
+                GetValueResult::ParseError(parse_error) => {
+                    let model_error = output::error::TreeError::Parse(parse_error);
+                    errors.insert(model_path.to_path_buf(), model_error);
+
+                    (None, errors)
+                }
+
+                GetValueResult::ParameterErrors(parameter_errors) => {
+                    errors
+                        .entry(model_path.to_path_buf())
+                        .or_default()
+                        .insert_parameter_errors(parameter_name.to_string(), parameter_errors);
+
+                    (None, errors)
                 }
             }
         }
@@ -484,7 +505,7 @@ impl Runtime {
         model_path: &Path,
         reference_name: Option<&str>,
         parameter_name: &str,
-    ) -> Option<Result<output::dependency::DependencyTreeValue, output::error::TreeError>> {
+    ) -> Option<GetValueResult<output::dependency::DependencyTreeValue>> {
         let eval_result = self.eval_cache.get_entry(model_path)?;
 
         // get the parameter from the model if it exists,
@@ -497,10 +518,10 @@ impl Runtime {
                 } => {
                     return parameter_errors
                         .get(parameter_name)
-                        .map(|errors| Err(errors.to_vec()));
+                        .map(|errors| GetValueResult::ParameterErrors(errors.to_vec()));
                 }
                 output::error::ResolutionError::Parse(parse_error) => {
-                    return Some(Err(parse_error.to_vec()));
+                    return Some(GetValueResult::ParseError(parse_error.clone()));
                 }
             },
             // it may be possible to recover the parameter from the partial result
@@ -510,7 +531,7 @@ impl Runtime {
                 ..
             }) => {
                 if let Some(errors) = parameter_errors.get(parameter_name) {
-                    return Some(Err(errors.to_vec()));
+                    return Some(GetValueResult::ParameterErrors(errors.to_vec()));
                 }
 
                 partial_result.parameters.get(parameter_name)?
@@ -532,7 +553,7 @@ impl Runtime {
             display_info,
         };
 
-        Some(Ok(tree_value))
+        Some(GetValueResult::ValidTree(tree_value))
     }
 
     /// Gets the reference tree for a specific parameter.
@@ -546,7 +567,7 @@ impl Runtime {
         parameter_name: &str,
     ) -> (
         Option<output::Tree<output::dependency::ReferenceTreeValue>>,
-        output::error::TreeError,
+        IndexMap<PathBuf, output::error::TreeError>,
     ) {
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, parameter_name, &dependency_graph);
@@ -562,10 +583,10 @@ impl Runtime {
             dependency_graph: &output::DependencyGraph,
         ) -> (
             Option<output::Tree<output::dependency::ReferenceTreeValue>>,
-            output::error::TreeError,
+            IndexMap<PathBuf, output::error::TreeError>,
         ) {
             let Some(value) = runtime.get_reference_tree_value(model_path, parameter_name) else {
-                return (None, output::error::TreeError::default());
+                return (None, IndexMap::new());
             };
 
             let deps = dependency_graph
@@ -591,15 +612,36 @@ impl Runtime {
 
             let (children, errors): (Vec<_>, Vec<_>) = parameter_deps.chain(external_deps).unzip();
             let children = children.into_iter().flatten().collect();
-            let errors: output::error::TreeError = errors.into_iter().flatten().collect();
+            let mut errors = errors.into_iter().fold(
+                IndexMap::<PathBuf, output::error::TreeError>::new(),
+                |mut acc, error_map| {
+                    for (path, errors) in error_map {
+                        acc.entry(path).or_default().insert_all(errors);
+                    }
+
+                    acc
+                },
+            );
 
             match value {
-                Ok(value) => (Some(output::Tree::new(value, children)), errors),
-                Err(value_errors) => {
-                    let mut all_errors = value_errors;
-                    all_errors.extend(errors);
+                GetValueResult::ValidTree(value) => {
+                    (Some(output::Tree::new(value, children)), errors)
+                }
 
-                    (None, all_errors)
+                GetValueResult::ParseError(parse_error) => {
+                    let model_error = output::error::TreeError::Parse(parse_error);
+                    errors.insert(model_path.to_path_buf(), model_error);
+
+                    (None, errors)
+                }
+
+                GetValueResult::ParameterErrors(parameter_errors) => {
+                    errors
+                        .entry(model_path.to_path_buf())
+                        .or_default()
+                        .insert_parameter_errors(parameter_name.to_string(), parameter_errors);
+
+                    (None, errors)
                 }
             }
         }
@@ -609,7 +651,7 @@ impl Runtime {
         &self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> Option<Result<output::dependency::ReferenceTreeValue, output::error::TreeError>> {
+    ) -> Option<GetValueResult<output::dependency::ReferenceTreeValue>> {
         let eval_result = self.eval_cache.get_entry(model_path)?;
 
         // get the parameter from the model if it exists,
@@ -622,10 +664,10 @@ impl Runtime {
                 } => {
                     return parameter_errors
                         .get(parameter_name)
-                        .map(|errors| Err(errors.to_vec()));
+                        .map(|errors| GetValueResult::ParameterErrors(errors.to_vec()));
                 }
                 output::error::ResolutionError::Parse(parse_error) => {
-                    return Some(Err(parse_error.to_vec()));
+                    return Some(GetValueResult::ParseError(parse_error.clone()));
                 }
             },
             // it may be possible to recover the parameter from the partial result
@@ -635,7 +677,7 @@ impl Runtime {
                 ..
             }) => {
                 if let Some(errors) = parameter_errors.get(parameter_name) {
-                    return Some(Err(errors.to_vec()));
+                    return Some(GetValueResult::ParameterErrors(errors.to_vec()));
                 }
 
                 partial_result.parameters.get(parameter_name)?
@@ -658,7 +700,7 @@ impl Runtime {
             display_info,
         };
 
-        Some(Ok(tree_value))
+        Some(GetValueResult::ValidTree(tree_value))
     }
 }
 
@@ -742,4 +784,10 @@ impl AsOneilError for InternalIoError<'_> {
     fn message(&self) -> String {
         format!("couldn't read `{}` - {}", self.path.display(), self.error)
     }
+}
+
+enum GetValueResult<T> {
+    ValidTree(T),
+    ParseError(output::error::ParseError),
+    ParameterErrors(Vec<OneilError>),
 }
