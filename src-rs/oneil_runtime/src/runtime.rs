@@ -402,7 +402,7 @@ impl Runtime {
     /// The graph is built from the cached evaluation results. The cache must
     /// have been populated by a prior call to [`eval_model`](Self::eval_model).
     #[must_use]
-    pub fn get_dependency_graph(&self) -> output::DependencyGraph {
+    fn get_dependency_graph(&self) -> output::DependencyGraph {
         let mut dependency_graph = output::DependencyGraph::new();
 
         for (model_path, model) in self.eval_cache.models_iter() {
