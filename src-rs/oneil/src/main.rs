@@ -289,6 +289,7 @@ fn handle_test_command(args: TestArgs) {
     let TestArgs {
         file,
         recursive,
+        partial: display_partial_results,
         no_header,
         no_test_report,
     } = args;
@@ -297,18 +298,14 @@ fn handle_test_command(args: TestArgs) {
         no_header,
         no_test_report,
         recursive,
+        display_partial_results,
     };
 
-    let builtins = create_builtins();
-    let (eval_context, _watch_paths) = eval_model(&file, &builtins);
+    let mut runtime = Runtime::new();
 
-    if let Some(eval_context) = eval_context {
-        let model_result = eval_context
-            .get_model_result(&file)
-            .expect("model should be evaluated");
+    let eval_result = runtime.eval_model(&file);
 
-        print_model_result::print_test_results(&model_result, &test_print_config);
-    }
+    print_model_result::print_test_results(eval_result, &test_print_config);
 }
 
 fn handle_tree_command(args: TreeArgs) {

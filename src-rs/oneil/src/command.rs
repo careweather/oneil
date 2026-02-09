@@ -156,6 +156,13 @@ pub struct TestArgs {
     #[arg(long, short = 'r')]
     pub recursive: bool,
 
+    /// Display partial test results even if there are errors
+    ///
+    /// If errors occurred during evaluation, errors will be printed,
+    /// then the partial results will be printed.
+    #[arg(long)]
+    pub partial: bool,
+
     /// Don't print the results header
     #[arg(long)]
     pub no_header: bool,

@@ -11,7 +11,7 @@ use oneil_shared::{error::OneilError, span::Span};
 
 use crate::{
     command::{PrintMode, Variable, VariableList},
-    print_utils, stylesheet,
+    print_error, print_utils, stylesheet,
 };
 
 #[expect(
@@ -30,15 +30,23 @@ pub struct ModelPrintConfig {
     pub no_parameters: bool,
 }
 
-fn divider_line() -> String {
-    "─".repeat(80)
-}
-
 pub fn print_eval_result(
     eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
     model_config: &ModelPrintConfig,
 ) {
     let (top_model, errors) = unwrap_eval_result(eval_result);
+
+    for error in &errors {
+        print_error::print(error, false);
+    }
+
+    if !errors.is_empty() && !model_config.display_partial_results {
+        return;
+    }
+
+    let Some(top_model) = top_model else {
+        return;
+    };
 
     let test_info = get_model_tests(top_model, model_config.recursive, TestInfo::default());
 
@@ -67,6 +75,7 @@ pub struct TestPrintConfig {
     pub no_header: bool,
     pub no_test_report: bool,
     pub recursive: bool,
+    pub display_partial_results: bool,
 }
 
 pub fn print_test_results(
@@ -74,6 +83,18 @@ pub fn print_test_results(
     test_config: &TestPrintConfig,
 ) {
     let (top_model, errors) = unwrap_eval_result(eval_result);
+
+    for error in &errors {
+        print_error::print(error, false);
+    }
+
+    if !errors.is_empty() && !test_config.display_partial_results {
+        return;
+    }
+
+    let Some(top_model) = top_model else {
+        return;
+    };
 
     let test_info = get_model_tests(top_model, test_config.recursive, TestInfo::default());
 
@@ -89,10 +110,61 @@ pub fn print_test_results(
     }
 }
 
+/// Collects all errors from the evaluation result by traversing the model hierarchy,
+/// and returns the top-level model (if any) and the collected errors.
+///
+/// The top-level model is present when the result is `Ok`, or when it is `Err` but
+/// has a partial result. Uses a depth-first search over references to collect
+/// errors from every nested evaluation failure.
 fn unwrap_eval_result<'a>(
     eval_result: Result<ModelReference<'a>, EvalErrorReference<'a>>,
-) -> (ModelReference<'a>, Vec<OneilError>) {
-    todo!()
+) -> (Option<ModelReference<'a>>, Vec<OneilError>) {
+    // unwrap the top model if it exists
+    let top_model = match &eval_result {
+        Ok(r) => Some(*r),
+        Err(e) => e.partial_result(),
+    };
+
+    let errors = extract_errors(eval_result);
+
+    (top_model, errors)
+}
+
+fn extract_errors(
+    eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
+) -> Vec<OneilError> {
+    let mut errors = Vec::new();
+
+    let mut stack: Vec<Result<_, EvalErrorReference<'_>>> = match &eval_result {
+        Ok(r) => vec![Ok(*r)],
+        Err(e) => {
+            errors.extend(e.model_errors());
+            if let Some(partial) = e.partial_result() {
+                let queue = vec![Ok(partial)];
+                queue
+            } else {
+                vec![]
+            }
+        }
+    };
+
+    while let Some(r) = stack.pop() {
+        match r {
+            Err(e) => {
+                errors.extend(e.model_errors());
+                if let Some(partial) = e.partial_result() {
+                    stack.push(Ok(partial));
+                }
+            }
+            Ok(model_ref) => {
+                for nested in model_ref.references().values() {
+                    stack.push(*nested);
+                }
+            }
+        }
+    }
+
+    errors
 }
 
 #[derive(Default)]
@@ -128,10 +200,14 @@ fn get_model_tests<'result>(
 
     if recursive {
         model_ref
-            .submodels()
+            .references()
             .values()
+            .filter_map(|submodel| match submodel {
+                Ok(submodel) => Some(*submodel),
+                Err(e) => e.partial_result(),
+            })
             .fold(test_info, |test_info, submodel| {
-                get_model_tests(*submodel, recursive, test_info)
+                get_model_tests(submodel, recursive, test_info)
             })
     } else {
         test_info
@@ -320,9 +396,16 @@ fn get_parameter_from_model<'result>(
         let submodels = model_ref.submodels();
         let model = references
             .get(submodel.as_str())
-            .or(submodels.get(submodel.as_str()))?;
+            .or_else(|| {
+                submodels.get(submodel.as_str()).map(|r| {
+                    references
+                        .get(r)
+                        .expect("submodel reference should be found")
+                })
+            })
+            .and_then(|r| r.ok())?;
 
-        recurse(*model, parameter, param_vec)
+        recurse(model, parameter, param_vec)
     }
 }
 
@@ -408,11 +491,15 @@ fn get_model_parameters_by_filter(
         if recursive {
             // NOTE: all submodels are also references, so we can simply use the references map
             let references = model_ref.references();
-            let models = references.values();
-
-            models.fold(parameters, |parameters, model| {
-                recurse(*model, print_level, recursive, parameters)
-            })
+            references
+                .values()
+                .filter_map(|submodel| match submodel {
+                    Ok(submodel) => Some(*submodel),
+                    Err(e) => e.partial_result(),
+                })
+                .fold(parameters, |parameters, model| {
+                    recurse(model, print_level, recursive, parameters)
+                })
         } else {
             parameters
         }
@@ -520,7 +607,18 @@ fn print_all_tests(model_ref: ModelReference<'_>, recursive: bool) {
         }
 
         for reference in model_ref.references().values() {
-            print_all_tests(*reference, recursive);
+            let reference = match reference {
+                Ok(r) => Some(*r),
+                Err(e) => e.partial_result(),
+            };
+
+            if let Some(r) = reference {
+                print_all_tests(r, recursive);
+            }
         }
     }
+}
+
+fn divider_line() -> String {
+    "─".repeat(80)
 }
