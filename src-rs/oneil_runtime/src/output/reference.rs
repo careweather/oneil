@@ -49,26 +49,11 @@ impl<'result> ModelReference<'result> {
     /// the case as long as creating the `EvalResult`
     /// resolves successfully.
     #[must_use]
-    pub fn submodels(&self) -> IndexMap<&'result str, Result<Self, EvalErrorReference<'result>>> {
+    pub fn submodels(&self) -> IndexMap<&'result str, &'result str> {
         self.model
             .submodels
             .iter()
-            .map(|(name, path)| {
-                let entry = self
-                    .eval_cache
-                    .get_entry(path)
-                    .expect("submodel should be in cache");
-
-                let result = entry
-                    .as_ref()
-                    .map(|model| Self {
-                        model,
-                        eval_cache: self.eval_cache,
-                    })
-                    .map_err(|eval_error| EvalErrorReference::new(eval_error, self.eval_cache));
-
-                (name.as_str(), result)
-            })
+            .map(|(name, reference_name)| (name.as_str(), reference_name.as_str()))
             .collect()
     }
 

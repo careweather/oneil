@@ -68,12 +68,7 @@ fn eval_model_from_context<E: ExternalEvaluationContext>(
     // Add submodels to the current model
     let submodels = model.get_submodels();
     for (submodel_name, submodel_import) in submodels {
-        let submodel_reference_path = model
-            .get_reference(submodel_import.reference_name())
-            .expect("submodel reference should be found")
-            .path();
-
-        context.add_submodel(submodel_name.as_str(), submodel_reference_path);
+        context.add_submodel(submodel_name.as_str(), submodel_import.reference_name());
     }
 
     // Evaluate parameters

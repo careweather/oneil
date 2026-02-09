@@ -24,11 +24,8 @@ use crate::{output::dependency::DependencySet, value::Value};
 pub struct Model {
     /// The file path of the model that was evaluated.
     pub path: PathBuf,
-    /// A map of submodel names to their evaluated results.
-    ///
-    /// Submodels are evaluated recursively, so each entry contains a fully
-    /// evaluated `Model` structure.
-    pub submodels: IndexMap<String, PathBuf>,
+    /// A map of submodel names to their reference names.
+    pub submodels: IndexMap<String, String>,
     /// A map of reference names to their evaluated results.
     ///
     /// References are evaluated recursively, so each entry contains a fully

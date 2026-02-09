@@ -48,7 +48,7 @@ pub trait ExternalEvaluationContext {
 struct ModelInProgress {
     had_resolution_errors: bool,
     parameters: IndexMap<String, Result<output::Parameter, Vec<EvalError>>>,
-    submodels: IndexMap<String, PathBuf>,
+    submodels: IndexMap<String, String>,
     references: IndexMap<String, PathBuf>,
     tests: Vec<Result<output::Test, Vec<EvalError>>>,
 }
@@ -334,7 +334,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// # Panics
     ///
     /// Panics if no current model is set or if the current model was not created.
-    pub(crate) fn add_submodel(&mut self, submodel_name: &str, submodel_import: &ir::ModelPath) {
+    pub(crate) fn add_submodel(&mut self, submodel_name: &str, submodel_reference_name: &str) {
         let Some(current_model) = self.active_models.last() else {
             panic!("current model should be set when adding a submodel");
         };
@@ -346,7 +346,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
         model.submodels.insert(
             submodel_name.to_string(),
-            submodel_import.as_ref().to_path_buf(),
+            submodel_reference_name.to_string(),
         );
     }
 
