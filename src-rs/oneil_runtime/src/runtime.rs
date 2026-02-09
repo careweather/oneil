@@ -46,9 +46,7 @@ impl Runtime {
     }
 
     /// Returns documentation for all builtin units.
-    pub fn builtin_units_docs(
-        &self,
-    ) -> impl Iterator<Item = (&'static str, Vec<&'static str>)> {
+    pub fn builtin_units_docs(&self) -> impl Iterator<Item = (&'static str, Vec<&'static str>)> {
         self.builtins.builtin_units_docs()
     }
 
@@ -414,13 +412,15 @@ impl Runtime {
     /// that the specified parameter depends on, recursively.
     #[must_use]
     pub fn get_dependency_tree(
-        &self,
+        &mut self,
         model_path: &Path,
         parameter_name: &str,
     ) -> (
         Option<output::Tree<output::dependency::DependencyTreeValue>>,
         IndexMap<PathBuf, output::error::TreeError>,
     ) {
+        let _ = self.eval_model(model_path);
+
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, None, parameter_name, &dependency_graph);
 
@@ -590,13 +590,15 @@ impl Runtime {
     /// This is the inverse of the dependency tree.
     #[must_use]
     pub fn get_reference_tree(
-        &self,
+        &mut self,
         model_path: &Path,
         parameter_name: &str,
     ) -> (
         Option<output::Tree<output::dependency::ReferenceTreeValue>>,
         IndexMap<PathBuf, output::error::TreeError>,
     ) {
+        let _ = self.eval_model(model_path);
+
         let dependency_graph = self.get_dependency_graph();
         return recurse(self, model_path, parameter_name, &dependency_graph);
 
