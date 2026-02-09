@@ -14,9 +14,16 @@ use std::{
 
 use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use notify::Watcher;
-use oneil_runtime::Runtime;
+use oneil_runtime::{
+    Runtime,
+    output::{
+        Tree,
+        dependency::{DependencyTreeValue, ReferenceTreeValue},
+        error::TreeError,
+    },
+};
 
 use crate::{
     command::{
@@ -325,46 +332,47 @@ fn handle_tree_command(args: TreeArgs) {
 
     let tree_print_config = TreePrintConfig { recursive, depth };
 
-    let builtins = create_builtins();
-    let (eval_context, _watch_paths) = eval_model(&file, &builtins);
-
-    let Some(eval_context) = eval_context else {
-        return;
-    };
+    let mut runtime = Runtime::new();
+    runtime.eval_model(&file);
 
     let (trees, errors) = if list_refs {
         let mut trees = Vec::new();
-        let mut errors = Vec::new();
+        let mut errors = IndexMap::<PathBuf, TreeError>::new();
 
         for param in params {
-            let (reference_tree, tree_errors) = eval_context.get_reference_tree(&file, &param);
+            let (reference_tree, tree_errors) = runtime.get_reference_tree(&file, &param);
 
             trees.push((param, reference_tree));
-            errors.extend(tree_errors);
+            for (path, error) in tree_errors {
+                errors.entry(path).or_default().insert_all(error);
+            }
         }
 
         (TreeResults::ReferenceTrees(trees), errors)
     } else {
         let mut trees = Vec::new();
-        let mut errors = Vec::new();
+        let mut errors = IndexMap::<PathBuf, TreeError>::new();
 
         for param in params {
-            let (dependency_tree, tree_errors) = eval_context.get_dependency_tree(&file, &param);
+            let (dependency_tree, tree_errors) = runtime.get_dependency_tree(&file, &param);
 
             trees.push((param, dependency_tree));
-            errors.extend(tree_errors);
+            for (path, error) in tree_errors {
+                errors.entry(path).or_default().insert_all(error);
+            }
         }
 
         (TreeResults::DependencyTrees(trees), errors)
     };
 
-    for error in &errors {
-        let error = convert_error::eval::convert(error);
+    let errors = errors
+        .into_values()
+        .map(|errors| errors.to_vec())
+        .flatten()
+        .collect::<Vec<_>>();
 
-        if let Some(error) = error {
-            print_error::print(&error, false);
-            eprintln!();
-        }
+    for error in &errors {
+        print_error::print(&error, false);
         eprintln!();
     }
 
