@@ -38,7 +38,7 @@ pub fn print_eval_result(
     let (top_model, errors) = unwrap_eval_result(eval_result);
 
     for error in &errors {
-        print_error::print(error, false, model_config.show_internal_errors);
+        print_error::print(error, model_config.show_internal_errors);
     }
 
     if !errors.is_empty() && !model_config.display_partial_results {
@@ -91,7 +91,7 @@ pub fn print_test_results(
     let (top_model, errors) = unwrap_eval_result(eval_result);
 
     for error in &errors {
-        print_error::print(error, false, test_config.show_internal_errors);
+        print_error::print(error, test_config.show_internal_errors);
     }
 
     if !errors.is_empty() && !test_config.display_partial_results {

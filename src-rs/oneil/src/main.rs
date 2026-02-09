@@ -385,7 +385,7 @@ fn handle_tree_command(args: TreeArgs, show_internal_errors: bool) {
         .collect::<Vec<_>>();
 
     for error in &errors {
-        print_error::print(error, false, show_internal_errors);
+        print_error::print(error, show_internal_errors);
         eprintln!();
     }
 

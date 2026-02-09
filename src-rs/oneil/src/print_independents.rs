@@ -38,7 +38,7 @@ pub fn print(
     let errors = collect_all_errors(&model_result);
 
     for error in &errors {
-        print_error::print(error, false, independent_print_config.show_internal_errors);
+        print_error::print(error, independent_print_config.show_internal_errors);
     }
 
     let show_independents = errors.is_empty() || independent_print_config.display_partial_results;

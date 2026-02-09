@@ -33,7 +33,7 @@ pub fn print(
 
     if !errors.is_empty() {
         for error in &errors {
-            print_error::print(error, false, config.show_internal_errors);
+            print_error::print(error, config.show_internal_errors);
         }
     }
 

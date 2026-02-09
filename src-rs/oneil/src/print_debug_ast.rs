@@ -20,7 +20,7 @@ pub fn print(ast_result: Result<&ast::Model, output::error::ParseError>, config:
             errors,
         }) => {
             for error in errors {
-                print_error::print(&error, false, config.show_internal_errors);
+                print_error::print(&error, config.show_internal_errors);
                 eprintln!();
             }
 
@@ -29,7 +29,7 @@ pub fn print(ast_result: Result<&ast::Model, output::error::ParseError>, config:
             }
         }
         Err(output::error::ParseError::File(error)) => {
-            print_error::print(&error.error, false, config.show_internal_errors);
+            print_error::print(&error.error, config.show_internal_errors);
             eprintln!();
         }
     }
