@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 use oneil_ir as ir;
 
-use crate::output::error::{ParseError, ResolutionError};
+use crate::output::error::ResolutionError;
 
 /// Result of loading IR for a model: either the resolved model or a [`ResolutionError`].
 pub type IrLoadResult = Result<ir::Model, ResolutionError>;
@@ -34,10 +34,7 @@ impl IrCache {
         match entry {
             Ok(m) => Some(m),
             Err(ResolutionError::ResolutionErrors { partial_ir, .. }) => Some(partial_ir),
-            Err(ResolutionError::Parse(error)) => match error {
-                ParseError::ParseErrors { .. } => None,
-                ParseError::File(_) => None,
-            },
+            Err(ResolutionError::Parse(_error)) => None,
         }
     }
 
