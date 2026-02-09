@@ -1,12 +1,37 @@
 //! Abstract Syntax Tree (AST) printing functionality for the Oneil CLI
 
-use oneil_runtime::output::ast;
+use oneil_runtime::output::{self, ast};
 
 use anstream::println;
 
+use crate::print_error;
+
+pub struct AstPrintConfig {
+    pub display_partial: bool,
+}
+
 /// Prints the AST in a hierarchical tree format for debugging
-pub fn print(ast: &ast::Model) {
-    print_model(ast, 0);
+pub fn print(ast_result: Result<&ast::Model, output::error::ParseError>, config: &AstPrintConfig) {
+    match ast_result {
+        Ok(ast) => print_model(ast, 0),
+        Err(output::error::ParseError::ParseErrors {
+            partial_ast,
+            errors,
+        }) => {
+            for error in errors {
+                print_error::print(&error, false);
+                eprintln!();
+            }
+
+            if config.display_partial {
+                print_model(&*partial_ast, 0);
+            }
+        }
+        Err(output::error::ParseError::File(error)) => {
+            print_error::print(&error.error, false);
+            eprintln!();
+        }
+    }
 }
 
 /// Prints a model node with its declarations and sections
