@@ -101,6 +101,18 @@ impl Runtime {
                 Ok(model) => {
                     self.eval_cache.insert_ok(model_path, model);
                 }
+                Err(eval_errors) if eval_errors.had_resolution_errors => {
+                    let resolution_errors = self
+                        .ir_cache
+                        .get_error(&model_path)
+                        .expect("should have resolution errors")
+                        .clone();
+
+                    self.eval_cache.insert_err(
+                        model_path,
+                        output::error::EvalError::Resolution(resolution_errors),
+                    );
+                }
                 Err(eval_errors) => {
                     let parameter_errors = eval_errors
                         .parameters
@@ -789,7 +801,8 @@ impl model_resolver::ExternalResolutionContext for Runtime {
         &mut self,
         python_path: &ir::PythonPath,
     ) -> Result<(), model_resolver::PythonImportLoadingFailedError> {
-        todo!()
+        // TODO: implement this
+        Ok(())
     }
 }
 

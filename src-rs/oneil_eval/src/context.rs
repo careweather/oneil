@@ -12,6 +12,7 @@ use crate::{
 };
 
 /// Error indicating that an IR model could not be loaded.
+#[derive(Debug, Clone, Copy)]
 pub struct IrLoadError;
 
 /// Context provided by the runtime for resolving IR, builtins, and units during evaluation.
@@ -143,7 +144,8 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                 tests,
             };
 
-            if parameter_errors.is_empty() && test_errors.is_empty() {
+            if parameter_errors.is_empty() && test_errors.is_empty() && !model.had_resolution_errors
+            {
                 result.insert(path, Ok(output_model));
             } else {
                 result.insert(
