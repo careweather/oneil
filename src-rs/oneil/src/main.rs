@@ -432,7 +432,7 @@ fn handle_builtins_command(command: Option<BuiltinsCommand>) {
             unit_name: Some(unit_name),
         }) => print_builtins::search_builtins_units(&runtime, &unit_name),
         Some(BuiltinsCommand::Units { unit_name: None }) => {
-            print_builtins::print_builtins_units(&runtime)
+            print_builtins::print_builtins_units(&runtime);
         }
         Some(BuiltinsCommand::Functions {
             function_name: Some(function_name),
@@ -444,13 +444,13 @@ fn handle_builtins_command(command: Option<BuiltinsCommand>) {
             value_name: Some(value_name),
         }) => print_builtins::search_builtins_values(&runtime, &value_name),
         Some(BuiltinsCommand::Values { value_name: None }) => {
-            print_builtins::print_builtins_values(&runtime)
+            print_builtins::print_builtins_values(&runtime);
         }
         Some(BuiltinsCommand::Prefixes {
             prefix_name: Some(prefix_name),
         }) => print_builtins::search_builtins_prefixes(&runtime, &prefix_name),
         Some(BuiltinsCommand::Prefixes { prefix_name: None }) => {
-            print_builtins::print_builtins_prefixes(&runtime)
+            print_builtins::print_builtins_prefixes(&runtime);
         }
     }
 }
