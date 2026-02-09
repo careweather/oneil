@@ -18,6 +18,10 @@ pub struct CliCommand {
     /// terminals that don't support ANSI color codes or for redirecting to files.
     #[arg(long)]
     pub no_colors: bool,
+
+    /// Show internal errors
+    #[arg(long, hide = true)]
+    pub dev_show_internal_errors: bool,
 }
 
 /// Available top-level commands for the Oneil CLI

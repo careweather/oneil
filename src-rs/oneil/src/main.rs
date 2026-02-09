@@ -61,39 +61,40 @@ fn main() {
             //       the LSP
             //oneil_lsp::run();
         }
-        Commands::Dev { command } => handle_dev_command(command),
-        Commands::Eval(args) => handle_eval_command(args),
-        Commands::Test(args) => handle_test_command(args),
-        Commands::Tree(args) => handle_tree_command(args),
+        Commands::Dev { command } => handle_dev_command(command, cli.dev_show_internal_errors),
+        Commands::Eval(args) => handle_eval_command(args, cli.dev_show_internal_errors),
+        Commands::Test(args) => handle_test_command(args, cli.dev_show_internal_errors),
+        Commands::Tree(args) => handle_tree_command(args, cli.dev_show_internal_errors),
         Commands::Builtins { command } => handle_builtins_command(command),
-        Commands::Independent(args) => handle_independent_command(args),
+        Commands::Independent(args) => handle_independent_command(args, cli.dev_show_internal_errors),
     }
 }
 
-fn handle_dev_command(command: DevCommand) {
+fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
     match command {
         DevCommand::PrintAst {
             files,
             display_partial,
-        } => handle_print_ast(&files, display_partial),
+        } => handle_print_ast(&files, display_partial, show_internal_errors),
         DevCommand::PrintIr {
             file,
             display_partial,
             recursive,
-        } => handle_print_ir(&file, display_partial, recursive),
+        } => handle_print_ir(&file, display_partial, recursive, show_internal_errors),
         DevCommand::PrintModelResult {
             file,
             display_partial,
             recursive,
-        } => {
-            handle_print_model_result(&file, display_partial, recursive);
-        }
+        } => handle_print_model_result(&file, display_partial, recursive, show_internal_errors),
     }
 }
 
 /// Handles the `dev print-ast` command.
-fn handle_print_ast(files: &[PathBuf], display_partial: bool) {
-    let ast_print_config = AstPrintConfig { display_partial };
+fn handle_print_ast(files: &[PathBuf], display_partial: bool, show_internal_errors: bool) {
+    let ast_print_config = AstPrintConfig {
+        display_partial,
+        show_internal_errors,
+    };
 
     let mut runtime = Runtime::new();
 
@@ -110,10 +111,16 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool) {
 }
 
 /// Handles the `dev print-ir` command.
-fn handle_print_ir(file: &Path, display_partial: bool, recursive: bool) {
+fn handle_print_ir(
+    file: &Path,
+    display_partial: bool,
+    recursive: bool,
+    show_internal_errors: bool,
+) {
     let ir_print_config = IrPrintConfig {
         display_partial,
         recursive,
+        show_internal_errors,
     };
 
     let mut runtime = Runtime::new();
@@ -124,10 +131,16 @@ fn handle_print_ir(file: &Path, display_partial: bool, recursive: bool) {
 }
 
 /// Handles the `dev print-model-result` command.
-fn handle_print_model_result(file: &Path, display_partial: bool, recursive: bool) {
+fn handle_print_model_result(
+    file: &Path,
+    display_partial: bool,
+    recursive: bool,
+    show_internal_errors: bool,
+) {
     let config = print_debug_model_result::DebugModelResultPrintConfig {
         display_partial,
         recursive,
+        show_internal_errors,
     };
 
     let mut runtime = Runtime::new();
@@ -136,7 +149,7 @@ fn handle_print_model_result(file: &Path, display_partial: bool, recursive: bool
     print_debug_model_result::print(eval_result, &config);
 }
 
-fn handle_eval_command(args: EvalArgs) {
+fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
     let EvalArgs {
         file,
         params: variables,
@@ -159,9 +172,9 @@ fn handle_eval_command(args: EvalArgs) {
         no_header,
         no_test_report,
         no_parameters,
+        show_internal_errors,
     };
 
-    // TODO: make a function on the runtime for getting the paths to watch
     if watch {
         watch_model(&file, &model_print_config);
     } else {
@@ -293,7 +306,7 @@ fn clear_screen() {
     std::io::stdout().flush().expect("failed to flush stdout");
 }
 
-fn handle_test_command(args: TestArgs) {
+fn handle_test_command(args: TestArgs, show_internal_errors: bool) {
     let TestArgs {
         file,
         recursive,
@@ -307,6 +320,7 @@ fn handle_test_command(args: TestArgs) {
         no_test_report,
         recursive,
         display_partial_results,
+        show_internal_errors,
     };
 
     let mut runtime = Runtime::new();
@@ -316,7 +330,7 @@ fn handle_test_command(args: TestArgs) {
     print_model_result::print_test_results(eval_result, &test_print_config);
 }
 
-fn handle_tree_command(args: TreeArgs) {
+fn handle_tree_command(args: TreeArgs, show_internal_errors: bool) {
     enum TreeResults {
         ReferenceTrees(Vec<(String, Option<Tree<ReferenceTreeValue>>)>),
         DependencyTrees(Vec<(String, Option<Tree<DependencyTreeValue>>)>),
@@ -371,7 +385,7 @@ fn handle_tree_command(args: TreeArgs) {
         .collect::<Vec<_>>();
 
     for error in &errors {
-        print_error::print(error, false);
+        print_error::print(error, false, show_internal_errors);
         eprintln!();
     }
 
@@ -455,7 +469,7 @@ fn handle_builtins_command(command: Option<BuiltinsCommand>) {
     }
 }
 
-fn handle_independent_command(args: IndependentArgs) {
+fn handle_independent_command(args: IndependentArgs, show_internal_errors: bool) {
     let IndependentArgs {
         file,
         recursive,
@@ -467,6 +481,7 @@ fn handle_independent_command(args: IndependentArgs) {
         print_values,
         recursive,
         display_partial_results,
+        show_internal_errors,
     };
 
     let mut runtime = Runtime::new();

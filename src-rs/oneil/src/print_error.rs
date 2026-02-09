@@ -26,10 +26,10 @@ use owo_colors::{OwoColorize, Style};
 use crate::stylesheet;
 
 /// Prints a formatted error message to the specified writer
-pub fn print(error: &OneilError, print_debug: bool) {
+pub fn print(error: &OneilError, print_debug: bool, show_internal_errors: bool) {
     if print_debug {
         eprintln!("{error:?}");
-    } else if error.should_show_to_user() {
+    } else if error.should_show_to_user() || show_internal_errors {
         let error_string = error_to_string(error);
         eprintln!("{error_string}");
     }

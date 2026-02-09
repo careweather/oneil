@@ -15,6 +15,7 @@ use crate::print_error;
 pub struct IrPrintConfig {
     pub display_partial: bool,
     pub recursive: bool,
+    pub show_internal_errors: bool,
 }
 
 /// Prints the IR in a hierarchical tree format for debugging.
@@ -30,7 +31,7 @@ pub fn print(
 
     if !errors.is_empty() {
         for error in &errors {
-            print_error::print(error, false);
+            print_error::print(error, false, ir_print_config.show_internal_errors);
         }
     }
 

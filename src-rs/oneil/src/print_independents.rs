@@ -9,10 +9,15 @@ use oneil_shared::error::OneilError;
 
 use crate::{print_error, print_utils, stylesheet};
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "this is a configuration struct for printing independent parameters"
+)]
 pub struct IndependentPrintConfig {
     pub print_values: bool,
     pub recursive: bool,
     pub display_partial_results: bool,
+    pub show_internal_errors: bool,
 }
 
 /// Prints all independent parameters from the model result.
@@ -33,7 +38,7 @@ pub fn print(
     let errors = collect_all_errors(&model_result);
 
     for error in &errors {
-        print_error::print(error, false);
+        print_error::print(error, false, independent_print_config.show_internal_errors);
     }
 
     let show_independents = errors.is_empty() || independent_print_config.display_partial_results;
