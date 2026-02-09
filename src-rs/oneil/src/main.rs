@@ -7,7 +7,6 @@
 )]
 
 use std::{
-    collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
     sync::mpsc,
@@ -15,14 +14,16 @@ use std::{
 
 use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
+use indexmap::IndexSet;
 use notify::Watcher;
-use oneil_runtime::{Runtime, output};
+use oneil_runtime::Runtime;
 
 use crate::{
     command::{
         BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, IndependentArgs, TestArgs,
         TreeArgs,
     },
+    print_debug_ast::AstPrintConfig,
     print_debug_ir::IrPrintConfig,
     print_independents::IndependentPrintConfig,
     print_model_result::{ModelPrintConfig, TestPrintConfig},
@@ -152,24 +153,21 @@ fn handle_eval_command(args: EvalArgs) {
         no_parameters,
     };
 
-    let mut runtime = Runtime::new();
-
+    // TODO: make a function on the runtime for getting the paths to watch
     if watch {
-        watch_model(&file, &mut runtime, &model_print_config);
+        watch_model(&file, &model_print_config);
     } else {
-        let (eval_context, _watch_paths) = eval_model(&file, &mut runtime);
+        let mut runtime = Runtime::new();
 
-        if let Some(eval_context) = eval_context {
-            let model_result = eval_context
-                .get_model_result(&file)
-                .expect("model should be evaluated");
+        let eval_result = runtime.eval_model(&file);
 
-            print_model_result(&model_result, &model_print_config);
-        }
+        print_model_result::print_eval_result(eval_result, &model_print_config);
     }
 }
 
-fn watch_model(file: &Path, runtime: &mut Runtime, model_print_config: &ModelPrintConfig) {
+fn watch_model(file: &Path, model_print_config: &ModelPrintConfig) {
+    let mut runtime = Runtime::new();
+
     let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
 
     let mut watcher = match notify::recommended_watcher(tx) {
@@ -184,19 +182,14 @@ fn watch_model(file: &Path, runtime: &mut Runtime, model_print_config: &ModelPri
         }
     };
 
+    let mut watch_paths = IndexSet::new();
+
     clear_screen();
-    let mut watch_paths = HashSet::new();
 
-    let (eval_context, new_watch_paths) = eval_model(file, runtime);
+    let eval_result = runtime.eval_model(file);
+    print_model_result::print_eval_result(eval_result, model_print_config);
 
-    if let Some(eval_context) = eval_context {
-        let model_result = eval_context
-            .get_model_result(file)
-            .expect("model should be evaluated");
-
-        print_model_result(&model_result, model_print_config);
-    }
-
+    let new_watch_paths = runtime.get_watch_paths();
     let (add_paths, remove_paths) = find_watch_paths_difference(&watch_paths, &new_watch_paths);
 
     update_watcher(&mut watcher, &add_paths, &remove_paths);
@@ -208,16 +201,10 @@ fn watch_model(file: &Path, runtime: &mut Runtime, model_print_config: &ModelPri
                 notify::EventKind::Modify(_) => {
                     clear_screen();
 
-                    let (eval_context, new_watch_paths) = eval_model(file, runtime);
+                    let eval_result = runtime.eval_model(file);
+                    print_model_result::print_eval_result(eval_result, model_print_config);
 
-                    if let Some(eval_context) = eval_context {
-                        let model_result = eval_context
-                            .get_model_result(file)
-                            .expect("model should be evaluated");
-
-                        print_model_result(&model_result, model_print_config);
-                    }
-
+                    let new_watch_paths = runtime.get_watch_paths();
                     let (add_paths, remove_paths) =
                         find_watch_paths_difference(&watch_paths, &new_watch_paths);
 
@@ -238,82 +225,10 @@ fn watch_model(file: &Path, runtime: &mut Runtime, model_print_config: &ModelPri
     }
 }
 
-fn eval_model(
-    file: &Path,
-    runtime: &mut Runtime,
-) -> (
-    Option<output::reference::ModelReference<'_>>,
-    HashSet<PathBuf>,
-) {
-    let model_collection =
-        oneil_model_resolver::load_model(file, builtins, &mut file_parser::FileLoader);
-    let model_collection = match model_collection {
-        Ok(model_collection) => model_collection,
-        Err(error) => {
-            let (model_collection, error_map) = *error;
-
-            let errors = convert_error::loader::convert_map(&error_map);
-            for error in errors {
-                print_error::print(&error, false);
-                eprintln!();
-            }
-
-            let model_watch_paths = watch_paths_from_model_collection(&model_collection);
-            let error_model_watch_paths = error_map.get_watch_paths();
-
-            let watch_paths = model_watch_paths
-                .into_iter()
-                .chain(error_model_watch_paths)
-                .collect();
-
-            return (None, watch_paths);
-        }
-    };
-
-    // TODO: remove this clone?
-    let eval_context =
-        oneil_eval::eval_model_collection(&model_collection, builtins.builtin_map.clone());
-
-    let watch_paths = watch_paths_from_model_collection(&model_collection);
-
-    (Some(eval_context), watch_paths)
-}
-
-fn watch_paths_from_model_collection(model_collection: &ir::ModelCollection) -> HashSet<PathBuf> {
-    let model_paths = model_collection
-        .get_models()
-        .keys()
-        .map(|path| path.as_ref().to_path_buf());
-
-    let python_imports = model_collection
-        .get_python_imports()
-        .into_iter()
-        .map(|import| import.import_path().as_ref().to_path_buf());
-
-    model_paths.chain(python_imports).collect()
-}
-
-fn print_model_result(model_result: &EvalResult, model_print_config: &ModelPrintConfig) {
-    let errors = model_result.get_errors();
-
-    for error in &errors {
-        let error = convert_error::eval::convert(error);
-
-        if let Some(error) = error {
-            print_error::print(&error, false);
-            eprintln!();
-        }
-    }
-
-    if errors.is_empty() || model_print_config.display_partial_results {
-        print_model_result::print_eval_result(model_result, model_print_config);
-    }
-}
-
 fn find_watch_paths_difference<'a>(
-    old_paths: &'a HashSet<PathBuf>,
-    new_paths: &'a HashSet<PathBuf>,
-) -> (HashSet<&'a PathBuf>, HashSet<&'a PathBuf>) {
+    old_paths: &'a IndexSet<PathBuf>,
+    new_paths: &'a IndexSet<PathBuf>,
+) -> (IndexSet<&'a PathBuf>, IndexSet<&'a PathBuf>) {
     let add_paths = new_paths.difference(old_paths).collect();
     let remove_paths = old_paths.difference(new_paths).collect();
     (add_paths, remove_paths)
@@ -321,8 +236,8 @@ fn find_watch_paths_difference<'a>(
 
 fn update_watcher(
     watcher: &mut notify::RecommendedWatcher,
-    add_paths: &HashSet<&PathBuf>,
-    remove_paths: &HashSet<&PathBuf>,
+    add_paths: &IndexSet<&PathBuf>,
+    remove_paths: &IndexSet<&PathBuf>,
 ) {
     let mut watcher_paths_mut = watcher.paths_mut();
 
