@@ -130,10 +130,10 @@ impl AsOneilError for ParameterResolutionError {
         }
     }
 
-    fn should_show_to_user(&self) -> bool {
+    fn is_internal_error(&self) -> bool {
         match self {
-            Self::VariableResolution(error) => error.should_show_to_user(),
-            Self::CircularDependency { .. } | Self::DuplicateParameter { .. } => true,
+            Self::VariableResolution(error) => error.is_internal_error(),
+            Self::CircularDependency { .. } | Self::DuplicateParameter { .. } => false,
         }
     }
 }

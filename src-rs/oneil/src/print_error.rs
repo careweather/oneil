@@ -27,7 +27,7 @@ use crate::stylesheet;
 
 /// Prints a formatted error message to the specified writer
 pub fn print(error: &OneilError, show_internal_errors: bool) {
-    if error.should_show_to_user() || show_internal_errors {
+    if !error.is_internal_error() || show_internal_errors {
         let error_string = error_to_string(error);
         eprintln!("{error_string}");
     }
