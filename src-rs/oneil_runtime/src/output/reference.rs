@@ -219,6 +219,12 @@ impl<'result> ModelIrReference<'result> {
         self.model.get_parameters().iter().collect()
     }
 
+    /// Returns a parameter by its name.
+    #[must_use]
+    pub fn get_parameter(&self, name: &ir::ParameterName) -> Option<&'result ir::Parameter> {
+        self.model.get_parameters().get(name)
+    }
+
     /// Returns the list of tests for this model.
     #[must_use]
     pub fn tests(&self) -> Vec<&'result ir::Test> {

@@ -10,8 +10,8 @@ mod symbol_lookup;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use oneil_runtime::Runtime as OneilRuntime;
 use oneil_runtime::output::ir;
-use oneil_runtime::{Runtime as OneilRuntime, RuntimeResult};
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
@@ -222,26 +222,16 @@ impl LanguageServer for Backend {
                 .lock()
                 .expect("if the runtime has panicked elsewhere, it is not in a useful state");
 
-            runtime.load_ir(&current_model_path);
+            let result = runtime.load_ir(&current_model_path);
 
-            let Some(ir_model) = runtime.get_ir(&current_model_path).get_maybe_partial_ir() else {
-                break 'complete (
-                    Ok(None),
-                    Some(format!("Model not found in IR: {current_model_path:?}")),
-                );
-            };
-            let ir_model = match runtime.get_ir(&current_model_path) {
-                RuntimeResult::None => {
-                    break 'complete (
-                        Ok(None),
-                        Some(format!("Model not found in IR: {current_model_path:?}")),
-                    );
-                }
-                RuntimeResult::Ok(ir_model)
-                | RuntimeResult::ErrWithPartial {
-                    partial_result: ir_model,
-                    errors: _,
-                } => ir_model,
+            let ir_model = match result {
+                Ok(ir_model) => ir_model,
+                Err(error) => match error.partial_ir() {
+                    Some(ir_model) => ir_model,
+                    None => {
+                        break 'complete (Ok(None), Some(format!("Error loading IR: {error:?}")));
+                    }
+                },
             };
 
             // Find the symbol at the cursor position
@@ -253,7 +243,7 @@ impl LanguageServer for Backend {
 
             // Resolve the symbol to its definition location
             let location =
-                symbol_lookup::resolve_definition(&symbol, &runtime, &current_model_path);
+                symbol_lookup::resolve_definition(&symbol, &mut runtime, &current_model_path);
 
             let log_message =
                 format!("Found symbol: {symbol:?}, definition location: {location:?}");
