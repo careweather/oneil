@@ -4,10 +4,10 @@ use anstream::{eprintln, print, println};
 use indexmap::{IndexMap, IndexSet};
 use oneil_runtime::output::{
     eval::{DebugInfo, Parameter, PrintLevel, TestResult},
-    reference::ModelReference,
+    reference::{EvalErrorReference, ModelReference},
     value::Value,
 };
-use oneil_shared::span::Span;
+use oneil_shared::{error::OneilError, span::Span};
 
 use crate::{
     command::{PrintMode, Variable, VariableList},
@@ -34,7 +34,12 @@ fn divider_line() -> String {
     "─".repeat(80)
 }
 
-pub fn print_eval_result(top_model: ModelReference<'_>, model_config: &ModelPrintConfig) {
+pub fn print_eval_result(
+    eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
+    model_config: &ModelPrintConfig,
+) {
+    let (top_model, errors) = unwrap_eval_result(eval_result);
+
     let test_info = get_model_tests(top_model, model_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
@@ -64,7 +69,12 @@ pub struct TestPrintConfig {
     pub recursive: bool,
 }
 
-pub fn print_test_results(top_model: ModelReference<'_>, test_config: &TestPrintConfig) {
+pub fn print_test_results(
+    eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
+    test_config: &TestPrintConfig,
+) {
+    let (top_model, errors) = unwrap_eval_result(eval_result);
+
     let test_info = get_model_tests(top_model, test_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
@@ -77,6 +87,12 @@ pub fn print_test_results(top_model: ModelReference<'_>, test_config: &TestPrint
     if !test_config.no_test_report {
         print_all_tests(top_model, test_config.recursive);
     }
+}
+
+fn unwrap_eval_result<'a>(
+    eval_result: Result<ModelReference<'a>, EvalErrorReference<'a>>,
+) -> (ModelReference<'a>, Vec<OneilError>) {
+    todo!()
 }
 
 #[derive(Default)]
