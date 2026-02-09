@@ -265,6 +265,13 @@ pub struct IndependentArgs {
     /// Print the parameter values
     #[arg(long)]
     pub values: bool,
+
+    /// Display partial results even if there are errors
+    ///
+    /// If errors occurred during evaluation, errors will be printed,
+    /// then the partial results will be printed.
+    #[arg(long)]
+    pub partial: bool,
 }
 
 /// Development-specific commands for the Oneil CLI
