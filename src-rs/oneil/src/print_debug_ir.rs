@@ -4,7 +4,10 @@ use anstream::println;
 use indexmap::IndexMap;
 use oneil_runtime::output::{
     ir,
-    reference::{ModelIrReference, ResolutionErrorReference},
+    reference::{
+        ModelIrReference, ReferenceImportReference, ResolutionErrorReference,
+        SubmodelImportReference,
+    },
 };
 
 use crate::print_error;
@@ -78,7 +81,7 @@ fn collect_errors(
             Ok(model_ref) => {
                 // We only need to print the references, since every submodel is a reference
                 for nested in model_ref.references().values() {
-                    queue.push(*nested);
+                    queue.push(nested.model());
                 }
             }
         }
@@ -151,8 +154,8 @@ fn print_model(model_ref: ModelIrReference<'_>, indent: usize, prefix: &str, rec
         let refs_to_print: Vec<_> = model_ref
             .references()
             .values()
-            .filter_map(|r| match r {
-                Ok(m) => Some(*m),
+            .filter_map(|r| match r.model() {
+                Ok(m) => Some(m),
                 Err(e) => e.partial_ir(),
             })
             .collect();
@@ -167,7 +170,10 @@ fn print_model(model_ref: ModelIrReference<'_>, indent: usize, prefix: &str, rec
 }
 
 /// Prints submodels, showing the reference path each submodel refers to.
-fn print_submodels(submodels: &IndexMap<&ir::SubmodelName, &ir::SubmodelImport>, indent: usize) {
+fn print_submodels(
+    submodels: &IndexMap<&ir::SubmodelName, SubmodelImportReference<'_>>,
+    indent: usize,
+) {
     for (i, (identifier, submodel)) in submodels.iter().enumerate() {
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -183,29 +189,21 @@ fn print_submodels(submodels: &IndexMap<&ir::SubmodelName, &ir::SubmodelImport>,
 
 /// Prints submodels
 fn print_references(
-    references: &IndexMap<
-        &ir::ReferenceName,
-        Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>,
-    >,
+    references: &IndexMap<&ir::ReferenceName, ReferenceImportReference<'_>>,
     indent: usize,
 ) {
     for (i, (identifier, reference)) in references.iter().enumerate() {
-        let path = match reference {
-            Ok(reference) => Some(reference.path()),
-            Err(e) => e.partial_ir().map(|r| r.path()),
-        };
+        let path = reference.path();
 
-        if let Some(path) = path {
-            let is_last = i == references.len() - 1;
-            let prefix = if is_last { "└──" } else { "├──" };
-            println!(
-                "{}    {}Reference: \"{}\" -> \"{}\"",
-                "  ".repeat(indent),
-                prefix,
-                identifier.as_str(),
-                path.as_ref().display()
-            );
-        }
+        let is_last = i == references.len() - 1;
+        let prefix = if is_last { "└──" } else { "├──" };
+        println!(
+            "{}    {}Reference: \"{}\" -> \"{}\"",
+            "  ".repeat(indent),
+            prefix,
+            identifier.as_str(),
+            path.as_ref().display()
+        );
     }
 }
 
