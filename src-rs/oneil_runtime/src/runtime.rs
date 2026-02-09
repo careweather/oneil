@@ -30,6 +30,7 @@ pub struct Runtime {
 
 impl Runtime {
     /// Creates a new runtime instance with empty caches.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             source_cache: SourceCache::new(),
@@ -41,6 +42,7 @@ impl Runtime {
     }
 
     /// Gets the paths to files that the runtime relies on.
+    #[must_use]
     pub fn get_watch_paths(&self) -> IndexSet<PathBuf> {
         self.source_cache.get_paths()
     }
@@ -72,6 +74,14 @@ impl Runtime {
     }
 
     /// Evaluates a model and returns the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`EvalErrorReference`](output::reference::EvalErrorReference) if the model could not be evaluated.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "the panic only happens if an internal invariant is violated"
+    )]
     pub fn eval_model(
         &mut self,
         path: impl AsRef<Path>,
@@ -148,10 +158,15 @@ impl Runtime {
 
     /// Loads the IR for a model and all of its dependencies.
     ///
-    /// Returns a [`ModelIrReference`](output::reference::ModelIrReference) for the
-    /// requested model on success, or a
+    /// # Errors
+    ///
+    /// Returns a
     /// [`ResolutionErrorReference`](output::reference::ResolutionErrorReference) if that
     /// model had parse or resolution errors.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "the panic only happens if an internal invariant is violated"
+    )]
     pub fn load_ir(
         &mut self,
         path: impl AsRef<Path>,
@@ -279,8 +294,13 @@ impl Runtime {
 
     /// Loads AST for a model.
     ///
-    /// On success, returns the AST. On failure, returns the errors
-    /// and a partial AST if available.
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`](output::error::ParseError) if the AST could not be loaded.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "the panic only happens if an internal invariant is violated"
+    )]
     pub fn load_ast(
         &mut self,
         path: impl AsRef<Path>,
@@ -326,6 +346,14 @@ impl Runtime {
     }
 
     /// Loads source code from a file.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileError`](output::error::FileError) if the file could not be read.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "the panic only happens if an internal invariant is violated"
+    )]
     pub fn load_source(
         &mut self,
         path: impl AsRef<Path>,
@@ -546,7 +574,7 @@ impl Runtime {
                 } => {
                     return parameter_errors
                         .get(parameter_name)
-                        .map(|errors| GetValueResult::ParameterErrors(errors.to_vec()));
+                        .map(|errors| GetValueResult::ParameterErrors(errors.clone()));
                 }
                 output::error::ResolutionError::Parse(parse_error) => {
                     return Some(GetValueResult::ParseError(parse_error.clone()));
@@ -559,7 +587,7 @@ impl Runtime {
                 ..
             }) => {
                 if let Some(errors) = parameter_errors.get(parameter_name) {
-                    return Some(GetValueResult::ParameterErrors(errors.to_vec()));
+                    return Some(GetValueResult::ParameterErrors(errors.clone()));
                 }
 
                 partial_result.parameters.get(parameter_name)?
@@ -694,7 +722,7 @@ impl Runtime {
                 } => {
                     return parameter_errors
                         .get(parameter_name)
-                        .map(|errors| GetValueResult::ParameterErrors(errors.to_vec()));
+                        .map(|errors| GetValueResult::ParameterErrors(errors.clone()));
                 }
                 output::error::ResolutionError::Parse(parse_error) => {
                     return Some(GetValueResult::ParseError(parse_error.clone()));
@@ -707,7 +735,7 @@ impl Runtime {
                 ..
             }) => {
                 if let Some(errors) = parameter_errors.get(parameter_name) {
-                    return Some(GetValueResult::ParameterErrors(errors.to_vec()));
+                    return Some(GetValueResult::ParameterErrors(errors.clone()));
                 }
 
                 partial_result.parameters.get(parameter_name)?
