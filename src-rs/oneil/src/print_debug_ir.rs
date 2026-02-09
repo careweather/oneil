@@ -31,7 +31,7 @@ pub fn print(
 
     if !errors.is_empty() {
         for error in &errors {
-            print_error::print(error, false, ir_print_config.show_internal_errors);
+            print_error::print(error, ir_print_config.show_internal_errors);
         }
     }
 
