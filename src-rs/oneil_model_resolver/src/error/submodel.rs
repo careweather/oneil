@@ -238,9 +238,6 @@ impl AsOneilError for ModelImportResolutionError {
     }
 
     fn should_show_to_user(&self) -> bool {
-        !matches!(
-            self,
-            Self::ModelHasError { .. } | Self::UndefinedSubmodel { .. }
-        )
+        !matches!(self, Self::ModelHasError { .. })
     }
 }

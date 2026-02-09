@@ -28,6 +28,7 @@ pub struct ModelPrintConfig {
     pub no_header: bool,
     pub no_test_report: bool,
     pub no_parameters: bool,
+    pub show_internal_errors: bool,
 }
 
 pub fn print_eval_result(
@@ -37,7 +38,7 @@ pub fn print_eval_result(
     let (top_model, errors) = unwrap_eval_result(eval_result);
 
     for error in &errors {
-        print_error::print(error, false);
+        print_error::print(error, false, model_config.show_internal_errors);
     }
 
     if !errors.is_empty() && !model_config.display_partial_results {
@@ -80,6 +81,7 @@ pub struct TestPrintConfig {
     pub no_test_report: bool,
     pub recursive: bool,
     pub display_partial_results: bool,
+    pub show_internal_errors: bool,
 }
 
 pub fn print_test_results(
@@ -89,7 +91,7 @@ pub fn print_test_results(
     let (top_model, errors) = unwrap_eval_result(eval_result);
 
     for error in &errors {
-        print_error::print(error, false);
+        print_error::print(error, false, test_config.show_internal_errors);
     }
 
     if !errors.is_empty() && !test_config.display_partial_results {
