@@ -140,9 +140,9 @@ impl DependencyGraph {
             .insert(reference);
     }
 
-    /// Returns the parameters that depend on a given parameter.
+    /// Returns the parameters that a given parameter depends on.
     #[must_use]
-    pub fn depends_on(&self, model_path: &Path, parameter_name: &str) -> Option<&DependencySet> {
+    pub fn dependents(&self, model_path: &Path, parameter_name: &str) -> Option<&DependencySet> {
         let model = self.depends_on.get(model_path)?;
         model.get(parameter_name)
     }

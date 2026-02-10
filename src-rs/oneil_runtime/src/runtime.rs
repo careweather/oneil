@@ -619,14 +619,141 @@ impl Runtime {
                 }
 
                 GetValueResult::ParameterErrors(parameter_errors) => {
+                    // add the parameter errors to the errors map
                     errors
                         .entry(location.model_path.clone())
                         .or_default()
                         .insert_parameter_errors(location.parameter_name.clone(), parameter_errors);
+
+                    // get the errors for the dependent parameters
+                    let dependent_parameter_errors = runtime.get_dependent_parameter_errors(
+                        &location.model_path,
+                        &location.parameter_name,
+                        dependency_graph,
+                    );
+
+                    // add the dependent parameter errors to the errors map
+                    for (model_path, model_errors) in dependent_parameter_errors {
+                        errors
+                            .entry(model_path)
+                            .or_default()
+                            .insert_all(model_errors);
+                    }
+
                     (None, errors)
                 }
             }
         }
+    }
+
+    /// Collects errors for all parameters that depend on the given parameter, recursively.
+    ///
+    /// For each parameter that (directly or transitively) depends on the given parameter,
+    /// if that parameter has errors in the evaluation cache, those errors are included
+    /// in the returned map keyed by model path.
+    fn get_dependent_parameter_errors(
+        &self,
+        model_path: &Path,
+        parameter_name: &str,
+        dependency_graph: &output::DependencyGraph,
+    ) -> IndexMap<PathBuf, output::error::TreeError> {
+        let mut visited = IndexSet::new();
+        let mut result = IndexMap::new();
+
+        self.collect_dependent_parameter_errors(
+            dependency_graph,
+            model_path,
+            parameter_name,
+            &mut visited,
+            &mut result,
+        );
+
+        result
+    }
+
+    /// Recursively collects parameter errors for all dependents of the given parameter.
+    fn collect_dependent_parameter_errors(
+        &self,
+        dependency_graph: &output::DependencyGraph,
+        model_path: &Path,
+        parameter_name: &str,
+        visited: &mut IndexSet<(PathBuf, String)>,
+        result: &mut IndexMap<PathBuf, output::error::TreeError>,
+    ) {
+        let key = (model_path.to_path_buf(), parameter_name.to_string());
+
+        if visited.contains(&key) {
+            return;
+        }
+        visited.insert(key);
+
+        let Some(deps) = dependency_graph.dependents(model_path, parameter_name) else {
+            return;
+        };
+
+        for param_dep in &deps.parameter_dependencies {
+            let dep_model_path = model_path.to_path_buf();
+            let dep_param_name = param_dep.parameter_name.clone();
+
+            if let Some(errors) = self.get_cached_parameter_errors(&dep_model_path, &dep_param_name)
+            {
+                result
+                    .entry(dep_model_path.clone())
+                    .or_default()
+                    .insert_parameter_errors(dep_param_name.clone(), errors);
+            }
+
+            self.collect_dependent_parameter_errors(
+                dependency_graph,
+                &dep_model_path,
+                &dep_param_name,
+                visited,
+                result,
+            );
+        }
+
+        for ext_dep in &deps.external_dependencies {
+            let dep_model_path = ext_dep.model_path.clone();
+            let dep_param_name = ext_dep.parameter_name.clone();
+
+            if let Some(errors) = self.get_cached_parameter_errors(&dep_model_path, &dep_param_name)
+            {
+                result
+                    .entry(dep_model_path.clone())
+                    .or_default()
+                    .insert_parameter_errors(dep_param_name.clone(), errors);
+            }
+
+            self.collect_dependent_parameter_errors(
+                dependency_graph,
+                &dep_model_path,
+                &dep_param_name,
+                visited,
+                result,
+            );
+        }
+    }
+
+    /// Returns the cached parameter errors for a parameter, if the model has errors and the parameter is in the error map.
+    fn get_cached_parameter_errors(
+        &self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> Option<Vec<OneilError>> {
+        let eval_result = self.eval_cache.get_entry(model_path)?;
+        let parameter_errors = match eval_result {
+            Ok(_) => return None,
+            Err(output::error::EvalError::Resolution(resolution_error)) => match resolution_error {
+                output::error::ResolutionError::ResolutionErrors {
+                    parameter_errors, ..
+                } => parameter_errors,
+                output::error::ResolutionError::Parse(_) => return None,
+            },
+            Err(output::error::EvalError::EvalErrors {
+                parameter_errors, ..
+            }) => parameter_errors,
+        };
+        parameter_errors.get(parameter_name).cloned()
     }
 
     fn get_dependency_tree_children(
@@ -637,7 +764,7 @@ impl Runtime {
         parameter_name: &str,
     ) -> GetChildrenResult<output::dependency::DependencyTreeValue> {
         let deps = dependency_graph
-            .depends_on(model_path, parameter_name)
+            .dependents(model_path, parameter_name)
             .cloned()
             .unwrap_or_default();
 
