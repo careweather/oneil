@@ -394,13 +394,26 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
             name,
             args,
         } => {
-            let name = match name {
-                ir::FunctionName::Builtin(name, _) | ir::FunctionName::Imported(name, _) => {
-                    name.as_str()
+            match name {
+                ir::FunctionName::Builtin(name, _) => {
+                    println!(
+                        "{}    ├── FunctionCall (builtin): \"{}\"",
+                        "  ".repeat(indent),
+                        name.as_str()
+                    );
                 }
-            };
+                ir::FunctionName::Imported {
+                    name, python_path, ..
+                } => {
+                    println!(
+                        "{}    ├── FunctionCall (imported): \"{}\" from \"{}\"",
+                        "  ".repeat(indent),
+                        name.as_str(),
+                        python_path.as_ref().display()
+                    );
+                }
+            }
 
-            println!("{}    ├── FunctionCall: \"{}\"", "  ".repeat(indent), name);
             for (i, arg) in args.iter().enumerate() {
                 let is_last = i == args.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };

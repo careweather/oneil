@@ -1467,7 +1467,7 @@ mod fns {
         }])
     }
 
-    /// Homogeneous number list helpers (duplicated in oneil_eval::test_context::std_builtins::fns).
+    /// Homogeneous number list helpers
     enum HomogeneousNumberList<'a> {
         Numbers(Vec<&'a Number>),
         MeasuredNumbers(Vec<&'a MeasuredNumber>),

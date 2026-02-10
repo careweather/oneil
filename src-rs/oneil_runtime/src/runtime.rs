@@ -1039,7 +1039,7 @@ impl model_resolver::ExternalResolutionContext for Runtime {
         python_path: &ir::PythonPath,
     ) -> Result<&IndexSet<String>, model_resolver::PythonImportLoadingFailedError> {
         self.load_python_import(python_path.as_ref())
-            .map_err(|e| model_resolver::PythonImportLoadingFailedError)
+            .map_err(|_error| model_resolver::PythonImportLoadingFailedError)
     }
 }
 
@@ -1064,6 +1064,17 @@ impl eval::ExternalEvaluationContext for Runtime {
     ) -> Option<Result<Value, Vec<EvalError>>> {
         let function = self.builtins.get_function(identifier.as_str())?;
         Some(function(identifier_span, args))
+    }
+
+    #[cfg(feature = "python")]
+    fn evaluate_imported_function(
+        &self,
+        python_path: &oneil_ir::PythonPath,
+        identifier: &oneil_ir::Identifier,
+        identifier_span: Span,
+        args: Vec<(oneil_output::Value, Span)>,
+    ) -> Option<Result<oneil_output::Value, Vec<EvalError>>> {
+        todo!()
     }
 
     fn lookup_unit(&self, name: &str) -> Option<&Unit> {

@@ -435,6 +435,11 @@ pub enum EvalError {
         /// Whether this feature is planned to be supported in the future.
         will_be_supported: bool,
     },
+    /// An error indicating that Python is not enabled.
+    PythonNotEnabled {
+        /// The source span of the Python function usage.
+        relevant_span: Span,
+    },
 }
 
 impl AsOneilError for EvalError {
@@ -709,6 +714,9 @@ impl AsOneilError for EvalError {
                 || "unsupported feature".to_string(),
                 |feature_name| format!("unsupported feature: `{feature_name}`"),
             ),
+            Self::PythonNotEnabled { relevant_span: _ } => {
+                "python feature is not enabled".to_string()
+            }
         }
     }
 
@@ -888,6 +896,9 @@ impl AsOneilError for EvalError {
                 relevant_span: location_span,
                 feature_name: _,
                 will_be_supported: _,
+            }
+            | Self::PythonNotEnabled {
+                relevant_span: location_span,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
         }
     }
@@ -1121,6 +1132,9 @@ impl AsOneilError for EvalError {
                     Vec::new()
                 }
             }
+            Self::PythonNotEnabled { relevant_span: _ } => vec![ErrorContext::Help(
+                "rebuild Oneil with the `python` feature enabled".to_string(),
+            )],
         }
     }
 
@@ -1403,6 +1417,7 @@ impl AsOneilError for EvalError {
                 feature_name: _,
                 will_be_supported: _,
             } => Vec::new(),
+            Self::PythonNotEnabled { relevant_span: _ } => Vec::new(),
         }
     }
 

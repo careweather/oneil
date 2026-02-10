@@ -16,22 +16,35 @@ pub fn resolve_python_imports<E>(
         let python_path = ir::PythonPath::new(python_path);
         let python_path_span = import.path().span();
 
-        // check for duplicate imports
-        let original_import = resolution_context.get_python_import_from_active_model(&python_path);
-        if let Some(original_import) = original_import {
-            resolution_context.add_python_import_error_to_active_model(
-                python_path.clone(),
-                PythonImportResolutionError::duplicate_import(
-                    *original_import.import_path_span(),
-                    python_path_span,
-                    python_path,
-                ),
-            );
+        #[cfg(feature = "python")]
+        {
+            // check for duplicate imports
+            let original_import =
+                resolution_context.get_python_import_from_active_model(&python_path);
 
-            continue;
+            if let Some(original_import) = original_import {
+                resolution_context.add_python_import_error_to_active_model(
+                    python_path.clone(),
+                    PythonImportResolutionError::duplicate_import(
+                        *original_import.import_path_span(),
+                        python_path_span,
+                        python_path,
+                    ),
+                );
+
+                continue;
+            }
+
+            resolution_context.load_python_import_to_active_model(&python_path, python_path_span);
         }
 
-        resolution_context.load_python_import_to_active_model(&python_path, python_path_span);
+        #[cfg(not(feature = "python"))]
+        {
+            resolution_context.add_python_import_error_to_active_model(
+                python_path,
+                PythonImportResolutionError::python_unsupported(python_path_span),
+            );
+        }
     }
 }
 

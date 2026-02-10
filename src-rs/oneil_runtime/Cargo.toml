@@ -23,7 +23,11 @@ indexmap = { workspace = true }
 
 [features]
 default = ["python"]
-python = ["dep:oneil_python"]
+python = [
+    "dep:oneil_python",
+    "oneil_model_resolver/python",
+    "oneil_eval/python",
+]
 
 [lints]
 workspace = true
