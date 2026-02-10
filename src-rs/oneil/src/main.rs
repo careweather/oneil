@@ -88,6 +88,7 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
             display_partial,
             recursive,
         } => handle_print_model_result(&file, display_partial, recursive, show_internal_errors),
+        #[cfg(feature = "python")]
         DevCommand::PrintPythonImports { files } => {
             handle_print_python_imports(&files, show_internal_errors);
         }
@@ -95,6 +96,7 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
 }
 
 /// Handles the `dev print-python-imports` command.
+#[cfg(feature = "python")]
 fn handle_print_python_imports(files: &[PathBuf], show_internal_errors: bool) {
     let mut runtime = Runtime::new();
 
@@ -118,8 +120,19 @@ fn handle_print_python_imports(files: &[PathBuf], show_internal_errors: bool) {
         print_error::print(&error, show_internal_errors);
     }
 
+    let is_multiple_files = imports.len() > 1;
     for (file, import) in imports {
-        println!("===== {} =====", file.display());
+        if is_multiple_files {
+            println!("===== {} =====", file.display());
+        }
+
+        if import.is_empty() {
+            let message = format!("no functions found in `{}`", file.display());
+            let styled_message = stylesheet::NO_PYTHON_FUNCTIONS_FOUND_MESSAGE.style(message);
+            println!("{styled_message}");
+            continue;
+        }
+
         for s in import {
             println!("{s}");
         }

@@ -346,6 +346,7 @@ pub enum DevCommand {
         recursive: bool,
     },
     /// Print Python imports from Oneil source file(s)
+    #[cfg(feature = "python")]
     PrintPythonImports {
         /// Path(s) to the Oneil source file(s) to inspect
         #[arg(value_name = "FILE", num_args = 1..)]

@@ -6,6 +6,10 @@ pub const NOTE_COLOR: Style = Style::new().blue();
 pub const HELP_COLOR: Style = Style::new().blue();
 pub const SOURCE_ANNOTATION: Style = Style::new().blue().bold();
 
+// Python output styles
+#[cfg(feature = "python")]
+pub const NO_PYTHON_FUNCTIONS_FOUND_MESSAGE: Style = Style::new().italic().dimmed();
+
 // Model output styles
 pub const MODEL_LABEL: Style = Style::new().blue();
 pub const TESTS_LABEL: Style = Style::new().green();
