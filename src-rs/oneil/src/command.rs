@@ -345,6 +345,12 @@ pub enum DevCommand {
         #[arg(long, short = 'r', default_value_t = false)]
         recursive: bool,
     },
+    /// Print Python imports from Oneil source file(s)
+    PrintPythonImports {
+        /// Path(s) to the Oneil source file(s) to inspect
+        #[arg(value_name = "FILE", num_args = 1..)]
+        files: Vec<PathBuf>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

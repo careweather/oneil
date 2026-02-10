@@ -67,7 +67,7 @@ fn main() {
         Commands::Tree(args) => handle_tree_command(args, cli.dev_show_internal_errors),
         Commands::Builtins { command } => handle_builtins_command(command),
         Commands::Independent(args) => {
-            handle_independent_command(args, cli.dev_show_internal_errors)
+            handle_independent_command(args, cli.dev_show_internal_errors);
         }
     }
 }
@@ -88,6 +88,26 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
             display_partial,
             recursive,
         } => handle_print_model_result(&file, display_partial, recursive, show_internal_errors),
+        DevCommand::PrintPythonImports { files } => {
+            handle_print_python_imports(&files, show_internal_errors);
+        }
+    }
+}
+
+/// Handles the `dev print-python-imports` command.
+fn handle_print_python_imports(files: &[PathBuf], _show_internal_errors: bool) {
+    let mut runtime = Runtime::new();
+    let is_multiple_files = files.len() > 1;
+
+    for file in files {
+        if is_multiple_files {
+            println!("===== {} =====", file.display());
+        }
+
+        let imports = runtime.load_python_import(file);
+        for s in &imports {
+            println!("{s}");
+        }
     }
 }
 
