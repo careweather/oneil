@@ -1,0 +1,16 @@
+[package]
+name = "oneil_python"
+description = "Python integration for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+
+[lints]
+workspace = true
