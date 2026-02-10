@@ -13,7 +13,7 @@ readme = "README.md"
 [dependencies]
 indexmap.workspace = true
 oneil_shared = { path = "../oneil_shared" }
-pyo3 = "0.28.0"
+pyo3 = { version = "0.28.0", features = ["auto-initialize"] }
 
 [lints]
 workspace = true

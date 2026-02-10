@@ -319,6 +319,7 @@ impl Runtime {
         clippy::missing_panics_doc,
         reason = "the panic only happens if an internal invariant is violated"
     )]
+    #[cfg(feature = "python")]
     pub fn load_python_import(
         &mut self,
         path: impl AsRef<Path>,
