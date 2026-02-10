@@ -1610,7 +1610,7 @@ mod tests {
 
         use crate::context::EvalContext;
         use crate::output;
-        use crate::output::dependency::DependencySet;
+        use crate::output::DependencySet;
         use crate::test_context::TestExternalContext;
 
         use oneil_ir::DisplayCompositeUnit;
