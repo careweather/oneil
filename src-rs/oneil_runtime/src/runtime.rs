@@ -400,43 +400,46 @@ impl Runtime {
     /// Gets the dependency graph for all models in the evaluation cache.
     ///
     /// The graph is built from the cached evaluation results. The cache must
-    /// have been populated by a prior call to [`eval_model`](Self::eval_model).
+    /// have been populated by a prior call to [`load_ir`](Self::load_ir). This
+    /// can be done indirectly by calling [`eval_model`](Self::eval_model).
     #[must_use]
     fn get_dependency_graph(&self) -> output::DependencyGraph {
         let mut dependency_graph = output::DependencyGraph::new();
 
-        for (model_path, model) in self.eval_cache.models_iter() {
-            for parameter in model.parameters.values() {
-                let dependencies = &parameter.dependencies;
+        for (model_path, model) in self.ir_cache.models_iter_maybe_partial() {
+            for (parameter_name, parameter) in model.get_parameters() {
+                let dependencies = parameter.dependencies();
 
-                for dependency in &dependencies.builtin_dependencies {
+                for builtin_dep in dependencies.builtin().keys() {
                     dependency_graph.add_depends_on_builtin(
                         model_path.clone(),
-                        parameter.ident.clone(),
+                        parameter_name.as_str().to_string(),
                         output::dependency::BuiltinDependency {
-                            ident: dependency.ident.clone(),
+                            ident: builtin_dep.as_str().to_string(),
                         },
                     );
                 }
 
-                for dependency in &dependencies.parameter_dependencies {
+                for parameter_dep in dependencies.parameter().keys() {
                     dependency_graph.add_depends_on_parameter(
                         model_path.clone(),
-                        parameter.ident.clone(),
+                        parameter_name.as_str().to_string(),
                         output::dependency::ParameterDependency {
-                            parameter_name: dependency.parameter_name.clone(),
+                            parameter_name: parameter_dep.as_str().to_string(),
                         },
                     );
                 }
 
-                for dependency in &dependencies.external_dependencies {
+                for ((reference_dep_name, parameter_dep_name), (external_model_path, _)) in
+                    dependencies.external()
+                {
                     dependency_graph.add_depends_on_external(
-                        model_path.clone(),
-                        parameter.ident.clone(),
+                        external_model_path.as_ref().to_path_buf(),
+                        parameter_name.as_str().to_string(),
                         output::dependency::ExternalDependency {
-                            model_path: dependency.model_path.clone(),
-                            reference_name: dependency.reference_name.clone(),
-                            parameter_name: dependency.parameter_name.clone(),
+                            model_path: external_model_path.as_ref().to_path_buf(),
+                            reference_name: reference_dep_name.as_str().to_string(),
+                            parameter_name: parameter_dep_name.as_str().to_string(),
                         },
                     );
                 }
@@ -524,7 +527,7 @@ impl Runtime {
     ///
     /// Recursively builds a tree of parameter values, using `get_value` to resolve
     /// each node and `get_children` to determine the values for the children.
-    fn get_parameter_tree<V, GetVal, GetChildren>(
+    fn get_parameter_tree<V: std::fmt::Debug, GetVal, GetChildren>(
         &mut self,
         location: &TreeValueLocation,
         get_value: GetVal,
@@ -547,7 +550,7 @@ impl Runtime {
             clippy::items_after_statements,
             reason = "this is an internal recursive function, we keep it here for clarity"
         )]
-        fn recurse<V, GetVal, GetChildren>(
+        fn recurse<V: std::fmt::Debug, GetVal, GetChildren>(
             runtime: &Runtime,
             location: &TreeValueLocation,
             dependency_graph: &output::DependencyGraph,
@@ -917,18 +920,21 @@ impl AsOneilError for InternalIoError<'_> {
     }
 }
 
+#[derive(Debug)]
 struct TreeValueLocation {
     pub model_path: PathBuf,
     pub reference_name: Option<String>,
     pub parameter_name: String,
 }
 
+#[derive(Debug)]
 enum GetValueResult<T> {
     ValidTree(T),
     ParseError(output::error::ParseError),
     ParameterErrors(Vec<OneilError>),
 }
 
+#[derive(Debug)]
 struct GetChildrenResult<T> {
     builtin_children: Vec<output::Tree<T>>,
     parameter_children: Vec<TreeValueLocation>,
