@@ -16,6 +16,10 @@ oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
 indexmap = { workspace = true }
 
+[features]
+default = ["python"]
+python = []
+
 [dev-dependencies]
 oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
 

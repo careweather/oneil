@@ -41,6 +41,7 @@ pub trait ExternalEvaluationContext {
     /// # Errors
     ///
     /// Returns an error if there was an error evaluating the imported function.
+    #[cfg(feature = "python")]
     fn evaluate_imported_function(
         &self,
         python_path: &ir::PythonPath,
@@ -280,9 +281,17 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Result<output::Value, Vec<EvalError>> {
-        self.external_context
-            .evaluate_imported_function(python_path, identifier, identifier_span, args)
-            .expect("imported function should be defined (checked during resolution)")
+        #[cfg(feature = "python")]
+        {
+            self.external_context
+                .evaluate_imported_function(python_path, identifier, identifier_span, args)
+                .expect("imported function should be defined (checked during resolution)")
+        }
+
+        #[cfg(not(feature = "python"))]
+        {
+            Err(vec![EvalError::PythonNotEnabled { identifier_span }])
+        }
     }
 
     /// Looks up a unit by name.
