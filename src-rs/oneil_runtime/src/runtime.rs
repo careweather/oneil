@@ -304,6 +304,20 @@ impl Runtime {
         }
     }
 
+    /// Loads Python import strings from a Oneil model.
+    ///
+    /// Returns the set of Python import paths referenced by the model (and its
+    /// dependencies). The implementation is currently stubbed and returns an
+    /// empty set.
+    pub fn load_python_import(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> IndexSet<String> {
+        let _ = path;
+        // TODO: implement
+        IndexSet::new()
+    }
+
     /// Loads AST for a model.
     ///
     /// # Errors
