@@ -133,6 +133,7 @@ where
 
     let args = error::combine_error_list(args)?;
 
+    let name_with_span = name_with_span.map_err(|e| vec![e])?;
     let expr = ir::Expr::function_call(span, name.span(), name_with_span, args);
     Ok(expr)
 }
@@ -206,7 +207,7 @@ fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::UnaryOp {
 fn resolve_function_name<E>(
     name: &ast::IdentifierNode,
     resolution_context: &ResolutionContext<'_, E>,
-) -> ir::FunctionName
+) -> Result<ir::FunctionName, VariableResolutionError>
 where
     E: ExternalResolutionContext,
 {
@@ -214,9 +215,25 @@ where
     let name = ir::Identifier::new(name.as_str().to_string());
 
     if resolution_context.has_builtin_function(&name) {
-        ir::FunctionName::builtin(name, name_span)
-    } else {
-        ir::FunctionName::imported(name, name_span)
+        return Ok(ir::FunctionName::builtin(name, name_span));
+    }
+
+    let python_paths = resolution_context.lookup_imported_function(name.as_str());
+    match python_paths.len() {
+        0 => Err(VariableResolutionError::undefined_function(
+            name.as_str().to_string(),
+            name_span,
+        )),
+        1 => Ok(ir::FunctionName::imported(
+            python_paths[0].clone(),
+            name,
+            name_span,
+        )),
+        _ => Err(VariableResolutionError::multiple_functions_found(
+            name.as_str().to_string(),
+            name_span,
+            python_paths,
+        )),
     }
 }
 
@@ -324,6 +341,8 @@ pub fn get_expr_dependencies(expr: &ir::Expr) -> Dependencies {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
     use crate::test::{
         external_context::TestExternalContext, resolution_context::ResolutionContextBuilder,
@@ -333,14 +352,16 @@ mod tests {
     use oneil_ast as ast;
     use oneil_ir as ir;
 
-    fn make_resolution_context(
-        external: &mut TestExternalContext,
+    fn make_resolution_context<'a>(
+        external: &'a mut TestExternalContext,
         parameters: Vec<ir::Parameter>,
-    ) -> ResolutionContext<'_, TestExternalContext> {
+        python_import_paths: Vec<&'a str>,
+    ) -> ResolutionContext<'a, TestExternalContext> {
         let model_path = ir::ModelPath::new("/test");
         ResolutionContextBuilder::new()
             .with_active_model(model_path)
             .with_parameters(parameters)
+            .with_python_import_paths(python_import_paths)
             .with_external_context(external)
             .build()
     }
@@ -351,7 +372,7 @@ mod tests {
         let literal = test_ast::literal_number_expr_node(42.0);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&literal, &resolution_context);
@@ -374,7 +395,7 @@ mod tests {
         let literal = test_ast::literal_string_expr_node("hello");
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&literal, &resolution_context);
@@ -397,7 +418,7 @@ mod tests {
         let literal = test_ast::literal_boolean_expr_node(true);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&literal, &resolution_context);
@@ -423,7 +444,7 @@ mod tests {
         let expr = test_ast::binary_op_expr_node(ast_op, ast_left, ast_right);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -464,7 +485,7 @@ mod tests {
         let expr = test_ast::unary_op_expr_node(ast_op, ast_inner_expr);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -494,7 +515,7 @@ mod tests {
         let expr = test_ast::function_call_expr_node(ast_name, vec![ast_arg]);
 
         let mut external = TestExternalContext::new().with_builtin_functions(["foo"]);
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -536,8 +557,10 @@ mod tests {
         let ast_name = test_ast::identifier_node("custom_function");
         let expr = test_ast::function_call_expr_node(ast_name, vec![ast_arg]);
 
-        let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let mut external =
+            TestExternalContext::new().with_python_import_functions("test", ["custom_function"]);
+
+        let resolution_context = make_resolution_context(&mut external, vec![], vec!["test"]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -557,10 +580,16 @@ mod tests {
             panic!("Expected function call, got {result:?}");
         };
 
-        let ir::FunctionName::Imported(name, _name_span) = name else {
+        let ir::FunctionName::Imported {
+            python_path,
+            name,
+            name_span: _,
+        } = name
+        else {
             panic!("Expected imported function, got {name:?}");
         };
 
+        assert_eq!(python_path.as_ref(), &PathBuf::from("test.py"));
         assert_eq!(name.as_str(), "custom_function");
 
         assert_eq!(args.len(), 1);
@@ -579,7 +608,7 @@ mod tests {
         let expr = test_ast::variable_expr_node(ast_variable);
 
         let mut external = TestExternalContext::new().with_builtin_variables(["x"]);
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -612,7 +641,7 @@ mod tests {
             .build();
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![parameter]);
+        let resolution_context = make_resolution_context(&mut external, vec![parameter], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -640,7 +669,7 @@ mod tests {
         let expr = test_ast::variable_expr_node(variable_ast);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -680,8 +709,8 @@ mod tests {
         let ast_mul_op = test_ast::binary_op_node(ast::BinaryOp::Mul);
         let expr = test_ast::binary_op_expr_node(ast_mul_op, inner_binary, func_call);
 
-        let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let mut external = TestExternalContext::new().with_python_import_functions("test", ["foo"]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec!["test"]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -737,10 +766,16 @@ mod tests {
             panic!("Expected function call on right side, got {right:?}");
         };
 
-        let ir::FunctionName::Imported(name, _name_span) = name else {
+        let ir::FunctionName::Imported {
+            python_path,
+            name,
+            name_span: _,
+        } = name
+        else {
             panic!("Expected imported function, got {name:?}");
         };
 
+        assert_eq!(python_path.as_ref(), &PathBuf::from("test.py"));
         assert_eq!(name.as_str(), "foo");
 
         assert_eq!(args.len(), 1);
@@ -837,7 +872,7 @@ mod tests {
         let builtin_functions = ["min", "max", "sin", "cos", "tan"];
 
         let mut external = TestExternalContext::new().with_builtin_functions(builtin_functions);
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the function names
         for func_name in builtin_functions {
@@ -845,7 +880,8 @@ mod tests {
             let ast_func_name_node = test_ast::identifier_node(func_name);
 
             // resolve the function name
-            let result = resolve_function_name(&ast_func_name_node, &resolution_context);
+            let result = resolve_function_name(&ast_func_name_node, &resolution_context)
+                .expect("builtin function should be resolved");
 
             // check the result
             let ir::FunctionName::Builtin(name, _name_span) = result else {
@@ -866,8 +902,9 @@ mod tests {
             "user_defined_function",
         ];
 
-        let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let mut external =
+            TestExternalContext::new().with_python_import_functions("test", &imported_functions);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec!["test"]);
 
         // resolve the function names
         for func_name in imported_functions {
@@ -875,13 +912,20 @@ mod tests {
             let ast_func_name_node = test_ast::identifier_node(func_name);
 
             // resolve the function name
-            let result = resolve_function_name(&ast_func_name_node, &resolution_context);
+            let result = resolve_function_name(&ast_func_name_node, &resolution_context)
+                .expect("imported function should be resolved");
 
             // check the result
-            let ir::FunctionName::Imported(name, _name_span) = result else {
+            let ir::FunctionName::Imported {
+                python_path,
+                name,
+                name_span: _,
+            } = result
+            else {
                 panic!("Expected imported function, got {result:?}");
             };
 
+            assert_eq!(python_path.as_ref(), &PathBuf::from("test.py"));
             assert_eq!(name.as_str(), func_name);
         }
     }
@@ -915,7 +959,7 @@ mod tests {
         let expr = test_ast::binary_op_expr_node(ast_add_op, ast_left_expr, ast_right_expr);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -957,7 +1001,7 @@ mod tests {
         let expr = test_ast::parenthesized_expr_node(inner_expr);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -1003,7 +1047,7 @@ mod tests {
         let expr = test_ast::binary_op_expr_node(ast_mul_op, inner_parenthesized, ast_outer_right);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -1059,7 +1103,7 @@ mod tests {
         let expr = test_ast::parenthesized_expr_node(first_parentheses);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -1087,7 +1131,7 @@ mod tests {
         let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, rest_chained);
 
         let mut external = TestExternalContext::new().with_builtin_variables(["x"]);
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -1140,7 +1184,7 @@ mod tests {
             test_ast::comparison_op_expr_node(op1, left_expr, middle_expr, [(op2, right_expr)]);
 
         let mut external = TestExternalContext::new().with_builtin_variables(["x"]);
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         // resolve the expression
         let result = resolve_expr(&expr, &resolution_context);
@@ -1198,7 +1242,7 @@ mod tests {
         let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, rest_chained);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         let result = resolve_expr(&expr, &resolution_context);
 
@@ -1232,7 +1276,7 @@ mod tests {
         let expr = test_ast::comparison_op_expr_node(op, left_expr, right_expr, []);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         let result = resolve_expr(&expr, &resolution_context);
 
@@ -1270,7 +1314,7 @@ mod tests {
             test_ast::comparison_op_expr_node(op1, left_expr, middle_expr, [(op2, chained_expr)]);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         let result = resolve_expr(&expr, &resolution_context);
 
@@ -1310,7 +1354,7 @@ mod tests {
             test_ast::comparison_op_expr_node(op1, left_expr, right_expr, [(op2, chained_expr)]);
 
         let mut external = TestExternalContext::new();
-        let resolution_context = make_resolution_context(&mut external, vec![]);
+        let resolution_context = make_resolution_context(&mut external, vec![], vec![]);
 
         let result = resolve_expr(&expr, &resolution_context);
 

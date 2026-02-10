@@ -1037,9 +1037,9 @@ impl model_resolver::ExternalResolutionContext for Runtime {
     fn load_python_import(
         &mut self,
         python_path: &ir::PythonPath,
-    ) -> Result<(), model_resolver::PythonImportLoadingFailedError> {
-        // TODO: implement this
-        Ok(())
+    ) -> Result<&IndexSet<String>, model_resolver::PythonImportLoadingFailedError> {
+        self.load_python_import(python_path.as_ref())
+            .map_err(|e| model_resolver::PythonImportLoadingFailedError)
     }
 }
 

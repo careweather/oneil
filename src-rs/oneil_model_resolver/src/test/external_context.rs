@@ -5,12 +5,14 @@
 //! [`load_ast`](ExternalResolutionContext::load_ast) returns ASTs registered via
 //! [`with_model_asts`](Self::with_model_asts); otherwise returns `Err(())`.
 //! [`load_python_import`](ExternalResolutionContext::load_python_import) returns
-//! `Ok(())` only for paths registered via [`with_python_imports_ok`](Self::with_python_imports_ok).
+//! `Ok(&IndexSet<String>)` (the set of function names) for paths registered via
+//! [`with_python_imports_ok`](Self::with_python_imports_ok); use
+//! [`with_python_import_functions`](Self::with_python_import_functions) to set the function list.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use oneil_ast as ast;
 use oneil_ir as ir;
 
@@ -21,21 +23,22 @@ use crate::util::{
 /// Test double for [`ExternalResolutionContext`].
 ///
 /// Configurable builtin values, builtin functions, model ASTs (via
-/// [`with_model_asts`](Self::with_model_asts)), and Python import paths (via
-/// [`with_python_imports_ok`](Self::with_python_imports_ok)).
+/// [`with_model_asts`](Self::with_model_asts)), and Python import paths with
+/// their function lists (via [`with_python_imports_ok`](Self::with_python_imports_ok) and
+/// [`with_python_import_functions`](Self::with_python_import_functions)).
 #[derive(Debug, Default)]
 pub struct TestExternalContext {
+    /// Builtin variables that are valid.
     builtin_variables: HashSet<String>,
+
+    /// Builtin functions that are valid.
     builtin_functions: HashSet<String>,
 
     /// Model path -> AST; paths are derived from the given path's stem (e.g. "test.on" -> ModelPath("test.on")).
     model_asts: IndexMap<ir::ModelPath, ast::Model>,
 
-    /// Python paths for which `load_python_import` should return `Ok(())`.
-    /// Stored as path strings (e.g. `my_python` or `subdir/my_python`) that are
-    /// compared against the path stem before the `.py` extension when used with
-    /// [`ModelPath::get_sibling_path`]; the resolver then builds [`ir::PythonPath`] from that.
-    python_imports_ok: HashSet<PathBuf>,
+    /// Python path (with `.py` extension) -> set of callable function names returned by `load_python_import`.
+    python_imports: IndexMap<PathBuf, IndexSet<String>>,
 }
 
 impl TestExternalContext {
@@ -53,6 +56,7 @@ impl TestExternalContext {
     ) -> Self {
         self.builtin_variables
             .extend(variables.into_iter().map(ToString::to_string));
+
         self
     }
 
@@ -64,6 +68,7 @@ impl TestExternalContext {
     ) -> Self {
         self.builtin_functions
             .extend(functions.into_iter().map(ToString::to_string));
+
         self
     }
 
@@ -85,11 +90,12 @@ impl TestExternalContext {
         self
     }
 
-    /// Registers Python paths for which `load_python_import` should return `Ok(())`.
+    /// Registers Python paths for which `load_python_import` should return `Ok` with an empty function set.
     ///
     /// Paths are compared against the resolved Python path (as from
     /// `model_path.get_sibling_path(import_path)` with `.py` extension). Use the
     /// same path strings as in the import (e.g. `"my_python"`, `"subdir/my_python"`).
+    /// Use [`with_python_import_functions`](Self::with_python_import_functions) to set the function list for a path.
     #[must_use]
     pub fn with_python_imports_ok(
         mut self,
@@ -98,8 +104,29 @@ impl TestExternalContext {
         for p in paths {
             let mut path = p.as_ref().to_path_buf();
             path.set_extension("py");
-            self.python_imports_ok.insert(path);
+            self.python_imports.insert(path, IndexSet::new());
         }
+        self
+    }
+
+    /// Registers the set of function names for a Python import path.
+    ///
+    /// The path is normalized with a `.py` extension to match how the resolver looks it up.
+    /// If the path was not already registered (e.g. via [`with_python_imports_ok`](Self::with_python_imports_ok)),
+    /// it is added.
+    #[must_use]
+    pub fn with_python_import_functions(
+        mut self,
+        path: impl AsRef<std::path::Path>,
+        functions: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> Self {
+        let mut path = path.as_ref().to_path_buf();
+        path.set_extension("py");
+        let set: IndexSet<String> = functions
+            .into_iter()
+            .map(|s| s.as_ref().to_string())
+            .collect();
+        self.python_imports.insert(path, set);
         self
     }
 }
@@ -120,11 +147,9 @@ impl ExternalResolutionContext for TestExternalContext {
     fn load_python_import(
         &mut self,
         python_path: &ir::PythonPath,
-    ) -> Result<(), PythonImportLoadingFailedError> {
-        if self.python_imports_ok.contains(python_path.as_ref()) {
-            Ok(())
-        } else {
-            Err(PythonImportLoadingFailedError)
-        }
+    ) -> Result<&IndexSet<String>, PythonImportLoadingFailedError> {
+        self.python_imports
+            .get(python_path.as_ref())
+            .ok_or(PythonImportLoadingFailedError)
     }
 }
