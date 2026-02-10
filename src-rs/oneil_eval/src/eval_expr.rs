@@ -348,9 +348,11 @@ fn eval_function_call<E: ExternalEvaluationContext>(
         ir::FunctionName::Builtin(fn_identifier, fn_identifier_span) => {
             context.evaluate_builtin_function(fn_identifier, *fn_identifier_span, args)
         }
-        ir::FunctionName::Imported(fn_identifier, fn_identifier_span) => {
-            context.evaluate_imported_function(fn_identifier, *fn_identifier_span, args)
-        }
+        ir::FunctionName::Imported {
+            python_path,
+            name,
+            name_span,
+        } => context.evaluate_imported_function(python_path, name, *name_span, args),
     }
 }
 
