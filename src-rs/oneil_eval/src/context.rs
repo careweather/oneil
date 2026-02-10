@@ -34,6 +34,21 @@ pub trait ExternalEvaluationContext {
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Vec<EvalError>>>;
 
+    /// Evaluates an imported function by identifier with the given arguments, if it exists.
+    ///
+    /// If the function does not exist, returns `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there was an error evaluating the imported function.
+    fn evaluate_imported_function(
+        &self,
+        python_path: &ir::PythonPath,
+        identifier: &ir::Identifier,
+        identifier_span: Span,
+        args: Vec<(output::Value, Span)>,
+    ) -> Option<Result<output::Value, Vec<EvalError>>>;
+
     /// Returns a unit by name if it is defined in the builtin context.
     fn lookup_unit(&self, name: &str) -> Option<&output::Unit>;
 
@@ -258,20 +273,16 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     }
 
     /// Evaluates an imported function with the given arguments.
-    ///
-    /// Currently unsupported and always returns an error.
     pub fn evaluate_imported_function(
         &self,
+        python_path: &ir::PythonPath,
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Result<output::Value, Vec<EvalError>> {
-        let _ = (self, identifier, args);
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("imported function".to_string()),
-            will_be_supported: true,
-        }])
+        self.external_context
+            .evaluate_imported_function(python_path, identifier, identifier_span, args)
+            .expect("imported function should be defined (checked during resolution)")
     }
 
     /// Looks up a unit by name.

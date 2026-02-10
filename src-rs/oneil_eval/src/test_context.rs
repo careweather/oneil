@@ -73,6 +73,17 @@ impl ExternalEvaluationContext for TestExternalContext {
             .map(|f| f(identifier_span, args))
     }
 
+    fn evaluate_imported_function(
+        &self,
+        _python_path: &ir::PythonPath,
+        _identifier: &ir::Identifier,
+        _identifier_span: Span,
+        _args: Vec<(Value, Span)>,
+    ) -> Option<Result<Value, Vec<EvalError>>> {
+        // For now, we don't support imported functions in tests
+        None
+    }
+
     fn lookup_unit(&self, name: &str) -> Option<&Unit> {
         self.builtin_units.get(name)
     }
