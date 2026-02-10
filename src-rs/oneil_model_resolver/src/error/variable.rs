@@ -2,7 +2,7 @@ use std::fmt;
 
 use oneil_ir as ir;
 use oneil_shared::{
-    error::{AsOneilError, ErrorLocation},
+    error::{AsOneilError, Context, ErrorLocation},
     span::Span,
 };
 
@@ -45,6 +45,22 @@ pub enum VariableResolutionError {
         reference: ir::ReferenceName,
         /// The span of where the reference is referenced
         reference_span: Span,
+    },
+    /// The function name is not defined as a builtin or in any loaded Python import.
+    UndefinedFunction {
+        /// The function name that could not be resolved
+        function_name: String,
+        /// The span of the function name in the source
+        relevant_span: Span,
+    },
+    /// The function name is defined in more than one Python import; resolution is ambiguous.
+    MultipleFunctionsFound {
+        /// The function name that was resolved in multiple imports
+        function_name: String,
+        /// The span of the function name in the source
+        relevant_span: Span,
+        /// The Python paths that export this function
+        python_paths: Vec<ir::PythonPath>,
     },
 }
 
@@ -118,6 +134,29 @@ impl VariableResolutionError {
             reference_span,
         }
     }
+
+    /// Creates a new error indicating that the function is not defined as a builtin or in any Python import.
+    #[must_use]
+    pub const fn undefined_function(function_name: String, relevant_span: Span) -> Self {
+        Self::UndefinedFunction {
+            function_name,
+            relevant_span,
+        }
+    }
+
+    /// Creates a new error indicating that the function is defined in more than one Python import.
+    #[must_use]
+    pub const fn multiple_functions_found(
+        function_name: String,
+        relevant_span: Span,
+        python_paths: Vec<ir::PythonPath>,
+    ) -> Self {
+        Self::MultipleFunctionsFound {
+            function_name,
+            relevant_span,
+            python_paths,
+        }
+    }
 }
 
 impl fmt::Display for VariableResolutionError {
@@ -176,6 +215,25 @@ impl fmt::Display for VariableResolutionError {
                     "reference `{identifier_str}` is not defined in the current model"
                 )
             }
+            Self::UndefinedFunction {
+                function_name,
+                relevant_span: _,
+            } => {
+                write!(
+                    f,
+                    "function `{function_name}` is not defined as a builtin or in any Python import"
+                )
+            }
+            Self::MultipleFunctionsFound {
+                function_name,
+                python_paths: _,
+                relevant_span: _,
+            } => {
+                write!(
+                    f,
+                    "function `{function_name}` is defined in multiple Python imports"
+                )
+            }
         }
     }
 }
@@ -211,6 +269,61 @@ impl AsOneilError for VariableResolutionError {
                 let location = ErrorLocation::from_source_and_span(source, *reference_span);
                 Some(location)
             }
+            Self::UndefinedFunction {
+                function_name: _,
+                relevant_span,
+            }
+            | Self::MultipleFunctionsFound {
+                function_name: _,
+                relevant_span,
+                python_paths: _,
+            } => {
+                let location = ErrorLocation::from_source_and_span(source, *relevant_span);
+                Some(location)
+            }
+        }
+    }
+
+    fn context(&self) -> Vec<Context> {
+        match self {
+            Self::ModelHasError {
+                path: _,
+                reference_span: _,
+            }
+            | Self::ParameterHasError {
+                parameter_name: _,
+                reference_span: _,
+            }
+            | Self::ReferenceResolutionFailed {
+                identifier: _,
+                reference_span: _,
+            }
+            | Self::UndefinedParameter {
+                model_path: _,
+                parameter_name: _,
+                reference_span: _,
+            }
+            | Self::UndefinedReference {
+                reference: _,
+                reference_span: _,
+            }
+            | Self::UndefinedFunction {
+                function_name: _,
+                relevant_span: _,
+            } => Vec::new(),
+            Self::MultipleFunctionsFound {
+                function_name,
+                relevant_span: _,
+                python_paths,
+            } => python_paths
+                .iter()
+                .map(|path| {
+                    Context::Note(format!(
+                        "python import `{}` exports `{function_name}`",
+                        path.as_ref().display()
+                    ))
+                })
+                .collect(),
         }
     }
 

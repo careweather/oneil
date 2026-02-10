@@ -6,6 +6,8 @@
 //! [`run_with`](ResolutionContextBuilder::run_with) to create a context,
 //! populate it, and run a closure with a reference to it.
 
+use std::path::PathBuf;
+
 use oneil_ir as ir;
 
 use crate::{
@@ -36,6 +38,8 @@ pub struct ResolutionContextBuilder<'external> {
     parameter_error_names: Vec<ir::ParameterName>,
     reference_errors: Vec<(ir::ReferenceName, ModelImportResolutionError)>,
     model_error_paths: Vec<ir::ModelPath>,
+    /// Python import paths to load into the active model (via external context) after setup.
+    python_import_paths: Vec<PathBuf>,
     external_context: Option<&'external mut TestExternalContext>,
 }
 
@@ -120,6 +124,23 @@ impl<'external> ResolutionContextBuilder<'external> {
     #[must_use]
     pub fn with_external_context(mut self, external: &'external mut TestExternalContext) -> Self {
         self.external_context = Some(external);
+        self
+    }
+
+    /// Adds Python import paths to load into the active model during build.
+    ///
+    /// For each path, [`load_python_import_to_active_model`](ResolutionContext::load_python_import_to_active_model)
+    /// is called, so the external context must have the path registered (e.g. via
+    /// [`with_python_imports_ok`](TestExternalContext::with_python_imports_ok) and
+    /// [`with_python_import_functions`](TestExternalContext::with_python_import_functions)).
+    #[must_use]
+    pub fn with_python_import_paths(
+        mut self,
+        paths: impl IntoIterator<Item = impl AsRef<std::path::Path>>,
+    ) -> Self {
+        self.python_import_paths
+            .extend(paths.into_iter().map(|p| p.as_ref().to_path_buf()));
+
         self
     }
 
@@ -216,6 +237,11 @@ impl<'external> ResolutionContextBuilder<'external> {
             );
             ctx.add_parameter_error_to_active_model(dummy_name, err);
             ctx.pop_active_model(path);
+        }
+
+        for path in &self.python_import_paths {
+            let python_path = ir::PythonPath::new(path.clone());
+            ctx.load_python_import_to_active_model(&python_path, unimportant_span());
         }
 
         ctx

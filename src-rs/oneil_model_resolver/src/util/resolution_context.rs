@@ -109,7 +109,7 @@ pub trait ExternalResolutionContext {
     fn load_python_import(
         &mut self,
         python_path: &ir::PythonPath,
-    ) -> Result<(), PythonImportLoadingFailedError>;
+    ) -> Result<&IndexSet<String>, PythonImportLoadingFailedError>;
 }
 
 pub struct ResolutionContext<'external, E: ExternalResolutionContext> {
@@ -290,8 +290,9 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     ) {
         let load_result = self.external_context.load_python_import(python_path);
 
-        if matches!(load_result, Ok(())) {
-            let import = ir::PythonImport::new(python_path.clone(), python_path_span);
+        if let Ok(functions) = load_result {
+            let import =
+                ir::PythonImport::new(python_path.clone(), python_path_span, functions.clone());
             self.active_model_mut()
                 .add_python_import(python_path.clone(), import);
         } else {
@@ -319,6 +320,20 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         python_path: &ir::PythonPath,
     ) -> Option<&ir::PythonImport> {
         self.active_model().get_python_imports().get(python_path)
+    }
+
+    /// Returns the Python paths in the active model that export the given function name.
+    ///
+    /// Only imports that were successfully loaded and that include `function_name` in
+    /// their function set are returned.
+    #[must_use]
+    pub fn lookup_imported_function(&self, function_name: &str) -> Vec<ir::PythonPath> {
+        self.active_model()
+            .get_python_imports()
+            .iter()
+            .filter(|(_path, import)| import.functions().contains(function_name))
+            .map(|(path, _)| path.clone())
+            .collect()
     }
 
     // ===== MODEL IMPORT LOADING =====

@@ -3,7 +3,7 @@
 use oneil_shared::span::Span;
 
 use crate::{
-    ParameterName, ReferenceName,
+    ParameterName, PythonPath, ReferenceName,
     reference::{Identifier, ModelPath},
 };
 
@@ -374,7 +374,14 @@ pub enum FunctionName {
     /// Built-in mathematical function.
     Builtin(Identifier, Span),
     /// Function imported from a Python module.
-    Imported(Identifier, Span),
+    Imported {
+        /// The path to the Python module.
+        python_path: PythonPath,
+        /// The name of the function.
+        name: Identifier,
+        /// The span of the function name.
+        name_span: Span,
+    },
 }
 
 impl FunctionName {
@@ -386,8 +393,12 @@ impl FunctionName {
 
     /// Creates a reference to an imported Python function.
     #[must_use]
-    pub const fn imported(name: Identifier, name_span: Span) -> Self {
-        Self::Imported(name, name_span)
+    pub const fn imported(python_path: PythonPath, name: Identifier, name_span: Span) -> Self {
+        Self::Imported {
+            python_path,
+            name,
+            name_span,
+        }
     }
 }
 
