@@ -10,7 +10,7 @@ use oneil_shared::error::{AsOneilError, OneilError};
 use oneil_shared::span::Span;
 
 use crate::{
-    cache::{AstCache, EvalCache, IrCache, SourceCache},
+    cache::{AstCache, EvalCache, IrCache, PythonImportCache, SourceCache},
     output::{self, ast, ir},
     std_builtin::StdBuiltins,
 };
@@ -25,6 +25,7 @@ pub struct Runtime {
     ast_cache: AstCache,
     ir_cache: IrCache,
     eval_cache: EvalCache,
+    python_import_cache: PythonImportCache,
     builtins: StdBuiltins,
 }
 
@@ -37,6 +38,7 @@ impl Runtime {
             ast_cache: AstCache::new(),
             ir_cache: IrCache::new(),
             eval_cache: EvalCache::new(),
+            python_import_cache: PythonImportCache::new(),
             builtins: StdBuiltins::new(),
         }
     }
@@ -304,18 +306,48 @@ impl Runtime {
         }
     }
 
-    /// Loads Python import strings from a Oneil model.
+    /// Loads a Python module from a file path and returns the set of callable names.
     ///
-    /// Returns the set of Python import paths referenced by the model (and its
-    /// dependencies). The implementation is currently stubbed and returns an
-    /// empty set.
+    /// Source is read from the file and passed to the Python loader. Results are
+    /// cached; subsequent calls for the same path return the cached result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`OneilError`] if the file could not be read or Python failed
+    /// to load the module.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "the panic only happens if an internal invariant is violated"
+    )]
     pub fn load_python_import(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> IndexSet<String> {
-        let _ = path;
-        // TODO: implement
-        IndexSet::new()
+    ) -> Result<&IndexSet<String>, Box<OneilError>> {
+        let path = path.as_ref();
+
+        // load the source code from the file
+        let source = self.load_source(path).map_err(|e| e.error)?;
+
+        // load the Python module and return the set of functions
+        let names_result = oneil_python::load_python_import(path, source)
+            .map(|map| map.keys().cloned().collect::<IndexSet<String>>())
+            .map_err(|e| OneilError::from_error_with_source(&e, path.to_path_buf(), source));
+
+        // insert the result into the cache
+        match names_result {
+            Ok(names) => self
+                .python_import_cache
+                .insert_ok(path.to_path_buf(), names),
+
+            Err(e) => self.python_import_cache.insert_err(path.to_path_buf(), e),
+        }
+
+        // return the cached result
+        self.python_import_cache
+            .get_entry(path)
+            .expect("entry was inserted in this function for the requested path")
+            .as_ref()
+            .map_err(|e| Box::new(e.clone()))
     }
 
     /// Loads AST for a model.
