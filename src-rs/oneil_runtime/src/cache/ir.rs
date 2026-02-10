@@ -58,4 +58,17 @@ impl IrCache {
     pub fn insert_err(&mut self, path: PathBuf, error: ResolutionError) {
         self.entries.insert(path, Err(error));
     }
+
+    /// Returns an iterator over the paths and models in the cache.
+    pub fn models_iter_maybe_partial(&self) -> impl Iterator<Item = (&PathBuf, &ir::Model)> {
+        self.entries
+            .iter()
+            .filter_map(|(path, result)| match result {
+                Ok(model) => Some((path, model)),
+                Err(ResolutionError::ResolutionErrors { partial_ir, .. }) => {
+                    Some((path, partial_ir))
+                }
+                Err(ResolutionError::Parse(_)) => None,
+            })
+    }
 }
