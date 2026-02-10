@@ -7,8 +7,6 @@ mod eval_expr;
 mod eval_model;
 mod eval_parameter;
 mod eval_unit;
-pub mod output;
-pub mod value;
 
 pub use context::{ExternalEvaluationContext, IrLoadError};
 pub use error::EvalError;
@@ -29,7 +27,7 @@ mod test {
     /// ```
     macro_rules! assert_is_close {
         ($expected:expr, $actual:expr) => {{
-            use $crate::value::util::is_close;
+            use oneil_output::util::is_close;
 
             let expected: f64 = $expected;
             let actual: f64 = $actual;
@@ -47,7 +45,8 @@ mod test {
     ///
     /// ```rust
     /// # use indexmap::IndexMap;
-    /// # use oneil_eval::{assert_units_eq, value::{Dimension, DimensionMap}};
+    /// # use oneil_eval::assert_units_eq;
+    /// # use oneil_output::{Dimension, DimensionMap};
     ///
     /// let unit = DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)]));
     /// assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
@@ -55,7 +54,7 @@ mod test {
     macro_rules! assert_units_dimensionally_eq {
         ($expected_unit_list:expr, $actual_unit:expr) => {{
             use indexmap::IndexMap;
-            use $crate::value::DimensionMap;
+            use oneil_output::{DimensionMap, Unit};
 
             let expected: DimensionMap = DimensionMap::new(IndexMap::from($expected_unit_list));
             let actual: &Unit = &$actual_unit;

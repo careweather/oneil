@@ -8,10 +8,7 @@ use oneil_shared::{
     span::Span,
 };
 
-use crate::{
-    output::Model,
-    value::{DisplayUnit, Interval, NumberType, Value, ValueType},
-};
+use oneil_output::{DisplayUnit, Interval, Model, NumberType, Value, ValueType};
 
 /// Errors that occurred during evaluation of a model.
 #[derive(Debug, Clone)]
@@ -1411,5 +1408,152 @@ impl AsOneilError for EvalError {
 
     fn is_internal_error(&self) -> bool {
         matches!(self, Self::ParameterHasError { .. })
+    }
+}
+
+/// Conversion from value-level errors (`oneil_output`) to evaluator errors.
+pub mod convert {
+    use oneil_output::{
+        BinaryEvalError, ExpectedType as OutputExpectedType, UnaryEvalError, UnaryOperation,
+    };
+    use oneil_shared::span::Span;
+
+    use super::{EvalError, ExpectedType};
+
+    /// Converts a binary eval error from the output crate into an evaluator error.
+    #[must_use]
+    pub fn binary_eval_error_to_eval_error(
+        error: BinaryEvalError,
+        lhs_span: Span,
+        rhs_span: Span,
+    ) -> EvalError {
+        match error {
+            BinaryEvalError::UnitMismatch { lhs_unit, rhs_unit } => EvalError::UnitMismatch {
+                expected_unit: lhs_unit,
+                expected_source_span: lhs_span,
+                found_unit: rhs_unit,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::TypeMismatch { lhs_type, rhs_type } => EvalError::TypeMismatch {
+                expected_type: *lhs_type,
+                expected_source_span: lhs_span,
+                found_type: *rhs_type,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::InvalidLhsType {
+                expected_type,
+                lhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *lhs_type,
+                found_span: lhs_span,
+            },
+            BinaryEvalError::InvalidRhsType {
+                expected_type,
+                rhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *rhs_type,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::ExponentHasUnits { exponent_unit } => EvalError::ExponentHasUnits {
+                exponent_span: rhs_span,
+                exponent_unit,
+            },
+            BinaryEvalError::ExponentIsInterval { exponent_interval } => {
+                EvalError::ExponentIsInterval {
+                    exponent_interval,
+                    exponent_value_span: rhs_span,
+                }
+            }
+        }
+    }
+
+    /// Converts a binary eval error that only applies to the left-hand side into an evaluator error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the error is not `InvalidLhsType`.
+    #[must_use]
+    pub fn binary_eval_error_expect_only_lhs(error: BinaryEvalError, lhs_span: Span) -> EvalError {
+        match error {
+            BinaryEvalError::InvalidLhsType {
+                expected_type,
+                lhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *lhs_type,
+                found_span: lhs_span,
+            },
+            BinaryEvalError::UnitMismatch { .. }
+            | BinaryEvalError::TypeMismatch { .. }
+            | BinaryEvalError::InvalidRhsType { .. }
+            | BinaryEvalError::ExponentHasUnits { .. }
+            | BinaryEvalError::ExponentIsInterval { .. } => {
+                panic!("expected only lhs errors, but got {error:?}")
+            }
+        }
+    }
+
+    /// Converts a binary eval error that only applies to the right-hand side into an evaluator error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the error is not `InvalidRhsType`, `ExponentHasUnits`, or `ExponentIsInterval`.
+    #[must_use]
+    pub fn binary_eval_error_expect_only_rhs(error: BinaryEvalError, rhs_span: Span) -> EvalError {
+        match error {
+            BinaryEvalError::InvalidRhsType {
+                expected_type,
+                rhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *rhs_type,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::ExponentHasUnits { exponent_unit } => EvalError::ExponentHasUnits {
+                exponent_span: rhs_span,
+                exponent_unit,
+            },
+            BinaryEvalError::ExponentIsInterval { exponent_interval } => {
+                EvalError::ExponentIsInterval {
+                    exponent_interval,
+                    exponent_value_span: rhs_span,
+                }
+            }
+            BinaryEvalError::UnitMismatch { .. }
+            | BinaryEvalError::TypeMismatch { .. }
+            | BinaryEvalError::InvalidLhsType { .. } => {
+                panic!("expected only rhs errors, but got {error:?}")
+            }
+        }
+    }
+
+    /// Converts a unary eval error from the output crate into an evaluator error.
+    #[must_use]
+    pub fn unary_eval_error_to_eval_error(error: UnaryEvalError, value_span: Span) -> EvalError {
+        match error {
+            UnaryEvalError::InvalidType { op, value_type } => {
+                let expected_type = match op {
+                    UnaryOperation::Neg => ExpectedType::Number,
+                    UnaryOperation::Not => ExpectedType::Boolean,
+                };
+                EvalError::InvalidType {
+                    expected_type,
+                    found_type: *value_type,
+                    found_span: value_span,
+                }
+            }
+        }
+    }
+
+    const fn expected_type_to_eval(e: OutputExpectedType) -> ExpectedType {
+        match e {
+            OutputExpectedType::Boolean => ExpectedType::Boolean,
+            OutputExpectedType::String => ExpectedType::String,
+            OutputExpectedType::Number => ExpectedType::Number,
+            OutputExpectedType::MeasuredNumber => ExpectedType::MeasuredNumber,
+            OutputExpectedType::NumberOrMeasuredNumber => ExpectedType::NumberOrMeasuredNumber,
+        }
     }
 }

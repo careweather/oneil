@@ -1,10 +1,11 @@
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
+use oneil_output::{DisplayUnit, Unit};
+
 use crate::{
     context::{EvalContext, ExternalEvaluationContext},
     error::EvalError,
-    value::{DisplayUnit, Unit},
 };
 
 // TODO: figure out display units. for now, we just
@@ -133,11 +134,12 @@ fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
 mod test {
     use std::f64::consts::PI;
 
+    use oneil_output::Dimension;
     use oneil_shared::span::SourceLocation;
 
     use crate::{
         assert_is_close, assert_units_dimensionally_eq, context::EvalContext,
-        test_context::TestExternalContext, value::Dimension,
+        test_context::TestExternalContext,
     };
 
     use super::*;

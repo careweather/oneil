@@ -9,7 +9,8 @@ use indexmap::IndexMap;
 
 use oneil_shared::span::Span;
 
-use crate::{output::dependency::DependencySet, value::Value};
+use crate::Value;
+use crate::dependency::DependencySet;
 
 /// The result of evaluating a model.
 ///
@@ -47,9 +48,9 @@ pub struct Model {
 /// and the source location of the test expression.
 #[derive(Debug, Clone)]
 pub struct Test {
-    /// The source span of the test expression.
+    /// Source span of the test expression.
     pub expr_span: Span,
-    /// The evaluated value of the test expression.
+    /// The evaluated result of the test expression.
     pub result: TestResult,
 }
 

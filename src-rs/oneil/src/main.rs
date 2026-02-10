@@ -66,7 +66,9 @@ fn main() {
         Commands::Test(args) => handle_test_command(args, cli.dev_show_internal_errors),
         Commands::Tree(args) => handle_tree_command(args, cli.dev_show_internal_errors),
         Commands::Builtins { command } => handle_builtins_command(command),
-        Commands::Independent(args) => handle_independent_command(args, cli.dev_show_internal_errors),
+        Commands::Independent(args) => {
+            handle_independent_command(args, cli.dev_show_internal_errors)
+        }
     }
 }
 

@@ -10,12 +10,12 @@ use std::path::Path;
 use indexmap::IndexMap;
 
 use oneil_ir as ir;
+use oneil_output::{Unit, Value};
 use oneil_shared::span::Span;
 
 use crate::{
     context::{ExternalEvaluationContext, IrLoadError},
     error::EvalError,
-    value::{Unit, Value},
 };
 
 /// Test double for [`ExternalResolutionContext`] with standard builtins included.
@@ -95,12 +95,10 @@ mod std_builtins {
 
     use indexmap::IndexMap;
 
+    use oneil_output::{Dimension, DimensionMap, DisplayUnit, Number, Unit, Value};
     use oneil_shared::span::Span;
 
-    use crate::{
-        EvalError,
-        value::{Dimension, DimensionMap, DisplayUnit, Number, Unit, Value},
-    };
+    use crate::EvalError;
 
     struct StdBuiltinValue {
         name: &'static str,
@@ -863,14 +861,14 @@ mod std_builtins {
     }
 
     mod fns {
+        use oneil_output::{DisplayUnit, MeasuredNumber, Number, NumberType, Unit, Value};
         use oneil_shared::span::Span;
 
         use crate::{
             EvalError,
-            error::{ExpectedArgumentCount, ExpectedType},
-            value::{
-                MeasuredNumber, Number, NumberType, Value,
-                util::{HomogeneousNumberList, extract_homogeneous_numbers_list},
+            error::{
+                ExpectedArgumentCount, ExpectedType,
+                convert::{binary_eval_error_expect_only_lhs, binary_eval_error_to_eval_error},
             },
         };
 
@@ -1100,7 +1098,7 @@ mod std_builtins {
             let (arg, arg_span) = args.next().expect("there should be one argument");
 
             arg.checked_pow(Value::from(0.5))
-                .map_err(|error| vec![error.expect_only_lhs_error(arg_span)])
+                .map_err(|error| vec![binary_eval_error_expect_only_lhs(error, arg_span)])
         }
 
         #[expect(unused_variables, reason = "not implemented")]
@@ -1229,8 +1227,11 @@ mod std_builtins {
                     let (left, left_span) = args.next().expect("there should be two arguments");
                     let (right, right_span) = args.next().expect("there should be two arguments");
 
-                    left.checked_sub(right)
-                        .map_err(|error| vec![error.into_eval_error(left_span, right_span)])
+                    left.checked_sub(right).map_err(|error| {
+                        vec![binary_eval_error_to_eval_error(
+                            error, left_span, right_span,
+                        )]
+                    })
                 }
                 _ => Err(vec![EvalError::InvalidArgumentCount {
                     function_name: "range".to_string(),
@@ -1317,7 +1318,11 @@ mod std_builtins {
 
                     left.checked_add(right)
                         .and_then(|value| value.checked_div(Value::from(2.0)))
-                        .map_err(|error| vec![error.into_eval_error(left_span, right_span)])
+                        .map_err(|error| {
+                            vec![binary_eval_error_to_eval_error(
+                                error, left_span, right_span,
+                            )]
+                        })
                 }
                 _ => Err(vec![EvalError::InvalidArgumentCount {
                     function_name: "mid".to_string(),
@@ -1352,6 +1357,146 @@ mod std_builtins {
                 feature_name: Some("mnmx".to_string()),
                 will_be_supported: true,
             }])
+        }
+
+        // Duplicate of homogeneous number list logic (also in oneil_runtime::std_builtin::fns).
+        enum HomogeneousNumberList<'a> {
+            Numbers(Vec<&'a Number>),
+            MeasuredNumbers(Vec<&'a MeasuredNumber>),
+        }
+
+        enum ListResult<'a> {
+            Numbers {
+                numbers: Vec<&'a Number>,
+                first_number_span: &'a Span,
+            },
+            MeasuredNumbers {
+                numbers: Vec<&'a MeasuredNumber>,
+                expected_unit: &'a Unit,
+                expected_unit_value_span: &'a Span,
+            },
+        }
+
+        #[expect(
+            clippy::panic_in_result_fn,
+            reason = "callers enforce non-empty list to provide correct error message"
+        )]
+        fn extract_homogeneous_numbers_list(
+            values: &[(Value, Span)],
+        ) -> Result<HomogeneousNumberList<'_>, Vec<EvalError>> {
+            assert!(!values.is_empty());
+            let mut list_result: Option<ListResult<'_>> = None;
+            let mut errors = Vec::new();
+            for (value, value_span) in values {
+                match value {
+                    Value::MeasuredNumber(number) => {
+                        handle_measured_number(number, value_span, &mut list_result, &mut errors);
+                    }
+                    Value::Number(number) => {
+                        handle_number(number, value_span, &mut list_result, &mut errors);
+                    }
+                    Value::String(_) | Value::Boolean(_) => {
+                        handle_invalid_type(value, value_span, &mut errors);
+                    }
+                }
+            }
+            if !errors.is_empty() {
+                return Err(errors);
+            }
+            let list_result = list_result.expect("at least one number");
+            Ok(convert_to_homogeneous_list(list_result))
+        }
+
+        fn handle_measured_number<'a>(
+            number: &'a MeasuredNumber,
+            value_span: &'a Span,
+            list_result: &mut Option<ListResult<'a>>,
+            errors: &mut Vec<EvalError>,
+        ) {
+            match list_result {
+                Some(ListResult::MeasuredNumbers {
+                    numbers,
+                    expected_unit,
+                    expected_unit_value_span,
+                }) => {
+                    if number.unit().dimensionally_eq(expected_unit) {
+                        numbers.push(number);
+                    } else {
+                        errors.push(EvalError::UnitMismatch {
+                            expected_unit: expected_unit.display_unit.clone(),
+                            expected_source_span: **expected_unit_value_span,
+                            found_unit: number.unit().display_unit.clone(),
+                            found_span: *value_span,
+                        });
+                    }
+                }
+                Some(ListResult::Numbers {
+                    numbers: _,
+                    first_number_span,
+                }) => {
+                    errors.push(EvalError::UnitMismatch {
+                        expected_unit: DisplayUnit::Unitless,
+                        expected_source_span: **first_number_span,
+                        found_unit: number.unit().display_unit.clone(),
+                        found_span: *value_span,
+                    });
+                }
+                None => {
+                    *list_result = Some(ListResult::MeasuredNumbers {
+                        numbers: vec![number],
+                        expected_unit: number.unit(),
+                        expected_unit_value_span: value_span,
+                    });
+                }
+            }
+        }
+
+        fn handle_number<'a>(
+            number: &'a Number,
+            value_span: &'a Span,
+            list_result: &mut Option<ListResult<'a>>,
+            errors: &mut Vec<EvalError>,
+        ) {
+            match list_result {
+                Some(ListResult::MeasuredNumbers {
+                    numbers: _,
+                    expected_unit,
+                    expected_unit_value_span,
+                }) => {
+                    errors.push(EvalError::UnitMismatch {
+                        expected_unit: expected_unit.display_unit.clone(),
+                        expected_source_span: **expected_unit_value_span,
+                        found_unit: DisplayUnit::Unitless,
+                        found_span: *value_span,
+                    });
+                }
+                Some(ListResult::Numbers { numbers, .. }) => {
+                    numbers.push(number);
+                }
+                None => {
+                    *list_result = Some(ListResult::Numbers {
+                        numbers: vec![number],
+                        first_number_span: value_span,
+                    });
+                }
+            }
+        }
+
+        fn handle_invalid_type(value: &Value, value_span: &Span, errors: &mut Vec<EvalError>) {
+            errors.push(EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type: value.type_(),
+                found_span: *value_span,
+            });
+        }
+
+        fn convert_to_homogeneous_list(list_result: ListResult<'_>) -> HomogeneousNumberList<'_> {
+            match list_result {
+                ListResult::Numbers { numbers, .. } => HomogeneousNumberList::Numbers(numbers),
+                ListResult::MeasuredNumbers { numbers, .. } => {
+                    HomogeneousNumberList::MeasuredNumbers(numbers)
+                }
+            }
         }
     }
 }

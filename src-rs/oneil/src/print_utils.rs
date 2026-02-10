@@ -1,7 +1,7 @@
 //! Shared printing utilities for the Oneil CLI
 
 use anstream::print;
-use oneil_runtime::output::value::{self, Value};
+use oneil_runtime::output::{Number, Unit, Value};
 
 use crate::stylesheet;
 
@@ -20,15 +20,15 @@ pub fn print_value(value: &Value) {
 }
 
 /// Prints a number value.
-pub fn print_number_value(value: &value::Number) {
+pub fn print_number_value(value: &Number) {
     match value {
-        value::Number::Scalar(scalar) => print!("{scalar}"),
-        value::Number::Interval(interval) => print!("{} | {}", interval.min(), interval.max()),
+        Number::Scalar(scalar) => print!("{scalar}"),
+        Number::Interval(interval) => print!("{} | {}", interval.min(), interval.max()),
     }
 }
 
 /// Prints a number unit.
-pub fn print_number_unit(unit: &value::Unit) {
+pub fn print_number_unit(unit: &Unit) {
     let styled_display_unit = stylesheet::PARAMETER_UNIT.style(unit.display_unit.to_string());
     print!(" :{styled_display_unit}");
 }

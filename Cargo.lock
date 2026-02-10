@@ -609,18 +609,10 @@ dependencies = [
 name = "oneil_eval"
 version = "0.15.0"
 dependencies = [
- "arbitrary",
  "indexmap",
  "oneil_ir",
+ "oneil_output",
  "oneil_shared",
-]
-
-[[package]]
-name = "oneil_eval_fuzz"
-version = "0.0.0"
-dependencies = [
- "libfuzzer-sys",
- "oneil_eval",
 ]
 
 [[package]]
@@ -652,6 +644,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil_output"
+version = "0.15.0"
+dependencies = [
+ "arbitrary",
+ "indexmap",
+ "oneil_shared",
+]
+
+[[package]]
+name = "oneil_output_fuzz"
+version = "0.0.0"
+dependencies = [
+ "libfuzzer-sys",
+ "oneil_output",
+]
+
+[[package]]
 name = "oneil_parser"
 version = "0.15.0"
 dependencies = [
@@ -670,6 +679,7 @@ dependencies = [
  "oneil_eval",
  "oneil_ir",
  "oneil_model_resolver",
+ "oneil_output",
  "oneil_parser",
  "oneil_shared",
 ]

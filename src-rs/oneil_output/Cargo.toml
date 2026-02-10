@@ -1,6 +1,6 @@
 [package]
-name = "oneil_eval"
-description = "The evaluator for Oneil"
+name = "oneil_output"
+description = "Output and value types for the Oneil programming language"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,14 +10,13 @@ keywords.workspace = true
 categories.workspace = true
 readme = "README.md"
 
-[dependencies]
-oneil_output = { path = "../oneil_output" }
-oneil_shared = { path = "../oneil_shared" }
-oneil_ir = { path = "../oneil_ir" }
-indexmap = { workspace = true }
+[features]
+arbitrary = ["dep:arbitrary"]
 
-[dev-dependencies]
-oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
+[dependencies]
+oneil_shared = { path = "../oneil_shared" }
+indexmap = { workspace = true }
+arbitrary = { version = "1.4.2", optional = true }
 
 [lints]
 workspace = true

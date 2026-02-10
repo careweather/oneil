@@ -1,5 +1,5 @@
 [package]
-name = "oneil_eval_fuzz"
+name = "oneil_output_fuzz"
 version = "0.0.0"
 publish = false
 edition = "2024"
@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
-oneil_eval = { path = "..", features = ["arbitrary"] }
+oneil_output = { path = "..", features = ["arbitrary"] }
 
 [lib]
 name = "shared"

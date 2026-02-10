@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::{arbitrary, fuzz_target};
-use oneil_eval::value::Interval;
+use oneil_output::Interval;
 
 #[derive(Debug, Clone, PartialEq, arbitrary::Arbitrary)]
 pub struct FuzzData {

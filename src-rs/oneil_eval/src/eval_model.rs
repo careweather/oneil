@@ -8,15 +8,16 @@ use indexmap::{IndexMap, IndexSet};
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
+use oneil_output::{
+    self as output, BuiltinDependency, DependencySet, ExternalDependency, Model,
+    ParameterDependency, Value,
+};
+
 use crate::{
     EvalError,
     context::{EvalContext, ExternalEvaluationContext},
     error::{EvalErrors, ExpectedType},
     eval_expr, eval_parameter,
-    output::{
-        self, BuiltinDependency, DependencySet, ExternalDependency, Model, ParameterDependency,
-    },
-    value::Value,
 };
 
 /// Evaluates the model at the given path and all its dependencies, returning a map of
