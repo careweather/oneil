@@ -14,8 +14,7 @@ use crate::{
     error::{EvalErrors, ExpectedType},
     eval_expr, eval_parameter,
     output::{
-        self, Model,
-        dependency::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency},
+        self, BuiltinDependency, DependencySet, ExternalDependency, Model, ParameterDependency,
     },
     value::Value,
 };
