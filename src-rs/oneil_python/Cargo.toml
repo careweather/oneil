@@ -11,6 +11,9 @@ categories.workspace = true
 readme = "README.md"
 
 [dependencies]
+indexmap.workspace = true
+oneil_shared = { path = "../oneil_shared" }
+pyo3 = "0.28.0"
 
 [lints]
 workspace = true

@@ -95,17 +95,32 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
 }
 
 /// Handles the `dev print-python-imports` command.
-fn handle_print_python_imports(files: &[PathBuf], _show_internal_errors: bool) {
+fn handle_print_python_imports(files: &[PathBuf], show_internal_errors: bool) {
     let mut runtime = Runtime::new();
-    let is_multiple_files = files.len() > 1;
+
+    let mut imports = IndexMap::new();
+    let mut errors = Vec::new();
 
     for file in files {
-        if is_multiple_files {
-            println!("===== {} =====", file.display());
-        }
+        let file_result = runtime.load_python_import(file);
 
-        let imports = runtime.load_python_import(file);
-        for s in &imports {
+        match file_result {
+            Ok(import) => {
+                imports.insert(file.clone(), import.clone());
+            }
+            Err(e) => {
+                errors.push(e);
+            }
+        }
+    }
+
+    for error in errors {
+        print_error::print(&error, show_internal_errors);
+    }
+
+    for (file, import) in imports {
+        println!("===== {} =====", file.display());
+        for s in import {
             println!("{s}");
         }
     }

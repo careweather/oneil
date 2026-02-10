@@ -17,6 +17,7 @@ oneil_ir = { path = "../oneil_ir" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }
 oneil_output = { path = "../oneil_output" }
 oneil_parser = { path = "../oneil_parser" }
+oneil_python = { path = "../oneil_python" }
 oneil_shared = { path = "../oneil_shared" }
 indexmap = { workspace = true }
 
