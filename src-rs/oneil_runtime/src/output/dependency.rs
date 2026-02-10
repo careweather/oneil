@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use indexmap::{IndexMap, IndexSet};
 use oneil_shared::span::Span;
 
-use oneil_eval::value::Value;
+use oneil_output::Value;
 
 /// A value in a dependency tree
 #[derive(Debug, Clone, PartialEq)]

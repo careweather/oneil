@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, ops};
 
-use crate::value::util::is_close;
+use crate::util::is_close;
 
 // TODO: maybe add more comparison functions for
 //       intervals into the standard library (
@@ -224,7 +224,7 @@ impl Interval {
     /// # Examples
     ///
     /// ```
-    /// use oneil_eval::value::Interval;
+    /// use oneil_output::Interval;
     ///
     /// let interval1 = Interval::new(1.0, 2.0);
     /// let interval2 = Interval::new(3.0, 4.0);

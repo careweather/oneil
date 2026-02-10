@@ -3,11 +3,12 @@ use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
+use oneil_output::{MeasuredNumber, Number, Unit, Value};
+
 use crate::{
     context::{EvalContext, ExternalEvaluationContext},
     error::EvalError,
     eval_expr, eval_unit,
-    value::{MeasuredNumber, Number, Unit, Value},
 };
 
 pub struct EvalParameterResult {
@@ -754,9 +755,11 @@ fn verify_value_is_within_string_discrete_limit(
 mod tests {
     use std::path::PathBuf;
 
+    use oneil_output::Dimension;
+
     use crate::{
         assert_is_close, assert_units_dimensionally_eq, context::EvalContext,
-        test_context::TestExternalContext, value::Dimension,
+        test_context::TestExternalContext,
     };
 
     use super::*;
@@ -1609,9 +1612,8 @@ mod tests {
         use super::*;
 
         use crate::context::EvalContext;
-        use crate::output;
-        use crate::output::DependencySet;
         use crate::test_context::TestExternalContext;
+        use oneil_output as output;
 
         use oneil_ir::DisplayCompositeUnit;
         use oneil_shared::span::SourceLocation;
@@ -2340,7 +2342,7 @@ mod tests {
                 label: name.to_string(),
                 print_level: output::PrintLevel::None,
                 debug_info: None,
-                dependencies: DependencySet::default(),
+                dependencies: output::DependencySet::default(),
                 expr_span: random_span(),
             }
         }

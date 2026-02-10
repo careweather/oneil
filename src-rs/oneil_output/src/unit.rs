@@ -2,7 +2,7 @@ use std::{fmt, ops};
 
 use indexmap::IndexMap;
 
-use crate::value::util::is_close;
+use crate::util::is_close;
 
 /// A unit in Oneil.
 ///

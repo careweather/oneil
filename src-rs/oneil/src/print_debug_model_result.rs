@@ -173,10 +173,7 @@ fn print_submodels(submodels: &IndexMap<&str, &str>, indent: usize) {
     }
 }
 
-fn print_parameters(
-    parameters: &IndexMap<&str, &oneil_runtime::output::eval::Parameter>,
-    indent: usize,
-) {
+fn print_parameters(parameters: &IndexMap<&str, &oneil_runtime::output::Parameter>, indent: usize) {
     for (i, (name, param)) in parameters.iter().enumerate() {
         let is_last = i == parameters.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
@@ -213,13 +210,13 @@ fn print_references(
     }
 }
 
-fn print_tests(tests: &[&oneil_runtime::output::eval::Test], indent: usize) {
+fn print_tests(tests: &[&oneil_runtime::output::Test], indent: usize) {
     for (i, test) in tests.iter().enumerate() {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         let result_str = match &test.result {
-            oneil_runtime::output::eval::TestResult::Passed => "passed",
-            oneil_runtime::output::eval::TestResult::Failed { .. } => "failed",
+            oneil_runtime::output::TestResult::Passed => "passed",
+            oneil_runtime::output::TestResult::Failed { .. } => "failed",
         };
         println!("{}    {}Test: {}", "  ".repeat(indent), prefix, result_str);
     }

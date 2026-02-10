@@ -2,9 +2,9 @@ use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
-use oneil_eval::value::{Unit, Value};
 use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext, IrLoadError};
 use oneil_model_resolver as model_resolver;
+use oneil_output::{Unit, Value};
 use oneil_parser as parser;
 use oneil_shared::error::{AsOneilError, OneilError};
 use oneil_shared::span::Span;

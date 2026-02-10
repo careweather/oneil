@@ -7,8 +7,8 @@
 
 use std::path::Path;
 
+use crate::output;
 use indexmap::IndexMap;
-use oneil_eval::output;
 use oneil_ir as ir;
 use oneil_shared::{error::OneilError, span::Span};
 

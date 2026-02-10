@@ -2,8 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::output;
 use indexmap::IndexMap;
-use oneil_eval::output;
 
 use crate::output::error::EvalError;
 

@@ -1,11 +1,8 @@
 use std::{cmp::Ordering, fmt};
 
 use crate::{
-    error::ExpectedType,
-    value::{
-        MeasuredNumber, Number, ValueType,
-        error::{BinaryEvalError, UnaryEvalError, UnaryOperation},
-    },
+    MeasuredNumber, Number, ValueType,
+    error::{BinaryEvalError, ExpectedType, UnaryEvalError, UnaryOperation},
 };
 
 // TODO: document the layers of a value

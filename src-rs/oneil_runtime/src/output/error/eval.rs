@@ -1,7 +1,7 @@
 //! Error type for model evaluation failures.
 
+use crate::output;
 use indexmap::IndexMap;
-use oneil_eval::output;
 use oneil_shared::error::OneilError;
 
 use super::resolution::ResolutionError;

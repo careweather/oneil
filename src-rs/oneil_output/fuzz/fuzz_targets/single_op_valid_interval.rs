@@ -3,7 +3,7 @@
 // TODO: make multi-op version of this fuzz target
 
 use libfuzzer_sys::{arbitrary, fuzz_target};
-use oneil_eval::value::Interval;
+use oneil_output::Interval;
 
 #[derive(Debug, Clone, PartialEq, arbitrary::Arbitrary)]
 enum FuzzData {

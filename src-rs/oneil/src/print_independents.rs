@@ -2,7 +2,7 @@
 
 use anstream::{print, println};
 use oneil_runtime::output::{
-    eval,
+    Parameter,
     reference::{EvalErrorReference, ModelReference},
 };
 use oneil_shared::error::OneilError;
@@ -127,7 +127,7 @@ fn print_model_independents(
 ///
 /// A parameter is independent if it doesn't have any parameter dependencies
 /// or external dependencies (it may still have builtin dependencies).
-fn get_independent_parameters(model_ref: ModelReference<'_>) -> Vec<&eval::Parameter> {
+fn get_independent_parameters(model_ref: ModelReference<'_>) -> Vec<&Parameter> {
     let parameters = model_ref.parameters();
 
     parameters
@@ -142,7 +142,7 @@ fn get_independent_parameters(model_ref: ModelReference<'_>) -> Vec<&eval::Param
 }
 
 /// Prints a single parameter.
-fn print_parameter(parameter: &eval::Parameter, print_values: bool) {
+fn print_parameter(parameter: &Parameter, print_values: bool) {
     let styled_ident = stylesheet::PARAMETER_IDENTIFIER.style(&parameter.ident);
 
     if print_values {

@@ -13,10 +13,11 @@ readme = "README.md"
 [dependencies]
 oneil_ast = { path = "../oneil_ast" }
 oneil_eval = { path = "../oneil_eval" }
-oneil_parser = { path = "../oneil_parser" }
-oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
 oneil_model_resolver = { path = "../oneil_model_resolver" }
+oneil_output = { path = "../oneil_output" }
+oneil_parser = { path = "../oneil_parser" }
+oneil_shared = { path = "../oneil_shared" }
 indexmap = { workspace = true }
 
 [lints]

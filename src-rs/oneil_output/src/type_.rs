@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::value::Unit;
+use crate::Unit;
 
 /// The type of a value
 #[derive(Debug, Clone)]

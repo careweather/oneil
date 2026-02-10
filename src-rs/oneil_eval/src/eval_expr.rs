@@ -3,10 +3,14 @@ use std::iter;
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
+use oneil_output::{Number, Value};
+
 use crate::{
     context::{EvalContext, ExternalEvaluationContext},
-    error::EvalError,
-    value::{Number, Value},
+    error::{
+        EvalError,
+        convert::{binary_eval_error_to_eval_error, unary_eval_error_to_eval_error},
+    },
 };
 
 /// Evaluates an expression and returns the resulting value.
@@ -234,7 +238,7 @@ fn eval_comparison_op(
         ir::ComparisonOp::GreaterThanEq => lhs.checked_gte(rhs),
     };
 
-    result.map_err(|error| Box::new(error.into_eval_error(lhs_span, rhs_span)))
+    result.map_err(|error| Box::new(binary_eval_error_to_eval_error(error, lhs_span, rhs_span)))
 }
 
 struct BinaryOpSubexpressionsResult {
@@ -290,7 +294,13 @@ fn eval_binary_op(
         ir::BinaryOp::MinMax => left_result.checked_min_max(right_result),
     };
 
-    result.map_err(|error| vec![error.into_eval_error(left_result_span, right_result_span)])
+    result.map_err(|error| {
+        vec![binary_eval_error_to_eval_error(
+            error,
+            left_result_span,
+            right_result_span,
+        )]
+    })
 }
 
 fn eval_unary_op(
@@ -303,7 +313,7 @@ fn eval_unary_op(
         ir::UnaryOp::Not => expr_result.checked_not(),
     };
 
-    result.map_err(|error| vec![error.into_eval_error(expr_result_span)])
+    result.map_err(|error| vec![unary_eval_error_to_eval_error(error, expr_result_span)])
 }
 
 fn eval_function_call_args<E: ExternalEvaluationContext>(

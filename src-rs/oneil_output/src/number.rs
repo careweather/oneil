@@ -1,11 +1,9 @@
 use std::{cmp::Ordering, fmt, ops};
 
 use crate::{
-    value::error::BinaryEvalError,
-    value::{
-        Interval, NumberType, Unit,
-        util::{db_to_linear, is_close, linear_to_db},
-    },
+    Interval, NumberType, Unit,
+    error::BinaryEvalError,
+    util::{db_to_linear, is_close, linear_to_db},
 };
 
 // TODO: document how this guarantees that the number is

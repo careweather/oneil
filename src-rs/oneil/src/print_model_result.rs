@@ -3,9 +3,8 @@ use std::path::Path;
 use anstream::{eprintln, print, println};
 use indexmap::{IndexMap, IndexSet};
 use oneil_runtime::output::{
-    eval::{DebugInfo, Parameter, PrintLevel, TestResult},
+    DebugInfo, Parameter, PrintLevel, TestResult, Value,
     reference::{EvalErrorReference, ModelReference},
-    value::Value,
 };
 use oneil_shared::{error::OneilError, span::Span};
 

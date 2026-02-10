@@ -3,13 +3,10 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 
 use oneil_ir as ir;
+use oneil_output as output;
 use oneil_shared::span::Span;
 
-use crate::{
-    error::{EvalError, EvalErrors},
-    output::{self},
-    value::{Unit, Value},
-};
+use crate::error::{EvalError, EvalErrors};
 
 /// Error indicating that an IR model could not be loaded.
 #[derive(Debug, Clone, Copy)]
@@ -21,7 +18,7 @@ pub trait ExternalEvaluationContext {
     fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<Result<&ir::Model, IrLoadError>>;
 
     /// Returns the value of a builtin variable by identifier, if it exists.
-    fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&Value>;
+    fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&output::Value>;
 
     /// Evaluates a builtin function by identifier with the given arguments, if it exists.
     ///
@@ -34,11 +31,11 @@ pub trait ExternalEvaluationContext {
         &self,
         identifier: &ir::Identifier,
         identifier_span: Span,
-        args: Vec<(Value, Span)>,
-    ) -> Option<Result<Value, Vec<EvalError>>>;
+        args: Vec<(output::Value, Span)>,
+    ) -> Option<Result<output::Value, Vec<EvalError>>>;
 
     /// Returns a unit by name if it is defined in the builtin context.
-    fn lookup_unit(&self, name: &str) -> Option<&Unit>;
+    fn lookup_unit(&self, name: &str) -> Option<&output::Unit>;
 
     /// Returns the map of available unit prefixes (e.g. "k" -> 1000.0).
     fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)>;
@@ -99,7 +96,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
     /// Consumes the context and returns the accumulated models and errors.
     ///
-    /// Each entry maps a model path to its evaluated [`output::Model`] and any
+    /// Each entry maps a model path to its evaluated [`Model`] and any
     /// [`ModelError`]s that occurred during evaluation (e.g. from parameters or
     /// tests that failed).
     #[must_use]
@@ -184,7 +181,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// If it is, then there is a bug either in the model resolver when it resolves builtin variables
     /// or in the builtin map when it defines the builtin values.
     #[must_use]
-    pub fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Value {
+    pub fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> output::Value {
         self.external_context
             .lookup_builtin_variable(identifier)
             .expect("builtin value should be defined (checked during resolution)")
@@ -200,7 +197,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         &self,
         parameter_name: &ir::ParameterName,
         variable_span: Span,
-    ) -> Result<Value, Vec<EvalError>> {
+    ) -> Result<output::Value, Vec<EvalError>> {
         let current_model = self
             .active_models
             .last()
@@ -215,7 +212,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         model: &ir::ModelPath,
         parameter_name: &ir::ParameterName,
         variable_span: Span,
-    ) -> Result<Value, Vec<EvalError>> {
+    ) -> Result<output::Value, Vec<EvalError>> {
         self.lookup_model_parameter_value_internal(model.as_ref(), parameter_name, variable_span)
     }
 
@@ -224,7 +221,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         model_path: &Path,
         parameter_name: &ir::ParameterName,
         variable_span: Span,
-    ) -> Result<Value, Vec<EvalError>> {
+    ) -> Result<output::Value, Vec<EvalError>> {
         let model = self
             .models
             .get(model_path)
@@ -253,8 +250,8 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         &self,
         identifier: &ir::Identifier,
         identifier_span: Span,
-        args: Vec<(Value, Span)>,
-    ) -> Result<Value, Vec<EvalError>> {
+        args: Vec<(output::Value, Span)>,
+    ) -> Result<output::Value, Vec<EvalError>> {
         self.external_context
             .evaluate_builtin_function(identifier, identifier_span, args)
             .expect("builtin function should be defined (checked during resolution)")
@@ -267,8 +264,8 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         &self,
         identifier: &ir::Identifier,
         identifier_span: Span,
-        args: Vec<(Value, Span)>,
-    ) -> Result<Value, Vec<EvalError>> {
+        args: Vec<(output::Value, Span)>,
+    ) -> Result<output::Value, Vec<EvalError>> {
         let _ = (self, identifier, args);
         Err(vec![EvalError::Unsupported {
             relevant_span: identifier_span,
@@ -283,7 +280,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     ///
     /// Panics if the unit is not defined. This should never be the case.
     #[must_use]
-    pub fn lookup_unit(&self, name: &str) -> Option<Unit> {
+    pub fn lookup_unit(&self, name: &str) -> Option<output::Unit> {
         self.external_context.lookup_unit(name).cloned()
     }
 
