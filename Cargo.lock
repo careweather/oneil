@@ -634,16 +634,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oneil_model_resolver"
-version = "0.15.0"
-dependencies = [
- "indexmap",
- "oneil_ast",
- "oneil_ir",
- "oneil_shared",
-]
-
-[[package]]
 name = "oneil_output"
 version = "0.15.0"
 dependencies = [
@@ -681,6 +671,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil_resolver"
+version = "0.15.0"
+dependencies = [
+ "indexmap",
+ "oneil_ast",
+ "oneil_ir",
+ "oneil_shared",
+]
+
+[[package]]
 name = "oneil_runtime"
 version = "0.15.0"
 dependencies = [
@@ -688,10 +688,10 @@ dependencies = [
  "oneil_ast",
  "oneil_eval",
  "oneil_ir",
- "oneil_model_resolver",
  "oneil_output",
  "oneil_parser",
  "oneil_python",
+ "oneil_resolver",
  "oneil_shared",
 ]
 

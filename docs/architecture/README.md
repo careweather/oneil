@@ -16,8 +16,8 @@ This is the basic structure of the system. Each component is broken into an indi
 - [`oneil_ast`](../../src-rs/oneil_ast/) - contains the data structures for the
   Oneil AST
 
-- [`oneil_model_resolver`](../../src-rs/oneil_model_resolver/) - contains the
-  model resolver, which connects a model and its dependencies
+- [`oneil_resolver`](../../src-rs/oneil_resolver/) - contains the resolver,
+  which connects a model and its dependencies
 
 - [`oneil_ir`](../../src-rs/oneil_ir/) - contains data structures for the Oneil
   IR

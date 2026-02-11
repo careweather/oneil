@@ -14,7 +14,7 @@ readme = "README.md"
 oneil_ast = { path = "../oneil_ast" }
 oneil_eval = { path = "../oneil_eval" }
 oneil_ir = { path = "../oneil_ir" }
-oneil_model_resolver = { path = "../oneil_model_resolver" }
+oneil_resolver = { path = "../oneil_resolver" }
 oneil_output = { path = "../oneil_output" }
 oneil_parser = { path = "../oneil_parser" }
 oneil_python = { path = "../oneil_python", optional = true }
@@ -25,7 +25,7 @@ indexmap = { workspace = true }
 default = ["python"]
 python = [
     "dep:oneil_python",
-    "oneil_model_resolver/python",
+    "oneil_resolver/python",
     "oneil_eval/python",
 ]
 
