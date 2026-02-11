@@ -224,14 +224,8 @@ impl LanguageServer for Backend {
 
             let result = runtime.load_ir(&current_model_path);
 
-            let ir_model = match result {
-                Ok(ir_model) => ir_model,
-                Err(error) => match error.partial_ir() {
-                    Some(ir_model) => ir_model,
-                    None => {
-                        break 'complete (Ok(None), Some(format!("Error loading IR: {error:?}")));
-                    }
-                },
+            let Some(ir_model) = result.maybe_partial_ir() else {
+                break 'complete (Ok(None), Some(format!("Error loading IR: {result:?}")));
             };
 
             // Find the symbol at the cursor position

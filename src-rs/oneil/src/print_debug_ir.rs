@@ -3,7 +3,7 @@
 use anstream::println;
 use indexmap::IndexMap;
 use oneil_runtime::output::{
-    ir,
+    IrLoadResult, ir,
     reference::{
         ModelIrReference, ReferenceImportReference, ResolutionErrorReference,
         SubmodelImportReference,
@@ -23,11 +23,12 @@ pub struct IrPrintConfig {
 /// Collects all errors from the model IR by traversing the hierarchy. If there are errors, they
 /// are printed. If there are no errors or `display_partial` is true, the IR is displayed.
 /// When displaying, only the top-level model IR is shown unless `recursive` is true.
-pub fn print(
-    ir_result: Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>,
-    ir_print_config: &IrPrintConfig,
-) {
-    let errors = collect_errors(&ir_result);
+pub fn print(ir_result: IrLoadResult<'_>, ir_print_config: &IrPrintConfig) {
+    // Get the model ref for later so that we can consume
+    // the IR result to collect errors
+    let model_ref = ir_result.maybe_partial_ir();
+
+    let errors = collect_errors(ir_result);
 
     if !errors.is_empty() {
         for error in &errors {
@@ -40,11 +41,6 @@ pub fn print(
         return;
     }
 
-    let model_ref = match &ir_result {
-        Ok(r) => Some(*r),
-        Err(e) => e.partial_ir(),
-    };
-
     if let Some(model_ref) = model_ref {
         println!("ModelCollection");
         println!("└── Models:");
@@ -56,33 +52,34 @@ pub fn print(
 /// Collects all errors from the IR result by traversing the model hierarchy.
 ///
 /// It does a breadth-first search.
-fn collect_errors(
-    ir_result: &Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>,
-) -> Vec<oneil_shared::error::OneilError> {
+fn collect_errors(ir_result: IrLoadResult<'_>) -> Vec<oneil_shared::error::OneilError> {
     let mut errors = Vec::new();
 
-    let mut queue: Vec<Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>> = match ir_result
-    {
-        Ok(r) => vec![Ok(*r)],
-        Err(e) => {
-            errors.extend(e.model_errors());
-            e.partial_ir()
-                .map_or_else(Vec::new, |partial| vec![Ok(partial)])
-        }
-    };
+    let mut stack: Vec<Result<ModelIrReference<'_>, ResolutionErrorReference<'_>>> =
+        match ir_result.into() {
+            Ok(r) => vec![Ok(r)],
+            Err(error) => {
+                errors.extend(error.python_import_errors);
+                errors.extend(error.resolution_error.model_errors());
+                error
+                    .resolution_error
+                    .partial_ir()
+                    .map_or_else(Vec::new, |partial| vec![Ok(partial)])
+            }
+        };
 
-    while let Some(r) = queue.pop() {
+    while let Some(r) = stack.pop() {
         match r {
             Err(e) => {
                 errors.extend(e.model_errors());
                 if let Some(partial) = e.partial_ir() {
-                    queue.push(Ok(partial));
+                    stack.push(Ok(partial));
                 }
             }
             Ok(model_ref) => {
                 // We only need to print the references, since every submodel is a reference
                 for nested in model_ref.references().values() {
-                    queue.push(nested.model());
+                    stack.push(nested.model());
                 }
             }
         }

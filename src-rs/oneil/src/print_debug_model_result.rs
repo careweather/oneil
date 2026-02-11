@@ -56,14 +56,12 @@ pub fn print(
 }
 
 /// Collects all errors from the evaluation result by traversing the model hierarchy.
-///
-/// Uses a breadth-first search over references (each submodel is a reference).
 fn collect_errors(
     eval_result: &Result<ModelReference<'_>, EvalErrorReference<'_>>,
 ) -> Vec<oneil_shared::error::OneilError> {
     let mut errors = Vec::new();
 
-    let mut queue: Vec<Result<ModelReference<'_>, EvalErrorReference<'_>>> = match eval_result {
+    let mut stack: Vec<Result<ModelReference<'_>, EvalErrorReference<'_>>> = match eval_result {
         Ok(r) => vec![Ok(*r)],
         Err(e) => {
             errors.extend(e.model_errors());
@@ -72,17 +70,17 @@ fn collect_errors(
         }
     };
 
-    while let Some(r) = queue.pop() {
+    while let Some(r) = stack.pop() {
         match r {
             Err(e) => {
                 errors.extend(e.model_errors());
                 if let Some(partial) = e.partial_result() {
-                    queue.push(Ok(partial));
+                    stack.push(Ok(partial));
                 }
             }
             Ok(model_ref) => {
                 for nested in model_ref.references().values() {
-                    queue.push(*nested);
+                    stack.push(*nested);
                 }
             }
         }

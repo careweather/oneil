@@ -2,10 +2,12 @@
 
 pub mod dependency;
 pub mod error;
+pub mod ir_result;
 pub mod reference;
 mod tree;
 
 pub use dependency::DependencyGraph;
+pub use ir_result::IrLoadResult;
 pub use tree::Tree;
 
 pub use oneil_ast as ast;

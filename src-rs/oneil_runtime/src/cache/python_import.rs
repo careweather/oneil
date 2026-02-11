@@ -26,6 +26,11 @@ impl PythonImportCache {
         self.entries.get(path)
     }
 
+    /// Returns the cached error for `path`, if present.
+    pub fn get_error(&self, path: &Path) -> Option<&OneilError> {
+        self.entries.get(path)?.as_ref().err()
+    }
+
     /// Stores a successful load result (set of callable names) for `path`.
     pub fn insert_ok(&mut self, path: PathBuf, names: IndexSet<String>) {
         self.entries.insert(path, Ok(names));

@@ -144,10 +144,8 @@ fn extract_errors(
         Ok(r) => vec![Ok(*r)],
         Err(e) => {
             errors.extend(e.model_errors());
-            e.partial_result().map_or_else(Vec::new, |partial| {
-                let queue = vec![Ok(partial)];
-                queue
-            })
+            e.partial_result()
+                .map_or_else(Vec::new, |partial| vec![Ok(partial)])
         }
     };
 
