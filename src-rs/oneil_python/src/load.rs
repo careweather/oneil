@@ -5,17 +5,7 @@ use std::{ffi::CString, path::Path};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 
-use crate::error::LoadPythonImportError;
-
-pub struct PythonFunction {
-    function: Py<PyAny>,
-}
-
-impl PythonFunction {
-    pub const fn new(function: Py<PyAny>) -> Self {
-        Self { function }
-    }
-}
+use crate::{PythonFunction, error::LoadPythonImportError};
 
 pub fn load_python_import(
     path: &Path,

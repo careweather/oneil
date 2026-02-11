@@ -147,9 +147,10 @@ impl ExternalResolutionContext for TestExternalContext {
     fn load_python_import(
         &mut self,
         python_path: &ir::PythonPath,
-    ) -> Result<&IndexSet<String>, PythonImportLoadingFailedError> {
+    ) -> Result<IndexSet<String>, PythonImportLoadingFailedError> {
         self.python_imports
             .get(python_path.as_ref())
+            .cloned()
             .ok_or(PythonImportLoadingFailedError)
     }
 }

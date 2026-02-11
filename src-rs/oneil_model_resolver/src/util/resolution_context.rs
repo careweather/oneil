@@ -135,7 +135,7 @@ pub trait ExternalResolutionContext {
     fn load_python_import(
         &mut self,
         python_path: &ir::PythonPath,
-    ) -> Result<&IndexSet<String>, PythonImportLoadingFailedError>;
+    ) -> Result<IndexSet<String>, PythonImportLoadingFailedError>;
 }
 
 pub struct ResolutionContext<'external, E: ExternalResolutionContext> {
@@ -330,8 +330,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         let load_result = self.external_context.load_python_import(python_path);
 
         if let Ok(functions) = load_result {
-            let import =
-                ir::PythonImport::new(python_path.clone(), python_path_span, functions.clone());
+            let import = ir::PythonImport::new(python_path.clone(), python_path_span, functions);
             self.active_model_mut()
                 .add_python_import(python_path.clone(), import);
         } else {

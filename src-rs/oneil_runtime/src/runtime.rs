@@ -170,6 +170,32 @@ impl Runtime {
         }
     }
 
+    #[cfg(feature = "python")]
+    fn evaluate_python_function(
+        &self,
+        python_path: &ir::PythonPath,
+        identifier: &ir::Identifier,
+        identifier_span: Span,
+        args: Vec<(output::Value, Span)>,
+    ) -> Option<Result<output::Value, Vec<EvalError>>> {
+        let python_import = self
+            .python_import_cache
+            .get_entry(python_path.as_ref())?
+            .as_ref()
+            .expect("should not be trying to evaluate a Python function if the import failed");
+
+        let function = python_import.get(identifier.as_str())?;
+
+        let eval_result = oneil_python::evaluate_python_function(
+            function,
+            identifier.as_str(),
+            identifier_span,
+            args,
+        );
+
+        Some(eval_result.map_err(|e| todo!()))
+    }
+
     /// Loads the IR for a model and all of its dependencies.
     ///
     /// # Errors
@@ -341,22 +367,21 @@ impl Runtime {
     pub fn load_python_import(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<&IndexSet<String>, Box<OneilError>> {
+    ) -> Result<IndexSet<String>, Box<OneilError>> {
         let path = path.as_ref();
 
         // load the source code from the file
         let source = self.load_source(path).map_err(|e| e.error)?;
 
         // load the Python module and return the set of functions
-        let names_result = oneil_python::load_python_import(path, source)
-            .map(|map| map.keys().cloned().collect::<IndexSet<String>>())
+        let functions_result = oneil_python::load_python_import(path, source)
             .map_err(|e| OneilError::from_error_with_source(&e, path.to_path_buf(), source));
 
         // insert the result into the cache
-        match names_result {
-            Ok(names) => self
+        match functions_result {
+            Ok(functions) => self
                 .python_import_cache
-                .insert_ok(path.to_path_buf(), names),
+                .insert_ok(path.to_path_buf(), functions),
 
             Err(e) => self.python_import_cache.insert_err(path.to_path_buf(), e),
         }
@@ -366,6 +391,7 @@ impl Runtime {
             .get_entry(path)
             .expect("entry was inserted in this function for the requested path")
             .as_ref()
+            .map(|functions| functions.keys().cloned().collect::<IndexSet<String>>())
             .map_err(|e| Box::new(e.clone()))
     }
 
@@ -1055,7 +1081,7 @@ impl model_resolver::ExternalResolutionContext for Runtime {
     fn load_python_import(
         &mut self,
         python_path: &oneil_ir::PythonPath,
-    ) -> Result<&IndexSet<String>, model_resolver::PythonImportLoadingFailedError> {
+    ) -> Result<IndexSet<String>, model_resolver::PythonImportLoadingFailedError> {
         self.load_python_import(python_path.as_ref())
             .map_err(|_error| model_resolver::PythonImportLoadingFailedError)
     }
@@ -1090,9 +1116,9 @@ impl eval::ExternalEvaluationContext for Runtime {
         python_path: &ir::PythonPath,
         identifier: &ir::Identifier,
         identifier_span: Span,
-        args: Vec<(oneil_output::Value, Span)>,
-    ) -> Option<Result<oneil_output::Value, Vec<EvalError>>> {
-        todo!()
+        args: Vec<(output::Value, Span)>,
+    ) -> Option<Result<output::Value, Vec<EvalError>>> {
+        self.evaluate_python_function(python_path, identifier, identifier_span, args)
     }
 
     fn lookup_unit(&self, name: &str) -> Option<&Unit> {
