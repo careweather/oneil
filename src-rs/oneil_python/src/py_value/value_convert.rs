@@ -13,17 +13,29 @@ use super::measured_number::PyMeasuredNumber;
 /// - Boolean and string values are converted to the equivalent Python `bool` and `str`.
 /// - [`Number::Scalar`] becomes a Python `float`; [`Number::Interval`] becomes a [`PyInterval`].
 /// - [`Value::MeasuredNumber`] becomes a [`PyMeasuredNumber`].
-pub fn value_to_py_any(value: Value, py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+pub fn value_to_py_any(value: Value, py: Python<'_>) -> Bound<'_, PyAny> {
     match value {
-        Value::Boolean(b) => b.into_bound_py_any(py),
-        Value::String(s) => s.into_bound_py_any(py),
+        Value::Boolean(b) => b
+            .into_bound_py_any(py)
+            .expect("boolean conversion should not fail"),
+
+        Value::String(s) => s
+            .into_bound_py_any(py)
+            .expect("string conversion should not fail"),
 
         Value::Number(number) => match number {
-            Number::Scalar(value) => value.into_bound_py_any(py),
-            Number::Interval(interval) => PyInterval::from(interval).into_bound_py_any(py),
+            Number::Scalar(value) => value
+                .into_bound_py_any(py)
+                .expect("scalar conversion should not fail"),
+
+            Number::Interval(interval) => PyInterval::from(interval)
+                .into_bound_py_any(py)
+                .expect("interval conversion should not fail"),
         },
 
-        Value::MeasuredNumber(m) => PyMeasuredNumber::from(m).into_bound_py_any(py),
+        Value::MeasuredNumber(m) => PyMeasuredNumber::from(m)
+            .into_bound_py_any(py)
+            .expect("measured number conversion should not fail"),
     }
 }
 

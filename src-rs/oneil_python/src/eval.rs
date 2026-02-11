@@ -4,9 +4,9 @@ use oneil_output::Value;
 use oneil_shared::span::Span;
 use pyo3::Python;
 
+use crate::PythonFunction;
 use crate::error::PythonEvalError;
 use crate::py_value::{py_any_to_value, value_to_py_any};
-use crate::PythonFunction;
 
 /// Evaluates a Python function with the given Oneil values as positional arguments.
 ///
@@ -29,10 +29,9 @@ pub fn evaluate_python_function(
         let py_args: Vec<_> = args
             .into_iter()
             .map(|(value, _span)| value_to_py_any(value, py))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| to_eval_err(e))?;
+            .collect::<Vec<_>>();
 
-        let result = function.call(py, &py_args).map_err(|e| to_eval_err(e))?;
-        py_any_to_value(&result).map_err(|e| to_eval_err(e))
+        let result = function.call(py, &py_args).map_err(to_eval_err)?;
+        py_any_to_value(&result).map_err(to_eval_err)
     })
 }
