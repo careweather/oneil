@@ -1,13 +1,18 @@
-//! Conversion between Oneil values and Python objects.
+//! Python wrapper for Oneil’s [`Interval`].
 
-use oneil_output::{Interval, Value};
-use pyo3::exceptions::PyTypeError;
+use oneil_output::Interval;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyNotImplemented, PyString};
+use pyo3::types::PyNotImplemented;
+
+/// Converts an [`Interval`] into a Python object (a [`PyInterval`] instance).
+pub fn interval_to_py_interval(interval: &Interval, py: Python<'_>) -> Bound<PyInterval> {
+    Bound::new(py, PyInterval { inner: *interval })
+        .expect("PyInterval construction should not fail")
+}
 
 /// Tries to convert a Python object to an [`Interval`]: accepts [`PyInterval`], or a
 /// scalar (PyInt/PyFloat) as an interval with that value as both min and max.
-fn py_any_to_py_interval(other: &Bound<'_, PyAny>) -> Option<Interval> {
+pub fn py_any_to_py_interval(other: &Bound<'_, PyAny>) -> Option<Interval> {
     if let Ok(py_interval) = other.cast_exact::<PyInterval>() {
         return Some(py_interval.borrow().inner);
     }
@@ -434,35 +439,20 @@ impl PyInterval {
     }
 }
 
-/// Converts an Oneil [`Value`] into a Python object.
-///
-/// - Boolean and string values are converted to the equivalent Python `bool` and `str`.
-/// - Number and measured number conversions are not yet implemented.
-pub fn value_to_py_any(value: &Value, py: Python<'_>) -> Py<PyAny> {
-    match value {
-        Value::Boolean(b) => PyBool::new(py, *b).to_owned().into_any().unbind(),
-        Value::String(s) => PyString::new(py, s.as_str()).into_any().unbind(),
-        Value::Number(_) => todo!("convert Oneil Number to Python"),
-        Value::MeasuredNumber(_) => todo!("convert Oneil MeasuredNumber to Python"),
+impl From<Interval> for PyInterval {
+    fn from(interval: Interval) -> Self {
+        Self { inner: interval }
     }
 }
 
-/// Converts a Python object into an Oneil [`Value`].
-///
-/// - Python `bool` and `str` are converted to the equivalent Oneil values.
-/// - Number and measured number conversions are not yet implemented.
-/// - Returns a type error if the object is not a supported type.
-pub fn py_any_to_value(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
-    if let Ok(py_bool) = obj.cast_exact::<PyBool>() {
-        return Ok(Value::Boolean(py_bool.is_true()));
+impl From<&Interval> for PyInterval {
+    fn from(interval: &Interval) -> Self {
+        Self { inner: *interval }
     }
-    if let Ok(py_str) = obj.cast_exact::<PyString>() {
-        return Ok(Value::String(py_str.to_string()));
+}
+
+impl From<PyInterval> for Interval {
+    fn from(interval: PyInterval) -> Self {
+        interval.inner
     }
-    if obj.is_instance_of::<pyo3::types::PyInt>() || obj.is_instance_of::<pyo3::types::PyFloat>() {
-        todo!("convert Python number to Oneil Number");
-    }
-    Err(PyErr::new::<PyTypeError, _>(
-        "expected bool, str, or number; conversion for number not yet implemented",
-    ))
 }
