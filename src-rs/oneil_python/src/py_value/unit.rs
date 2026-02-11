@@ -67,17 +67,33 @@ impl PyUnit {
         self.inner.is_unitless()
     }
 
+    /// Returns the dimensions as a dict mapping dimension keys to exponents (str -> float).
+    ///
+    /// Keys are the same as for the constructor: `"kg"`, `"m"`, `"s"`, `"K"`, `"A"`, `"b"`, `"$"`, `"mol"`, `"cd"`.
+    fn get_dimensions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
+
+        for (dim, exp) in self.inner.dimension_map.as_map() {
+            dict.set_item(dimension_to_key(*dim), *exp)?;
+        }
+
+        Ok(dict)
+    }
+
     /// Returns the magnitude of the unit (e.g. 1000 for km).
+    #[getter]
     const fn magnitude(&self) -> f64 {
         self.inner.magnitude
     }
 
     /// Returns true if the unit is a decibel unit.
+    #[getter]
     const fn is_db(&self) -> bool {
         self.inner.is_db
     }
 
     /// Returns a human-readable display string for the unit.
+    #[getter]
     fn display_string(&self) -> String {
         format!("{}", self.inner.display_unit)
     }
@@ -173,6 +189,21 @@ fn dimension_from_key(key: &str) -> Option<Dimension> {
         "mol" => Some(Dimension::Substance),
         "cd" => Some(Dimension::LuminousIntensity),
         _ => None,
+    }
+}
+
+/// Maps a [`Dimension`] to the Python dimension key (dict key).
+const fn dimension_to_key(dim: Dimension) -> &'static str {
+    match dim {
+        Dimension::Mass => "kg",
+        Dimension::Distance => "m",
+        Dimension::Time => "s",
+        Dimension::Temperature => "K",
+        Dimension::Current => "A",
+        Dimension::Information => "b",
+        Dimension::Currency => "$",
+        Dimension::Substance => "mol",
+        Dimension::LuminousIntensity => "cd",
     }
 }
 

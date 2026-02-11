@@ -190,6 +190,12 @@ impl DimensionMap {
         self.0.is_empty()
     }
 
+    /// Returns a reference to the underlying map of dimension to exponent.
+    #[must_use]
+    pub const fn as_map(&self) -> &IndexMap<Dimension, f64> {
+        &self.0
+    }
+
     /// Raises the unit to the power of the given exponent.
     #[must_use]
     pub fn pow(self, exponent: f64) -> Self {
