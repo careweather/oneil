@@ -238,6 +238,9 @@ impl AsOneilError for ModelImportResolutionError {
     }
 
     fn is_internal_error(&self) -> bool {
-        matches!(self, Self::ModelHasError { .. })
+        matches!(
+            self,
+            Self::ModelHasError { .. } | Self::ParentModelHasError { .. }
+        )
     }
 }
