@@ -423,6 +423,15 @@ pub enum EvalError {
         /// The unit that the limit has.
         limit_unit: DisplayUnit,
     },
+    /// An error indicating that a Python function evaluation failed.
+    PythonEvalError {
+        /// The name of the Python function that was called.
+        function_name: String,
+        /// The source span of the function identifier in the Oneil source.
+        identifier_span: Span,
+        /// The error message from Python or from conversion.
+        message: String,
+    },
     /// An error indicating that an unsupported feature was used.
     ///
     /// This occurs when attempting to use a language feature that is not yet
@@ -706,6 +715,11 @@ impl AsOneilError for EvalError {
             } => {
                 format!("limit unit `{limit_unit}` does not match parameter unit `{param_unit}`")
             }
+            Self::PythonEvalError {
+                function_name,
+                identifier_span: _,
+                message,
+            } => format!("python function `{function_name}` raised an error: {message}"),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
@@ -891,6 +905,11 @@ impl AsOneilError for EvalError {
                 param_unit: _,
                 limit_span: location_span,
                 limit_unit: _,
+            }
+            | Self::PythonEvalError {
+                function_name: _,
+                identifier_span: location_span,
+                message: _,
             }
             | Self::Unsupported {
                 relevant_span: location_span,
@@ -1112,6 +1131,11 @@ impl AsOneilError for EvalError {
                 param_unit: _,
                 limit_span: _,
                 limit_unit: _,
+            } => Vec::new(),
+            Self::PythonEvalError {
+                function_name: _,
+                identifier_span: _,
+                message: _,
             } => Vec::new(),
             Self::Unsupported {
                 relevant_span: _,
@@ -1411,6 +1435,11 @@ impl AsOneilError for EvalError {
                 param_unit: _,
                 limit_span: _,
                 limit_unit: _,
+            } => Vec::new(),
+            Self::PythonEvalError {
+                function_name: _,
+                identifier_span: _,
+                message: _,
             } => Vec::new(),
             Self::Unsupported {
                 relevant_span: _,

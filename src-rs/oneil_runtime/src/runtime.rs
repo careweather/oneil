@@ -177,7 +177,7 @@ impl Runtime {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
-    ) -> Option<Result<output::Value, Vec<EvalError>>> {
+    ) -> Option<Result<output::Value, EvalError>> {
         let python_import = self
             .python_import_cache
             .get_entry(python_path.as_ref())?
@@ -193,7 +193,11 @@ impl Runtime {
             args,
         );
 
-        Some(eval_result.map_err(|e| todo!()))
+        Some(eval_result.map_err(|e| EvalError::PythonEvalError {
+            function_name: e.function_name,
+            identifier_span: e.identifier_span,
+            message: e.message,
+        }))
     }
 
     /// Loads the IR for a model and all of its dependencies.
@@ -1117,7 +1121,7 @@ impl eval::ExternalEvaluationContext for Runtime {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
-    ) -> Option<Result<output::Value, Vec<EvalError>>> {
+    ) -> Option<Result<output::Value, EvalError>> {
         self.evaluate_python_function(python_path, identifier, identifier_span, args)
     }
 
