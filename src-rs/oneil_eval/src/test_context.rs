@@ -79,7 +79,7 @@ impl ExternalEvaluationContext for TestExternalContext {
         _identifier: &ir::Identifier,
         _identifier_span: Span,
         _args: Vec<(Value, Span)>,
-    ) -> Option<Result<Value, Vec<EvalError>>> {
+    ) -> Option<Result<Value, Box<EvalError>>> {
         // For now, we don't support imported functions in tests
         None
     }

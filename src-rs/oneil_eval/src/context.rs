@@ -48,7 +48,7 @@ pub trait ExternalEvaluationContext {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
-    ) -> Option<Result<output::Value, EvalError>>;
+    ) -> Option<Result<output::Value, Box<EvalError>>>;
 
     /// Returns a unit by name if it is defined in the builtin context.
     fn lookup_unit(&self, name: &str) -> Option<&output::Unit>;
@@ -280,7 +280,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
-    ) -> Result<output::Value, EvalError> {
+    ) -> Result<output::Value, Box<EvalError>> {
         #[cfg(feature = "python")]
         {
             self.external_context

@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext, IrLoadError};
-use oneil_resolver as resolver;
 use oneil_output::{Unit, Value};
 use oneil_parser as parser;
+use oneil_resolver as resolver;
 use oneil_shared::error::{AsOneilError, OneilError};
 use oneil_shared::span::Span;
 
@@ -177,7 +177,7 @@ impl Runtime {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
-    ) -> Option<Result<output::Value, EvalError>> {
+    ) -> Option<Result<output::Value, Box<EvalError>>> {
         let python_import = self
             .python_import_cache
             .get_entry(python_path.as_ref())?
@@ -193,10 +193,12 @@ impl Runtime {
             args,
         );
 
-        Some(eval_result.map_err(|e| EvalError::PythonEvalError {
-            function_name: e.function_name,
-            identifier_span: e.identifier_span,
-            message: e.message,
+        Some(eval_result.map_err(|e| {
+            Box::new(EvalError::PythonEvalError {
+                function_name: e.function_name,
+                identifier_span: e.identifier_span,
+                message: e.message,
+            })
         }))
     }
 
@@ -1121,7 +1123,7 @@ impl eval::ExternalEvaluationContext for Runtime {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
-    ) -> Option<Result<output::Value, EvalError>> {
+    ) -> Option<Result<output::Value, Box<EvalError>>> {
         self.evaluate_python_function(python_path, identifier, identifier_span, args)
     }
 
