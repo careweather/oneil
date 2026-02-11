@@ -6,7 +6,7 @@ use pyo3::Python;
 
 use crate::PythonFunction;
 use crate::error::PythonEvalError;
-use crate::py_value::{py_any_to_value, value_to_py_any};
+use crate::py_compat::{py_any_to_value, value_to_py_any};
 
 /// Evaluates a Python function with the given Oneil values as positional arguments.
 ///

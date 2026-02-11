@@ -14,7 +14,7 @@ pub mod error;
 pub mod eval;
 pub mod function;
 pub mod load;
-mod py_value;
+mod py_compat;
 
 pub use error::{LoadPythonImportError, PythonEvalError};
 pub use eval::evaluate_python_function;
