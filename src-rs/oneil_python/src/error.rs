@@ -1,6 +1,7 @@
 //! Error types for Python integration.
 
 use oneil_shared::error::AsOneilError;
+use oneil_shared::span::Span;
 
 /// Error that can occur when loading a Python import.
 #[derive(Debug)]
@@ -20,4 +21,15 @@ impl AsOneilError for LoadPythonImportError {
             }
         }
     }
+}
+
+/// Error from evaluating a Python function (argument conversion, call, or result conversion failed).
+#[derive(Debug)]
+pub struct PythonEvalError {
+    /// Name of the Python function that was called.
+    pub function_name: String,
+    /// Span of the function identifier in the Oneil source.
+    pub identifier_span: Span,
+    /// Error message from Python or from conversion.
+    pub message: String,
 }
