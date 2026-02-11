@@ -352,7 +352,9 @@ fn eval_function_call<E: ExternalEvaluationContext>(
             python_path,
             name,
             name_span,
-        } => context.evaluate_imported_function(python_path, name, *name_span, args),
+        } => context
+            .evaluate_imported_function(python_path, name, *name_span, args)
+            .map_err(|error| vec![error]),
     }
 }
 
