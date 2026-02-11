@@ -30,28 +30,42 @@ pub enum ExpectedType {
 pub enum BinaryEvalError {
     /// Unit mismatch between operands.
     UnitMismatch {
+        /// Unit of the left-hand side.
         lhs_unit: DisplayUnit,
+        /// Unit of the right-hand side.
         rhs_unit: DisplayUnit,
     },
     /// Type mismatch between operands.
     TypeMismatch {
+        /// Type of the left-hand side.
         lhs_type: Box<ValueType>,
+        /// Type of the right-hand side.
         rhs_type: Box<ValueType>,
     },
     /// Left-hand side has an invalid type.
     InvalidLhsType {
+        /// Type that was expected for the left-hand side.
         expected_type: ExpectedType,
+        /// Actual type of the left-hand side.
         lhs_type: Box<ValueType>,
     },
     /// Right-hand side has an invalid type.
     InvalidRhsType {
+        /// Type that was expected for the right-hand side.
         expected_type: ExpectedType,
+        /// Actual type of the right-hand side.
         rhs_type: Box<ValueType>,
     },
     /// Exponent has units (not allowed).
-    ExponentHasUnits { exponent_unit: DisplayUnit },
+    ExponentHasUnits {
+        /// Unit of the exponent (must be unitless).
+        exponent_unit: DisplayUnit,
+    },
     /// Exponent is an interval (not allowed when base has unit).
-    ExponentIsInterval { exponent_interval: Interval },
+    ExponentIsInterval {
+        /// Interval used as exponent (must be scalar when base has unit).
+        exponent_interval: Interval,
+    },
 }
 
 /// Unary operations that can fail with a type error.
@@ -68,7 +82,9 @@ pub enum UnaryOperation {
 pub enum UnaryEvalError {
     /// The value has an invalid type for the operation.
     InvalidType {
+        /// The unary operation that was applied.
         op: UnaryOperation,
+        /// Actual type of the value (invalid for this operation).
         value_type: Box<ValueType>,
     },
 }
