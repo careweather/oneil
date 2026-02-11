@@ -27,9 +27,6 @@ pub fn load_python_import(
     };
 
     let functions = Python::attach(|py| {
-        // add the Oneil module to the sys module
-        add_oneil_to_sys(py)?;
-
         // load the code module
         let code_module = PyModule::from_code(py, &source_cstr, &path_cstr, &module_name_cstr)?;
 
@@ -49,10 +46,4 @@ pub fn load_python_import(
         Ok(functions) => Ok(functions),
         Err(e) => Err(LoadPythonImportError::CouldNotLoadPythonModule(e)),
     }
-}
-
-fn add_oneil_to_sys(py: Python<'_>) -> Result<(), PyErr> {
-    // TODO: implement
-    let _ = py;
-    Ok(())
 }
