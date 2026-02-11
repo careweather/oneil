@@ -9,6 +9,7 @@ use oneil_resolver as resolver;
 use oneil_shared::error::{AsOneilError, OneilError};
 use oneil_shared::span::Span;
 
+use crate::cache::ErrorsCache;
 use crate::{
     cache::{AstCache, EvalCache, IrCache, PythonImportCache, SourceCache},
     output::{self, ast, ir},
@@ -26,6 +27,8 @@ pub struct Runtime {
     ir_cache: IrCache,
     eval_cache: EvalCache,
     python_import_cache: PythonImportCache,
+    errors_cache: ErrorsCache,
+    watch_paths: IndexSet<PathBuf>,
     builtins: StdBuiltins,
 }
 
@@ -39,6 +42,8 @@ impl Runtime {
             ir_cache: IrCache::new(),
             eval_cache: EvalCache::new(),
             python_import_cache: PythonImportCache::new(),
+            errors_cache: ErrorsCache::new(),
+            watch_paths: IndexSet::new(),
             builtins: StdBuiltins::new(),
         }
     }
@@ -46,7 +51,7 @@ impl Runtime {
     /// Gets the paths to files that the runtime relies on.
     #[must_use]
     pub fn get_watch_paths(&self) -> IndexSet<PathBuf> {
-        self.source_cache.get_paths()
+        self.watch_paths.clone()
     }
 
     /// Returns documentation for all builtin units.
@@ -469,13 +474,12 @@ impl Runtime {
     ) -> Result<&str, output::error::FileError> {
         let path = path.as_ref();
 
+        self.watch_paths.insert(path.to_path_buf());
+
         // Read the source code from the file
         match std::fs::read_to_string(path) {
             Ok(source) => {
-                // If it's found, insert it into the loaded models map
-                // and return it
-                self.source_cache.insert_ok(path.to_path_buf(), source);
-
+                self.source_cache.insert(path.to_path_buf(), source);
                 let source = self.source_cache.get(path).expect("it was just inserted");
 
                 Ok(source)
@@ -484,8 +488,8 @@ impl Runtime {
                 let error = InternalIoError::new(path, e);
                 let error = OneilError::from_error(&error, path.to_path_buf());
 
-                self.source_cache
-                    .insert_err(path.to_path_buf(), error.clone());
+                self.errors_cache
+                    .insert_file_errors(path.to_path_buf(), vec![error.clone()]);
 
                 Err(output::error::FileError {
                     error: Box::new(error),
