@@ -199,14 +199,7 @@ pub fn resolve_definition(
         }
         SymbolAtPosition::ParameterReference { name, .. } => {
             // Find the parameter in the current model
-            let model = runtime.load_ir(current_model_path);
-            let model = match model {
-                Ok(model) => model,
-                Err(error) => match error.partial_ir() {
-                    Some(model) => model,
-                    None => return None,
-                },
-            };
+            let model = runtime.load_ir(current_model_path).maybe_partial_ir()?;
 
             let param = model.get_parameter(name)?;
 
@@ -219,14 +212,7 @@ pub fn resolve_definition(
         } => {
             // Find the parameter in the external model
             // First, resolve the model name to a ModelPath through imports
-            let current_model = runtime.load_ir(current_model_path);
-            let current_model = match current_model {
-                Ok(model) => model,
-                Err(error) => match error.partial_ir() {
-                    Some(model) => model,
-                    None => return None,
-                },
-            };
+            let current_model = runtime.load_ir(current_model_path).maybe_partial_ir()?;
 
             // Check submodels
             if let Some(submodel) = current_model
@@ -235,14 +221,7 @@ pub fn resolve_definition(
             {
                 let submodel_path = submodel.reference_import().path().clone();
 
-                let external_model = runtime.load_ir(&submodel_path);
-                let external_model = match external_model {
-                    Ok(model) => model,
-                    Err(error) => match error.partial_ir() {
-                        Some(model) => model,
-                        None => return None,
-                    },
-                };
+                let external_model = runtime.load_ir(&submodel_path).maybe_partial_ir()?;
 
                 let param = external_model.get_parameter(parameter_name)?;
                 return Some(span_to_location(&submodel_path, param.name_span()));
@@ -255,14 +234,7 @@ pub fn resolve_definition(
             {
                 let path = reference.path().clone();
 
-                let external_model = runtime.load_ir(&path);
-                let external_model = match external_model {
-                    Ok(model) => model,
-                    Err(error) => match error.partial_ir() {
-                        Some(model) => model,
-                        None => return None,
-                    },
-                };
+                let external_model = runtime.load_ir(&path).maybe_partial_ir()?;
 
                 let param = external_model.get_parameter(parameter_name)?;
                 return Some(span_to_location(&path, param.name_span()));

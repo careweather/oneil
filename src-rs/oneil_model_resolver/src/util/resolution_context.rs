@@ -22,6 +22,8 @@ pub struct ModelResolutionResult {
     model_errors: ResolutionErrorCollection,
     /// Whether the AST for the model has been loaded.
     ast_loaded: bool,
+    /// Failed Python imports.
+    failed_python_imports: IndexSet<ir::PythonPath>,
 }
 
 impl ModelResolutionResult {
@@ -42,6 +44,7 @@ impl ModelResolutionResult {
             model: empty_model,
             model_errors: ResolutionErrorCollection::empty(),
             ast_loaded: true,
+            failed_python_imports: IndexSet::new(),
         }
     }
 
@@ -78,10 +81,33 @@ impl ModelResolutionResult {
         &mut self.ast_loaded
     }
 
+    /// Returns a reference to the failed Python imports.
+    #[must_use]
+    pub const fn failed_python_imports(&self) -> &IndexSet<ir::PythonPath> {
+        &self.failed_python_imports
+    }
+
+    /// Returns a mutable reference to the failed Python imports.
+    pub const fn failed_python_imports_mut(&mut self) -> &mut IndexSet<ir::PythonPath> {
+        &mut self.failed_python_imports
+    }
+
     /// Breaks the result into its components.
     #[must_use]
-    pub fn into_parts(self) -> (ir::Model, ResolutionErrorCollection, bool) {
-        (self.model, self.model_errors, self.ast_loaded)
+    pub fn into_parts(
+        self,
+    ) -> (
+        ir::Model,
+        ResolutionErrorCollection,
+        bool,
+        IndexSet<ir::PythonPath>,
+    ) {
+        (
+            self.model,
+            self.model_errors,
+            self.ast_loaded,
+            self.failed_python_imports,
+        )
     }
 }
 
@@ -247,6 +273,19 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             .model_errors_mut()
     }
 
+    /// Returns a mutable reference to the failed Python imports for the current active model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no active model or if the active model has no failed Python imports.
+    fn active_model_failed_python_imports_mut(&mut self) -> &mut IndexSet<ir::PythonPath> {
+        let path = self.active_models.last().expect("no active model");
+        self.model_results
+            .get_mut(path)
+            .expect("active model not in model results map")
+            .failed_python_imports_mut()
+    }
+
     /// Returns whether the given model path has any resolution errors.
     fn model_has_errors(&self, model_path: &ir::ModelPath) -> bool {
         self.model_results
@@ -300,6 +339,8 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
                 python_path_span,
                 python_path.clone(),
             );
+
+            self.mark_python_import_not_loaded(python_path);
             self.add_python_import_error_to_active_model(python_path.clone(), error);
         }
     }
@@ -320,6 +361,12 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         python_path: &ir::PythonPath,
     ) -> Option<&ir::PythonImport> {
         self.active_model().get_python_imports().get(python_path)
+    }
+
+    /// Marks a Python import as not loaded.
+    pub fn mark_python_import_not_loaded(&mut self, python_path: &ir::PythonPath) {
+        self.active_model_failed_python_imports_mut()
+            .insert(python_path.clone());
     }
 
     /// Returns the Python paths in the active model that export the given function name.
