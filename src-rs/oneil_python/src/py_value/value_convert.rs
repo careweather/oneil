@@ -2,36 +2,36 @@
 
 use oneil_output::{Number, Value};
 use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyFloat, PyString};
+use pyo3::types::{PyBool, PyString};
+use pyo3::{IntoPyObjectExt, prelude::*};
 
-use crate::py_value::PyInterval;
+use super::interval::PyInterval;
+use super::measured_number::PyMeasuredNumber;
 
 /// Converts an Oneil [`Value`] into a Python object.
 ///
 /// - Boolean and string values are converted to the equivalent Python `bool` and `str`.
 /// - [`Number::Scalar`] becomes a Python `float`; [`Number::Interval`] becomes a [`PyInterval`].
-/// - Measured number conversion is not yet implemented.
-pub fn value_to_py_any(value: &Value, py: Python<'_>) -> Py<PyAny> {
+/// - [`Value::MeasuredNumber`] becomes a [`PyMeasuredNumber`].
+pub fn value_to_py_any(value: Value, py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     match value {
-        Value::Boolean(b) => PyBool::new(py, *b).to_owned().into_any().unbind(),
-        Value::String(s) => PyString::new(py, s.as_str()).into_any().unbind(),
+        Value::Boolean(b) => b.into_bound_py_any(py),
+        Value::String(s) => s.into_bound_py_any(py),
+
         Value::Number(number) => match number {
-            Number::Scalar(value) => PyFloat::new(py, *value).into_any().unbind(),
-            Number::Interval(interval) => Bound::new(py, PyInterval::from(*interval))
-                .expect("PyInterval construction should not fail")
-                .into_any()
-                .unbind(),
+            Number::Scalar(value) => value.into_bound_py_any(py),
+            Number::Interval(interval) => PyInterval::from(interval).into_bound_py_any(py),
         },
 
-        Value::MeasuredNumber(_) => todo!("convert Oneil MeasuredNumber to Python"),
+        Value::MeasuredNumber(m) => PyMeasuredNumber::from(m).into_bound_py_any(py),
     }
 }
 
 /// Converts a Python object into an Oneil [`Value`].
 ///
 /// - Python `bool` and `str` are converted to the equivalent Oneil values.
-/// - Number and measured number conversions are not yet implemented.
+/// - Python `float` becomes [`Number::Scalar`]; [`PyInterval`] becomes [`Number::Interval`].
+/// - [`PyMeasuredNumber`] becomes [`Value::MeasuredNumber`].
 /// - Returns a type error if the object is not a supported type.
 pub fn py_any_to_value(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
     if let Ok(py_bool) = obj.cast_exact::<PyBool>() {
@@ -50,7 +50,11 @@ pub fn py_any_to_value(obj: &Bound<'_, PyAny>) -> PyResult<Value> {
         return Ok(Value::Number(Number::Interval(interval.into())));
     }
 
+    if let Ok(py_mn) = obj.extract::<PyMeasuredNumber>() {
+        return Ok(Value::MeasuredNumber(py_mn.into()));
+    }
+
     Err(PyErr::new::<PyTypeError, _>(
-        "expected bool, str, or number; conversion for number not yet implemented",
+        "expected bool, str, float, Interval, or MeasuredNumber",
     ))
 }
