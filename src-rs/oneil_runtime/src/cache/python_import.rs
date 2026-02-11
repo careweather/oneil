@@ -3,11 +3,11 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use indexmap::IndexSet;
+use oneil_python as python;
 use oneil_shared::error::OneilError;
 
 /// Result of loading Python import for a path: set of callable names or error.
-pub type PythonImportLoadResult = Result<IndexSet<String>, OneilError>;
+pub type PythonImportLoadResult = Result<IndexMap<String, python::PythonFunction>, OneilError>;
 
 /// Cache of Python import load results keyed by path.
 #[derive(Debug, Default)]
@@ -31,9 +31,13 @@ impl PythonImportCache {
         self.entries.get(path)?.as_ref().err()
     }
 
-    /// Stores a successful load result (set of callable names) for `path`.
-    pub fn insert_ok(&mut self, path: PathBuf, names: IndexSet<String>) {
-        self.entries.insert(path, Ok(names));
+    /// Stores a successful load result (map of callable names to functions) for `path`.
+    pub fn insert_ok(
+        &mut self,
+        path: PathBuf,
+        functions: IndexMap<String, python::PythonFunction>,
+    ) {
+        self.entries.insert(path, Ok(functions));
     }
 
     /// Stores a load error for `path`.
