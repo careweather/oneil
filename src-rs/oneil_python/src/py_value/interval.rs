@@ -4,15 +4,9 @@ use oneil_output::Interval;
 use pyo3::prelude::*;
 use pyo3::types::PyNotImplemented;
 
-/// Converts an [`Interval`] into a Python object (a [`PyInterval`] instance).
-pub fn interval_to_py_interval(interval: &Interval, py: Python<'_>) -> Bound<PyInterval> {
-    Bound::new(py, PyInterval { inner: *interval })
-        .expect("PyInterval construction should not fail")
-}
-
 /// Tries to convert a Python object to an [`Interval`]: accepts [`PyInterval`], or a
 /// scalar (PyInt/PyFloat) as an interval with that value as both min and max.
-pub fn py_any_to_py_interval(other: &Bound<'_, PyAny>) -> Option<Interval> {
+fn py_any_to_py_interval(other: &Bound<'_, PyAny>) -> Option<Interval> {
     if let Ok(py_interval) = other.cast_exact::<PyInterval>() {
         return Some(py_interval.borrow().inner);
     }
