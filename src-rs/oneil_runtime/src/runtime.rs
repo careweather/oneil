@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_eval::{self as eval, EvalError, ExternalEvaluationContext, IrLoadError};
-use oneil_model_resolver as model_resolver;
+use oneil_resolver as resolver;
 use oneil_output::{Unit, Value};
 use oneil_parser as parser;
 use oneil_shared::error::{AsOneilError, OneilError};
@@ -212,7 +212,7 @@ impl Runtime {
         reason = "the panic only happens if an internal invariant is violated"
     )]
     pub fn load_ir(&mut self, path: impl AsRef<Path>) -> output::IrLoadResult<'_> {
-        let results = model_resolver::load_model(&path, self);
+        let results = resolver::load_model(&path, self);
 
         let mut failed_python_imports = IndexSet::new();
 
@@ -277,7 +277,7 @@ impl Runtime {
         &mut self,
         model_path: PathBuf,
         model: oneil_ir::Model,
-        model_errors: oneil_model_resolver::ResolutionErrorCollection,
+        model_errors: oneil_resolver::ResolutionErrorCollection,
     ) {
         let source = self
             .source_cache
@@ -1065,7 +1065,7 @@ impl Default for Runtime {
     }
 }
 
-impl model_resolver::ExternalResolutionContext for Runtime {
+impl resolver::ExternalResolutionContext for Runtime {
     fn has_builtin_value(&self, identifier: &oneil_ir::Identifier) -> bool {
         self.builtins.has_builtin_value(identifier.as_str())
     }
@@ -1077,17 +1077,17 @@ impl model_resolver::ExternalResolutionContext for Runtime {
     fn load_ast(
         &mut self,
         path: &oneil_ir::ModelPath,
-    ) -> Result<&ast::Model, model_resolver::AstLoadingFailedError> {
+    ) -> Result<&ast::Model, resolver::AstLoadingFailedError> {
         self.load_ast(path)
-            .map_err(|_e| model_resolver::AstLoadingFailedError)
+            .map_err(|_e| resolver::AstLoadingFailedError)
     }
 
     fn load_python_import(
         &mut self,
         python_path: &oneil_ir::PythonPath,
-    ) -> Result<IndexSet<String>, model_resolver::PythonImportLoadingFailedError> {
+    ) -> Result<IndexSet<String>, resolver::PythonImportLoadingFailedError> {
         self.load_python_import(python_path.as_ref())
-            .map_err(|_error| model_resolver::PythonImportLoadingFailedError)
+            .map_err(|_error| resolver::PythonImportLoadingFailedError)
     }
 }
 

@@ -1,6 +1,6 @@
-# Oneil Model Resolver
+# Oneil Resolver
 
-The Oneil Model Resolver resolves a model and it's dependencies.
+The Oneil Resolver resolves a model and it's dependencies.
 
 The purpose of model resolution is:
 
