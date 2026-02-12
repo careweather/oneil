@@ -3,11 +3,13 @@
 mod ast;
 mod errors;
 mod eval;
+mod generic;
 mod ir;
 mod python_import;
 mod source;
 
 pub use ast::AstCache;
+pub use generic::Cache;
 pub use errors::ErrorsCache;
 pub use eval::EvalCache;
 pub use ir::IrCache;
