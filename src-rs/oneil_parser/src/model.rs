@@ -22,7 +22,7 @@ use crate::{
     error::{
         ParserError,
         parser_trait::ErrorHandlingParser,
-        partial::ParserPartialError,
+        partial::ParserPartialModelError,
         reason::{ExpectKind, ParserErrorReason},
     },
     note::parse as parse_note,
@@ -33,15 +33,13 @@ use crate::{
 /// Parses a model definition, consuming the complete input
 ///
 /// This function **fails if the complete input is not consumed**.
-pub fn parse_complete(
-    input: InputSpan<'_>,
-) -> Result<'_, ModelNode, Box<ParserPartialError<ModelNode, ParserError>>> {
+pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, ModelNode, Box<ParserPartialModelError>> {
     let (rest, model) = model(input)?;
     let result = eof(rest);
 
     match result {
         Ok((rest, _)) => Ok((rest, model)),
-        Err(nom::Err::Error(e)) => Err(nom::Err::Failure(Box::new(ParserPartialError::new(
+        Err(nom::Err::Error(e)) => Err(nom::Err::Failure(Box::new(ParserPartialModelError::new(
             model,
             vec![e],
         )))),
@@ -54,11 +52,13 @@ pub fn parse_complete(
 /// The function uses error recovery to continue parsing even when individual
 /// declarations or sections fail, allowing multiple syntax errors to be
 /// reported in a single pass.
-fn model(
-    input: InputSpan<'_>,
-) -> Result<'_, ModelNode, Box<ParserPartialError<ModelNode, ParserError>>> {
-    let (rest, end_of_line_token) = opt(end_of_line).parse(input).expect("optional cannot fail");
-    let (rest, note) = opt(parse_note).parse(rest).expect("optional cannot fail");
+fn model(input: InputSpan<'_>) -> Result<'_, ModelNode, Box<ParserPartialModelError>> {
+    let (rest, end_of_line_token) = opt(end_of_line).parse(input).expect("should always parse");
+
+    let (rest, note) = opt(parse_note)
+        .parse(rest)
+        .map_err(|error| handle_model_note_failure(rest, error))?;
+
     let (rest, mut decls, decl_errors) = parse_decls(rest);
     let (rest, sections, decls_without_section, section_errors) = parse_sections(rest);
 
@@ -121,9 +121,33 @@ fn model(
     if errors.is_empty() {
         Ok((rest, model_node))
     } else {
-        Err(nom::Err::Failure(Box::new(ParserPartialError::new(
+        Err(nom::Err::Failure(Box::new(ParserPartialModelError::new(
             model_node, errors,
         ))))
+    }
+}
+
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "the parameter *is* in fact consumed..."
+)]
+fn handle_model_note_failure(
+    input: InputSpan<'_>,
+    error: nom::Err<ParserError>,
+) -> nom::Err<Box<ParserPartialModelError>> {
+    match error {
+        nom::Err::Error(e) => panic!("should not be able to fail with an error: {e:?}"),
+
+        nom::Err::Failure(e) => {
+            let source_location = source_location_from(input);
+            let span = Span::empty(source_location);
+            let model_node = ModelNode::new(Model::empty(), span, span);
+            let errors = vec![e];
+            let partial_error = ParserPartialModelError::new(model_node, errors);
+            nom::Err::Failure(Box::new(partial_error))
+        }
+
+        nom::Err::Incomplete(e) => nom::Err::Incomplete(e),
     }
 }
 

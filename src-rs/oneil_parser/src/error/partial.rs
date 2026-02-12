@@ -4,59 +4,64 @@
 use std::ops;
 
 use nom::error::ParseError;
-use oneil_shared::partial::PartialError;
+use oneil_ast::{Model, ModelNode};
+use oneil_shared::{
+    partial::PartialError,
+    span::{SourceLocation, Span},
+};
 
-use crate::error::ParserError;
+use crate::{error::ParserError, util::InputSpan};
 
 /// A wrapper around the shared partial error type that can be used as a parser error
 #[derive(Debug, Clone)]
-pub(crate) struct ParserPartialError<T, E>(PartialError<T, Vec<E>>);
+pub(crate) struct ParserPartialModelError(PartialError<ModelNode, Vec<ParserError>>);
 
-impl<T, E> ParserPartialError<T, E> {
-    /// Creates a new `ErrorsWithPartialResult` with the given partial result
+impl ParserPartialModelError {
+    /// Creates a new `ParserPartialModelError` with the given partial result
     /// and errors
     #[must_use]
-    pub const fn new(partial_result: T, error_collection: Vec<E>) -> Self {
+    pub const fn new(partial_result: ModelNode, error_collection: Vec<ParserError>) -> Self {
         Self(PartialError::new(partial_result, error_collection))
     }
 }
 
-impl<I, T, E> ParseError<I> for ParserPartialError<T, E>
-where
-    T: Default,
-    E: ParseError<I>,
-{
-    fn from_error_kind(input: I, kind: nom::error::ErrorKind) -> Self {
+impl ParseError<InputSpan<'_>> for ParserPartialModelError {
+    fn from_error_kind(input: InputSpan<'_>, kind: nom::error::ErrorKind) -> Self {
+        let offset = input.location_offset();
+        let line = usize::try_from(input.location_line())
+            .expect("usize should be greater than or equal to u32");
+        let column = input.get_column();
+
+        let source_location = SourceLocation {
+            offset,
+            line,
+            column,
+        };
+
+        let span = Span::empty(source_location);
+
+        let model_node = ModelNode::new(Model::empty(), span, span);
+
         Self(PartialError::new(
-            T::default(),
-            vec![E::from_error_kind(input, kind)],
+            model_node,
+            vec![ParserError::from_error_kind(input, kind)],
         ))
     }
 
-    fn append(_input: I, _kind: nom::error::ErrorKind, other: Self) -> Self {
+    fn append(_input: InputSpan<'_>, _kind: nom::error::ErrorKind, other: Self) -> Self {
         other
     }
 }
 
-impl<T, E> From<E> for ParserPartialError<T, ParserError>
-where
-    T: Default,
-    E: Into<ParserError>,
-{
-    fn from(e: E) -> Self {
-        Self(PartialError::new(T::default(), vec![e.into()]))
-    }
-}
-
-impl<T, E> From<ParserPartialError<T, E>> for PartialError<T, Vec<E>> {
-    fn from(partial_error: ParserPartialError<T, E>) -> Self {
+impl From<ParserPartialModelError> for PartialError<ModelNode, Vec<ParserError>> {
+    fn from(partial_error: ParserPartialModelError) -> Self {
         partial_error.0
     }
 }
 
 #[cfg(test)]
-impl<T, E> ops::Deref for ParserPartialError<T, E> {
-    type Target = PartialError<T, Vec<E>>;
+impl ops::Deref for ParserPartialModelError {
+    type Target = PartialError<ModelNode, Vec<ParserError>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
