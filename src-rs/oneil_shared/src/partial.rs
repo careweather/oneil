@@ -48,6 +48,12 @@ impl<T, E> MaybePartialResult<T, E> {
     }
 }
 
+impl<T, E> From<Result<T, PartialError<T, E>>> for MaybePartialResult<T, E> {
+    fn from(result: Result<T, PartialError<T, E>>) -> Self {
+        Self(result)
+    }
+}
+
 impl<T, E> From<MaybePartialResult<T, E>> for Result<T, PartialError<T, E>> {
     fn from(result: MaybePartialResult<T, E>) -> Self {
         result.into_result()
@@ -57,7 +63,7 @@ impl<T, E> From<MaybePartialResult<T, E>> for Result<T, PartialError<T, E>> {
 /// Error for a partial result: a value was produced but errors occurred.
 ///
 /// Holds the partial value of type `T` and an error collection of type `E`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PartialError<T, E> {
     /// The value that was produced despite the errors.
     pub partial_result: T,

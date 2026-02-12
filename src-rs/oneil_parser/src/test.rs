@@ -8,7 +8,7 @@ use oneil_ast::{Node, Test, TestNode, TraceLevel, TraceLevelNode};
 use oneil_shared::span::Span;
 
 use crate::{
-    error::{ErrorHandlingParser, ParserError},
+    error::{parser_trait::ErrorHandlingParser, ParserError},
     expression::parse as parse_expr,
     note::parse as parse_note,
     token::{

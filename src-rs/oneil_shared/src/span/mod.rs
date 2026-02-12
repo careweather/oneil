@@ -34,6 +34,15 @@ impl Span {
         Self { start, end }
     }
 
+    /// Creates an empty span from a source location
+    #[must_use]
+    pub const fn empty(source_location: SourceLocation) -> Self {
+        Self {
+            start: source_location,
+            end: source_location,
+        }
+    }
+
     /// Returns the start source location
     #[must_use]
     pub const fn start(&self) -> &SourceLocation {
