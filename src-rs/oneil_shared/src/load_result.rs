@@ -1,0 +1,77 @@
+//! Load result type.
+//!
+//! [`LoadResult<T, E>`] represents the outcome of a load operation that may
+//! succeed fully, succeed partially (with a value and errors), or fail entirely.
+
+/// Result of a load operation with three possible outcomes.
+///
+/// - [`LoadResult::Success`]: the load completed successfully with value `T`.
+/// - [`LoadResult::Partial`]: a value `T` was produced but errors `E` also occurred.
+/// - [`LoadResult::Failure`]: the load failed with errors `E` and no value was produced.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LoadResult<T, E> {
+    /// Load failed; only errors are available.
+    Failure(E),
+    /// Load produced a value but errors also occurred.
+    Partial(T, E),
+    /// Load completed successfully.
+    Success(T),
+}
+
+impl<T, E> LoadResult<T, E> {
+    /// Builds a failure result with no value.
+    #[must_use]
+    pub const fn failure(error: E) -> Self {
+        Self::Failure(error)
+    }
+
+    /// Builds a partial result with a value and errors.
+    #[must_use]
+    pub const fn partial(value: T, error: E) -> Self {
+        Self::Partial(value, error)
+    }
+
+    /// Builds a successful result.
+    #[must_use]
+    pub const fn success(value: T) -> Self {
+        Self::Success(value)
+    }
+
+    /// Returns `true` if this is [`LoadResult::Success`].
+    #[must_use]
+    pub const fn is_success(&self) -> bool {
+        matches!(self, Self::Success(_))
+    }
+
+    /// Returns `true` if this is [`LoadResult::Partial`].
+    #[must_use]
+    pub const fn is_partial(&self) -> bool {
+        matches!(self, Self::Partial(_, _))
+    }
+
+    /// Returns `true` if this is [`LoadResult::Failure`].
+    #[must_use]
+    pub const fn is_failure(&self) -> bool {
+        matches!(self, Self::Failure(_))
+    }
+
+    /// Returns the value if present: `Some` for [`Success`](LoadResult::Success) or
+    /// [`Partial`](LoadResult::Partial), `None` for [`Failure`](LoadResult::Failure).
+    #[must_use]
+    pub const fn value(&self) -> Option<&T> {
+        match self {
+            Self::Success(v) | Self::Partial(v, _) => Some(v),
+            Self::Failure(_) => None,
+        }
+    }
+
+    /// Returns the error if present: `Some` for [`Partial`](LoadResult::Partial) or
+    /// [`Failure`](LoadResult::Failure), `None` for [`Success`](LoadResult::Success).
+    #[must_use]
+    pub const fn error(&self) -> Option<&E> {
+        match self {
+            Self::Failure(e) | Self::Partial(_, e) => Some(e),
+            Self::Success(_) => None,
+        }
+    }
+}
