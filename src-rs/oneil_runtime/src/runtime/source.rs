@@ -32,6 +32,8 @@ impl Runtime {
 
         self.source_cache.insert(path.to_path_buf(), load_result);
 
-        self.source_cache.get(path).expect("it was just inserted")
+        self.source_cache
+            .get_entry(path)
+            .expect("it was just inserted")
     }
 }
