@@ -74,4 +74,28 @@ impl<T, E> LoadResult<T, E> {
             Self::Success(_) => None,
         }
     }
+
+    /// Maps a function over the value if present.
+    pub fn map<U, F>(self, f: F) -> LoadResult<U, E>
+    where
+        F: FnOnce(T) -> U,
+    {
+        match self {
+            Self::Success(v) => LoadResult::success(f(v)),
+            Self::Partial(v, e) => LoadResult::partial(f(v), e),
+            Self::Failure(e) => LoadResult::failure(e),
+        }
+    }
+
+    /// Maps a function over the error if present.
+    pub fn map_err<F, E2>(self, f: F) -> LoadResult<T, E2>
+    where
+        F: FnOnce(E) -> E2,
+    {
+        match self {
+            Self::Success(v) => LoadResult::success(v),
+            Self::Partial(v, e) => LoadResult::partial(v, f(e)),
+            Self::Failure(e) => LoadResult::failure(f(e)),
+        }
+    }
 }
