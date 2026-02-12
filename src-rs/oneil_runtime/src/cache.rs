@@ -35,6 +35,18 @@ impl<T, E> Cache<T, E> {
         self.entries.get(path)
     }
 
+    /// Returns the value for `path`, if present.
+    #[must_use]
+    pub fn get_value(&self, path: &Path) -> Option<&T> {
+        self.entries.get(path).and_then(LoadResult::value)
+    }
+
+    /// Returns the error for `path`, if present.
+    #[must_use]
+    pub fn get_error(&self, path: &Path) -> Option<&E> {
+        self.entries.get(path).and_then(LoadResult::error)
+    }
+
     /// Inserts a [`LoadResult`] for `path`, replacing any existing entry.
     pub fn insert(&mut self, path: PathBuf, result: LoadResult<T, E>) {
         self.entries.insert(path, result);
