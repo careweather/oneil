@@ -9,9 +9,10 @@ use oneil_resolver as resolver;
 use oneil_shared::error::{AsOneilError, OneilError};
 use oneil_shared::span::Span;
 
-use crate::cache::ErrorsCache;
+#[cfg(feature = "python")]
+use crate::cache::PythonImportCache;
+use crate::cache::{AstCache, EvalCache, IrCache, SourceCache};
 use crate::{
-    cache::{AstCache, EvalCache, IrCache, PythonImportCache, SourceCache},
     output::{self, ast, ir},
     std_builtin::StdBuiltins,
 };
@@ -26,24 +27,21 @@ pub struct Runtime {
     ast_cache: AstCache,
     ir_cache: IrCache,
     eval_cache: EvalCache,
+    #[cfg(feature = "python")]
     python_import_cache: PythonImportCache,
-    errors_cache: ErrorsCache,
-    watch_paths: IndexSet<PathBuf>,
     builtins: StdBuiltins,
 }
 
 impl Runtime {
     /// Creates a new runtime instance with empty caches.
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new() -> Runtime {
         Self {
             source_cache: SourceCache::new(),
             ast_cache: AstCache::new(),
             ir_cache: IrCache::new(),
             eval_cache: EvalCache::new(),
             python_import_cache: PythonImportCache::new(),
-            errors_cache: ErrorsCache::new(),
-            watch_paths: IndexSet::new(),
             builtins: StdBuiltins::new(),
         }
     }
@@ -51,7 +49,10 @@ impl Runtime {
     /// Gets the paths to files that the runtime relies on.
     #[must_use]
     pub fn get_watch_paths(&self) -> IndexSet<PathBuf> {
-        self.watch_paths.clone()
+        self.source_cache
+            .iter()
+            .map(|(path, _)| path.clone())
+            .collect()
     }
 
     /// Returns documentation for all builtin units.
