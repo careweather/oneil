@@ -1,7 +1,7 @@
 use indexmap::{IndexMap, IndexSet};
 use oneil_ast as ast;
 use oneil_ir as ir;
-use oneil_shared::{LoadResult, span::Span};
+use oneil_shared::{load_result::LoadResult, span::Span};
 
 use crate::error::{
     CircularDependencyError, ModelImportResolutionError, ParameterResolutionError,

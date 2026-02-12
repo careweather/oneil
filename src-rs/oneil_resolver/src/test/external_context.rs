@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use indexmap::{IndexMap, IndexSet};
 use oneil_ast as ast;
 use oneil_ir as ir;
-use oneil_shared::LoadResult;
+use oneil_shared::load_result::LoadResult;
 
 use crate::util::{
     AstLoadingFailedError, ExternalResolutionContext, PythonImportLoadingFailedError,

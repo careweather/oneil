@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use oneil_shared::LoadResult;
+use oneil_shared::load_result::LoadResult;
 
 use crate::output;
 
