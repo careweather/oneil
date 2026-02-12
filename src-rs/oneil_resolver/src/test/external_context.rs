@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use indexmap::{IndexMap, IndexSet};
 use oneil_ast as ast;
 use oneil_ir as ir;
+use oneil_shared::LoadResult;
 
 use crate::util::{
     AstLoadingFailedError, ExternalResolutionContext, PythonImportLoadingFailedError,
@@ -35,7 +36,7 @@ pub struct TestExternalContext {
     builtin_functions: HashSet<String>,
 
     /// Model path -> AST; paths are derived from the given path's stem (e.g. "test.on" -> ModelPath("test.on")).
-    model_asts: IndexMap<ir::ModelPath, ast::Model>,
+    model_asts: IndexMap<ir::ModelPath, ast::ModelNode>,
 
     /// Python path (with `.py` extension) -> set of callable function names returned by `load_python_import`.
     python_imports: IndexMap<PathBuf, IndexSet<String>>,
@@ -80,7 +81,7 @@ impl TestExternalContext {
     #[must_use]
     pub fn with_model_asts(
         mut self,
-        models: impl IntoIterator<Item = (impl AsRef<std::path::Path>, ast::Model)>,
+        models: impl IntoIterator<Item = (impl AsRef<std::path::Path>, ast::ModelNode)>,
     ) -> Self {
         for (path, model) in models {
             let path = path.as_ref().to_path_buf();
@@ -140,8 +141,14 @@ impl ExternalResolutionContext for TestExternalContext {
         self.builtin_functions.contains(identifier.as_str())
     }
 
-    fn load_ast(&mut self, path: &ir::ModelPath) -> Result<&ast::Model, AstLoadingFailedError> {
-        self.model_asts.get(path).ok_or(AstLoadingFailedError)
+    fn load_ast(
+        &mut self,
+        path: &ir::ModelPath,
+    ) -> LoadResult<&ast::ModelNode, AstLoadingFailedError> {
+        self.model_asts.get(path).map_or_else(
+            || LoadResult::failure(AstLoadingFailedError),
+            LoadResult::success,
+        )
     }
 
     fn load_python_import(
