@@ -5,6 +5,25 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 use oneil_shared::LoadResult;
 
+use crate::output;
+
+/// Cache for raw source file contents keyed by path.
+pub type SourceCache = Cache<String, InternalIoError>;
+
+/// Cache for parsed AST models keyed by path.
+pub type AstCache = Cache<output::ast::Model, output::error::ParseError>;
+
+/// Cache for resolved IR models keyed by path.
+pub type IrCache = Cache<output::ir::Model, output::error::ResolutionError>;
+
+/// Cache for evaluated output models keyed by path.
+pub type EvalCache = Cache<output::Model, output::error::EvalError>;
+
+/// Cache for Python import function maps keyed by path.
+#[cfg(feature = "python")]
+pub type PythonImportCache =
+    Cache<oneil_python::function::PythonFunctionMap, oneil_shared::error::OneilError>;
+
 /// Generic cache keyed by path, storing [`LoadResult<T, E>`] per path.
 ///
 /// Used to cache load outcomes (success, partial, or failure) for files or
