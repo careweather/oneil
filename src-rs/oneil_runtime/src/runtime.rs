@@ -425,7 +425,7 @@ impl Runtime {
             .map_err(output::error::ParseError::File)?;
 
         // parse the model and return an error if it fails
-        match parser::parse_model(source, None) {
+        match parser::parse_model(source, None).into_result() {
             Ok(ast) => {
                 self.ast_cache
                     .insert_ok(path.to_path_buf(), ast.take_value());
@@ -441,12 +441,12 @@ impl Runtime {
                     .get(path)
                     .expect("it has already been loaded previously");
                 let errors = e
-                    .errors
+                    .error_collection
                     .into_iter()
                     .map(|err| OneilError::from_error_with_source(&err, path.to_path_buf(), source))
                     .collect::<Vec<OneilError>>();
 
-                let partial_ast = *e.partial_result;
+                let partial_ast = e.partial_result.take_value();
                 let partial_ast_for_error = partial_ast.clone();
                 self.ast_cache
                     .insert_err(path.to_path_buf(), partial_ast, errors.clone());
