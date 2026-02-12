@@ -25,11 +25,11 @@ use crate::std_builtin::StdBuiltins;
 /// methods to load and process Oneil models.
 #[derive(Debug)]
 pub struct Runtime {
-    pub(super) source_cache: SourceCache,
-    pub(super) ast_cache: AstCache,
-    pub(super) ir_cache: IrCache,
-    pub(super) eval_cache: EvalCache,
+    source_cache: SourceCache,
+    ast_cache: AstCache,
+    ir_cache: IrCache,
+    eval_cache: EvalCache,
     #[cfg(feature = "python")]
-    pub(super) python_import_cache: PythonImportCache,
-    pub(super) builtins: StdBuiltins,
+    python_import_cache: PythonImportCache,
+    builtins: StdBuiltins,
 }
