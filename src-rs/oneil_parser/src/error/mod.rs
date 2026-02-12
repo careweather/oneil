@@ -20,11 +20,9 @@ mod display;
 pub mod reason;
 use reason::ParserErrorReason;
 
-mod parser_trait;
-pub use parser_trait::ErrorHandlingParser;
+pub mod parser_trait;
 
 pub mod partial;
-pub use partial::ErrorsWithPartialResult;
 
 /// An error that occurred during parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

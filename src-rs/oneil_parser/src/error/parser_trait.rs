@@ -1,3 +1,9 @@
+//! Parser trait extensions for error handling.
+//!
+//! This module provides [`ErrorHandlingParser`], which extends nom's [`Parser`]
+//! with methods to convert and map errors between types while preserving
+//! recoverable vs unrecoverable distinction.
+
 use nom::{Parser, error::ParseError};
 
 /// A trait for handling parser errors in a consistent way.
@@ -14,7 +20,7 @@ use nom::{Parser, error::ParseError};
 /// * `I` - The input type (usually `Span`)
 /// * `O` - The output type
 /// * `E` - The error type
-pub trait ErrorHandlingParser<I, O, E>: Parser<I, Output = O, Error = E>
+pub(crate) trait ErrorHandlingParser<I, O, E>: Parser<I, Output = O, Error = E>
 where
     E: ParseError<I>,
 {

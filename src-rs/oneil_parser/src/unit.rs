@@ -11,7 +11,7 @@ use oneil_ast::{IdentifierNode, Node, UnitExponent, UnitExpr, UnitExprNode, Unit
 use oneil_shared::span::Span;
 
 use crate::{
-    error::{ErrorHandlingParser, ParserError},
+    error::{parser_trait::ErrorHandlingParser, ParserError},
     token::{
         literal::{number, unit_one},
         naming::unit_identifier,

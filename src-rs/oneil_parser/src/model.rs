@@ -20,8 +20,9 @@ use oneil_shared::span::Span;
 use crate::{
     declaration::parse as parse_decl,
     error::{
-        ErrorHandlingParser, ParserError,
-        partial::ErrorsWithPartialResult,
+        ParserError,
+        parser_trait::ErrorHandlingParser,
+        partial::ParserPartialError,
         reason::{ExpectKind, ParserErrorReason},
     },
     note::parse as parse_note,
@@ -34,16 +35,16 @@ use crate::{
 /// This function **fails if the complete input is not consumed**.
 pub fn parse_complete(
     input: InputSpan<'_>,
-) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
+) -> Result<'_, ModelNode, Box<ParserPartialError<ModelNode, ParserError>>> {
     let (rest, model) = model(input)?;
     let result = eof(rest);
 
     match result {
         Ok((rest, _)) => Ok((rest, model)),
-        Err(nom::Err::Error(e)) => Err(nom::Err::Failure(ErrorsWithPartialResult::new(
-            Box::new(model.take_value()),
+        Err(nom::Err::Error(e)) => Err(nom::Err::Failure(Box::new(ParserPartialError::new(
+            model,
             vec![e],
-        ))),
+        )))),
         _ => unreachable!(),
     }
 }
@@ -55,9 +56,9 @@ pub fn parse_complete(
 /// reported in a single pass.
 fn model(
     input: InputSpan<'_>,
-) -> Result<'_, ModelNode, ErrorsWithPartialResult<Box<Model>, ParserError>> {
-    let (rest, end_of_line_token) = opt(end_of_line).convert_errors().parse(input)?;
-    let (rest, note) = opt(parse_note).convert_errors().parse(rest)?;
+) -> Result<'_, ModelNode, Box<ParserPartialError<ModelNode, ParserError>>> {
+    let (rest, end_of_line_token) = opt(end_of_line).parse(input).expect("optional cannot fail");
+    let (rest, note) = opt(parse_note).parse(rest).expect("optional cannot fail");
     let (rest, mut decls, decl_errors) = parse_decls(rest);
     let (rest, sections, decls_without_section, section_errors) = parse_sections(rest);
 
@@ -65,14 +66,6 @@ fn model(
     decls.extend(decls_without_section);
 
     let errors = [decl_errors, section_errors].concat();
-
-    // if there were errors, return a partial result
-    if !errors.is_empty() {
-        let model = Box::new(Model::new(note, decls, sections));
-        return Err(nom::Err::Failure(ErrorsWithPartialResult::new(
-            model, errors,
-        )));
-    }
 
     // get the start of the model
     let model_span_start = source_location_from(input);
@@ -124,7 +117,14 @@ fn model(
         model_whitespace_span,
     );
 
-    Ok((rest, model_node))
+    // if there were errors, return a partial result
+    if errors.is_empty() {
+        Ok((rest, model_node))
+    } else {
+        Err(nom::Err::Failure(Box::new(ParserPartialError::new(
+            model_node, errors,
+        ))))
+    }
 }
 
 /// Attempts to parse declarations with error recovery
@@ -557,8 +557,8 @@ mod tests {
             panic!("Expected error for incomplete input");
         };
 
-        let model = e.partial_result;
-        let errors = e.errors;
+        let model = &e.partial_result;
+        let errors = &e.error_collection;
 
         assert_eq!(model.decls().len(), 1);
         assert_eq!(model.sections().len(), 1);
@@ -582,8 +582,8 @@ mod tests {
                 panic!("Expected error for remaining input");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 1);
             assert_eq!(errors.len(), 1);
@@ -608,8 +608,8 @@ mod tests {
                 panic!("Expected error for missing section label");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 1);
             assert_eq!(errors.len(), 1);
@@ -634,8 +634,8 @@ mod tests {
                 panic!("Expected error for missing section label, got {result:?}");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 1);
             assert_eq!(errors.len(), 1);
@@ -660,8 +660,8 @@ mod tests {
                 panic!("Expected error for invalid declaration in section");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.sections().len(), 1);
             assert_eq!(model.sections()[0].decls().len(), 0);
@@ -693,8 +693,8 @@ mod tests {
                 panic!("Expected error for missing import path");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 0);
             assert_eq!(errors.len(), 1);
@@ -719,8 +719,8 @@ mod tests {
                 panic!("Expected error for missing equals in parameter");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 0);
             assert_eq!(errors.len(), 1);
@@ -745,8 +745,8 @@ mod tests {
                 panic!("Expected error for missing value in parameter");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 0);
             assert_eq!(errors.len(), 1);
@@ -771,8 +771,8 @@ mod tests {
                 panic!("Expected error for missing colon in test");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 0);
             assert_eq!(errors.len(), 1);
@@ -804,8 +804,8 @@ mod tests {
                 panic!("Expected error for unterminated note");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 0);
             assert_eq!(errors.len(), 1);
@@ -828,14 +828,14 @@ mod tests {
                 panic!("Expected error for multiple declaration errors");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.decls().len(), 0);
             assert_eq!(errors.len(), 3);
 
             // All errors should be declaration-related
-            for error in &errors {
+            for error in errors {
                 let ParserErrorReason::Incomplete {
                     kind: IncompleteKind::Decl(_) | IncompleteKind::Parameter(_),
                     ..
@@ -854,8 +854,8 @@ mod tests {
                 panic!("Expected error for section with multiple errors");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             assert_eq!(model.sections().len(), 1);
             assert_eq!(model.sections()[0].decls().len(), 0);
@@ -873,8 +873,8 @@ mod tests {
                 panic!("Expected error for mixed valid and invalid declarations");
             };
 
-            let model = e.partial_result;
-            let errors = e.errors;
+            let model = &e.partial_result;
+            let errors = &e.error_collection;
 
             // Should have successfully parsed some declarations
             assert_eq!(model.decls().len(), 2);

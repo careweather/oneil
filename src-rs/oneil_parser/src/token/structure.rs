@@ -8,9 +8,10 @@ use nom::{
 };
 
 use crate::{
+    error::parser_trait::ErrorHandlingParser,
     token::{
         InputSpan, Result,
-        error::{ErrorHandlingParser, TokenError},
+        error::TokenError,
         util::{Token, inline_whitespace},
     },
     util::span_from,

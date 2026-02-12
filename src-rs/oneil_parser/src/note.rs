@@ -4,9 +4,11 @@ use nom::Parser;
 use nom::combinator::all_consuming;
 use oneil_ast::{Note, NoteNode};
 
-use crate::error::{ErrorHandlingParser, ParserError};
-use crate::token::note::{NoteKind, note as note_token};
-use crate::util::{InputSpan, Result};
+use crate::{
+    error::{ParserError, parser_trait::ErrorHandlingParser},
+    token::note::{NoteKind, note as note_token},
+    util::{InputSpan, Result},
+};
 
 /// Parse a note, which can be either a single-line note starting with `~`
 /// or a multi-line note delimited by `~~~`.

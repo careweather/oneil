@@ -14,7 +14,7 @@ use oneil_ast::{
 use oneil_shared::span::Span;
 
 use crate::{
-    error::{ErrorHandlingParser, ParserError},
+    error::{parser_trait::ErrorHandlingParser, ParserError},
     token::{
         keyword::{and, false_, not, or, true_},
         literal::{number, string},
