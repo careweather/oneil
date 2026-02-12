@@ -164,51 +164,6 @@ impl Runtime {
             self.ir_cache.insert_ok(model_path, model);
         }
     }
-
-    /// Loads a Python module from a file path and returns the set of callable names.
-    ///
-    /// Source is read from the file and passed to the Python loader. Results are
-    /// cached; subsequent calls for the same path return the cached result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an [`OneilError`] if the file could not be read or Python failed
-    /// to load the module.
-    #[expect(
-        clippy::missing_panics_doc,
-        reason = "the panic only happens if an internal invariant is violated"
-    )]
-    #[cfg(feature = "python")]
-    pub fn load_python_import(
-        &mut self,
-        path: impl AsRef<Path>,
-    ) -> Result<IndexSet<String>, Box<OneilError>> {
-        let path = path.as_ref();
-
-        // load the source code from the file
-        let source = self.load_source(path).map_err(|e| e.error)?;
-
-        // load the Python module and return the set of functions
-        let functions_result = oneil_python::load_python_import(path, source)
-            .map_err(|e| OneilError::from_error_with_source(&e, path.to_path_buf(), source));
-
-        // insert the result into the cache
-        match functions_result {
-            Ok(functions) => self
-                .python_import_cache
-                .insert_ok(path.to_path_buf(), functions),
-
-            Err(e) => self.python_import_cache.insert_err(path.to_path_buf(), e),
-        }
-
-        // return the cached result
-        self.python_import_cache
-            .get_entry(path)
-            .expect("entry was inserted in this function for the requested path")
-            .as_ref()
-            .map(|functions| functions.keys().cloned().collect::<IndexSet<String>>())
-            .map_err(|e| Box::new(e.clone()))
-    }
 }
 
 impl resolver::ExternalResolutionContext for Runtime {
