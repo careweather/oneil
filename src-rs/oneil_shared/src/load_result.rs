@@ -55,6 +55,16 @@ impl<T, E> LoadResult<T, E> {
         matches!(self, Self::Failure(_))
     }
 
+    /// Returns a reference projection of the load result.
+    #[must_use]
+    pub const fn as_ref(&self) -> LoadResult<&T, &E> {
+        match self {
+            Self::Failure(e) => LoadResult::Failure(e),
+            Self::Partial(v, e) => LoadResult::Partial(v, e),
+            Self::Success(v) => LoadResult::Success(v),
+        }
+    }
+
     /// Returns the value if present: `Some` for [`Success`](LoadResult::Success) or
     /// [`Partial`](LoadResult::Partial), `None` for [`Failure`](LoadResult::Failure).
     #[must_use]

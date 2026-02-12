@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use oneil_parser as parser;
-use oneil_shared::LoadResult;
+use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
 use crate::output::{self, ast};
