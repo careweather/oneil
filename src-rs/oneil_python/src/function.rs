@@ -1,5 +1,31 @@
+use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
+
+#[derive(Debug, Default)]
+pub struct PythonFunctionMap {
+    entries: IndexMap<String, PythonFunction>,
+}
+
+impl PythonFunctionMap {
+    pub fn new() -> Self {
+        Self {
+            entries: IndexMap::new(),
+        }
+    }
+}
+
+impl From<IndexMap<String, PythonFunction>> for PythonFunctionMap {
+    fn from(entries: IndexMap<String, PythonFunction>) -> Self {
+        Self { entries }
+    }
+}
+
+impl From<PythonFunctionMap> for IndexMap<String, PythonFunction> {
+    fn from(map: PythonFunctionMap) -> Self {
+        map.entries
+    }
+}
 
 #[derive(Debug)]
 pub struct PythonFunction {

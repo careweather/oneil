@@ -5,12 +5,12 @@ use std::{ffi::CString, path::Path};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 
-use crate::{PythonFunction, error::LoadPythonImportError};
+use crate::{PythonFunction, error::LoadPythonImportError, function::PythonFunctionMap};
 
 pub fn load_python_import(
     path: &Path,
     source: &str,
-) -> Result<IndexMap<String, PythonFunction>, LoadPythonImportError> {
+) -> Result<PythonFunctionMap, LoadPythonImportError> {
     // get the module name from the path
     let path = path.to_string_lossy();
     let module_name = path.trim_end_matches(".py").replace('/', ".");
@@ -43,7 +43,7 @@ pub fn load_python_import(
 
     // return the functions
     match functions {
-        Ok(functions) => Ok(functions),
+        Ok(functions) => Ok(PythonFunctionMap::from(functions)),
         Err(e) => Err(LoadPythonImportError::CouldNotLoadPythonModule(e)),
     }
 }
