@@ -28,6 +28,11 @@ pub fn empty_model() -> ast::Model {
     ast::Model::new(None, vec![], vec![])
 }
 
+/// Wraps a [`Model`](ast::Model) in a [`ModelNode`](ast::ModelNode) with unimportant spans.
+pub fn model_node(model: ast::Model) -> ast::ModelNode {
+    ast::Node::new(model, unimportant_span(), unimportant_span())
+}
+
 pub fn identifier_node(identifier: &'static str) -> ast::Node<ast::Identifier> {
     let identifier = ast::Identifier::new(identifier.to_string());
     ast::Node::new(identifier, unimportant_span(), unimportant_span())

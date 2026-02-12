@@ -61,12 +61,14 @@ where
     // parse model ast
     let load_ast_result = resolution_context.load_ast(model_path);
 
-    // TODO: this might be able to recover and produce a partial model?
-    let Ok(model_ast) = load_ast_result else {
-        resolution_context.mark_ast_not_loaded(model_path);
+    // get the model ast
+    //
+    // note that this succeeds even if the model ast is only partially loaded
+    let Some(model_ast) = load_ast_result.value() else {
         resolution_context.pop_active_model(model_path);
         return;
     };
+    let model_ast = (*model_ast).clone();
 
     // split model ast into imports, use models, parameters, and tests
     let (imports, model_imports, parameters, tests) = split_model_ast(&model_ast);
@@ -264,7 +266,7 @@ mod tests {
     fn load_model_success() {
         let model_path = ir::ModelPath::new("test");
         let mut external =
-            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model())]);
+            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model_node())]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&model_path, &mut resolution_context);
@@ -301,8 +303,10 @@ mod tests {
         let sub_path = ir::ModelPath::new("sub");
         let main_test_model = test_ast::ModelBuilder::new().with_submodel("sub").build();
         let sub_test_model = test_ast::ModelBuilder::new().with_submodel("main").build();
-        let mut external = TestExternalContext::new()
-            .with_model_asts([("main.on", main_test_model), ("sub.on", sub_test_model)]);
+        let mut external = TestExternalContext::new().with_model_asts([
+            ("main.on", test_ast::model_node(main_test_model)),
+            ("sub.on", test_ast::model_node(sub_test_model)),
+        ]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&main_path, &mut resolution_context);
@@ -347,7 +351,7 @@ mod tests {
         // Load the same model twice
         let model_path = ir::ModelPath::new("test");
         let mut external =
-            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model())]);
+            TestExternalContext::new().with_model_asts([("test.on", test_ast::empty_model_node())]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&model_path, &mut resolution_context);
@@ -367,8 +371,8 @@ mod tests {
     fn load_use_models_empty() {
         // Load a model with no use/ref declarations (only parent in context).
         let model_path = ir::ModelPath::new("parent");
-        let mut external =
-            TestExternalContext::new().with_model_asts([("parent.on", test_ast::empty_model())]);
+        let mut external = TestExternalContext::new()
+            .with_model_asts([("parent.on", test_ast::empty_model_node())]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&model_path, &mut resolution_context);
@@ -392,9 +396,9 @@ mod tests {
             .with_submodel("child2")
             .build();
         let mut external = TestExternalContext::new().with_model_asts([
-            ("parent.on", parent_ast),
-            ("child1.on", test_ast::empty_model()),
-            ("child2.on", test_ast::empty_model()),
+            ("parent.on", test_ast::model_node(parent_ast)),
+            ("child1.on", test_ast::empty_model_node()),
+            ("child2.on", test_ast::empty_model_node()),
         ]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
@@ -419,7 +423,8 @@ mod tests {
         let parent_ast = test_ast::ModelBuilder::new()
             .with_submodel("nonexistent")
             .build();
-        let mut external = TestExternalContext::new().with_model_asts([("parent.on", parent_ast)]);
+        let mut external = TestExternalContext::new()
+            .with_model_asts([("parent.on", test_ast::model_node(parent_ast))]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&parent_path, &mut resolution_context);
@@ -443,9 +448,9 @@ mod tests {
         let level2_model = test_ast::empty_model();
 
         let mut external = TestExternalContext::new().with_model_asts([
-            ("root.on", root_model),
-            ("level1.on", level1_model),
-            ("level2.on", level2_model),
+            ("root.on", test_ast::model_node(root_model)),
+            ("level1.on", test_ast::model_node(level1_model)),
+            ("level2.on", test_ast::model_node(level2_model)),
         ]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
@@ -476,8 +481,10 @@ mod tests {
             .with_section("section1", vec![use_model_decl])
             .build();
 
-        let mut external = TestExternalContext::new()
-            .with_model_asts([("test.on", model_node), ("submodel.on", submodel_node)]);
+        let mut external = TestExternalContext::new().with_model_asts([
+            ("test.on", test_ast::model_node(model_node)),
+            ("submodel.on", test_ast::model_node(submodel_node)),
+        ]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&test_path, &mut resolution_context);
@@ -506,8 +513,10 @@ mod tests {
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
 
-        let mut external = TestExternalContext::new()
-            .with_model_asts([("test.on", model_node), ("reference.on", reference_node)]);
+        let mut external = TestExternalContext::new().with_model_asts([
+            ("test.on", test_ast::model_node(model_node)),
+            ("reference.on", test_ast::model_node(reference_node)),
+        ]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&test_path, &mut resolution_context);
@@ -565,8 +574,10 @@ mod tests {
             .with_reference_variable_parameter("y", "reference", "x")
             .build();
 
-        let mut external = TestExternalContext::new()
-            .with_model_asts([("test.on", model_node), ("submodel.on", submodel_node)]);
+        let mut external = TestExternalContext::new().with_model_asts([
+            ("test.on", test_ast::model_node(model_node)),
+            ("submodel.on", test_ast::model_node(submodel_node)),
+        ]);
         let mut resolution_context = ResolutionContext::new(&mut external);
 
         load_model(&test_path, &mut resolution_context);

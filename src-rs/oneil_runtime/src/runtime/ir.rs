@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_resolver as resolver;
-use oneil_shared::error::OneilError;
+use oneil_shared::{LoadResult, error::OneilError};
 
 use super::Runtime;
 use crate::output::{self, ast};
@@ -178,7 +178,7 @@ impl resolver::ExternalResolutionContext for Runtime {
     fn load_ast(
         &mut self,
         path: &oneil_ir::ModelPath,
-    ) -> Result<&ast::Model, resolver::AstLoadingFailedError> {
+    ) -> LoadResult<&ast::ModelNode, resolver::AstLoadingFailedError> {
         self.load_ast(path)
             .map_err(|_e| resolver::AstLoadingFailedError)
     }
