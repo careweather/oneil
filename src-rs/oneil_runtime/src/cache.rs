@@ -8,7 +8,7 @@ use oneil_shared::load_result::LoadResult;
 use crate::output;
 
 /// Cache for raw source file contents keyed by path.
-pub type SourceCache = Cache<String, InternalIoError>;
+pub type SourceCache = Cache<String, output::error::SourceError>;
 
 /// Cache for parsed AST models keyed by path.
 pub type AstCache = Cache<output::ast::ModelNode, output::error::ParseError>;
