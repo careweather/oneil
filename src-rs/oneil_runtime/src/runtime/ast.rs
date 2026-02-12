@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use oneil_parser as parser;
-use oneil_shared::error::OneilError;
+use oneil_shared::LoadResult;
 
 use super::Runtime;
 use crate::output::{self, ast};
@@ -21,43 +21,52 @@ impl Runtime {
     pub fn load_ast(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<&ast::Model, output::error::ParseError> {
+    ) -> &LoadResult<ast::ModelNode, output::error::ParseError> {
         let path = path.as_ref();
-        let source = self
-            .load_source(path)
-            .map_err(output::error::ParseError::File)?;
+        let load_result = self.load_source(path);
+
+        let source = match load_result {
+            LoadResult::Success(source) => source,
+            LoadResult::Failure(_error) => {
+                // if the source file could not be loaded, we return a parse error
+                self.ast_cache.insert(
+                    path.to_path_buf(),
+                    LoadResult::failure(output::error::ParseError::FileLoadingFailed),
+                );
+
+                return self
+                    .ast_cache
+                    .get_entry(path)
+                    .expect("it was just inserted");
+            }
+            LoadResult::Partial(_source, _errors) => unreachable!("source cannot load partially"),
+        };
 
         // parse the model and return an error if it fails
         match parser::parse_model(source, None).into_result() {
             Ok(ast) => {
                 self.ast_cache
-                    .insert_ok(path.to_path_buf(), ast.take_value());
-                let ast = self.ast_cache.get(path).expect("it was just inserted");
+                    .insert(path.to_path_buf(), LoadResult::success(ast));
 
-                Ok(ast)
+                self.ast_cache
+                    .get_entry(path)
+                    .expect("it was just inserted")
             }
             Err(e) => {
                 // need to reload the source for lifetime reasons
                 // TODO: maybe another call to `load_source` once caching works would make more sense?
-                let source = self
-                    .source_cache
-                    .get(path)
-                    .expect("it has already been loaded previously");
-                let errors = e
-                    .error_collection
-                    .into_iter()
-                    .map(|err| OneilError::from_error_with_source(&err, path.to_path_buf(), source))
-                    .collect::<Vec<OneilError>>();
 
-                let partial_ast = e.partial_result.take_value();
-                let partial_ast_for_error = partial_ast.clone();
+                let partial_ast = e.partial_result;
+                let errors = output::error::ParseError::ParseErrors {
+                    errors: e.error_collection,
+                };
+
                 self.ast_cache
-                    .insert_err(path.to_path_buf(), partial_ast, errors.clone());
+                    .insert(path.to_path_buf(), LoadResult::partial(partial_ast, errors));
 
-                Err(output::error::ParseError::ParseErrors {
-                    errors,
-                    partial_ast: Box::new(partial_ast_for_error),
-                })
+                self.ast_cache
+                    .get_entry(path)
+                    .expect("it was just inserted")
             }
         }
     }

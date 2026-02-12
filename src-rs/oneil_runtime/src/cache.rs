@@ -11,7 +11,7 @@ use crate::output;
 pub type SourceCache = Cache<String, InternalIoError>;
 
 /// Cache for parsed AST models keyed by path.
-pub type AstCache = Cache<output::ast::Model, output::error::ParseError>;
+pub type AstCache = Cache<output::ast::ModelNode, output::error::ParseError>;
 
 /// Cache for resolved IR models keyed by path.
 pub type IrCache = Cache<output::ir::Model, output::error::ResolutionError>;
