@@ -101,7 +101,7 @@ pub type EvalCache = Cache<output::Model, eval::EvalErrors>;
 /// Cache for Python import function maps keyed by path.
 #[cfg(feature = "python")]
 pub type PythonImportCache =
-    Cache<oneil_python::function::PythonFunctionMap, oneil_shared::error::OneilError>;
+    Cache<oneil_python::function::PythonFunctionMap, oneil_python::LoadPythonImportError>;
 
 /// Generic cache keyed by path, storing [`LoadResult<T, E>`] per path.
 ///

@@ -150,13 +150,13 @@ impl ExternalResolutionContext for TestExternalContext {
             .map_or_else(LoadResult::failure, LoadResult::success)
     }
 
-    fn load_python_import(
-        &mut self,
+    fn load_python_import<'context>(
+        &'context mut self,
         python_path: &ir::PythonPath,
-    ) -> Result<IndexSet<String>, PythonImportLoadingFailedError> {
+    ) -> Result<IndexSet<&'context str>, PythonImportLoadingFailedError> {
         self.python_imports
             .get(python_path.as_ref())
-            .cloned()
+            .map(|set| set.iter().map(String::as_str).collect())
             .ok_or(PythonImportLoadingFailedError)
     }
 }
