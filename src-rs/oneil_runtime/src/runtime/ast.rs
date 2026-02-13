@@ -23,11 +23,11 @@ impl Runtime {
         path: impl AsRef<Path>,
     ) -> &LoadResult<ast::ModelNode, output::error::ParseError> {
         let path = path.as_ref();
-        let load_result = self.load_source(path);
+        let source_result = self.load_source(path);
 
-        let source = match load_result {
-            LoadResult::Success(source) => source,
-            LoadResult::Failure(_error) => {
+        let source = match source_result {
+            Ok(source) => source,
+            Err(_error) => {
                 // if the source file could not be loaded, we return a parse error
                 self.ast_cache.insert(
                     path.to_path_buf(),
@@ -39,7 +39,6 @@ impl Runtime {
                     .get_entry(path)
                     .expect("it was just inserted");
             }
-            LoadResult::Partial(_source, _errors) => unreachable!("source cannot load partially"),
         };
 
         // parse the model and return an error if it fails

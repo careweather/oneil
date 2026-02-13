@@ -2,8 +2,6 @@
 
 use std::path::Path;
 
-use oneil_shared::load_result::LoadResult;
-
 use super::Runtime;
 use crate::output::error::SourceError;
 
@@ -17,20 +15,18 @@ impl Runtime {
         clippy::missing_panics_doc,
         reason = "the panic only happens if an internal invariant is violated"
     )]
-    pub fn load_source(&mut self, path: impl AsRef<Path>) -> &LoadResult<String, SourceError> {
+    pub fn load_source(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> &Result<String, SourceError> {
         let path = path.as_ref();
 
-        // Read the source code from the file
-        let load_result = match std::fs::read_to_string(path) {
-            Ok(source) => LoadResult::success(source),
-            Err(e) => {
-                let error = SourceError::new(path.to_path_buf(), e);
-
-                LoadResult::failure(error)
-            }
+        let result = match std::fs::read_to_string(path) {
+            Ok(source) => Ok(source),
+            Err(e) => Err(SourceError::new(path.to_path_buf(), e)),
         };
 
-        self.source_cache.insert(path.to_path_buf(), load_result);
+        self.source_cache.insert(path.to_path_buf(), result);
 
         self.source_cache
             .get_entry(path)
