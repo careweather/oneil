@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
+use oneil_parser::error::ParserError;
 use oneil_shared::load_result::LoadResult;
 
 use crate::output;
@@ -87,7 +88,7 @@ impl SourceCache {
 }
 
 /// Cache for parsed AST models keyed by path.
-pub type AstCache = Cache<output::ast::ModelNode, output::error::ParseError>;
+pub type AstCache = Cache<output::ast::ModelNode, Vec<ParserError>>;
 
 /// Cache for resolved IR models keyed by path.
 pub type IrCache = Cache<output::ir::Model, output::error::ResolutionError>;

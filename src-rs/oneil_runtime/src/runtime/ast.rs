@@ -2,11 +2,11 @@
 
 use std::path::Path;
 
-use oneil_parser as parser;
+use oneil_parser::{self as parser, error::ParserError};
 use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
-use crate::output::{self, ast};
+use crate::output::ast;
 
 impl Runtime {
     /// Loads AST for a model.
@@ -21,7 +21,7 @@ impl Runtime {
     pub fn load_ast(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> &LoadResult<ast::ModelNode, output::error::ParseError> {
+    ) -> &LoadResult<ast::ModelNode, Vec<ParserError>> {
         let path = path.as_ref();
         let source_result = self.load_source(path);
 
@@ -29,10 +29,8 @@ impl Runtime {
             Ok(source) => source,
             Err(_error) => {
                 // if the source file could not be loaded, we return a parse error
-                self.ast_cache.insert(
-                    path.to_path_buf(),
-                    LoadResult::failure(),
-                );
+                self.ast_cache
+                    .insert(path.to_path_buf(), LoadResult::failure());
 
                 return self
                     .ast_cache
@@ -56,9 +54,7 @@ impl Runtime {
                 // TODO: maybe another call to `load_source` once caching works would make more sense?
 
                 let partial_ast = e.partial_result;
-                let errors = output::error::ParseError::ParseErrors {
-                    errors: e.error_collection,
-                };
+                let errors = e.error_collection;
 
                 self.ast_cache
                     .insert(path.to_path_buf(), LoadResult::partial(partial_ast, errors));
