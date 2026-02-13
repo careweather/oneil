@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 
 use oneil_ir as ir;
 use oneil_output::{Unit, Value};
-use oneil_shared::span::Span;
+use oneil_shared::{load_result::LoadResult, span::Span};
 
 use crate::{
     context::{ExternalEvaluationContext, IrLoadError},
@@ -54,7 +54,7 @@ impl Default for TestExternalContext {
 }
 
 impl ExternalEvaluationContext for TestExternalContext {
-    fn lookup_ir(&self, _path: impl AsRef<Path>) -> Option<Result<&ir::Model, IrLoadError>> {
+    fn lookup_ir(&self, _path: impl AsRef<Path>) -> Option<LoadResult<&ir::Model, IrLoadError>> {
         panic!("no tests currently use this method")
     }
 

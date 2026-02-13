@@ -9,7 +9,7 @@ mod eval_parameter;
 mod eval_unit;
 
 pub use context::{ExternalEvaluationContext, IrLoadError};
-pub use error::EvalError;
+pub use error::{EvalError, EvalErrors};
 pub use eval_model::eval_model;
 
 #[cfg(test)]

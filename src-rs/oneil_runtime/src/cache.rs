@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
+use oneil_eval as eval;
 use oneil_parser::error::ParserError;
+use oneil_resolver as resolver;
 use oneil_shared::load_result::LoadResult;
 
 use crate::output;
@@ -91,10 +93,10 @@ impl SourceCache {
 pub type AstCache = Cache<output::ast::ModelNode, Vec<ParserError>>;
 
 /// Cache for resolved IR models keyed by path.
-pub type IrCache = Cache<output::ir::Model, output::error::ResolutionError>;
+pub type IrCache = Cache<output::ir::Model, resolver::ResolutionErrorCollection>;
 
 /// Cache for evaluated output models keyed by path.
-pub type EvalCache = Cache<output::Model, output::error::EvalError>;
+pub type EvalCache = Cache<output::Model, eval::EvalErrors>;
 
 /// Cache for Python import function maps keyed by path.
 #[cfg(feature = "python")]

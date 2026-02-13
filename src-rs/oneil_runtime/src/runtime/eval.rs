@@ -2,10 +2,9 @@
 
 use std::path::Path;
 
-use oneil_eval::{self as eval, EvalError, IrLoadError};
+use oneil_eval::{self as eval, IrLoadError};
 use oneil_output::{Unit, Value};
-use oneil_shared::error::OneilError;
-use oneil_shared::span::Span;
+use oneil_shared::{load_result::LoadResult, span::Span};
 
 use super::Runtime;
 use crate::output::{self, ir};
@@ -23,10 +22,7 @@ impl Runtime {
     pub fn eval_model(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<
-        output::reference::ModelReference<'_>,
-        output::reference::EvalErrorReference<'_>,
-    > {
+    ) -> &LoadResult<output::Model, eval::EvalErrors> {
         // make sure the IR is loaded for the model and its dependencies
         // TODO: once caching works, evaluating the model should load the IR as it goes
         let _ir_results = self.load_ir(&path);
@@ -34,91 +30,33 @@ impl Runtime {
         // evaluate the model and its dependencies
         let eval_result = eval::eval_model(&path, self);
 
-        for (model_path, result) in eval_result {
-            let source = self.source_cache.get(&model_path).unwrap_or("");
-
-            match result {
+        for (model_path, maybe_partial) in eval_result {
+            match maybe_partial.into_result() {
                 Ok(model) => {
-                    self.eval_cache.insert_ok(model_path, model);
+                    self.eval_cache
+                        .insert(model_path, LoadResult::success(model));
                 }
-                Err(eval_errors) if eval_errors.had_resolution_errors => {
-                    let resolution_errors = self
-                        .ir_cache
-                        .get_error(&model_path)
-                        .expect("should have resolution errors")
-                        .clone();
-
-                    self.eval_cache.insert_err(
+                Err(partial) => {
+                    self.eval_cache.insert(
                         model_path,
-                        output::error::EvalError::Resolution(resolution_errors),
-                    );
-                }
-                Err(eval_errors) => {
-                    let parameter_errors = eval_errors
-                        .parameters
-                        .into_iter()
-                        .map(|(name, errs)| {
-                            (
-                                name,
-                                errs.into_iter()
-                                    .map(|e| {
-                                        OneilError::from_error_with_source(
-                                            &e,
-                                            model_path.clone(),
-                                            source,
-                                        )
-                                    })
-                                    .collect(),
-                            )
-                        })
-                        .collect();
-
-                    let test_errors = eval_errors
-                        .tests
-                        .into_iter()
-                        .map(|e| {
-                            OneilError::from_error_with_source(&e, model_path.clone(), source)
-                        })
-                        .collect();
-
-                    self.eval_cache.insert_err(
-                        model_path,
-                        output::error::EvalError::EvalErrors {
-                            partial_result: Box::new(eval_errors.partial_result),
-                            parameter_errors,
-                            test_errors,
-                        },
+                        LoadResult::partial(partial.partial_result, partial.error_collection),
                     );
                 }
             }
         }
 
-        let model = self
-            .eval_cache
+        self.eval_cache
             .get_entry(path.as_ref())
-            .expect("eval_model populates cache for requested path and dependencies");
-
-        match model {
-            Ok(model) => {
-                let model_ref = output::reference::ModelReference::new(model, &self.eval_cache);
-                Ok(model_ref)
-            }
-            Err(err) => {
-                let err_ref =
-                    output::reference::EvalErrorReference::new(err, &self.eval_cache);
-                Err(err_ref)
-            }
-        }
+            .expect("eval_model populates cache for requested path and dependencies")
     }
 }
 
 impl eval::ExternalEvaluationContext for Runtime {
-    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<Result<&oneil_ir::Model, IrLoadError>> {
-        let result = self.ir_cache.get_entry(path.as_ref())?;
-        match result {
-            Ok(ir) => Some(Ok(ir)),
-            Err(_error) => Some(Err(IrLoadError)),
-        }
+    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<LoadResult<&ir::Model, IrLoadError>> {
+        let entry = self.ir_cache.get_entry(path.as_ref())?;
+        let result = entry.as_ref().map_err(|_error| eval::IrLoadError);
+
+        Some(result)
     }
 
     fn lookup_builtin_variable(&self, identifier: &oneil_ir::Identifier) -> Option<&Value> {
@@ -130,7 +68,7 @@ impl eval::ExternalEvaluationContext for Runtime {
         identifier: &oneil_ir::Identifier,
         identifier_span: Span,
         args: Vec<(Value, Span)>,
-    ) -> Option<Result<Value, Vec<EvalError>>> {
+    ) -> Option<Result<Value, Vec<eval::EvalError>>> {
         let function = self.builtins.get_function(identifier.as_str())?;
         Some(function(identifier_span, args))
     }
@@ -142,7 +80,7 @@ impl eval::ExternalEvaluationContext for Runtime {
         identifier: &ir::Identifier,
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
-    ) -> Option<Result<output::Value, Box<EvalError>>> {
+    ) -> Option<Result<output::Value, Box<eval::EvalError>>> {
         self.evaluate_python_function(python_path, identifier, identifier_span, args)
     }
 

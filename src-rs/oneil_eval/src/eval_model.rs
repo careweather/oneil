@@ -4,8 +4,8 @@ use std::{
 };
 
 use indexmap::{IndexMap, IndexSet};
-
 use oneil_ir as ir;
+use oneil_shared::partial::MaybePartialResult;
 use oneil_shared::span::Span;
 
 use oneil_output::{
@@ -25,7 +25,7 @@ use crate::{
 pub fn eval_model<E: ExternalEvaluationContext>(
     model_path: impl AsRef<Path>,
     external_context: &mut E,
-) -> IndexMap<PathBuf, Result<Model, EvalErrors>> {
+) -> IndexMap<PathBuf, MaybePartialResult<Model, EvalErrors>> {
     let model_path = ir::ModelPath::new(model_path);
     let mut context = EvalContext::new(external_context);
 
@@ -45,13 +45,8 @@ fn eval_model_from_context<E: ExternalEvaluationContext>(
 
     let model = context.get_ir(&model_path);
 
-    // TODO: maybe there's an opportunity for partial recovery here?
-    let model = match model {
-        Ok(model) => model,
-        Err(_error) => {
-            context.mark_ir_load_error_for_active_model();
-            return;
-        }
+    let Some(model) = model.value() else {
+        return;
     };
 
     // Recursively evaluate references
