@@ -145,10 +145,9 @@ impl ExternalResolutionContext for TestExternalContext {
         &mut self,
         path: &ir::ModelPath,
     ) -> LoadResult<&ast::ModelNode, AstLoadingFailedError> {
-        self.model_asts.get(path).map_or_else(
-            || LoadResult::failure(AstLoadingFailedError),
-            LoadResult::success,
-        )
+        self.model_asts
+            .get(path)
+            .map_or_else(LoadResult::failure, LoadResult::success)
     }
 
     fn load_python_import(
