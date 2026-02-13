@@ -10,12 +10,9 @@ use std::path::Path;
 use crate::output;
 use indexmap::IndexMap;
 use oneil_ir as ir;
-use oneil_shared::{error::OneilError, span::Span};
+use oneil_shared::span::Span;
 
-use crate::{
-    cache::{EvalCache, IrCache},
-    output::error::{EvalError, ResolutionError},
-};
+use crate::cache::{EvalCache, IrCache};
 
 /// A reference to an evaluated model within a model hierarchy.
 ///
@@ -66,23 +63,24 @@ impl<'result> ModelReference<'result> {
     /// the case as long as creating the `EvalResult`
     /// resolves successfully.
     #[must_use]
-    pub fn references(&self) -> IndexMap<&'result str, Result<Self, EvalErrorReference<'result>>> {
+    pub fn references(&self) -> IndexMap<&'result str, ModelReference<'result>> {
         self.model
             .references
             .iter()
-            .map(|(name, path)| {
+            .filter_map(|(name, path)| {
                 let entry = self
                     .eval_cache
                     .get_entry(path)
                     .expect("reference should be in cache");
-                let result = entry
-                    .as_ref()
-                    .map(|model| Self {
-                        model,
-                        eval_cache: self.eval_cache,
-                    })
-                    .map_err(|eval_error| EvalErrorReference::new(eval_error, self.eval_cache));
-                (name.as_str(), result)
+
+                let model = entry.value()?;
+
+                let result = Self {
+                    model,
+                    eval_cache: self.eval_cache,
+                };
+
+                Some((name.as_str(), result))
             })
             .collect()
     }
@@ -101,44 +99,6 @@ impl<'result> ModelReference<'result> {
     #[must_use]
     pub fn tests(&self) -> Vec<&'result output::Test> {
         self.model.tests.iter().collect()
-    }
-}
-
-/// A reference to an evaluation error within a model hierarchy.
-///
-/// Allows inspecting partial results and error details (e.g. parameter
-/// or test errors) when evaluation of a model fails.
-#[derive(Debug, Clone, Copy)]
-pub struct EvalErrorReference<'result> {
-    eval_error: &'result EvalError,
-    eval_cache: &'result EvalCache,
-}
-
-impl<'result> EvalErrorReference<'result> {
-    /// Creates a new `EvalErrorReference` for the given evaluation error and evaluation cache.
-    #[must_use]
-    pub const fn new(eval_error: &'result EvalError, eval_cache: &'result EvalCache) -> Self {
-        Self {
-            eval_error,
-            eval_cache,
-        }
-    }
-
-    /// Returns the partial evaluation result for this model, if any.
-    #[must_use]
-    pub fn partial_result(&self) -> Option<ModelReference<'result>> {
-        match self.eval_error {
-            EvalError::EvalErrors { partial_result, .. } => {
-                Some(ModelReference::new(partial_result, self.eval_cache))
-            }
-            EvalError::Resolution(_) => None,
-        }
-    }
-
-    /// Returns all underlying evaluation errors for this model as a list of [`OneilError`]s.
-    #[must_use]
-    pub fn model_errors(&self) -> Vec<OneilError> {
-        self.eval_error.to_vec()
     }
 }
 
@@ -328,68 +288,20 @@ impl<'result> ReferenceImportReference<'result> {
         self.reference_import.path()
     }
 
-    /// Returns the model that this reference imports.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`ResolutionErrorReference`](ResolutionErrorReference) if the
-    /// model that is referenced has resolution errors.
+    /// Returns the model that this reference imports. If the referenced model
+    /// failed to resolve, returns `None`.
     #[expect(
         clippy::missing_panics_doc,
         reason = "the panic only happens if an internal invariant is violated"
     )]
-    pub fn model(&self) -> Result<ModelIrReference<'result>, ResolutionErrorReference<'result>> {
+    pub fn model(&self) -> Option<ModelIrReference<'result>> {
         let entry = self
             .ir_cache
             .get_entry(self.reference_import.path().as_ref())
             .expect("reference should be in cache");
-        match entry {
-            Ok(model) => Ok(ModelIrReference::new(model, self.ir_cache)),
-            Err(resolution_error) => Err(ResolutionErrorReference::new(
-                resolution_error,
-                self.ir_cache,
-            )),
-        }
-    }
-}
 
-/// A reference to a resolution error within a model hierarchy.
-///
-/// Allows inspecting partial IR and error details (e.g. parameter
-/// or test resolution errors) when resolution of a model fails.
-#[derive(Debug, Clone, Copy)]
-pub struct ResolutionErrorReference<'result> {
-    resolution_error: &'result ResolutionError,
-    ir_cache: &'result IrCache,
-}
+        let ir = entry.value()?;
 
-impl<'result> ResolutionErrorReference<'result> {
-    /// Creates a new `ResolutionErrorReference` for the given resolution error, IR cache, and path.
-    #[must_use]
-    pub const fn new(
-        resolution_error: &'result ResolutionError,
-        ir_cache: &'result IrCache,
-    ) -> Self {
-        Self {
-            resolution_error,
-            ir_cache,
-        }
-    }
-
-    /// Returns the partial IR for this model, if any.
-    #[must_use]
-    pub fn partial_ir(&self) -> Option<ModelIrReference<'result>> {
-        match self.resolution_error {
-            ResolutionError::ResolutionErrors { partial_ir, .. } => {
-                Some(ModelIrReference::new(partial_ir.as_ref(), self.ir_cache))
-            }
-            ResolutionError::Parse(_) => None,
-        }
-    }
-
-    /// Returns all underlying resolution errors for this model as a list of [`OneilError`]s.
-    #[must_use]
-    pub fn model_errors(&self) -> Vec<OneilError> {
-        self.resolution_error.to_vec()
+        Some(ModelIrReference::new(ir, self.ir_cache))
     }
 }
