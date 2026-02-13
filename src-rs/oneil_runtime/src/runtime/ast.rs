@@ -31,7 +31,7 @@ impl Runtime {
                 // if the source file could not be loaded, we return a parse error
                 self.ast_cache.insert(
                     path.to_path_buf(),
-                    LoadResult::failure(output::error::ParseError::FileLoadingFailed),
+                    LoadResult::failure(),
                 );
 
                 return self

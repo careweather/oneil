@@ -7,11 +7,11 @@
 ///
 /// - [`LoadResult::Success`]: the load completed successfully with value `T`.
 /// - [`LoadResult::Partial`]: a value `T` was produced but errors `E` also occurred.
-/// - [`LoadResult::Failure`]: the load failed with errors `E` and no value was produced.
+/// - [`LoadResult::Failure`]: the load failed entirely; nothing was produced, including errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoadResult<T, E> {
-    /// Load failed; only errors are available.
-    Failure(E),
+    /// Load failed completely; no value and no errors (e.g. unable to even start).
+    Failure,
     /// Load produced a value but errors also occurred.
     Partial(T, E),
     /// Load completed successfully.
@@ -19,10 +19,10 @@ pub enum LoadResult<T, E> {
 }
 
 impl<T, E> LoadResult<T, E> {
-    /// Builds a failure result with no value.
+    /// Builds a failure result with no value and no errors.
     #[must_use]
-    pub const fn failure(error: E) -> Self {
-        Self::Failure(error)
+    pub const fn failure() -> Self {
+        Self::Failure
     }
 
     /// Builds a partial result with a value and errors.
@@ -52,14 +52,14 @@ impl<T, E> LoadResult<T, E> {
     /// Returns `true` if this is [`LoadResult::Failure`].
     #[must_use]
     pub const fn is_failure(&self) -> bool {
-        matches!(self, Self::Failure(_))
+        matches!(self, Self::Failure)
     }
 
     /// Returns a reference projection of the load result.
     #[must_use]
     pub const fn as_ref(&self) -> LoadResult<&T, &E> {
         match self {
-            Self::Failure(e) => LoadResult::Failure(e),
+            Self::Failure => LoadResult::Failure,
             Self::Partial(v, e) => LoadResult::Partial(v, e),
             Self::Success(v) => LoadResult::Success(v),
         }
@@ -71,17 +71,17 @@ impl<T, E> LoadResult<T, E> {
     pub const fn value(&self) -> Option<&T> {
         match self {
             Self::Success(v) | Self::Partial(v, _) => Some(v),
-            Self::Failure(_) => None,
+            Self::Failure => None,
         }
     }
 
-    /// Returns the error if present: `Some` for [`Partial`](LoadResult::Partial) or
-    /// [`Failure`](LoadResult::Failure), `None` for [`Success`](LoadResult::Success).
+    /// Returns the error if present: `Some` for [`Partial`](LoadResult::Partial),
+    /// `None` for [`Success`](LoadResult::Success) or [`Failure`](LoadResult::Failure).
     #[must_use]
     pub const fn error(&self) -> Option<&E> {
         match self {
-            Self::Failure(e) | Self::Partial(_, e) => Some(e),
-            Self::Success(_) => None,
+            Self::Partial(_, e) => Some(e),
+            Self::Failure | Self::Success(_) => None,
         }
     }
 
@@ -93,7 +93,7 @@ impl<T, E> LoadResult<T, E> {
         match self {
             Self::Success(v) => LoadResult::success(f(v)),
             Self::Partial(v, e) => LoadResult::partial(f(v), e),
-            Self::Failure(e) => LoadResult::failure(e),
+            Self::Failure => LoadResult::failure(),
         }
     }
 
@@ -105,7 +105,7 @@ impl<T, E> LoadResult<T, E> {
         match self {
             Self::Success(v) => LoadResult::success(v),
             Self::Partial(v, e) => LoadResult::partial(v, f(e)),
-            Self::Failure(e) => LoadResult::failure(f(e)),
+            Self::Failure => LoadResult::failure(),
         }
     }
 }
