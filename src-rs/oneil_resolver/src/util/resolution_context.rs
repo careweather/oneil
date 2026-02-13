@@ -95,10 +95,10 @@ pub trait ExternalResolutionContext {
     ///
     /// Returns `Err(PythonImportLoadingFailedError)` when the Python import cannot be loaded or
     /// validated.
-    fn load_python_import(
-        &mut self,
+    fn load_python_import<'context>(
+        &'context mut self,
         python_path: &ir::PythonPath,
-    ) -> Result<IndexSet<String>, PythonImportLoadingFailedError>;
+    ) -> Result<IndexSet<&'context str>, PythonImportLoadingFailedError>;
 }
 
 pub struct ResolutionContext<'external, E: ExternalResolutionContext> {
@@ -273,6 +273,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         let load_result = self.external_context.load_python_import(python_path);
 
         if let Ok(functions) = load_result {
+            let functions = functions.into_iter().map(String::from).collect();
             let import = ir::PythonImport::new(python_path.clone(), python_path_span, functions);
             self.active_model_mut()
                 .add_python_import(python_path.clone(), import);

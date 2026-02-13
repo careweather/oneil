@@ -2,9 +2,10 @@
 
 use std::path::Path;
 
-use indexmap::IndexSet;
 use oneil_eval::EvalError;
-use oneil_shared::error::OneilError;
+use oneil_python::LoadPythonImportError;
+use oneil_python::function::PythonFunctionMap;
+use oneil_shared::load_result::LoadResult;
 use oneil_shared::span::Span;
 
 use super::Runtime;
@@ -27,32 +28,39 @@ impl Runtime {
     pub fn load_python_import(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Result<IndexSet<String>, Box<OneilError>> {
+    ) -> &LoadResult<PythonFunctionMap, LoadPythonImportError> {
         let path = path.as_ref();
 
         // load the source code from the file
-        let source = self.load_source(path).map_err(|e| e.error)?;
+        let Ok(source) = self.load_source(path) else {
+            self.python_import_cache
+                .insert(path.to_path_buf(), LoadResult::failure());
+
+            return self
+                .python_import_cache
+                .get_entry(path)
+                .expect("it was just inserted");
+        };
 
         // load the Python module and return the set of functions
-        let functions_result = oneil_python::load_python_import(path, source)
-            .map_err(|e| OneilError::from_error_with_source(&e, path.to_path_buf(), source));
+        let functions_result = oneil_python::load_python_import(path, source);
 
         // insert the result into the cache
         match functions_result {
             Ok(functions) => self
                 .python_import_cache
-                .insert_ok(path.to_path_buf(), functions),
+                .insert(path.to_path_buf(), LoadResult::success(functions)),
 
-            Err(e) => self.python_import_cache.insert_err(path.to_path_buf(), e),
+            Err(e) => self.python_import_cache.insert(
+                path.to_path_buf(),
+                LoadResult::partial(PythonFunctionMap::default(), e),
+            ),
         }
 
         // return the cached result
         self.python_import_cache
             .get_entry(path)
             .expect("entry was inserted in this function for the requested path")
-            .as_ref()
-            .map(|functions| functions.keys().cloned().collect::<IndexSet<String>>())
-            .map_err(|e| Box::new(e.clone()))
     }
 
     /// Evaluates a Python function by path and identifier.
@@ -63,13 +71,13 @@ impl Runtime {
         identifier_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Box<EvalError>>> {
-        let python_import = self
+        let python_functions = self
             .python_import_cache
             .get_entry(python_path.as_ref())?
-            .as_ref()
+            .value()
             .expect("should not be trying to evaluate a Python function if the import failed");
 
-        let function = python_import.get(identifier.as_str())?;
+        let function = python_functions.get_function(identifier.as_str())?;
 
         let eval_result = oneil_python::evaluate_python_function(
             function,

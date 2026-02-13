@@ -13,6 +13,14 @@ impl PythonFunctionMap {
             entries: IndexMap::new(),
         }
     }
+
+    pub fn get_function(&self, identifier: &str) -> Option<&PythonFunction> {
+        self.entries.get(identifier)
+    }
+
+    pub fn get_function_names(&self) -> impl Iterator<Item = &str> {
+        self.entries.keys().map(|key| key.as_str())
+    }
 }
 
 impl From<IndexMap<String, PythonFunction>> for PythonFunctionMap {

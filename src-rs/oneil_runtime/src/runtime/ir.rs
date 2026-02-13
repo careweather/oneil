@@ -64,11 +64,13 @@ impl resolver::ExternalResolutionContext for Runtime {
             .map_err(|_e| resolver::AstLoadingFailedError)
     }
 
-    fn load_python_import(
-        &mut self,
+    fn load_python_import<'context>(
+        &'context mut self,
         python_path: &oneil_ir::PythonPath,
-    ) -> Result<IndexSet<String>, resolver::PythonImportLoadingFailedError> {
+    ) -> Result<IndexSet<&'context str>, resolver::PythonImportLoadingFailedError> {
         self.load_python_import(python_path.as_ref())
-            .map_err(|_error| resolver::PythonImportLoadingFailedError)
+            .value()
+            .map(|functions| functions.get_function_names().collect())
+            .ok_or(resolver::PythonImportLoadingFailedError)
     }
 }
