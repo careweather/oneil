@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_output as output;
 use oneil_shared::span::Span;
+use oneil_shared::{load_result::LoadResult, partial::MaybePartialResult};
 
 use crate::error::{EvalError, EvalErrors};
 
@@ -15,7 +16,7 @@ pub struct IrLoadError;
 /// Context provided by the runtime for resolving IR, builtins, and units during evaluation.
 pub trait ExternalEvaluationContext {
     /// Returns the IR model at the given path if it has been loaded.
-    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<Result<&ir::Model, IrLoadError>>;
+    fn lookup_ir(&self, path: impl AsRef<Path>) -> Option<LoadResult<&ir::Model, IrLoadError>>;
 
     /// Returns the value of a builtin variable by identifier, if it exists.
     fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&output::Value>;
@@ -60,7 +61,6 @@ pub trait ExternalEvaluationContext {
 /// Represents a model in progress of being evaluated.
 #[derive(Debug, Clone)]
 struct ModelInProgress {
-    had_resolution_errors: bool,
     parameters: IndexMap<String, Result<output::Parameter, Vec<EvalError>>>,
     submodels: IndexMap<String, String>,
     references: IndexMap<String, PathBuf>,
@@ -71,7 +71,6 @@ impl ModelInProgress {
     /// Creates a new empty model.
     pub fn new() -> Self {
         Self {
-            had_resolution_errors: false,
             parameters: IndexMap::new(),
             submodels: IndexMap::new(),
             references: IndexMap::new(),
@@ -112,11 +111,12 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
     /// Consumes the context and returns the accumulated models and errors.
     ///
-    /// Each entry maps a model path to its evaluated [`Model`] and any
-    /// [`ModelError`]s that occurred during evaluation (e.g. from parameters or
-    /// tests that failed).
+    /// Each entry maps a model path to a [`MaybePartialResult`]: either a full
+    /// success with the evaluated [`Model`], or a partial result (the model) and
+    /// any [`EvalErrors`] that occurred during evaluation (e.g. from parameters
+    /// or tests that failed).
     #[must_use]
-    pub fn into_result(self) -> IndexMap<PathBuf, Result<output::Model, EvalErrors>> {
+    pub fn into_result(self) -> IndexMap<PathBuf, MaybePartialResult<output::Model, EvalErrors>> {
         let mut result = IndexMap::new();
 
         // for each model, collect the parameters and tests, and any errors
@@ -157,18 +157,18 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                 tests,
             };
 
-            if parameter_errors.is_empty() && test_errors.is_empty() && !model.had_resolution_errors
-            {
-                result.insert(path, Ok(output_model));
+            if parameter_errors.is_empty() && test_errors.is_empty() {
+                result.insert(path, MaybePartialResult::ok(output_model));
             } else {
                 result.insert(
                     path,
-                    Err(EvalErrors {
-                        partial_result: output_model,
-                        had_resolution_errors: model.had_resolution_errors,
-                        parameters: parameter_errors,
-                        tests: test_errors,
-                    }),
+                    MaybePartialResult::err(
+                        output_model,
+                        EvalErrors {
+                            parameters: parameter_errors,
+                            tests: test_errors,
+                        },
+                    ),
                 );
             }
         }
@@ -181,12 +181,12 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// # Panics
     ///
     /// Panics if the model is not found. This should never be the case.
-    pub fn get_ir(&self, path: impl AsRef<Path>) -> Result<ir::Model, IrLoadError> {
+    pub fn get_ir(&self, path: impl AsRef<Path>) -> LoadResult<ir::Model, IrLoadError> {
         self.external_context
             .lookup_ir(path)
             .expect("model should be found")
             // TODO: figure out how to get rid of this clone
-            .cloned()
+            .map(ir::Model::clone)
     }
 
     /// Looks up the given builtin variable and returns the corresponding value.
@@ -406,19 +406,5 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             .expect("current model should be created when set");
 
         model.tests.push(test_result);
-    }
-
-    /// Marks the active model as having a resolution error.
-    pub(crate) fn mark_ir_load_error_for_active_model(&mut self) {
-        let Some(current_model) = self.active_models.last() else {
-            panic!("current model should be set when marking an IR load error");
-        };
-
-        let model = self
-            .models
-            .get_mut(current_model)
-            .expect("current model should be created when set");
-
-        model.had_resolution_errors = true;
     }
 }

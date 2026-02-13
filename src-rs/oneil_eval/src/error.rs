@@ -8,15 +8,11 @@ use oneil_shared::{
     span::Span,
 };
 
-use oneil_output::{DisplayUnit, Interval, Model, NumberType, Value, ValueType};
+use oneil_output::{DisplayUnit, Interval, NumberType, Value, ValueType};
 
 /// Errors that occurred during evaluation of a model.
 #[derive(Debug, Clone)]
 pub struct EvalErrors {
-    /// Had resolution errors
-    pub had_resolution_errors: bool,
-    /// Partial evaluation result.
-    pub partial_result: Model,
     /// Errors that occurred during evaluation of the parameters.
     pub parameters: IndexMap<String, Vec<EvalError>>,
     /// Errors that occurred during evaluation of the tests.
