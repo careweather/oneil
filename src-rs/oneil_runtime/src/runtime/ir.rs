@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_resolver as resolver;
-use oneil_shared::{LoadResult, error::OneilError};
+use oneil_shared::{error::OneilError, load_result::LoadResult};
 
 use super::Runtime;
 use crate::output::{self, ast};
@@ -24,15 +24,10 @@ impl Runtime {
     pub fn load_ir(&mut self, path: impl AsRef<Path>) -> output::IrLoadResult<'_> {
         let results = resolver::load_model(&path, self);
 
-        let mut failed_python_imports = IndexSet::new();
-
         for (model_path, result) in results {
             let model_path = model_path.as_ref().to_path_buf();
 
-            let (model, model_errors, ast_loaded, model_failed_python_imports) =
-                result.into_parts();
-
-            failed_python_imports.extend(model_failed_python_imports);
+            let (model, model_errors) = result.into_parts();
 
             // If the AST failed to load during resolution, we insert
             // the parse error that caused it to fail
@@ -180,6 +175,7 @@ impl resolver::ExternalResolutionContext for Runtime {
         path: &oneil_ir::ModelPath,
     ) -> LoadResult<&ast::ModelNode, resolver::AstLoadingFailedError> {
         self.load_ast(path)
+            .as_ref()
             .map_err(|_e| resolver::AstLoadingFailedError)
     }
 
