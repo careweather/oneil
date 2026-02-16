@@ -63,16 +63,14 @@ fn get_dependency_value<E: ExternalTreeContext>(
     location: &TreeValueLocation,
     tree_context: &TreeContext<'_, E>,
 ) -> Option<Result<output::DependencyTreeValue, GetValueError>> {
-    let model_path: &Path = &location.model_path;
-    let reference_name = location.reference_name.as_deref();
-    let parameter_name: &str = &location.parameter_name;
-    let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
+    let parameter =
+        tree_context.lookup_parameter_value(&location.model_path, &location.parameter_name)?;
 
     let result = parameter.map(|parameter| {
-        let parameter_name = parameter_name.to_string();
-        let reference_name = reference_name.map(str::to_string);
+        let parameter_name = location.parameter_name.to_string();
+        let reference_name = location.reference_name.clone();
         let parameter_value = parameter.value;
-        let display_info = Some((model_path.to_path_buf(), parameter.expr_span));
+        let display_info = Some((location.model_path.clone(), parameter.expr_span));
 
         output::DependencyTreeValue {
             reference_name,
@@ -174,13 +172,12 @@ fn get_reference_value<E: ExternalTreeContext>(
     location: &TreeValueLocation,
     tree_context: &TreeContext<'_, E>,
 ) -> Option<Result<output::ReferenceTreeValue, GetValueError>> {
-    let model_path: &Path = &location.model_path;
-    let parameter_name: &str = &location.parameter_name;
-    let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
+    let parameter =
+        tree_context.lookup_parameter_value(&location.model_path, &location.parameter_name)?;
 
     let result = parameter.map(|parameter| {
-        let model_path = model_path.to_path_buf();
-        let parameter_name = parameter_name.to_string();
+        let model_path = location.model_path.clone();
+        let parameter_name = location.parameter_name.to_string();
         let parameter_value = parameter.value;
         let display_info = (model_path.clone(), parameter.expr_span);
 
