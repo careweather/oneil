@@ -11,6 +11,7 @@ categories.workspace = true
 readme = "README.md"
 
 [dependencies]
+oneil_analysis = { path = "../oneil_analysis" }
 oneil_ast = { path = "../oneil_ast" }
 oneil_eval = { path = "../oneil_eval" }
 oneil_ir = { path = "../oneil_ir" }

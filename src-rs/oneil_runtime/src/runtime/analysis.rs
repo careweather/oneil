@@ -2,8 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
-use indexmap::{IndexMap, IndexSet};
-use oneil_shared::error::OneilError;
+use indexmap::IndexMap;
+use oneil_shared::partial::MaybePartialResult;
 
 use super::Runtime;
 use crate::output;
@@ -13,13 +13,6 @@ struct TreeValueLocation {
     pub model_path: PathBuf,
     pub reference_name: Option<String>,
     pub parameter_name: String,
-}
-
-#[derive(Debug)]
-enum GetValueResult<T> {
-    ValidTree(T),
-    ParseError(output::error::ParseError),
-    ParameterErrors(Vec<OneilError>),
 }
 
 #[derive(Debug)]
@@ -36,9 +29,19 @@ impl Runtime {
     /// can be done indirectly by calling [`eval_model`](Self::eval_model).
     #[must_use]
     fn get_dependency_graph(&self) -> output::DependencyGraph {
+        todo!();
         let mut dependency_graph = output::DependencyGraph::new();
 
-        for (model_path, model) in self.ir_cache.models_iter_maybe_partial() {
+        let model_ir = self
+            .ir_cache
+            .iter()
+            .filter_map(|(path, result)| {
+                let ir = result.value();
+                ir.map(|ir| (path, ir))
+            })
+            .collect::<IndexMap<_, _>>();
+
+        for (model_path, model) in model_ir {
             for (parameter_name, parameter) in model.get_parameters() {
                 let dependencies = parameter.dependencies();
 
@@ -90,10 +93,12 @@ impl Runtime {
         &mut self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> (
-        Option<output::Tree<output::dependency::DependencyTreeValue>>,
-        IndexMap<PathBuf, output::error::TreeError>,
-    ) {
+    ) -> Option<
+        MaybePartialResult<
+            output::Tree<output::dependency::DependencyTreeValue>,
+            output::error::TreeError,
+        >,
+    > {
         let location = TreeValueLocation {
             model_path: model_path.to_path_buf(),
             reference_name: None,
@@ -130,10 +135,12 @@ impl Runtime {
         &mut self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> (
-        Option<output::Tree<output::dependency::ReferenceTreeValue>>,
-        IndexMap<PathBuf, output::error::TreeError>,
-    ) {
+    ) -> Option<
+        MaybePartialResult<
+            output::Tree<output::dependency::ReferenceTreeValue>,
+            output::error::TreeError,
+        >,
+    > {
         let location = TreeValueLocation {
             model_path: model_path.to_path_buf(),
             reference_name: None,
@@ -164,12 +171,9 @@ impl Runtime {
         location: &TreeValueLocation,
         get_value: GetVal,
         get_children: GetChildren,
-    ) -> (
-        Option<output::Tree<V>>,
-        IndexMap<PathBuf, output::error::TreeError>,
-    )
+    ) -> Option<MaybePartialResult<output::Tree<V>, output::error::TreeError>>
     where
-        GetVal: Fn(&Self, &TreeValueLocation) -> Option<GetValueResult<V>>,
+        GetVal: Fn(&Self, &TreeValueLocation) -> Option<V>,
         GetChildren:
             Fn(&Self, &output::DependencyGraph, &TreeValueLocation) -> GetChildrenResult<V>,
     {
@@ -188,19 +192,16 @@ impl Runtime {
             dependency_graph: &output::DependencyGraph,
             get_value: &GetVal,
             get_children: &GetChildren,
-        ) -> (
-            Option<output::Tree<V>>,
-            IndexMap<PathBuf, output::error::TreeError>,
-        )
+        ) -> Option<output::Tree<Result<V, output::error::TreeError>>>
         where
-            GetVal: Fn(&Runtime, &TreeValueLocation) -> Option<GetValueResult<V>>,
+            GetVal: Fn(&Runtime, &TreeValueLocation) -> Option<V>,
             GetChildren:
                 Fn(&Runtime, &output::DependencyGraph, &TreeValueLocation) -> GetChildrenResult<V>,
         {
             // get the value for the current location
             let Some(value) = get_value(runtime, location) else {
                 // if it doesn't exist, return no tree and no errors
-                return (None, IndexMap::new());
+                return None;
             };
 
             // get the children for the current location
@@ -210,9 +211,9 @@ impl Runtime {
             } = get_children(runtime, dependency_graph, location);
 
             // recurse on the parameter children
-            let (parameter_children, errors): (Vec<_>, Vec<_>) = parameter_children
+            let parameter_children: Vec<_> = parameter_children
                 .into_iter()
-                .map(|location| {
+                .filter_map(|location| {
                     recurse(
                         runtime,
                         &location,
@@ -221,7 +222,7 @@ impl Runtime {
                         get_children,
                     )
                 })
-                .unzip();
+                .collect();
 
             let parameter_children = parameter_children.into_iter().flatten();
             let mut errors = errors.into_iter().fold(
@@ -276,116 +277,6 @@ impl Runtime {
                 }
             }
         }
-    }
-
-    /// Collects errors for all parameters that depend on the given parameter, recursively.
-    ///
-    /// For each parameter that (directly or transitively) depends on the given parameter,
-    /// if that parameter has errors in the evaluation cache, those errors are included
-    /// in the returned map keyed by model path.
-    fn get_dependent_parameter_errors(
-        &self,
-        model_path: &Path,
-        parameter_name: &str,
-        dependency_graph: &output::DependencyGraph,
-    ) -> IndexMap<PathBuf, output::error::TreeError> {
-        let mut visited = IndexSet::new();
-        let mut result = IndexMap::new();
-
-        self.collect_dependent_parameter_errors(
-            dependency_graph,
-            model_path,
-            parameter_name,
-            &mut visited,
-            &mut result,
-        );
-
-        result
-    }
-
-    /// Recursively collects parameter errors for all dependents of the given parameter.
-    fn collect_dependent_parameter_errors(
-        &self,
-        dependency_graph: &output::DependencyGraph,
-        model_path: &Path,
-        parameter_name: &str,
-        visited: &mut IndexSet<(PathBuf, String)>,
-        result: &mut IndexMap<PathBuf, output::error::TreeError>,
-    ) {
-        let key = (model_path.to_path_buf(), parameter_name.to_string());
-
-        if visited.contains(&key) {
-            return;
-        }
-        visited.insert(key);
-
-        let Some(deps) = dependency_graph.dependents(model_path, parameter_name) else {
-            return;
-        };
-
-        for param_dep in &deps.parameter_dependencies {
-            let dep_model_path = model_path.to_path_buf();
-            let dep_param_name = param_dep.parameter_name.clone();
-
-            if let Some(errors) = self.get_cached_parameter_errors(&dep_model_path, &dep_param_name)
-            {
-                result
-                    .entry(dep_model_path.clone())
-                    .or_default()
-                    .insert_parameter_errors(dep_param_name.clone(), errors);
-            }
-
-            self.collect_dependent_parameter_errors(
-                dependency_graph,
-                &dep_model_path,
-                &dep_param_name,
-                visited,
-                result,
-            );
-        }
-
-        for ext_dep in &deps.external_dependencies {
-            let dep_model_path = ext_dep.model_path.clone();
-            let dep_param_name = ext_dep.parameter_name.clone();
-
-            if let Some(errors) = self.get_cached_parameter_errors(&dep_model_path, &dep_param_name)
-            {
-                result
-                    .entry(dep_model_path.clone())
-                    .or_default()
-                    .insert_parameter_errors(dep_param_name.clone(), errors);
-            }
-
-            self.collect_dependent_parameter_errors(
-                dependency_graph,
-                &dep_model_path,
-                &dep_param_name,
-                visited,
-                result,
-            );
-        }
-    }
-
-    /// Returns the cached parameter errors for a parameter, if the model has errors and the parameter is in the error map.
-    fn get_cached_parameter_errors(
-        &self,
-        model_path: &Path,
-        parameter_name: &str,
-    ) -> Option<Vec<OneilError>> {
-        let eval_result = self.eval_cache.get_entry(model_path)?;
-        let parameter_errors = match eval_result {
-            Ok(_) => return None,
-            Err(output::error::EvalError::Resolution(resolution_error)) => match resolution_error {
-                output::error::ResolutionError::ResolutionErrors {
-                    parameter_errors, ..
-                } => parameter_errors,
-                output::error::ResolutionError::Parse(_) => return None,
-            },
-            Err(output::error::EvalError::EvalErrors {
-                parameter_errors, ..
-            }) => parameter_errors,
-        };
-        parameter_errors.get(parameter_name).cloned()
     }
 
     fn get_dependency_tree_children(
@@ -488,38 +379,10 @@ impl Runtime {
         model_path: &Path,
         reference_name: Option<&str>,
         parameter_name: &str,
-    ) -> Option<GetValueResult<output::dependency::DependencyTreeValue>> {
-        let eval_result = self.eval_cache.get_entry(model_path)?;
-
-        // get the parameter from the model if it exists,
-        // or return parameter errors if they exist
-        let parameter = match eval_result {
-            Ok(model) => model.parameters.get(parameter_name)?,
-            Err(output::error::EvalError::Resolution(resolution_error)) => match resolution_error {
-                output::error::ResolutionError::ResolutionErrors {
-                    parameter_errors, ..
-                } => {
-                    return parameter_errors
-                        .get(parameter_name)
-                        .map(|errors| GetValueResult::ParameterErrors(errors.clone()));
-                }
-                output::error::ResolutionError::Parse(parse_error) => {
-                    return Some(GetValueResult::ParseError(parse_error.clone()));
-                }
-            },
-            // it may be possible to recover the parameter from the partial result
-            Err(output::error::EvalError::EvalErrors {
-                partial_result,
-                parameter_errors,
-                ..
-            }) => {
-                if let Some(errors) = parameter_errors.get(parameter_name) {
-                    return Some(GetValueResult::ParameterErrors(errors.clone()));
-                }
-
-                partial_result.parameters.get(parameter_name)?
-            }
-        };
+    ) -> Option<output::dependency::DependencyTreeValue> {
+        let model_result = self.eval_cache.get_entry(model_path)?;
+        let model = model_result.value()?;
+        let parameter = model.parameters.get(parameter_name)?;
 
         let reference_name = reference_name.map(str::to_string);
         let parameter_name = parameter_name.to_string();
@@ -536,45 +399,17 @@ impl Runtime {
             display_info,
         };
 
-        Some(GetValueResult::ValidTree(tree_value))
+        Some(tree_value)
     }
 
     fn get_reference_tree_value(
         &self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> Option<GetValueResult<output::dependency::ReferenceTreeValue>> {
-        let eval_result = self.eval_cache.get_entry(model_path)?;
-
-        // get the parameter from the model if it exists,
-        // or return parameter errors if they exist
-        let parameter = match eval_result {
-            Ok(model) => model.parameters.get(parameter_name)?,
-            Err(output::error::EvalError::Resolution(resolution_error)) => match resolution_error {
-                output::error::ResolutionError::ResolutionErrors {
-                    parameter_errors, ..
-                } => {
-                    return parameter_errors
-                        .get(parameter_name)
-                        .map(|errors| GetValueResult::ParameterErrors(errors.clone()));
-                }
-                output::error::ResolutionError::Parse(parse_error) => {
-                    return Some(GetValueResult::ParseError(parse_error.clone()));
-                }
-            },
-            // it may be possible to recover the parameter from the partial result
-            Err(output::error::EvalError::EvalErrors {
-                partial_result,
-                parameter_errors,
-                ..
-            }) => {
-                if let Some(errors) = parameter_errors.get(parameter_name) {
-                    return Some(GetValueResult::ParameterErrors(errors.clone()));
-                }
-
-                partial_result.parameters.get(parameter_name)?
-            }
-        };
+    ) -> Option<output::dependency::ReferenceTreeValue> {
+        let model_result = self.eval_cache.get_entry(model_path)?;
+        let model = model_result.value()?;
+        let parameter = model.parameters.get(parameter_name)?;
 
         let model_path = model_path.to_path_buf();
 
@@ -592,6 +427,6 @@ impl Runtime {
             display_info,
         };
 
-        Some(GetValueResult::ValidTree(tree_value))
+        Some(tree_value)
     }
 }
