@@ -1,4 +1,4 @@
-//! Error type for source loading failures.
+//! Error types for runtime output operations.
 
 use std::path::PathBuf;
 
@@ -14,6 +14,7 @@ pub struct SourceError {
 
 impl SourceError {
     /// Creates a new source error from a path and I/O error.
+    #[must_use]
     pub const fn new(path: PathBuf, error: IoError) -> Self {
         Self { path, error }
     }

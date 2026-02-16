@@ -6,4 +6,5 @@ mod dep_graph;
 mod dependency;
 pub mod output;
 
+pub use context::ExternalTreeContext;
 pub use dependency::{get_dependency_tree, get_reference_tree};

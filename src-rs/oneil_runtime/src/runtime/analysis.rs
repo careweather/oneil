@@ -5,11 +5,11 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use oneil_analysis as analysis;
+use oneil_analysis::{self as analysis, output::error::TreeErrors};
 use oneil_ir as ir;
 
 use super::Runtime;
-use crate::output;
+use crate::output::tree;
 
 impl Runtime {
     /// Gets the dependency tree for a specific parameter.
@@ -24,10 +24,7 @@ impl Runtime {
         &mut self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> (
-        Option<output::Tree<output::DependencyTreeValue>>,
-        output::TreeErrors,
-    ) {
+    ) -> (Option<tree::Tree<tree::DependencyTreeValue>>, TreeErrors) {
         let _ = self.eval_model(model_path);
         analysis::get_dependency_tree(model_path, parameter_name, self)
     }
@@ -44,10 +41,7 @@ impl Runtime {
         &mut self,
         model_path: &Path,
         parameter_name: &str,
-    ) -> (
-        Option<output::Tree<output::ReferenceTreeValue>>,
-        output::TreeErrors,
-    ) {
+    ) -> (Option<tree::Tree<tree::ReferenceTreeValue>>, TreeErrors) {
         let _ = self.eval_model(model_path);
         analysis::get_reference_tree(self, model_path, parameter_name)
     }
