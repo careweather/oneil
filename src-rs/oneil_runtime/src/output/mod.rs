@@ -1,13 +1,9 @@
 //! Output types for the Oneil runtime.
 
-pub mod dependency;
 pub mod error;
 pub mod reference;
-mod tree;
 
-pub use dependency::DependencyGraph;
-pub use tree::Tree;
-
+pub use oneil_analysis::output;
 pub use oneil_ast as ast;
 pub use oneil_ir as ir;
 pub use oneil_output::{
@@ -15,3 +11,7 @@ pub use oneil_output::{
     ParameterDependency, PrintLevel, Test, TestResult, Unit, Value,
 };
 pub use oneil_shared::{error::OneilError, span::Span};
+
+pub mod tree {
+    pub use oneil_analysis::output::{DependencyTreeValue, ReferenceTreeValue, Tree};
+}
