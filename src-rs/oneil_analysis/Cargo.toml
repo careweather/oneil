@@ -1,0 +1,20 @@
+[package]
+name = "oneil_analysis"
+description = "Semantic analysis for Oneil"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+oneil_ir = { path = "../oneil_ir" }
+oneil_output = { path = "../oneil_output" }
+oneil_shared = { path = "../oneil_shared" }
+indexmap = { workspace = true }
+
+[lints]
+workspace = true

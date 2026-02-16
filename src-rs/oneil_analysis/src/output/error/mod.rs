@@ -1,10 +1,6 @@
 //! Error types for runtime output operations.
 
-mod source;
-
 use std::path::PathBuf;
-
-pub use source::SourceError;
 
 pub struct TreeError {
     model_path: PathBuf,
