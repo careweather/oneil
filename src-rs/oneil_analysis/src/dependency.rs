@@ -2,8 +2,6 @@
 
 use std::path::{Path, PathBuf};
 
-use indexmap::IndexMap;
-use oneil_ir as ir;
 use oneil_output::DependencySet;
 
 use crate::{
@@ -46,29 +44,6 @@ pub fn get_dependency_tree<E: ExternalTreeContext>(
         parameter_name: parameter_name.to_string(),
     };
 
-    let get_dependency_value = |location: &TreeValueLocation, tree_context: &TreeContext<'_, E>| {
-        let model_path: &Path = &location.model_path;
-        let reference_name = location.reference_name.as_deref();
-        let parameter_name: &str = &location.parameter_name;
-        let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
-
-        let result = parameter.map(|parameter| {
-            let parameter_name = parameter_name.to_string();
-            let reference_name = reference_name.map(str::to_string);
-            let parameter_value = parameter.value;
-            let display_info = Some((model_path.to_path_buf(), parameter.expr_span));
-
-            output::DependencyTreeValue {
-                reference_name,
-                parameter_name,
-                parameter_value,
-                display_info,
-            }
-        });
-
-        Some(result)
-    };
-
     get_parameter_tree(
         &location,
         external_context,
@@ -82,6 +57,87 @@ pub fn get_dependency_tree<E: ExternalTreeContext>(
             )
         },
     )
+}
+
+fn get_dependency_value<E: ExternalTreeContext>(
+    location: &TreeValueLocation,
+    tree_context: &TreeContext<'_, E>,
+) -> Option<Result<output::DependencyTreeValue, GetValueError>> {
+    let model_path: &Path = &location.model_path;
+    let reference_name = location.reference_name.as_deref();
+    let parameter_name: &str = &location.parameter_name;
+    let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
+
+    let result = parameter.map(|parameter| {
+        let parameter_name = parameter_name.to_string();
+        let reference_name = reference_name.map(str::to_string);
+        let parameter_value = parameter.value;
+        let display_info = Some((model_path.to_path_buf(), parameter.expr_span));
+
+        output::DependencyTreeValue {
+            reference_name,
+            parameter_name,
+            parameter_value,
+            display_info,
+        }
+    });
+
+    Some(result)
+}
+
+fn get_dependency_tree_children(
+    model_path: &Path,
+    reference_name: Option<&str>,
+    parameter_name: &str,
+    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
+) -> GetChildrenResult<output::DependencyTreeValue> {
+    let DependencySet {
+        builtin_dependencies,
+        parameter_dependencies,
+        external_dependencies,
+    } = tree_context.dependents(model_path, parameter_name);
+
+    let builtin_children = builtin_dependencies
+        .into_iter()
+        .map(|dep| {
+            let parameter_value = tree_context
+                .lookup_builtin_variable(&dep.ident)
+                .cloned()
+                .expect("the builtin value should be defined");
+
+            let tree_value = output::DependencyTreeValue {
+                reference_name: None,
+                parameter_name: dep.ident,
+                parameter_value,
+                display_info: None,
+            };
+
+            output::Tree::new(tree_value, Vec::new())
+        })
+        .collect();
+
+    let parameter_args = parameter_dependencies
+        .into_iter()
+        .map(|dep| TreeValueLocation {
+            model_path: model_path.to_path_buf(),
+            reference_name: reference_name.map(String::from),
+            parameter_name: dep.parameter_name,
+        });
+
+    let external_args = external_dependencies
+        .into_iter()
+        .map(|dep| TreeValueLocation {
+            model_path: dep.model_path.clone(),
+            reference_name: Some(dep.reference_name.clone()),
+            parameter_name: dep.parameter_name,
+        });
+
+    let parameter_children = parameter_args.chain(external_args).collect();
+
+    GetChildrenResult {
+        builtin_children,
+        parameter_children,
+    }
 }
 
 /// Gets the reference tree for a specific parameter.
@@ -100,28 +156,6 @@ pub fn get_reference_tree<E: ExternalTreeContext>(
         parameter_name: parameter_name.to_string(),
     };
 
-    let get_reference_value = |location: &TreeValueLocation, tree_context: &TreeContext<'_, E>| {
-        let model_path: &Path = &location.model_path;
-        let parameter_name: &str = &location.parameter_name;
-        let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
-
-        let result = parameter.map(|parameter| {
-            let model_path = model_path.to_path_buf();
-            let parameter_name = parameter_name.to_string();
-            let parameter_value = parameter.value;
-            let display_info = (model_path.clone(), parameter.expr_span);
-
-            output::ReferenceTreeValue {
-                model_path,
-                parameter_name,
-                parameter_value,
-                display_info,
-            }
-        });
-
-        Some(result)
-    };
-
     get_parameter_tree(
         &location,
         external_context,
@@ -134,6 +168,65 @@ pub fn get_reference_tree<E: ExternalTreeContext>(
             )
         },
     )
+}
+
+fn get_reference_value<E: ExternalTreeContext>(
+    location: &TreeValueLocation,
+    tree_context: &TreeContext<'_, E>,
+) -> Option<Result<output::ReferenceTreeValue, GetValueError>> {
+    let model_path: &Path = &location.model_path;
+    let parameter_name: &str = &location.parameter_name;
+    let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
+
+    let result = parameter.map(|parameter| {
+        let model_path = model_path.to_path_buf();
+        let parameter_name = parameter_name.to_string();
+        let parameter_value = parameter.value;
+        let display_info = (model_path.clone(), parameter.expr_span);
+
+        output::ReferenceTreeValue {
+            model_path,
+            parameter_name,
+            parameter_value,
+            display_info,
+        }
+    });
+
+    Some(result)
+}
+
+fn get_reference_tree_children(
+    model_path: &Path,
+    parameter_name: &str,
+    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
+) -> GetChildrenResult<output::ReferenceTreeValue> {
+    let deps = tree_context.references(model_path, parameter_name);
+
+    let parameter_args = deps
+        .parameter_references
+        .iter()
+        .map(|dep| TreeValueLocation {
+            model_path: model_path.to_path_buf(),
+            reference_name: None,
+            parameter_name: dep.parameter_name.clone(),
+        });
+
+    let external_args = deps
+        .external_references
+        .iter()
+        .map(|dep| TreeValueLocation {
+            model_path: dep.model_path.clone(),
+            reference_name: None,
+            parameter_name: dep.parameter_name.clone(),
+        });
+
+    let recurse_args = parameter_args.chain(external_args).collect();
+
+    GetChildrenResult {
+        // no builtins reference other parameters
+        builtin_children: Vec::new(),
+        parameter_children: recurse_args,
+    }
 }
 
 /// Unified implementation for dependency and reference trees.
@@ -220,95 +313,6 @@ where
             .collect();
 
         (Some(output::Tree::new(value, children)), tree_errors)
-    }
-}
-
-fn get_dependency_tree_children(
-    model_path: &Path,
-    reference_name: Option<&str>,
-    parameter_name: &str,
-    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
-) -> GetChildrenResult<output::DependencyTreeValue> {
-    let DependencySet {
-        builtin_dependencies,
-        parameter_dependencies,
-        external_dependencies,
-    } = tree_context.dependents(model_path, parameter_name);
-
-    let builtin_children = builtin_dependencies
-        .into_iter()
-        .map(|dep| {
-            let parameter_value = tree_context
-                .lookup_builtin_variable(&dep.ident)
-                .cloned()
-                .expect("the builtin value should be defined");
-
-            let tree_value = output::DependencyTreeValue {
-                reference_name: None,
-                parameter_name: dep.ident,
-                parameter_value,
-                display_info: None,
-            };
-
-            output::Tree::new(tree_value, Vec::new())
-        })
-        .collect();
-
-    let parameter_args = parameter_dependencies
-        .into_iter()
-        .map(|dep| TreeValueLocation {
-            model_path: model_path.to_path_buf(),
-            reference_name: reference_name.map(String::from),
-            parameter_name: dep.parameter_name,
-        });
-
-    let external_args = external_dependencies
-        .into_iter()
-        .map(|dep| TreeValueLocation {
-            model_path: dep.model_path.clone(),
-            reference_name: Some(dep.reference_name.clone()),
-            parameter_name: dep.parameter_name,
-        });
-
-    let parameter_children = parameter_args.chain(external_args).collect();
-
-    GetChildrenResult {
-        builtin_children,
-        parameter_children,
-    }
-}
-
-fn get_reference_tree_children(
-    model_path: &Path,
-    parameter_name: &str,
-    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
-) -> GetChildrenResult<output::ReferenceTreeValue> {
-    let deps = tree_context.references(model_path, parameter_name);
-
-    let parameter_args = deps
-        .parameter_references
-        .iter()
-        .map(|dep| TreeValueLocation {
-            model_path: model_path.to_path_buf(),
-            reference_name: None,
-            parameter_name: dep.parameter_name.clone(),
-        });
-
-    let external_args = deps
-        .external_references
-        .iter()
-        .map(|dep| TreeValueLocation {
-            model_path: dep.model_path.clone(),
-            reference_name: None,
-            parameter_name: dep.parameter_name.clone(),
-        });
-
-    let recurse_args = parameter_args.chain(external_args).collect();
-
-    GetChildrenResult {
-        // no builtins reference other parameters
-        builtin_children: Vec::new(),
-        parameter_children: recurse_args,
     }
 }
 
