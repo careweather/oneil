@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use oneil_output::DependencySet;
 
 use crate::{
-    context::{ExternalTreeContext, TreeContext},
+    context::{ExternalAnalysisContext, TreeContext},
     output::{
         self,
         error::{GetValueError, TreeErrors},
@@ -30,7 +30,7 @@ struct GetChildrenResult<T> {
 /// The tree shows all parameters, builtin values, and external dependencies
 /// that the specified parameter depends on, recursively.
 #[must_use]
-pub fn get_dependency_tree<E: ExternalTreeContext>(
+pub fn get_dependency_tree<E: ExternalAnalysisContext>(
     model_path: &Path,
     parameter_name: &str,
     external_context: &mut E,
@@ -59,7 +59,7 @@ pub fn get_dependency_tree<E: ExternalTreeContext>(
     )
 }
 
-fn get_dependency_value<E: ExternalTreeContext>(
+fn get_dependency_value<E: ExternalAnalysisContext>(
     location: &TreeValueLocation,
     tree_context: &TreeContext<'_, E>,
 ) -> Option<Result<output::DependencyTreeValue, GetValueError>> {
@@ -87,7 +87,7 @@ fn get_dependency_tree_children(
     model_path: &Path,
     reference_name: Option<&str>,
     parameter_name: &str,
-    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
+    tree_context: &TreeContext<'_, impl ExternalAnalysisContext>,
 ) -> GetChildrenResult<output::DependencyTreeValue> {
     let DependencySet {
         builtin_dependencies,
@@ -143,7 +143,7 @@ fn get_dependency_tree_children(
 /// The tree shows all parameters that depend on the specified parameter, recursively.
 /// This is the inverse of the dependency tree.
 #[must_use]
-pub fn get_reference_tree<E: ExternalTreeContext>(
+pub fn get_reference_tree<E: ExternalAnalysisContext>(
     external_context: &mut E,
     model_path: &Path,
     parameter_name: &str,
@@ -168,7 +168,7 @@ pub fn get_reference_tree<E: ExternalTreeContext>(
     )
 }
 
-fn get_reference_value<E: ExternalTreeContext>(
+fn get_reference_value<E: ExternalAnalysisContext>(
     location: &TreeValueLocation,
     tree_context: &TreeContext<'_, E>,
 ) -> Option<Result<output::ReferenceTreeValue, GetValueError>> {
@@ -195,7 +195,7 @@ fn get_reference_value<E: ExternalTreeContext>(
 fn get_reference_tree_children(
     model_path: &Path,
     parameter_name: &str,
-    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
+    tree_context: &TreeContext<'_, impl ExternalAnalysisContext>,
 ) -> GetChildrenResult<output::ReferenceTreeValue> {
     let deps = tree_context.references(model_path, parameter_name);
 
@@ -230,7 +230,7 @@ fn get_reference_tree_children(
 ///
 /// Recursively builds a tree of parameter values, using `get_value` to resolve
 /// each node and `get_children` to determine the values for the children.
-fn get_parameter_tree<V: std::fmt::Debug, E: ExternalTreeContext, GetVal, GetChildren>(
+fn get_parameter_tree<V: std::fmt::Debug, E: ExternalAnalysisContext, GetVal, GetChildren>(
     location: &TreeValueLocation,
     external_context: &mut E,
     get_value: GetVal,
@@ -250,7 +250,7 @@ where
         clippy::items_after_statements,
         reason = "this is an internal recursive function, we keep it here for clarity"
     )]
-    fn recurse<V: std::fmt::Debug, E: ExternalTreeContext, GetVal, GetChildren>(
+    fn recurse<V: std::fmt::Debug, E: ExternalAnalysisContext, GetVal, GetChildren>(
         location: &TreeValueLocation,
         tree_context: &TreeContext<'_, E>,
         get_value: &GetVal,
@@ -319,7 +319,7 @@ where
 /// have been populated by a prior call to [`Runtime::load_ir`]. This
 /// can be done indirectly by calling [`Runtime::eval_model`].
 #[must_use]
-fn get_dependency_graph<E: ExternalTreeContext>(
+fn get_dependency_graph<E: ExternalAnalysisContext>(
     external_context: &E,
 ) -> crate::dep_graph::DependencyGraph {
     let mut dependency_graph = crate::dep_graph::DependencyGraph::new();
