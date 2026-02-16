@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
+use oneil_output::DependencySet;
 
 use crate::{
     context::{ExternalTreeContext, TreeContext},
@@ -31,10 +32,10 @@ struct GetChildrenResult<T> {
 /// The tree shows all parameters, builtin values, and external dependencies
 /// that the specified parameter depends on, recursively.
 #[must_use]
-pub fn get_dependency_tree(
-    model_ir: &IndexMap<PathBuf, ir::Model>,
+pub fn get_dependency_tree<E: ExternalTreeContext>(
     model_path: &Path,
     parameter_name: &str,
+    external_context: &mut E,
 ) -> (
     Option<output::Tree<output::DependencyTreeValue>>,
     TreeErrors,
@@ -45,23 +46,39 @@ pub fn get_dependency_tree(
         parameter_name: parameter_name.to_string(),
     };
 
+    let get_dependency_value = |location: &TreeValueLocation, tree_context: &TreeContext<'_, E>| {
+        let model_path: &Path = &location.model_path;
+        let reference_name = location.reference_name.as_deref();
+        let parameter_name: &str = &location.parameter_name;
+        let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
+
+        let result = parameter.map(|parameter| {
+            let parameter_name = parameter_name.to_string();
+            let reference_name = reference_name.map(str::to_string);
+            let parameter_value = parameter.value;
+            let display_info = Some((model_path.to_path_buf(), parameter.expr_span));
+
+            output::DependencyTreeValue {
+                reference_name,
+                parameter_name,
+                parameter_value,
+                display_info,
+            }
+        });
+
+        Some(result)
+    };
+
     get_parameter_tree(
         &location,
-        |r, location| {
-            get_dependency_tree_value(
-                r,
-                &location.model_path,
-                location.reference_name.as_deref(),
-                &location.parameter_name,
-            )
-        },
-        |r, dependency_graph, location| {
+        external_context,
+        get_dependency_value,
+        |location, tree_context| {
             get_dependency_tree_children(
-                r,
-                dependency_graph,
                 &location.model_path,
                 location.reference_name.as_deref(),
                 &location.parameter_name,
+                tree_context,
             )
         },
     )
@@ -72,7 +89,8 @@ pub fn get_dependency_tree(
 /// The tree shows all parameters that depend on the specified parameter, recursively.
 /// This is the inverse of the dependency tree.
 #[must_use]
-pub fn get_reference_tree(
+pub fn get_reference_tree<E: ExternalTreeContext>(
+    external_context: &mut E,
     model_path: &Path,
     parameter_name: &str,
 ) -> (Option<output::Tree<output::ReferenceTreeValue>>, TreeErrors) {
@@ -82,15 +100,37 @@ pub fn get_reference_tree(
         parameter_name: parameter_name.to_string(),
     };
 
+    let get_reference_value = |location: &TreeValueLocation, tree_context: &TreeContext<'_, E>| {
+        let model_path: &Path = &location.model_path;
+        let parameter_name: &str = &location.parameter_name;
+        let parameter = tree_context.lookup_parameter_value(model_path, parameter_name)?;
+
+        let result = parameter.map(|parameter| {
+            let model_path = model_path.to_path_buf();
+            let parameter_name = parameter_name.to_string();
+            let parameter_value = parameter.value;
+            let display_info = (model_path.clone(), parameter.expr_span);
+
+            output::ReferenceTreeValue {
+                model_path,
+                parameter_name,
+                parameter_value,
+                display_info,
+            }
+        });
+
+        Some(result)
+    };
+
     get_parameter_tree(
-        model_ir,
         &location,
-        |r, location| get_reference_tree_value(r, &location.model_path, &location.parameter_name),
-        |_runtime, dependency_graph, location| {
+        external_context,
+        get_reference_value,
+        |location, tree_context| {
             get_reference_tree_children(
-                dependency_graph,
                 &location.model_path,
                 &location.parameter_name,
+                tree_context,
             )
         },
     )
@@ -100,43 +140,35 @@ pub fn get_reference_tree(
 ///
 /// Recursively builds a tree of parameter values, using `get_value` to resolve
 /// each node and `get_children` to determine the values for the children.
-fn get_parameter_tree<V: std::fmt::Debug, GetVal, GetChildren>(
+fn get_parameter_tree<V: std::fmt::Debug, E: ExternalTreeContext, GetVal, GetChildren>(
     location: &TreeValueLocation,
-    tree_context: &TreeContext,
+    external_context: &mut E,
     get_value: GetVal,
     get_children: GetChildren,
 ) -> (Option<output::Tree<V>>, TreeErrors)
 where
-    GetVal: Fn(&TreeValueLocation, &TreeContext) -> Option<V>,
-    GetChildren: Fn(
-        &crate::dep_graph::DependencyGraph,
-        &TreeValueLocation,
-        &TreeContext,
-    ) -> GetChildrenResult<V>,
+    GetVal: Fn(&TreeValueLocation, &TreeContext<'_, E>) -> Option<Result<V, GetValueError>>,
+    GetChildren: Fn(&TreeValueLocation, &TreeContext<'_, E>) -> GetChildrenResult<V>,
 {
-    let dependency_graph = get_dependency_graph(tree_context);
+    let dependency_graph = get_dependency_graph(external_context);
 
-    return recurse(
-        runtime,
-        location,
-        &dependency_graph,
-        &get_value,
-        &get_children,
-    );
+    let tree_context = TreeContext::new(external_context, dependency_graph);
+
+    return recurse(location, &tree_context, &get_value, &get_children);
 
     #[expect(
         clippy::items_after_statements,
         reason = "this is an internal recursive function, we keep it here for clarity"
     )]
-    fn recurse<V: std::fmt::Debug, GetVal, GetChildren>(
+    fn recurse<V: std::fmt::Debug, E: ExternalTreeContext, GetVal, GetChildren>(
         location: &TreeValueLocation,
-        tree_context: &TreeContext,
+        tree_context: &TreeContext<'_, E>,
         get_value: &GetVal,
         get_children: &GetChildren,
     ) -> (Option<output::Tree<V>>, TreeErrors)
     where
-        GetVal: Fn(&TreeValueLocation, &TreeContext) -> Option<Result<V, GetValueError>>,
-        GetChildren: Fn(&TreeValueLocation, &TreeContext) -> GetChildrenResult<V>,
+        GetVal: Fn(&TreeValueLocation, &TreeContext<'_, E>) -> Option<Result<V, GetValueError>>,
+        GetChildren: Fn(&TreeValueLocation, &TreeContext<'_, E>) -> GetChildrenResult<V>,
     {
         // get the value for the current location
         let Some(value) = get_value(location, tree_context) else {
@@ -195,25 +227,25 @@ fn get_dependency_tree_children(
     model_path: &Path,
     reference_name: Option<&str>,
     parameter_name: &str,
-    tree_context: &TreeContext,
+    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
 ) -> GetChildrenResult<output::DependencyTreeValue> {
-    let deps = dependency_graph
-        .dependents(model_path, parameter_name)
-        .cloned()
-        .unwrap_or_default();
+    let DependencySet {
+        builtin_dependencies,
+        parameter_dependencies,
+        external_dependencies,
+    } = tree_context.dependents(model_path, parameter_name);
 
-    let builtin_children = deps
-        .builtin_dependencies
-        .iter()
+    let builtin_children = builtin_dependencies
+        .into_iter()
         .map(|dep| {
-            let parameter_value = runtime
-                .lookup_builtin_variable(&oneil_ir::Identifier::new(dep.ident.clone()))
+            let parameter_value = tree_context
+                .lookup_builtin_variable(&dep.ident)
                 .cloned()
                 .expect("the builtin value should be defined");
 
-            let tree_value = output::dependency::DependencyTreeValue {
+            let tree_value = output::DependencyTreeValue {
                 reference_name: None,
-                parameter_name: dep.ident.clone(),
+                parameter_name: dep.ident,
                 parameter_value,
                 display_info: None,
             };
@@ -222,22 +254,20 @@ fn get_dependency_tree_children(
         })
         .collect();
 
-    let parameter_args = deps
-        .parameter_dependencies
-        .iter()
+    let parameter_args = parameter_dependencies
+        .into_iter()
         .map(|dep| TreeValueLocation {
             model_path: model_path.to_path_buf(),
             reference_name: reference_name.map(String::from),
-            parameter_name: dep.parameter_name.clone(),
+            parameter_name: dep.parameter_name,
         });
 
-    let external_args = deps
-        .external_dependencies
-        .iter()
+    let external_args = external_dependencies
+        .into_iter()
         .map(|dep| TreeValueLocation {
             model_path: dep.model_path.clone(),
             reference_name: Some(dep.reference_name.clone()),
-            parameter_name: dep.parameter_name.clone(),
+            parameter_name: dep.parameter_name,
         });
 
     let parameter_children = parameter_args.chain(external_args).collect();
@@ -249,14 +279,11 @@ fn get_dependency_tree_children(
 }
 
 fn get_reference_tree_children(
-    dependency_graph: &crate::dep_graph::DependencyGraph,
     model_path: &Path,
     parameter_name: &str,
-) -> GetChildrenResult<output::dependency::ReferenceTreeValue> {
-    let deps = dependency_graph
-        .references(model_path, parameter_name)
-        .cloned()
-        .unwrap_or_default();
+    tree_context: &TreeContext<'_, impl ExternalTreeContext>,
+) -> GetChildrenResult<output::ReferenceTreeValue> {
+    let deps = tree_context.references(model_path, parameter_name);
 
     let parameter_args = deps
         .parameter_references
@@ -285,60 +312,6 @@ fn get_reference_tree_children(
     }
 }
 
-fn get_dependency_tree_value(
-    model_path: &Path,
-    reference_name: Option<&str>,
-    parameter_name: &str,
-) -> Option<output::dependency::DependencyTreeValue> {
-    let model_result = runtime.eval_cache.get_entry(model_path)?;
-    let model = model_result.value()?;
-    let parameter = model.parameters.get(parameter_name)?;
-
-    let reference_name = reference_name.map(str::to_string);
-    let parameter_name = parameter_name.to_string();
-
-    let parameter_value = parameter.value.clone();
-
-    let span = parameter.expr_span;
-    let display_info = Some((model_path.to_path_buf(), span));
-
-    let tree_value = output::dependency::DependencyTreeValue {
-        reference_name,
-        parameter_name,
-        parameter_value,
-        display_info,
-    };
-
-    Some(tree_value)
-}
-
-fn get_reference_tree_value(
-    model_path: &Path,
-    parameter_name: &str,
-) -> Option<output::dependency::ReferenceTreeValue> {
-    let model_result = runtime.eval_cache.get_entry(model_path)?;
-    let model = model_result.value()?;
-    let parameter = model.parameters.get(parameter_name)?;
-
-    let model_path = model_path.to_path_buf();
-
-    let parameter_name = parameter_name.to_string();
-
-    let parameter_value = parameter.value.clone();
-
-    let span = parameter.expr_span;
-    let display_info = (model_path.clone(), span);
-
-    let tree_value = output::dependency::ReferenceTreeValue {
-        model_path,
-        parameter_name,
-        parameter_value,
-        display_info,
-    };
-
-    Some(tree_value)
-}
-
 /// Gets the dependency graph for all models in the evaluation cache.
 ///
 /// The graph is built from the cached evaluation results. The cache must
@@ -346,11 +319,11 @@ fn get_reference_tree_value(
 /// can be done indirectly by calling [`Runtime::eval_model`].
 #[must_use]
 fn get_dependency_graph<E: ExternalTreeContext>(
-    tree_context: &TreeContext<'_, E>,
+    external_context: &E,
 ) -> crate::dep_graph::DependencyGraph {
     let mut dependency_graph = crate::dep_graph::DependencyGraph::new();
 
-    for (model_path, model) in tree_context.get_all_model_ir() {
+    for (model_path, model) in external_context.get_all_model_ir() {
         for (parameter_name, parameter) in model.get_parameters() {
             let dependencies = parameter.dependencies();
 
