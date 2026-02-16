@@ -10,7 +10,7 @@ use crate::dep_graph::{DependencyGraph, ReferenceSet};
 use crate::output::error::GetValueError;
 
 /// External context provided to tree operations.
-pub trait ExternalTreeContext {
+pub trait ExternalAnalysisContext {
     /// Returns the full map of model paths to their IR models.
     fn get_all_model_ir(&self) -> IndexMap<&PathBuf, &ir::Model>;
 
@@ -28,15 +28,15 @@ pub trait ExternalTreeContext {
     ) -> Option<Result<Parameter, GetValueError>>;
 }
 
-/// Context for tree operations that holds a mutable reference to an [`ExternalTreeContext`].
-pub struct TreeContext<'external, E: ExternalTreeContext> {
+/// Context for tree operations that holds a mutable reference to an [`ExternalAnalysisContext`].
+pub struct TreeContext<'external, E: ExternalAnalysisContext> {
     /// Mutable reference to the external tree context.
     external: &'external mut E,
     /// The dependency graph for the tree.
     dependency_graph: DependencyGraph,
 }
 
-impl<'external, E: ExternalTreeContext> TreeContext<'external, E> {
+impl<'external, E: ExternalAnalysisContext> TreeContext<'external, E> {
     /// Creates a new tree context with the given mutable reference to an external context.
     #[must_use]
     pub const fn new(external: &'external mut E, dependency_graph: DependencyGraph) -> Self {

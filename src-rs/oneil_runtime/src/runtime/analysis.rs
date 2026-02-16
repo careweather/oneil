@@ -47,7 +47,7 @@ impl Runtime {
     }
 }
 
-impl analysis::ExternalTreeContext for Runtime {
+impl analysis::ExternalAnalysisContext for Runtime {
     fn get_all_model_ir(&self) -> IndexMap<&PathBuf, &ir::Model> {
         self.ir_cache
             .iter()
