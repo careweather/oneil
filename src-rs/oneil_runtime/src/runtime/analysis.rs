@@ -13,7 +13,7 @@ use oneil_ir as ir;
 use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
-use crate::output::tree;
+use crate::output::{error::RuntimeErrors, tree};
 
 impl Runtime {
     /// Gets the dependency tree for a specific parameter.
@@ -25,6 +25,24 @@ impl Runtime {
     /// built from cached results.
     #[must_use]
     pub fn get_dependency_tree(
+        &mut self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> (Option<tree::Tree<tree::DependencyTreeValue>>, RuntimeErrors) {
+        let (tree, tree_errors) = self.get_dependency_tree_internal(model_path, parameter_name);
+
+        let errors = tree_errors
+            .model_paths()
+            .fold(RuntimeErrors::new(), |mut acc, path| {
+                acc.extend(self.get_model_errors(path));
+                acc
+            });
+
+        (tree, errors)
+    }
+
+    #[must_use]
+    fn get_dependency_tree_internal(
         &mut self,
         model_path: &Path,
         parameter_name: &str,
@@ -42,6 +60,24 @@ impl Runtime {
     /// built from cached results.
     #[must_use]
     pub fn get_reference_tree(
+        &mut self,
+        model_path: &Path,
+        parameter_name: &str,
+    ) -> (Option<tree::Tree<tree::ReferenceTreeValue>>, RuntimeErrors) {
+        let (tree, tree_errors) = self.get_reference_tree_internal(model_path, parameter_name);
+
+        let errors = tree_errors
+            .model_paths()
+            .fold(RuntimeErrors::new(), |mut acc, path| {
+                acc.extend(self.get_model_errors(path));
+                acc
+            });
+
+        (tree, errors)
+    }
+
+    #[must_use]
+    fn get_reference_tree_internal(
         &mut self,
         model_path: &Path,
         parameter_name: &str,

@@ -49,6 +49,11 @@ impl TreeErrors {
             }
         }
     }
+
+    /// Returns an iterator over the model paths that have errors.
+    pub fn model_paths(&self) -> impl Iterator<Item = &PathBuf> {
+        self.errors.keys()
+    }
 }
 
 /// Errors for a single model when building a tree.
