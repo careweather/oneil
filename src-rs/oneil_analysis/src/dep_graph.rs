@@ -3,9 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
-use oneil_output::{
-    BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency,
-};
+use oneil_output::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency};
 
 /// A dependency graph for the results of evaluating Oneil models.
 #[derive(Debug, Clone, PartialEq, Eq)]
