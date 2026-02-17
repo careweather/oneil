@@ -59,7 +59,7 @@ impl resolver::ExternalResolutionContext for Runtime {
         &mut self,
         path: &oneil_ir::ModelPath,
     ) -> LoadResult<&ast::ModelNode, resolver::AstLoadingFailedError> {
-        self.load_ast(path)
+        self.load_ast_internal(path)
             .as_ref()
             .map_err(|_e| resolver::AstLoadingFailedError)
     }

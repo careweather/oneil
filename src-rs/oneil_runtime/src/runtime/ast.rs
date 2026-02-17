@@ -6,19 +6,34 @@ use oneil_parser::{self as parser, error::ParserError};
 use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
-use crate::output::ast;
+use crate::output::{ast, error::RuntimeErrors};
 
 impl Runtime {
     /// Loads AST for a model.
     ///
     /// # Errors
     ///
-    /// Returns a [`ParseError`](output::error::ParseError) if the AST could not be loaded.
-    #[expect(
-        clippy::missing_panics_doc,
-        reason = "the panic only happens if an internal invariant is violated"
-    )]
-    pub fn load_ast(
+    /// Returns a list of Oneil errors if the AST could not be loaded.
+    pub fn load_ast(&mut self, path: impl AsRef<Path>) -> (Option<&ast::ModelNode>, RuntimeErrors) {
+        let path = path.as_ref();
+        self.load_ast_internal(path);
+
+        let is_success = self
+            .ast_cache
+            .get_entry(path)
+            .is_some_and(LoadResult::is_success);
+
+        let errors = if is_success {
+            RuntimeErrors::new()
+        } else {
+            self.get_model_errors(path)
+        };
+
+        let ast_opt = self.ast_cache.get_entry(path).and_then(LoadResult::value);
+        (ast_opt, errors)
+    }
+
+    pub(super) fn load_ast_internal(
         &mut self,
         path: impl AsRef<Path>,
     ) -> &LoadResult<ast::ModelNode, Vec<ParserError>> {
