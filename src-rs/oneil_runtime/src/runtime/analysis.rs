@@ -4,10 +4,10 @@
 
 use std::path::{Path, PathBuf};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use oneil_analysis::{
     self as analysis,
-    output::error::{ModelEvalHasErrors, TreeErrors},
+    output::error::{IndependentsErrors, ModelEvalHasErrors, TreeErrors},
 };
 use oneil_ir as ir;
 use oneil_shared::load_result::LoadResult;
@@ -84,6 +84,37 @@ impl Runtime {
     ) -> (Option<tree::Tree<tree::ReferenceTreeValue>>, TreeErrors) {
         let _ = self.eval_model(model_path);
         analysis::get_reference_tree(self, model_path, parameter_name)
+    }
+
+    /// Gets independent parameters for a model and its referenced models.
+    ///
+    /// A parameter is independent if it has no parameter or external dependencies
+    /// (it may still depend on builtin values). Evaluates the model first, then
+    /// returns a map from each model path to the set of independent parameter names.
+    #[must_use]
+    pub fn get_independents(
+        &mut self,
+        model_path: &Path,
+    ) -> (IndexMap<PathBuf, IndexSet<String>>, RuntimeErrors) {
+        let (map, independents_errors) = self.get_independents_internal(model_path);
+
+        let errors = independents_errors
+            .paths()
+            .fold(RuntimeErrors::new(), |mut acc, path| {
+                acc.extend(self.get_model_errors(path));
+                acc
+            });
+
+        (map, errors)
+    }
+
+    #[must_use]
+    fn get_independents_internal(
+        &mut self,
+        model_path: &Path,
+    ) -> (IndexMap<PathBuf, IndexSet<String>>, IndependentsErrors) {
+        let _ = self.eval_model(model_path);
+        analysis::get_independents(model_path, self)
     }
 }
 
