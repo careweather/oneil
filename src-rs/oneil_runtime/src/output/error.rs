@@ -35,7 +35,7 @@ impl RuntimeErrors {
     /// Merges another collection of runtime errors into this one.
     ///
     /// Entries from `other` replace any existing entries for the same path.
-    pub fn extend(&mut self, other: RuntimeErrors) {
+    pub fn extend(&mut self, other: Self) {
         for (path, error) in other.errors {
             self.add_model_error(path, error);
         }
@@ -50,11 +50,11 @@ pub enum ModelError {
     /// The model was loaded; contains import, parameter, and test errors.
     EvalErrors {
         /// Model reference name → error for that reference.
-        model_import_errors: IndexMap<String, OneilError>,
+        model_import_errors: Box<IndexMap<String, OneilError>>,
         /// Python import path → error for that import.
-        python_import_errors: IndexMap<PathBuf, OneilError>,
+        python_import_errors: Box<IndexMap<PathBuf, OneilError>>,
         /// Parameter name → list of errors for that parameter.
-        parameter_errors: IndexMap<String, Vec<OneilError>>,
+        parameter_errors: Box<IndexMap<String, Vec<OneilError>>>,
         /// Errors from model tests.
         test_errors: Vec<OneilError>,
     },

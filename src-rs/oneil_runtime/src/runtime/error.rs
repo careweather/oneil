@@ -1,7 +1,5 @@
 //! Error reporting for models and parameters.
 
-#![allow(clippy::pedantic, reason = "this is temporary")]
-
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
@@ -28,10 +26,9 @@ impl Runtime {
         //
         // If the source failed to load, then there can be no
         // other errors, so we return early
-        let source_entry = self
-            .source_cache
-            .get_entry(model_path)
-            .expect("source has already been attempted to be loaded");
+        let Some(source_entry) = self.source_cache.get_entry(model_path) else {
+            return RuntimeErrors::default();
+        };
 
         let source = match source_entry {
             Ok(source) => source,
@@ -48,15 +45,12 @@ impl Runtime {
         };
 
         // Get the AST errors, if any
-        let ast_entry = self
-            .ast_cache
-            .get_entry(model_path)
-            .expect("ast has already been attempted to be loaded");
+        let Some(ast_entry) = self.ast_cache.get_entry(model_path) else {
+            return RuntimeErrors::default();
+        };
 
         let ast_errors = match ast_entry {
-            LoadResult::Failure => panic!(
-                "this only occurs if the source load failed, which should have been handled above"
-            ),
+            LoadResult::Failure => return RuntimeErrors::default(),
             LoadResult::Partial(_, parser_errors) => {
                 let errors: Vec<OneilError> = parser_errors
                     .iter()
@@ -119,23 +113,15 @@ impl Runtime {
             errors.add_model_error(
                 path_buf,
                 ModelError::EvalErrors {
-                    model_import_errors,
-                    python_import_errors,
-                    parameter_errors,
+                    model_import_errors: Box::new(model_import_errors),
+                    python_import_errors: Box::new(python_import_errors),
+                    parameter_errors: Box::new(parameter_errors),
                     test_errors,
                 },
             );
         }
 
         errors
-    }
-
-    /// Returns errors for the given parameter in a model.
-    ///
-    /// Parameter-level errors indicate that the parameter could not be resolved or evaluated.
-    #[must_use]
-    pub fn get_parameter_errors(&self, _model_path: &Path, _parameter_name: &str) -> RuntimeErrors {
-        RuntimeErrors::new()
     }
 
     /// Returns errors for the given Python import path.
@@ -160,6 +146,10 @@ impl Runtime {
 }
 
 /// Result of collecting errors from IR resolution.
+#[expect(
+    clippy::struct_field_names,
+    reason = "removing 'errors' might be confusing"
+)]
 struct IrErrorsResult {
     /// Model paths that have errors (for recursive collection).
     models_with_errors: IndexSet<PathBuf>,
@@ -236,6 +226,10 @@ fn collect_ir_errors(
 }
 
 /// Result of collecting errors from evaluation.
+#[expect(
+    clippy::struct_field_names,
+    reason = "removing 'errors' might be confusing"
+)]
 struct EvalErrorsResult {
     /// Model paths that have errors (for recursive collection).
     models_with_errors: IndexSet<PathBuf>,
@@ -290,6 +284,10 @@ fn collect_eval_errors(errors: &EvalErrors, path: &Path, source: &str) -> EvalEr
 }
 
 /// Result of merging IR and eval error results.
+#[expect(
+    clippy::struct_field_names,
+    reason = "removing 'errors' might be confusing"
+)]
 struct MergedErrors {
     /// Model paths that have errors (for recursive collection).
     pub models_with_errors: IndexSet<PathBuf>,
