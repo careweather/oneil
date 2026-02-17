@@ -13,7 +13,33 @@ use std::io::Error as IoError;
 #[derive(Debug, Default)]
 pub struct RuntimeErrors {
     /// Map from model path to errors for that model.
-    pub errors: IndexMap<PathBuf, ModelError>,
+    errors: IndexMap<PathBuf, ModelError>,
+}
+
+impl RuntimeErrors {
+    /// Creates a new empty runtime errors collection.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            errors: IndexMap::new(),
+        }
+    }
+
+    /// Adds a model error for the given path.
+    ///
+    /// If the path already has an error, it is replaced.
+    pub fn add_model_error(&mut self, path: PathBuf, error: ModelError) {
+        self.errors.insert(path, error);
+    }
+
+    /// Merges another collection of runtime errors into this one.
+    ///
+    /// Entries from `other` replace any existing entries for the same path.
+    pub fn extend(&mut self, other: RuntimeErrors) {
+        for (path, error) in other.errors {
+            self.add_model_error(path, error);
+        }
+    }
 }
 
 /// Errors for a single model: either file-level or evaluation-level.
@@ -23,8 +49,8 @@ pub enum ModelError {
     FileError(Vec<OneilError>),
     /// The model was loaded; contains import, parameter, and test errors.
     EvalErrors {
-        /// Model import path → error for that import.
-        model_import_errors: IndexMap<PathBuf, OneilError>,
+        /// Model reference name → error for that reference.
+        model_import_errors: IndexMap<String, OneilError>,
         /// Python import path → error for that import.
         python_import_errors: IndexMap<PathBuf, OneilError>,
         /// Parameter name → list of errors for that parameter.
