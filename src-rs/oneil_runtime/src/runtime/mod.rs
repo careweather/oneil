@@ -3,6 +3,11 @@
 //! The runtime is split into submodules by concern: source loading, AST, IR,
 //! evaluation, analysis, builtins, utilities, and (optionally) Python.
 
+#![allow(
+    clippy::multiple_inherent_impl,
+    reason = "this allows the runtime to be split up into its different functionionalities"
+)]
+
 mod analysis;
 mod ast;
 mod builtin;

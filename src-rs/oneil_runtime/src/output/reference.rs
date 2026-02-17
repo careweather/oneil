@@ -63,7 +63,7 @@ impl<'result> ModelReference<'result> {
     /// the case as long as creating the `EvalResult`
     /// resolves successfully.
     #[must_use]
-    pub fn references(&self) -> IndexMap<&'result str, ModelReference<'result>> {
+    pub fn references(&self) -> IndexMap<&'result str, Self> {
         self.model
             .references
             .iter()
@@ -294,6 +294,7 @@ impl<'result> ReferenceImportReference<'result> {
         clippy::missing_panics_doc,
         reason = "the panic only happens if an internal invariant is violated"
     )]
+    #[must_use]
     pub fn model(&self) -> Option<ModelIrReference<'result>> {
         let entry = self
             .ir_cache

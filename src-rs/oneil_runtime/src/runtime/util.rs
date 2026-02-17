@@ -5,15 +5,15 @@ use std::path::PathBuf;
 use indexmap::IndexSet;
 
 use super::Runtime;
-use crate::cache::{AstCache, EvalCache, IrCache, SourceCache};
 #[cfg(feature = "python")]
 use crate::cache::PythonImportCache;
+use crate::cache::{AstCache, EvalCache, IrCache, SourceCache};
 use crate::std_builtin::StdBuiltins;
 
 impl Runtime {
     /// Creates a new runtime instance with empty caches.
     #[must_use]
-    pub fn new() -> Runtime {
+    pub fn new() -> Self {
         Self {
             source_cache: SourceCache::new(),
             ast_cache: AstCache::new(),
