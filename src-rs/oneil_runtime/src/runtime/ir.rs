@@ -7,21 +7,46 @@ use oneil_resolver as resolver;
 use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
-use crate::output::{self, ast};
+use crate::output::{self, ast, error::RuntimeErrors};
 
 impl Runtime {
     /// Loads the IR for a model and all of its dependencies.
     ///
     /// # Errors
     ///
-    /// Returns a
-    /// [`ResolutionErrorReference`](output::reference::ResolutionErrorReference) if that
+    /// Returns [`RuntimeErrors`] (via [`get_model_errors`](super::Runtime::get_model_errors)) if that
     /// model had parse or resolution errors.
-    #[expect(
-        clippy::missing_panics_doc,
-        reason = "the panic only happens if an internal invariant is violated"
-    )]
     pub fn load_ir(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> (
+        Option<output::reference::ModelIrReference<'_>>,
+        RuntimeErrors,
+    ) {
+        let path = path.as_ref();
+        self.load_ir_internal(path);
+
+        let is_success = self
+            .ir_cache
+            .get_entry(path)
+            .is_some_and(LoadResult::is_success);
+
+        let errors = if is_success {
+            RuntimeErrors::new()
+        } else {
+            self.get_model_errors(path)
+        };
+
+        let ir_opt = self
+            .ir_cache
+            .get_entry(path)
+            .and_then(LoadResult::value)
+            .map(|ir| output::reference::ModelIrReference::new(ir, &self.ir_cache));
+
+        (ir_opt, errors)
+    }
+
+    pub(super) fn load_ir_internal(
         &mut self,
         path: impl AsRef<Path>,
     ) -> &LoadResult<output::ir::Model, resolver::ResolutionErrorCollection> {

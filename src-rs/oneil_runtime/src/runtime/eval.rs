@@ -18,7 +18,7 @@ impl Runtime {
     pub fn eval_model(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> (Option<&output::Model>, RuntimeErrors) {
+    ) -> (Option<output::reference::ModelReference<'_>>, RuntimeErrors) {
         let path = path.as_ref();
         self.eval_model_internal(path);
 
@@ -33,7 +33,11 @@ impl Runtime {
             self.get_model_errors(path)
         };
 
-        let model_opt = self.eval_cache.get_entry(path).and_then(LoadResult::value);
+        let model_opt = self
+            .eval_cache
+            .get_entry(path)
+            .and_then(LoadResult::value)
+            .map(|model| output::reference::ModelReference::new(model, &self.eval_cache));
 
         (model_opt, errors)
     }
