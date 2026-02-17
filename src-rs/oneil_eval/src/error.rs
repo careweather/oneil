@@ -1,6 +1,6 @@
 //! Errors for the Oneil evaluator.
 
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 use indexmap::IndexMap;
 use oneil_shared::{
@@ -180,6 +180,8 @@ pub enum EvalError {
     /// For error reporting, this error can typically be ignored. The main purpose of this error
     /// is error propagation, not error reporting.
     ParameterHasError {
+        /// The path of the model that contains the parameter.
+        model_path: Option<PathBuf>,
         /// The name of the parameter that has errors.
         parameter_name: String,
         /// The source span of the parameter name.
@@ -531,10 +533,16 @@ impl AsOneilError for EvalError {
                 exponent_value_span: _,
             } => "exponent cannot be an interval".to_string(),
             Self::ParameterHasError {
+                model_path,
                 parameter_name,
                 variable_span: _,
             } => {
-                format!("parameter `{parameter_name}` has errors")
+                let model_path = model_path.as_ref().map_or_else(
+                    || "current model".to_string(),
+                    |path| format!("model `{}`", path.display()),
+                );
+
+                format!("parameter `{parameter_name}` in {model_path} has errors")
             }
             Self::InvalidArgumentCount {
                 function_name,
@@ -775,6 +783,7 @@ impl AsOneilError for EvalError {
                 exponent_value_span: location_span,
             }
             | Self::ParameterHasError {
+                model_path: _,
                 parameter_name: _,
                 variable_span: location_span,
             }
@@ -975,6 +984,7 @@ impl AsOneilError for EvalError {
                 exponent_interval.max(),
             ))],
             Self::ParameterHasError {
+                model_path: _,
                 parameter_name: _,
                 variable_span: _,
             } => Vec::new(),
@@ -1238,6 +1248,7 @@ impl AsOneilError for EvalError {
                 exponent_value_span: _,
             } => Vec::new(),
             Self::ParameterHasError {
+                model_path: _,
                 parameter_name: _,
                 variable_span: _,
             } => Vec::new(),

@@ -219,7 +219,12 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             .last()
             .expect("current model should be set when looking up a parameter");
 
-        self.lookup_model_parameter_value_internal(current_model, parameter_name, variable_span)
+        self.lookup_model_parameter_value_internal(
+            current_model,
+            parameter_name,
+            variable_span,
+            true,
+        )
     }
 
     /// Looks up a parameter value in a specific model.
@@ -229,7 +234,12 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         parameter_name: &ir::ParameterName,
         variable_span: Span,
     ) -> Result<output::Value, Vec<EvalError>> {
-        self.lookup_model_parameter_value_internal(model.as_ref(), parameter_name, variable_span)
+        self.lookup_model_parameter_value_internal(
+            model.as_ref(),
+            parameter_name,
+            variable_span,
+            false,
+        )
     }
 
     fn lookup_model_parameter_value_internal(
@@ -237,6 +247,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         model_path: &Path,
         parameter_name: &ir::ParameterName,
         variable_span: Span,
+        is_current_model: bool,
     ) -> Result<output::Value, Vec<EvalError>> {
         let model = self
             .models
@@ -250,7 +261,14 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             .clone()
             .map(|parameter| parameter.value)
             .map_err(|_errors| {
+                let model_path = if is_current_model {
+                    None
+                } else {
+                    Some(model_path.to_path_buf())
+                };
+
                 vec![EvalError::ParameterHasError {
+                    model_path,
                     parameter_name: parameter_name.as_str().to_string(),
                     variable_span,
                 }]
