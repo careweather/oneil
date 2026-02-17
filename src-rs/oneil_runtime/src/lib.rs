@@ -3,6 +3,7 @@
 
 mod cache;
 mod runtime;
+mod source_error;
 mod std_builtin;
 
 pub mod output;

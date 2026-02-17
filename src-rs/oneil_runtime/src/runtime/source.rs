@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use super::Runtime;
-use crate::output::error::SourceError;
+use crate::source_error::SourceError;
 
 impl Runtime {
     /// Loads source code from a file.
@@ -15,10 +15,7 @@ impl Runtime {
         clippy::missing_panics_doc,
         reason = "the panic only happens if an internal invariant is violated"
     )]
-    pub fn load_source(
-        &mut self,
-        path: impl AsRef<Path>,
-    ) -> &Result<String, SourceError> {
+    pub fn load_source(&mut self, path: impl AsRef<Path>) -> &Result<String, SourceError> {
         let path = path.as_ref();
 
         let result = match std::fs::read_to_string(path) {

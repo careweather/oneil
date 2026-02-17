@@ -8,7 +8,7 @@ use oneil_parser::error::ParserError;
 use oneil_resolver as resolver;
 use oneil_shared::load_result::LoadResult;
 
-use crate::output;
+use crate::{output, source_error::SourceError};
 
 /// Cache for source file contents keyed by path.
 ///
@@ -19,7 +19,7 @@ use crate::output;
 /// there is no possible partial result.
 #[derive(Debug)]
 pub struct SourceCache {
-    entries: IndexMap<PathBuf, Result<String, output::error::SourceError>>,
+    entries: IndexMap<PathBuf, Result<String, SourceError>>,
 }
 
 impl Default for SourceCache {
@@ -39,19 +39,17 @@ impl SourceCache {
 
     /// Returns the full cached entry for `path`.
     #[must_use]
-    pub fn get_entry(&self, path: &Path) -> Option<&Result<String, output::error::SourceError>> {
+    pub fn get_entry(&self, path: &Path) -> Option<&Result<String, SourceError>> {
         self.entries.get(path)
     }
 
     /// Inserts a result for `path`, replacing any existing entry.
-    pub fn insert(&mut self, path: PathBuf, result: Result<String, output::error::SourceError>) {
+    pub fn insert(&mut self, path: PathBuf, result: Result<String, SourceError>) {
         self.entries.insert(path, result);
     }
 
     /// Returns an iterator over path–result pairs.
-    pub fn iter(
-        &self,
-    ) -> indexmap::map::Iter<'_, PathBuf, Result<String, output::error::SourceError>> {
+    pub fn iter(&self) -> indexmap::map::Iter<'_, PathBuf, Result<String, SourceError>> {
         self.entries.iter()
     }
 }
