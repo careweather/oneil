@@ -3,7 +3,6 @@
 pub mod error;
 pub mod reference;
 
-pub use oneil_analysis::output;
 pub use oneil_ast as ast;
 pub use oneil_ir as ir;
 pub use oneil_output::{
