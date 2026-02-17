@@ -43,42 +43,9 @@ impl SourceCache {
         self.entries.get(path)
     }
 
-    /// Returns the source string for `path`, if present and successful.
-    #[must_use]
-    pub fn get_value(&self, path: &Path) -> Option<&str> {
-        self.entries
-            .get(path)
-            .and_then(|r| r.as_ref().ok())
-            .map(String::as_str)
-    }
-
-    /// Returns the source error for `path`, if present and failed.
-    #[must_use]
-    pub fn get_error(&self, path: &Path) -> Option<&output::error::SourceError> {
-        self.entries.get(path).and_then(|r| r.as_ref().err())
-    }
-
     /// Inserts a result for `path`, replacing any existing entry.
     pub fn insert(&mut self, path: PathBuf, result: Result<String, output::error::SourceError>) {
         self.entries.insert(path, result);
-    }
-
-    /// Returns whether `path` has a cached entry.
-    #[must_use]
-    pub fn contains(&self, path: &Path) -> bool {
-        self.entries.contains_key(path)
-    }
-
-    /// Returns the number of cached entries.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    /// Returns `true` if the cache is empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
     }
 
     /// Returns an iterator over path–result pairs.
