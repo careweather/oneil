@@ -5,8 +5,12 @@
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use oneil_analysis::{self as analysis, output::error::TreeErrors};
+use oneil_analysis::{
+    self as analysis,
+    output::error::{ModelEvalHasErrors, TreeErrors},
+};
 use oneil_ir as ir;
+use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
 use crate::output::tree;
@@ -53,6 +57,15 @@ impl analysis::ExternalAnalysisContext for Runtime {
             .iter()
             .filter_map(|(path, result)| result.value().map(|ir| (path, ir)))
             .collect()
+    }
+
+    fn get_evaluated_model(
+        &self,
+        model_path: &Path,
+    ) -> Option<LoadResult<&oneil_output::Model, ModelEvalHasErrors>> {
+        let entry = self.eval_cache.get_entry(model_path)?;
+        let result = entry.as_ref().map_err(|_error| ModelEvalHasErrors);
+        Some(result)
     }
 
     fn lookup_builtin_variable(

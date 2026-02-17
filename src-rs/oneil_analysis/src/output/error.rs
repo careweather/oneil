@@ -4,6 +4,10 @@ use std::path::PathBuf;
 
 use indexmap::{IndexMap, IndexSet};
 
+/// Singleton error indicating that model evaluation had errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModelEvalHasErrors;
+
 /// Accumulated errors encountered while building a dependency or reference tree.
 #[derive(Debug)]
 pub struct TreeErrors {
@@ -84,6 +88,45 @@ impl TreeModelError {
                 parameters.extend(other_parameters);
             }
         }
+    }
+}
+
+/// Set of model paths that had errors during independents analysis.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct IndependentsErrors {
+    /// Model paths that could not be evaluated or had evaluation errors.
+    paths: IndexSet<PathBuf>,
+}
+
+impl IndependentsErrors {
+    /// Creates an empty error set.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            paths: IndexSet::new(),
+        }
+    }
+
+    /// Adds a model path that had an error.
+    pub fn insert(&mut self, path: PathBuf) {
+        self.paths.insert(path);
+    }
+
+    /// Returns whether no errors were recorded.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.paths.is_empty()
+    }
+
+    /// Returns an iterator over the model paths that had errors.
+    #[must_use]
+    pub fn paths(&self) -> indexmap::set::Iter<'_, PathBuf> {
+        self.paths.iter()
+    }
+
+    /// Adds all paths from another `IndependentsErrors` into this one.
+    pub fn extend(&mut self, other: Self) {
+        self.paths.extend(other.paths);
     }
 }
 

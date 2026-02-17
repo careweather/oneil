@@ -4,10 +4,11 @@ use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
-use oneil_output::{DependencySet, Parameter, Value};
+use oneil_output::{DependencySet, Model, Parameter, Value};
+use oneil_shared::load_result::LoadResult;
 
 use crate::dep_graph::{DependencyGraph, ReferenceSet};
-use crate::output::error::GetValueError;
+use crate::output::error::{GetValueError, ModelEvalHasErrors};
 
 /// External context provided to tree operations.
 pub trait ExternalAnalysisContext {
@@ -16,6 +17,16 @@ pub trait ExternalAnalysisContext {
 
     /// Returns the value of a builtin variable by identifier, if defined.
     fn lookup_builtin_variable(&self, identifier: &ir::Identifier) -> Option<&Value>;
+
+    /// Looks up the evaluated model at the given path.
+    ///
+    /// Returns `None` if the model is not in the context. Otherwise returns a
+    /// [`LoadResult`]: success with the model reference, partial with the model and
+    /// [`ModelEvalHasErrors`], or failure.
+    fn get_evaluated_model(
+        &self,
+        model_path: &Path,
+    ) -> Option<LoadResult<&Model, ModelEvalHasErrors>>;
 
     /// Looks up an evaluated parameter by model path and parameter name.
     ///

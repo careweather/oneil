@@ -4,7 +4,9 @@
 mod context;
 mod dep_graph;
 mod dependency;
+mod independents;
 pub mod output;
 
 pub use context::ExternalAnalysisContext;
 pub use dependency::{get_dependency_tree, get_reference_tree};
+pub use independents::get_independents;
