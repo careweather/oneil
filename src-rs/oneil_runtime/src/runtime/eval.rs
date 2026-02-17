@@ -7,19 +7,38 @@ use oneil_output::{Unit, Value};
 use oneil_shared::{load_result::LoadResult, span::Span};
 
 use super::Runtime;
-use crate::output::{self, ir};
+use crate::output::{self, error::RuntimeErrors, ir};
 
 impl Runtime {
     /// Evaluates a model and returns the result.
     ///
     /// # Errors
     ///
-    /// Returns a [`EvalErrorReference`](output::reference::EvalErrorReference) if the model could not be evaluated.
-    #[expect(
-        clippy::missing_panics_doc,
-        reason = "the panic only happens if an internal invariant is violated"
-    )]
+    /// Returns [`RuntimeErrors`] (via [`get_model_errors`](super::Runtime::get_model_errors)) if the model could not be evaluated.
     pub fn eval_model(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> (Option<&output::Model>, RuntimeErrors) {
+        let path = path.as_ref();
+        self.eval_model_internal(path);
+
+        let is_success = self
+            .eval_cache
+            .get_entry(path)
+            .is_some_and(LoadResult::is_success);
+
+        let errors = if is_success {
+            RuntimeErrors::new()
+        } else {
+            self.get_model_errors(path)
+        };
+
+        let model_opt = self.eval_cache.get_entry(path).and_then(LoadResult::value);
+
+        (model_opt, errors)
+    }
+
+    pub(super) fn eval_model_internal(
         &mut self,
         path: impl AsRef<Path>,
     ) -> &LoadResult<output::Model, eval::EvalErrors> {

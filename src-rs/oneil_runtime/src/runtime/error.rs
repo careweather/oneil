@@ -19,7 +19,7 @@ impl Runtime {
     /// Source or parsing failures are reported as a [`ModelError::FileError`].
     /// Resolution or evaluation failures are reported as [`ModelError::EvalErrors`].
     #[must_use]
-    pub fn get_model_errors(&self, model_path: &Path) -> RuntimeErrors {
+    pub(super) fn get_model_errors(&self, model_path: &Path) -> RuntimeErrors {
         let path_buf = model_path.to_path_buf();
 
         // Handle source errors
@@ -130,7 +130,7 @@ impl Runtime {
     /// returns a [`RuntimeErrors`] with a single [`ModelError::FileError`] entry.
     #[must_use]
     #[cfg(feature = "python")]
-    pub fn get_python_import_errors(&self, python_import_path: &Path) -> RuntimeErrors {
+    pub(super) fn get_python_import_errors(&self, python_import_path: &Path) -> RuntimeErrors {
         let path_buf = python_import_path.to_path_buf();
         let mut errors = RuntimeErrors::new();
 
