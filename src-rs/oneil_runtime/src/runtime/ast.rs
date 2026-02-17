@@ -38,20 +38,17 @@ impl Runtime {
         path: impl AsRef<Path>,
     ) -> &LoadResult<ast::ModelNode, Vec<ParserError>> {
         let path = path.as_ref();
-        let source_result = self.load_source(path);
+        let source_result = self.load_source_internal(path);
 
-        let source = match source_result {
-            Ok(source) => source,
-            Err(_error) => {
-                // if the source file could not be loaded, we return a parse error
-                self.ast_cache
-                    .insert(path.to_path_buf(), LoadResult::failure());
+        let Ok(source) = source_result else {
+            // if the source file could not be loaded, we return a parse error
+            self.ast_cache
+                .insert(path.to_path_buf(), LoadResult::failure());
 
-                return self
-                    .ast_cache
-                    .get_entry(path)
-                    .expect("it was just inserted");
-            }
+            return self
+                .ast_cache
+                .get_entry(path)
+                .expect("it was just inserted");
         };
 
         // parse the model and return an error if it fails
