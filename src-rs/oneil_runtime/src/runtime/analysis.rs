@@ -4,10 +4,11 @@
 
 use std::path::{Path, PathBuf};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use oneil_analysis::{
     self as analysis,
     output::error::{IndependentsErrors, ModelEvalHasErrors, TreeErrors},
+    output::Independents,
 };
 use oneil_ir as ir;
 use oneil_shared::load_result::LoadResult;
@@ -90,13 +91,13 @@ impl Runtime {
     ///
     /// A parameter is independent if it has no parameter or external dependencies
     /// (it may still depend on builtin values). Evaluates the model first, then
-    /// returns a map from each model path to the set of independent parameter names.
+    /// returns an [`Independents`] (model path → parameter name → value) and any errors.
     #[must_use]
     pub fn get_independents(
         &mut self,
         model_path: &Path,
-    ) -> (IndexMap<PathBuf, IndexSet<String>>, RuntimeErrors) {
-        let (map, independents_errors) = self.get_independents_internal(model_path);
+    ) -> (Independents, RuntimeErrors) {
+        let (independents, independents_errors) = self.get_independents_internal(model_path);
 
         let errors = independents_errors
             .paths()
@@ -105,14 +106,14 @@ impl Runtime {
                 acc
             });
 
-        (map, errors)
+        (independents, errors)
     }
 
     #[must_use]
     fn get_independents_internal(
         &mut self,
         model_path: &Path,
-    ) -> (IndexMap<PathBuf, IndexSet<String>>, IndependentsErrors) {
+    ) -> (Independents, IndependentsErrors) {
         let _ = self.eval_model(model_path);
         analysis::get_independents(model_path, self)
     }
