@@ -55,7 +55,7 @@ impl Runtime {
         let path = path.as_ref();
 
         // load the source code from the file
-        let Ok(source) = self.load_source(path) else {
+        let Ok(source) = self.load_source_internal(path) else {
             self.python_import_cache
                 .insert(path.to_path_buf(), LoadResult::failure());
 
