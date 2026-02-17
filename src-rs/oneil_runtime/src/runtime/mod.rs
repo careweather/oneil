@@ -11,6 +11,7 @@
 mod analysis;
 mod ast;
 mod builtin;
+mod error;
 mod eval;
 mod ir;
 mod source;
