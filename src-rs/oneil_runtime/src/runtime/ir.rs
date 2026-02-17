@@ -93,7 +93,7 @@ impl resolver::ExternalResolutionContext for Runtime {
         &'context mut self,
         python_path: &oneil_ir::PythonPath,
     ) -> Result<IndexSet<&'context str>, resolver::PythonImportLoadingFailedError> {
-        self.load_python_import(python_path.as_ref())
+        self.load_python_import_internal(python_path.as_ref())
             .value()
             .map(|functions| functions.get_function_names().collect())
             .ok_or(resolver::PythonImportLoadingFailedError)
