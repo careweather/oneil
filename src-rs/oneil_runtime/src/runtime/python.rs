@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use indexmap::IndexSet;
 use oneil_eval::EvalError;
 use oneil_python::LoadPythonImportError;
 use oneil_python::function::PythonFunctionMap;
@@ -9,7 +10,7 @@ use oneil_shared::load_result::LoadResult;
 use oneil_shared::span::Span;
 
 use super::Runtime;
-use crate::output::{self, ir};
+use crate::output::{self, error::RuntimeErrors, ir};
 
 impl Runtime {
     /// Loads a Python module from a file path and returns the set of callable names.
@@ -19,13 +20,35 @@ impl Runtime {
     ///
     /// # Errors
     ///
-    /// Returns an [`OneilError`] if the file could not be read or Python failed
-    /// to load the module.
-    #[expect(
-        clippy::missing_panics_doc,
-        reason = "the panic only happens if an internal invariant is violated"
-    )]
+    /// Returns [`RuntimeErrors`] (via [`get_python_import_errors`](super::Runtime::get_python_import_errors)) if the file could not be read or Python failed to load the module.
     pub fn load_python_import(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> (Option<IndexSet<&str>>, RuntimeErrors) {
+        let path = path.as_ref();
+        self.load_python_import_internal(path);
+
+        let is_success = self
+            .python_import_cache
+            .get_entry(path)
+            .is_some_and(LoadResult::is_success);
+
+        let errors = if is_success {
+            RuntimeErrors::new()
+        } else {
+            self.get_python_import_errors(path)
+        };
+
+        let names_opt = self
+            .python_import_cache
+            .get_entry(path)
+            .and_then(LoadResult::value)
+            .map(|functions| functions.get_function_names().collect());
+
+        (names_opt, errors)
+    }
+
+    pub(super) fn load_python_import_internal(
         &mut self,
         path: impl AsRef<Path>,
     ) -> &LoadResult<PythonFunctionMap, LoadPythonImportError> {
