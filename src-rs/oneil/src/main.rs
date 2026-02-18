@@ -305,6 +305,10 @@ fn model_result_sections_from_include(
 }
 
 /// Handles the `dev print-model-result` command.
+#[expect(
+    clippy::fn_params_excessive_bools,
+    reason = "this is just passing in all the arguments from the CLI"
+)]
 fn handle_print_model_result(
     file: &Path,
     display_partial: bool,

@@ -39,7 +39,7 @@ pub const BUILTIN_NOT_FOUND: Style = Style::new().bold();
 pub mod debug {
     use owo_colors::Style;
 
-    /// Root-level headers: "ModelCollection", "ModelResult", "Model".
+    /// Root-level headers: `ModelCollection`, `ModelResult`, `Model`.
     pub const ROOT_HEADER: Style = Style::new().blue().bold();
 
     /// Tree branch symbols: ├── └──.
@@ -60,7 +60,7 @@ pub mod debug {
     /// Sub-labels and metadata: "Value:", "Limits:", "Trace Level:", "Type:".
     pub const DETAIL: Style = Style::new().dimmed();
 
-    /// Literal values and expression types (e.g. BinaryOp, Literal).
+    /// Literal values and expression types (e.g. `BinaryOp`, `Literal`).
     pub const LITERAL: Style = Style::new().dimmed();
 
     /// Test result: passed.
