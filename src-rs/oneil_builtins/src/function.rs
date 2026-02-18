@@ -163,6 +163,40 @@ mod fns {
     };
     use oneil_output::{DisplayUnit, MeasuredNumber, Number, NumberType, Unit, Value};
 
+    fn unary_numeric<F, G>(
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+        name: &str,
+        number_op: F,
+        measured_op: G,
+    ) -> Result<Value, Vec<EvalError>>
+    where
+        F: FnOnce(Number) -> Value,
+        G: FnOnce(MeasuredNumber) -> Value,
+    {
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: name.to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Exact(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let (arg, arg_span) = args.into_iter().next().expect("there should be one argument");
+        let found_type = arg.type_();
+
+        match arg {
+            Value::Number(number) => Ok(number_op(number)),
+            Value::MeasuredNumber(measured) => Ok(measured_op(measured)),
+            Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type,
+                found_span: arg_span,
+            }]),
+        }
+    }
+
     pub const MIN_DESCRIPTION: &str = "Find the minimum value of the given values.\n\nIf a value is an interval, the minimum value of the interval is used.";
 
     #[expect(
@@ -388,65 +422,77 @@ mod fns {
 
     pub const LN_DESCRIPTION: &str = "Compute the natural logarithm (base e) of a value.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the natural logarithm (base e) of the single numerical argument.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn ln(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("ln".to_string()),
-            will_be_supported: true,
-        }])
+        unary_numeric(identifier_span, args, "ln", |n| Value::Number(n.ln()), |m| {
+            Value::MeasuredNumber(m.ln())
+        })
     }
 
     pub const LOG_DESCRIPTION: &str = "Compute the logarithm of a value.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the natural logarithm (base e) of the single numerical argument.
+    ///
+    /// Same as `ln`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn log(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("log".to_string()),
-            will_be_supported: true,
-        }])
+        unary_numeric(identifier_span, args, "log", |n| Value::Number(n.ln()), |m| {
+            Value::MeasuredNumber(m.ln())
+        })
     }
 
     pub const LOG10_DESCRIPTION: &str = "Compute the base-10 logarithm of a value.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the base-10 logarithm of the single numerical argument.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn log10(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("log10".to_string()),
-            will_be_supported: true,
-        }])
+        unary_numeric(identifier_span, args, "log10", |n| Value::Number(n.log10()), |m| {
+            Value::MeasuredNumber(m.log10())
+        })
     }
 
     pub const FLOOR_DESCRIPTION: &str = "Round a value down to the nearest integer.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the single numerical argument rounded down to the nearest integer.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn floor(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("floor".to_string()),
-            will_be_supported: true,
-        }])
+        unary_numeric(identifier_span, args, "floor", |n| Value::Number(n.floor()), |m| {
+            Value::MeasuredNumber(m.floor())
+        })
     }
 
     pub const CEILING_DESCRIPTION: &str = "Round a value up to the nearest integer.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the single numerical argument rounded up to the nearest integer.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn ceiling(
         identifier_span: Span,
         args: Vec<(Value, Span)>,
     ) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("ceiling".to_string()),
-            will_be_supported: true,
-        }])
+        unary_numeric(identifier_span, args, "ceiling", |n| Value::Number(n.ceiling()), |m| {
+            Value::MeasuredNumber(m.ceiling())
+        })
     }
 
     pub const EXTENT_DESCRIPTION: &str = "Compute the extent of a value.";
