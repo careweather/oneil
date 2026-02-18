@@ -39,6 +39,34 @@ impl RuntimeErrors {
             self.add_model_error(path, error);
         }
     }
+
+    /// Converts the errors to a vector of Oneil errors.
+    #[must_use]
+    pub fn to_vec(&self) -> Vec<&OneilError> {
+        self.errors
+            .values()
+            .flat_map(|error| match error {
+                ModelError::FileError(errors) => errors.iter().collect::<Vec<&OneilError>>(),
+                ModelError::EvalErrors {
+                    model_import_errors,
+                    python_import_errors,
+                    parameter_errors,
+                    test_errors,
+                } => model_import_errors
+                    .values()
+                    .chain(python_import_errors.values())
+                    .chain(parameter_errors.values().flatten())
+                    .chain(test_errors.iter())
+                    .collect(),
+            })
+            .collect()
+    }
+
+    /// Returns true if there are no errors.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
 }
 
 /// Errors for a single model: either file-level or evaluation-level.

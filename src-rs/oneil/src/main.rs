@@ -19,9 +19,8 @@ use notify::Watcher;
 use oneil_runtime::{
     Runtime,
     output::{
-        Tree,
-        dependency::{DependencyTreeValue, ReferenceTreeValue},
-        error::TreeError,
+        error::RuntimeErrors,
+        tree::{DependencyTreeValue, ReferenceTreeValue, Tree},
     },
 };
 
@@ -104,14 +103,17 @@ fn handle_print_python_imports(files: &[PathBuf], show_internal_errors: bool) {
     let mut errors = Vec::new();
 
     for file in files {
-        let file_result = runtime.load_python_import(file);
+        let import_result = runtime.load_python_import(file);
 
-        match file_result {
+        match import_result {
             Ok(import) => {
-                imports.insert(file.clone(), import.clone());
+                let functions: IndexSet<String> = import.into_iter().map(str::to_string).collect();
+                imports.insert(file.clone(), functions);
             }
-            Err(e) => {
-                errors.push(e);
+
+            Err(runtime_errors) => {
+                let runtime_errors = runtime_errors.to_vec().into_iter().cloned();
+                errors.extend(runtime_errors);
             }
         }
     }
@@ -141,22 +143,39 @@ fn handle_print_python_imports(files: &[PathBuf], show_internal_errors: bool) {
 
 /// Handles the `dev print-ast` command.
 fn handle_print_ast(files: &[PathBuf], display_partial: bool, show_internal_errors: bool) {
-    let ast_print_config = AstPrintConfig {
-        display_partial,
-        show_internal_errors,
-    };
+    let ast_print_config = AstPrintConfig {};
 
     let mut runtime = Runtime::new();
 
-    let is_multiple_files = files.len() > 1;
+    let mut asts = IndexMap::new();
+    let mut errors = RuntimeErrors::new();
+
     for file in files {
+        let (ast_opt, runtime_errors) = runtime.load_ast(file);
+
+        if let Some(ast) = ast_opt {
+            asts.insert(file.clone(), ast.clone());
+        }
+
+        errors.extend(runtime_errors);
+    }
+
+    for error in errors.to_vec() {
+        print_error::print(error, show_internal_errors);
+    }
+
+    if !errors.is_empty() && !display_partial {
+        return;
+    }
+
+    let is_multiple_files = files.len() > 1;
+
+    for (file, ast) in asts {
         if is_multiple_files {
             println!("===== {} =====", file.display());
         }
 
-        let ast_result = runtime.load_ast(file);
-
-        print_debug_ast::print(ast_result, &ast_print_config);
+        print_debug_ast::print(&ast, &ast_print_config);
     }
 }
 
@@ -167,17 +186,23 @@ fn handle_print_ir(
     recursive: bool,
     show_internal_errors: bool,
 ) {
-    let ir_print_config = IrPrintConfig {
-        display_partial,
-        recursive,
-        show_internal_errors,
-    };
+    let ir_print_config = IrPrintConfig { recursive };
 
     let mut runtime = Runtime::new();
 
-    let ir_result = runtime.load_ir(file);
+    let (ir_result, errors) = runtime.load_ir(file);
 
-    print_debug_ir::print(ir_result, &ir_print_config);
+    for error in errors.to_vec() {
+        print_error::print(error, show_internal_errors);
+    }
+
+    if !errors.is_empty() && !display_partial {
+        return;
+    }
+
+    if let Some(ir_result) = ir_result {
+        print_debug_ir::print(ir_result, &ir_print_config);
+    }
 }
 
 /// Handles the `dev print-model-result` command.
@@ -187,16 +212,22 @@ fn handle_print_model_result(
     recursive: bool,
     show_internal_errors: bool,
 ) {
-    let config = print_debug_model_result::DebugModelResultPrintConfig {
-        display_partial,
-        recursive,
-        show_internal_errors,
-    };
+    let config = print_debug_model_result::DebugModelResultPrintConfig { recursive };
 
     let mut runtime = Runtime::new();
-    let eval_result = runtime.eval_model(file);
+    let (model_opt, errors) = runtime.eval_model(file);
 
-    print_debug_model_result::print(eval_result, &config);
+    for error in errors.to_vec() {
+        print_error::print(error, show_internal_errors);
+    }
+
+    if !errors.is_empty() && !display_partial {
+        return;
+    }
+
+    if let Some(model_ref) = model_opt {
+        print_debug_model_result::print(model_ref, &config);
+    }
 }
 
 fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
@@ -218,25 +249,42 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
         print_debug_info,
         variables,
         recursive,
-        display_partial_results,
         no_header,
         no_test_report,
         no_parameters,
-        show_internal_errors,
     };
 
     if watch {
-        watch_model(&file, &model_print_config);
+        watch_model(
+            &file,
+            show_internal_errors,
+            display_partial_results,
+            &model_print_config,
+        );
     } else {
         let mut runtime = Runtime::new();
+        let (model_opt, errors) = runtime.eval_model(&file);
 
-        let eval_result = runtime.eval_model(&file);
+        for error in errors.to_vec() {
+            print_error::print(error, show_internal_errors);
+        }
 
-        print_model_result::print_eval_result(eval_result, &model_print_config);
+        if !errors.is_empty() && !display_partial_results {
+            return;
+        }
+
+        if let Some(model_ref) = model_opt {
+            print_model_result::print_eval_result(model_ref, &model_print_config);
+        }
     }
 }
 
-fn watch_model(file: &Path, model_print_config: &ModelPrintConfig) {
+fn watch_model(
+    file: &Path,
+    show_internal_errors: bool,
+    display_partial_results: bool,
+    model_print_config: &ModelPrintConfig,
+) {
     let mut runtime = Runtime::new();
 
     let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
@@ -257,8 +305,19 @@ fn watch_model(file: &Path, model_print_config: &ModelPrintConfig) {
 
     clear_screen();
 
-    let eval_result = runtime.eval_model(file);
-    print_model_result::print_eval_result(eval_result, model_print_config);
+    let (model_opt, errors) = runtime.eval_model(file);
+
+    for error in errors.to_vec() {
+        print_error::print(error, show_internal_errors);
+    }
+
+    let should_print_result = errors.is_empty() || display_partial_results;
+
+    if let Some(model_ref) = model_opt
+        && should_print_result
+    {
+        print_model_result::print_eval_result(model_ref, model_print_config);
+    }
 
     let new_watch_paths = runtime.get_watch_paths();
     let (add_paths, remove_paths) = find_watch_paths_difference(&watch_paths, &new_watch_paths);
@@ -272,8 +331,19 @@ fn watch_model(file: &Path, model_print_config: &ModelPrintConfig) {
                 notify::EventKind::Modify(_) => {
                     clear_screen();
 
-                    let eval_result = runtime.eval_model(file);
-                    print_model_result::print_eval_result(eval_result, model_print_config);
+                    let (model_opt, errors) = runtime.eval_model(file);
+
+                    for error in errors.to_vec() {
+                        print_error::print(error, show_internal_errors);
+                    }
+
+                    let should_print_result = errors.is_empty() || display_partial_results;
+
+                    if let Some(model_ref) = model_opt
+                        && should_print_result
+                    {
+                        print_model_result::print_eval_result(model_ref, model_print_config);
+                    }
 
                     let new_watch_paths = runtime.get_watch_paths();
                     let (add_paths, remove_paths) =
@@ -374,10 +444,19 @@ fn handle_test_command(args: TestArgs, show_internal_errors: bool) {
     };
 
     let mut runtime = Runtime::new();
+    let (model_opt, errors) = runtime.eval_model(&file);
 
-    let eval_result = runtime.eval_model(&file);
+    for error in errors.to_vec() {
+        print_error::print(error, show_internal_errors);
+    }
 
-    print_model_result::print_test_results(eval_result, &test_print_config);
+    if !errors.is_empty() && !display_partial_results {
+        return;
+    }
+
+    if let Some(model_ref) = model_opt {
+        print_model_result::print_test_results(model_ref, &test_print_config);
+    }
 }
 
 fn handle_tree_command(args: TreeArgs, show_internal_errors: bool) {
@@ -392,7 +471,7 @@ fn handle_tree_command(args: TreeArgs, show_internal_errors: bool) {
         list_refs,
         recursive,
         depth,
-        partial,
+        partial: display_partial_results,
     } = args;
 
     let tree_print_config = TreePrintConfig { recursive, depth };
@@ -401,45 +480,38 @@ fn handle_tree_command(args: TreeArgs, show_internal_errors: bool) {
 
     let (trees, errors) = if list_refs {
         let mut trees = Vec::new();
-        let mut errors = IndexMap::<PathBuf, TreeError>::new();
+        let mut errors = RuntimeErrors::new();
 
         for param in params {
             let (reference_tree, tree_errors) = runtime.get_reference_tree(&file, &param);
 
             trees.push((param, reference_tree));
-            for (path, error) in tree_errors {
-                errors.entry(path).or_default().insert_all(error);
-            }
+            errors.extend(tree_errors);
         }
 
         (TreeResults::ReferenceTrees(trees), errors)
     } else {
         let mut trees = Vec::new();
-        let mut errors = IndexMap::<PathBuf, TreeError>::new();
+        let mut errors = RuntimeErrors::new();
 
         for param in params {
             let (dependency_tree, tree_errors) = runtime.get_dependency_tree(&file, &param);
 
             trees.push((param, dependency_tree));
-            for (path, error) in tree_errors {
-                errors.entry(path).or_default().insert_all(error);
-            }
+            errors.extend(tree_errors);
         }
 
         (TreeResults::DependencyTrees(trees), errors)
     };
 
-    let errors = errors
-        .into_values()
-        .flat_map(|errors| errors.to_vec())
-        .collect::<Vec<_>>();
+    let errors_vec = errors.to_vec();
 
-    for error in &errors {
+    for error in &errors_vec {
         print_error::print(error, show_internal_errors);
         eprintln!();
     }
 
-    if !errors.is_empty() && !partial {
+    if !errors_vec.is_empty() && !display_partial_results {
         return;
     }
 
@@ -530,12 +602,18 @@ fn handle_independent_command(args: IndependentArgs, show_internal_errors: bool)
     let independent_print_config = IndependentPrintConfig {
         print_values,
         recursive,
-        display_partial_results,
-        show_internal_errors,
     };
 
     let mut runtime = Runtime::new();
-    let model_result = runtime.eval_model(&file);
+    let (independents, errors) = runtime.get_independents(&file);
 
-    print_independents::print(model_result, &independent_print_config);
+    for error in errors.to_vec() {
+        print_error::print(error, show_internal_errors);
+    }
+
+    if !errors.is_empty() && !display_partial_results {
+        return;
+    }
+
+    print_independents::print(&file, &independents, &independent_print_config);
 }

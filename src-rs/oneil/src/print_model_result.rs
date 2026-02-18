@@ -3,14 +3,13 @@ use std::path::Path;
 use anstream::{eprintln, print, println};
 use indexmap::{IndexMap, IndexSet};
 use oneil_runtime::output::{
-    DebugInfo, Parameter, PrintLevel, TestResult, Value,
-    reference::{EvalErrorReference, ModelReference},
+    DebugInfo, Parameter, PrintLevel, TestResult, Value, reference::ModelReference,
 };
-use oneil_shared::{error::OneilError, span::Span};
+use oneil_shared::span::Span;
 
 use crate::{
     command::{PrintMode, Variable, VariableList},
-    print_error, print_utils, stylesheet,
+    print_utils, stylesheet,
 };
 
 #[expect(
@@ -23,38 +22,19 @@ pub struct ModelPrintConfig {
     pub print_debug_info: bool,
     pub variables: Option<VariableList>,
     pub recursive: bool,
-    pub display_partial_results: bool,
     pub no_header: bool,
     pub no_test_report: bool,
     pub no_parameters: bool,
-    pub show_internal_errors: bool,
 }
 
-pub fn print_eval_result(
-    eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
-    model_config: &ModelPrintConfig,
-) {
-    let (top_model, errors) = unwrap_eval_result(eval_result);
-
-    for error in &errors {
-        print_error::print(error, model_config.show_internal_errors);
-    }
-
-    if !errors.is_empty() && !model_config.display_partial_results {
-        return;
-    }
-
-    let Some(top_model) = top_model else {
-        return;
-    };
-
-    let test_info = get_model_tests(top_model, model_config.recursive, TestInfo::default());
+pub fn print_eval_result(eval_result: ModelReference<'_>, model_config: &ModelPrintConfig) {
+    let test_info = get_model_tests(eval_result, model_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
     println!("{divider_line}");
 
     if !model_config.no_header {
-        print_model_header(top_model.path(), &test_info);
+        print_model_header(eval_result.path(), &test_info);
     }
 
     if !model_config.no_test_report {
@@ -63,9 +43,9 @@ pub fn print_eval_result(
 
     if !model_config.no_parameters {
         if let Some(variables) = &model_config.variables {
-            print_parameters_by_list(top_model, model_config.print_debug_info, variables);
+            print_parameters_by_list(eval_result, model_config.print_debug_info, variables);
         } else {
-            print_parameters_by_filter(top_model, model_config.print_debug_info, model_config);
+            print_parameters_by_filter(eval_result, model_config.print_debug_info, model_config);
         }
     }
 }
@@ -83,89 +63,19 @@ pub struct TestPrintConfig {
     pub show_internal_errors: bool,
 }
 
-pub fn print_test_results(
-    eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
-    test_config: &TestPrintConfig,
-) {
-    let (top_model, errors) = unwrap_eval_result(eval_result);
-
-    for error in &errors {
-        print_error::print(error, test_config.show_internal_errors);
-    }
-
-    if !errors.is_empty() && !test_config.display_partial_results {
-        return;
-    }
-
-    let Some(top_model) = top_model else {
-        return;
-    };
-
-    let test_info = get_model_tests(top_model, test_config.recursive, TestInfo::default());
+pub fn print_test_results(eval_result: ModelReference<'_>, test_config: &TestPrintConfig) {
+    let test_info = get_model_tests(eval_result, test_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
     println!("{divider_line}");
 
     if !test_config.no_header {
-        print_model_header(top_model.path(), &test_info);
+        print_model_header(eval_result.path(), &test_info);
     }
 
     if !test_config.no_test_report {
-        print_all_tests(top_model, test_config.recursive);
+        print_all_tests(eval_result, test_config.recursive);
     }
-}
-
-/// Collects all errors from the evaluation result by traversing the model hierarchy,
-/// and returns the top-level model (if any) and the collected errors.
-///
-/// The top-level model is present when the result is `Ok`, or when it is `Err` but
-/// has a partial result. Uses a depth-first search over references to collect
-/// errors from every nested evaluation failure.
-fn unwrap_eval_result<'a>(
-    eval_result: Result<ModelReference<'a>, EvalErrorReference<'a>>,
-) -> (Option<ModelReference<'a>>, Vec<OneilError>) {
-    // unwrap the top model if it exists
-    let top_model = match &eval_result {
-        Ok(r) => Some(*r),
-        Err(e) => e.partial_result(),
-    };
-
-    let errors = extract_errors(eval_result);
-
-    (top_model, errors)
-}
-
-fn extract_errors(
-    eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
-) -> Vec<OneilError> {
-    let mut errors = Vec::new();
-
-    let mut stack: Vec<Result<_, EvalErrorReference<'_>>> = match &eval_result {
-        Ok(r) => vec![Ok(*r)],
-        Err(e) => {
-            errors.extend(e.model_errors());
-            e.partial_result()
-                .map_or_else(Vec::new, |partial| vec![Ok(partial)])
-        }
-    };
-
-    while let Some(r) = stack.pop() {
-        match r {
-            Err(e) => {
-                errors.extend(e.model_errors());
-                if let Some(partial) = e.partial_result() {
-                    stack.push(Ok(partial));
-                }
-            }
-            Ok(model_ref) => {
-                for nested in model_ref.references().values() {
-                    stack.push(*nested);
-                }
-            }
-        }
-    }
-
-    errors
 }
 
 #[derive(Default)]
@@ -203,12 +113,8 @@ fn get_model_tests<'result>(
         model_ref
             .references()
             .values()
-            .filter_map(|submodel| match submodel {
-                Ok(submodel) => Some(*submodel),
-                Err(e) => e.partial_result(),
-            })
             .fold(test_info, |test_info, submodel| {
-                get_model_tests(submodel, recursive, test_info)
+                get_model_tests(*submodel, recursive, test_info)
             })
     } else {
         test_info
@@ -395,18 +301,15 @@ fn get_parameter_from_model<'result>(
         //       the submodel name might be different from the reference name
         let references = model_ref.references();
         let submodels = model_ref.submodels();
-        let model = references
-            .get(submodel.as_str())
-            .or_else(|| {
-                submodels.get(submodel.as_str()).map(|r| {
-                    references
-                        .get(r)
-                        .expect("submodel reference should be found")
-                })
+        let model = references.get(submodel.as_str()).or_else(|| {
+            submodels.get(submodel.as_str()).map(|r| {
+                references
+                    .get(r)
+                    .expect("submodel reference should be found")
             })
-            .and_then(|r| r.ok())?;
+        })?;
 
-        recurse(model, parameter, param_vec)
+        recurse(*model, parameter, param_vec)
     }
 }
 
@@ -492,15 +395,9 @@ fn get_model_parameters_by_filter(
         if recursive {
             // NOTE: all submodels are also references, so we can simply use the references map
             let references = model_ref.references();
-            references
-                .values()
-                .filter_map(|submodel| match submodel {
-                    Ok(submodel) => Some(*submodel),
-                    Err(e) => e.partial_result(),
-                })
-                .fold(parameters, |parameters, model| {
-                    recurse(model, print_level, recursive, parameters)
-                })
+            references.values().fold(parameters, |parameters, model| {
+                recurse(*model, print_level, recursive, parameters)
+            })
         } else {
             parameters
         }
@@ -608,14 +505,7 @@ fn print_all_tests(model_ref: ModelReference<'_>, recursive: bool) {
         }
 
         for reference in model_ref.references().values() {
-            let reference = match reference {
-                Ok(r) => Some(*r),
-                Err(e) => e.partial_result(),
-            };
-
-            if let Some(r) = reference {
-                print_all_tests(r, recursive);
-            }
+            print_all_tests(*reference, recursive);
         }
     }
 }

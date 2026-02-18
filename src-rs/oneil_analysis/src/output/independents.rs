@@ -45,4 +45,9 @@ impl Independents {
     pub fn extend(&mut self, other: Self) {
         self.inner.extend(other.inner);
     }
+
+    /// Returns an iterator over (model path, independent name → value) entries.
+    pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &IndexMap<String, Value>)> {
+        self.inner.iter()
+    }
 }
