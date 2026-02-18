@@ -149,6 +149,48 @@ impl PyInterval {
         }
     }
 
+    /// Returns the sine of the interval (angle in radians).
+    fn sin(&self) -> Self {
+        Self {
+            inner: self.inner.sin(),
+        }
+    }
+
+    /// Returns the cosine of the interval (angle in radians).
+    fn cos(&self) -> Self {
+        Self {
+            inner: self.inner.cos(),
+        }
+    }
+
+    /// Returns the tangent of the interval (angle in radians).
+    fn tan(&self) -> Self {
+        Self {
+            inner: self.inner.tan(),
+        }
+    }
+
+    /// Returns the arc sine of the interval (result in radians).
+    fn asin(&self) -> Self {
+        Self {
+            inner: self.inner.asin(),
+        }
+    }
+
+    /// Returns the arc cosine of the interval (result in radians).
+    fn acos(&self) -> Self {
+        Self {
+            inner: self.inner.acos(),
+        }
+    }
+
+    /// Returns the arc tangent of the interval (result in radians).
+    fn atan(&self) -> Self {
+        Self {
+            inner: self.inner.atan(),
+        }
+    }
+
     /// Returns the interval of values rounded down to the nearest integer.
     fn floor(&self) -> Self {
         Self {
