@@ -390,6 +390,219 @@ impl Interval {
             Self::new(self.min.log2(), self.max.log2())
         }
     }
+
+    /// Returns the sine of the interval.
+    ///
+    /// The result is the tightest interval containing the image of this
+    /// interval under the sine function. The domain of the point function
+    /// is ℝ and the range is \[−1, 1\].
+    ///
+    /// Based on the [inari crate](https://github.com/unageek/inari) implementation.
+    #[must_use]
+    pub fn sin(self) -> Self {
+        if self.is_empty() {
+            return self;
+        }
+
+        let min = self.min;
+        let max = self.max;
+
+        let frac_pi_2 = Self::from(std::f64::consts::FRAC_PI_2);
+
+        let step = (self / frac_pi_2).floor();
+        let step_min = step.min;
+        let step_max = step.max;
+
+        let step_delta = if is_close(min, max) {
+            0.0
+        } else {
+            step_max - step_min
+        };
+
+        // Quarter-period index: 0, 1, 2, 3
+        let min_step_modulo = step_min.rem_euclid(4.0);
+
+        if (is_close(min_step_modulo, 0.0) && step_delta < 1.0)
+            || (is_close(min_step_modulo, 3.0) && step_delta < 2.0)
+        {
+            // monotonically increasing
+            Self::new(min.sin(), max.sin())
+        } else if (is_close(min_step_modulo, 1.0) && step_delta < 2.0)
+            || (is_close(min_step_modulo, 2.0) && step_delta < 1.0)
+        {
+            // monotonically decreasing
+            Self::new(max.sin(), min.sin())
+        } else if (is_close(min_step_modulo, 0.0) && step_delta < 3.0)
+            || (is_close(min_step_modulo, 3.0) && step_delta < 4.0)
+        {
+            // increasing, then decreasing
+            Self::new(f64::min(min.sin(), max.sin()), 1.0)
+        } else if (is_close(min_step_modulo, 1.0) && step_delta < 4.0)
+            || (is_close(min_step_modulo, 2.0) && step_delta < 3.0)
+        {
+            // decreasing, then increasing
+            Self::new(-1.0, f64::max(min.sin(), max.sin()))
+        } else {
+            Self::new(-1.0, 1.0)
+        }
+    }
+
+    /// Returns the cosine of the interval.
+    ///
+    /// The result is the tightest interval containing the image of this
+    /// interval under the cosine function. The domain of the point function
+    /// is ℝ and the range is \[−1, 1\].
+    ///
+    /// Based on the [inari crate](https://github.com/unageek/inari) implementation.
+    #[must_use]
+    pub fn cos(self) -> Self {
+        if self.is_empty() {
+            return self;
+        }
+
+        let min = self.min;
+        let max = self.max;
+
+        let pi = Self::from(std::f64::consts::PI);
+
+        let step = (self / pi).floor();
+        let step_min = step.min;
+        let step_max = step.max;
+
+        let step_delta = if is_close(min, max) {
+            0.0
+        } else {
+            step_max - step_min
+        };
+
+        // Half-period index: 0 or 1 (cos decreases on [0, π], increases on [π, 2π], etc.)
+        let min_step_modulo = step_min.rem_euclid(2.0);
+
+        if is_close(step_delta, 0.0) {
+            if is_close(min_step_modulo, 0.0) {
+                // monotonically decreasing
+                Self::new(max.cos(), min.cos())
+            } else {
+                // monotonically increasing
+                Self::new(min.cos(), max.cos())
+            }
+        } else if is_close(step_delta, 1.0) {
+            if is_close(min_step_modulo, 0.0) {
+                // decreasing, then increasing
+                Self::new(-1.0, f64::max(min.cos(), max.cos()))
+            } else {
+                // increasing, then decreasing
+                Self::new(f64::min(min.cos(), max.cos()), 1.0)
+            }
+        } else {
+            Self::new(-1.0, 1.0)
+        }
+    }
+
+    /// Returns the tangent of the interval.
+    ///
+    /// The result is the tightest interval containing the image of this
+    /// interval under the tangent function, or the entire real line if the
+    /// interval contains a singularity (e.g. π/2 + nπ).
+    ///
+    /// The domain of the point function is ℝ ∖ {(n + 1/2)π ∣ n ∈ ℤ}; the range is ℝ.
+    ///
+    /// Based on the [inari crate](https://github.com/unageek/inari) implementation.
+    #[must_use]
+    pub fn tan(self) -> Self {
+        if self.is_empty() {
+            return self;
+        }
+
+        let min = self.min;
+        let max = self.max;
+
+        let frac_pi_2 = Self::from(std::f64::consts::FRAC_PI_2);
+
+        let step = (self / frac_pi_2).floor();
+        let step_min = step.min;
+        let step_max = step.max;
+
+        let step_delta = if is_close(min, max) {
+            0.0
+        } else {
+            step_max - step_min
+        };
+
+        let min_step_modulo = step_min.rem_euclid(2.0);
+
+        let monotonic = (is_close(min_step_modulo, 0.0) && step_delta <= 1.0)
+            || (is_close(min_step_modulo, 1.0) && step_delta <= 2.0);
+
+        if monotonic {
+            Self::new(min.tan(), max.tan())
+        } else {
+            Self::new(f64::NEG_INFINITY, f64::INFINITY)
+        }
+    }
+
+    /// Returns the arc sine of the interval.
+    ///
+    /// The result is the tightest interval containing the image of this
+    /// interval under the arc sine function. The domain of the point function
+    /// is \[−1, 1\] and the range is \[−π/2, π/2\].
+    ///
+    /// If the interval does not intersect \[−1, 1\], returns an empty interval.
+    ///
+    /// Based on the [inari crate](https://github.com/unageek/inari) implementation.
+    #[must_use]
+    pub fn asin(self) -> Self {
+        const DOMAIN: Interval = Interval::new_unchecked(-1.0, 1.0);
+
+        let x = self.intersection(DOMAIN);
+
+        if x.is_empty() {
+            return Self::empty();
+        }
+
+        // asin is monotonically increasing
+        Self::new(x.min.asin(), x.max.asin())
+    }
+
+    /// Returns the arc cosine of the interval.
+    ///
+    /// The result is the tightest interval containing the image of this
+    /// interval under the arc cosine function. The domain of the point function
+    /// is \[−1, 1\] and the range is \[0, π\].
+    ///
+    /// If the interval does not intersect \[−1, 1\], returns an empty interval.
+    ///
+    /// Based on the [inari crate](https://github.com/unageek/inari) implementation.
+    #[must_use]
+    pub fn acos(self) -> Self {
+        const DOMAIN: Interval = Interval::new_unchecked(-1.0, 1.0);
+
+        let x = self.intersection(DOMAIN);
+
+        if x.is_empty() {
+            return Self::empty();
+        }
+
+        // acos is monotonically decreasing
+        Self::new(x.max.acos(), x.min.acos())
+    }
+
+    /// Returns the arc tangent of the interval.
+    ///
+    /// The result is the tightest interval containing the image of this
+    /// interval under the arc tangent function. The domain of the point function
+    /// is ℝ and the range is (−π/2, π/2).
+    ///
+    /// Based on the [inari crate](https://github.com/unageek/inari) implementation.
+    #[must_use]
+    pub fn atan(self) -> Self {
+        if self.is_empty() {
+            return self;
+        }
+
+        // atan is monotonically increasing
+        Self::new(self.min.atan(), self.max.atan())
+    }
 }
 
 impl From<f64> for Interval {
