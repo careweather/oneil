@@ -38,14 +38,15 @@ fn error_to_string(error: &OneilError) -> String {
     let message_line = get_error_message_line(error.message());
     let location_line = get_location_line(error.path(), error.location());
     let empty_line = String::new();
-    let maybe_source_line = error
-        .location()
-        .map(|location| get_source_lines(location, error.context(), stylesheet::ERROR_COLOR));
+    let maybe_source_line = error.location().map_or_else(
+        || get_context_lines(error.context(), 1),
+        |location| get_source_and_context_lines(location, error.context(), stylesheet::ERROR_COLOR),
+    );
     let context_with_source_lines =
         get_context_with_source_lines(error.path(), error.context_with_source());
 
     let mut lines = vec![message_line, location_line];
-    lines.extend(maybe_source_line);
+    lines.push(maybe_source_line);
     lines.push(empty_line);
     lines.extend(context_with_source_lines);
 
@@ -93,7 +94,7 @@ fn get_location_line(path: &Path, location: Option<&ErrorLocation>) -> String {
 }
 
 /// Formats the source code snippet with error highlighting
-fn get_source_lines(
+fn get_source_and_context_lines(
     location: &ErrorLocation,
     context: &[Context],
     code_highlight_color: Style,
@@ -129,25 +130,32 @@ fn get_source_lines(
     let source_line = format!("{line_label} {bar} {line_source}");
     let pointer_line = format!("{margin} {bar} {pointer_indent}{pointer}{pointer_rest}");
 
-    let context_lines = context.iter().map(|context| {
-        let (equals, context_message) = match context {
-            Context::Note(message) => (
-                stylesheet::NOTE_COLOR.bold().style("="),
-                get_note_message_line(message),
-            ),
-            Context::Help(message) => (
-                stylesheet::HELP_COLOR.bold().style("="),
-                get_help_message_line(message),
-            ),
-        };
-        let context_line = format!("{margin} {equals} {context_message}");
-        context_line
-    });
+    let context_lines = get_context_lines(context, margin_width);
 
-    let mut source_lines = vec![blank_line, source_line, pointer_line];
-    source_lines.extend(context_lines);
+    [blank_line, source_line, pointer_line, context_lines].join("\n")
+}
 
-    source_lines.join("\n")
+fn get_context_lines(context: &[Context], margin_width: u32) -> String {
+    let margin = " ".repeat(margin_width as usize);
+
+    context
+        .iter()
+        .map(|context| {
+            let (equals, context_message) = match context {
+                Context::Note(message) => (
+                    stylesheet::NOTE_COLOR.bold().style("="),
+                    get_note_message_line(message),
+                ),
+                Context::Help(message) => (
+                    stylesheet::HELP_COLOR.bold().style("="),
+                    get_help_message_line(message),
+                ),
+            };
+            let context_line = format!("{margin} {equals} {context_message}");
+            context_line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn get_context_with_source_lines(
@@ -163,7 +171,7 @@ fn get_context_with_source_lines(
             };
 
             let location_line = get_location_line(path, Some(location));
-            let source_lines = get_source_lines(location, &[], context_color);
+            let source_lines = get_source_and_context_lines(location, &[], context_color);
             let empty_line = String::new();
             let mut lines = vec![context_message, location_line];
             lines.push(source_lines);
