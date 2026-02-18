@@ -301,6 +301,21 @@ impl Interval {
         }
     }
 
+    /// Returns the sign of the interval: the tightest interval containing
+    /// the possible sign values (-1, 0, or 1).
+    #[must_use]
+    pub fn sign(self) -> Self {
+        match classify(&self) {
+            IntervalClass::Empty => Self::empty(),
+            IntervalClass::Zero => Self::zero(),
+            IntervalClass::Positive1 => Self::new(1.0, 1.0),
+            IntervalClass::Positive0 => Self::new(0.0, 1.0),
+            IntervalClass::Mixed => Self::new(-1.0, 1.0),
+            IntervalClass::Negative0 => Self::new(-1.0, 0.0),
+            IntervalClass::Negative1 => Self::new(-1.0, -1.0),
+        }
+    }
+
     /// Returns the natural logarithm of the interval
     ///
     /// This is defined based on Brendon's reasoning and

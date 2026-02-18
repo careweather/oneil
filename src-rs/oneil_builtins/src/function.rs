@@ -561,14 +561,39 @@ mod fns {
     pub const SIGN_DESCRIPTION: &str =
         "Compute the sign of a number, returning -1 for negative, 0 for zero, or 1 for positive.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the sign of the single numerical argument (-1, 0, or 1).
+    ///
+    /// For measured numbers, the unit is dropped since sign is dimensionless.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn sign(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("sign".to_string()),
-            will_be_supported: true,
-        }])
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "sign".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Exact(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let (arg, arg_span) = args.into_iter().next().expect("there should be one argument");
+        let found_type = arg.type_();
+
+        match arg {
+            Value::Number(number) => Ok(Value::Number(number.sign())),
+            Value::MeasuredNumber(measured) => {
+                let (number, _unit) = measured.into_number_and_unit();
+                Ok(Value::Number(number.sign()))
+            }
+            Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type,
+                found_span: arg_span,
+            }]),
+        }
     }
 
     pub const MID_DESCRIPTION: &str = "Compute the midpoint.\n\nWith one argument (an interval), returns the midpoint of the interval.\n\nWith two arguments, returns the midpoint between them.";
