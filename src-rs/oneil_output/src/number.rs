@@ -375,6 +375,15 @@ impl MeasuredNumber {
             unit: self.unit,
         }
     }
+
+    /// Returns the absolute value of the measured number.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.abs(),
+            unit: self.unit,
+        }
+    }
 }
 
 impl PartialEq for MeasuredNumber {
@@ -666,6 +675,12 @@ impl NormalizedNumber {
     #[must_use]
     pub fn log2(self) -> Self {
         Self(self.0.log2())
+    }
+
+    /// Returns the absolute value of the normalized number.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        Self(self.0.abs())
     }
 }
 
@@ -1047,6 +1062,15 @@ impl Number {
         match self {
             Self::Scalar(value) => Self::Scalar(value.log2()),
             Self::Interval(interval) => Self::Interval(interval.log2()),
+        }
+    }
+
+    /// Returns the absolute value of the number.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.abs()),
+            Self::Interval(interval) => Self::Interval(interval.abs()),
         }
     }
 }
