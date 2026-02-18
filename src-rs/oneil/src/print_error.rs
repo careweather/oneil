@@ -39,7 +39,7 @@ fn error_to_string(error: &OneilError) -> String {
     let location_line = get_location_line(error.path(), error.location());
     let empty_line = String::new();
     let maybe_source_line = error.location().map_or_else(
-        || get_context_lines(error.context(), 1),
+        || get_context_lines(error.context(), 0),
         |location| get_source_and_context_lines(location, error.context(), stylesheet::ERROR_COLOR),
     );
     let context_with_source_lines =
