@@ -316,6 +316,24 @@ impl Interval {
         }
     }
 
+    /// Returns the interval of values rounded down to the nearest integer.
+    #[must_use]
+    pub fn floor(self) -> Self {
+        if self.is_empty() {
+            return Self::empty();
+        }
+        Self::new(self.min.floor(), self.max.floor())
+    }
+
+    /// Returns the interval of values rounded up to the nearest integer.
+    #[must_use]
+    pub fn ceiling(self) -> Self {
+        if self.is_empty() {
+            return Self::empty();
+        }
+        Self::new(self.min.ceil(), self.max.ceil())
+    }
+
     /// Returns the natural logarithm of the interval
     ///
     /// This is defined based on Brendon's reasoning and

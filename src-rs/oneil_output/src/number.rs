@@ -384,6 +384,24 @@ impl MeasuredNumber {
             unit: self.unit,
         }
     }
+
+    /// Returns the measured number rounded down to the nearest integer.
+    #[must_use]
+    pub fn floor(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.floor(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the measured number rounded up to the nearest integer.
+    #[must_use]
+    pub fn ceiling(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.ceiling(),
+            unit: self.unit,
+        }
+    }
 }
 
 impl PartialEq for MeasuredNumber {
@@ -681,6 +699,18 @@ impl NormalizedNumber {
     #[must_use]
     pub fn abs(self) -> Self {
         Self(self.0.abs())
+    }
+
+    /// Returns the normalized number rounded down to the nearest integer.
+    #[must_use]
+    pub fn floor(self) -> Self {
+        Self(self.0.floor())
+    }
+
+    /// Returns the normalized number rounded up to the nearest integer.
+    #[must_use]
+    pub fn ceiling(self) -> Self {
+        Self(self.0.ceiling())
     }
 }
 
@@ -1082,6 +1112,24 @@ impl Number {
         match self {
             Self::Scalar(value) => Self::Scalar(value.signum()),
             Self::Interval(interval) => Self::Interval(interval.sign()),
+        }
+    }
+
+    /// Returns the number rounded down to the nearest integer.
+    #[must_use]
+    pub fn floor(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.floor()),
+            Self::Interval(interval) => Self::Interval(interval.floor()),
+        }
+    }
+
+    /// Returns the number rounded up to the nearest integer.
+    #[must_use]
+    pub fn ceiling(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.ceil()),
+            Self::Interval(interval) => Self::Interval(interval.ceiling()),
         }
     }
 }
