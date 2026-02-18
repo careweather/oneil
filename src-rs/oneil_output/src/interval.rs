@@ -531,8 +531,12 @@ impl Interval {
 
         let min_step_modulo = step_min.rem_euclid(2.0);
 
-        let monotonic = (is_close(min_step_modulo, 0.0) && step_delta <= 1.0)
-            || (is_close(min_step_modulo, 1.0) && step_delta <= 2.0);
+        let continuous = step_max != f64::INFINITY && max <= step_max * std::f64::consts::FRAC_PI_2;
+
+        let monotonic = (is_close(min_step_modulo, 0.0)
+            && (step_delta < 1.0 || (is_close(step_delta, 1.0) && continuous)))
+            || (is_close(min_step_modulo, 1.0)
+                && (step_delta < 2.0 || (is_close(step_delta, 2.0) && continuous)));
 
         if monotonic {
             Self::new(min.tan(), max.tan())
