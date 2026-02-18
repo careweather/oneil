@@ -222,10 +222,11 @@ impl LanguageServer for Backend {
                 .lock()
                 .expect("if the runtime has panicked elsewhere, it is not in a useful state");
 
-            let result = runtime.load_ir(&current_model_path);
+            let (ir_model, errors) = runtime.load_ir(&current_model_path);
 
-            let Some(ir_model) = result.maybe_partial_ir() else {
-                break 'complete (Ok(None), Some(format!("Error loading IR: {result:?}")));
+            let Some(ir_model) = ir_model else {
+                let errors = errors.to_vec();
+                break 'complete (Ok(None), Some(format!("Error loading IR: {errors:?}")));
             };
 
             // Find the symbol at the cursor position
