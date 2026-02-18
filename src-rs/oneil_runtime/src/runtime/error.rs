@@ -10,7 +10,10 @@ use oneil_shared::error::OneilError;
 use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
-use crate::output::error::{ModelError, RuntimeErrors};
+use crate::{
+    error::PythonImportError,
+    output::error::{ModelError, RuntimeErrors},
+};
 
 impl Runtime {
     /// Returns all errors associated with the given model, as well as any
@@ -141,7 +144,9 @@ impl Runtime {
             );
         }
 
-        if let Some(Err(load_err)) = self.python_import_cache.get_entry(python_import_path) {
+        if let Some(Err(load_err)) = self.python_import_cache.get_entry(python_import_path)
+            && let PythonImportError::LoadFailed(load_err) = load_err
+        {
             errors.add_model_error(
                 path_buf.clone(),
                 ModelError::FileError(vec![OneilError::from_error(load_err, path_buf)]),

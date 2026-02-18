@@ -36,13 +36,3 @@ pub enum PythonImportError {
     /// Python or the loader reported an error.
     LoadFailed(oneil_python::LoadPythonImportError),
 }
-
-#[cfg(feature = "python")]
-impl oneil_shared::error::AsOneilError for PythonImportError {
-    fn message(&self) -> String {
-        match self {
-            Self::HasSourceError => "Could not load source for Python import".to_string(),
-            Self::LoadFailed(e) => e.message(),
-        }
-    }
-}
