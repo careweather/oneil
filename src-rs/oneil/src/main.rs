@@ -75,16 +75,16 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
     match command {
         DevCommand::PrintAst {
             files,
-            display_partial,
+            partial: display_partial,
         } => handle_print_ast(&files, display_partial, show_internal_errors),
         DevCommand::PrintIr {
             file,
-            display_partial,
+            partial: display_partial,
             recursive,
         } => handle_print_ir(&file, display_partial, recursive, show_internal_errors),
         DevCommand::PrintModelResult {
             file,
-            display_partial,
+            partial: display_partial,
             recursive,
         } => handle_print_model_result(&file, display_partial, recursive, show_internal_errors),
         #[cfg(feature = "python")]
