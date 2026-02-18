@@ -291,77 +291,77 @@ mod fns {
 
     pub const SIN_DESCRIPTION: &str = "Compute the sine of an angle in radians.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn sin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("sin".to_string()),
-            will_be_supported: true,
-        }])
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "sin",
+            |n| Value::Number(n.sin()),
+            |m| Value::Number(m.into_number_and_unit().0.sin()),
+        )
     }
 
     pub const COS_DESCRIPTION: &str = "Compute the cosine of an angle in radians.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn cos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("cos".to_string()),
-            will_be_supported: true,
-        }])
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "cos",
+            |n| Value::Number(n.cos()),
+            |m| Value::Number(m.into_number_and_unit().0.cos()),
+        )
     }
 
     pub const TAN_DESCRIPTION: &str = "Compute the tangent of an angle in radians.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn tan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("tan".to_string()),
-            will_be_supported: true,
-        }])
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "tan",
+            |n| Value::Number(n.tan()),
+            |m| Value::Number(m.into_number_and_unit().0.tan()),
+        )
     }
 
     pub const ASIN_DESCRIPTION: &str =
         "Compute the arcsine (inverse sine) of a value, returning an angle in radians.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn asin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("asin".to_string()),
-            will_be_supported: true,
-        }])
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "asin",
+            |n| Value::Number(n.asin()),
+            |m| Value::Number(m.into_number_and_unit().0.asin()),
+        )
     }
 
     pub const ACOS_DESCRIPTION: &str =
         "Compute the arccosine (inverse cosine) of a value, returning an angle in radians.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn acos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("acos".to_string()),
-            will_be_supported: true,
-        }])
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "acos",
+            |n| Value::Number(n.acos()),
+            |m| Value::Number(m.into_number_and_unit().0.acos()),
+        )
     }
 
     pub const ATAN_DESCRIPTION: &str =
         "Compute the arctangent (inverse tangent) of a value, returning an angle in radians.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
     pub fn atan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("atan".to_string()),
-            will_be_supported: true,
-        }])
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "atan",
+            |n| Value::Number(n.atan()),
+            |m| Value::Number(m.into_number_and_unit().0.atan()),
+        )
     }
 
     pub const SQRT_DESCRIPTION: &str = "Compute the square root of a value.";

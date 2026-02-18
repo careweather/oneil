@@ -1068,6 +1068,60 @@ impl Number {
         }
     }
 
+    /// Returns the sine of the number value (angle in radians).
+    #[must_use]
+    pub fn sin(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.sin()),
+            Self::Interval(interval) => Self::Interval(interval.sin()),
+        }
+    }
+
+    /// Returns the cosine of the number value (angle in radians).
+    #[must_use]
+    pub fn cos(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.cos()),
+            Self::Interval(interval) => Self::Interval(interval.cos()),
+        }
+    }
+
+    /// Returns the tangent of the number value (angle in radians).
+    #[must_use]
+    pub fn tan(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.tan()),
+            Self::Interval(interval) => Self::Interval(interval.tan()),
+        }
+    }
+
+    /// Returns the arc sine of the number value (result in radians).
+    #[must_use]
+    pub fn asin(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.asin()),
+            Self::Interval(interval) => Self::Interval(interval.asin()),
+        }
+    }
+
+    /// Returns the arc cosine of the number value (result in radians).
+    #[must_use]
+    pub fn acos(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.acos()),
+            Self::Interval(interval) => Self::Interval(interval.acos()),
+        }
+    }
+
+    /// Returns the arc tangent of the number value (result in radians).
+    #[must_use]
+    pub fn atan(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.atan()),
+            Self::Interval(interval) => Self::Interval(interval.atan()),
+        }
+    }
+
     /// Returns the natural logarithm of the number value.
     #[must_use]
     pub fn ln(self) -> Self {
