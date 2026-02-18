@@ -27,7 +27,7 @@ use oneil_runtime::{
 use crate::{
     command::{
         BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, IndependentArgs,
-        IrIncludeSection, TestArgs, TreeArgs,
+        IrIncludeSection, ModelResultIncludeSection, TestArgs, TreeArgs,
     },
     print_debug_ast::AstPrintConfig,
     print_debug_ir::IrPrintConfig,
@@ -96,7 +96,17 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
             file,
             partial: display_partial,
             recursive,
-        } => handle_print_model_result(&file, display_partial, recursive, show_internal_errors),
+            include,
+        } => {
+            let sections = model_result_sections_from_include(include.as_deref());
+            handle_print_model_result(
+                &file,
+                display_partial,
+                recursive,
+                &sections,
+                show_internal_errors,
+            );
+        }
         #[cfg(feature = "python")]
         DevCommand::PrintPythonImports { files } => {
             handle_print_python_imports(&files, show_internal_errors);
@@ -252,14 +262,50 @@ fn handle_print_ir(
     }
 }
 
+/// Builds `ModelResultSections` from `--include` list: if None or empty, show all sections;
+/// otherwise only the listed sections.
+fn model_result_sections_from_include(
+    include: Option<&[ModelResultIncludeSection]>,
+) -> print_debug_model_result::ModelResultSections {
+    let list = match include {
+        None | Some([]) => return print_debug_model_result::ModelResultSections::All,
+        Some(s) => s,
+    };
+
+    let mut submodels = false;
+    let mut references = false;
+    let mut parameters = false;
+    let mut tests = false;
+
+    for &section in list {
+        match section {
+            ModelResultIncludeSection::Submodels => submodels = true,
+            ModelResultIncludeSection::References => references = true,
+            ModelResultIncludeSection::Parameters => parameters = true,
+            ModelResultIncludeSection::Tests => tests = true,
+        }
+    }
+
+    print_debug_model_result::ModelResultSections::Specified {
+        submodels,
+        references,
+        parameters,
+        tests,
+    }
+}
+
 /// Handles the `dev print-model-result` command.
 fn handle_print_model_result(
     file: &Path,
     display_partial: bool,
     recursive: bool,
+    sections: &print_debug_model_result::ModelResultSections,
     show_internal_errors: bool,
 ) {
-    let config = print_debug_model_result::DebugModelResultPrintConfig { recursive };
+    let config = print_debug_model_result::DebugModelResultPrintConfig {
+        recursive,
+        sections: sections.clone(),
+    };
 
     let mut runtime = Runtime::new();
     let (model_opt, errors) = runtime.eval_model(file);
