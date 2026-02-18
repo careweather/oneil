@@ -351,6 +351,13 @@ pub enum DevCommand {
         /// nested model results are also printed.
         #[arg(long, short = 'r', default_value_t = false)]
         recursive: bool,
+
+        /// Include only the given parts of the result (comma-separated)
+        ///
+        /// Valid values: submodels, references, parameters, tests.
+        /// If not specified, all parts are shown.
+        #[arg(long, value_delimiter(','), value_name = "SECTIONS")]
+        include: Option<Vec<ModelResultIncludeSection>>,
     },
     /// Print Python imports from Oneil source file(s)
     #[cfg(feature = "python")]
@@ -383,6 +390,31 @@ impl str::FromStr for IrIncludeSection {
             "tests" => Ok(Self::Tests),
             _ => Err(format!(
                 "unknown section \"{s}\"; valid options are: python, submodels, references, parameters, tests"
+            )),
+        }
+    }
+}
+
+/// Section of the model result that can be selected for `dev print-model-result --include`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelResultIncludeSection {
+    Submodels,
+    References,
+    Parameters,
+    Tests,
+}
+
+impl str::FromStr for ModelResultIncludeSection {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "submodels" => Ok(Self::Submodels),
+            "references" => Ok(Self::References),
+            "parameters" => Ok(Self::Parameters),
+            "tests" => Ok(Self::Tests),
+            _ => Err(format!(
+                "unknown section \"{s}\"; valid options are: submodels, references, parameters, tests"
             )),
         }
     }
