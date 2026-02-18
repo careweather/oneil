@@ -154,10 +154,7 @@ pub fn builtin_functions_complete() -> impl Iterator<Item = (&'static str, Built
 mod fns {
     use oneil_eval::{
         EvalError,
-        error::{
-            ExpectedArgumentCount, ExpectedType,
-            convert::binary_eval_error_to_eval_error,
-        },
+        error::{ExpectedArgumentCount, ExpectedType, convert::binary_eval_error_to_eval_error},
     };
     use oneil_output::{MeasuredNumber, Number, NumberType, Value};
     use oneil_shared::span::Span;
@@ -660,27 +657,69 @@ mod fns {
     pub const STRIP_DESCRIPTION: &str =
         "Strip units from a measured number, returning just the numeric value.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Strips units from a measured number, returning the numeric value.
+    ///
+    /// For a plain number, returns it unchanged. For a measured number,
+    /// returns just the number part (unit discarded).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn strip(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("strip".to_string()),
-            will_be_supported: true,
-        }])
+        helper::unary_numeric(identifier_span, args, "strip", Value::Number, |m| {
+            Value::Number(m.into_number_and_unit().0)
+        })
     }
 
     pub const MNMX_DESCRIPTION: &str =
         "Return both the minimum and maximum values from the given values.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the tightest interval containing all given values (min of mins, max of maxes).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if no arguments are given, or if arguments are not
+    /// homogeneous numbers or measured numbers.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "matches the expected signature"
+    )]
     pub fn mnmx(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("mnmx".to_string()),
-            will_be_supported: true,
-        }])
+        if args.is_empty() {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "mnmx".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::AtLeast(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let number_list = helper::extract_homogeneous_numbers_list(&args)?;
+
+        match number_list {
+            helper::HomogeneousNumberList::Numbers(numbers) => {
+                let result = numbers
+                    .into_iter()
+                    .copied()
+                    .reduce(Number::tightest_enclosing_interval)
+                    .expect("there should be at least one number");
+
+                Ok(Value::Number(result))
+            }
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => {
+                let result = numbers
+                    .into_iter()
+                    .cloned()
+                    .reduce(|a, b| {
+                        a.checked_min_max(&b)
+                            .expect("homogeneous list ensures same unit")
+                    })
+                    .expect("there should be at least one number");
+
+                Ok(Value::MeasuredNumber(result))
+            }
+        }
     }
 }
 
