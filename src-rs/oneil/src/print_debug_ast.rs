@@ -14,20 +14,20 @@ pub fn print(ast_result: &ast::Model, config: &AstPrintConfig) {
 
 /// Prints a model node with its declarations and sections
 fn print_model(model: &ast::Model, indent: usize) {
-    println!("{}Model", "  ".repeat(indent));
+    println!("{}Model", "    ".repeat(indent));
 
     // Print note if present
     if let Some(note) = model.note() {
-        println!("{}├── Note: \"{}\"", "  ".repeat(indent), note.value());
+        println!("{}├── Note: \"{}\"", "    ".repeat(indent), note.value());
     }
 
     // Print declarations
     if !model.decls().is_empty() {
-        println!("{}├── Declarations:", "  ".repeat(indent));
+        println!("{}├── Declarations:", "    ".repeat(indent));
         for (i, decl) in model.decls().iter().enumerate() {
             let is_last = i == model.decls().len() - 1 && model.sections().is_empty();
             let prefix = if is_last { "└──" } else { "├──" };
-            print_decl(decl, indent + 2, prefix);
+            print_decl(decl, indent + 1, prefix);
         }
     }
 
@@ -47,7 +47,7 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
         ast::Decl::Import(import) => {
             println!(
                 "{}{} Import: \"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 prefix,
                 import.path().as_str()
             );
@@ -58,7 +58,7 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
             let alias = format!(" as {}", alias.as_str());
             println!(
                 "{}{} UseModel: \"{}\"{}",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 prefix,
                 use_model.model_info().top_component().as_str(),
                 alias
@@ -74,7 +74,7 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
                     .collect();
                 println!(
                     "{}    └── Subcomponents: [{}]",
-                    "  ".repeat(indent),
+                    "    ".repeat(indent),
                     subcomps.join(", ")
                 );
             }
@@ -82,7 +82,7 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
         ast::Decl::Parameter(param) => {
             println!(
                 "{}{} Parameter: {}",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 prefix,
                 param.ident().as_str()
             );
@@ -90,52 +90,56 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
             // Print parameter details
             println!(
                 "{}    ├── Label: \"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 param.label().as_str()
             );
 
             // Print parameter value
-            println!("{}    ├── Value:", "  ".repeat(indent));
-            print_parameter_value(param.value(), indent + 4);
+            println!("{}    ├── Value:", "    ".repeat(indent));
+            print_parameter_value(param.value(), indent + 2);
 
             // Print limits if any
             if let Some(limits) = param.limits() {
-                println!("{}    ├── Limits:", "  ".repeat(indent));
-                print_limits(limits, indent + 4);
+                println!("{}    ├── Limits:", "    ".repeat(indent));
+                print_limits(limits, indent + 2);
             }
 
             // Print performance marker if any
             if param.performance_marker().is_some() {
-                println!("{}    ├── Performance Marker", "  ".repeat(indent));
+                println!("{}    ├── Performance Marker", "    ".repeat(indent));
             }
 
             // Print trace level if any
             if let Some(trace_level) = param.trace_level() {
                 println!(
                     "{}    ├── Trace Level: {:?}",
-                    "  ".repeat(indent),
+                    "    ".repeat(indent),
                     trace_level
                 );
             }
 
             // Print note if any
             if let Some(note) = param.note() {
-                println!("{}    └── Note: \"{}\"", "  ".repeat(indent), note.value());
+                println!(
+                    "{}    └── Note: \"{}\"",
+                    "    ".repeat(indent),
+                    note.value()
+                );
             }
         }
         ast::Decl::Test(test) => {
-            println!("{}{} Test:", "  ".repeat(indent), prefix);
+            println!("{}{} Test:", "    ".repeat(indent), prefix);
 
             if let Some(trace_level) = test.trace_level() {
                 println!(
                     "{}    ├── Trace Level: {:?}",
-                    "  ".repeat(indent),
+                    "    ".repeat(indent),
                     trace_level
                 );
             }
 
-            println!("{}    └── Expression:", "  ".repeat(indent));
-            print_expression(test.expr(), indent + 4);
+            println!("{}    └── Expression:", "    ".repeat(indent));
+            print_expression(test.expr(), indent + 2);
         }
     }
 }
@@ -144,14 +148,18 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
 fn print_section(section: &ast::SectionNode, indent: usize, prefix: &str) {
     println!(
         "{}{} Section: \"{}\"",
-        "  ".repeat(indent),
+        "    ".repeat(indent),
         prefix,
         section.header().label().as_str()
     );
 
     // Print section note if present
     if let Some(note) = section.note() {
-        println!("{}    ├── Note: \"{}\"", "  ".repeat(indent), note.value());
+        println!(
+            "{}    ├── Note: \"{}\"",
+            "    ".repeat(indent),
+            note.value()
+        );
     }
 
     // Print section declarations
@@ -159,7 +167,7 @@ fn print_section(section: &ast::SectionNode, indent: usize, prefix: &str) {
         for (i, decl) in section.decls().iter().enumerate() {
             let is_last = i == section.decls().len() - 1;
             let sub_prefix = if is_last { "└──" } else { "├──" };
-            print_decl(decl, indent + 2, sub_prefix);
+            print_decl(decl, indent + 1, sub_prefix);
         }
     }
 }
@@ -168,26 +176,30 @@ fn print_section(section: &ast::SectionNode, indent: usize, prefix: &str) {
 fn print_expression(expr: &ast::ExprNode, indent: usize) {
     match &**expr {
         ast::Expr::BinaryOp { op, left, right } => {
-            println!("{}BinaryOp: {:?}", "  ".repeat(indent), op);
-            print_expression(left, indent + 2);
-            print_expression(right, indent + 2);
+            println!("{}BinaryOp: {:?}", "    ".repeat(indent), op);
+            print_expression(left, indent + 1);
+            print_expression(right, indent + 1);
         }
         ast::Expr::UnaryOp { op, expr } => {
-            println!("{}UnaryOp: {:?}", "  ".repeat(indent), op);
-            print_expression(expr, indent + 2);
+            println!("{}UnaryOp: {:?}", "    ".repeat(indent), op);
+            print_expression(expr, indent + 1);
         }
         ast::Expr::FunctionCall { name, args } => {
-            println!("{}FunctionCall: \"{}\"", "  ".repeat(indent), name.as_str());
+            println!(
+                "{}FunctionCall: \"{}\"",
+                "    ".repeat(indent),
+                name.as_str()
+            );
             for (i, arg) in args.iter().enumerate() {
                 let is_last = i == args.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Arg {}:", "  ".repeat(indent), prefix, i + 1);
-                print_expression(arg, indent + 4);
+                println!("{}    {}Arg {}:", "    ".repeat(indent), prefix, i + 1);
+                print_expression(arg, indent + 2);
             }
         }
         ast::Expr::Parenthesized { expr } => {
-            println!("{}Parenthesized:", "  ".repeat(indent));
-            print_expression(expr, indent + 2);
+            println!("{}Parenthesized:", "    ".repeat(indent));
+            print_expression(expr, indent + 1);
         }
         ast::Expr::ComparisonOp {
             op,
@@ -195,14 +207,14 @@ fn print_expression(expr: &ast::ExprNode, indent: usize) {
             right,
             rest_chained,
         } => {
-            println!("{}ComparisonOp: {:?}", "  ".repeat(indent), op);
-            print_expression(left, indent + 2);
-            print_expression(right, indent + 2);
+            println!("{}ComparisonOp: {:?}", "    ".repeat(indent), op);
+            print_expression(left, indent + 1);
+            print_expression(right, indent + 1);
             for (i, (op, expr)) in rest_chained.iter().enumerate() {
                 let is_last = i == rest_chained.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Chained: {:?}", "  ".repeat(indent), prefix, op);
-                print_expression(expr, indent + 4);
+                println!("{}    {}Chained: {:?}", "    ".repeat(indent), prefix, op);
+                print_expression(expr, indent + 2);
             }
         }
         ast::Expr::Variable(var) => {
@@ -218,7 +230,7 @@ fn print_expression(expr: &ast::ExprNode, indent: usize) {
 fn print_variable(var: &ast::VariableNode, indent: usize) {
     match &**var {
         ast::Variable::Identifier(id) => {
-            println!("{}Variable: \"{}\"", "  ".repeat(indent), id.as_str());
+            println!("{}Variable: \"{}\"", "    ".repeat(indent), id.as_str());
         }
         ast::Variable::ModelParameter {
             reference_model,
@@ -226,7 +238,7 @@ fn print_variable(var: &ast::VariableNode, indent: usize) {
         } => {
             println!(
                 "{}ReferenceModelParameter: \"{}.{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 reference_model.as_str(),
                 parameter.as_str()
             );
@@ -238,13 +250,13 @@ fn print_variable(var: &ast::VariableNode, indent: usize) {
 fn print_literal(lit: &ast::LiteralNode, indent: usize) {
     match &**lit {
         ast::Literal::Number(n) => {
-            println!("{}Literal: {}", "  ".repeat(indent), n);
+            println!("{}Literal: {}", "    ".repeat(indent), n);
         }
         ast::Literal::String(s) => {
-            println!("{}Literal: \"{}\"", "  ".repeat(indent), s);
+            println!("{}Literal: \"{}\"", "    ".repeat(indent), s);
         }
         ast::Literal::Boolean(b) => {
-            println!("{}Literal: {}", "  ".repeat(indent), b);
+            println!("{}Literal: {}", "    ".repeat(indent), b);
         }
     }
 }
@@ -253,27 +265,27 @@ fn print_literal(lit: &ast::LiteralNode, indent: usize) {
 fn print_parameter_value(value: &ast::ParameterValueNode, indent: usize) {
     match &**value {
         ast::ParameterValue::Simple(expr, unit) => {
-            println!("{}Simple:", "  ".repeat(indent));
-            print_expression(expr, indent + 2);
+            println!("{}Simple:", "    ".repeat(indent));
+            print_expression(expr, indent + 1);
             if let Some(unit_expr) = unit {
-                println!("{}Unit:", "  ".repeat(indent));
-                print_unit_expression(unit_expr, indent + 2);
+                println!("{}Unit:", "    ".repeat(indent));
+                print_unit_expression(unit_expr, indent + 1);
             }
         }
         ast::ParameterValue::Piecewise(parts, unit) => {
-            println!("{}Piecewise:", "  ".repeat(indent));
+            println!("{}Piecewise:", "    ".repeat(indent));
             for (i, part) in parts.iter().enumerate() {
                 let is_last = i == parts.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Part {}:", "  ".repeat(indent), prefix, i + 1);
-                println!("{}        ├── Expression:", "  ".repeat(indent));
-                print_expression(part.expr(), indent + 6);
-                println!("{}        └── Condition:", "  ".repeat(indent));
-                print_expression(part.if_expr(), indent + 6);
+                println!("{}    {}Part {}:", "    ".repeat(indent), prefix, i + 1);
+                println!("{}        ├── Expression:", "    ".repeat(indent));
+                print_expression(part.expr(), indent + 3);
+                println!("{}        └── Condition:", "    ".repeat(indent));
+                print_expression(part.if_expr(), indent + 3);
             }
             if let Some(unit_expr) = unit {
-                println!("{}    └── Unit:", "  ".repeat(indent));
-                print_unit_expression(unit_expr, indent + 4);
+                println!("{}    └── Unit:", "    ".repeat(indent));
+                print_unit_expression(unit_expr, indent + 2);
             }
         }
     }
@@ -283,19 +295,19 @@ fn print_parameter_value(value: &ast::ParameterValueNode, indent: usize) {
 fn print_limits(limits: &ast::LimitsNode, indent: usize) {
     match &**limits {
         ast::Limits::Continuous { min, max } => {
-            println!("{}Continuous:", "  ".repeat(indent));
-            println!("{}    ├── Min:", "  ".repeat(indent));
-            print_expression(min, indent + 4);
-            println!("{}    └── Max:", "  ".repeat(indent));
-            print_expression(max, indent + 4);
+            println!("{}Continuous:", "    ".repeat(indent));
+            println!("{}    ├── Min:", "    ".repeat(indent));
+            print_expression(min, indent + 2);
+            println!("{}    └── Max:", "    ".repeat(indent));
+            print_expression(max, indent + 2);
         }
         ast::Limits::Discrete { values } => {
-            println!("{}Discrete:", "  ".repeat(indent));
+            println!("{}Discrete:", "    ".repeat(indent));
             for (i, value) in values.iter().enumerate() {
                 let is_last = i == values.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Value {}:", "  ".repeat(indent), prefix, i + 1);
-                print_expression(value, indent + 4);
+                println!("{}    {}Value {}:", "    ".repeat(indent), prefix, i + 1);
+                print_expression(value, indent + 2);
             }
         }
     }
@@ -305,25 +317,25 @@ fn print_limits(limits: &ast::LimitsNode, indent: usize) {
 fn print_unit_expression(unit_expr: &ast::UnitExprNode, indent: usize) {
     match &**unit_expr {
         ast::UnitExpr::BinaryOp { op, left, right } => {
-            println!("{}BinaryOp: {:?}", "  ".repeat(indent), op);
-            print_unit_expression(left, indent + 2);
-            print_unit_expression(right, indent + 2);
+            println!("{}BinaryOp: {:?}", "    ".repeat(indent), op);
+            print_unit_expression(left, indent + 1);
+            print_unit_expression(right, indent + 1);
         }
         ast::UnitExpr::Parenthesized { expr } => {
-            println!("{}Parenthesized:", "  ".repeat(indent));
-            print_unit_expression(expr, indent + 2);
+            println!("{}Parenthesized:", "    ".repeat(indent));
+            print_unit_expression(expr, indent + 1);
         }
         ast::UnitExpr::Unit {
             identifier,
             exponent,
         } => {
-            println!("{}Unit: \"{}\"", "  ".repeat(indent), identifier.as_str());
+            println!("{}Unit: \"{}\"", "    ".repeat(indent), identifier.as_str());
             if let Some(exp) = exponent {
-                println!("{}    └── Exponent: {}", "  ".repeat(indent), exp.value());
+                println!("{}    └── Exponent: {}", "    ".repeat(indent), exp.value());
             }
         }
         ast::UnitExpr::UnitOne => {
-            println!("{}Unit: 1", "  ".repeat(indent));
+            println!("{}Unit: 1", "    ".repeat(indent));
         }
     }
 }
