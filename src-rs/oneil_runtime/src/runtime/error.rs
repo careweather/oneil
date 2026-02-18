@@ -317,16 +317,18 @@ fn merge_ir_and_eval_errors(
         (Some(ir), Some(eval)) => MergedErrors {
             models_with_errors: ir
                 .models_with_errors
-                .intersection(&eval.models_with_errors)
+                .union(&eval.models_with_errors)
                 .cloned()
                 .collect(),
             python_imports_with_errors: ir.python_imports_with_errors,
             model_import_errors: ir.model_import_errors,
             python_import_errors: ir.python_import_errors,
-            parameter_errors: ir
+            // note that in the case of the same parameter/test having errors in both IR and eval,
+            // the IR errors are preferred because `ir` comes later in the chain
+            parameter_errors: eval
                 .parameter_errors
                 .into_iter()
-                .chain(eval.parameter_errors)
+                .chain(ir.parameter_errors)
                 .collect(),
             test_errors: ir.test_errors.into_iter().chain(eval.test_errors).collect(),
         },
