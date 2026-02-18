@@ -34,3 +34,38 @@ pub const BUILTIN_ALIASES: Style = Style::new();
 pub const BUILTIN_FUNCTION_ARGS: Style = Style::new().blue();
 pub const BUILTIN_VALUE: Style = Style::new().cyan();
 pub const BUILTIN_NOT_FOUND: Style = Style::new().bold();
+
+/// Styles for `print_debug_*` (AST, IR, model result) tree output.
+pub mod debug {
+    use owo_colors::Style;
+
+    /// Root-level headers: "ModelCollection", "ModelResult", "Model".
+    pub const ROOT_HEADER: Style = Style::new().blue().bold();
+
+    /// Tree branch symbols: ├── └──.
+    pub const TREE: Style = Style::new().dimmed();
+
+    /// Section titles: "Models:", "Python imports", "Parameters", etc.
+    pub const SECTION: Style = Style::new().blue();
+
+    /// Node type labels: "Parameter:", "Model:", "Submodel:", "Reference:", "Test:".
+    pub const LABEL: Style = Style::new().cyan();
+
+    /// Identifiers and paths (quoted names).
+    pub const IDENTIFIER: Style = Style::new().green();
+
+    /// Counts in parentheses: (N).
+    pub const COUNT: Style = Style::new().dimmed();
+
+    /// Sub-labels and metadata: "Value:", "Limits:", "Trace Level:", "Type:".
+    pub const DETAIL: Style = Style::new().dimmed();
+
+    /// Literal values and expression types (e.g. BinaryOp, Literal).
+    pub const LITERAL: Style = Style::new().dimmed();
+
+    /// Test result: passed.
+    pub const TEST_PASSED: Style = Style::new().green();
+
+    /// Test result: failed.
+    pub const TEST_FAILED: Style = Style::new().red();
+}

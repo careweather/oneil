@@ -1,8 +1,9 @@
 //! Abstract Syntax Tree (AST) printing functionality for the Oneil CLI
 
+use anstream::println;
 use oneil_runtime::output::ast;
 
-use anstream::println;
+use crate::stylesheet::debug as dbg_style;
 
 pub struct AstPrintConfig {}
 
@@ -14,16 +15,27 @@ pub fn print(ast_result: &ast::Model, config: &AstPrintConfig) {
 
 /// Prints a model node with its declarations and sections
 fn print_model(model: &ast::Model, indent: usize) {
-    println!("{}Model", "    ".repeat(indent));
+    println!("{}{}", "    ".repeat(indent), dbg_style::ROOT_HEADER.style("Model"));
 
     // Print note if present
     if let Some(note) = model.note() {
-        println!("{}├── Note: \"{}\"", "    ".repeat(indent), note.value());
+        println!(
+            "{} {} {} \"{}\"",
+            "    ".repeat(indent),
+            dbg_style::TREE.style("├──"),
+            dbg_style::DETAIL.style("Note:"),
+            dbg_style::IDENTIFIER.style(note.value())
+        );
     }
 
     // Print declarations
     if !model.decls().is_empty() {
-        println!("{}├── Declarations:", "    ".repeat(indent));
+        println!(
+            "{} {} {}",
+            "    ".repeat(indent),
+            dbg_style::TREE.style("├──"),
+            dbg_style::SECTION.style("Declarations:")
+        );
         for (i, decl) in model.decls().iter().enumerate() {
             let is_last = i == model.decls().len() - 1 && model.sections().is_empty();
             let prefix = if is_last { "└──" } else { "├──" };
@@ -46,22 +58,23 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
     match &**decl {
         ast::Decl::Import(import) => {
             println!(
-                "{}{} Import: \"{}\"",
+                "{}{} {} \"{}\"",
                 "    ".repeat(indent),
-                prefix,
-                import.path().as_str()
+                dbg_style::TREE.style(prefix),
+                dbg_style::LABEL.style("Import:"),
+                dbg_style::IDENTIFIER.style(import.path().as_str())
             );
         }
         ast::Decl::UseModel(use_model) => {
             let alias = use_model.model_info().get_alias();
-
-            let alias = format!(" as {}", alias.as_str());
+            let alias_str = format!(" as {}", alias.as_str());
             println!(
-                "{}{} UseModel: \"{}\"{}",
+                "{}{} {} \"{}\"{}",
                 "    ".repeat(indent),
-                prefix,
-                use_model.model_info().top_component().as_str(),
-                alias
+                dbg_style::TREE.style(prefix),
+                dbg_style::LABEL.style("UseModel:"),
+                dbg_style::IDENTIFIER.style(use_model.model_info().top_component().as_str()),
+                dbg_style::LITERAL.style(alias_str)
             );
 
             // Print subcomponents if any
@@ -73,47 +86,69 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
                     .map(|id| id.as_str().to_string())
                     .collect();
                 println!(
-                    "{}    └── Subcomponents: [{}]",
+                    "{}    {} {} [{}]",
                     "    ".repeat(indent),
-                    subcomps.join(", ")
+                    dbg_style::TREE.style("└──"),
+                    dbg_style::DETAIL.style("Subcomponents:"),
+                    dbg_style::IDENTIFIER.style(subcomps.join(", "))
                 );
             }
         }
         ast::Decl::Parameter(param) => {
             println!(
-                "{}{} Parameter: {}",
+                "{}{} {} {}",
                 "    ".repeat(indent),
-                prefix,
-                param.ident().as_str()
+                dbg_style::TREE.style(prefix),
+                dbg_style::LABEL.style("Parameter:"),
+                dbg_style::IDENTIFIER.style(param.ident().as_str())
             );
 
             // Print parameter details
             println!(
-                "{}    ├── Label: \"{}\"",
+                "{}    {} {} \"{}\"",
                 "    ".repeat(indent),
-                param.label().as_str()
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Label:"),
+                dbg_style::IDENTIFIER.style(param.label().as_str())
             );
 
             // Print parameter value
-            println!("{}    ├── Value:", "    ".repeat(indent));
+            println!(
+                "{}    {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Value:")
+            );
             print_parameter_value(param.value(), indent + 2);
 
             // Print limits if any
             if let Some(limits) = param.limits() {
-                println!("{}    ├── Limits:", "    ".repeat(indent));
+                println!(
+                    "{}    {} {}",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style("├──"),
+                    dbg_style::DETAIL.style("Limits:")
+                );
                 print_limits(limits, indent + 2);
             }
 
             // Print performance marker if any
             if param.performance_marker().is_some() {
-                println!("{}    ├── Performance Marker", "    ".repeat(indent));
+                println!(
+                    "{}    {} {}",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style("├──"),
+                    dbg_style::DETAIL.style("Performance Marker")
+                );
             }
 
             // Print trace level if any
             if let Some(trace_level) = param.trace_level() {
                 println!(
-                    "{}    ├── Trace Level: {:?}",
+                    "{}    {} {} {:?}",
                     "    ".repeat(indent),
+                    dbg_style::TREE.style("├──"),
+                    dbg_style::DETAIL.style("Trace Level:"),
                     trace_level
                 );
             }
@@ -121,24 +156,38 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
             // Print note if any
             if let Some(note) = param.note() {
                 println!(
-                    "{}    └── Note: \"{}\"",
+                    "{}    {} {} \"{}\"",
                     "    ".repeat(indent),
-                    note.value()
+                    dbg_style::TREE.style("└──"),
+                    dbg_style::DETAIL.style("Note:"),
+                    dbg_style::IDENTIFIER.style(note.value())
                 );
             }
         }
         ast::Decl::Test(test) => {
-            println!("{}{} Test:", "    ".repeat(indent), prefix);
+            println!(
+                "{}{} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style(prefix),
+                dbg_style::LABEL.style("Test:")
+            );
 
             if let Some(trace_level) = test.trace_level() {
                 println!(
-                    "{}    ├── Trace Level: {:?}",
+                    "{}    {} {} {:?}",
                     "    ".repeat(indent),
+                    dbg_style::TREE.style("├──"),
+                    dbg_style::DETAIL.style("Trace Level:"),
                     trace_level
                 );
             }
 
-            println!("{}    └── Expression:", "    ".repeat(indent));
+            println!(
+                "{}    {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("└──"),
+                dbg_style::DETAIL.style("Expression:")
+            );
             print_expression(test.expr(), indent + 2);
         }
     }
@@ -147,18 +196,21 @@ fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
 /// Prints a section node
 fn print_section(section: &ast::SectionNode, indent: usize, prefix: &str) {
     println!(
-        "{}{} Section: \"{}\"",
+        "{}{} {} \"{}\"",
         "    ".repeat(indent),
-        prefix,
-        section.header().label().as_str()
+        dbg_style::TREE.style(prefix),
+        dbg_style::LABEL.style("Section:"),
+        dbg_style::IDENTIFIER.style(section.header().label().as_str())
     );
 
     // Print section note if present
     if let Some(note) = section.note() {
         println!(
-            "{}    ├── Note: \"{}\"",
+            "{}    {} {} \"{}\"",
             "    ".repeat(indent),
-            note.value()
+            dbg_style::TREE.style("├──"),
+            dbg_style::DETAIL.style("Note:"),
+            dbg_style::IDENTIFIER.style(note.value())
         );
     }
 

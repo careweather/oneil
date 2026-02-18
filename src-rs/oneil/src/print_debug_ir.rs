@@ -7,6 +7,8 @@ use oneil_runtime::output::{
     reference::{ModelIrReference, ReferenceImportReference, SubmodelImportReference},
 };
 
+use crate::stylesheet::debug as dbg_style;
+
 /// Which sections of the IR to include when printing.
 #[derive(Clone, Debug)]
 pub enum IrSections {
@@ -89,8 +91,12 @@ pub struct IrPrintConfig {
 /// are printed. If there are no errors or `display_partial` is true, the IR is displayed.
 /// When displaying, only the top-level model IR is shown unless `recursive` is true.
 pub fn print(ir_result: ModelIrReference<'_>, ir_print_config: &IrPrintConfig) {
-    println!("ModelCollection");
-    println!("└── Models:");
+    println!("{}", dbg_style::ROOT_HEADER.style("ModelCollection"));
+    println!(
+        "{} {}",
+        dbg_style::TREE.style("└──"),
+        dbg_style::SECTION.style("Models:")
+    );
     let prefix = "└──";
     print_model(ir_result, 1, prefix, ir_print_config);
 }
@@ -105,10 +111,11 @@ fn print_model(
     config: &IrPrintConfig,
 ) {
     println!(
-        "{}  {} Model: \"{}\"",
+        "{}  {} {} \"{}\"",
         "    ".repeat(indent),
-        prefix,
-        model_ref.path().as_ref().display()
+        dbg_style::TREE.style(prefix),
+        dbg_style::LABEL.style("Model:"),
+        dbg_style::IDENTIFIER.style(model_ref.path().as_ref().display())
     );
 
     let sections = &config.sections;
@@ -154,11 +161,11 @@ fn print_model(
         let is_last = i == section_list.len() - 1;
         let section_prefix = if is_last { "└──" } else { "├──" };
         println!(
-            "{}    {} {} ({}):",
+            "{}    {} {} {}:",
             "    ".repeat(indent),
-            section_prefix,
-            section_name,
-            count
+            dbg_style::TREE.style(section_prefix),
+            dbg_style::SECTION.style(section_name),
+            dbg_style::COUNT.style(format!("({})", count))
         );
 
         match tag {
@@ -212,12 +219,12 @@ fn print_python_imports(imports: &IndexMap<ir::PythonPath, ir::PythonImport>, in
         let count = functions.len();
 
         println!(
-            "{}    {}Python import: \"{}\" ({} function{})",
+            "{}    {} {} \"{}\" {}",
             "    ".repeat(indent),
-            prefix,
-            python_path.as_ref().display(),
-            count,
-            if count == 1 { "" } else { "s" }
+            dbg_style::TREE.style(prefix),
+            dbg_style::LABEL.style("Python import:"),
+            dbg_style::IDENTIFIER.style(python_path.as_ref().display()),
+            dbg_style::COUNT.style(format!("({} function{})", count, if count == 1 { "" } else { "s" }))
         );
 
         let func_indent = indent + 1;
@@ -232,10 +239,11 @@ fn print_python_imports(imports: &IndexMap<ir::PythonPath, ir::PythonImport>, in
             };
 
             println!(
-                "{}    {}function: \"{}\"",
+                "{}    {} {} \"{}\"",
                 "    ".repeat(func_indent),
-                func_prefix,
-                name
+                dbg_style::TREE.style(func_prefix),
+                dbg_style::DETAIL.style("function:"),
+                dbg_style::IDENTIFIER.style(name)
             );
         }
     }
@@ -250,11 +258,12 @@ fn print_submodels(
         let is_last = i == submodels.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         println!(
-            "{}    {}Submodel: \"{}\" -> \"{}\"",
+            "{}    {} {} \"{}\" -> \"{}\"",
             "    ".repeat(indent),
-            prefix,
-            identifier.as_str(),
-            submodel.reference_name().as_str()
+            dbg_style::TREE.style(prefix),
+            dbg_style::LABEL.style("Submodel:"),
+            dbg_style::IDENTIFIER.style(identifier.as_str()),
+            dbg_style::IDENTIFIER.style(submodel.reference_name().as_str())
         );
     }
 }
@@ -270,11 +279,12 @@ fn print_references(
         let is_last = i == references.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         println!(
-            "{}    {}Reference: \"{}\" -> \"{}\"",
+            "{}    {} {} \"{}\" -> \"{}\"",
             "    ".repeat(indent),
-            prefix,
-            identifier.as_str(),
-            path.as_ref().display()
+            dbg_style::TREE.style(prefix),
+            dbg_style::LABEL.style("Reference:"),
+            dbg_style::IDENTIFIER.style(identifier.as_str()),
+            dbg_style::IDENTIFIER.style(path.as_ref().display())
         );
     }
 }
@@ -301,10 +311,11 @@ fn print_parameter(
     config: &IrPrintConfig,
 ) {
     println!(
-        "{}    {}Parameter: \"{}\"",
+        "{}    {} {} \"{}\"",
         "    ".repeat(indent),
-        prefix,
-        parameter_name.as_str()
+        dbg_style::TREE.style(prefix),
+        dbg_style::LABEL.style("Parameter:"),
+        dbg_style::IDENTIFIER.style(parameter_name.as_str())
     );
 
     let indent = indent + 1;
@@ -315,22 +326,39 @@ fn print_parameter(
 
     if config.print_values {
         // Print value
-        println!("{}    ├── Value:", "    ".repeat(indent));
+        println!(
+            "{}    {} {}",
+            "    ".repeat(indent),
+            dbg_style::TREE.style("├──"),
+            dbg_style::DETAIL.style("Value:")
+        );
         print_parameter_value(parameter.value(), indent + 1);
 
         // Print limits
-        println!("{}    ├── Limits:", "    ".repeat(indent));
+        println!(
+            "{}    {} {}",
+            "    ".repeat(indent),
+            dbg_style::TREE.style("├──"),
+            dbg_style::DETAIL.style("Limits:")
+        );
         print_limits(parameter.limits(), indent + 1);
     }
 
     // Print metadata
     if parameter.is_performance() {
-        println!("{}    ├── Performance: true", "    ".repeat(indent));
+        println!(
+            "{}    {} {}",
+            "    ".repeat(indent),
+            dbg_style::TREE.style("├──"),
+            dbg_style::DETAIL.style("Performance: true")
+        );
     }
 
     println!(
-        "{}    └── Trace Level: {:?}",
+        "{}    {} {} {:?}",
         "    ".repeat(indent),
+        dbg_style::TREE.style("└──"),
+        dbg_style::DETAIL.style("Trace Level:"),
         parameter.trace_level()
     );
 }
@@ -342,7 +370,12 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
 
     let total_deps = builtin_deps.len() + parameter_deps.len() + external_deps.len();
     if total_deps > 0 {
-        println!("{}    ├── Dependencies:", "    ".repeat(indent));
+        println!(
+            "{}    {} {}",
+            "    ".repeat(indent),
+            dbg_style::TREE.style("├──"),
+            dbg_style::DETAIL.style("Dependencies:")
+        );
         let mut dep_index = 0;
 
         // Print builtin dependencies
@@ -351,10 +384,11 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
             let is_last = dep_index == total_deps;
             let dep_prefix = if is_last { "└──" } else { "├──" };
             println!(
-                "{}        {}Builtin: \"{}\"",
+                "{}        {} {} \"{}\"",
                 "    ".repeat(indent),
-                dep_prefix,
-                ident.as_str()
+                dbg_style::TREE.style(dep_prefix),
+                dbg_style::DETAIL.style("Builtin:"),
+                dbg_style::IDENTIFIER.style(ident.as_str())
             );
         }
 
@@ -364,10 +398,11 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
             let is_last = dep_index == total_deps;
             let dep_prefix = if is_last { "└──" } else { "├──" };
             println!(
-                "{}        {}Parameter: \"{}\"",
+                "{}        {} {} \"{}\"",
                 "    ".repeat(indent),
-                dep_prefix,
-                param_name.as_str()
+                dbg_style::TREE.style(dep_prefix),
+                dbg_style::DETAIL.style("Parameter:"),
+                dbg_style::IDENTIFIER.style(param_name.as_str())
             );
         }
 
@@ -377,11 +412,12 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
             let is_last = dep_index == total_deps;
             let dep_prefix = if is_last { "└──" } else { "├──" };
             println!(
-                "{}        {}External: \"{}\".\"{}\"",
+                "{}        {} {} \"{}\".\"{}\"",
                 "    ".repeat(indent),
-                dep_prefix,
-                param_name.as_str(),
-                ref_name.as_str(),
+                dbg_style::TREE.style(dep_prefix),
+                dbg_style::DETAIL.style("External:"),
+                dbg_style::IDENTIFIER.style(param_name.as_str()),
+                dbg_style::IDENTIFIER.style(ref_name.as_str()),
             );
         }
     }
@@ -391,27 +427,70 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
 fn print_parameter_value(value: &ir::ParameterValue, indent: usize) {
     match value {
         ir::ParameterValue::Simple(expr, unit) => {
-            println!("{}    ├── Type: Simple", "    ".repeat(indent));
-            println!("{}    ├── Expression:", "    ".repeat(indent));
+            println!(
+                "{}    {} {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Type:"),
+                dbg_style::LITERAL.style("Simple")
+            );
+            println!(
+                "{}    {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Expression:")
+            );
             print_expression(expr, indent + 1);
             if let Some(unit) = unit {
-                println!("{}    └── Unit:", "    ".repeat(indent));
+                println!(
+                    "{}    {} {}",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style("└──"),
+                    dbg_style::DETAIL.style("Unit:")
+                );
                 print_unit(unit, indent + 1);
             }
         }
         ir::ParameterValue::Piecewise(exprs, unit) => {
-            println!("{}    ├── Type: Piecewise", "    ".repeat(indent));
+            println!(
+                "{}    {} {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Type:"),
+                dbg_style::LITERAL.style("Piecewise")
+            );
             for (i, piecewise_expr) in exprs.iter().enumerate() {
                 let is_last = i == exprs.len() - 1 && unit.is_none();
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Piece {}:", "    ".repeat(indent), prefix, i + 1);
-                println!("{}        ├── Expression:", "    ".repeat(indent));
+                println!(
+                    "{}    {} {} {}:",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style(prefix),
+                    dbg_style::DETAIL.style("Piece"),
+                    dbg_style::COUNT.style(i + 1)
+                );
+                println!(
+                    "{}        {} {}",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style("├──"),
+                    dbg_style::DETAIL.style("Expression:")
+                );
                 print_expression(piecewise_expr.expr(), indent + 2);
-                println!("{}        └── Condition:", "    ".repeat(indent));
+                println!(
+                    "{}        {} {}",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style("└──"),
+                    dbg_style::DETAIL.style("Condition:")
+                );
                 print_expression(piecewise_expr.if_expr(), indent + 2);
             }
             if let Some(unit) = unit {
-                println!("{}    └── Unit:", "    ".repeat(indent));
+                println!(
+                    "{}    {} {}",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style("└──"),
+                    dbg_style::DETAIL.style("Unit:")
+                );
                 print_unit(unit, indent + 2);
             }
         }
@@ -422,28 +501,62 @@ fn print_parameter_value(value: &ir::ParameterValue, indent: usize) {
 fn print_limits(limits: &ir::Limits, indent: usize) {
     match limits {
         ir::Limits::Default => {
-            println!("{}    └── Type: Default", "    ".repeat(indent));
+            println!(
+                "{}    {} {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("└──"),
+                dbg_style::DETAIL.style("Type:"),
+                dbg_style::LITERAL.style("Default")
+            );
         }
         ir::Limits::Continuous {
             min,
             max,
             limit_expr_span: _,
         } => {
-            println!("{}    ├── Type: Continuous", "    ".repeat(indent));
-            println!("{}    ├── Min:", "    ".repeat(indent));
+            println!(
+                "{}    {} {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Type:"),
+                dbg_style::LITERAL.style("Continuous")
+            );
+            println!(
+                "{}    {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Min:")
+            );
             print_expression(min, indent + 1);
-            println!("{}    └── Max:", "    ".repeat(indent));
+            println!(
+                "{}    {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("└──"),
+                dbg_style::DETAIL.style("Max:")
+            );
             print_expression(max, indent + 1);
         }
         ir::Limits::Discrete {
             values,
             limit_expr_span: _,
         } => {
-            println!("{}    ├── Type: Discrete", "    ".repeat(indent));
+            println!(
+                "{}    {} {} {}",
+                "    ".repeat(indent),
+                dbg_style::TREE.style("├──"),
+                dbg_style::DETAIL.style("Type:"),
+                dbg_style::LITERAL.style("Discrete")
+            );
             for (i, value) in values.iter().enumerate() {
                 let is_last = i == values.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Value {}:", "    ".repeat(indent), prefix, i + 1);
+                println!(
+                    "{}    {} {} {}:",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style(prefix),
+                    dbg_style::DETAIL.style("Value"),
+                    dbg_style::COUNT.style(i + 1)
+                );
                 print_expression(value, indent + 1);
             }
         }
@@ -588,7 +701,13 @@ fn print_tests(tests: &Vec<&ir::Test>, indent: usize, config: &IrPrintConfig) {
     for (i, test) in tests.iter().enumerate() {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        println!("{}    {}Test {:?}:", "    ".repeat(indent), prefix, i + 1);
+        println!(
+            "{}    {} {} {}:",
+            "    ".repeat(indent),
+            dbg_style::TREE.style(prefix),
+            dbg_style::LABEL.style("Test"),
+            dbg_style::COUNT.style(i + 1)
+        );
         print_test(test, indent + 1, config);
     }
 }
@@ -597,16 +716,25 @@ fn print_tests(tests: &Vec<&ir::Test>, indent: usize, config: &IrPrintConfig) {
 fn print_test(test: &ir::Test, indent: usize, config: &IrPrintConfig) {
     if config.print_values {
         println!(
-            "{}    ├── Trace Level: {:?}",
+            "{}    {} {} {:?}",
             "    ".repeat(indent),
+            dbg_style::TREE.style("├──"),
+            dbg_style::DETAIL.style("Trace Level:"),
             test.trace_level()
         );
-        println!("{}    └── Test Expression:", "    ".repeat(indent));
+        println!(
+            "{}    {} {}",
+            "    ".repeat(indent),
+            dbg_style::TREE.style("└──"),
+            dbg_style::DETAIL.style("Test Expression:")
+        );
         print_expression(test.expr(), indent + 1);
     } else {
         println!(
-            "{}    └── Trace Level: {:?}",
+            "{}    {} {} {:?}",
             "    ".repeat(indent),
+            dbg_style::TREE.style("└──"),
+            dbg_style::DETAIL.style("Trace Level:"),
             test.trace_level()
         );
     }
