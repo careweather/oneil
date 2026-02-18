@@ -15,7 +15,11 @@ pub fn print(ast_result: &ast::Model, config: &AstPrintConfig) {
 
 /// Prints a model node with its declarations and sections
 fn print_model(model: &ast::Model, indent: usize) {
-    println!("{}{}", "    ".repeat(indent), dbg_style::ROOT_HEADER.style("Model"));
+    println!(
+        "{}{}",
+        "    ".repeat(indent),
+        dbg_style::ROOT_HEADER.style("Model")
+    );
 
     // Print note if present
     if let Some(note) = model.note() {
@@ -54,6 +58,7 @@ fn print_model(model: &ast::Model, indent: usize) {
 }
 
 /// Prints a declaration node
+#[expect(clippy::too_many_lines, reason = "this is still easy to follow")]
 fn print_decl(decl: &ast::DeclNode, indent: usize, prefix: &str) {
     match &**decl {
         ast::Decl::Import(import) => {

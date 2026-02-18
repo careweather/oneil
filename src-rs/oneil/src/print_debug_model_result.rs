@@ -148,7 +148,7 @@ fn print_model(
             "    ".repeat(indent),
             dbg_style::TREE.style(section_prefix),
             dbg_style::SECTION.style(section_name),
-            dbg_style::COUNT.style(format!("({})", count))
+            dbg_style::COUNT.style(format!("({count})"))
         );
 
         match tag {

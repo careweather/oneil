@@ -165,7 +165,7 @@ fn print_model(
             "    ".repeat(indent),
             dbg_style::TREE.style(section_prefix),
             dbg_style::SECTION.style(section_name),
-            dbg_style::COUNT.style(format!("({})", count))
+            dbg_style::COUNT.style(format!("({count})"))
         );
 
         match tag {
@@ -224,7 +224,11 @@ fn print_python_imports(imports: &IndexMap<ir::PythonPath, ir::PythonImport>, in
             dbg_style::TREE.style(prefix),
             dbg_style::LABEL.style("Python import:"),
             dbg_style::IDENTIFIER.style(python_path.as_ref().display()),
-            dbg_style::COUNT.style(format!("({} function{})", count, if count == 1 { "" } else { "s" }))
+            dbg_style::COUNT.style(format!(
+                "({} function{})",
+                count,
+                if count == 1 { "" } else { "s" }
+            ))
         );
 
         let func_indent = indent + 1;
