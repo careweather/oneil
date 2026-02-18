@@ -616,6 +616,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil_builtins"
+version = "0.15.0"
+dependencies = [
+ "indexmap",
+ "oneil_eval",
+ "oneil_output",
+ "oneil_shared",
+]
+
+[[package]]
 name = "oneil_eval"
 version = "0.15.0"
 dependencies = [
@@ -697,6 +707,7 @@ dependencies = [
  "indexmap",
  "oneil_analysis",
  "oneil_ast",
+ "oneil_builtins",
  "oneil_eval",
  "oneil_ir",
  "oneil_output",

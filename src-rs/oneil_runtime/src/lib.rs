@@ -4,7 +4,6 @@
 mod cache;
 mod runtime;
 mod error;
-mod std_builtin;
 
 pub mod output;
 

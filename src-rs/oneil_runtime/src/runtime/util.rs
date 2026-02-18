@@ -8,7 +8,7 @@ use super::Runtime;
 #[cfg(feature = "python")]
 use crate::cache::PythonImportCache;
 use crate::cache::{AstCache, EvalCache, IrCache, SourceCache};
-use crate::std_builtin::StdBuiltins;
+use oneil_builtins::BuiltinRef;
 
 impl Runtime {
     /// Creates a new runtime instance with empty caches.
@@ -21,7 +21,7 @@ impl Runtime {
             eval_cache: EvalCache::new(),
             #[cfg(feature = "python")]
             python_import_cache: PythonImportCache::new(),
-            builtins: StdBuiltins::new(),
+            builtins: BuiltinRef::new(),
         }
     }
 
