@@ -7,13 +7,34 @@ use shared::IntervalWithValue;
 
 #[derive(Debug, Clone, PartialEq, arbitrary::Arbitrary)]
 enum FuzzData {
+    Abs {
+        val: IntervalWithValue,
+    },
+    Acos {
+        val: IntervalWithValue,
+    },
     Add {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
     },
+    Asin {
+        val: IntervalWithValue,
+    },
+    Atan {
+        val: IntervalWithValue,
+    },
+    Ceiling {
+        val: IntervalWithValue,
+    },
+    Cos {
+        val: IntervalWithValue,
+    },
     Div {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
+    },
+    Floor {
+        val: IntervalWithValue,
     },
     Ln {
         val: IntervalWithValue,
@@ -45,12 +66,21 @@ enum FuzzData {
     //     base: IntervalWithValue,
     //     exponent: IntervalWithValue,
     // },
+    Sign {
+        val: IntervalWithValue,
+    },
+    Sin {
+        val: IntervalWithValue,
+    },
     Sqrt {
         val: IntervalWithValue,
     },
     Sub {
         lhs: IntervalWithValue,
         rhs: IntervalWithValue,
+    },
+    Tan {
+        val: IntervalWithValue,
     },
 }
 
@@ -60,9 +90,45 @@ enum FuzzData {
 
 fuzz_target!(|data: FuzzData| {
     let (interval_result, value_result) = match data {
+        FuzzData::Abs { val } => {
+            let interval_result = val.interval.abs();
+            let value_result = val.value.abs();
+            (interval_result, value_result)
+        }
+        FuzzData::Acos { val } => {
+            if val.value < -1.0 || val.value > 1.0 {
+                return;
+            }
+            let interval_result = val.interval.acos();
+            let value_result = val.value.acos();
+            (interval_result, value_result)
+        }
         FuzzData::Add { lhs, rhs } => {
             let interval_result = lhs.interval + rhs.interval;
             let value_result = lhs.value + rhs.value;
+            (interval_result, value_result)
+        }
+        FuzzData::Asin { val } => {
+            if val.value < -1.0 || val.value > 1.0 {
+                return;
+            }
+            let interval_result = val.interval.asin();
+            let value_result = val.value.asin();
+            (interval_result, value_result)
+        }
+        FuzzData::Atan { val } => {
+            let interval_result = val.interval.atan();
+            let value_result = val.value.atan();
+            (interval_result, value_result)
+        }
+        FuzzData::Ceiling { val } => {
+            let interval_result = val.interval.ceiling();
+            let value_result = val.value.ceil();
+            (interval_result, value_result)
+        }
+        FuzzData::Cos { val } => {
+            let interval_result = val.interval.cos();
+            let value_result = val.value.cos();
             (interval_result, value_result)
         }
         FuzzData::Div { lhs, rhs } => {
@@ -79,6 +145,11 @@ fuzz_target!(|data: FuzzData| {
                 return;
             }
 
+            (interval_result, value_result)
+        }
+        FuzzData::Floor { val } => {
+            let interval_result = val.interval.floor();
+            let value_result = val.value.floor();
             (interval_result, value_result)
         }
         FuzzData::Ln { val } => {
@@ -131,6 +202,16 @@ fuzz_target!(|data: FuzzData| {
         //     }
         //     (interval_result, value_result)
         // }
+        FuzzData::Sign { val } => {
+            let interval_result = val.interval.sign();
+            let value_result = val.value.signum();
+            (interval_result, value_result)
+        }
+        FuzzData::Sin { val } => {
+            let interval_result = val.interval.sin();
+            let value_result = val.value.sin();
+            (interval_result, value_result)
+        }
         FuzzData::Sqrt { val } => {
             let interval_result = val.interval.sqrt();
             let value_result = val.value.sqrt();
@@ -139,6 +220,11 @@ fuzz_target!(|data: FuzzData| {
         FuzzData::Sub { lhs, rhs } => {
             let interval_result = lhs.interval - rhs.interval;
             let value_result = lhs.value - rhs.value;
+            (interval_result, value_result)
+        }
+        FuzzData::Tan { val } => {
+            let interval_result = val.interval.tan();
+            let value_result = val.value.tan();
             (interval_result, value_result)
         }
     };
@@ -150,7 +236,7 @@ fuzz_target!(|data: FuzzData| {
         interval_result.max()
     );
 
-    if !interval_result.is_empty() && !value_result.is_nan() {
+    if !interval_result.is_empty() && value_result.is_finite() {
         assert!(
             value_result <= interval_result.max(),
             "value result ({:?}) is greater than the interval max ({:?}), interval: ({:?}, {:?})",
