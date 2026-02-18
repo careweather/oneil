@@ -5,18 +5,12 @@
 
 use anstream::println;
 use indexmap::IndexMap;
-use oneil_runtime::output::reference::{EvalErrorReference, ModelReference};
-
-use crate::print_error;
+use oneil_runtime::output::reference::ModelReference;
 
 /// Configuration for debug-printing an evaluated model result.
 pub struct DebugModelResultPrintConfig {
-    /// When true, show partial results even if there are errors.
-    pub display_partial: bool,
     /// When true, recurse into submodels and references when printing the tree.
     pub recursive: bool,
-    /// When true, show internal errors that are normally hidden from users.
-    pub show_internal_errors: bool,
 }
 
 /// Prints the evaluated model result in a hierarchical tree format for debugging.
@@ -25,68 +19,11 @@ pub struct DebugModelResultPrintConfig {
 /// errors, they are printed. If there are no errors or `display_partial` is true, the
 /// model result tree is displayed. When displaying, only the top-level model is shown
 /// unless `recursive` is true.
-pub fn print(
-    eval_result: Result<ModelReference<'_>, EvalErrorReference<'_>>,
-    config: &DebugModelResultPrintConfig,
-) {
-    let errors = collect_errors(&eval_result);
-
-    if !errors.is_empty() {
-        for error in &errors {
-            print_error::print(error, config.show_internal_errors);
-        }
-    }
-
-    let should_display = errors.is_empty() || config.display_partial;
-    if !should_display {
-        return;
-    }
-
-    let model_ref = match &eval_result {
-        Ok(r) => Some(*r),
-        Err(e) => e.partial_result(),
-    };
-
-    if let Some(model_ref) = model_ref {
-        println!("ModelResult");
-        println!("└── Models:");
-        let prefix = "└──";
-        print_model(model_ref, 2, prefix, config.recursive);
-    }
-}
-
-/// Collects all errors from the evaluation result by traversing the model hierarchy.
-fn collect_errors(
-    eval_result: &Result<ModelReference<'_>, EvalErrorReference<'_>>,
-) -> Vec<oneil_shared::error::OneilError> {
-    let mut errors = Vec::new();
-
-    let mut stack: Vec<Result<ModelReference<'_>, EvalErrorReference<'_>>> = match eval_result {
-        Ok(r) => vec![Ok(*r)],
-        Err(e) => {
-            errors.extend(e.model_errors());
-            e.partial_result()
-                .map_or_else(Vec::new, |partial| vec![Ok(partial)])
-        }
-    };
-
-    while let Some(r) = stack.pop() {
-        match r {
-            Err(e) => {
-                errors.extend(e.model_errors());
-                if let Some(partial) = e.partial_result() {
-                    stack.push(Ok(partial));
-                }
-            }
-            Ok(model_ref) => {
-                for nested in model_ref.references().values() {
-                    stack.push(*nested);
-                }
-            }
-        }
-    }
-
-    errors
+pub fn print(eval_result: ModelReference<'_>, config: &DebugModelResultPrintConfig) {
+    println!("ModelResult");
+    println!("└── Models:");
+    let prefix = "└──";
+    print_model(eval_result, 2, prefix, config.recursive);
 }
 
 /// Prints a single evaluated model with its components.
@@ -141,13 +78,7 @@ fn print_model(model_ref: ModelReference<'_>, indent: usize, prefix: &str, recur
     }
 
     if recursive {
-        let refs_to_print: Vec<ModelReference<'_>> = references
-            .values()
-            .filter_map(|r| match r {
-                Ok(m) => Some(*m),
-                Err(e) => e.partial_result(),
-            })
-            .collect();
+        let refs_to_print: Vec<ModelReference<'_>> = references.values().copied().collect();
 
         for (i, nested_ref) in refs_to_print.iter().enumerate() {
             let is_last = i == refs_to_print.len() - 1;
@@ -185,19 +116,12 @@ fn print_parameters(parameters: &IndexMap<&str, &oneil_runtime::output::Paramete
     }
 }
 
-fn print_references(
-    references: &IndexMap<&str, Result<ModelReference<'_>, EvalErrorReference<'_>>>,
-    indent: usize,
-) {
+fn print_references(references: &IndexMap<&str, ModelReference<'_>>, indent: usize) {
     for (i, (name, result)) in references.iter().enumerate() {
         let is_last = i == references.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        let path_str = match result {
-            Ok(r) => r.path().display().to_string(),
-            Err(e) => e
-                .partial_result()
-                .map_or_else(|| "<error>".to_string(), |r| r.path().display().to_string()),
-        };
+        let path_str = result.path().display().to_string();
+
         println!(
             "{}    {}Reference: \"{}\" -> \"{}\"",
             "  ".repeat(indent),

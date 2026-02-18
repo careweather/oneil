@@ -24,7 +24,7 @@ impl Runtime {
     pub fn load_python_import(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> (Option<IndexSet<&str>>, RuntimeErrors) {
+    ) -> Result<IndexSet<&str>, RuntimeErrors> {
         let path = path.as_ref();
         self.load_python_import_internal(path);
 
@@ -45,7 +45,7 @@ impl Runtime {
             .and_then(LoadResult::value)
             .map(|functions| functions.get_function_names().collect());
 
-        (names_opt, errors)
+        names_opt.ok_or(errors)
     }
 
     pub(super) fn load_python_import_internal(

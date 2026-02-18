@@ -5,8 +5,8 @@ use std::{
 
 use anstream::{print, println};
 use oneil_runtime::output::{
-    Tree, Value,
-    dependency::{DependencyTreeValue, ReferenceTreeValue},
+    Value,
+    tree::{DependencyTreeValue, ReferenceTreeValue, Tree},
 };
 use oneil_shared::span::Span;
 
