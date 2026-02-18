@@ -1,5 +1,7 @@
 //! Python wrapper for Oneil’s [`MeasuredNumber`].
 
+use std::cmp::Ordering;
+
 use oneil_output::{BinaryEvalError, MeasuredNumber, Number, Unit};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -62,6 +64,37 @@ impl PyMeasuredNumber {
         })
     }
 
+    /// Converts this measured number to a number (float or Interval) in the given unit.
+    fn into_number_using_unit<'py>(
+        &self,
+        unit: &Bound<'_, PyUnit>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let unit: Unit = Unit::from(&*unit.borrow());
+        let number = self.inner.clone().into_number_using_unit(&unit);
+        Ok(number_to_py_any(&number, py))
+    }
+
+    /// Compares two measured numbers. Returns -1, 0, or 1. Raises if units do not match.
+    fn checked_partial_cmp(&self, other: &Bound<'_, Self>) -> PyResult<i8> {
+        self.inner
+            .checked_partial_cmp(&other.borrow().inner)
+            .map(|opt| match opt {
+                Some(Ordering::Less) => -1,
+                Some(Ordering::Equal) => 0,
+                Some(Ordering::Greater) => 1,
+                None => 0,
+            })
+            .map_err(binary_eval_error_to_py_err)
+    }
+
+    /// Returns true if two measured numbers are equal. Raises if units do not match.
+    fn checked_eq(&self, other: &Bound<'_, Self>) -> PyResult<bool> {
+        self.inner
+            .checked_eq(&other.borrow().inner)
+            .map_err(binary_eval_error_to_py_err)
+    }
+
     /// Negates the measured number.
     fn neg(&self) -> Self {
         Self {
@@ -114,6 +147,57 @@ impl PyMeasuredNumber {
             .map_err(binary_eval_error_to_py_err)
     }
 
+    /// Escaped subtraction (min-min, max-max). Raises if units do not match.
+    fn checked_escaped_sub(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
+        self.inner
+            .clone()
+            .checked_escaped_sub(&other.borrow().inner)
+            .map(|inner| Self { inner })
+            .map_err(binary_eval_error_to_py_err)
+    }
+
+    /// Escaped division (min/min, max/max). Raises if units do not match.
+    fn checked_escaped_div(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
+        self.inner
+            .clone()
+            .checked_escaped_div(other.borrow().inner.clone())
+            .map(|inner| Self { inner })
+            .map_err(binary_eval_error_to_py_err)
+    }
+
+    /// Raises this measured number to a scalar exponent. Raises if exponent is an interval.
+    fn checked_pow(&self, exponent: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let exponent_number = py_any_to_number(exponent)?;
+        self.inner
+            .clone()
+            .checked_pow(&exponent_number)
+            .map(|inner| Self { inner })
+            .map_err(binary_eval_error_to_py_err)
+    }
+
+    /// Returns the tightest enclosing interval of this and the other measured number. Raises if units do not match.
+    fn checked_min_max(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
+        self.inner
+            .clone()
+            .checked_min_max(&other.borrow().inner)
+            .map(|inner| Self { inner })
+            .map_err(binary_eval_error_to_py_err)
+    }
+
+    /// Returns the minimum value of the measured number (as a scalar measured number).
+    fn min(&self) -> Self {
+        Self {
+            inner: self.inner.min(),
+        }
+    }
+
+    /// Returns the maximum value of the measured number (as a scalar measured number).
+    fn max(&self) -> Self {
+        Self {
+            inner: self.inner.max(),
+        }
+    }
+
     /// Square root.
     fn sqrt(&self) -> Self {
         Self {
@@ -140,6 +224,35 @@ impl PyMeasuredNumber {
         Self {
             inner: self.inner.clone().log2(),
         }
+    }
+
+    /// Absolute value.
+    fn abs(&self) -> Self {
+        Self {
+            inner: self.inner.clone().abs(),
+        }
+    }
+
+    /// Rounds down to the nearest integer (in this number's unit).
+    fn floor(&self) -> Self {
+        Self {
+            inner: self.inner.clone().floor(),
+        }
+    }
+
+    /// Rounds up to the nearest integer (in this number's unit).
+    fn ceiling(&self) -> Self {
+        Self {
+            inner: self.inner.clone().ceiling(),
+        }
+    }
+
+    /// Returns the tightest enclosing measured number of this and the given number (float or Interval) in the same unit.
+    fn min_max_number(&self, rhs: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let number = py_any_to_number(rhs)?;
+        Ok(Self {
+            inner: self.inner.clone().min_max_number(number),
+        })
     }
 
     fn __repr__(&self) -> String {

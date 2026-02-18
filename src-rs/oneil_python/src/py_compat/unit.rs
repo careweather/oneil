@@ -124,6 +124,12 @@ impl PyUnit {
         self.inner.dimensionally_eq(&other.borrow().inner)
     }
 
+    /// Returns true if this unit's dimensions match the given dimension map (dict mapping dimension keys to exponents).
+    fn dimensions_match(&self, dimensions: &Bound<'_, PyDict>) -> PyResult<bool> {
+        let dimension_map = dimension_map_from_dict(dimensions)?;
+        Ok(self.inner.dimensions_match(&dimension_map))
+    }
+
     /// Returns true if this unit is numerically equal to the other (dimensions, magnitude, and is_db).
     fn numerically_eq(&self, other: &Bound<'_, Self>) -> bool {
         self.inner.numerically_eq(&other.borrow().inner)
