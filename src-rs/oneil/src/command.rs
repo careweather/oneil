@@ -300,7 +300,7 @@ pub enum DevCommand {
         /// When enabled, shows the portion of the AST that was successfully
         /// parsed. Useful for debugging incomplete or malformed code.
         #[arg(long)]
-        display_partial: bool,
+        partial: bool,
     },
     /// Print the Intermediate Representation (IR) of a Oneil source file
     PrintIr {
@@ -313,7 +313,7 @@ pub enum DevCommand {
         /// When enabled, shows the portion of the IR that was successfully generated
         /// before encountering errors. Useful for debugging model loading issues.
         #[arg(long)]
-        display_partial: bool,
+        partial: bool,
 
         /// Print submodel IR recursively
         ///
@@ -336,7 +336,7 @@ pub enum DevCommand {
         /// When enabled, shows the portion of the results that were successfully generated
         /// before encountering errors. Useful for debugging model evaluation issues.
         #[arg(long)]
-        display_partial: bool,
+        partial: bool,
 
         /// Print submodel and reference results recursively
         ///
