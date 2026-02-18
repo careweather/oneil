@@ -126,13 +126,20 @@ impl Runtime {
 
     /// Returns errors for the given Python import path.
     ///
-    /// If the Python module failed to load (e.g. file not found or load error),
-    /// returns a [`RuntimeErrors`] with a single [`ModelError::FileError`] entry.
+    /// If the source failed to load or the Python module failed to load (e.g. file not found or load error),
+    /// returns a [`RuntimeErrors`] with [`ModelError::FileError`] entries for each.
     #[must_use]
     #[cfg(feature = "python")]
     pub(super) fn get_python_import_errors(&self, python_import_path: &Path) -> RuntimeErrors {
         let path_buf = python_import_path.to_path_buf();
         let mut errors = RuntimeErrors::new();
+
+        if let Some(Err(source_err)) = self.source_cache.get_entry(python_import_path) {
+            errors.add_model_error(
+                path_buf.clone(),
+                ModelError::FileError(vec![OneilError::from_error(source_err, path_buf.clone())]),
+            );
+        }
 
         if let Some(load_err) = self.python_import_cache.get_error(python_import_path) {
             errors.add_model_error(
