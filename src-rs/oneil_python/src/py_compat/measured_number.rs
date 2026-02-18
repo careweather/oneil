@@ -65,6 +65,7 @@ impl PyMeasuredNumber {
     }
 
     /// Converts this measured number to a number (float or Interval) in the given unit.
+    #[expect(clippy::wrong_self_convention, reason = "this is for Python, not Rust")]
     fn into_number_using_unit<'py>(
         &self,
         unit: &Bound<'_, PyUnit>,
@@ -231,6 +232,42 @@ impl PyMeasuredNumber {
         Self {
             inner: self.inner.clone().abs(),
         }
+    }
+
+    /// Sine of the value (angle in this number’s unit). Returns a dimensionless float or interval.
+    fn sin<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        let (number, _unit) = self.inner.clone().into_number_and_unit();
+        number_to_py_any(&number.sin(), py)
+    }
+
+    /// Cosine of the value (angle in this number’s unit). Returns a dimensionless float or interval.
+    fn cos<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        let (number, _unit) = self.inner.clone().into_number_and_unit();
+        number_to_py_any(&number.cos(), py)
+    }
+
+    /// Tangent of the value (angle in this number’s unit). Returns a dimensionless float or interval.
+    fn tan<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        let (number, _unit) = self.inner.clone().into_number_and_unit();
+        number_to_py_any(&number.tan(), py)
+    }
+
+    /// Arc sine (result in this number’s unit). Returns a dimensionless float or interval.
+    fn asin<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        let (number, _unit) = self.inner.clone().into_number_and_unit();
+        number_to_py_any(&number.asin(), py)
+    }
+
+    /// Arc cosine (result in this number’s unit). Returns a dimensionless float or interval.
+    fn acos<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        let (number, _unit) = self.inner.clone().into_number_and_unit();
+        number_to_py_any(&number.acos(), py)
+    }
+
+    /// Arc tangent (result in this number’s unit). Returns a dimensionless float or interval.
+    fn atan<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        let (number, _unit) = self.inner.clone().into_number_and_unit();
+        number_to_py_any(&number.atan(), py)
     }
 
     /// Rounds down to the nearest integer (in this number's unit).
