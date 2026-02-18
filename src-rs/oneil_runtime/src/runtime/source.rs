@@ -5,7 +5,7 @@ use std::path::Path;
 use oneil_shared::error::OneilError;
 
 use super::Runtime;
-use crate::source_error::SourceError;
+use crate::error::SourceError;
 
 impl Runtime {
     /// Loads source code from a file.
