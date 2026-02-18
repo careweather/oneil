@@ -1073,6 +1073,17 @@ impl Number {
             Self::Interval(interval) => Self::Interval(interval.abs()),
         }
     }
+
+    /// Returns the sign of the number: -1 for negative, 0 for zero, or 1 for positive.
+    ///
+    /// For an interval, returns the tightest interval containing the possible sign values.
+    #[must_use]
+    pub fn sign(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.signum()),
+            Self::Interval(interval) => Self::Interval(interval.sign()),
+        }
+    }
 }
 
 impl PartialEq for Number {
