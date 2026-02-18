@@ -150,6 +150,7 @@ impl Runtime {
     clippy::struct_field_names,
     reason = "removing 'errors' might be confusing"
 )]
+#[derive(Debug)]
 struct IrErrorsResult {
     /// Model paths that have errors (for recursive collection).
     models_with_errors: IndexSet<PathBuf>,
@@ -230,6 +231,7 @@ fn collect_ir_errors(
     clippy::struct_field_names,
     reason = "removing 'errors' might be confusing"
 )]
+#[derive(Debug)]
 struct EvalErrorsResult {
     /// Model paths that have errors (for recursive collection).
     models_with_errors: IndexSet<PathBuf>,
@@ -288,6 +290,7 @@ fn collect_eval_errors(errors: &EvalErrors, path: &Path, source: &str) -> EvalEr
     clippy::struct_field_names,
     reason = "removing 'errors' might be confusing"
 )]
+#[derive(Debug)]
 struct MergedErrors {
     /// Model paths that have errors (for recursive collection).
     pub models_with_errors: IndexSet<PathBuf>,
