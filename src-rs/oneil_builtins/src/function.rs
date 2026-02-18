@@ -156,7 +156,7 @@ mod fns {
         EvalError,
         error::{
             ExpectedArgumentCount, ExpectedType,
-            convert::{binary_eval_error_expect_only_lhs, binary_eval_error_to_eval_error},
+            convert::binary_eval_error_to_eval_error,
         },
     };
     use oneil_output::{MeasuredNumber, Number, NumberType, Value};
@@ -370,21 +370,13 @@ mod fns {
     pub const SQRT_DESCRIPTION: &str = "Compute the square root of a value.";
 
     pub fn sqrt(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        if args.len() != 1 {
-            return Err(vec![EvalError::InvalidArgumentCount {
-                function_name: "sqrt".to_string(),
-                function_name_span: identifier_span,
-                expected_argument_count: ExpectedArgumentCount::Exact(1),
-                actual_argument_count: args.len(),
-            }]);
-        }
-
-        let mut args = args.into_iter();
-
-        let (arg, arg_span) = args.next().expect("there should be one argument");
-
-        arg.checked_pow(Value::from(0.5))
-            .map_err(|error| vec![binary_eval_error_expect_only_lhs(error, arg_span)])
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "sqrt",
+            |n| Value::Number(n.sqrt()),
+            |m| Value::MeasuredNumber(m.sqrt()),
+        )
     }
 
     pub const LN_DESCRIPTION: &str = "Compute the natural logarithm (base e) of a value.";
@@ -568,30 +560,13 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn abs(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        if args.len() != 1 {
-            return Err(vec![EvalError::InvalidArgumentCount {
-                function_name: "abs".to_string(),
-                function_name_span: identifier_span,
-                expected_argument_count: ExpectedArgumentCount::Exact(1),
-                actual_argument_count: args.len(),
-            }]);
-        }
-
-        let (arg, arg_span) = args
-            .into_iter()
-            .next()
-            .expect("there should be one argument");
-        let found_type = arg.type_();
-
-        match arg {
-            Value::Number(number) => Ok(Value::Number(number.abs())),
-            Value::MeasuredNumber(measured) => Ok(Value::MeasuredNumber(measured.abs())),
-            Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
-                expected_type: ExpectedType::NumberOrMeasuredNumber,
-                found_type,
-                found_span: arg_span,
-            }]),
-        }
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "abs",
+            |n| Value::Number(n.abs()),
+            |m| Value::MeasuredNumber(m.abs()),
+        )
     }
 
     pub const SIGN_DESCRIPTION: &str =
@@ -606,33 +581,16 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn sign(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        if args.len() != 1 {
-            return Err(vec![EvalError::InvalidArgumentCount {
-                function_name: "sign".to_string(),
-                function_name_span: identifier_span,
-                expected_argument_count: ExpectedArgumentCount::Exact(1),
-                actual_argument_count: args.len(),
-            }]);
-        }
-
-        let (arg, arg_span) = args
-            .into_iter()
-            .next()
-            .expect("there should be one argument");
-        let found_type = arg.type_();
-
-        match arg {
-            Value::Number(number) => Ok(Value::Number(number.sign())),
-            Value::MeasuredNumber(measured) => {
-                let (number, _unit) = measured.into_number_and_unit();
-                Ok(Value::Number(number.sign()))
-            }
-            Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
-                expected_type: ExpectedType::NumberOrMeasuredNumber,
-                found_type,
-                found_span: arg_span,
-            }]),
-        }
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "sign",
+            |n| Value::Number(n.sign()),
+            |m| {
+                let (number, _unit) = m.into_number_and_unit();
+                Value::Number(number.sign())
+            },
+        )
     }
 
     pub const MID_DESCRIPTION: &str = "Compute the midpoint.\n\nWith one argument (an interval), returns the midpoint of the interval.\n\nWith two arguments, returns the midpoint between them.";
