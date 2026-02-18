@@ -135,6 +135,34 @@ impl PyInterval {
         }
     }
 
+    /// Returns the absolute value of the interval.
+    fn abs(&self) -> Self {
+        Self {
+            inner: self.inner.abs(),
+        }
+    }
+
+    /// Returns the sign of the interval: the tightest interval containing the possible sign values (-1, 0, or 1).
+    fn sign(&self) -> Self {
+        Self {
+            inner: self.inner.sign(),
+        }
+    }
+
+    /// Returns the interval of values rounded down to the nearest integer.
+    fn floor(&self) -> Self {
+        Self {
+            inner: self.inner.floor(),
+        }
+    }
+
+    /// Returns the interval of values rounded up to the nearest integer.
+    fn ceiling(&self) -> Self {
+        Self {
+            inner: self.inner.ceiling(),
+        }
+    }
+
     /// Raises this interval to the power of the exponent interval.
     fn pow(&self, exponent: &Bound<'_, Self>) -> Self {
         Self {
