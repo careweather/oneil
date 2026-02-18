@@ -99,6 +99,7 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
             partial: display_partial,
             recursive,
             include,
+            no_values,
         } => {
             let sections = model_result_sections_from_include(include.as_deref());
             handle_print_model_result(
@@ -106,6 +107,7 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
                 display_partial,
                 recursive,
                 &sections,
+                no_values,
                 show_internal_errors,
             );
         }
@@ -308,11 +310,13 @@ fn handle_print_model_result(
     display_partial: bool,
     recursive: bool,
     sections: &print_debug_model_result::ModelResultSections,
+    no_values: bool,
     show_internal_errors: bool,
 ) {
     let config = print_debug_model_result::DebugModelResultPrintConfig {
         recursive,
         sections: sections.clone(),
+        print_values: !no_values,
     };
 
     let mut runtime = Runtime::new();

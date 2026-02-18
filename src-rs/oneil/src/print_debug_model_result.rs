@@ -73,6 +73,9 @@ pub struct DebugModelResultPrintConfig {
 
     /// Which sections to include in the output.
     pub sections: ModelResultSections,
+
+    /// When false, parameter values are omitted (test passed/failed is still shown).
+    pub print_values: bool,
 }
 
 /// Prints the evaluated model result in a hierarchical tree format for debugging.
@@ -143,7 +146,7 @@ fn print_model(
 
         match tag {
             SectionTag::Submodels => print_submodels(&submodels, indent + 1),
-            SectionTag::Parameters => print_parameters(&parameters, indent + 1),
+            SectionTag::Parameters => print_parameters(&parameters, indent + 1, config),
             SectionTag::References => print_references(&references, indent + 1),
             SectionTag::Tests => print_tests(&tests, indent + 1),
         }
@@ -181,17 +184,30 @@ fn print_submodels(submodels: &IndexMap<&str, &str>, indent: usize) {
     }
 }
 
-fn print_parameters(parameters: &IndexMap<&str, &oneil_runtime::output::Parameter>, indent: usize) {
+fn print_parameters(
+    parameters: &IndexMap<&str, &oneil_runtime::output::Parameter>,
+    indent: usize,
+    config: &DebugModelResultPrintConfig,
+) {
     for (i, (name, param)) in parameters.iter().enumerate() {
         let is_last = i == parameters.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        println!(
-            "{}    {}Parameter: \"{}\" = {:?}",
-            "    ".repeat(indent),
-            prefix,
-            name,
-            param.value
-        );
+        if config.print_values {
+            println!(
+                "{}    {}Parameter: \"{}\" = {:?}",
+                "    ".repeat(indent),
+                prefix,
+                name,
+                param.value
+            );
+        } else {
+            println!(
+                "{}    {}Parameter: \"{}\"",
+                "    ".repeat(indent),
+                prefix,
+                name
+            );
+        }
     }
 }
 
