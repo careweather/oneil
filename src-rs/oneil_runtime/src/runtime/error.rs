@@ -259,7 +259,7 @@ fn collect_eval_errors(errors: &EvalErrors, path: &Path, source: &str) -> EvalEr
 
         let oneil_errors: Vec<OneilError> = param_errs
             .iter()
-            .map(|e| OneilError::from_error(e, path.to_path_buf()))
+            .map(|e| OneilError::from_error_with_source(e, path.to_path_buf(), source))
             .collect();
         parameter_errors.insert(name.clone(), oneil_errors);
     }
