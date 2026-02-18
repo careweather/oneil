@@ -16,5 +16,10 @@ oneil_output = { path = "../oneil_output" }
 oneil_shared = { path = "../oneil_shared" }
 pyo3 = { version = "0.28.0", features = ["auto-initialize", "abi3"] }
 
+[features]
+default = ["python-lib", "rust-lib"]
+python-lib = []
+rust-lib = []
+
 [lints]
 workspace = true
