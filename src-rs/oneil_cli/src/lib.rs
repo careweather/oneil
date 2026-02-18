@@ -48,8 +48,8 @@ mod print_tree;
 mod print_utils;
 mod stylesheet;
 
-/// Main entry point for the Oneil CLI application
-fn main() {
+/// Main entry point for the Oneil CLI application.
+pub fn main() {
     let cli = CliCommand::parse();
 
     set_color_choice(cli.no_colors);

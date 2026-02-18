@@ -1,7 +1,6 @@
 [package]
-name = "oneil"
+name = "oneil_cli"
 description = "CLI tool for using the Oneil programming language"
-default-run = "oneil"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

@@ -31,7 +31,7 @@ Other crates include:
   used across the oneil codebase, including an abstract error type and a type
   for referencing specific locations in a source file
 
-- [`oneil`](../../src-rs/oneil/) - implements the CLI for Oneil
+- [`oneil_cli`](../../src-rs/oneil_cli/) - implements the CLI for Oneil
 
 
 For more details about what each crate does, how it operates, patterns used,
