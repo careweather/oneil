@@ -586,6 +586,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
+name = "oneil"
+version = "0.15.0"
+dependencies = [
+ "oneil_analysis",
+ "oneil_ast",
+ "oneil_builtins",
+ "oneil_cli",
+ "oneil_eval",
+ "oneil_ir",
+ "oneil_lsp",
+ "oneil_output",
+ "oneil_parser",
+ "oneil_python",
+ "oneil_resolver",
+ "oneil_runtime",
+ "oneil_shared",
+]
+
+[[package]]
 name = "oneil_analysis"
 version = "0.15.0"
 dependencies = [

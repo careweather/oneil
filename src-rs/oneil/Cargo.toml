@@ -1,0 +1,31 @@
+[package]
+name = "oneil"
+description = "Oneil programming language and tools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lib]
+
+[dependencies]
+oneil_analysis = { path = "../oneil_analysis" }
+oneil_ast = { path = "../oneil_ast" }
+oneil_builtins = { path = "../oneil_builtins" }
+oneil_cli = { path = "../oneil_cli" }
+oneil_eval = { path = "../oneil_eval" }
+oneil_ir = { path = "../oneil_ir" }
+oneil_lsp = { path = "../oneil_lsp" }
+oneil_output = { path = "../oneil_output" }
+oneil_parser = { path = "../oneil_parser" }
+oneil_python = { path = "../oneil_python" }
+oneil_resolver = { path = "../oneil_resolver" }
+oneil_runtime = { path = "../oneil_runtime" }
+oneil_shared = { path = "../oneil_shared" }
+
+[lints]
+workspace = true
