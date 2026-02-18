@@ -152,8 +152,6 @@ pub fn builtin_functions_complete() -> impl Iterator<Item = (&'static str, Built
 }
 
 mod fns {
-    use oneil_shared::span::Span;
-
     use oneil_eval::{
         EvalError,
         error::{
@@ -161,41 +159,10 @@ mod fns {
             convert::{binary_eval_error_expect_only_lhs, binary_eval_error_to_eval_error},
         },
     };
-    use oneil_output::{DisplayUnit, MeasuredNumber, Number, NumberType, Unit, Value};
+    use oneil_output::{MeasuredNumber, Number, NumberType, Value};
+    use oneil_shared::span::Span;
 
-    fn unary_numeric<F, G>(
-        identifier_span: Span,
-        args: Vec<(Value, Span)>,
-        name: &str,
-        number_op: F,
-        measured_op: G,
-    ) -> Result<Value, Vec<EvalError>>
-    where
-        F: FnOnce(Number) -> Value,
-        G: FnOnce(MeasuredNumber) -> Value,
-    {
-        if args.len() != 1 {
-            return Err(vec![EvalError::InvalidArgumentCount {
-                function_name: name.to_string(),
-                function_name_span: identifier_span,
-                expected_argument_count: ExpectedArgumentCount::Exact(1),
-                actual_argument_count: args.len(),
-            }]);
-        }
-
-        let (arg, arg_span) = args.into_iter().next().expect("there should be one argument");
-        let found_type = arg.type_();
-
-        match arg {
-            Value::Number(number) => Ok(number_op(number)),
-            Value::MeasuredNumber(measured) => Ok(measured_op(measured)),
-            Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
-                expected_type: ExpectedType::NumberOrMeasuredNumber,
-                found_type,
-                found_span: arg_span,
-            }]),
-        }
-    }
+    use super::helper;
 
     pub const MIN_DESCRIPTION: &str = "Find the minimum value of the given values.\n\nIf a value is an interval, the minimum value of the interval is used.";
 
@@ -213,10 +180,10 @@ mod fns {
             }]);
         }
 
-        let number_list = extract_homogeneous_numbers_list(&args)?;
+        let number_list = helper::extract_homogeneous_numbers_list(&args)?;
 
         match number_list {
-            HomogeneousNumberList::Numbers(numbers) => {
+            helper::HomogeneousNumberList::Numbers(numbers) => {
                 let min = numbers
                     .into_iter()
                     .filter_map(|number| match number {
@@ -234,7 +201,7 @@ mod fns {
 
                 Ok(Value::Number(Number::Scalar(min)))
             }
-            HomogeneousNumberList::MeasuredNumbers(numbers) => {
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => {
                 let min = numbers
                     .into_iter()
                     .filter_map(|number| match number.normalized_value().as_number() {
@@ -277,10 +244,10 @@ mod fns {
             }]);
         }
 
-        let number_list = extract_homogeneous_numbers_list(&args)?;
+        let number_list = helper::extract_homogeneous_numbers_list(&args)?;
 
         match number_list {
-            HomogeneousNumberList::Numbers(numbers) => {
+            helper::HomogeneousNumberList::Numbers(numbers) => {
                 let max = numbers
                     .into_iter()
                     .filter_map(|number| match number {
@@ -298,7 +265,7 @@ mod fns {
 
                 Ok(Value::Number(Number::Scalar(max)))
             }
-            HomogeneousNumberList::MeasuredNumbers(numbers) => {
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => {
                 let max = numbers
                     .into_iter()
                     .filter_map(|number| match number.normalized_value().as_number() {
@@ -429,9 +396,13 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn ln(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        unary_numeric(identifier_span, args, "ln", |n| Value::Number(n.ln()), |m| {
-            Value::MeasuredNumber(m.ln())
-        })
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "ln",
+            |n| Value::Number(n.ln()),
+            |m| Value::MeasuredNumber(m.ln()),
+        )
     }
 
     pub const LOG_DESCRIPTION: &str = "Compute the logarithm of a value.";
@@ -445,9 +416,13 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn log(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        unary_numeric(identifier_span, args, "log", |n| Value::Number(n.ln()), |m| {
-            Value::MeasuredNumber(m.ln())
-        })
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "log",
+            |n| Value::Number(n.ln()),
+            |m| Value::MeasuredNumber(m.ln()),
+        )
     }
 
     pub const LOG10_DESCRIPTION: &str = "Compute the base-10 logarithm of a value.";
@@ -459,9 +434,13 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn log10(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        unary_numeric(identifier_span, args, "log10", |n| Value::Number(n.log10()), |m| {
-            Value::MeasuredNumber(m.log10())
-        })
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "log10",
+            |n| Value::Number(n.log10()),
+            |m| Value::MeasuredNumber(m.log10()),
+        )
     }
 
     pub const FLOOR_DESCRIPTION: &str = "Round a value down to the nearest integer.";
@@ -473,9 +452,13 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn floor(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        unary_numeric(identifier_span, args, "floor", |n| Value::Number(n.floor()), |m| {
-            Value::MeasuredNumber(m.floor())
-        })
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "floor",
+            |n| Value::Number(n.floor()),
+            |m| Value::MeasuredNumber(m.floor()),
+        )
     }
 
     pub const CEILING_DESCRIPTION: &str = "Round a value up to the nearest integer.";
@@ -490,9 +473,13 @@ mod fns {
         identifier_span: Span,
         args: Vec<(Value, Span)>,
     ) -> Result<Value, Vec<EvalError>> {
-        unary_numeric(identifier_span, args, "ceiling", |n| Value::Number(n.ceiling()), |m| {
-            Value::MeasuredNumber(m.ceiling())
-        })
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "ceiling",
+            |n| Value::Number(n.ceiling()),
+            |m| Value::MeasuredNumber(m.ceiling()),
+        )
     }
 
     pub const EXTENT_DESCRIPTION: &str = "Compute the extent of a value.";
@@ -590,7 +577,10 @@ mod fns {
             }]);
         }
 
-        let (arg, arg_span) = args.into_iter().next().expect("there should be one argument");
+        let (arg, arg_span) = args
+            .into_iter()
+            .next()
+            .expect("there should be one argument");
         let found_type = arg.type_();
 
         match arg {
@@ -625,7 +615,10 @@ mod fns {
             }]);
         }
 
-        let (arg, arg_span) = args.into_iter().next().expect("there should be one argument");
+        let (arg, arg_span) = args
+            .into_iter()
+            .next()
+            .expect("there should be one argument");
         let found_type = arg.type_();
 
         match arg {
@@ -731,9 +724,55 @@ mod fns {
             will_be_supported: true,
         }])
     }
+}
 
-    /// Homogeneous number list helpers
-    enum HomogeneousNumberList<'a> {
+mod helper {
+    use oneil_shared::span::Span;
+
+    use oneil_eval::{
+        EvalError,
+        error::{ExpectedArgumentCount, ExpectedType},
+    };
+    use oneil_output::{DisplayUnit, MeasuredNumber, Number, Unit, Value};
+
+    pub fn unary_numeric<F, G>(
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+        name: &str,
+        number_op: F,
+        measured_op: G,
+    ) -> Result<Value, Vec<EvalError>>
+    where
+        F: FnOnce(Number) -> Value,
+        G: FnOnce(MeasuredNumber) -> Value,
+    {
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: name.to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Exact(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let (arg, arg_span) = args
+            .into_iter()
+            .next()
+            .expect("there should be one argument");
+        let found_type = arg.type_();
+
+        match arg {
+            Value::Number(number) => Ok(number_op(number)),
+            Value::MeasuredNumber(measured) => Ok(measured_op(measured)),
+            Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type,
+                found_span: arg_span,
+            }]),
+        }
+    }
+
+    pub enum HomogeneousNumberList<'a> {
         Numbers(Vec<&'a Number>),
         MeasuredNumbers(Vec<&'a MeasuredNumber>),
     }
@@ -754,7 +793,7 @@ mod fns {
         clippy::panic_in_result_fn,
         reason = "callers enforce non-empty list to provide correct error message"
     )]
-    fn extract_homogeneous_numbers_list(
+    pub fn extract_homogeneous_numbers_list(
         values: &[(Value, Span)],
     ) -> Result<HomogeneousNumberList<'_>, Vec<EvalError>> {
         assert!(!values.is_empty());
