@@ -81,10 +81,10 @@ pub fn builtin_functions_complete() -> impl Iterator<Item = (&'static str, Built
             function: fns::ln as BuiltinFunctionFn,
         },
         BuiltinFunction {
-            name: "log",
+            name: "log2",
             args: &["x"],
-            description: fns::LOG_DESCRIPTION,
-            function: fns::log as BuiltinFunctionFn,
+            description: fns::LOG2_DESCRIPTION,
+            function: fns::log2 as BuiltinFunctionFn,
         },
         BuiltinFunction {
             name: "log10",
@@ -394,26 +394,6 @@ mod fns {
         )
     }
 
-    pub const LOG_DESCRIPTION: &str = "Compute the logarithm of a value.";
-
-    /// Returns the natural logarithm (base e) of the single numerical argument.
-    ///
-    /// Same as `ln`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` if the argument count is not exactly one, or if the
-    /// argument is not a number or measured number.
-    pub fn log(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
-            identifier_span,
-            args,
-            "log",
-            |n| Value::Number(n.ln()),
-            |m| Value::MeasuredNumber(m.ln()),
-        )
-    }
-
     pub const LOG10_DESCRIPTION: &str = "Compute the base-10 logarithm of a value.";
 
     /// Returns the base-10 logarithm of the single numerical argument.
@@ -429,6 +409,24 @@ mod fns {
             "log10",
             |n| Value::Number(n.log10()),
             |m| Value::MeasuredNumber(m.log10()),
+        )
+    }
+
+    pub const LOG2_DESCRIPTION: &str = "Compute the base-2 logarithm of a value.";
+
+    /// Returns the base-2 logarithm of the single numerical argument.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
+    pub fn log2(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
+        helper::unary_numeric(
+            identifier_span,
+            args,
+            "log2",
+            |n| Value::Number(n.log2()),
+            |m| Value::MeasuredNumber(m.log2()),
         )
     }
 
