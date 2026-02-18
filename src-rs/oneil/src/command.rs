@@ -362,6 +362,10 @@ pub enum DevCommand {
         /// If not specified, all parts are shown.
         #[arg(long, value_delimiter(','), value_name = "SECTIONS")]
         include: Option<Vec<ModelResultIncludeSection>>,
+
+        /// Omit parameter values from the output
+        #[arg(long)]
+        no_values: bool,
     },
     /// Print Python imports from Oneil source file(s)
     #[cfg(feature = "python")]
