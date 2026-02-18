@@ -4,9 +4,9 @@ use std::path::Path;
 
 use indexmap::IndexSet;
 use oneil_eval::EvalError;
-use oneil_python::LoadPythonImportError;
 use oneil_python::function::PythonFunctionMap;
-use oneil_shared::load_result::LoadResult;
+
+use crate::error::PythonImportError;
 use oneil_shared::span::Span;
 
 use super::Runtime;
@@ -31,7 +31,7 @@ impl Runtime {
         let is_success = self
             .python_import_cache
             .get_entry(path)
-            .is_some_and(LoadResult::is_success);
+            .is_some_and(Result::is_ok);
 
         let errors = if is_success {
             RuntimeErrors::new()
@@ -42,7 +42,7 @@ impl Runtime {
         let names_opt = self
             .python_import_cache
             .get_entry(path)
-            .and_then(LoadResult::value)
+            .and_then(|result| result.as_ref().ok())
             .map(|functions| functions.get_function_names().collect());
 
         names_opt.ok_or(errors)
@@ -51,13 +51,13 @@ impl Runtime {
     pub(super) fn load_python_import_internal(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> &LoadResult<PythonFunctionMap, LoadPythonImportError> {
+    ) -> &Result<PythonFunctionMap, PythonImportError> {
         let path = path.as_ref();
 
         // load the source code from the file
         let Ok(source) = self.load_source_internal(path) else {
             self.python_import_cache
-                .insert(path.to_path_buf(), LoadResult::failure());
+                .insert(path.to_path_buf(), Err(PythonImportError::HasSourceError));
 
             return self
                 .python_import_cache
@@ -72,12 +72,11 @@ impl Runtime {
         match functions_result {
             Ok(functions) => self
                 .python_import_cache
-                .insert(path.to_path_buf(), LoadResult::success(functions)),
+                .insert(path.to_path_buf(), Ok(functions)),
 
-            Err(e) => self.python_import_cache.insert(
-                path.to_path_buf(),
-                LoadResult::partial(PythonFunctionMap::default(), e),
-            ),
+            Err(e) => self
+                .python_import_cache
+                .insert(path.to_path_buf(), Err(PythonImportError::LoadFailed(e))),
         }
 
         // return the cached result
@@ -97,7 +96,7 @@ impl Runtime {
         let python_functions = self
             .python_import_cache
             .get_entry(python_path.as_ref())?
-            .value()
+            .as_ref()
             .expect("should not be trying to evaluate a Python function if the import failed");
 
         let function = python_functions.get_function(identifier.as_str())?;

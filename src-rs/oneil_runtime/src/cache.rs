@@ -8,12 +8,15 @@ use oneil_parser::error::ParserError;
 use oneil_resolver as resolver;
 use oneil_shared::load_result::LoadResult;
 
-use crate::{output, source_error::SourceError};
+use crate::{error::SourceError, output};
+
+#[cfg(feature = "python")]
+use crate::error::PythonImportError;
 
 /// Cache for source file contents keyed by path.
 ///
 /// Stores a [`Result`] per path: either the file contents as a [`String`] or a
-/// [`output::error::SourceError`] when loading failed.
+/// [`SourceError`](crate::error::SourceError) when loading failed.
 ///
 /// This is specialized for source files because, unlike other caches,
 /// there is no possible partial result.
@@ -64,9 +67,51 @@ pub type IrCache = Cache<output::ir::Model, resolver::ResolutionErrorCollection>
 pub type EvalCache = Cache<output::Model, eval::EvalErrors>;
 
 /// Cache for Python import function maps keyed by path.
+///
+/// Stores a [`Result`] per path: either the loaded [`PythonFunctionMap`] or a
+/// [`PythonImportError`](crate::error::PythonImportError) when loading failed.
 #[cfg(feature = "python")]
-pub type PythonImportCache =
-    Cache<oneil_python::function::PythonFunctionMap, oneil_python::LoadPythonImportError>;
+#[derive(Debug)]
+pub struct PythonImportCache {
+    entries:
+        IndexMap<PathBuf, Result<oneil_python::function::PythonFunctionMap, PythonImportError>>,
+}
+
+#[cfg(feature = "python")]
+impl Default for PythonImportCache {
+    fn default() -> Self {
+        Self {
+            entries: IndexMap::new(),
+        }
+    }
+}
+
+#[cfg(feature = "python")]
+impl PythonImportCache {
+    /// Creates an empty Python import cache.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the full cached entry for `path`.
+    #[must_use]
+    pub fn get_entry(
+        &self,
+        path: &Path,
+    ) -> Option<&Result<oneil_python::function::PythonFunctionMap, PythonImportError>> {
+        self.entries.get(path)
+    }
+
+    /// Inserts a result for `path`, replacing any existing entry.
+    pub fn insert(
+        &mut self,
+        path: PathBuf,
+        result: Result<oneil_python::function::PythonFunctionMap, PythonImportError>,
+    ) {
+        self.entries.insert(path, result);
+    }
+}
 
 /// Generic cache keyed by path, storing [`LoadResult<T, E>`] per path.
 ///

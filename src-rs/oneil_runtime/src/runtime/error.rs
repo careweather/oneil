@@ -141,7 +141,7 @@ impl Runtime {
             );
         }
 
-        if let Some(load_err) = self.python_import_cache.get_error(python_import_path) {
+        if let Some(Err(load_err)) = self.python_import_cache.get_entry(python_import_path) {
             errors.add_model_error(
                 path_buf.clone(),
                 ModelError::FileError(vec![OneilError::from_error(load_err, path_buf)]),
