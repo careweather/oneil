@@ -16,7 +16,21 @@ pub mod function;
 pub mod load;
 mod py_compat;
 
-pub use error::{LoadPythonImportError, PythonEvalError};
-pub use eval::evaluate_python_function;
-pub use function::PythonFunction;
-pub use load::load_python_import;
+#[cfg(feature = "rust-lib")]
+pub use rust_lib::*;
+
+#[cfg(feature = "rust-lib")]
+mod rust_lib {
+    pub use crate::error::{LoadPythonImportError, PythonEvalError};
+    pub use crate::eval::evaluate_python_function;
+    pub use crate::function::PythonFunction;
+    pub use crate::load::load_python_import;
+}
+
+#[cfg(feature = "python-lib")]
+pub use python_lib::*;
+
+#[cfg(feature = "python-lib")]
+mod python_lib {
+    pub use crate::py_compat::oneil_py;
+}

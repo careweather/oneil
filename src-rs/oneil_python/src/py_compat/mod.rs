@@ -5,7 +5,18 @@ mod measured_number;
 mod unit;
 mod value_convert;
 
-pub use interval::PyInterval;
-pub use measured_number::PyMeasuredNumber;
-pub use unit::PyUnit;
 pub use value_convert::{py_any_to_value, value_to_py_any};
+
+use pyo3::prelude::*;
+
+#[pymodule]
+pub mod oneil_py {
+    #[pymodule_export]
+    pub use super::interval::PyInterval;
+
+    #[pymodule_export]
+    pub use super::measured_number::PyMeasuredNumber;
+
+    #[pymodule_export]
+    pub use super::unit::PyUnit;
+}
