@@ -321,6 +321,13 @@ pub enum DevCommand {
         /// submodel IR is also printed.
         #[arg(long, short = 'r')]
         recursive: bool,
+
+        /// Include only the given parts of the IR (comma-separated)
+        ///
+        /// Valid values: python, submodels, references, parameters, tests.
+        /// If not specified, all parts are shown.
+        #[arg(long, value_delimiter(','), value_name = "SECTIONS")]
+        include: Option<Vec<IrIncludeSection>>,
     },
     /// Print the results of evaluating an Oneil model
     ///
@@ -352,6 +359,33 @@ pub enum DevCommand {
         #[arg(value_name = "FILE", num_args = 1..)]
         files: Vec<PathBuf>,
     },
+}
+
+/// Section of the IR that can be selected for `dev print-ir --include`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrIncludeSection {
+    PythonImports,
+    Submodels,
+    References,
+    Parameters,
+    Tests,
+}
+
+impl str::FromStr for IrIncludeSection {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "python" => Ok(Self::PythonImports),
+            "submodels" => Ok(Self::Submodels),
+            "references" => Ok(Self::References),
+            "parameters" => Ok(Self::Parameters),
+            "tests" => Ok(Self::Tests),
+            _ => Err(format!(
+                "unknown section \"{s}\"; valid options are: python, submodels, references, parameters, tests"
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

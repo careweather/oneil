@@ -190,6 +190,14 @@ impl<'result> ModelIrReference<'result> {
     pub fn tests(&self) -> Vec<&'result ir::Test> {
         self.model.get_tests().values().collect()
     }
+
+    /// Returns the Python imports for this model.
+    #[must_use]
+    pub const fn python_imports(
+        &self,
+    ) -> &'result IndexMap<ir::PythonPath, ir::PythonImport> {
+        self.model.get_python_imports()
+    }
 }
 
 /// A reference to a submodel import within a model.

@@ -26,8 +26,8 @@ use oneil_runtime::{
 
 use crate::{
     command::{
-        BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, IndependentArgs, TestArgs,
-        TreeArgs,
+        BuiltinsCommand, CliCommand, Commands, DevCommand, EvalArgs, IndependentArgs,
+        IrIncludeSection, TestArgs, TreeArgs,
     },
     print_debug_ast::AstPrintConfig,
     print_debug_ir::IrPrintConfig,
@@ -81,7 +81,17 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
             file,
             partial: display_partial,
             recursive,
-        } => handle_print_ir(&file, display_partial, recursive, show_internal_errors),
+            include,
+        } => {
+            let sections = ir_sections_from_include(include.as_deref());
+            handle_print_ir(
+                &file,
+                display_partial,
+                recursive,
+                &sections,
+                show_internal_errors,
+            );
+        }
         DevCommand::PrintModelResult {
             file,
             partial: display_partial,
@@ -179,14 +189,51 @@ fn handle_print_ast(files: &[PathBuf], display_partial: bool, show_internal_erro
     }
 }
 
+/// Builds `IrSections` from `--include` list: if None or empty, show all sections;
+/// otherwise only the listed sections.
+fn ir_sections_from_include(include: Option<&[IrIncludeSection]>) -> print_debug_ir::IrSections {
+    let list = match include {
+        None | Some([]) => return print_debug_ir::IrSections::All,
+        Some(sections) => sections,
+    };
+
+    let mut python_imports = false;
+    let mut submodels = false;
+    let mut references = false;
+    let mut parameters = false;
+    let mut tests = false;
+
+    for &section in list {
+        match section {
+            IrIncludeSection::PythonImports => python_imports = true,
+            IrIncludeSection::Submodels => submodels = true,
+            IrIncludeSection::References => references = true,
+            IrIncludeSection::Parameters => parameters = true,
+            IrIncludeSection::Tests => tests = true,
+        }
+    }
+
+    print_debug_ir::IrSections::Specified {
+        python_imports,
+        submodels,
+        references,
+        parameters,
+        tests,
+    }
+}
+
 /// Handles the `dev print-ir` command.
 fn handle_print_ir(
     file: &Path,
     display_partial: bool,
     recursive: bool,
+    sections: &print_debug_ir::IrSections,
     show_internal_errors: bool,
 ) {
-    let ir_print_config = IrPrintConfig { recursive };
+    let ir_print_config = IrPrintConfig {
+        recursive,
+        sections: sections.clone(),
+    };
 
     let mut runtime = Runtime::new();
 
