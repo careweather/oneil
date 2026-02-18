@@ -282,6 +282,25 @@ impl Interval {
         }
     }
 
+    /// Returns the absolute value of the interval.
+    ///
+    /// The result is the tightest interval containing the image of this
+    /// interval under the absolute value function.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        if self.is_empty() {
+            return Self::empty();
+        }
+
+        if self.min >= 0.0 {
+            self
+        } else if self.max <= 0.0 {
+            Self::new(-self.max, -self.min)
+        } else {
+            Self::new(0.0, f64::max(-self.min, self.max))
+        }
+    }
+
     /// Returns the natural logarithm of the interval
     ///
     /// This is defined based on Brendon's reasoning and

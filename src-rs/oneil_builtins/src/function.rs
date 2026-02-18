@@ -528,14 +528,34 @@ mod fns {
 
     pub const ABS_DESCRIPTION: &str = "Compute the absolute value of a number.";
 
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
+    /// Returns the absolute value of the single numerical argument.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument count is not exactly one, or if the
+    /// argument is not a number or measured number.
     pub fn abs(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("abs".to_string()),
-            will_be_supported: true,
-        }])
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: "abs".to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Exact(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let (arg, arg_span) = args.into_iter().next().expect("there should be one argument");
+        let found_type = arg.type_();
+
+        match arg {
+            Value::Number(number) => Ok(Value::Number(number.abs())),
+            Value::MeasuredNumber(measured) => Ok(Value::MeasuredNumber(measured.abs())),
+            Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type,
+                found_span: arg_span,
+            }]),
+        }
     }
 
     pub const SIGN_DESCRIPTION: &str =
