@@ -82,6 +82,7 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
             partial: display_partial,
             recursive,
             include,
+            no_values,
         } => {
             let sections = ir_sections_from_include(include.as_deref());
             handle_print_ir(
@@ -89,6 +90,7 @@ fn handle_dev_command(command: DevCommand, show_internal_errors: bool) {
                 display_partial,
                 recursive,
                 &sections,
+                no_values,
                 show_internal_errors,
             );
         }
@@ -233,16 +235,22 @@ fn ir_sections_from_include(include: Option<&[IrIncludeSection]>) -> print_debug
 }
 
 /// Handles the `dev print-ir` command.
+#[expect(
+    clippy::fn_params_excessive_bools,
+    reason = "this is just passing in all the arguments from the CLI"
+)]
 fn handle_print_ir(
     file: &Path,
     display_partial: bool,
     recursive: bool,
     sections: &print_debug_ir::IrSections,
+    no_values: bool,
     show_internal_errors: bool,
 ) {
     let ir_print_config = IrPrintConfig {
         recursive,
         sections: sections.clone(),
+        print_values: !no_values,
     };
 
     let mut runtime = Runtime::new();

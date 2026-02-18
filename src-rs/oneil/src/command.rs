@@ -328,6 +328,10 @@ pub enum DevCommand {
         /// If not specified, all parts are shown.
         #[arg(long, value_delimiter(','), value_name = "SECTIONS")]
         include: Option<Vec<IrIncludeSection>>,
+
+        /// Omit parameter values, limits, and test expressions from the output
+        #[arg(long)]
+        no_values: bool,
     },
     /// Print the results of evaluating an Oneil model
     ///

@@ -79,6 +79,8 @@ impl IrSections {
 pub struct IrPrintConfig {
     pub recursive: bool,
     pub sections: IrSections,
+    /// When false, parameter values/limits and test expressions are omitted.
+    pub print_values: bool,
 }
 
 /// Prints the IR in a hierarchical tree format for debugging.
@@ -164,9 +166,9 @@ fn print_model(
                 print_python_imports(model_ref.python_imports(), indent + 2);
             }
             SectionTag::Submodels => print_submodels(&model_ref.submodels(), indent + 2),
-            SectionTag::Parameters => print_parameters(&model_ref.parameters(), indent + 2),
+            SectionTag::Parameters => print_parameters(&model_ref.parameters(), indent + 2, config),
             SectionTag::References => print_references(&model_ref.references(), indent + 2),
-            SectionTag::Tests => print_tests(&model_ref.tests(), indent + 2),
+            SectionTag::Tests => print_tests(&model_ref.tests(), indent + 2, config),
         }
     }
 
@@ -278,11 +280,15 @@ fn print_references(
 }
 
 /// Prints parameters
-fn print_parameters(parameters: &IndexMap<&ir::ParameterName, &ir::Parameter>, indent: usize) {
+fn print_parameters(
+    parameters: &IndexMap<&ir::ParameterName, &ir::Parameter>,
+    indent: usize,
+    config: &IrPrintConfig,
+) {
     for (i, (parameter_name, parameter)) in parameters.iter().enumerate() {
         let is_last = i == parameters.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        print_parameter(parameter_name, parameter, indent, prefix);
+        print_parameter(parameter_name, parameter, indent, prefix, config);
     }
 }
 
@@ -292,6 +298,7 @@ fn print_parameter(
     parameter: &ir::Parameter,
     indent: usize,
     prefix: &str,
+    config: &IrPrintConfig,
 ) {
     println!(
         "{}    {}Parameter: \"{}\"",
@@ -306,18 +313,21 @@ fn print_parameter(
     let dependencies = parameter.dependencies();
     print_dependencies(indent, dependencies);
 
-    // Print value
-    println!("{}    ├── Value:", "    ".repeat(indent));
-    print_parameter_value(parameter.value(), indent + 1);
+    if config.print_values {
+        // Print value
+        println!("{}    ├── Value:", "    ".repeat(indent));
+        print_parameter_value(parameter.value(), indent + 1);
 
-    // Print limits
-    println!("{}    ├── Limits:", "    ".repeat(indent));
-    print_limits(parameter.limits(), indent + 1);
+        // Print limits
+        println!("{}    ├── Limits:", "    ".repeat(indent));
+        print_limits(parameter.limits(), indent + 1);
+    }
 
     // Print metadata
     if parameter.is_performance() {
         println!("{}    ├── Performance: true", "    ".repeat(indent));
     }
+
     println!(
         "{}    └── Trace Level: {:?}",
         "    ".repeat(indent),
@@ -574,25 +584,30 @@ fn print_unit(unit: &ir::CompositeUnit, indent: usize) {
 }
 
 /// Prints tests
-fn print_tests(tests: &Vec<&ir::Test>, indent: usize) {
+fn print_tests(tests: &Vec<&ir::Test>, indent: usize, config: &IrPrintConfig) {
     for (i, test) in tests.iter().enumerate() {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         println!("{}    {}Test {:?}:", "    ".repeat(indent), prefix, i + 1);
-        print_test(test, indent + 1);
+        print_test(test, indent + 1, config);
     }
 }
 
 /// Prints a single test
-fn print_test(test: &ir::Test, indent: usize) {
-    // Print trace level
-    println!(
-        "{}    ├── Trace Level: {:?}",
-        "    ".repeat(indent),
-        test.trace_level()
-    );
-
-    // Print test expression
-    println!("{}    └── Test Expression:", "    ".repeat(indent));
-    print_expression(test.expr(), indent + 1);
+fn print_test(test: &ir::Test, indent: usize, config: &IrPrintConfig) {
+    if config.print_values {
+        println!(
+            "{}    ├── Trace Level: {:?}",
+            "    ".repeat(indent),
+            test.trace_level()
+        );
+        println!("{}    └── Test Expression:", "    ".repeat(indent));
+        print_expression(test.expr(), indent + 1);
+    } else {
+        println!(
+            "{}    └── Trace Level: {:?}",
+            "    ".repeat(indent),
+            test.trace_level()
+        );
+    }
 }
