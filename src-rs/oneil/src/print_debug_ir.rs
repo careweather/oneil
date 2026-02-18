@@ -104,7 +104,7 @@ fn print_model(
 ) {
     println!(
         "{}  {} Model: \"{}\"",
-        "  ".repeat(indent),
+        "    ".repeat(indent),
         prefix,
         model_ref.path().as_ref().display()
     );
@@ -153,7 +153,7 @@ fn print_model(
         let section_prefix = if is_last { "└──" } else { "├──" };
         println!(
             "{}    {} {} ({}):",
-            "  ".repeat(indent),
+            "    ".repeat(indent),
             section_prefix,
             section_name,
             count
@@ -211,7 +211,7 @@ fn print_python_imports(imports: &IndexMap<ir::PythonPath, ir::PythonImport>, in
 
         println!(
             "{}    {}Python import: \"{}\" ({} function{})",
-            "  ".repeat(indent),
+            "    ".repeat(indent),
             prefix,
             python_path.as_ref().display(),
             count,
@@ -231,7 +231,7 @@ fn print_python_imports(imports: &IndexMap<ir::PythonPath, ir::PythonImport>, in
 
             println!(
                 "{}    {}function: \"{}\"",
-                "  ".repeat(func_indent),
+                "    ".repeat(func_indent),
                 func_prefix,
                 name
             );
@@ -249,7 +249,7 @@ fn print_submodels(
         let prefix = if is_last { "└──" } else { "├──" };
         println!(
             "{}    {}Submodel: \"{}\" -> \"{}\"",
-            "  ".repeat(indent),
+            "    ".repeat(indent),
             prefix,
             identifier.as_str(),
             submodel.reference_name().as_str()
@@ -269,7 +269,7 @@ fn print_references(
         let prefix = if is_last { "└──" } else { "├──" };
         println!(
             "{}    {}Reference: \"{}\" -> \"{}\"",
-            "  ".repeat(indent),
+            "    ".repeat(indent),
             prefix,
             identifier.as_str(),
             path.as_ref().display()
@@ -295,7 +295,7 @@ fn print_parameter(
 ) {
     println!(
         "{}    {}Parameter: \"{}\"",
-        "  ".repeat(indent),
+        "    ".repeat(indent),
         prefix,
         parameter_name.as_str()
     );
@@ -307,20 +307,20 @@ fn print_parameter(
     print_dependencies(indent, dependencies);
 
     // Print value
-    println!("{}    ├── Value:", "  ".repeat(indent));
+    println!("{}    ├── Value:", "    ".repeat(indent));
     print_parameter_value(parameter.value(), indent + 1);
 
     // Print limits
-    println!("{}    ├── Limits:", "  ".repeat(indent));
+    println!("{}    ├── Limits:", "    ".repeat(indent));
     print_limits(parameter.limits(), indent + 1);
 
     // Print metadata
     if parameter.is_performance() {
-        println!("{}    ├── Performance: true", "  ".repeat(indent));
+        println!("{}    ├── Performance: true", "    ".repeat(indent));
     }
     println!(
         "{}    └── Trace Level: {:?}",
-        "  ".repeat(indent),
+        "    ".repeat(indent),
         parameter.trace_level()
     );
 }
@@ -332,7 +332,7 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
 
     let total_deps = builtin_deps.len() + parameter_deps.len() + external_deps.len();
     if total_deps > 0 {
-        println!("{}    ├── Dependencies:", "  ".repeat(indent));
+        println!("{}    ├── Dependencies:", "    ".repeat(indent));
         let mut dep_index = 0;
 
         // Print builtin dependencies
@@ -342,7 +342,7 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
             let dep_prefix = if is_last { "└──" } else { "├──" };
             println!(
                 "{}        {}Builtin: \"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 dep_prefix,
                 ident.as_str()
             );
@@ -355,7 +355,7 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
             let dep_prefix = if is_last { "└──" } else { "├──" };
             println!(
                 "{}        {}Parameter: \"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 dep_prefix,
                 param_name.as_str()
             );
@@ -368,7 +368,7 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
             let dep_prefix = if is_last { "└──" } else { "├──" };
             println!(
                 "{}        {}External: \"{}\".\"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 dep_prefix,
                 param_name.as_str(),
                 ref_name.as_str(),
@@ -381,27 +381,27 @@ fn print_dependencies(indent: usize, dependencies: &ir::Dependencies) {
 fn print_parameter_value(value: &ir::ParameterValue, indent: usize) {
     match value {
         ir::ParameterValue::Simple(expr, unit) => {
-            println!("{}    ├── Type: Simple", "  ".repeat(indent));
-            println!("{}    ├── Expression:", "  ".repeat(indent));
+            println!("{}    ├── Type: Simple", "    ".repeat(indent));
+            println!("{}    ├── Expression:", "    ".repeat(indent));
             print_expression(expr, indent + 1);
             if let Some(unit) = unit {
-                println!("{}    └── Unit:", "  ".repeat(indent));
+                println!("{}    └── Unit:", "    ".repeat(indent));
                 print_unit(unit, indent + 1);
             }
         }
         ir::ParameterValue::Piecewise(exprs, unit) => {
-            println!("{}    ├── Type: Piecewise", "  ".repeat(indent));
+            println!("{}    ├── Type: Piecewise", "    ".repeat(indent));
             for (i, piecewise_expr) in exprs.iter().enumerate() {
                 let is_last = i == exprs.len() - 1 && unit.is_none();
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Piece {}:", "  ".repeat(indent), prefix, i + 1);
-                println!("{}        ├── Expression:", "  ".repeat(indent));
+                println!("{}    {}Piece {}:", "    ".repeat(indent), prefix, i + 1);
+                println!("{}        ├── Expression:", "    ".repeat(indent));
                 print_expression(piecewise_expr.expr(), indent + 2);
-                println!("{}        └── Condition:", "  ".repeat(indent));
+                println!("{}        └── Condition:", "    ".repeat(indent));
                 print_expression(piecewise_expr.if_expr(), indent + 2);
             }
             if let Some(unit) = unit {
-                println!("{}    └── Unit:", "  ".repeat(indent));
+                println!("{}    └── Unit:", "    ".repeat(indent));
                 print_unit(unit, indent + 2);
             }
         }
@@ -412,28 +412,28 @@ fn print_parameter_value(value: &ir::ParameterValue, indent: usize) {
 fn print_limits(limits: &ir::Limits, indent: usize) {
     match limits {
         ir::Limits::Default => {
-            println!("{}    └── Type: Default", "  ".repeat(indent));
+            println!("{}    └── Type: Default", "    ".repeat(indent));
         }
         ir::Limits::Continuous {
             min,
             max,
             limit_expr_span: _,
         } => {
-            println!("{}    ├── Type: Continuous", "  ".repeat(indent));
-            println!("{}    ├── Min:", "  ".repeat(indent));
+            println!("{}    ├── Type: Continuous", "    ".repeat(indent));
+            println!("{}    ├── Min:", "    ".repeat(indent));
             print_expression(min, indent + 1);
-            println!("{}    └── Max:", "  ".repeat(indent));
+            println!("{}    └── Max:", "    ".repeat(indent));
             print_expression(max, indent + 1);
         }
         ir::Limits::Discrete {
             values,
             limit_expr_span: _,
         } => {
-            println!("{}    ├── Type: Discrete", "  ".repeat(indent));
+            println!("{}    ├── Type: Discrete", "    ".repeat(indent));
             for (i, value) in values.iter().enumerate() {
                 let is_last = i == values.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}    {}Value {}:", "  ".repeat(indent), prefix, i + 1);
+                println!("{}    {}Value {}:", "    ".repeat(indent), prefix, i + 1);
                 print_expression(value, indent + 1);
             }
         }
@@ -449,12 +449,12 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
             left,
             right,
         } => {
-            println!("{}    ├── BinaryOp: {:?}", "  ".repeat(indent), op);
+            println!("{}    ├── BinaryOp: {:?}", "    ".repeat(indent), op);
             print_expression(left, indent + 1);
             print_expression(right, indent + 1);
         }
         ir::Expr::UnaryOp { span: _, op, expr } => {
-            println!("{}    ├── UnaryOp: {:?}", "  ".repeat(indent), op);
+            println!("{}    ├── UnaryOp: {:?}", "    ".repeat(indent), op);
             print_expression(expr, indent + 1);
         }
         ir::Expr::FunctionCall {
@@ -467,7 +467,7 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
                 ir::FunctionName::Builtin(name, _) => {
                     println!(
                         "{}    ├── FunctionCall (builtin): \"{}\"",
-                        "  ".repeat(indent),
+                        "    ".repeat(indent),
                         name.as_str()
                     );
                 }
@@ -476,7 +476,7 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
                 } => {
                     println!(
                         "{}    ├── FunctionCall (imported): \"{}\" from \"{}\"",
-                        "  ".repeat(indent),
+                        "    ".repeat(indent),
                         name.as_str(),
                         python_path.as_ref().display()
                     );
@@ -486,7 +486,7 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
             for (i, arg) in args.iter().enumerate() {
                 let is_last = i == args.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}        {}Arg {}:", "  ".repeat(indent), prefix, i + 1);
+                println!("{}        {}Arg {}:", "    ".repeat(indent), prefix, i + 1);
                 print_expression(arg, indent + 2);
             }
         }
@@ -503,13 +503,18 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
             right,
             rest_chained,
         } => {
-            println!("{}    ├── ComparisonOp: {:?}", "  ".repeat(indent), op);
+            println!("{}    ├── ComparisonOp: {:?}", "    ".repeat(indent), op);
             print_expression(left, indent + 1);
             print_expression(right, indent + 1);
             for (i, (op, expr)) in rest_chained.iter().enumerate() {
                 let is_last = i == rest_chained.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
-                println!("{}        {}Chained: {:?}", "  ".repeat(indent), prefix, op);
+                println!(
+                    "{}        {}Chained: {:?}",
+                    "    ".repeat(indent),
+                    prefix,
+                    op
+                );
                 print_expression(expr, indent + 2);
             }
         }
@@ -522,14 +527,14 @@ fn print_variable(var: &ir::Variable, indent: usize) {
         ir::Variable::Builtin { ident, .. } => {
             println!(
                 "{}    ├── Builtin Variable: \"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 ident.as_str()
             );
         }
         ir::Variable::Parameter { parameter_name, .. } => {
             println!(
                 "{}    ├── Parameter Variable: \"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 parameter_name.as_str()
             );
         }
@@ -540,7 +545,7 @@ fn print_variable(var: &ir::Variable, indent: usize) {
         } => {
             println!(
                 "{}    ├── External Variable: \"{}\" from \"{}\"",
-                "  ".repeat(indent),
+                "    ".repeat(indent),
                 parameter_name.as_str(),
                 model.as_ref().display()
             );
@@ -552,20 +557,20 @@ fn print_variable(var: &ir::Variable, indent: usize) {
 fn print_literal(lit: &ir::Literal, indent: usize) {
     match lit {
         ir::Literal::Number(n) => {
-            println!("{}    ├── Literal: {}", "  ".repeat(indent), n);
+            println!("{}    ├── Literal: {}", "    ".repeat(indent), n);
         }
         ir::Literal::String(s) => {
-            println!("{}    ├── Literal: \"{}\"", "  ".repeat(indent), s);
+            println!("{}    ├── Literal: \"{}\"", "    ".repeat(indent), s);
         }
         ir::Literal::Boolean(b) => {
-            println!("{}    ├── Literal: {}", "  ".repeat(indent), b);
+            println!("{}    ├── Literal: {}", "    ".repeat(indent), b);
         }
     }
 }
 
 /// Prints a unit
 fn print_unit(unit: &ir::CompositeUnit, indent: usize) {
-    println!("{}    └── Unit: {:?}", "  ".repeat(indent), unit);
+    println!("{}    └── Unit: {:?}", "    ".repeat(indent), unit);
 }
 
 /// Prints tests
@@ -573,7 +578,7 @@ fn print_tests(tests: &Vec<&ir::Test>, indent: usize) {
     for (i, test) in tests.iter().enumerate() {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
-        println!("{}    {}Test {:?}:", "  ".repeat(indent), prefix, i + 1);
+        println!("{}    {}Test {:?}:", "    ".repeat(indent), prefix, i + 1);
         print_test(test, indent + 1);
     }
 }
@@ -583,11 +588,11 @@ fn print_test(test: &ir::Test, indent: usize) {
     // Print trace level
     println!(
         "{}    ├── Trace Level: {:?}",
-        "  ".repeat(indent),
+        "    ".repeat(indent),
         test.trace_level()
     );
 
     // Print test expression
-    println!("{}    └── Test Expression:", "  ".repeat(indent));
+    println!("{}    └── Test Expression:", "    ".repeat(indent));
     print_expression(test.expr(), indent + 1);
 }
