@@ -1,7 +1,9 @@
 //! Error types for Python integration.
 
-use oneil_shared::error::AsOneilError;
+use oneil_shared::error::{AsOneilError, Context};
 use oneil_shared::span::Span;
+use pyo3::Python;
+use pyo3::types::PyTracebackMethods;
 
 /// Error that can occur when loading a Python import.
 #[derive(Debug)]
@@ -17,8 +19,19 @@ impl AsOneilError for LoadPythonImportError {
         match self {
             Self::SourceHasNullByte => "Python source contains a null byte".to_string(),
             Self::CouldNotLoadPythonModule(error) => {
-                format!("Could not load Python module: {error}")
+                format!("Could not load Python module: \"{error}\"")
             }
+        }
+    }
+
+    fn context(&self) -> Vec<Context> {
+        match self {
+            Self::SourceHasNullByte => vec![],
+            Self::CouldNotLoadPythonModule(error) => Python::attach(|py| {
+                let traceback = error.traceback(py).and_then(|tb| tb.format().ok());
+
+                traceback.map_or_else(Vec::new, |traceback| vec![Context::Note(traceback)])
+            }),
         }
     }
 }

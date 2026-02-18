@@ -142,20 +142,44 @@ fn get_context_lines(context: &[Context], margin_width: u32) -> String {
         .iter()
         .map(|context| {
             let (equals, context_message) = match context {
-                Context::Note(message) => (
-                    stylesheet::NOTE_COLOR.bold().style("="),
-                    get_note_message_line(message),
-                ),
-                Context::Help(message) => (
-                    stylesheet::HELP_COLOR.bold().style("="),
-                    get_help_message_line(message),
-                ),
+                Context::Note(message) => {
+                    let message = adjust_context_message_indent(message, margin_width);
+                    (
+                        stylesheet::NOTE_COLOR.bold().style("="),
+                        get_note_message_line(&message),
+                    )
+                }
+                Context::Help(message) => {
+                    let message = adjust_context_message_indent(message, margin_width);
+                    (
+                        stylesheet::HELP_COLOR.bold().style("="),
+                        get_help_message_line(&message),
+                    )
+                }
             };
             let context_line = format!("{margin} {equals} {context_message}");
             context_line
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Adjusts the indentation of a context message to match the margin width
+fn adjust_context_message_indent(message: &str, margin_width: u32) -> String {
+    // ______ = note: <message>
+    // ^     ^  ^   ^
+    // 1     2  3   4
+    //
+    // 1. margin_width
+    // 2. equals + spaces
+    // 3. kind
+    // 4. colon + space
+    let indent = margin_width + 3 + 4 + 2;
+    let indent_str = " ".repeat(indent as usize);
+
+    let newline_replacement = format!("\n{indent_str}");
+
+    message.replace('\n', &newline_replacement)
 }
 
 fn get_context_with_source_lines(
