@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 oneil_analysis = { path = "../oneil_analysis" }
 oneil_ast = { path = "../oneil_ast" }
+oneil_builtins = { path = "../oneil_builtins" }
 oneil_eval = { path = "../oneil_eval" }
 oneil_ir = { path = "../oneil_ir" }
 oneil_resolver = { path = "../oneil_resolver" }
@@ -24,11 +25,7 @@ indexmap = { workspace = true }
 
 [features]
 default = ["python"]
-python = [
-    "dep:oneil_python",
-    "oneil_resolver/python",
-    "oneil_eval/python",
-]
+python = ["dep:oneil_python", "oneil_resolver/python", "oneil_eval/python"]
 
 [lints]
 workspace = true

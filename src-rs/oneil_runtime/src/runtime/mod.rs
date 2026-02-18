@@ -23,7 +23,7 @@ mod python;
 #[cfg(feature = "python")]
 use crate::cache::PythonImportCache;
 use crate::cache::{AstCache, EvalCache, IrCache, SourceCache};
-use crate::std_builtin::StdBuiltins;
+use oneil_builtins::BuiltinRef;
 
 /// Runtime for the Oneil programming language.
 ///
@@ -37,5 +37,5 @@ pub struct Runtime {
     eval_cache: EvalCache,
     #[cfg(feature = "python")]
     python_import_cache: PythonImportCache,
-    builtins: StdBuiltins,
+    builtins: BuiltinRef,
 }
