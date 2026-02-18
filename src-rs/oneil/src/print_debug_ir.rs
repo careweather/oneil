@@ -7,8 +7,78 @@ use oneil_runtime::output::{
     reference::{ModelIrReference, ReferenceImportReference, SubmodelImportReference},
 };
 
+/// Which sections of the IR to include when printing.
+#[derive(Clone, Debug)]
+pub enum IrSections {
+    /// Show all sections.
+    All,
+
+    /// Show only the specified sections.
+    Specified {
+        python_imports: bool,
+        submodels: bool,
+        references: bool,
+        parameters: bool,
+        tests: bool,
+    },
+}
+
+impl Default for IrSections {
+    fn default() -> Self {
+        Self::All
+    }
+}
+
+impl IrSections {
+    /// Returns whether to show the Python imports section.
+    #[must_use]
+    pub const fn show_python_imports(&self) -> bool {
+        match self {
+            Self::All => true,
+            Self::Specified { python_imports, .. } => *python_imports,
+        }
+    }
+
+    /// Returns whether to show the submodels section.
+    #[must_use]
+    pub const fn show_submodels(&self) -> bool {
+        match self {
+            Self::All => true,
+            Self::Specified { submodels, .. } => *submodels,
+        }
+    }
+
+    /// Returns whether to show the references section.
+    #[must_use]
+    pub const fn show_references(&self) -> bool {
+        match self {
+            Self::All => true,
+            Self::Specified { references, .. } => *references,
+        }
+    }
+
+    /// Returns whether to show the parameters section.
+    #[must_use]
+    pub const fn show_parameters(&self) -> bool {
+        match self {
+            Self::All => true,
+            Self::Specified { parameters, .. } => *parameters,
+        }
+    }
+
+    /// Returns whether to show the tests section.
+    #[must_use]
+    pub const fn show_tests(&self) -> bool {
+        match self {
+            Self::All => true,
+            Self::Specified { tests, .. } => *tests,
+        }
+    }
+}
+
 pub struct IrPrintConfig {
     pub recursive: bool,
+    pub sections: IrSections,
 }
 
 /// Prints the IR in a hierarchical tree format for debugging.
@@ -20,50 +90,66 @@ pub fn print(ir_result: ModelIrReference<'_>, ir_print_config: &IrPrintConfig) {
     println!("ModelCollection");
     println!("└── Models:");
     let prefix = "└──";
-    print_model(ir_result, 2, prefix, ir_print_config.recursive);
+    print_model(ir_result, 1, prefix, ir_print_config);
 }
 
 /// Prints a single model with its components.
 ///
 /// When `recursive` is true and `model_ref` is `Some`, also prints nested submodels and references.
-fn print_model(model_ref: ModelIrReference<'_>, indent: usize, prefix: &str, recursive: bool) {
+fn print_model(
+    model_ref: ModelIrReference<'_>,
+    indent: usize,
+    prefix: &str,
+    config: &IrPrintConfig,
+) {
     println!(
-        "{}    {}Model: \"{}\"",
+        "{}  {} Model: \"{}\"",
         "  ".repeat(indent),
         prefix,
         model_ref.path().as_ref().display()
     );
 
-    let indent = indent + 2;
-    let mut sections = Vec::new();
+    let sections = &config.sections;
+    let mut section_list: Vec<(&str, usize, SectionTag)> = Vec::new();
 
-    // Collect submodels
-    let submodels = model_ref.submodels();
-    if !submodels.is_empty() {
-        sections.push(("Submodels", submodels.len()));
+    if sections.show_python_imports() {
+        let python_imports = model_ref.python_imports();
+        let count = python_imports.len();
+        if count > 0 {
+            section_list.push(("Python imports", count, SectionTag::PythonImports));
+        }
     }
 
-    // Collect parameters
-    let parameters = model_ref.parameters();
-    if !parameters.is_empty() {
-        sections.push(("Parameters", parameters.len()));
+    if sections.show_submodels() {
+        let submodels = model_ref.submodels();
+        if !submodels.is_empty() {
+            section_list.push(("Submodels", submodels.len(), SectionTag::Submodels));
+        }
     }
 
-    // Collect references
-    let references = model_ref.references();
-    if !references.is_empty() {
-        sections.push(("References", references.len()));
+    if sections.show_parameters() {
+        let parameters = model_ref.parameters();
+        if !parameters.is_empty() {
+            section_list.push(("Parameters", parameters.len(), SectionTag::Parameters));
+        }
     }
 
-    // Collect tests
-    let tests = model_ref.tests();
-    if !tests.is_empty() {
-        sections.push(("Tests", tests.len()));
+    if sections.show_references() {
+        let references = model_ref.references();
+        if !references.is_empty() {
+            section_list.push(("References", references.len(), SectionTag::References));
+        }
     }
 
-    // Print sections
-    for (i, (section_name, count)) in sections.iter().enumerate() {
-        let is_last = i == sections.len() - 1;
+    if sections.show_tests() {
+        let tests = model_ref.tests();
+        if !tests.is_empty() {
+            section_list.push(("Tests", tests.len(), SectionTag::Tests));
+        }
+    }
+
+    for (i, (section_name, count, tag)) in section_list.iter().enumerate() {
+        let is_last = i == section_list.len() - 1;
         let section_prefix = if is_last { "└──" } else { "├──" };
         println!(
             "{}    {} {} ({}):",
@@ -73,16 +159,18 @@ fn print_model(model_ref: ModelIrReference<'_>, indent: usize, prefix: &str, rec
             count
         );
 
-        match *section_name {
-            "Submodels" => print_submodels(&submodels, indent + 2),
-            "Parameters" => print_parameters(&parameters, indent + 2),
-            "References" => print_references(&references, indent + 2),
-            "Tests" => print_tests(&tests, indent + 2),
-            _ => {}
+        match tag {
+            SectionTag::PythonImports => {
+                print_python_imports(model_ref.python_imports(), indent + 2);
+            }
+            SectionTag::Submodels => print_submodels(&model_ref.submodels(), indent + 2),
+            SectionTag::Parameters => print_parameters(&model_ref.parameters(), indent + 2),
+            SectionTag::References => print_references(&model_ref.references(), indent + 2),
+            SectionTag::Tests => print_tests(&model_ref.tests(), indent + 2),
         }
     }
 
-    if recursive {
+    if config.recursive {
         // Get all the references that have valid IR
         let refs_to_print: Vec<_> = model_ref
             .references()
@@ -94,7 +182,59 @@ fn print_model(model_ref: ModelIrReference<'_>, indent: usize, prefix: &str, rec
         for (i, nested_ref) in refs_to_print.iter().enumerate() {
             let is_last = i == refs_to_print.len() - 1;
             let nested_prefix = if is_last { "└──" } else { "├──" };
-            print_model(*nested_ref, indent + 2, nested_prefix, recursive);
+            print_model(*nested_ref, indent + 1, nested_prefix, config);
+        }
+    }
+}
+
+enum SectionTag {
+    PythonImports,
+    Submodels,
+    Parameters,
+    References,
+    Tests,
+}
+
+/// Prints Python imports, showing the path and function names for each import.
+fn print_python_imports(imports: &IndexMap<ir::PythonPath, ir::PythonImport>, indent: usize) {
+    for (i, (python_path, import)) in imports.iter().enumerate() {
+        let is_last_import = i == imports.len() - 1;
+
+        let prefix = if is_last_import {
+            "└──"
+        } else {
+            "├──"
+        };
+
+        let functions = import.functions();
+        let count = functions.len();
+
+        println!(
+            "{}    {}Python import: \"{}\" ({} function{})",
+            "  ".repeat(indent),
+            prefix,
+            python_path.as_ref().display(),
+            count,
+            if count == 1 { "" } else { "s" }
+        );
+
+        let func_indent = indent + 1;
+
+        for (j, name) in functions.iter().enumerate() {
+            let is_last_func = j == functions.len() - 1;
+
+            let func_prefix = if is_last_func {
+                "└──"
+            } else {
+                "├──"
+            };
+
+            println!(
+                "{}    {}function: \"{}\"",
+                "  ".repeat(func_indent),
+                func_prefix,
+                name
+            );
         }
     }
 }
@@ -160,7 +300,7 @@ fn print_parameter(
         parameter_name.as_str()
     );
 
-    let indent = indent + 2;
+    let indent = indent + 1;
 
     // Print dependencies
     let dependencies = parameter.dependencies();
@@ -168,11 +308,11 @@ fn print_parameter(
 
     // Print value
     println!("{}    ├── Value:", "  ".repeat(indent));
-    print_parameter_value(parameter.value(), indent + 2);
+    print_parameter_value(parameter.value(), indent + 1);
 
     // Print limits
     println!("{}    ├── Limits:", "  ".repeat(indent));
-    print_limits(parameter.limits(), indent + 2);
+    print_limits(parameter.limits(), indent + 1);
 
     // Print metadata
     if parameter.is_performance() {
@@ -243,10 +383,10 @@ fn print_parameter_value(value: &ir::ParameterValue, indent: usize) {
         ir::ParameterValue::Simple(expr, unit) => {
             println!("{}    ├── Type: Simple", "  ".repeat(indent));
             println!("{}    ├── Expression:", "  ".repeat(indent));
-            print_expression(expr, indent + 2);
+            print_expression(expr, indent + 1);
             if let Some(unit) = unit {
                 println!("{}    └── Unit:", "  ".repeat(indent));
-                print_unit(unit, indent + 2);
+                print_unit(unit, indent + 1);
             }
         }
         ir::ParameterValue::Piecewise(exprs, unit) => {
@@ -256,13 +396,13 @@ fn print_parameter_value(value: &ir::ParameterValue, indent: usize) {
                 let prefix = if is_last { "└──" } else { "├──" };
                 println!("{}    {}Piece {}:", "  ".repeat(indent), prefix, i + 1);
                 println!("{}        ├── Expression:", "  ".repeat(indent));
-                print_expression(piecewise_expr.expr(), indent + 4);
+                print_expression(piecewise_expr.expr(), indent + 2);
                 println!("{}        └── Condition:", "  ".repeat(indent));
-                print_expression(piecewise_expr.if_expr(), indent + 4);
+                print_expression(piecewise_expr.if_expr(), indent + 2);
             }
             if let Some(unit) = unit {
                 println!("{}    └── Unit:", "  ".repeat(indent));
-                print_unit(unit, indent + 4);
+                print_unit(unit, indent + 2);
             }
         }
     }
@@ -281,9 +421,9 @@ fn print_limits(limits: &ir::Limits, indent: usize) {
         } => {
             println!("{}    ├── Type: Continuous", "  ".repeat(indent));
             println!("{}    ├── Min:", "  ".repeat(indent));
-            print_expression(min, indent + 2);
+            print_expression(min, indent + 1);
             println!("{}    └── Max:", "  ".repeat(indent));
-            print_expression(max, indent + 2);
+            print_expression(max, indent + 1);
         }
         ir::Limits::Discrete {
             values,
@@ -294,7 +434,7 @@ fn print_limits(limits: &ir::Limits, indent: usize) {
                 let is_last = i == values.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
                 println!("{}    {}Value {}:", "  ".repeat(indent), prefix, i + 1);
-                print_expression(value, indent + 2);
+                print_expression(value, indent + 1);
             }
         }
     }
@@ -310,12 +450,12 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
             right,
         } => {
             println!("{}    ├── BinaryOp: {:?}", "  ".repeat(indent), op);
-            print_expression(left, indent + 2);
-            print_expression(right, indent + 2);
+            print_expression(left, indent + 1);
+            print_expression(right, indent + 1);
         }
         ir::Expr::UnaryOp { span: _, op, expr } => {
             println!("{}    ├── UnaryOp: {:?}", "  ".repeat(indent), op);
-            print_expression(expr, indent + 2);
+            print_expression(expr, indent + 1);
         }
         ir::Expr::FunctionCall {
             span: _,
@@ -347,7 +487,7 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
                 let is_last = i == args.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
                 println!("{}        {}Arg {}:", "  ".repeat(indent), prefix, i + 1);
-                print_expression(arg, indent + 4);
+                print_expression(arg, indent + 2);
             }
         }
         ir::Expr::Variable { span: _, variable } => {
@@ -364,13 +504,13 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
             rest_chained,
         } => {
             println!("{}    ├── ComparisonOp: {:?}", "  ".repeat(indent), op);
-            print_expression(left, indent + 2);
-            print_expression(right, indent + 2);
+            print_expression(left, indent + 1);
+            print_expression(right, indent + 1);
             for (i, (op, expr)) in rest_chained.iter().enumerate() {
                 let is_last = i == rest_chained.len() - 1;
                 let prefix = if is_last { "└──" } else { "├──" };
                 println!("{}        {}Chained: {:?}", "  ".repeat(indent), prefix, op);
-                print_expression(expr, indent + 4);
+                print_expression(expr, indent + 2);
             }
         }
     }
@@ -434,7 +574,7 @@ fn print_tests(tests: &Vec<&ir::Test>, indent: usize) {
         let is_last = i == tests.len() - 1;
         let prefix = if is_last { "└──" } else { "├──" };
         println!("{}    {}Test {:?}:", "  ".repeat(indent), prefix, i + 1);
-        print_test(test, indent + 2);
+        print_test(test, indent + 1);
     }
 }
 
@@ -449,5 +589,5 @@ fn print_test(test: &ir::Test, indent: usize) {
 
     // Print test expression
     println!("{}    └── Test Expression:", "  ".repeat(indent));
-    print_expression(test.expr(), indent + 2);
+    print_expression(test.expr(), indent + 1);
 }
