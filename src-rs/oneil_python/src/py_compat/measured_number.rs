@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 use oneil_output::{BinaryEvalError, MeasuredNumber, Number, Unit};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyNotImplemented;
 use pyo3::types::{PyFloat, PyTuple};
 
 use super::interval::PyInterval;
@@ -76,111 +77,314 @@ impl PyMeasuredNumber {
         Ok(number_to_py_any(&number, py))
     }
 
-    /// Compares two measured numbers. Returns -1, 0, or 1. Raises if units do not match.
-    fn checked_partial_cmp(&self, other: &Bound<'_, Self>) -> PyResult<i8> {
-        self.inner
-            .checked_partial_cmp(&other.borrow().inner)
-            .map(|opt| match opt {
-                Some(Ordering::Less) => -1,
-                Some(Ordering::Equal) => 0,
-                Some(Ordering::Greater) => 1,
-                None => 0,
-            })
-            .map_err(binary_eval_error_to_py_err)
-    }
-
-    /// Returns true if two measured numbers are equal. Raises if units do not match.
-    fn checked_eq(&self, other: &Bound<'_, Self>) -> PyResult<bool> {
-        self.inner
-            .checked_eq(&other.borrow().inner)
-            .map_err(binary_eval_error_to_py_err)
-    }
-
-    /// Negates the measured number.
-    fn neg(&self) -> Self {
+    fn __neg__(&self) -> Self {
         Self {
             inner: self.inner.clone().checked_neg(),
         }
     }
 
-    /// Adds two measured numbers. Raises if units do not match.
-    fn checked_add(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
-        self.inner
-            .clone()
-            .checked_add(&other.borrow().inner)
-            .map(|inner| Self { inner })
-            .map_err(binary_eval_error_to_py_err)
+    fn __pos__(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
     }
 
-    /// Subtracts two measured numbers. Raises if units do not match.
-    fn checked_sub(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
-        self.inner
+    fn __add__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = self
+            .inner
             .clone()
-            .checked_sub(&other.borrow().inner)
-            .map(|inner| Self { inner })
-            .map_err(binary_eval_error_to_py_err)
+            .checked_add(&rhs)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
     }
 
-    /// Multiplies two measured numbers.
-    fn checked_mul(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
-        self.inner
-            .clone()
-            .checked_mul(other.borrow().inner.clone())
-            .map(|inner| Self { inner })
-            .map_err(binary_eval_error_to_py_err)
+    fn __radd__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let lhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = lhs
+            .checked_add(&self.inner)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
     }
 
-    /// Divides two measured numbers. Raises if units do not match.
-    fn checked_div(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
-        self.inner
+    fn __sub__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = self
+            .inner
             .clone()
-            .checked_div(other.borrow().inner.clone())
-            .map(|inner| Self { inner })
-            .map_err(binary_eval_error_to_py_err)
+            .checked_sub(&rhs)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
     }
 
-    /// Remainder of two measured numbers. Raises if units do not match.
-    fn checked_rem(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
-        self.inner
+    fn __rsub__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let lhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = lhs
+            .checked_sub(&self.inner)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __mul__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = self
+            .inner
             .clone()
-            .checked_rem(&other.borrow().inner)
-            .map(|inner| Self { inner })
+            .checked_mul(rhs)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __rmul__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let lhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = lhs
+            .checked_mul(self.inner.clone())
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __truediv__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = self
+            .inner
+            .clone()
+            .checked_div(rhs)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __rtruediv__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let lhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = lhs
+            .checked_div(self.inner.clone())
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __mod__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = self
+            .inner
+            .clone()
+            .checked_rem(&rhs)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __rmod__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let lhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = lhs
+            .checked_rem(&self.inner)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __pow__<'py>(
+        &self,
+        other: &Bound<'_, PyAny>,
+        modulus: Option<&Bound<'_, PyAny>>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if modulus.is_some() {
+            return Ok(PyNotImplemented::get(py).to_owned().into_any());
+        }
+
+        let exponent_number = match py_any_to_number(other) {
+            Ok(n) => n,
+            Err(_) => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
+        };
+
+        let inner = self
+            .inner
+            .clone()
+            .checked_pow(&exponent_number)
+            .map_err(binary_eval_error_to_py_err)?;
+
+        Bound::new(py, Self { inner }).map(|b| b.into_any())
+    }
+
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
+        self.inner
+            .checked_eq(&rhs)
             .map_err(binary_eval_error_to_py_err)
+            .map(Some)
+    }
+
+    fn __lt__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
+        self.inner
+            .checked_partial_cmp(&rhs)
+            .map_err(binary_eval_error_to_py_err)
+            .map(|opt| opt.map(|o| o == Ordering::Less))
+    }
+
+    fn __le__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
+        self.inner
+            .checked_partial_cmp(&rhs)
+            .map_err(binary_eval_error_to_py_err)
+            .map(|opt| opt.map(|o| o == Ordering::Less || o == Ordering::Equal))
+    }
+
+    fn __gt__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
+        self.inner
+            .checked_partial_cmp(&rhs)
+            .map_err(binary_eval_error_to_py_err)
+            .map(|opt| opt.map(|o| o == Ordering::Greater))
+    }
+
+    fn __ge__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+        let rhs = match py_any_to_measured_number(other) {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
+        self.inner
+            .checked_partial_cmp(&rhs)
+            .map_err(binary_eval_error_to_py_err)
+            .map(|opt| opt.map(|o| o == Ordering::Greater || o == Ordering::Equal))
     }
 
     /// Escaped subtraction (min-min, max-max). Raises if units do not match.
-    fn checked_escaped_sub(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
+    fn escaped_sub(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let rhs = py_any_to_measured_number(other)
+            .ok_or_else(|| PyErr::new::<PyValueError, _>("expected MeasuredNumber"))?;
+
         self.inner
             .clone()
-            .checked_escaped_sub(&other.borrow().inner)
+            .checked_escaped_sub(&rhs)
             .map(|inner| Self { inner })
             .map_err(binary_eval_error_to_py_err)
     }
 
     /// Escaped division (min/min, max/max). Raises if units do not match.
-    fn checked_escaped_div(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
-        self.inner
-            .clone()
-            .checked_escaped_div(other.borrow().inner.clone())
-            .map(|inner| Self { inner })
-            .map_err(binary_eval_error_to_py_err)
-    }
+    fn escaped_div(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let rhs = py_any_to_measured_number(other)
+            .ok_or_else(|| PyErr::new::<PyValueError, _>("expected MeasuredNumber"))?;
 
-    /// Raises this measured number to a scalar exponent. Raises if exponent is an interval.
-    fn checked_pow(&self, exponent: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let exponent_number = py_any_to_number(exponent)?;
         self.inner
             .clone()
-            .checked_pow(&exponent_number)
+            .checked_escaped_div(rhs)
             .map(|inner| Self { inner })
             .map_err(binary_eval_error_to_py_err)
     }
 
     /// Returns the tightest enclosing interval of this and the other measured number. Raises if units do not match.
-    fn checked_min_max(&self, other: &Bound<'_, Self>) -> PyResult<Self> {
+    fn min_max(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let rhs = py_any_to_measured_number(other)
+            .ok_or_else(|| PyErr::new::<PyValueError, _>("expected MeasuredNumber"))?;
+
         self.inner
             .clone()
-            .checked_min_max(&other.borrow().inner)
+            .checked_min_max(&rhs)
             .map(|inner| Self { inner })
             .map_err(binary_eval_error_to_py_err)
     }
@@ -314,6 +518,16 @@ impl From<&PyMeasuredNumber> for MeasuredNumber {
     fn from(p: &PyMeasuredNumber) -> Self {
         p.inner.clone()
     }
+}
+
+/// Tries to convert a Python object to a [`MeasuredNumber`]: accepts [`PyMeasuredNumber`].
+///
+/// Used by binary operators to accept `PyAny` and return `NotImplemented` when conversion fails.
+fn py_any_to_measured_number(other: &Bound<'_, PyAny>) -> Option<MeasuredNumber> {
+    other
+        .extract::<PyMeasuredNumber>()
+        .ok()
+        .map(MeasuredNumber::from)
 }
 
 fn binary_eval_error_to_py_err(err: BinaryEvalError) -> PyErr {
