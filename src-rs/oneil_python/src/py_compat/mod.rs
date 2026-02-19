@@ -1,5 +1,6 @@
 //! Python compatibility data types and conversion functions.
 
+mod builtin;
 mod interval;
 mod measured_number;
 mod unit;
