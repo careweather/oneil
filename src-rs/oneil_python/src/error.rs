@@ -18,9 +18,7 @@ impl AsOneilError for LoadPythonImportError {
     fn message(&self) -> String {
         match self {
             Self::SourceHasNullByte => "Python source contains a null byte".to_string(),
-            Self::CouldNotLoadPythonModule(error) => {
-                format!("Could not load Python module: \"{error}\"")
-            }
+            Self::CouldNotLoadPythonModule(_error) => "Could not load Python module".to_string(),
         }
     }
 
@@ -30,7 +28,10 @@ impl AsOneilError for LoadPythonImportError {
             Self::CouldNotLoadPythonModule(error) => Python::attach(|py| {
                 let traceback = error.traceback(py).and_then(|tb| tb.format().ok());
 
-                traceback.map_or_else(Vec::new, |traceback| vec![Context::Note(traceback)])
+                traceback.map_or_else(
+                    || vec![Context::Note(error.to_string())],
+                    |traceback| vec![Context::Note(error.to_string()), Context::Note(traceback)],
+                )
             }),
         }
     }
@@ -45,4 +46,6 @@ pub struct PythonEvalError {
     pub identifier_span: Span,
     /// Error message from Python or from conversion.
     pub message: String,
+    /// The traceback from Python.
+    pub traceback: Option<String>,
 }

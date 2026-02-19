@@ -3,6 +3,7 @@
 use oneil_output::Value;
 use oneil_shared::span::Span;
 use pyo3::Python;
+use pyo3::types::PyTracebackMethods;
 
 use crate::error::PythonEvalError;
 use crate::function::PythonFunction;
@@ -19,10 +20,11 @@ pub fn evaluate_python_function(
     identifier_span: Span,
     args: Vec<(Value, Span)>,
 ) -> Result<Value, PythonEvalError> {
-    let to_eval_err = |e: pyo3::PyErr| PythonEvalError {
+    let to_eval_err = |e: pyo3::PyErr, py: Python<'_>| PythonEvalError {
         function_name: identifier.to_string(),
         identifier_span,
         message: e.to_string(),
+        traceback: e.traceback(py).and_then(|tb| tb.format().ok()),
     };
 
     Python::attach(|py| {
@@ -31,7 +33,10 @@ pub fn evaluate_python_function(
             .map(|(value, _span)| value_to_py_any(value, py))
             .collect::<Vec<_>>();
 
-        let result = function.call(py, &py_args).map_err(to_eval_err)?;
-        py_any_to_value(&result).map_err(to_eval_err)
+        let result = function
+            .call(py, &py_args)
+            .map_err(|e| to_eval_err(e, py))?;
+
+        py_any_to_value(&result).map_err(|e| to_eval_err(e, py))
     })
 }
