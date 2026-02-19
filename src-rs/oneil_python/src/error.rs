@@ -1,7 +1,6 @@
 //! Error types for Python integration.
 
 use oneil_shared::error::{AsOneilError, Context};
-use oneil_shared::span::Span;
 use pyo3::Python;
 use pyo3::types::PyTracebackMethods;
 
@@ -39,13 +38,16 @@ impl AsOneilError for LoadPythonImportError {
 
 /// Error from evaluating a Python function (argument conversion, call, or result conversion failed).
 #[derive(Debug)]
-pub struct PythonEvalError {
-    /// Name of the Python function that was called.
-    pub function_name: String,
-    /// Span of the function identifier in the Oneil source.
-    pub identifier_span: Span,
-    /// Error message from Python or from conversion.
-    pub message: String,
-    /// The traceback from Python.
-    pub traceback: Option<String>,
+pub enum PythonEvalError {
+    PyErr {
+        /// Error message from Python or from conversion.
+        message: String,
+        /// The traceback from Python.
+        traceback: Option<String>,
+    },
+
+    InvalidReturnValue {
+        /// The value that was invalid.
+        value_repr: String,
+    },
 }

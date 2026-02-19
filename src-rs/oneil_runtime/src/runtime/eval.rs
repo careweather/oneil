@@ -92,10 +92,10 @@ impl eval::ExternalEvaluationContext for Runtime {
         &self,
         python_path: &ir::PythonPath,
         identifier: &ir::Identifier,
-        identifier_span: Span,
+        function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Box<eval::EvalError>>> {
-        self.evaluate_python_function(python_path, identifier, identifier_span, args)
+        self.evaluate_python_function(python_path, identifier, function_call_span, args)
     }
 
     fn lookup_unit(&self, name: &str) -> Option<&Unit> {

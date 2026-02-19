@@ -47,7 +47,7 @@ pub trait ExternalEvaluationContext {
         &self,
         python_path: &ir::PythonPath,
         identifier: &ir::Identifier,
-        identifier_span: Span,
+        function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Box<EvalError>>>;
 
@@ -296,13 +296,13 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         &self,
         python_path: &ir::PythonPath,
         identifier: &ir::Identifier,
-        identifier_span: Span,
+        function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Result<output::Value, Box<EvalError>> {
         #[cfg(feature = "python")]
         {
             self.external_context
-                .evaluate_imported_function(python_path, identifier, identifier_span, args)
+                .evaluate_imported_function(python_path, identifier, function_call_span, args)
                 .expect("imported function should be defined (checked during resolution)")
         }
 
