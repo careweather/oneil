@@ -3,11 +3,12 @@
 use std::{ffi::CString, path::Path};
 
 use indexmap::IndexMap;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyDict, wrap_pymodule};
 
 use crate::{
     error::LoadPythonImportError,
     function::{PythonFunction, PythonFunctionMap},
+    py_compat::oneil_python_module,
 };
 
 pub fn load_python_import(
@@ -30,6 +31,8 @@ pub fn load_python_import(
     };
 
     let functions = Python::attach(|py| {
+        insert_oneil_module_into_python(py)?;
+
         // load the code module
         let code_module = PyModule::from_code(py, &source_cstr, &path_cstr, &module_name_cstr)?;
 
@@ -49,4 +52,18 @@ pub fn load_python_import(
         Ok(functions) => Ok(PythonFunctionMap::from(functions)),
         Err(e) => Err(LoadPythonImportError::CouldNotLoadPythonModule(e)),
     }
+}
+
+fn insert_oneil_module_into_python(py: Python<'_>) -> PyResult<()> {
+    // wrap the oneil_python_module into a Python module
+    let oneil_module = wrap_pymodule!(oneil_python_module)(py);
+
+    // Import and get sys.modules
+    let sys = PyModule::import(py, "sys")?;
+    let py_modules: Bound<'_, PyDict> = sys.getattr("modules")?.cast_into()?;
+
+    // Insert oneil_python_module into sys.modules
+    py_modules.set_item("oneil", oneil_module)?;
+
+    Ok(())
 }
