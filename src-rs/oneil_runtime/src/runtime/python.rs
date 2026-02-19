@@ -104,6 +104,7 @@ impl Runtime {
                 function_name: e.function_name,
                 identifier_span: e.identifier_span,
                 message: e.message,
+                traceback: e.traceback,
             })
         }))
     }

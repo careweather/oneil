@@ -429,6 +429,8 @@ pub enum EvalError {
         identifier_span: Span,
         /// The error message from Python or from conversion.
         message: String,
+        /// The traceback from Python.
+        traceback: Option<String>,
     },
     /// An error indicating that an unsupported feature was used.
     ///
@@ -722,8 +724,9 @@ impl AsOneilError for EvalError {
             Self::PythonEvalError {
                 function_name,
                 identifier_span: _,
-                message,
-            } => format!("python function `{function_name}` raised an error: {message}"),
+                message: _,
+                traceback: _,
+            } => format!("python function `{function_name}` raised an error"),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
@@ -915,6 +918,7 @@ impl AsOneilError for EvalError {
                 function_name: _,
                 identifier_span: location_span,
                 message: _,
+                traceback: _,
             }
             | Self::Unsupported {
                 relevant_span: location_span,
@@ -1141,8 +1145,17 @@ impl AsOneilError for EvalError {
             Self::PythonEvalError {
                 function_name: _,
                 identifier_span: _,
-                message: _,
-            } => Vec::new(),
+                message,
+                traceback,
+            } => traceback.as_ref().map_or_else(
+                || vec![ErrorContext::Note(message.to_string())],
+                |traceback| {
+                    vec![
+                        ErrorContext::Note(message.to_string()),
+                        ErrorContext::Note(traceback.to_string()),
+                    ]
+                },
+            ),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
@@ -1447,6 +1460,7 @@ impl AsOneilError for EvalError {
                 function_name: _,
                 identifier_span: _,
                 message: _,
+                traceback: _,
             } => Vec::new(),
             Self::Unsupported {
                 relevant_span: _,
