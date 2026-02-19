@@ -14,7 +14,7 @@ use super::unit::PyUnit;
 /// Python wrapper for Oneil’s [`MeasuredNumber`].
 ///
 /// A measured number is a number (scalar or interval) with a unit.
-#[pyclass(name = "OneilMeasuredNumber", from_py_object)]
+#[pyclass(name = "MeasuredNumber", module = "oneil", from_py_object)]
 #[derive(Debug, Clone)]
 pub struct PyMeasuredNumber {
     inner: MeasuredNumber,

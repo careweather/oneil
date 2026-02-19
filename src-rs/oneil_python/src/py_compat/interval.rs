@@ -19,7 +19,7 @@ fn py_any_to_py_interval(other: &Bound<'_, PyAny>) -> Option<Interval> {
 /// Python wrapper for Oneil’s [`Interval`].
 ///
 /// An interval is a closed, connected set of numbers with a minimum and maximum.
-#[pyclass(name = "OneilInterval", eq, ord, frozen, from_py_object)]
+#[pyclass(name = "Interval", module = "oneil", eq, ord, frozen, from_py_object)]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct PyInterval {
     inner: Interval,

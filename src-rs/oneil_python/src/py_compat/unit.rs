@@ -10,7 +10,7 @@ use pyo3::types::PyDict;
 /// A unit has dimensions, a magnitude (e.g. 1000 for km), an optional decibel flag,
 /// and display information. Units are not compared for equality by default; use
 /// `dimensionally_eq` or `numerically_eq` as appropriate.
-#[pyclass(name = "OneilUnit", from_py_object)]
+#[pyclass(name = "Unit", module = "oneil", from_py_object)]
 #[derive(Debug, Clone)]
 pub struct PyUnit {
     inner: Unit,
