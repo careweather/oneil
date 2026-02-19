@@ -602,6 +602,7 @@ dependencies = [
  "oneil_resolver",
  "oneil_runtime",
  "oneil_shared",
+ "pyo3",
 ]
 
 [[package]]
