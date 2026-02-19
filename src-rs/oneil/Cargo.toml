@@ -1,5 +1,6 @@
 [package]
 name = "oneil"
+default-run = "oneil"
 description = "Oneil programming language and tools"
 version.workspace = true
 edition.workspace = true
