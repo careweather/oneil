@@ -22,22 +22,13 @@ impl Runtime {
         let path = path.as_ref();
         self.eval_model_internal(path);
 
-        let is_success = self
-            .eval_cache
-            .get_entry(path)
-            .is_some_and(LoadResult::is_success);
-
-        let errors = if is_success {
-            RuntimeErrors::new()
-        } else {
-            self.get_model_errors(path)
-        };
-
         let model_opt = self
             .eval_cache
             .get_entry(path)
             .and_then(LoadResult::value)
             .map(|model| output::reference::ModelReference::new(model, &self.eval_cache));
+
+        let errors = self.get_model_errors(path);
 
         (model_opt, errors)
     }

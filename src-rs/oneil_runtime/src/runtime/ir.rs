@@ -26,22 +26,13 @@ impl Runtime {
         let path = path.as_ref();
         self.load_ir_internal(path);
 
-        let is_success = self
-            .ir_cache
-            .get_entry(path)
-            .is_some_and(LoadResult::is_success);
-
-        let errors = if is_success {
-            RuntimeErrors::new()
-        } else {
-            self.get_model_errors(path)
-        };
-
         let ir_opt = self
             .ir_cache
             .get_entry(path)
             .and_then(LoadResult::value)
             .map(|ir| output::reference::ModelIrReference::new(ir, &self.ir_cache));
+
+        let errors = self.get_model_errors(path);
 
         (ir_opt, errors)
     }

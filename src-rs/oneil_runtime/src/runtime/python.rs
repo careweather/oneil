@@ -28,22 +28,13 @@ impl Runtime {
         let path = path.as_ref();
         self.load_python_import_internal(path);
 
-        let is_success = self
-            .python_import_cache
-            .get_entry(path)
-            .is_some_and(Result::is_ok);
-
-        let errors = if is_success {
-            RuntimeErrors::new()
-        } else {
-            self.get_python_import_errors(path)
-        };
-
         let names_opt = self
             .python_import_cache
             .get_entry(path)
             .and_then(|result| result.as_ref().ok())
             .map(|functions| functions.get_function_names().collect());
+
+        let errors = self.get_python_import_errors(path);
 
         names_opt.ok_or(errors)
     }
