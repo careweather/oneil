@@ -79,17 +79,17 @@ pub fn print_test_results(eval_result: ModelReference<'_>, test_config: &TestPri
 }
 
 #[derive(Default)]
-struct TestInfo<'result> {
+struct TestInfo<'runtime> {
     pub test_count: usize,
     pub passed_count: usize,
-    pub failed_tests: IndexMap<&'result Path, Vec<(Span, &'result DebugInfo)>>,
+    pub failed_tests: IndexMap<&'runtime Path, Vec<(Span, &'runtime DebugInfo)>>,
 }
 
-fn get_model_tests<'result>(
-    model_ref: ModelReference<'result>,
+fn get_model_tests<'runtime>(
+    model_ref: ModelReference<'runtime>,
     recursive: bool,
-    mut test_info: TestInfo<'result>,
-) -> TestInfo<'result> {
+    mut test_info: TestInfo<'runtime>,
+) -> TestInfo<'runtime> {
     let tests = model_ref.tests();
     let test_count = tests.len();
     let failed_tests = tests
@@ -239,15 +239,15 @@ fn print_parameters_by_list(
     }
 }
 
-struct ModelParametersToPrint<'result> {
-    pub parameters: IndexMap<String, &'result Parameter>,
+struct ModelParametersToPrint<'runtime> {
+    pub parameters: IndexMap<String, &'runtime Parameter>,
     pub parameters_not_found: IndexSet<String>,
 }
 
-fn get_model_parameters_by_list<'result>(
-    model_ref: ModelReference<'result>,
+fn get_model_parameters_by_list<'runtime>(
+    model_ref: ModelReference<'runtime>,
     variables: &VariableList,
-) -> ModelParametersToPrint<'result> {
+) -> ModelParametersToPrint<'runtime> {
     let mut parameters = IndexMap::new();
     let mut parameters_not_found = IndexSet::new();
 
@@ -271,10 +271,10 @@ fn get_model_parameters_by_list<'result>(
     }
 }
 
-fn get_parameter_from_model<'result>(
-    model_ref: ModelReference<'result>,
+fn get_parameter_from_model<'runtime>(
+    model_ref: ModelReference<'runtime>,
     param: &Variable,
-) -> Option<&'result Parameter> {
+) -> Option<&'runtime Parameter> {
     let mut param_vec = param.to_vec();
 
     let parameter = param_vec.remove(0);
@@ -363,12 +363,12 @@ fn get_model_parameters_by_filter(
         clippy::items_after_statements,
         reason = "this is an internal recursive function, we keep it here for clarity"
     )]
-    fn recurse<'result>(
-        model_ref: ModelReference<'result>,
+    fn recurse<'runtime>(
+        model_ref: ModelReference<'runtime>,
         print_level: PrintMode,
         recursive: bool,
-        mut parameters: IndexMap<&'result Path, Vec<&'result Parameter>>,
-    ) -> IndexMap<&'result Path, Vec<&'result Parameter>> {
+        mut parameters: IndexMap<&'runtime Path, Vec<&'runtime Parameter>>,
+    ) -> IndexMap<&'runtime Path, Vec<&'runtime Parameter>> {
         let model_parameters = model_ref.parameters();
         let parameters_to_print: Vec<_> = match print_level {
             PrintMode::All => model_parameters
