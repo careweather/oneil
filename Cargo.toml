@@ -20,7 +20,7 @@ categories = ["compilers", "science", "simulation"]
 
 [workspace.dependencies]
 indexmap = "2.1"
-pyo3 = { version = "0.28.0", features = ["auto-initialize", "abi3"] }
+pyo3 = { version = "0.28.0", features = ["auto-initialize", "abi3-py310"] }
 
 # Lints originally derived from https://medium.com/@carlmkadie/92bb899d47ef
 # 
