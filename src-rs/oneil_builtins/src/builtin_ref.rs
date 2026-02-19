@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use oneil_output::{Unit, Value};
 
-use crate::function::{BuiltinFunctionFn, BuiltinFunction};
+use crate::function::{BuiltinFunction, BuiltinFunctionFn};
 use crate::prefix::BuiltinPrefix;
 use crate::unit::BuiltinUnit;
 use crate::value::BuiltinValue;
@@ -56,15 +56,32 @@ impl BuiltinRef {
     /// Returns the builtin function for the given identifier, if any.
     #[must_use]
     pub fn get_function(&self, identifier: &str) -> Option<BuiltinFunctionFn> {
-        self.functions
-            .get(identifier)
-            .map(|f| f.function)
+        self.functions.get(identifier).map(|f| f.function)
     }
 
     /// Returns the builtin unit for the given name, if any.
     #[must_use]
     pub fn get_unit(&self, name: &str) -> Option<&Unit> {
         self.units.get(name).map(|u| &u.unit)
+    }
+
+    /// Returns an iterator over all builtin values.
+    pub fn builtin_values(&self) -> impl Iterator<Item = (&str, &Value)> {
+        self.values
+            .iter()
+            .map(|(name, value)| (*name, &value.value))
+    }
+
+    /// Returns an iterator over all builtin functions.
+    pub fn builtin_functions(&self) -> impl Iterator<Item = (&str, &BuiltinFunction)> {
+        self.functions
+            .iter()
+            .map(|(name, function)| (*name, function))
+    }
+
+    /// Returns an iterator over all builtin units.
+    pub fn builtin_units(&self) -> impl Iterator<Item = (&str, &Unit)> {
+        self.units.iter().map(|(name, unit)| (*name, &unit.unit))
     }
 
     /// Returns an iterator over all builtin unit prefixes (name, multiplier).
