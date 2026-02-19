@@ -1,30 +1,35 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
 
 [project]
-name="oneil"
-version="0.13"
-authors=[
-  { name="Patrick Walton", email="m.patrick.walton@gmail.com" },
+name = "oneil"
+version = "0.15.0"
+authors = [
+	{ name = "Patrick Walton", email = "m.patrick.walton@gmail.com" },
+	{ name = "Brendon Bown", email = "brendon.bown@proton.me" },
 ]
-description="Design specification language for system modeling"
-readme="README.md"
-requires-python=">=3.10"
-classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Programming Language :: Python :: 3",
-        "Operating System :: POSIX :: Linux",
-	]
-dependencies = [
-	"beautifultable==1.1.0",
-	"numpy==2.0.0",
-	"pytexit==0.4.0",
+description = "Design specification language for system modeling"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+	"Development Status :: 3 - Alpha",
+	"Programming Language :: Python :: 3",
+	"Operating System :: POSIX :: Linux",
 ]
+dependencies = ["beautifultable==1.1.0", "numpy==2.0.0", "pytexit==0.4.0"]
 
 [project.urls]
-Homepage="https://github.com/careweather/oneil"
-Issues="https://github.com/careweather/oneil/issues"
+Homepage = "https://github.com/careweather/oneil"
+Issues = "https://github.com/careweather/oneil/issues"
 
 [project.scripts]
 oneil = "oneil:main"
+
+[tool.maturin]
+profile = "release"
+editable-profile = "dev"
+features = ["python-lib"]
+all-features = false
+no-default-features = true
+manifest-path = "src-rs/oneil/Cargo.toml"

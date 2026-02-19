@@ -9,8 +9,8 @@ pub use value_convert::{py_any_to_value, value_to_py_any};
 
 use pyo3::prelude::*;
 
-#[pymodule]
-pub mod oneil_py {
+#[pymodule(name = "oneil")]
+pub mod oneil_python_module {
     #[pymodule_export]
     pub use super::interval::PyInterval;
 

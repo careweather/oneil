@@ -5,7 +5,10 @@ use std::{ffi::CString, path::Path};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 
-use crate::{PythonFunction, error::LoadPythonImportError, function::PythonFunctionMap};
+use crate::{
+    error::LoadPythonImportError,
+    function::{PythonFunction, PythonFunctionMap},
+};
 
 pub fn load_python_import(
     path: &Path,

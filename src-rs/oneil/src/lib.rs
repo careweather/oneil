@@ -6,17 +6,6 @@
     clippy::multiple_crate_versions,
     reason = "this isn't causing problems, and it's going to take time to fix"
 )]
-#![cfg_attr(
-    all(
-        feature = "rust-lib",
-        feature = "python-imports",
-        feature = "python-lib"
-    ),
-    expect(
-        unused_imports,
-        reason = "if all three features are enabled, `oneil_python` will be re-exported twice"
-    )
-)]
 
 #[cfg(feature = "rust-lib")]
 pub use rust_lib::*;
@@ -45,5 +34,6 @@ pub use python_lib::*;
 
 #[cfg(feature = "python-lib")]
 mod python_lib {
-    pub use oneil_python as python;
+
+    pub use oneil_python::oneil_python_module;
 }

@@ -14,7 +14,7 @@ readme = "README.md"
 indexmap.workspace = true
 oneil_output = { path = "../oneil_output" }
 oneil_shared = { path = "../oneil_shared" }
-pyo3 = { version = "0.28.0", features = ["auto-initialize", "abi3"] }
+pyo3 = { workspace = true }
 
 [features]
 default = ["python-lib", "rust-lib"]

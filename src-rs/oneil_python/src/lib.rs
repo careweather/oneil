@@ -32,5 +32,5 @@ pub use python_lib::*;
 
 #[cfg(feature = "python-lib")]
 mod python_lib {
-    pub use crate::py_compat::oneil_py;
+    pub use crate::py_compat::oneil_python_module;
 }
