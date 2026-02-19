@@ -4,7 +4,7 @@ use std::path::Path;
 
 use indexmap::IndexSet;
 use oneil_eval::EvalError;
-use oneil_python::function::PythonFunctionMap;
+use oneil_python::{PythonEvalError, function::PythonFunctionMap};
 
 use crate::error::PythonImportError;
 use oneil_shared::span::Span;
@@ -81,7 +81,7 @@ impl Runtime {
         &self,
         python_path: &ir::PythonPath,
         identifier: &ir::Identifier,
-        identifier_span: Span,
+        function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Box<EvalError>>> {
         let python_functions = self
@@ -92,20 +92,22 @@ impl Runtime {
 
         let function = python_functions.get_function(identifier.as_str())?;
 
-        let eval_result = oneil_python::evaluate_python_function(
-            function,
-            identifier.as_str(),
-            identifier_span,
-            args,
-        );
+        let eval_result = oneil_python::evaluate_python_function(function, args);
 
-        Some(eval_result.map_err(|e| {
-            Box::new(EvalError::PythonEvalError {
-                function_name: e.function_name,
-                identifier_span: e.identifier_span,
-                message: e.message,
-                traceback: e.traceback,
-            })
+        Some(eval_result.map_err(|e| match e {
+            PythonEvalError::PyErr { message, traceback } => Box::new(EvalError::PythonEvalError {
+                function_name: identifier.as_str().to_string(),
+                function_call_span,
+                message,
+                traceback,
+            }),
+            PythonEvalError::InvalidReturnValue { value_repr } => {
+                Box::new(EvalError::InvalidPythonReturnValue {
+                    function_name: identifier.as_str().to_string(),
+                    function_call_span,
+                    value_repr,
+                })
+            }
         }))
     }
 }

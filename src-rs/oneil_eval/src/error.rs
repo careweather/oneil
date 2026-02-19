@@ -425,12 +425,21 @@ pub enum EvalError {
     PythonEvalError {
         /// The name of the Python function that was called.
         function_name: String,
-        /// The source span of the function identifier in the Oneil source.
-        identifier_span: Span,
+        /// The source span of the function call.
+        function_call_span: Span,
         /// The error message from Python or from conversion.
         message: String,
         /// The traceback from Python.
         traceback: Option<String>,
+    },
+    /// An invalid return value from a Python function.
+    InvalidPythonReturnValue {
+        /// The name of the Python function that returned the invalid value.
+        function_name: String,
+        /// The source span of the function call.
+        function_call_span: Span,
+        /// The value that was invalid.
+        value_repr: String,
     },
     /// An error indicating that an unsupported feature was used.
     ///
@@ -723,10 +732,15 @@ impl AsOneilError for EvalError {
             }
             Self::PythonEvalError {
                 function_name,
-                identifier_span: _,
+                function_call_span: _,
                 message: _,
                 traceback: _,
             } => format!("python function `{function_name}` raised an error"),
+            Self::InvalidPythonReturnValue {
+                function_name,
+                function_call_span: _,
+                value_repr: _,
+            } => format!("python function `{function_name}` returned an invalid value"),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
@@ -916,9 +930,14 @@ impl AsOneilError for EvalError {
             }
             | Self::PythonEvalError {
                 function_name: _,
-                identifier_span: location_span,
+                function_call_span: location_span,
                 message: _,
                 traceback: _,
+            }
+            | Self::InvalidPythonReturnValue {
+                function_name: _,
+                function_call_span: location_span,
+                value_repr: _,
             }
             | Self::Unsupported {
                 relevant_span: location_span,
@@ -1144,7 +1163,7 @@ impl AsOneilError for EvalError {
             } => Vec::new(),
             Self::PythonEvalError {
                 function_name: _,
-                identifier_span: _,
+                function_call_span: _,
                 message,
                 traceback,
             } => traceback.as_ref().map_or_else(
@@ -1156,6 +1175,16 @@ impl AsOneilError for EvalError {
                     ]
                 },
             ),
+            Self::InvalidPythonReturnValue {
+                function_name: _,
+                function_call_span: _,
+                value_repr,
+            } => vec![
+                ErrorContext::Note(format!("returned value `{value_repr}`")),
+                ErrorContext::Note(
+                    "expected bool, str, float, Interval, or MeasuredNumber".to_string(),
+                ),
+            ],
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
@@ -1458,9 +1487,14 @@ impl AsOneilError for EvalError {
             } => Vec::new(),
             Self::PythonEvalError {
                 function_name: _,
-                identifier_span: _,
+                function_call_span: _,
                 message: _,
                 traceback: _,
+            } => Vec::new(),
+            Self::InvalidPythonReturnValue {
+                function_name: _,
+                function_call_span: _,
+                value_repr: _,
             } => Vec::new(),
             Self::Unsupported {
                 relevant_span: _,

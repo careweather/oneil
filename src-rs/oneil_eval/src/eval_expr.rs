@@ -66,11 +66,12 @@ pub fn eval_expr<'a, E: ExternalEvaluationContext>(
         ir::Expr::FunctionCall {
             name,
             args,
-            span,
+            span: function_call_span,
             name_span: _,
         } => {
             let args_results = eval_function_call_args(args, context)?;
-            eval_function_call(name, args_results, context).map(|result| (result, span))
+            eval_function_call(name, *function_call_span, args_results, context)
+                .map(|result| (result, function_call_span))
         }
         ir::Expr::Variable { variable, span } => {
             eval_variable(variable, context).map(|result| (result, span))
@@ -341,6 +342,7 @@ fn eval_function_call_args<E: ExternalEvaluationContext>(
 
 fn eval_function_call<E: ExternalEvaluationContext>(
     name: &ir::FunctionName,
+    function_call_span: Span,
     args: Vec<(Value, Span)>,
     context: &EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {
@@ -351,9 +353,9 @@ fn eval_function_call<E: ExternalEvaluationContext>(
         ir::FunctionName::Imported {
             python_path,
             name,
-            name_span,
+            name_span: _,
         } => context
-            .evaluate_imported_function(python_path, name, *name_span, args)
+            .evaluate_imported_function(python_path, name, function_call_span, args)
             .map_err(|error| vec![*error]),
     }
 }

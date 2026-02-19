@@ -77,7 +77,7 @@ impl ExternalEvaluationContext for TestExternalContext {
         &self,
         _python_path: &ir::PythonPath,
         _identifier: &ir::Identifier,
-        _identifier_span: Span,
+        _function_call_span: Span,
         _args: Vec<(Value, Span)>,
     ) -> Option<Result<Value, Box<EvalError>>> {
         // For now, we don't support imported functions in tests

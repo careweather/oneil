@@ -16,17 +16,8 @@ use crate::py_compat::{py_any_to_value, value_to_py_any};
 /// or Python exception.
 pub fn evaluate_python_function(
     function: &PythonFunction,
-    identifier: &str,
-    identifier_span: Span,
     args: Vec<(Value, Span)>,
 ) -> Result<Value, PythonEvalError> {
-    let to_eval_err = |e: pyo3::PyErr, py: Python<'_>| PythonEvalError {
-        function_name: identifier.to_string(),
-        identifier_span,
-        message: e.to_string(),
-        traceback: e.traceback(py).and_then(|tb| tb.format().ok()),
-    };
-
     Python::attach(|py| {
         let py_args: Vec<_> = args
             .into_iter()
@@ -35,8 +26,12 @@ pub fn evaluate_python_function(
 
         let result = function
             .call(py, &py_args)
-            .map_err(|e| to_eval_err(e, py))?;
+            .map_err(|e| PythonEvalError::PyErr {
+                message: e.to_string(),
+                traceback: e.traceback(py).and_then(|tb| tb.format().ok()),
+            })?;
 
-        py_any_to_value(&result).map_err(|e| to_eval_err(e, py))
+        py_any_to_value(&result)
+            .map_err(|e| PythonEvalError::InvalidReturnValue { value_repr: e.0 })
     })
 }
