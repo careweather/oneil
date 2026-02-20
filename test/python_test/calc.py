@@ -4,11 +4,11 @@ def iter_sum(a, n):
 		sum = sum + a
 	return sum
 
-from oneil import Unit, MeasuredNumber
+import oneil
+from oneil import MeasuredNumber
 
-meters = Unit(dimensions={'m': 1}, display_unit='m')
-
-seconds = Unit(dimensions={'s': 1}, display_unit='s')
+meters = oneil.units.meters
+seconds = oneil.units.seconds
 
 def calc_velocity(level):
 	distance = MeasuredNumber(level * 10, meters)
