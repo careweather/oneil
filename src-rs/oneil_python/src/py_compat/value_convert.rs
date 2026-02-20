@@ -1,5 +1,7 @@
 //! Conversion between Oneil values and Python objects.
 
+use std::fmt;
+
 use oneil_output::{Number, Value};
 use pyo3::types::{PyBool, PyString};
 use pyo3::{IntoPyObjectExt, prelude::*};
@@ -38,7 +40,17 @@ pub fn value_to_py_any(value: Value, py: Python<'_>) -> Bound<'_, PyAny> {
     }
 }
 
-pub struct ValueRepr(pub String);
+pub struct ValueReprError(pub String);
+
+impl fmt::Display for ValueReprError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Expected bool, str, float, Interval, or MeasuredNumber, got {}",
+            self.0
+        )
+    }
+}
 
 /// Converts a Python object into an Oneil [`Value`].
 ///
@@ -46,7 +58,7 @@ pub struct ValueRepr(pub String);
 /// - Python `float` becomes [`Number::Scalar`]; [`PyInterval`] becomes [`Number::Interval`].
 /// - [`PyMeasuredNumber`] becomes [`Value::MeasuredNumber`].
 /// - Returns a type error if the object is not a supported type.
-pub fn py_any_to_value(obj: &Bound<'_, PyAny>) -> Result<Value, ValueRepr> {
+pub fn py_any_to_value(obj: &Bound<'_, PyAny>) -> Result<Value, ValueReprError> {
     if let Ok(py_bool) = obj.cast_exact::<PyBool>() {
         return Ok(Value::Boolean(py_bool.is_true()));
     }
@@ -68,7 +80,7 @@ pub fn py_any_to_value(obj: &Bound<'_, PyAny>) -> Result<Value, ValueRepr> {
     }
 
     Err(obj.repr().map_or_else(
-        |_err| ValueRepr(format!("{:?}", obj)),
-        |repr| ValueRepr(repr.to_string()),
+        |_err| ValueReprError(format!("{:?}", obj)),
+        |repr| ValueReprError(repr.to_string()),
     ))
 }

@@ -12,6 +12,7 @@ readme = "README.md"
 
 [dependencies]
 indexmap.workspace = true
+oneil_builtins = { path = "../oneil_builtins" }
 oneil_output = { path = "../oneil_output" }
 oneil_shared = { path = "../oneil_shared" }
 pyo3 = { workspace = true }
