@@ -7,9 +7,13 @@ use oneil_shared::span::Span;
 /// Information about a builtin function.
 #[derive(Debug, Clone)]
 pub struct BuiltinFunction {
+    /// The name of the function.
     pub name: &'static str,
+    /// The arguments of the function.
     pub args: &'static [&'static str],
+    /// The description of the function.
     pub description: &'static str,
+    /// The function implementation.
     pub function: BuiltinFunctionFn,
 }
 
