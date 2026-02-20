@@ -56,6 +56,9 @@ pub trait ExternalEvaluationContext {
 
     /// Returns the map of available unit prefixes (e.g. "k" -> 1000.0).
     fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)>;
+
+    /// Returns whether the given unit supports SI prefixes.
+    fn unit_supports_si_prefixes(&self, name: &str) -> bool;
 }
 
 /// Represents a model in progress of being evaluated.
@@ -325,6 +328,11 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// Returns the available unit prefixes.
     pub fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
         self.external_context.available_prefixes()
+    }
+
+    /// Returns whether the given unit supports SI prefixes.
+    pub fn unit_supports_si_prefixes(&self, name: &str) -> bool {
+        self.external_context.unit_supports_si_prefixes(name)
     }
 
     /// Pushes the active model for evaluation.

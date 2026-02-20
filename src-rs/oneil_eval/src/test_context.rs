@@ -93,6 +93,11 @@ impl ExternalEvaluationContext for TestExternalContext {
             .iter()
             .map(|(name, value)| (name.as_str(), *value))
     }
+
+    fn unit_supports_si_prefixes(&self, _name: &str) -> bool {
+        // for now, we assume that all units support SI prefixes
+        true
+    }
 }
 
 /// The standard builtin values, functions, units, and prefixes
