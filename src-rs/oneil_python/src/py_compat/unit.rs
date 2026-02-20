@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use oneil_output::{Dimension, DimensionMap, DisplayUnit, Unit};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyNotImplemented};
 
 /// Python wrapper for Oneil’s [`Unit`].
 ///
@@ -157,6 +157,25 @@ impl PyUnit {
         Self {
             inner: other.borrow().inner.clone() / self.inner.clone(),
         }
+    }
+
+    fn __pow__<'py>(
+        &self,
+        py: Python<'py>,
+        exponent: f64,
+        modulus: Option<&Bound<'_, Self>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if modulus.is_some() {
+            return Ok(PyNotImplemented::get(py).to_owned().into_any());
+        }
+
+        Ok(Bound::new(
+            py,
+            Self {
+                inner: self.inner.clone().pow(exponent),
+            },
+        )?
+        .into_any())
     }
 
     fn __repr__(&self) -> String {
