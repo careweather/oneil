@@ -220,7 +220,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Current, -1.0),
             ])),
             is_db: false,
-            uses_prefixes: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Lumen",
