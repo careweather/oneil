@@ -13,10 +13,13 @@ use pyo3::prelude::*;
 #[pymodule(name = "oneil")]
 pub mod oneil_python_module {
     #[pymodule_export]
-    pub use super::builtin::functions;
+    pub use super::builtin::values;
 
     #[pymodule_export]
-    pub use super::builtin::values;
+    pub use super::builtin::units;
+
+    #[pymodule_export]
+    pub use super::builtin::functions;
 
     #[pymodule_export]
     pub use super::interval::PyInterval;

@@ -1,11 +1,12 @@
 //! Builtin functions and types for Python compatibility.
 
 use oneil_builtins::{BuiltinFunction, BuiltinRef};
-use oneil_output::Value;
+use oneil_output::{DisplayUnit, Value};
 use oneil_shared::span::{SourceLocation, Span};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
+use super::unit::PyUnit;
 use super::value_convert::{ValueReprError, py_any_to_value, value_to_py_any};
 
 /// Python submodule exposing Oneil builtin values (e.g. `pi`, `e`) as Python objects.
@@ -34,6 +35,46 @@ pub fn functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
         let py_wrapper = Py::new(m.py(), wrapper)?;
 
         m.add(name, py_wrapper)?;
+    }
+
+    Ok(())
+}
+
+/// Python submodule exposing Oneil builtin units (e.g. `m`, `kg`, `s`) as `PyUnit` objects.
+///
+/// For units that support SI prefixes, prefixed variants are also included
+/// (e.g. `km`, `mm`, `kg`, `mg`).
+#[pymodule]
+pub fn units(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    let builtins = BuiltinRef::new();
+
+    let prefixes: Vec<_> = builtins.builtin_prefixes().collect();
+
+    for (alias, unit) in builtins.builtin_units() {
+        let python_alias = alias.replace('%', "percent").replace('$', "dollar");
+
+        let py_unit = PyUnit::from(unit.clone());
+        m.add(&python_alias, py_unit)?;
+
+        if builtins.unit_supports_si_prefixes(alias) {
+            for &(prefix, multiplier) in &prefixes {
+                let prefixed_name = format!("{prefix}{alias}");
+                let python_prefixed_name = format!("{prefix}{python_alias}");
+
+                let prefixed_display = DisplayUnit::Unit {
+                    name: prefixed_name.clone(),
+                    exponent: 1.0,
+                };
+
+                let prefixed_unit = unit
+                    .clone()
+                    .mul_magnitude(multiplier)
+                    .with_unit_display_expr(prefixed_display);
+
+                let py_prefixed_unit = PyUnit::from(prefixed_unit);
+                m.add(python_prefixed_name, py_prefixed_unit)?;
+            }
+        }
     }
 
     Ok(())
