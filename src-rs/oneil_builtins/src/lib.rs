@@ -7,3 +7,4 @@ mod unit;
 mod value;
 
 pub use builtin_ref::BuiltinRef;
+pub use function::{BuiltinFunction, BuiltinFunctionFn};

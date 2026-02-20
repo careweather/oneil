@@ -705,6 +705,7 @@ name = "oneil_python"
 version = "0.15.0"
 dependencies = [
  "indexmap",
+ "oneil_builtins",
  "oneil_output",
  "oneil_shared",
  "pyo3",
