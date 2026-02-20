@@ -65,6 +65,12 @@ impl BuiltinRef {
         self.units.get(name).map(|u| &u.unit)
     }
 
+    /// Returns whether the given identifier names a builtin unit that uses prefixes.
+    #[must_use]
+    pub fn unit_supports_si_prefixes(&self, name: &str) -> bool {
+        self.units.get(name).is_some_and(|u| u.supports_si_prefixes)
+    }
+
     /// Returns an iterator over all builtin values.
     pub fn builtin_values(&self) -> impl Iterator<Item = (&str, &Value)> {
         self.values

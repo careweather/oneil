@@ -9,6 +9,7 @@ pub struct BuiltinUnit {
     pub alias: &'static str,
     pub unit: Unit,
     pub readable_name: &'static str,
+    pub supports_si_prefixes: bool,
 }
 
 /// The builtin units that come with Oneil.
@@ -25,6 +26,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
         magnitude: f64,
         dimensions: DimensionMap,
         is_db: bool,
+        uses_prefixes: bool,
     }
 
     let units = [
@@ -36,6 +38,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1e-3,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "meter",
@@ -43,6 +46,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "second",
@@ -50,6 +54,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Kelvin",
@@ -57,6 +62,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Temperature, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Ampere",
@@ -64,6 +70,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Current, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "bit",
@@ -71,6 +78,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "dollar",
@@ -78,6 +86,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "mole",
@@ -85,6 +94,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Substance, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "candela",
@@ -92,6 +102,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         // === DERIVED UNITS ===
         UnitInfo {
@@ -105,6 +116,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Current, -1.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Watt",
@@ -116,6 +128,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -3.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Hertz",
@@ -123,6 +136,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 2.0 * std::f64::consts::PI,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Joule",
@@ -134,6 +148,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Watt-hour",
@@ -145,6 +160,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Amp-hour",
@@ -155,6 +171,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, 1.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Tesla",
@@ -166,6 +183,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Current, -1.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Ohm",
@@ -178,6 +196,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Current, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Newton",
@@ -189,6 +208,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Gauss",
@@ -200,6 +220,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Current, -1.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "Lumen",
@@ -207,6 +228,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Lux",
@@ -217,6 +239,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Distance, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "bits per second",
@@ -227,6 +250,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -1.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "byte",
@@ -234,6 +258,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 8.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "Pascal",
@@ -245,6 +270,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         // === LEGACY UNITS ===
         UnitInfo {
@@ -253,6 +279,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 3.1556952e10,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "century",
@@ -260,6 +287,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 3.1556952e9,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "decade",
@@ -267,6 +295,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 3.1556952e8,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "year",
@@ -274,6 +303,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 3.1556952e7,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "month",
@@ -281,6 +311,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 2.629746e6,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "week",
@@ -288,6 +319,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 6.048e5,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "day",
@@ -295,6 +327,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 8.64e4,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "hour",
@@ -302,6 +335,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 3600.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "minute",
@@ -309,6 +343,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 60.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "revolutions per minute",
@@ -316,6 +351,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.10471975511965977,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "thousand dollars",
@@ -323,6 +359,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1000.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "million dollars",
@@ -330,6 +367,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1e6,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "billion dollars",
@@ -337,6 +375,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1e9,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "trillion dollars",
@@ -344,6 +383,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1e12,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "Earth gravity",
@@ -354,6 +394,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "centimeter",
@@ -368,6 +409,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.01,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "pounds per square inch",
@@ -379,6 +421,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "atmosphere",
@@ -390,6 +433,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "bar",
@@ -401,6 +445,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "barye",
@@ -412,6 +457,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "dyne",
@@ -423,6 +469,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "millimeter of mercury",
@@ -434,6 +481,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "torr",
@@ -445,6 +493,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -2.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "inch",
@@ -452,6 +501,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.0254,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "foot",
@@ -459,6 +509,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.3048,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "yard",
@@ -466,6 +517,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.9144,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "mile",
@@ -473,6 +525,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1609.344,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "nautical mile",
@@ -480,6 +533,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1852.0,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "pound",
@@ -487,6 +541,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.45359237,
             dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "mile per hour",
@@ -497,6 +552,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                 (Dimension::Time, -1.0),
             ])),
             is_db: false,
+            uses_prefixes: false,
         },
         // === DIMENSIONLESS UNITS ===
         UnitInfo {
@@ -505,6 +561,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 2.0 * std::f64::consts::PI,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "cycle",
@@ -512,6 +569,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 2.0 * std::f64::consts::PI,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "radian",
@@ -519,6 +577,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1.0,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: true,
         },
         UnitInfo {
             name: "degree",
@@ -526,6 +585,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.017453292519943295,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "percent",
@@ -533,6 +593,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.01,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "part per million",
@@ -540,6 +601,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1e-6,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "part per billion",
@@ -547,6 +609,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 1e-9,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "arcminute",
@@ -554,6 +617,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 0.0002908882086657216,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
         UnitInfo {
             name: "arcsecond",
@@ -561,6 +625,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
             magnitude: 4.84813681109536e-06,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
+            uses_prefixes: false,
         },
     ];
 
@@ -571,6 +636,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
              magnitude,
              dimensions,
              is_db,
+             uses_prefixes,
          }| {
             aliases.iter().map(move |alias| {
                 let unit = Unit {
@@ -588,6 +654,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
                         alias,
                         unit,
                         readable_name: name,
+                        supports_si_prefixes: uses_prefixes,
                     },
                 )
             })
