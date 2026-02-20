@@ -105,4 +105,8 @@ impl eval::ExternalEvaluationContext for Runtime {
     fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
         self.builtins.builtin_prefixes()
     }
+
+    fn unit_supports_si_prefixes(&self, name: &str) -> bool {
+        self.builtins.unit_supports_si_prefixes(name)
+    }
 }

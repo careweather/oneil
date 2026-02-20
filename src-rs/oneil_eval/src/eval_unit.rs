@@ -8,8 +8,6 @@ use crate::{
     error::EvalError,
 };
 
-// TODO: figure out display units. for now, we just
-//       discard the magnitude and return the dimensions
 /// Evaluates a composite unit and returns the resulting sized unit.
 ///
 /// # Errors
@@ -92,6 +90,11 @@ fn eval_unit_component<E: ExternalEvaluationContext>(
         let Some(stripped_name) = name.strip_prefix(prefix) else {
             continue;
         };
+
+        // check if the unit supports SI prefixes
+        if !context.unit_supports_si_prefixes(stripped_name) {
+            continue;
+        }
 
         let unit = context.lookup_unit(stripped_name);
         if let Some(unit) = unit {
