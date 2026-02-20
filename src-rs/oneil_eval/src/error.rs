@@ -236,16 +236,6 @@ pub enum EvalError {
         /// The unit that the parameter is declared to have.
         param_unit: DisplayUnit,
     },
-    /// An error indicating that an unknown unit name was used.
-    ///
-    /// This occurs when a unit name is referenced that is not recognized by
-    /// the unit system.
-    UnknownUnit {
-        /// The name of the unknown unit.
-        unit_name: String,
-        /// The source span of the unit name.
-        unit_name_span: Span,
-    },
     /// An error indicating that a piecewise expression condition does not evaluate to a boolean.
     InvalidIfExpressionType {
         /// The source span of the conditional expression.
@@ -607,10 +597,6 @@ impl fmt::Display for EvalError {
                 f,
                 "parameter value unit `{param_value_unit}` does not match expected unit `{param_unit}`"
             ),
-            Self::UnknownUnit {
-                unit_name,
-                unit_name_span: _,
-            } => write!(f, "unknown unit `{unit_name}`"),
             Self::InvalidIfExpressionType {
                 expr_span: _,
                 found_value,
@@ -865,10 +851,6 @@ impl AsOneilError for EvalError {
                 param_unit_span: _,
                 param_unit: _,
             }
-            | Self::UnknownUnit {
-                unit_name: _,
-                unit_name_span: location_span,
-            }
             | Self::InvalidIfExpressionType {
                 expr_span: location_span,
                 found_value: _,
@@ -1076,10 +1058,6 @@ impl AsOneilError for EvalError {
                 param_value_unit: _,
                 param_unit_span: _,
                 param_unit: _,
-            } => Vec::new(),
-            Self::UnknownUnit {
-                unit_name: _,
-                unit_name_span: _,
             } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
@@ -1361,10 +1339,6 @@ impl AsOneilError for EvalError {
                     *param_unit_span,
                 )),
             )],
-            Self::UnknownUnit {
-                unit_name: _,
-                unit_name_span: _,
-            } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
                 found_value: _,

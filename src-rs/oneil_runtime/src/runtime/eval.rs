@@ -102,11 +102,7 @@ impl eval::ExternalEvaluationContext for Runtime {
         self.builtins.get_unit(name)
     }
 
-    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
-        self.builtins.builtin_prefixes()
-    }
-
-    fn unit_supports_si_prefixes(&self, name: &str) -> bool {
-        self.builtins.unit_supports_si_prefixes(name)
+    fn lookup_prefix(&self, name: &str) -> Option<f64> {
+        self.builtins.get_prefix(name)
     }
 }

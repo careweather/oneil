@@ -54,11 +54,8 @@ pub trait ExternalEvaluationContext {
     /// Returns a unit by name if it is defined in the builtin context.
     fn lookup_unit(&self, name: &str) -> Option<&output::Unit>;
 
-    /// Returns the map of available unit prefixes (e.g. "k" -> 1000.0).
-    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)>;
-
-    /// Returns whether the given unit supports SI prefixes.
-    fn unit_supports_si_prefixes(&self, name: &str) -> bool;
+    /// Returns a prefix by name if it is defined in the builtin context.
+    fn lookup_prefix(&self, name: &str) -> Option<f64>;
 }
 
 /// Represents a model in progress of being evaluated.
@@ -316,23 +313,15 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     }
 
     /// Looks up a unit by name.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the unit is not defined. This should never be the case.
     #[must_use]
     pub fn lookup_unit(&self, name: &str) -> Option<output::Unit> {
         self.external_context.lookup_unit(name).cloned()
     }
 
-    /// Returns the available unit prefixes.
-    pub fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
-        self.external_context.available_prefixes()
-    }
-
-    /// Returns whether the given unit supports SI prefixes.
-    pub fn unit_supports_si_prefixes(&self, name: &str) -> bool {
-        self.external_context.unit_supports_si_prefixes(name)
+    /// Looks up a prefix by name.
+    #[must_use]
+    pub fn lookup_prefix(&self, name: &str) -> Option<f64> {
+        self.external_context.lookup_prefix(name)
     }
 
     /// Pushes the active model for evaluation.

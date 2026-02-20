@@ -21,6 +21,11 @@ use crate::util::{
     AstLoadingFailedError, ExternalResolutionContext, PythonImportLoadingFailedError,
 };
 
+pub struct TestBuiltinUnit {
+    pub name: &'static str,
+    pub supports_si_prefixes: bool,
+}
+
 /// Test double for [`ExternalResolutionContext`].
 ///
 /// Configurable builtin values, builtin functions, model ASTs (via
@@ -34,6 +39,15 @@ pub struct TestExternalContext {
 
     /// Builtin functions that are valid.
     builtin_functions: HashSet<String>,
+
+    /// Builtin units that are valid.
+    builtin_units: HashSet<String>,
+
+    /// Units that support SI prefixes.
+    units_with_si_prefixes: HashSet<String>,
+
+    /// Builtin prefixes (name -> magnitude).
+    builtin_prefixes: IndexMap<String, f64>,
 
     /// Model path -> AST; paths are derived from the given path's stem (e.g. "test.on" -> ModelPath("test.on")).
     model_asts: IndexMap<ir::ModelPath, ast::ModelNode>,
@@ -69,6 +83,39 @@ impl TestExternalContext {
     ) -> Self {
         self.builtin_functions
             .extend(functions.into_iter().map(ToString::to_string));
+
+        self
+    }
+
+    /// Registers the given names as builtin units.
+    #[must_use]
+    pub fn with_builtin_units(mut self, units: impl IntoIterator<Item = TestBuiltinUnit>) -> Self {
+        let (builtin_units, units_with_si_prefixes): (Vec<String>, Vec<Option<String>>) = units
+            .into_iter()
+            .map(|unit| {
+                (
+                    unit.name.to_string(),
+                    unit.supports_si_prefixes.then_some(unit.name.to_string()),
+                )
+            })
+            .unzip();
+
+        self.builtin_units.extend(builtin_units);
+
+        self.units_with_si_prefixes
+            .extend(units_with_si_prefixes.into_iter().flatten());
+
+        self
+    }
+
+    /// Registers the given prefixes with their magnitudes.
+    #[must_use]
+    pub fn with_builtin_prefixes(
+        mut self,
+        prefixes: impl IntoIterator<Item = (&'static str, f64)>,
+    ) -> Self {
+        self.builtin_prefixes
+            .extend(prefixes.into_iter().map(|(k, v)| (k.to_string(), v)));
 
         self
     }
@@ -139,6 +186,18 @@ impl ExternalResolutionContext for TestExternalContext {
 
     fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
         self.builtin_functions.contains(identifier.as_str())
+    }
+
+    fn has_builtin_unit(&self, name: &str) -> bool {
+        self.builtin_units.contains(name)
+    }
+
+    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
+        self.builtin_prefixes.iter().map(|(k, v)| (k.as_str(), *v))
+    }
+
+    fn unit_supports_si_prefixes(&self, name: &str) -> bool {
+        self.units_with_si_prefixes.contains(name)
     }
 
     fn load_ast(
