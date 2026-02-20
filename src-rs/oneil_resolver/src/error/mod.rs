@@ -19,6 +19,7 @@ mod errors;
 mod import;
 mod parameter;
 mod submodel;
+mod unit;
 mod util;
 mod variable;
 
@@ -27,5 +28,6 @@ pub use errors::ResolutionErrorCollection;
 pub use import::PythonImportResolutionError;
 pub use parameter::ParameterResolutionError;
 pub use submodel::ModelImportResolutionError;
+pub use unit::UnitResolutionError;
 pub use util::{combine_error_list, combine_errors, convert_errors, split_ok_and_errors};
 pub use variable::VariableResolutionError;

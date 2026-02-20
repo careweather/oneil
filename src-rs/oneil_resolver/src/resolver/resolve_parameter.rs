@@ -275,7 +275,11 @@ where
         ast::ParameterValue::Simple(expr, unit) => {
             let expr = resolve_expr(expr, resolution_context).map_err(error::convert_errors)?;
 
-            let unit = unit.as_ref().map(resolve_unit);
+            let unit = unit
+                .as_ref()
+                .map(|u| resolve_unit(u, resolution_context))
+                .transpose()
+                .map_err(error::convert_errors)?;
 
             Ok(ir::ParameterValue::simple(expr, unit))
         }
@@ -293,7 +297,11 @@ where
                 Ok(ir::PiecewiseExpr::new(expr, if_expr))
             });
 
-            let unit = unit.as_ref().map(resolve_unit);
+            let unit = unit
+                .as_ref()
+                .map(|u| resolve_unit(u, resolution_context))
+                .transpose()
+                .map_err(error::convert_errors)?;
 
             let exprs = error::combine_error_list(exprs)?;
 

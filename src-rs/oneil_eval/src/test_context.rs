@@ -88,15 +88,8 @@ impl ExternalEvaluationContext for TestExternalContext {
         self.builtin_units.get(name)
     }
 
-    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
-        self.builtin_prefixes
-            .iter()
-            .map(|(name, value)| (name.as_str(), *value))
-    }
-
-    fn unit_supports_si_prefixes(&self, _name: &str) -> bool {
-        // for now, we assume that all units support SI prefixes
-        true
+    fn lookup_prefix(&self, name: &str) -> Option<f64> {
+        self.builtin_prefixes.get(name).copied()
     }
 }
 

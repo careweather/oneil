@@ -71,6 +71,18 @@ impl resolver::ExternalResolutionContext for Runtime {
         self.builtins.has_builtin_function(identifier.as_str())
     }
 
+    fn has_builtin_unit(&self, name: &str) -> bool {
+        self.builtins.get_unit(name).is_some()
+    }
+
+    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)> {
+        self.builtins.builtin_prefixes()
+    }
+
+    fn unit_supports_si_prefixes(&self, name: &str) -> bool {
+        self.builtins.unit_supports_si_prefixes(name)
+    }
+
     fn load_ast(
         &mut self,
         path: &oneil_ir::ModelPath,

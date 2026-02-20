@@ -23,4 +23,4 @@ pub use parameter::{
 pub use python_import::PythonImport;
 pub use reference::{Identifier, ModelPath, PythonPath};
 pub use test::{Test, TestIndex};
-pub use unit::{CompositeUnit, DisplayCompositeUnit, DisplayUnit, Unit};
+pub use unit::{CompositeUnit, DisplayCompositeUnit, DisplayUnit, Unit, UnitInfo};

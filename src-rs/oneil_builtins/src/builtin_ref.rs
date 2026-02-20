@@ -65,6 +65,12 @@ impl BuiltinRef {
         self.units.get(name).map(|u| &u.unit)
     }
 
+    /// Returns the builtin prefix for the given name, if any.
+    #[must_use]
+    pub fn get_prefix(&self, name: &str) -> Option<f64> {
+        self.prefixes.get(name).map(|p| p.value)
+    }
+
     /// Returns whether the given identifier names a builtin unit that uses prefixes.
     #[must_use]
     pub fn unit_supports_si_prefixes(&self, name: &str) -> bool {
