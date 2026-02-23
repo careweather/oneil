@@ -156,6 +156,8 @@ pub fn builtin_functions_complete() -> impl Iterator<Item = (&'static str, Built
 }
 
 mod fns {
+    use std::borrow::Cow;
+
     use oneil_eval::{
         EvalError,
         error::{ExpectedArgumentCount, ExpectedType, convert::binary_eval_error_to_eval_error},
@@ -187,7 +189,7 @@ mod fns {
             helper::HomogeneousNumberList::Numbers(numbers) => {
                 let min = numbers
                     .into_iter()
-                    .filter_map(|number| match number {
+                    .filter_map(|number| match number.as_ref() {
                         Number::Scalar(value) => Some(*value),
                         Number::Interval(interval) => {
                             if interval.is_empty() {
@@ -251,7 +253,7 @@ mod fns {
             helper::HomogeneousNumberList::Numbers(numbers) => {
                 let max = numbers
                     .into_iter()
-                    .filter_map(|number| match number {
+                    .filter_map(|number| match number.as_ref() {
                         Number::Scalar(value) => Some(*value),
                         Number::Interval(interval) => {
                             if interval.is_empty() {
@@ -703,7 +705,7 @@ mod fns {
             helper::HomogeneousNumberList::Numbers(numbers) => {
                 let result = numbers
                     .into_iter()
-                    .copied()
+                    .map(Cow::into_owned)
                     .reduce(Number::tightest_enclosing_interval)
                     .expect("there should be at least one number");
 
@@ -712,7 +714,7 @@ mod fns {
             helper::HomogeneousNumberList::MeasuredNumbers(numbers) => {
                 let result = numbers
                     .into_iter()
-                    .cloned()
+                    .map(Cow::into_owned)
                     .reduce(|a, b| {
                         a.checked_min_max(&b)
                             .expect("homogeneous list ensures same unit")
@@ -726,6 +728,8 @@ mod fns {
 }
 
 mod helper {
+    use std::borrow::Cow;
+
     use oneil_shared::span::Span;
 
     use oneil_eval::{
@@ -771,18 +775,19 @@ mod helper {
         }
     }
 
+    // Use a Cow (Clone on Write) to avoid unnecessary cloning.
     pub enum HomogeneousNumberList<'a> {
-        Numbers(Vec<&'a Number>),
-        MeasuredNumbers(Vec<&'a MeasuredNumber>),
+        Numbers(Vec<Cow<'a, Number>>),
+        MeasuredNumbers(Vec<Cow<'a, MeasuredNumber>>),
     }
 
     enum ListResult<'a> {
         Numbers {
-            numbers: Vec<&'a Number>,
+            numbers: Vec<Cow<'a, Number>>,
             first_number_span: &'a Span,
         },
         MeasuredNumbers {
-            numbers: Vec<&'a MeasuredNumber>,
+            numbers: Vec<Cow<'a, MeasuredNumber>>,
             expected_unit: &'a Unit,
             expected_unit_value_span: &'a Span,
         },
@@ -796,8 +801,18 @@ mod helper {
         values: &[(Value, Span)],
     ) -> Result<HomogeneousNumberList<'_>, Vec<EvalError>> {
         assert!(!values.is_empty());
+
+        // if there are exactly two values, then the unit of
+        // one value may be inferred from the other
+        if values.len() == 2 {
+            return extract_two_numbers_list(values);
+        }
+
+        // otherwise, we need to iterate over the values and
+        // collect them into a homogeneous list
         let mut list_result: Option<ListResult<'_>> = None;
         let mut errors = Vec::new();
+
         for (value, value_span) in values {
             match value {
                 Value::MeasuredNumber(number) => {
@@ -811,11 +826,94 @@ mod helper {
                 }
             }
         }
+
         if !errors.is_empty() {
             return Err(errors);
         }
+
         let list_result = list_result.expect("at least one number");
         Ok(convert_to_homogeneous_list(list_result))
+    }
+
+    /// Extracts a list of two homogeneous numbers from the given values.
+    ///
+    /// If one value is a number and the other is a measured number, then
+    /// the unit of the number is inferred from the measured number.
+    #[expect(
+        clippy::panic_in_result_fn,
+        reason = "callers enforce exactly two values"
+    )]
+    fn extract_two_numbers_list(
+        values: &[(Value, Span)],
+    ) -> Result<HomogeneousNumberList<'_>, Vec<EvalError>> {
+        assert!(values.len() == 2);
+
+        let (left, left_span) = &values[0];
+        let (right, right_span) = &values[1];
+
+        match (left, right) {
+            (Value::Number(left), Value::Number(right)) => {
+                let left = Cow::Borrowed(left);
+                let right = Cow::Borrowed(right);
+
+                Ok(HomogeneousNumberList::Numbers(vec![left, right]))
+            }
+            (Value::MeasuredNumber(left), Value::MeasuredNumber(right)) => {
+                let left = Cow::Borrowed(left);
+                let right = Cow::Borrowed(right);
+
+                Ok(HomogeneousNumberList::MeasuredNumbers(vec![left, right]))
+            }
+            (Value::Number(left), Value::MeasuredNumber(right)) => {
+                let right_unit = right.unit();
+                let left = MeasuredNumber::from_number_and_unit(*left, right_unit.clone());
+                let left = Cow::Owned(left);
+
+                let right = Cow::Borrowed(right);
+
+                Ok(HomogeneousNumberList::MeasuredNumbers(vec![left, right]))
+            }
+            (Value::MeasuredNumber(left), Value::Number(right)) => {
+                let left = Cow::Borrowed(left);
+
+                let left_unit = left.unit();
+                let right = MeasuredNumber::from_number_and_unit(*right, left_unit.clone());
+                let right = Cow::Owned(right);
+
+                Ok(HomogeneousNumberList::MeasuredNumbers(vec![left, right]))
+            }
+            (
+                left @ (Value::Boolean(_) | Value::String(_)),
+                right @ (Value::Boolean(_) | Value::String(_)),
+            ) => Err(vec![
+                EvalError::InvalidType {
+                    expected_type: ExpectedType::NumberOrMeasuredNumber,
+                    found_type: left.type_(),
+                    found_span: *left_span,
+                },
+                EvalError::InvalidType {
+                    expected_type: ExpectedType::NumberOrMeasuredNumber,
+                    found_type: right.type_(),
+                    found_span: *right_span,
+                },
+            ]),
+            (
+                left @ (Value::Boolean(_) | Value::String(_)),
+                _right @ (Value::Number(_) | Value::MeasuredNumber(_)),
+            ) => Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type: left.type_(),
+                found_span: *left_span,
+            }]),
+            (
+                _left @ (Value::Number(_) | Value::MeasuredNumber(_)),
+                right @ (Value::Boolean(_) | Value::String(_)),
+            ) => Err(vec![EvalError::InvalidType {
+                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                found_type: right.type_(),
+                found_span: *right_span,
+            }]),
+        }
     }
 
     fn handle_measured_number<'a>(
@@ -831,6 +929,7 @@ mod helper {
                 expected_unit_value_span,
             }) => {
                 if number.unit().dimensionally_eq(expected_unit) {
+                    let number = Cow::Borrowed(number);
                     numbers.push(number);
                 } else {
                     errors.push(EvalError::UnitMismatch {
@@ -853,9 +952,12 @@ mod helper {
                 });
             }
             None => {
+                let number_unit = number.unit();
+                let number = Cow::Borrowed(number);
+
                 *list_result = Some(ListResult::MeasuredNumbers {
                     numbers: vec![number],
-                    expected_unit: number.unit(),
+                    expected_unit: number_unit,
                     expected_unit_value_span: value_span,
                 });
             }
@@ -882,9 +984,11 @@ mod helper {
                 });
             }
             Some(ListResult::Numbers { numbers, .. }) => {
+                let number = Cow::Borrowed(number);
                 numbers.push(number);
             }
             None => {
+                let number = Cow::Borrowed(number);
                 *list_result = Some(ListResult::Numbers {
                     numbers: vec![number],
                     first_number_span: value_span,
