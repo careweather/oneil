@@ -462,6 +462,17 @@ pub enum EvalError {
         /// The source span of the Python function usage.
         relevant_span: Span,
     },
+    /// Custom error from a builtin function.
+    BuiltinFnCustomError {
+        /// The error message.
+        msg: String,
+        /// Optional source location for the error.
+        ///
+        /// This will generally either be the span of the
+        /// function call or the span of the argument that
+        /// caused the error.
+        error_location: Span,
+    },
 }
 
 impl fmt::Display for EvalError {
@@ -775,6 +786,10 @@ impl fmt::Display for EvalError {
             Self::PythonNotEnabled { relevant_span: _ } => {
                 write!(f, "python feature is not enabled")
             }
+            Self::BuiltinFnCustomError {
+                msg,
+                error_location: _,
+            } => write!(f, "{msg}"),
         }
     }
 }
@@ -965,6 +980,10 @@ impl AsOneilError for EvalError {
                 function_name: _,
                 function_call_span: location_span,
                 value_repr: _,
+            }
+            | Self::BuiltinFnCustomError {
+                error_location: location_span,
+                msg: _,
             }
             | Self::Unsupported {
                 relevant_span: location_span,
@@ -1230,6 +1249,10 @@ impl AsOneilError for EvalError {
             Self::PythonNotEnabled { relevant_span: _ } => vec![ErrorContext::Help(
                 "rebuild Oneil with the `python` feature enabled".to_string(),
             )],
+            Self::BuiltinFnCustomError {
+                msg: _,
+                error_location: _,
+            } => Vec::new(),
         }
     }
 
@@ -1521,6 +1544,10 @@ impl AsOneilError for EvalError {
                 will_be_supported: _,
             } => Vec::new(),
             Self::PythonNotEnabled { relevant_span: _ } => Vec::new(),
+            Self::BuiltinFnCustomError {
+                msg: _,
+                error_location: _,
+            } => Vec::new(),
         }
     }
 
