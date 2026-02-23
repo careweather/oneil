@@ -366,15 +366,19 @@ impl fmt::Display for DisplayUnit {
                     write!(f, "{left}/{right}")?;
                 }
             },
-            Self::Power { base, exponent } => {
-                match **base {
-                    Self::Unitless | Self::Unit { .. } => write!(f, "({base})^{exponent}")?,
-                    Self::Multiply(_, _) | Self::Divide(_, _) | Self::Power { .. } => {
-                        write!(f, "({base})^{exponent}")?;
-                    }
+            Self::Power { base, exponent } => match **base {
+                Self::Unitless => write!(f, "{base}^{exponent}")?,
+                Self::Unit {
+                    exponent: base_exponent,
+                    ..
+                } if is_close(base_exponent, 1.0) => write!(f, "{base}^{exponent}")?,
+                Self::Unit { .. }
+                | Self::Multiply(_, _)
+                | Self::Divide(_, _)
+                | Self::Power { .. } => {
+                    write!(f, "({base})^{exponent}")?;
                 }
-                write!(f, "({base})^{exponent}")?;
-            }
+            },
         }
 
         Ok(())
