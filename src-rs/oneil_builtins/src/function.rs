@@ -186,48 +186,56 @@ mod fns {
         let number_list = helper::extract_homogeneous_numbers_list(&args)?;
 
         match number_list {
-            helper::HomogeneousNumberList::Numbers(numbers) => {
-                let min = numbers
-                    .into_iter()
-                    .filter_map(|number| match number.as_ref() {
-                        Number::Scalar(value) => Some(*value),
-                        Number::Interval(interval) => {
-                            if interval.is_empty() {
-                                None
-                            } else {
-                                Some(interval.min())
-                            }
-                        }
-                    })
-                    .reduce(f64::min)
-                    .expect("there should be at least one number");
-
-                Ok(Value::Number(Number::Scalar(min)))
-            }
-            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => {
-                let min = numbers
-                    .into_iter()
-                    .filter_map(|number| match number.normalized_value().as_number() {
-                        Number::Scalar(_) => Some(number.min()),
-                        Number::Interval(interval) => {
-                            if interval.is_empty() {
-                                None
-                            } else {
-                                Some(number.min())
-                            }
-                        }
-                    })
-                    .reduce(|a, b| {
-                        if a.normalized_value() < b.normalized_value() {
-                            a
+            helper::HomogeneousNumberList::Numbers(numbers) => numbers
+                .into_iter()
+                .filter_map(|number| match number.as_ref() {
+                    Number::Scalar(value) => Some(*value),
+                    Number::Interval(interval) => {
+                        if interval.is_empty() {
+                            None
                         } else {
-                            b
+                            Some(interval.min())
                         }
-                    })
-                    .expect("there should be at least one number");
-
-                Ok(Value::MeasuredNumber(min))
-            }
+                    }
+                })
+                .reduce(f64::min)
+                .map_or_else(
+                    || {
+                        Err(vec![EvalError::BuiltinFnCustomError {
+                            error_location: identifier_span,
+                            msg: "list contains no numbers or non-empty intervals".to_string(),
+                        }])
+                    },
+                    |min| Ok(Value::Number(Number::Scalar(min))),
+                ),
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => numbers
+                .into_iter()
+                .filter_map(|number| match number.normalized_value().as_number() {
+                    Number::Scalar(_) => Some(number.min()),
+                    Number::Interval(interval) => {
+                        if interval.is_empty() {
+                            None
+                        } else {
+                            Some(number.min())
+                        }
+                    }
+                })
+                .reduce(|a, b| {
+                    if a.normalized_value() < b.normalized_value() {
+                        a
+                    } else {
+                        b
+                    }
+                })
+                .map_or_else(
+                    || {
+                        Err(vec![EvalError::BuiltinFnCustomError {
+                            error_location: identifier_span,
+                            msg: "list contains no numbers or non-empty intervals".to_string(),
+                        }])
+                    },
+                    |min| Ok(Value::MeasuredNumber(min)),
+                ),
         }
     }
 
@@ -250,48 +258,56 @@ mod fns {
         let number_list = helper::extract_homogeneous_numbers_list(&args)?;
 
         match number_list {
-            helper::HomogeneousNumberList::Numbers(numbers) => {
-                let max = numbers
-                    .into_iter()
-                    .filter_map(|number| match number.as_ref() {
-                        Number::Scalar(value) => Some(*value),
-                        Number::Interval(interval) => {
-                            if interval.is_empty() {
-                                None
-                            } else {
-                                Some(interval.max())
-                            }
-                        }
-                    })
-                    .reduce(f64::max)
-                    .expect("there should be at least one number");
-
-                Ok(Value::Number(Number::Scalar(max)))
-            }
-            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => {
-                let max = numbers
-                    .into_iter()
-                    .filter_map(|number| match number.normalized_value().as_number() {
-                        Number::Scalar(_) => Some(number.max()),
-                        Number::Interval(interval) => {
-                            if interval.is_empty() {
-                                None
-                            } else {
-                                Some(number.max())
-                            }
-                        }
-                    })
-                    .reduce(|a, b| {
-                        if a.normalized_value() > b.normalized_value() {
-                            a
+            helper::HomogeneousNumberList::Numbers(numbers) => numbers
+                .into_iter()
+                .filter_map(|number| match number.as_ref() {
+                    Number::Scalar(value) => Some(*value),
+                    Number::Interval(interval) => {
+                        if interval.is_empty() {
+                            None
                         } else {
-                            b
+                            Some(interval.max())
                         }
-                    })
-                    .expect("there should be at least one number");
-
-                Ok(Value::MeasuredNumber(max))
-            }
+                    }
+                })
+                .reduce(f64::max)
+                .map_or_else(
+                    || {
+                        Err(vec![EvalError::BuiltinFnCustomError {
+                            error_location: identifier_span,
+                            msg: "list contains no numbers or non-empty intervals".to_string(),
+                        }])
+                    },
+                    |max| Ok(Value::Number(Number::Scalar(max))),
+                ),
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => numbers
+                .into_iter()
+                .filter_map(|number| match number.normalized_value().as_number() {
+                    Number::Scalar(_) => Some(number.max()),
+                    Number::Interval(interval) => {
+                        if interval.is_empty() {
+                            None
+                        } else {
+                            Some(number.max())
+                        }
+                    }
+                })
+                .reduce(|a, b| {
+                    if a.normalized_value() > b.normalized_value() {
+                        a
+                    } else {
+                        b
+                    }
+                })
+                .map_or_else(
+                    || {
+                        Err(vec![EvalError::BuiltinFnCustomError {
+                            error_location: identifier_span,
+                            msg: "list contains no numbers or non-empty intervals".to_string(),
+                        }])
+                    },
+                    |max| Ok(Value::MeasuredNumber(max)),
+                ),
         }
     }
 
@@ -776,11 +792,13 @@ mod helper {
     }
 
     // Use a Cow (Clone on Write) to avoid unnecessary cloning.
+    #[derive(Debug)]
     pub enum HomogeneousNumberList<'a> {
         Numbers(Vec<Cow<'a, Number>>),
         MeasuredNumbers(Vec<Cow<'a, MeasuredNumber>>),
     }
 
+    #[derive(Debug)]
     enum ListResult<'a> {
         Numbers {
             numbers: Vec<Cow<'a, Number>>,
