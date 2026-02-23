@@ -72,11 +72,6 @@ pub fn eval_parameter<E: ExternalEvaluationContext>(
             let number = MeasuredNumber::from_number_and_unit(number, unit);
             Value::MeasuredNumber(number)
         }
-        (Value::MeasuredNumber(number), None) if number.unit().is_unitless() => {
-            // if the unit is unitless, then we can just return the measured number
-            // even if there is no explicit unit
-            Value::MeasuredNumber(number)
-        }
         (Value::MeasuredNumber(number), None) => {
             return Err(vec![EvalError::ParameterMissingUnitAnnotation {
                 param_expr_span: *expr_span,
