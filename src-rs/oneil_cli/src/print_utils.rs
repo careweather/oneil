@@ -23,6 +23,7 @@ pub fn print_value(value: &Value) {
 pub fn print_number_value(value: &Number) {
     match value {
         Number::Scalar(scalar) => print!("{scalar}"),
+        Number::Interval(interval) if interval.is_empty() => print!("<empty interval>"),
         Number::Interval(interval) => print!("{} | {}", interval.min(), interval.max()),
     }
 }
