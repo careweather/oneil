@@ -205,9 +205,6 @@ fn get_evaluation_order(
             evaluation_order,
             parameters,
         );
-
-        evaluation_order.push(parameter_name.clone());
-        visited.insert(parameter_name.clone());
     }
 
     evaluation_order
