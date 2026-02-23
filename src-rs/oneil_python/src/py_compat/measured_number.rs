@@ -39,7 +39,8 @@ impl PyMeasuredNumber {
     }
 
     /// Returns a tuple of (number, unit). The number is a float or Interval in this measured number’s unit.
-    fn as_number_and_unit<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+    #[expect(clippy::wrong_self_convention, reason = "this is for Python, not Rust")]
+    fn into_number_and_unit<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let (number, unit) = self.inner.clone().into_number_and_unit();
 
         let number_py = number_to_py_any(&number, py);
