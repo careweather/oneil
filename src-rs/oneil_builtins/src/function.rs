@@ -342,48 +342,88 @@ mod fns {
         "Compute the arcsine (inverse sine) of a value, returning an angle.";
 
     pub fn asin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_number_fn(identifier_span, args, "asin", |n, _arg_span| {
-            // the base unit for angles is radians,
-            // so we need to convert to dimensionless with no magnitude
-            let number = n.asin();
-            let unit = Unit::one();
+        // the base unit for angles is radians,
+        // so we essentially need to convert to unit `1`
 
-            let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+        helper::unary_number_or_measured_number_fn(
+            identifier_span,
+            args,
+            "asin",
+            |n, _arg_span| {
+                let number = n.asin();
+                let unit = Unit::one();
+                let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
 
-            Ok(Value::MeasuredNumber(measured_number))
-        })
+                Ok(Value::MeasuredNumber(measured_number))
+            },
+            |m, arg_span| {
+                let number = helper::dimensionless_measured_number_as_number(m, arg_span)?;
+                let number = number.asin();
+                let unit = Unit::one();
+                let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+
+                Ok(Value::MeasuredNumber(measured_number))
+            },
+        )
     }
 
     pub const ACOS_DESCRIPTION: &str =
         "Compute the arccosine (inverse cosine) of a value, returning an angle.";
 
     pub fn acos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_number_fn(identifier_span, args, "acos", |n, _arg_span| {
-            // the base unit for angles is radians,
-            // so we need to convert to dimensionless with no magnitude
-            let number = n.acos();
-            let unit = Unit::one();
+        // the base unit for angles is radians,
+        // so we essentially need to convert to unit `1`
 
-            let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+        helper::unary_number_or_measured_number_fn(
+            identifier_span,
+            args,
+            "acos",
+            |n, _arg_span| {
+                let number = n.acos();
+                let unit = Unit::one();
+                let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
 
-            Ok(Value::MeasuredNumber(measured_number))
-        })
+                Ok(Value::MeasuredNumber(measured_number))
+            },
+            |m, arg_span| {
+                let number = helper::dimensionless_measured_number_as_number(m, arg_span)?;
+                let number = number.acos();
+                let unit = Unit::one();
+                let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+
+                Ok(Value::MeasuredNumber(measured_number))
+            },
+        )
     }
 
     pub const ATAN_DESCRIPTION: &str =
         "Compute the arctangent (inverse tangent) of a value, returning an angle.";
 
     pub fn atan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_number_fn(identifier_span, args, "atan", |n, _arg_span| {
-            // the base unit for angles is radians,
-            // so we need to convert to dimensionless with no magnitude
-            let number = n.atan();
-            let unit = Unit::one();
+        // the base unit for angles is radians,
+        // so we essentially need to convert to unit `1`
 
-            let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+        helper::unary_number_or_measured_number_fn(
+            identifier_span,
+            args,
+            "atan",
+            |n, _arg_span| {
+                let number = n.atan();
+                let unit = Unit::one();
 
-            Ok(Value::MeasuredNumber(measured_number))
-        })
+                let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+
+                Ok(Value::MeasuredNumber(measured_number))
+            },
+            |m, arg_span| {
+                let number = helper::dimensionless_measured_number_as_number(m, arg_span)?;
+                let number = number.atan();
+                let unit = Unit::one();
+                let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+
+                Ok(Value::MeasuredNumber(measured_number))
+            },
+        )
     }
 
     pub const SQRT_DESCRIPTION: &str = "Compute the square root of a value.";
@@ -664,21 +704,14 @@ mod fns {
 
     /// Strips units from a measured number, returning the numeric value.
     ///
-    /// For a plain number, returns it unchanged. For a measured number,
-    /// returns just the number part (unit discarded).
-    ///
     /// # Errors
     ///
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn strip(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_number_or_measured_number_fn(
-            identifier_span,
-            args,
-            "strip",
-            |n, _arg_span| Ok(Value::Number(n)),
-            |m, _arg_span| Ok(Value::Number(m.into_number_and_unit().0)),
-        )
+        helper::unary_measured_number_fn(identifier_span, args, "strip", |m, _arg_span| {
+            Ok(Value::Number(m.into_number_and_unit().0))
+        })
     }
 
     pub const MNMX_DESCRIPTION: &str =
@@ -777,42 +810,6 @@ mod helper {
                 found_type,
                 found_span: arg_span,
             }]),
-        }
-    }
-
-    pub fn unary_number_fn<F>(
-        identifier_span: Span,
-        args: Vec<(Value, Span)>,
-        name: &str,
-        number_op: F,
-    ) -> Result<Value, Vec<EvalError>>
-    where
-        F: FnOnce(Number, Span) -> Result<Value, Vec<EvalError>>,
-    {
-        if args.len() != 1 {
-            return Err(vec![EvalError::InvalidArgumentCount {
-                function_name: name.to_string(),
-                function_name_span: identifier_span,
-                expected_argument_count: ExpectedArgumentCount::Exact(1),
-                actual_argument_count: args.len(),
-            }]);
-        }
-
-        let (arg, arg_span) = args
-            .into_iter()
-            .next()
-            .expect("there should be one argument");
-        let found_type = arg.type_();
-
-        match arg {
-            Value::Number(number) => number_op(number, arg_span),
-            Value::MeasuredNumber(_) | Value::Boolean(_) | Value::String(_) => {
-                Err(vec![EvalError::InvalidType {
-                    expected_type: ExpectedType::Number,
-                    found_type,
-                    found_span: arg_span,
-                }])
-            }
         }
     }
 
