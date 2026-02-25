@@ -1,5 +1,10 @@
 //! Python compatibility data types and conversion functions.
 
+#![allow(
+    clippy::multiple_inherent_impl,
+    reason = "there may be a Rust-specific impl and a Python-specific impl"
+)]
+
 mod builtin;
 mod interval;
 mod measured_number;
