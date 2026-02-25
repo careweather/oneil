@@ -352,7 +352,7 @@ fn get_dependency_graph<E: ExternalAnalysisContext>(
                 dependencies.external()
             {
                 dependency_graph.add_depends_on_external(
-                    external_model_path.as_ref().to_path_buf(),
+                    model_path.clone(),
                     parameter_name.as_str().to_string(),
                     oneil_output::ExternalDependency {
                         model_path: external_model_path.as_ref().to_path_buf(),
