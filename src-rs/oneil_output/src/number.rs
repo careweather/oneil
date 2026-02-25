@@ -64,9 +64,21 @@ impl MeasuredNumber {
     ///
     /// This performs adjustment based on the magnitude/dB of the unit.
     ///
-    /// See `from_number_and_unit` for more details.
+    /// # Panics
+    ///
+    /// This panics if the new unit is not dimensionally equivalent
+    /// to the old unit.
     #[must_use]
     pub fn into_number_using_unit(self, unit: &Unit) -> Number {
+        debug_assert!(
+            self.unit.dimensionally_eq(unit),
+            "old unit {} is not dimensionally equivalent to new unit {}\nold unit dimensions: {:?}\nnew unit dimensions: {:?}",
+            self.unit.display_unit,
+            unit.display_unit,
+            self.unit.dimension_map,
+            unit.dimension_map,
+        );
+
         self.normalized_value.into_number_using_unit(unit)
     }
 

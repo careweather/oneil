@@ -20,6 +20,18 @@ pub struct PyMeasuredNumber {
     inner: MeasuredNumber,
 }
 
+impl PyMeasuredNumber {
+    fn verify_unit_is_dimensionally_equivalent(&self, unit: &Unit) -> PyResult<()> {
+        if !self.inner.unit().dimensionally_eq(unit) {
+            return Err(PyErr::new::<PyValueError, _>(
+                "units are not dimensionally equivalent",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 #[pymethods]
 impl PyMeasuredNumber {
     /// Creates a measured number from a value (float or Interval) and a unit.
@@ -51,21 +63,6 @@ impl PyMeasuredNumber {
         PyTuple::new(py, [number_py, unit_py])
     }
 
-    /// Returns a copy with the given unit. Raises [`ValueError`] if the new unit is not dimensionally equivalent.
-    fn with_unit(&self, unit: &Bound<'_, PyUnit>) -> PyResult<Self> {
-        let unit: Unit = Unit::from(&*unit.borrow());
-
-        if !self.inner.unit().dimensionally_eq(&unit) {
-            return Err(PyErr::new::<PyValueError, _>(
-                "units are not dimensionally equivalent",
-            ));
-        }
-
-        Ok(Self {
-            inner: self.inner.clone().with_unit(unit),
-        })
-    }
-
     /// Converts this measured number to a number (float or Interval) in the given unit.
     #[expect(clippy::wrong_self_convention, reason = "this is for Python, not Rust")]
     fn into_number_using_unit<'py>(
@@ -74,8 +71,33 @@ impl PyMeasuredNumber {
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let unit: Unit = Unit::from(&*unit.borrow());
+
+        self.verify_unit_is_dimensionally_equivalent(&unit)?;
+
         let number = self.inner.clone().into_number_using_unit(&unit);
         Ok(number_to_py_any(&number, py))
+    }
+
+    /// Converts this measured number to a unitless number (float or Interval).
+    #[expect(clippy::wrong_self_convention, reason = "this is for Python, not Rust")]
+    fn into_unitless_number<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let unit = Unit::unitless();
+
+        self.verify_unit_is_dimensionally_equivalent(&unit)?;
+
+        let number = self.inner.clone().into_number_using_unit(&unit);
+        Ok(number_to_py_any(&number, py))
+    }
+
+    /// Returns a copy with the given unit. Raises [`ValueError`] if the new unit is not dimensionally equivalent.
+    fn with_unit(&self, unit: &Bound<'_, PyUnit>) -> PyResult<Self> {
+        let unit: Unit = Unit::from(&*unit.borrow());
+
+        self.verify_unit_is_dimensionally_equivalent(&unit)?;
+
+        Ok(Self {
+            inner: self.inner.clone().with_unit(unit),
+        })
     }
 
     fn __neg__(&self) -> Self {
