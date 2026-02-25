@@ -221,6 +221,8 @@ pub enum EvalError {
         param_expr_span: Span,
         /// The unit that the parameter value has.
         param_value_unit: DisplayUnit,
+        /// Whether the parameter value is dimensionless
+        is_dimensionless: bool,
     },
     /// An error indicating that a parameter value's unit does not match the parameter's declared unit.
     ///
@@ -598,6 +600,7 @@ impl fmt::Display for EvalError {
             Self::ParameterMissingUnitAnnotation {
                 param_expr_span: _,
                 param_value_unit: _,
+                is_dimensionless: _,
             } => write!(f, "parameter is missing a unit"),
             Self::ParameterUnitMismatch {
                 param_expr_span: _,
@@ -859,6 +862,7 @@ impl AsOneilError for EvalError {
             | Self::ParameterMissingUnitAnnotation {
                 param_expr_span: location_span,
                 param_value_unit: _,
+                is_dimensionless: _,
             }
             | Self::ParameterUnitMismatch {
                 param_expr_span: location_span,
@@ -1066,12 +1070,24 @@ impl AsOneilError for EvalError {
             Self::ParameterMissingUnitAnnotation {
                 param_expr_span: _,
                 param_value_unit,
-            } => vec![
-                ErrorContext::Note(format!("parameter value has unit `{param_value_unit}`")),
-                ErrorContext::Help(format!(
-                    "add a unit annotation `:{param_value_unit}` to the parameter"
-                )),
-            ],
+                is_dimensionless,
+            } => {
+                let mut context = vec![
+                    ErrorContext::Note(format!("parameter value has unit `{param_value_unit}`")),
+                    ErrorContext::Help(format!(
+                        "add a unit annotation `:{param_value_unit}` to the parameter"
+                    )),
+                ];
+
+                if *is_dimensionless {
+                    context.push(ErrorContext::Help(
+                        "or add `:1` if you intend for the parameter value to be dimensionless (such as a ratio)"
+                            .to_string(),
+                    ));
+                }
+
+                context
+            }
             Self::ParameterUnitMismatch {
                 param_expr_span: _,
                 param_value_unit: _,
@@ -1349,6 +1365,7 @@ impl AsOneilError for EvalError {
             Self::ParameterMissingUnitAnnotation {
                 param_expr_span: _,
                 param_value_unit: _,
+                is_dimensionless: _,
             } => Vec::new(),
             Self::ParameterUnitMismatch {
                 param_expr_span: _,
