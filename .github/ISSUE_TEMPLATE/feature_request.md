@@ -1,8 +1,8 @@
 ---
 name: Feature request
 about: Suggest an idea for this project
-type: 'Feature'
 labels: 'needs-triage'
+type: 'Feature'
 ---
 
 **Is your feature request related to a problem? Please describe.**
