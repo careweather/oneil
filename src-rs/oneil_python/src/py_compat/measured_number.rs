@@ -30,6 +30,14 @@ impl PyMeasuredNumber {
 
         Ok(())
     }
+
+    fn verify_unit_is_dimensionless(&self) -> PyResult<()> {
+        if !self.inner.unit().is_unitless() {
+            return Err(PyErr::new::<PyValueError, _>("units are not dimensionless"));
+        }
+
+        Ok(())
+    }
 }
 
 #[pymethods]
@@ -81,11 +89,9 @@ impl PyMeasuredNumber {
     /// Converts this measured number to a unitless number (float or Interval).
     #[expect(clippy::wrong_self_convention, reason = "this is for Python, not Rust")]
     fn into_unitless_number<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let unit = Unit::unitless();
+        self.verify_unit_is_dimensionless()?;
 
-        self.verify_unit_is_dimensionally_equivalent(&unit)?;
-
-        let number = self.inner.clone().into_number_using_unit(&unit);
+        let number = self.inner.clone().into_number_using_unit(&Unit::unitless());
         Ok(number_to_py_any(&number, py))
     }
 
@@ -462,21 +468,33 @@ impl PyMeasuredNumber {
     }
 
     /// Sine of the value (angle in this number’s unit). Returns a dimensionless float or interval.
-    fn sin<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
-        let (number, _unit) = self.inner.clone().into_number_and_unit();
-        number_to_py_any(&number.sin(), py)
+    fn sin<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.verify_unit_is_dimensionless()?;
+
+        // the base unit for angles is radians,
+        // so we need to convert to unitless (no magnitude)
+        let number = self.inner.clone().into_number_using_unit(&Unit::unitless());
+        Ok(number_to_py_any(&number.sin(), py))
     }
 
     /// Cosine of the value (angle in this number’s unit). Returns a dimensionless float or interval.
-    fn cos<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
-        let (number, _unit) = self.inner.clone().into_number_and_unit();
-        number_to_py_any(&number.cos(), py)
+    fn cos<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.verify_unit_is_dimensionless()?;
+
+        // the base unit for angles is radians,
+        // so we need to convert to unitless (no magnitude)
+        let number = self.inner.clone().into_number_using_unit(&Unit::unitless());
+        Ok(number_to_py_any(&number.cos(), py))
     }
 
     /// Tangent of the value (angle in this number’s unit). Returns a dimensionless float or interval.
-    fn tan<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
-        let (number, _unit) = self.inner.clone().into_number_and_unit();
-        number_to_py_any(&number.tan(), py)
+    fn tan<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.verify_unit_is_dimensionless()?;
+
+        // the base unit for angles is radians,
+        // so we need to convert to unitless (no magnitude)
+        let number = self.inner.clone().into_number_using_unit(&Unit::unitless());
+        Ok(number_to_py_any(&number.tan(), py))
     }
 
     /// Arc sine (result in this number’s unit). Returns a dimensionless float or interval.
