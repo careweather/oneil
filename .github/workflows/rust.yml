@@ -1,21 +1,35 @@
 name: Rust
 
-on: pull_request
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-Dwarnings"
+  RUSTFLAGS: "--deny warnings"
 
 jobs:
-  build:
-
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Lint
-      run: cargo clippy
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Lint
+        run: cargo clippy
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Run tests
+        run: cargo test --verbose
