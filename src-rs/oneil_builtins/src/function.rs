@@ -156,7 +156,7 @@ mod fns {
         EvalError,
         error::{ExpectedArgumentCount, ExpectedType, convert::binary_eval_error_to_eval_error},
     };
-    use oneil_output::{MeasuredNumber, Number, NumberType, Value};
+    use oneil_output::{MeasuredNumber, Number, NumberType, Unit, Value};
     use oneil_shared::span::Span;
 
     use super::helper;
@@ -305,90 +305,96 @@ mod fns {
         }
     }
 
-    pub const SIN_DESCRIPTION: &str = "Compute the sine of an angle in radians.";
+    pub const SIN_DESCRIPTION: &str = "Compute the sine of an angle.";
 
     pub fn sin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
-            identifier_span,
-            args,
-            "sin",
-            |n| Value::Number(n.sin()),
-            |m| Value::Number(m.into_number_and_unit().0.sin()),
-        )
+        // the base unit for angles is radians,
+        // so we need to convert from dimensionless with no magnitude
+        helper::unary_measured_number_fn(identifier_span, args, "sin", |m, arg_span| {
+            let number = helper::unitless_measured_number_as_number(identifier_span, arg_span, m)?;
+            Ok(Value::Number(number.sin()))
+        })
     }
 
-    pub const COS_DESCRIPTION: &str = "Compute the cosine of an angle in radians.";
+    pub const COS_DESCRIPTION: &str = "Compute the cosine of an angle.";
 
     pub fn cos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
-            identifier_span,
-            args,
-            "cos",
-            |n| Value::Number(n.cos()),
-            |m| Value::Number(m.into_number_and_unit().0.cos()),
-        )
+        // the base unit for angles is radians,
+        // so we need to convert from dimensionless with no magnitude
+        helper::unary_measured_number_fn(identifier_span, args, "cos", |m, arg_span| {
+            let number = helper::unitless_measured_number_as_number(identifier_span, arg_span, m)?;
+            Ok(Value::Number(number.cos()))
+        })
     }
 
-    pub const TAN_DESCRIPTION: &str = "Compute the tangent of an angle in radians.";
+    pub const TAN_DESCRIPTION: &str = "Compute the tangent of an angle.";
 
     pub fn tan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
-            identifier_span,
-            args,
-            "tan",
-            |n| Value::Number(n.tan()),
-            |m| Value::Number(m.into_number_and_unit().0.tan()),
-        )
+        // the base unit for angles is radians,
+        // so we need to convert from dimensionless with no magnitude
+        helper::unary_measured_number_fn(identifier_span, args, "tan", |m, arg_span| {
+            let number = helper::unitless_measured_number_as_number(identifier_span, arg_span, m)?;
+            Ok(Value::Number(number.tan()))
+        })
     }
 
     pub const ASIN_DESCRIPTION: &str =
-        "Compute the arcsine (inverse sine) of a value, returning an angle in radians.";
+        "Compute the arcsine (inverse sine) of a value, returning an angle.";
 
     pub fn asin(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
-            identifier_span,
-            args,
-            "asin",
-            |n| Value::Number(n.asin()),
-            |m| Value::Number(m.into_number_and_unit().0.asin()),
-        )
+        helper::unary_number_fn(identifier_span, args, "asin", |n, _arg_span| {
+            // the base unit for angles is radians,
+            // so we need to convert to dimensionless with no magnitude
+            let number = n.asin();
+            let unit = Unit::unitless();
+
+            let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+
+            Ok(Value::MeasuredNumber(measured_number))
+        })
     }
 
     pub const ACOS_DESCRIPTION: &str =
-        "Compute the arccosine (inverse cosine) of a value, returning an angle in radians.";
+        "Compute the arccosine (inverse cosine) of a value, returning an angle.";
 
     pub fn acos(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
-            identifier_span,
-            args,
-            "acos",
-            |n| Value::Number(n.acos()),
-            |m| Value::Number(m.into_number_and_unit().0.acos()),
-        )
+        helper::unary_number_fn(identifier_span, args, "acos", |n, _arg_span| {
+            // the base unit for angles is radians,
+            // so we need to convert to dimensionless with no magnitude
+            let number = n.acos();
+            let unit = Unit::unitless();
+
+            let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+
+            Ok(Value::MeasuredNumber(measured_number))
+        })
     }
 
     pub const ATAN_DESCRIPTION: &str =
-        "Compute the arctangent (inverse tangent) of a value, returning an angle in radians.";
+        "Compute the arctangent (inverse tangent) of a value, returning an angle.";
 
     pub fn atan(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
-            identifier_span,
-            args,
-            "atan",
-            |n| Value::Number(n.atan()),
-            |m| Value::Number(m.into_number_and_unit().0.atan()),
-        )
+        helper::unary_number_fn(identifier_span, args, "atan", |n, _arg_span| {
+            // the base unit for angles is radians,
+            // so we need to convert to dimensionless with no magnitude
+            let number = n.atan();
+            let unit = Unit::unitless();
+
+            let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
+
+            Ok(Value::MeasuredNumber(measured_number))
+        })
     }
 
     pub const SQRT_DESCRIPTION: &str = "Compute the square root of a value.";
 
     pub fn sqrt(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "sqrt",
-            |n| Value::Number(n.sqrt()),
-            |m| Value::MeasuredNumber(m.sqrt()),
+            |n, _arg_span| Ok(Value::Number(n.sqrt())),
+            |m, _arg_span| Ok(Value::MeasuredNumber(m.sqrt())),
         )
     }
 
@@ -401,12 +407,12 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn ln(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "ln",
-            |n| Value::Number(n.ln()),
-            |m| Value::MeasuredNumber(m.ln()),
+            |n, _arg_span| Ok(Value::Number(n.ln())),
+            |m, _arg_span| Ok(Value::MeasuredNumber(m.ln())),
         )
     }
 
@@ -419,12 +425,12 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn log10(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "log10",
-            |n| Value::Number(n.log10()),
-            |m| Value::MeasuredNumber(m.log10()),
+            |n, _arg_span| Ok(Value::Number(n.log10())),
+            |m, _arg_span| Ok(Value::MeasuredNumber(m.log10())),
         )
     }
 
@@ -437,12 +443,12 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn log2(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "log2",
-            |n| Value::Number(n.log2()),
-            |m| Value::MeasuredNumber(m.log2()),
+            |n, _arg_span| Ok(Value::Number(n.log2())),
+            |m, _arg_span| Ok(Value::MeasuredNumber(m.log2())),
         )
     }
 
@@ -455,12 +461,12 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn floor(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "floor",
-            |n| Value::Number(n.floor()),
-            |m| Value::MeasuredNumber(m.floor()),
+            |n, _arg_span| Ok(Value::Number(n.floor())),
+            |m, _arg_span| Ok(Value::MeasuredNumber(m.floor())),
         )
     }
 
@@ -476,12 +482,12 @@ mod fns {
         identifier_span: Span,
         args: Vec<(Value, Span)>,
     ) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "ceiling",
-            |n| Value::Number(n.ceiling()),
-            |m| Value::MeasuredNumber(m.ceiling()),
+            |n, _arg_span| Ok(Value::Number(n.ceiling())),
+            |m, _arg_span| Ok(Value::MeasuredNumber(m.ceiling())),
         )
     }
 
@@ -556,12 +562,12 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn abs(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "abs",
-            |n| Value::Number(n.abs()),
-            |m| Value::MeasuredNumber(m.abs()),
+            |n, _arg_span| Ok(Value::Number(n.abs())),
+            |m, _arg_span| Ok(Value::MeasuredNumber(m.abs())),
         )
     }
 
@@ -577,14 +583,14 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn sign(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(
+        helper::unary_number_or_measured_number_fn(
             identifier_span,
             args,
             "sign",
-            |n| Value::Number(n.sign()),
-            |m| {
+            |n, _arg_span| Ok(Value::Number(n.sign())),
+            |m, _arg_span| {
                 let (number, _unit) = m.into_number_and_unit();
-                Value::Number(number.sign())
+                Ok(Value::Number(number.sign()))
             },
         )
     }
@@ -666,9 +672,13 @@ mod fns {
     /// Returns `Err` if the argument count is not exactly one, or if the
     /// argument is not a number or measured number.
     pub fn strip(identifier_span: Span, args: Vec<(Value, Span)>) -> Result<Value, Vec<EvalError>> {
-        helper::unary_numeric(identifier_span, args, "strip", Value::Number, |m| {
-            Value::Number(m.into_number_and_unit().0)
-        })
+        helper::unary_number_or_measured_number_fn(
+            identifier_span,
+            args,
+            "strip",
+            |n, _arg_span| Ok(Value::Number(n)),
+            |m, _arg_span| Ok(Value::Number(m.into_number_and_unit().0)),
+        )
     }
 
     pub const MNMX_DESCRIPTION: &str =
@@ -733,7 +743,7 @@ mod helper {
     };
     use oneil_output::{DisplayUnit, MeasuredNumber, Number, Unit, Value};
 
-    pub fn unary_numeric<F, G>(
+    pub fn unary_number_or_measured_number_fn<F, G>(
         identifier_span: Span,
         args: Vec<(Value, Span)>,
         name: &str,
@@ -741,8 +751,8 @@ mod helper {
         measured_op: G,
     ) -> Result<Value, Vec<EvalError>>
     where
-        F: FnOnce(Number) -> Value,
-        G: FnOnce(MeasuredNumber) -> Value,
+        F: FnOnce(Number, Span) -> Result<Value, Vec<EvalError>>,
+        G: FnOnce(MeasuredNumber, Span) -> Result<Value, Vec<EvalError>>,
     {
         if args.len() != 1 {
             return Err(vec![EvalError::InvalidArgumentCount {
@@ -760,14 +770,106 @@ mod helper {
         let found_type = arg.type_();
 
         match arg {
-            Value::Number(number) => Ok(number_op(number)),
-            Value::MeasuredNumber(measured) => Ok(measured_op(measured)),
+            Value::Number(number) => number_op(number, arg_span),
+            Value::MeasuredNumber(measured) => measured_op(measured, arg_span),
             Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
                 expected_type: ExpectedType::NumberOrMeasuredNumber,
                 found_type,
                 found_span: arg_span,
             }]),
         }
+    }
+
+    pub fn unary_number_fn<F>(
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+        name: &str,
+        number_op: F,
+    ) -> Result<Value, Vec<EvalError>>
+    where
+        F: FnOnce(Number, Span) -> Result<Value, Vec<EvalError>>,
+    {
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: name.to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Exact(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let (arg, arg_span) = args
+            .into_iter()
+            .next()
+            .expect("there should be one argument");
+        let found_type = arg.type_();
+
+        match arg {
+            Value::Number(number) => number_op(number, arg_span),
+            Value::MeasuredNumber(_) | Value::Boolean(_) | Value::String(_) => {
+                Err(vec![EvalError::InvalidType {
+                    expected_type: ExpectedType::Number,
+                    found_type,
+                    found_span: arg_span,
+                }])
+            }
+        }
+    }
+
+    pub fn unary_measured_number_fn<F>(
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+        name: &str,
+        measured_op: F,
+    ) -> Result<Value, Vec<EvalError>>
+    where
+        F: FnOnce(MeasuredNumber, Span) -> Result<Value, Vec<EvalError>>,
+    {
+        if args.len() != 1 {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: name.to_string(),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::Exact(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let (arg, arg_span) = args
+            .into_iter()
+            .next()
+            .expect("there should be one argument");
+        let found_type = arg.type_();
+
+        match arg {
+            Value::MeasuredNumber(measured) => measured_op(measured, arg_span),
+            Value::Number(_) | Value::Boolean(_) | Value::String(_) => {
+                Err(vec![EvalError::InvalidType {
+                    expected_type: ExpectedType::MeasuredNumber,
+                    found_type,
+                    found_span: arg_span,
+                }])
+            }
+        }
+    }
+
+    /// Converts a measured number into a unitless number.
+    ///
+    /// Returns an error if the measured number is not dimensionless.
+    pub fn unitless_measured_number_as_number(
+        identifier_span: Span,
+        argument_span: Span,
+        measured: MeasuredNumber,
+    ) -> Result<Number, Vec<EvalError>> {
+        if !measured.unit().is_unitless() {
+            return Err(vec![EvalError::UnitMismatch {
+                expected_unit: DisplayUnit::Unitless,
+                expected_source_span: identifier_span,
+                found_unit: measured.unit().display_unit.clone(),
+                found_span: argument_span,
+            }]);
+        }
+
+        Ok(measured.into_number_using_unit(&Unit::unitless()))
     }
 
     // Use a Cow (Clone on Write) to avoid unnecessary cloning.
