@@ -1341,7 +1341,15 @@ mod tests {
 
         // setup parameter z = x // y with unit m
         // Escaped division requires matching units
-        let parameter = helper::build_escaped_div_parameter("z", "x", "y", []);
+        let parameter = helper::build_escaped_div_parameter(
+            "z",
+            "x",
+            "y",
+            [
+                helper::UnitSpec::new(Some("m"), None, false, 1.0),
+                helper::UnitSpec::new(Some("m"), None, false, -1.0),
+            ],
+        );
 
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
