@@ -109,12 +109,6 @@ pub fn builtin_functions_complete() -> impl Iterator<Item = (&'static str, Built
             function: fns::ceiling as BuiltinFunctionFn,
         },
         BuiltinFunction {
-            name: "extent",
-            args: &["x"],
-            description: fns::EXTENT_DESCRIPTION,
-            function: fns::extent as BuiltinFunctionFn,
-        },
-        BuiltinFunction {
             name: "range",
             args: &["x", "y?"],
             description: fns::RANGE_DESCRIPTION,
@@ -489,21 +483,6 @@ mod fns {
             |n| Value::Number(n.ceiling()),
             |m| Value::MeasuredNumber(m.ceiling()),
         )
-    }
-
-    pub const EXTENT_DESCRIPTION: &str = "Compute the extent of a value.";
-
-    #[expect(unused_variables, reason = "not implemented")]
-    #[expect(clippy::needless_pass_by_value, reason = "not implemented")]
-    pub fn extent(
-        identifier_span: Span,
-        args: Vec<(Value, Span)>,
-    ) -> Result<Value, Vec<EvalError>> {
-        Err(vec![EvalError::Unsupported {
-            relevant_span: identifier_span,
-            feature_name: Some("extent".to_string()),
-            will_be_supported: true,
-        }])
     }
 
     pub const RANGE_DESCRIPTION: &str = "Compute the range of values.\n\nWith one argument (an interval), returns the difference between the maximum and minimum.\n\nWith two arguments, returns the difference between them.";
