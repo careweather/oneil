@@ -35,7 +35,7 @@ impl PyUnit {
     ) -> PyResult<Self> {
         let dimension_map = match dimensions {
             Some(d) => dimension_map_from_dict(d)?,
-            None => DimensionMap::unitless(),
+            None => DimensionMap::dimensionless(),
         };
         let magnitude = magnitude.unwrap_or(1.0);
         let is_db = is_db.unwrap_or(false);
@@ -54,17 +54,18 @@ impl PyUnit {
         Ok(Self { inner })
     }
 
-    /// Creates the unitless unit.
+    /// Creates the `1` unit.
+    ///
+    /// This is a dimensionless unit with no dimensions and a
+    /// magnitude of 1. It is also not a decibel unit.
     #[staticmethod]
-    fn unitless() -> Self {
-        Self {
-            inner: Unit::unitless(),
-        }
+    fn one() -> Self {
+        Self { inner: Unit::one() }
     }
 
-    /// Returns true if the unit is unitless.
-    fn is_unitless(&self) -> bool {
-        self.inner.is_unitless()
+    /// Returns true if the unit is dimensionless.
+    fn is_dimensionless(&self) -> bool {
+        self.inner.is_dimensionless()
     }
 
     /// Returns the dimensions as a dict mapping dimension keys to exponents (str -> float).

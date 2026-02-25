@@ -311,7 +311,8 @@ mod fns {
         // the base unit for angles is radians,
         // so we need to convert from dimensionless with no magnitude
         helper::unary_measured_number_fn(identifier_span, args, "sin", |m, arg_span| {
-            let number = helper::unitless_measured_number_as_number(identifier_span, arg_span, m)?;
+            let number =
+                helper::dimensionless_measured_number_as_number(identifier_span, arg_span, m)?;
             Ok(Value::Number(number.sin()))
         })
     }
@@ -322,7 +323,8 @@ mod fns {
         // the base unit for angles is radians,
         // so we need to convert from dimensionless with no magnitude
         helper::unary_measured_number_fn(identifier_span, args, "cos", |m, arg_span| {
-            let number = helper::unitless_measured_number_as_number(identifier_span, arg_span, m)?;
+            let number =
+                helper::dimensionless_measured_number_as_number(identifier_span, arg_span, m)?;
             Ok(Value::Number(number.cos()))
         })
     }
@@ -333,7 +335,8 @@ mod fns {
         // the base unit for angles is radians,
         // so we need to convert from dimensionless with no magnitude
         helper::unary_measured_number_fn(identifier_span, args, "tan", |m, arg_span| {
-            let number = helper::unitless_measured_number_as_number(identifier_span, arg_span, m)?;
+            let number =
+                helper::dimensionless_measured_number_as_number(identifier_span, arg_span, m)?;
             Ok(Value::Number(number.tan()))
         })
     }
@@ -346,7 +349,7 @@ mod fns {
             // the base unit for angles is radians,
             // so we need to convert to dimensionless with no magnitude
             let number = n.asin();
-            let unit = Unit::unitless();
+            let unit = Unit::one();
 
             let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
 
@@ -362,7 +365,7 @@ mod fns {
             // the base unit for angles is radians,
             // so we need to convert to dimensionless with no magnitude
             let number = n.acos();
-            let unit = Unit::unitless();
+            let unit = Unit::one();
 
             let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
 
@@ -378,7 +381,7 @@ mod fns {
             // the base unit for angles is radians,
             // so we need to convert to dimensionless with no magnitude
             let number = n.atan();
-            let unit = Unit::unitless();
+            let unit = Unit::one();
 
             let measured_number = MeasuredNumber::from_number_and_unit(number, unit);
 
@@ -855,21 +858,21 @@ mod helper {
     /// Converts a measured number into a unitless number.
     ///
     /// Returns an error if the measured number is not dimensionless.
-    pub fn unitless_measured_number_as_number(
+    pub fn dimensionless_measured_number_as_number(
         identifier_span: Span,
         argument_span: Span,
         measured: MeasuredNumber,
     ) -> Result<Number, Vec<EvalError>> {
-        if !measured.unit().is_unitless() {
+        if !measured.unit().is_dimensionless() {
             return Err(vec![EvalError::UnitMismatch {
-                expected_unit: DisplayUnit::Unitless,
+                expected_unit: DisplayUnit::One,
                 expected_source_span: identifier_span,
                 found_unit: measured.unit().display_unit.clone(),
                 found_span: argument_span,
             }]);
         }
 
-        Ok(measured.into_number_using_unit(&Unit::unitless()))
+        Ok(measured.into_number_using_unit(&Unit::one()))
     }
 
     // Use a Cow (Clone on Write) to avoid unnecessary cloning.
@@ -1044,7 +1047,7 @@ mod helper {
                 first_number_span,
             }) => {
                 errors.push(EvalError::UnitMismatch {
-                    expected_unit: DisplayUnit::Unitless,
+                    expected_unit: DisplayUnit::One,
                     expected_source_span: **first_number_span,
                     found_unit: number.unit().display_unit.clone(),
                     found_span: *value_span,
@@ -1078,7 +1081,7 @@ mod helper {
                 errors.push(EvalError::UnitMismatch {
                     expected_unit: expected_unit.display_unit.clone(),
                     expected_source_span: **expected_unit_value_span,
-                    found_unit: DisplayUnit::Unitless,
+                    found_unit: DisplayUnit::One,
                     found_span: *value_span,
                 });
             }

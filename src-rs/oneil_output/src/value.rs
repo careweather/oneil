@@ -295,7 +295,7 @@ impl Value {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs * rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
-            // unitless measured number
+            // measured number with unit `1`
             (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs * rhs)),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs * rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
@@ -332,7 +332,7 @@ impl Value {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs / rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
-            // unitless measured number
+            // measured number with unit `1`
             (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs / rhs)),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs / rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
@@ -371,7 +371,7 @@ impl Value {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs / rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
-            // unitless measured number
+            // measured number with unit `1`
             (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs / rhs)),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs / rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
@@ -408,7 +408,7 @@ impl Value {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs % rhs)),
             // if any of the numbers is not measured, it is implicitly coerced to a
-            // unitless measured number
+            // measured number with unit `1`
             (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs % rhs)),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs % rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {

@@ -32,7 +32,7 @@ impl PyMeasuredNumber {
     }
 
     fn verify_unit_is_dimensionless(&self) -> PyResult<()> {
-        if !self.inner.unit().is_unitless() {
+        if !self.inner.unit().is_dimensionless() {
             return Err(PyErr::new::<PyValueError, _>("units are not dimensionless"));
         }
 
@@ -87,11 +87,13 @@ impl PyMeasuredNumber {
     }
 
     /// Converts this measured number to a unitless number (float or Interval).
+    ///
+    /// This will fail if the value's unit is not dimensionless.
     #[expect(clippy::wrong_self_convention, reason = "this is for Python, not Rust")]
     fn into_unitless_number<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.verify_unit_is_dimensionless()?;
 
-        let number = self.inner.clone().into_number_using_unit(&Unit::unitless());
+        let number = self.inner.clone().into_number_using_unit(&Unit::one());
         Ok(number_to_py_any(&number, py))
     }
 
@@ -531,7 +533,7 @@ fn py_any_to_measured_number_with_unit(
 }
 
 /// Tries to convert a Python object to a [`MeasuredNumber`]: accepts [`PyMeasuredNumber`], or a
-/// float/interval which is interpreted as a unitless measured value.
+/// float/interval which is interpreted as a measured value with unit `1`.
 ///
 /// Used by binary operators to accept `PyAny` and return `NotImplemented` when conversion fails.
 fn py_any_to_measured_number(other: &Bound<'_, PyAny>) -> Option<MeasuredNumber> {
@@ -541,7 +543,7 @@ fn py_any_to_measured_number(other: &Bound<'_, PyAny>) -> Option<MeasuredNumber>
 
     py_any_to_number(other)
         .ok()
-        .map(|number| MeasuredNumber::from_number_and_unit(number, Unit::unitless()))
+        .map(|number| MeasuredNumber::from_number_and_unit(number, Unit::one()))
 }
 
 fn binary_eval_error_to_py_err(err: BinaryEvalError) -> PyErr {

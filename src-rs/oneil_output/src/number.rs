@@ -294,8 +294,8 @@ impl MeasuredNumber {
             });
         }
 
-        // if the left unit is unitless, use the right unit, otherwise use the left unit
-        let unit = if self.unit.is_unitless() {
+        // if the left unit is dimensionless, use the right unit, otherwise use the left unit
+        let unit = if self.unit.is_dimensionless() {
             rhs.unit.clone()
         } else {
             self.unit
@@ -490,8 +490,8 @@ impl ops::Mul<Number> for MeasuredNumber {
 
     /// Multiply a measured number by a number.
     ///
-    /// The `Number` is implicitly coerced to a unitless
-    /// measured number.
+    /// The `Number` is implicitly coerced to a
+    /// measured number with unit `1`.
     fn mul(self, rhs: Number) -> Self::Output {
         Self {
             normalized_value: self.normalized_value * rhs,
@@ -505,8 +505,8 @@ impl ops::Mul<MeasuredNumber> for Number {
 
     /// Multiply a number by a measured number.
     ///
-    /// The `Number` is implicitly coerced to a unitless
-    /// measured number.
+    /// The `Number` is implicitly coerced to a
+    /// measured number with unit `1`.
     fn mul(self, rhs: MeasuredNumber) -> Self::Output {
         MeasuredNumber {
             normalized_value: self * rhs.normalized_value,
@@ -520,7 +520,7 @@ impl ops::Div<Number> for MeasuredNumber {
 
     /// Divide a measured number by a number.
     ///
-    /// The `Number` is implicitly coerced to a unitless
+    /// The `Number` is implicitly coerced to a dimensionless
     /// measured number.
     fn div(self, rhs: Number) -> Self::Output {
         Self {
@@ -535,12 +535,12 @@ impl ops::Div<MeasuredNumber> for Number {
 
     /// Divide a number by a measured number.
     ///
-    /// The `Number` is implicitly coerced to a unitless
+    /// The `Number` is implicitly coerced to a dimensionless
     /// measured number.
     fn div(self, rhs: MeasuredNumber) -> Self::Output {
         MeasuredNumber {
             normalized_value: self / rhs.normalized_value,
-            unit: Unit::unitless() / rhs.unit,
+            unit: Unit::one() / rhs.unit,
         }
     }
 }

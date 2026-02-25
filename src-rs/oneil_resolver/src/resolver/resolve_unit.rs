@@ -174,7 +174,7 @@ fn resolve_display_unit(unit: &ast::UnitExprNode) -> ir::DisplayCompositeUnit {
             );
             ir::DisplayCompositeUnit::BaseUnit(display_unit)
         }
-        ast::UnitExpr::UnitOne => ir::DisplayCompositeUnit::Unitless,
+        ast::UnitExpr::UnitOne => ir::DisplayCompositeUnit::One,
         ast::UnitExpr::Parenthesized { expr } => resolve_display_unit(expr),
     }
 }
