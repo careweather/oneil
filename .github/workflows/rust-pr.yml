@@ -1,0 +1,112 @@
+name: Rust Pull Request
+
+on: pull_request
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "--deny warnings"
+
+jobs:
+  run-fuzz-targets:
+    # derived from https://rust-fuzz.github.io/book/cargo-fuzz/ci.html
+
+    runs-on: ubuntu-latest
+
+    env:
+      # the version of `cargo-fuzz` to install and use.
+      CARGO_FUZZ_VERSION: 0.13.1
+
+      # the number of seconds to run the fuzz target. 300 seconds = 5 minutes.
+      FUZZ_TIME: 300
+
+    strategy:
+      matrix:
+        include:
+          # list fuzz targets here
+          - crate: oneil_output
+            target: single_op_inclusion_property
+          - crate: oneil_output
+            target: single_op_valid_interval
+          - crate: oneil_output
+            target: contains_is_valid
+          - crate: oneil_output
+            target: linear_db_conversion
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # install the nightly Rust channel
+      - run: rustup toolchain install nightly
+      - run: rustup default nightly
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo-fuzz
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/cargo-fuzz
+          key: cargo-fuzz-bin-${{ env.CARGO_FUZZ_VERSION }}
+
+      # install cargo-fuzz
+      - run: echo "${{ runner.tool_cache }}/cargo-fuzz/bin" >> $GITHUB_PATH
+      - run: cargo install --root "${{ runner.tool_cache }}/cargo-fuzz" --version ${{ env.CARGO_FUZZ_VERSION }} cargo-fuzz --locked
+
+      # Build and then run the fuzz target.
+      - run: cargo fuzz build ${{ matrix.target }} --fuzz-dir src-rs/${{ matrix.crate }}/fuzz
+      - run: cargo fuzz run ${{ matrix.target }} --fuzz-dir src-rs/${{ matrix.crate }}/fuzz -- -max_total_time=${{ env.FUZZ_TIME }}
+
+      # Upload fuzzing artifacts on failure for post-mortem debugging.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzzing-artifacts-${{ matrix.crate }}-${{ matrix.target }}-${{ github.sha }}
+          path: src-rs/${{ matrix.crate }}/fuzz/artifacts
+
+  check-for-unused-dependencies:
+    runs-on: ubuntu-latest
+
+    env:
+      # the version of `cargo-udeps` to install and use.
+      CARGO_UDEPS_VERSION: 0.1.60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # install the nightly Rust channel
+      - run: rustup toolchain install nightly
+      - run: rustup default nightly
+
+      - name: Run cargo-udeps
+        uses: aig787/cargo-udeps-action@v1
+        with:
+          version: latest
+          args: --all-targets --all-features
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo-udeps
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/cargo-udeps
+          key: cargo-udeps-bin-${{ env.CARGO_UDEPS_VERSION }}
+
+      # install cargo-udeps
+      - run: echo "${{ runner.tool_cache }}/cargo-udeps/bin" >> $GITHUB_PATH
+      - run: cargo install --root "${{ runner.tool_cache }}/cargo-udeps" --version ${{ env.CARGO_UDEPS_VERSION }} cargo-udeps --locked
+
+      - name: Run cargo-udeps
+        run: cargo udeps --all-targets --all-features
