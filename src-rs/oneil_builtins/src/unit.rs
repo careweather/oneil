@@ -582,7 +582,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
         UnitInfo {
             name: "degree",
             aliases: ["deg", "degree", "degrees"].as_ref(),
-            magnitude: 0.017453292519943295,
+            magnitude: 2.0 * std::f64::consts::PI / 360.0,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
             uses_prefixes: false,
@@ -614,7 +614,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
         UnitInfo {
             name: "arcminute",
             aliases: ["arcmin", "arcminute", "arcminutes"].as_ref(),
-            magnitude: 0.0002908882086657216,
+            magnitude: 2.0 * std::f64::consts::PI / 360.0 / 60.0,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
             uses_prefixes: false,
@@ -622,7 +622,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (&'static str, BuiltinUn
         UnitInfo {
             name: "arcsecond",
             aliases: ["arcsec", "arcsecond", "arcseconds"].as_ref(),
-            magnitude: 4.84813681109536e-06,
+            magnitude: 2.0 * std::f64::consts::PI / 360.0 / 60.0 / 60.0,
             dimensions: DimensionMap::new(IndexMap::from([])),
             is_db: false,
             uses_prefixes: false,
