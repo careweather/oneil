@@ -286,7 +286,7 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_min_max(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
-        // check that the units match (or are unitless)
+        // check that the units match
         if !self.unit.dimensionally_eq(&rhs.unit) {
             return Err(BinaryEvalError::UnitMismatch {
                 lhs_unit: self.unit.display_unit,
@@ -294,18 +294,11 @@ impl MeasuredNumber {
             });
         }
 
-        // if the left unit is dimensionless, use the right unit, otherwise use the left unit
-        let unit = if self.unit.is_dimensionless() {
-            rhs.unit.clone()
-        } else {
-            self.unit
-        };
-
         Ok(Self {
             normalized_value: self
                 .normalized_value
                 .tightest_enclosing_interval(rhs.normalized_value),
-            unit,
+            unit: self.unit,
         })
     }
 
