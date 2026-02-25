@@ -396,7 +396,7 @@ impl PyMeasuredNumber {
 
     /// Escaped division (min/min, max/max). Raises if units do not match.
     fn escaped_div(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let rhs = py_any_to_measured_number_with_unit(other, self.inner.unit())
+        let rhs = py_any_to_measured_number(other)
             .ok_or_else(|| PyErr::new::<PyValueError, _>("expected MeasuredNumber"))?;
 
         self.inner
