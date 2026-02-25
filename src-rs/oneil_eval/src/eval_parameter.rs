@@ -76,6 +76,7 @@ pub fn eval_parameter<E: ExternalEvaluationContext>(
             return Err(vec![EvalError::ParameterMissingUnitAnnotation {
                 param_expr_span: *expr_span,
                 param_value_unit: number.unit().display_unit.clone(),
+                is_dimensionless: number.unit().is_dimensionless(),
             }]);
         }
         (Value::MeasuredNumber(number), Some((unit, unit_span)))
