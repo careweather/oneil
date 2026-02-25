@@ -25,21 +25,30 @@ pub struct Unit {
 }
 
 impl Unit {
-    /// Creates a unitless unit.
+    /// Creates a `1` unit.
+    ///
+    /// This is a unit with no dimensions and a
+    /// magnitude of 1. It is also not a decibel unit.
     #[must_use]
-    pub fn unitless() -> Self {
+    pub fn one() -> Self {
         Self {
-            dimension_map: DimensionMap::unitless(),
+            dimension_map: DimensionMap::dimensionless(),
             magnitude: 1.0,
             is_db: false,
-            display_unit: DisplayUnit::Unitless,
+            display_unit: DisplayUnit::One,
         }
     }
 
-    /// Determines if the unit is unitless.
+    /// Determines if the unit is dimensionless.
     #[must_use]
-    pub fn is_unitless(&self) -> bool {
-        self.dimension_map.is_unitless()
+    pub fn is_dimensionless(&self) -> bool {
+        self.dimension_map.is_dimensionless()
+    }
+
+    /// Determines if the unit is a `1` unit.
+    #[must_use]
+    pub fn is_one(&self) -> bool {
+        self.dimension_map.is_dimensionless() && is_close(self.magnitude, 1.0) && !self.is_db
     }
 
     /// Sets the `is_db` flag for the unit.
@@ -172,21 +181,21 @@ pub enum Dimension {
 pub struct DimensionMap(IndexMap<Dimension, f64>);
 
 impl DimensionMap {
-    /// Creates a new unit from a map of dimensions and their exponents.
+    /// Creates a new dimension map from a map of dimensions and their exponents.
     #[must_use]
     pub const fn new(units: IndexMap<Dimension, f64>) -> Self {
         Self(units)
     }
 
-    /// Creates a unitless unit, which is a unit with no dimensions.
+    /// Creates a dimensionless map
     #[must_use]
-    pub fn unitless() -> Self {
+    pub fn dimensionless() -> Self {
         Self(IndexMap::new())
     }
 
-    /// Checks if the unit is unitless (has no dimensions).
+    /// Checks if the dimension map is dimensionless
     #[must_use]
-    pub fn is_unitless(&self) -> bool {
+    pub fn is_dimensionless(&self) -> bool {
         self.0.is_empty()
     }
 
@@ -289,8 +298,8 @@ impl ops::Div for DimensionMap {
 /// It uses an AST-like structure.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayUnit {
-    /// Unitless `1`
-    Unitless,
+    /// `1` unit
+    One,
     /// A single unit
     Unit {
         /// The name of the unit
@@ -316,7 +325,7 @@ impl DisplayUnit {
     #[must_use]
     pub fn pow(self, pow_exponent: f64) -> Self {
         match self {
-            Self::Unitless => Self::Unitless,
+            Self::One => Self::One,
             Self::Unit { name, exponent } => Self::Unit {
                 name,
                 exponent: exponent * pow_exponent,
@@ -352,7 +361,7 @@ impl ops::Div for DisplayUnit {
 impl fmt::Display for DisplayUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Unitless => write!(f, "1")?,
+            Self::One => write!(f, "1")?,
             Self::Unit { name, exponent } => {
                 write!(f, "{name}")?;
                 if !is_close(*exponent, 1.0) {
@@ -362,12 +371,12 @@ impl fmt::Display for DisplayUnit {
             Self::Multiply(left, right) => write!(f, "{left}*{right}")?,
             Self::Divide(left, right) => match **right {
                 Self::Multiply(_, _) | Self::Divide(_, _) => write!(f, "{left}/({right})")?,
-                Self::Unitless | Self::Unit { .. } | Self::Power { .. } => {
+                Self::One | Self::Unit { .. } | Self::Power { .. } => {
                     write!(f, "{left}/{right}")?;
                 }
             },
             Self::Power { base, exponent } => match **base {
-                Self::Unitless => write!(f, "{base}^{exponent}")?,
+                Self::One => write!(f, "{base}^{exponent}")?,
                 Self::Unit {
                     exponent: base_exponent,
                     ..

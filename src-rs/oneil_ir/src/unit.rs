@@ -144,8 +144,8 @@ pub enum DisplayCompositeUnit {
     Divide(Box<DisplayCompositeUnit>, Box<DisplayCompositeUnit>),
     /// A single unit
     BaseUnit(DisplayUnit),
-    /// Unitless `1`
-    Unitless,
+    /// `1` unit
+    One,
 }
 
 /// A unit used for displaying the unit to

@@ -19,7 +19,7 @@ pub fn eval_unit<E: ExternalEvaluationContext>(
 
     // get the first unit
     let Some(first_unit) = units.next() else {
-        return (Unit::unitless(), unit_span);
+        return (Unit::one(), unit_span);
     };
 
     // multiply the units together
@@ -60,7 +60,7 @@ fn eval_unit_component<E: ExternalEvaluationContext>(
         ir::UnitInfo::Db { prefix, base_name } => (prefix.as_deref(), base_name.as_deref(), true),
     };
 
-    let base_unit = base_name.map_or_else(Unit::unitless, |name| {
+    let base_unit = base_name.map_or_else(Unit::one, |name| {
         context
             .lookup_unit(name)
             .expect("base unit should exist in builtins")
@@ -86,7 +86,7 @@ fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
             let exponent = unit.exponent;
             DisplayUnit::Unit { name, exponent }
         }
-        ir::DisplayCompositeUnit::Unitless => DisplayUnit::Unitless,
+        ir::DisplayCompositeUnit::One => DisplayUnit::One,
         ir::DisplayCompositeUnit::Multiply(left, right) => {
             let left = eval_unit_display_expr(left);
             let right = eval_unit_display_expr(right);
@@ -223,7 +223,7 @@ mod test {
             // evaluate unit
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
-            assert!(unit.is_unitless(), "unit should be unitless");
+            assert!(unit.is_dimensionless(), "unit should be dimensionless");
         }
 
         #[test]

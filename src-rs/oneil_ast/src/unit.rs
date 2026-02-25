@@ -19,7 +19,7 @@ pub enum UnitExpr {
         /// The expression inside parentheses
         expr: UnitExprNode,
     },
-    /// A unitless 1, usually used for units like 1/s
+    /// A `1` unit, usually used for units like 1/s
     UnitOne,
     /// A unit with optional exponent
     Unit {
@@ -46,7 +46,7 @@ impl UnitExpr {
         Self::Parenthesized { expr }
     }
 
-    /// Creates a unitless 1, usually used for units like 1/s
+    /// Creates a `1` unit, usually used for units like 1/s
     #[must_use]
     pub const fn unit_one() -> Self {
         Self::UnitOne

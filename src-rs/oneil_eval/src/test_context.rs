@@ -1444,7 +1444,7 @@ mod std_builtins {
                     first_number_span,
                 }) => {
                     errors.push(EvalError::UnitMismatch {
-                        expected_unit: DisplayUnit::Unitless,
+                        expected_unit: DisplayUnit::One,
                         expected_source_span: **first_number_span,
                         found_unit: number.unit().display_unit.clone(),
                         found_span: *value_span,
@@ -1475,7 +1475,7 @@ mod std_builtins {
                     errors.push(EvalError::UnitMismatch {
                         expected_unit: expected_unit.display_unit.clone(),
                         expected_source_span: **expected_unit_value_span,
-                        found_unit: DisplayUnit::Unitless,
+                        found_unit: DisplayUnit::One,
                         found_span: *value_span,
                     });
                 }
