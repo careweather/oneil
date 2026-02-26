@@ -69,7 +69,7 @@ impl Runtime {
         }
     }
 
-    pub(super) fn parse_expression(&self, expression: &str) -> Result<ast::ExprNode, ParserError> {
+    pub(super) fn parse_expression(expression: &str) -> Result<ast::ExprNode, ParserError> {
         parser::parse_expression(expression, None)
     }
 }
