@@ -10,6 +10,15 @@ use oneil_shared::{error::OneilError, load_result::LoadResult, span::Span};
 use super::Runtime;
 use crate::output::{self, error::RuntimeErrors, ir};
 
+type EvalModelAndExpressionsResult<'runtime> = (
+    Option<(
+        output::reference::ModelReference<'runtime>,
+        IndexMap<String, Value>,
+    )>,
+    RuntimeErrors,
+    Vec<OneilError>,
+);
+
 impl Runtime {
     /// Evaluates a model and returns the result.
     ///
@@ -32,6 +41,38 @@ impl Runtime {
         let errors = self.get_model_errors(path);
 
         (model_opt, errors)
+    }
+
+    /// Evaluates a model and a list of expressions in the context of
+    /// the given model and returns the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RuntimeErrors`] (via [`get_model_errors`](super::Runtime::get_model_errors)) if the model could not be evaluated.
+    /// Returns [`OneilError`]s if the expressions could not be evaluated.
+    pub fn eval_model_and_expressions(
+        &mut self,
+        path: impl AsRef<Path>,
+        expressions: &[String],
+    ) -> EvalModelAndExpressionsResult<'_> {
+        // evaluate the model and its dependencies
+        self.eval_model_internal(&path);
+
+        // evaluate the expressions
+        let (expr_results, expr_errors) =
+            self.eval_expressions_internal(expressions, path.as_ref());
+
+        let model_opt = self
+            .eval_cache
+            .get_entry(path.as_ref())
+            .and_then(LoadResult::value)
+            .map(|model| output::reference::ModelReference::new(model, &self.eval_cache));
+
+        let result = model_opt.map(|model| (model, expr_results));
+
+        let model_errors = self.get_model_errors(path.as_ref());
+
+        (result, model_errors, expr_errors)
     }
 
     pub(super) fn eval_model_internal(
@@ -67,7 +108,7 @@ impl Runtime {
 
     /// Evaluates a list of expressions in the context of
     /// the given model and returns the results.
-    pub fn eval_expressions(
+    fn eval_expressions_internal(
         &mut self,
         expressions: &[String],
         file: &Path,

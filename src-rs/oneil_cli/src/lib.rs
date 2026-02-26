@@ -394,7 +394,8 @@ fn eval_and_print_model(
     model_print_config: &ModelPrintConfig,
     runtime: &mut Runtime,
 ) {
-    let (model_opt, model_errors) = runtime.eval_model(file);
+    let (result, model_errors, expr_errors) =
+        runtime.eval_model_and_expressions(file, exec_expressions);
 
     for error in model_errors.to_vec() {
         print_error::print(error, show_internal_errors);
@@ -404,13 +405,11 @@ fn eval_and_print_model(
         return;
     }
 
-    let (exec_results, expr_errors) = runtime.eval_expressions(exec_expressions, file);
-
     for error in expr_errors {
         print_error::print(&error, show_internal_errors);
     }
 
-    if let Some(model_ref) = model_opt {
+    if let Some((model_ref, exec_results)) = result {
         print_model_result::print_eval_result(model_ref, &exec_results, model_print_config);
     }
 }
