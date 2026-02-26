@@ -346,7 +346,7 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
         print_mode,
         debug: print_debug_info,
         watch,
-        exec: _exec,
+        exec: exec_expressions,
         recursive,
         partial: display_partial_results,
         no_header,
@@ -367,30 +367,57 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
     if watch {
         watch_model(
             &file,
+            &exec_expressions,
             show_internal_errors,
             display_partial_results,
             &model_print_config,
         );
     } else {
         let mut runtime = Runtime::new();
-        let (model_opt, errors) = runtime.eval_model(&file);
 
-        for error in errors.to_vec() {
-            print_error::print(error, show_internal_errors);
-        }
+        eval_and_print_model(
+            &file,
+            &exec_expressions,
+            show_internal_errors,
+            display_partial_results,
+            &model_print_config,
+            &mut runtime,
+        );
+    }
+}
 
-        if !errors.is_empty() && !display_partial_results {
-            return;
-        }
+fn eval_and_print_model(
+    file: &Path,
+    exec_expressions: &[String],
+    show_internal_errors: bool,
+    display_partial_results: bool,
+    model_print_config: &ModelPrintConfig,
+    runtime: &mut Runtime,
+) {
+    let (model_opt, errors) = runtime.eval_model(file);
 
-        if let Some(model_ref) = model_opt {
-            print_model_result::print_eval_result(model_ref, &model_print_config);
-        }
+    for error in errors.to_vec() {
+        print_error::print(error, show_internal_errors);
+    }
+
+    if !errors.is_empty() && !display_partial_results {
+        return;
+    }
+
+    let (exec_results, errors) = runtime.eval_expressions(exec_expressions, file);
+
+    for error in errors {
+        print_error::print(error, show_internal_errors);
+    }
+
+    if let Some(model_ref) = model_opt {
+        print_model_result::print_eval_result(model_ref, exec_results, model_print_config);
     }
 }
 
 fn watch_model(
     file: &Path,
+    exec_expressions: &[String],
     show_internal_errors: bool,
     display_partial_results: bool,
     model_print_config: &ModelPrintConfig,
@@ -415,19 +442,14 @@ fn watch_model(
 
     clear_screen();
 
-    let (model_opt, errors) = runtime.eval_model(file);
-
-    for error in errors.to_vec() {
-        print_error::print(error, show_internal_errors);
-    }
-
-    let should_print_result = errors.is_empty() || display_partial_results;
-
-    if let Some(model_ref) = model_opt
-        && should_print_result
-    {
-        print_model_result::print_eval_result(model_ref, model_print_config);
-    }
+    eval_and_print_model(
+        file,
+        exec_expressions,
+        show_internal_errors,
+        display_partial_results,
+        model_print_config,
+        &mut runtime,
+    );
 
     let new_watch_paths = runtime.get_watch_paths();
     let (add_paths, remove_paths) = find_watch_paths_difference(&watch_paths, &new_watch_paths);
@@ -441,19 +463,14 @@ fn watch_model(
                 notify::EventKind::Modify(_) => {
                     clear_screen();
 
-                    let (model_opt, errors) = runtime.eval_model(file);
-
-                    for error in errors.to_vec() {
-                        print_error::print(error, show_internal_errors);
-                    }
-
-                    let should_print_result = errors.is_empty() || display_partial_results;
-
-                    if let Some(model_ref) = model_opt
-                        && should_print_result
-                    {
-                        print_model_result::print_eval_result(model_ref, model_print_config);
-                    }
+                    eval_and_print_model(
+                        file,
+                        exec_expressions,
+                        show_internal_errors,
+                        display_partial_results,
+                        model_print_config,
+                        &mut runtime,
+                    );
 
                     let new_watch_paths = runtime.get_watch_paths();
                     let (add_paths, remove_paths) =
