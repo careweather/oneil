@@ -2,8 +2,8 @@
 //! Runtime for the Oneil programming language
 
 mod cache;
-mod runtime;
 mod error;
+mod runtime;
 
 pub mod output;
 

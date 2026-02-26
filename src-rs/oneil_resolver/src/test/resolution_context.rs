@@ -11,9 +11,9 @@ use std::path::PathBuf;
 use oneil_ir as ir;
 
 use crate::{
+    ResolutionContext,
     error::{ModelImportResolutionError, ParameterResolutionError, VariableResolutionError},
     test::external_context::TestExternalContext,
-    ResolutionContext,
 };
 
 use super::unimportant_span;

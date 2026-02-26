@@ -14,7 +14,7 @@ use oneil_ast::{
 use oneil_shared::span::Span;
 
 use crate::{
-    error::{parser_trait::ErrorHandlingParser, ParserError},
+    error::{ParserError, parser_trait::ErrorHandlingParser},
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
