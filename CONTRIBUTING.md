@@ -53,6 +53,11 @@ If you are using `rust-analyzer` in VS Code, ensure that you are using the
 `clippy` linter by [updating your
 settings](https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-analyzer/41881)
 
+> [!TIP]
+> You can run the linter manually using `cargo clippy`. If you are ever failing
+> the lint check on Github and `cargo clippy` isn't producing any output,
+> run `rustup install stable` to upgrade to the latest version of Rust.
+
 ## LSP and Tooling Development Setup
 
 1. Clone the repository
