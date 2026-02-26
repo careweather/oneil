@@ -176,4 +176,12 @@ impl eval::ExternalEvaluationContext for Runtime {
     fn lookup_prefix(&self, name: &str) -> Option<f64> {
         self.builtins.get_prefix(name)
     }
+
+    fn get_preloaded_models(
+        &self,
+    ) -> impl Iterator<Item = (PathBuf, &LoadResult<output::Model, eval::EvalErrors>)> {
+        self.eval_cache
+            .iter()
+            .map(|(path, result)| (path.clone(), result))
+    }
 }

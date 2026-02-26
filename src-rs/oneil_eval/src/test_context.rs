@@ -5,17 +5,17 @@
 //! context with [`TestExternalContext::new`], then pass a mutable reference
 //! to it when creating an [`EvalContext`].
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 
 use oneil_ir as ir;
-use oneil_output::{Unit, Value};
+use oneil_output::{self as output, Unit, Value};
 use oneil_shared::{load_result::LoadResult, span::Span};
 
 use crate::{
     context::{ExternalEvaluationContext, IrLoadError},
-    error::EvalError,
+    error::{EvalError, EvalErrors},
 };
 
 /// Test double for [`ExternalResolutionContext`] with standard builtins included.
@@ -90,6 +90,13 @@ impl ExternalEvaluationContext for TestExternalContext {
 
     fn lookup_prefix(&self, name: &str) -> Option<f64> {
         self.builtin_prefixes.get(name).copied()
+    }
+
+    #[expect(unreachable_code, reason = "this is unused in tests")]
+    fn get_preloaded_models(
+        &self,
+    ) -> impl Iterator<Item = (PathBuf, &LoadResult<output::Model, EvalErrors>)> {
+        (unimplemented!("this is unused in tests") as Vec<_>).into_iter()
     }
 }
 

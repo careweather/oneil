@@ -1,4 +1,4 @@
-use std::iter;
+use std::{iter, path::Path};
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
@@ -12,6 +12,25 @@ use crate::{
         convert::{binary_eval_error_to_eval_error, unary_eval_error_to_eval_error},
     },
 };
+
+/// Evaluates an expression in the context of the given model.
+///
+/// # Errors
+///
+/// Returns an error if the expression is invalid.
+// TODO: remove the `&mut`, since the context is never actually mutated.
+//       Maybe add a new kind of context? Also do the same when resolving
+//       an IR expression
+pub fn eval_expr_in_model<E: ExternalEvaluationContext>(
+    expr: &ir::Expr,
+    model_path: &Path,
+    context: &mut E,
+) -> Result<Value, Vec<EvalError>> {
+    let mut eval_context = EvalContext::with_preloaded_models(context);
+    eval_context.push_active_model(model_path.to_path_buf());
+
+    eval_expr(expr, &eval_context).map(|(value, _span)| value)
+}
 
 /// Evaluates an expression and returns the resulting value.
 ///
