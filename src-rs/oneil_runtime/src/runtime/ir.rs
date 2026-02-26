@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use indexmap::IndexSet;
-use oneil_resolver as resolver;
+use oneil_resolver::{self as resolver, error::VariableResolutionError};
 use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
@@ -59,6 +59,16 @@ impl Runtime {
         self.ir_cache
             .get_entry(path.as_ref())
             .expect("entry was inserted in this function for the requested path")
+    }
+
+    /// Resolves an expression as if it were in the context
+    /// of the given model.
+    pub(super) fn resolve_expr_in_model(
+        &mut self,
+        expr_ast: &ast::ExprNode,
+        file: &Path,
+    ) -> Result<output::ir::Expr, Vec<VariableResolutionError>> {
+        resolver::resolve_expr_in_model(expr_ast, file, self)
     }
 }
 

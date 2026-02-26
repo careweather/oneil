@@ -1,10 +1,11 @@
 //! Model evaluation for the runtime.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use indexmap::IndexMap;
 use oneil_eval::{self as eval, IrLoadError};
 use oneil_output::{Unit, Value};
-use oneil_shared::{load_result::LoadResult, span::Span};
+use oneil_shared::{error::OneilError, load_result::LoadResult, span::Span};
 
 use super::Runtime;
 use crate::output::{self, error::RuntimeErrors, ir};
@@ -62,6 +63,76 @@ impl Runtime {
         self.eval_cache
             .get_entry(path.as_ref())
             .expect("eval_model populates cache for requested path and dependencies")
+    }
+
+    /// Evaluates a list of expressions in the context of
+    /// the given model and returns the results.
+    pub fn eval_expressions(
+        &mut self,
+        expressions: &[String],
+        file: &Path,
+    ) -> (IndexMap<String, Value>, Vec<OneilError>) {
+        let mut results = IndexMap::new();
+        let mut errors = Vec::new();
+
+        for (index, expression) in expressions.iter().enumerate() {
+            // a pseudo path for the expression, to be used for error reporting
+            // this is not a real path, but it is a unique path for the expression
+            let pseudo_path = format!("/oneil-eval/{index}");
+            let pseudo_path = PathBuf::from(pseudo_path);
+
+            let expr_ast = match self.parse_expression(expression) {
+                Ok(expr_ast) => expr_ast,
+                Err(error) => {
+                    let oneil_error =
+                        OneilError::from_error_with_source(&error, pseudo_path, expression);
+
+                    errors.push(oneil_error);
+
+                    continue;
+                }
+            };
+
+            let expr_ir = match self.resolve_expr_in_model(&expr_ast, file) {
+                Ok(expr_ir) => expr_ir,
+                Err(resolution_errors) => {
+                    let oneil_errors = resolution_errors.into_iter().map(|error| {
+                        OneilError::from_error_with_source(&error, pseudo_path.clone(), expression)
+                    });
+
+                    errors.extend(oneil_errors);
+
+                    continue;
+                }
+            };
+
+            let eval_result = match self.eval_expr_in_model(&expr_ir, file) {
+                Ok(eval_result) => eval_result,
+                Err(eval_errors) => {
+                    let oneil_errors = eval_errors.into_iter().map(|error| {
+                        OneilError::from_error_with_source(&error, pseudo_path.clone(), expression)
+                    });
+
+                    errors.extend(oneil_errors);
+
+                    continue;
+                }
+            };
+
+            results.insert(expression.clone(), eval_result);
+        }
+
+        (results, errors)
+    }
+
+    /// Evaluates an expression as if it were in the context
+    /// of the given model.
+    fn eval_expr_in_model(
+        &mut self,
+        expr_ir: &output::ir::Expr,
+        file: &Path,
+    ) -> Result<Value, Vec<eval::EvalError>> {
+        eval::eval_expr_in_model(expr_ir, file, self)
     }
 }
 
