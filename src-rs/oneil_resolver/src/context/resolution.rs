@@ -1,18 +1,13 @@
 use indexmap::{IndexMap, IndexSet};
-use oneil_ast as ast;
 use oneil_ir as ir;
-use oneil_shared::{load_result::LoadResult, span::Span};
+use oneil_shared::span::Span;
 
 use crate::error::{
     CircularDependencyError, ModelImportResolutionError, ParameterResolutionError,
     PythonImportResolutionError, ResolutionErrorCollection, VariableResolutionError,
 };
 
-/// Error indicating that loading/parsing a model's AST failed.
-pub struct AstLoadingFailedError;
-
-/// Error indicating that loading a Python import failed.
-pub struct PythonImportLoadingFailedError;
+use super::{AstLoadingFailedError, ExternalResolutionContext};
 
 /// Result of resolving one or more models: resolved models and per-model errors.
 pub struct ModelResolutionResult {
@@ -71,45 +66,7 @@ impl ModelResolutionResult {
     }
 }
 
-/// Context provided by the environment for resolving models (builtins, AST loading, Python imports).
-pub trait ExternalResolutionContext {
-    /// Checks if the given identifier refers to a builtin value.
-    fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool;
-
-    /// Checks if the given identifier refers to a builtin function.
-    fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool;
-
-    /// Checks if the given name refers to a builtin unit.
-    fn has_builtin_unit(&self, name: &str) -> bool;
-
-    /// Returns the available unit prefixes (e.g., "k" -> 1000.0).
-    fn available_prefixes(&self) -> impl Iterator<Item = (&str, f64)>;
-
-    /// Returns whether the given unit name supports SI prefixes.
-    fn unit_supports_si_prefixes(&self, name: &str) -> bool;
-
-    /// Loads the AST for a model.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(AstLoadingFailedError)` when the model file cannot be read or parsed.
-    fn load_ast(
-        &mut self,
-        path: &ir::ModelPath,
-    ) -> LoadResult<&ast::ModelNode, AstLoadingFailedError>;
-
-    /// Loads a Python import.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(PythonImportLoadingFailedError)` when the Python import cannot be loaded or
-    /// validated.
-    fn load_python_import<'context>(
-        &'context mut self,
-        python_path: &ir::PythonPath,
-    ) -> Result<IndexSet<&'context str>, PythonImportLoadingFailedError>;
-}
-
+/// In-memory context used while resolving one or more models.
 pub struct ResolutionContext<'external, E: ExternalResolutionContext> {
     external_context: &'external mut E,
     /// Stack of active models. The last element is the current model.
@@ -120,10 +77,9 @@ pub struct ResolutionContext<'external, E: ExternalResolutionContext> {
     model_results: IndexMap<ir::ModelPath, ModelResolutionResult>,
 }
 
-/// A trait for providing resolution context to the model resolver.
-///
-/// This is used to provide the model resolver information about the outside world.
 impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
+    /// Creates a new resolution context.
+    #[must_use]
     pub fn new(external_context: &'external mut E) -> Self {
         Self {
             external_context,
@@ -139,17 +95,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         self.model_results
     }
 
-    // ===== MODEL LOADING =====
-
-    /// Activates a model.
-    ///
-    /// This has the responsibility of:
-    /// - Adding the model to the active models stack
-    /// - Marking the model as visited
-    /// - Initializing the model IR in the model map (empty, to be populated later)
-    ///
-    /// This assumes stack-like behavior, where the most recently
-    /// activated model is the current model.
+    /// Activates a model and initializes its result entry.
     pub fn push_active_model(&mut self, model_path: &ir::ModelPath) {
         self.active_models.push(model_path.clone());
         self.visited_models.insert(model_path.clone());
@@ -159,10 +105,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         );
     }
 
-    /// Deactivates a model.
-    ///
-    /// This assumes stack-like behavior, where the most recently
-    /// activated model is the current model.
+    /// Deactivates the current model.
     ///
     /// # Panics
     ///
@@ -180,20 +123,19 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Checks if the given model is active.
-    ///
-    /// A model is active if it is anywhere in the active models stack.
+    #[must_use]
     pub fn is_model_active(&self, model_path: &ir::ModelPath) -> bool {
         self.active_models.contains(model_path)
     }
 
     /// Returns the stack of active models.
-    ///
-    /// The last model in the stack is the current active model.
+    #[must_use]
     pub fn active_models(&self) -> &[ir::ModelPath] {
         &self.active_models
     }
 
     /// Checks if the given model has been visited.
+    #[must_use]
     pub fn has_visited_model(&self, model_path: &ir::ModelPath) -> bool {
         self.visited_models.contains(model_path)
     }
@@ -244,19 +186,20 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             .is_some_and(|r| !r.model_errors().is_empty())
     }
 
-    // ===== BUILTINS =====
-
     /// Checks if the given identifier refers to a builtin value.
+    #[must_use]
     pub fn has_builtin_value(&self, identifier: &ir::Identifier) -> bool {
         self.external_context.has_builtin_value(identifier)
     }
 
     /// Checks if the given identifier refers to a builtin function.
+    #[must_use]
     pub fn has_builtin_function(&self, identifier: &ir::Identifier) -> bool {
         self.external_context.has_builtin_function(identifier)
     }
 
     /// Checks if the given name refers to a builtin unit.
+    #[must_use]
     pub fn has_builtin_unit(&self, name: &str) -> bool {
         self.external_context.has_builtin_unit(name)
     }
@@ -267,28 +210,20 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Returns whether the given unit name supports SI prefixes.
+    #[must_use]
     pub fn unit_supports_si_prefixes(&self, name: &str) -> bool {
         self.external_context.unit_supports_si_prefixes(name)
     }
-
-    // ===== AST LOADING =====
 
     /// Loads the AST for a model.
     pub fn load_ast(
         &mut self,
         path: &ir::ModelPath,
-    ) -> LoadResult<&ast::ModelNode, AstLoadingFailedError> {
+    ) -> oneil_shared::load_result::LoadResult<&oneil_ast::ModelNode, AstLoadingFailedError> {
         self.external_context.load_ast(path)
     }
 
-    // ===== PYTHON IMPORT LOADING =====
-
-    /// Loads a Python import.
-    ///
-    /// This has the responsibility of:
-    /// - Loading the Python import
-    /// - Adding the Python import to the active model
-    /// - Adding a Python import error if the import fails to load
+    /// Loads a Python import and records either the import or an error.
     pub fn load_python_import_to_active_model(
         &mut self,
         python_path: &ir::PythonPath,
@@ -322,6 +257,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Gets a Python import from the active model.
+    #[must_use]
     pub fn get_python_import_from_active_model(
         &self,
         python_path: &ir::PythonPath,
@@ -330,9 +266,6 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Returns the Python paths in the active model that export the given function name.
-    ///
-    /// Only imports that were successfully loaded and that include `function_name` in
-    /// their function set are returned.
     #[must_use]
     pub fn lookup_imported_function(&self, function_name: &str) -> Vec<ir::PythonPath> {
         self.active_model()
@@ -342,8 +275,6 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             .map(|(path, _)| path.clone())
             .collect()
     }
-
-    // ===== MODEL IMPORT LOADING =====
 
     /// Adds a reference to the active model.
     pub fn add_reference_to_active_model(
@@ -359,8 +290,6 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Adds a submodel to the active model.
-    ///
-    /// A submodel always refers to a reference.
     pub fn add_submodel_to_active_model(
         &mut self,
         submodel_name: ir::SubmodelName,
@@ -374,6 +303,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Gets a reference from the active model.
+    #[must_use]
     pub fn get_reference_from_active_model(
         &self,
         reference_name: &ir::ReferenceName,
@@ -382,6 +312,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Gets a submodel from the active model.
+    #[must_use]
     pub fn get_submodel_from_active_model(
         &self,
         submodel_name: &ir::SubmodelName,
@@ -390,6 +321,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Looks up a model by path.
+    #[must_use]
     pub fn lookup_model(&self, model_path: &ir::ModelPath) -> ModelResult<'_> {
         if self.model_has_errors(model_path) {
             return ModelResult::HasError;
@@ -401,6 +333,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Looks up the path to a reference in the active model.
+    #[must_use]
     pub fn lookup_reference_path_in_active_model(
         &self,
         reference_name: &ir::ReferenceName,
@@ -460,8 +393,6 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             .add_model_import_resolution_error(reference_name, submodel_name, error);
     }
 
-    // ===== PARAMETER LOADING =====
-
     /// Adds a parameter to the active model.
     pub fn add_parameter_to_active_model(
         &mut self,
@@ -473,6 +404,7 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Looks up a parameter in the active model.
+    #[must_use]
     pub fn lookup_parameter_in_active_model(
         &self,
         parameter_name: &ir::ParameterName,
@@ -504,8 +436,6 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         self.active_model_errors_mut()
             .add_parameter_error(parameter_name, error);
     }
-
-    // ===== TEST LOADING =====
 
     /// Adds a test to the active model.
     pub fn add_test_to_active_model(&mut self, test_index: ir::TestIndex, test: ir::Test) {

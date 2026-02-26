@@ -13,7 +13,7 @@ use oneil_ir as ir;
 use crate::{
     error::{ModelImportResolutionError, ParameterResolutionError, VariableResolutionError},
     test::external_context::TestExternalContext,
-    util::ResolutionContext,
+    ResolutionContext,
 };
 
 use super::unimportant_span;
