@@ -28,17 +28,17 @@ pub struct ModelPrintConfig {
 }
 
 pub fn print_eval_result(
-    eval_result: ModelReference<'_>,
+    model_result: ModelReference<'_>,
     expr_results: &IndexMap<String, Value>,
     model_config: &ModelPrintConfig,
 ) {
-    let test_info = get_model_tests(eval_result, model_config.recursive, TestInfo::default());
+    let test_info = get_model_tests(model_result, model_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
     println!("{divider_line}");
 
     if !model_config.no_header {
-        print_model_header(eval_result.path(), &test_info);
+        print_model_header(model_result.path(), &test_info);
     }
 
     if !model_config.no_test_report {
@@ -47,18 +47,18 @@ pub fn print_eval_result(
 
     if !model_config.no_parameters {
         if let Some(variables) = &model_config.variables {
-            print_parameters_by_list(eval_result, model_config.print_debug_info, variables);
-            print_exec_results(expr_results);
+            print_parameters_by_list(model_result, model_config.print_debug_info, variables);
+            print_expr_results(expr_results);
         } else if !expr_results.is_empty() {
-            print_exec_results(expr_results);
+            print_expr_results(expr_results);
         } else {
-            print_parameters_by_filter(eval_result, model_config.print_debug_info, model_config);
+            print_parameters_by_filter(model_result, model_config.print_debug_info, model_config);
         }
     }
 }
 
-fn print_exec_results(exec_results: &IndexMap<String, Value>) {
-    for (expr, value) in exec_results {
+fn print_expr_results(expr_results: &IndexMap<String, Value>) {
+    for (expr, value) in expr_results {
         let styled_expr = stylesheet::EXPR.style(expr);
         print!("{styled_expr} = ");
         print_utils::print_value(value);
