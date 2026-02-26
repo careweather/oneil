@@ -346,7 +346,7 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
         print_mode,
         debug: print_debug_info,
         watch,
-        exec: exec_expressions,
+        expr: eval_expressions,
         recursive,
         partial: display_partial_results,
         no_header,
@@ -367,7 +367,7 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
     if watch {
         watch_model(
             &file,
-            &exec_expressions,
+            &eval_expressions,
             show_internal_errors,
             display_partial_results,
             &model_print_config,
@@ -377,7 +377,7 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
 
         eval_and_print_model(
             &file,
-            &exec_expressions,
+            &eval_expressions,
             show_internal_errors,
             display_partial_results,
             &model_print_config,
@@ -388,14 +388,14 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
 
 fn eval_and_print_model(
     file: &Path,
-    exec_expressions: &[String],
+    eval_expressions: &[String],
     show_internal_errors: bool,
     display_partial_results: bool,
     model_print_config: &ModelPrintConfig,
     runtime: &mut Runtime,
 ) {
     let (result, model_errors, expr_errors) =
-        runtime.eval_model_and_expressions(file, exec_expressions);
+        runtime.eval_model_and_expressions(file, eval_expressions);
 
     for error in model_errors.to_vec() {
         print_error::print(error, show_internal_errors);
@@ -409,14 +409,14 @@ fn eval_and_print_model(
         print_error::print(&error, show_internal_errors);
     }
 
-    if let Some((model_ref, exec_results)) = result {
-        print_model_result::print_eval_result(model_ref, &exec_results, model_print_config);
+    if let Some((model_ref, expr_results)) = result {
+        print_model_result::print_eval_result(model_ref, &expr_results, model_print_config);
     }
 }
 
 fn watch_model(
     file: &Path,
-    exec_expressions: &[String],
+    eval_expressions: &[String],
     show_internal_errors: bool,
     display_partial_results: bool,
     model_print_config: &ModelPrintConfig,
@@ -443,7 +443,7 @@ fn watch_model(
 
     eval_and_print_model(
         file,
-        exec_expressions,
+        eval_expressions,
         show_internal_errors,
         display_partial_results,
         model_print_config,
@@ -464,7 +464,7 @@ fn watch_model(
 
                     eval_and_print_model(
                         file,
-                        exec_expressions,
+                        eval_expressions,
                         show_internal_errors,
                         display_partial_results,
                         model_print_config,

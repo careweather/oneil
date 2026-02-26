@@ -121,7 +121,7 @@ pub struct EvalArgs {
     #[arg(long)]
     pub watch: bool,
 
-    /// Execute expression(s). The expressions are evaluated in the context
+    /// Evaluate expression(s). The expressions are evaluated in the context
     /// of the model being evaluated.
     ///
     /// This option can be provided multiple times. Each occurrence accepts
@@ -130,7 +130,7 @@ pub struct EvalArgs {
     /// If this option is used with `--params`, both the parameters and
     /// the expression results are displayed.
     #[arg(long, short = 'x', value_name = "STRING")]
-    pub exec: Vec<String>,
+    pub expr: Vec<String>,
 
     /// Print info about submodels as well as the top model
     ///
