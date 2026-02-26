@@ -81,7 +81,9 @@ pub struct EvalArgs {
     /// parameter `p` in `submodel2`, which is in `submodel1`, which
     /// is in the top model.
     ///
-    /// When provided, `--print-mode` and `--top-only` are ignored.
+    /// When provided, `--print-mode` and `--top-only` are ignored. If both
+    /// `--params` and `--exec` are provided, both the parameters and
+    /// the expression results are displayed.
     ///
     /// Examples:
     ///
@@ -118,6 +120,17 @@ pub struct EvalArgs {
     /// Watch files for changes and re-evaluate the model
     #[arg(long)]
     pub watch: bool,
+
+    /// Execute expression(s). The expressions are evaluated in the context
+    /// of the model being evaluated.
+    ///
+    /// This option can be provided multiple times. Each occurrence accepts
+    /// one string.
+    ///
+    /// If this option is used with `--params`, both the parameters and
+    /// the expression results are displayed.
+    #[arg(long, short = 'x', value_name = "STRING")]
+    pub exec: Vec<String>,
 
     /// Print info about submodels as well as the top model
     ///
