@@ -5,8 +5,8 @@ use oneil_ir as ir;
 
 use crate::{
     ExternalResolutionContext, ResolutionContext,
-    error::VariableResolutionError,
     context::{ParameterResult, ReferencePathResult},
+    error::VariableResolutionError,
 };
 
 /// Resolves a variable expression to its corresponding model expression.

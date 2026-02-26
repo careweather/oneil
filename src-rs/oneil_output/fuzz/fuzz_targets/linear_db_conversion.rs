@@ -2,8 +2,8 @@
 
 use libfuzzer_sys::{arbitrary, fuzz_target};
 use oneil_output::{
-    util::{db_to_linear, is_close, linear_to_db},
     Interval, Number,
+    util::{db_to_linear, is_close, linear_to_db},
 };
 
 macro_rules! assert_is_close {

@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexMap;
 use oneil_analysis::{
     self as analysis,
-    output::error::{IndependentsErrors, ModelEvalHasErrors, TreeErrors},
     output::Independents,
+    output::error::{IndependentsErrors, ModelEvalHasErrors, TreeErrors},
 };
 use oneil_ir as ir;
 use oneil_shared::load_result::LoadResult;
@@ -93,10 +93,7 @@ impl Runtime {
     /// (it may still depend on builtin values). Evaluates the model first, then
     /// returns an [`Independents`] (model path → parameter name → value) and any errors.
     #[must_use]
-    pub fn get_independents(
-        &mut self,
-        model_path: &Path,
-    ) -> (Independents, RuntimeErrors) {
+    pub fn get_independents(&mut self, model_path: &Path) -> (Independents, RuntimeErrors) {
         let (independents, independents_errors) = self.get_independents_internal(model_path);
 
         let errors = independents_errors
