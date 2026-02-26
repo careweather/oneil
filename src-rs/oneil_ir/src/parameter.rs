@@ -268,9 +268,10 @@ impl PiecewiseExpr {
 }
 
 /// Constraints on valid parameter values.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum Limits {
     /// No constraints on parameter values.
+    #[default]
     Default,
     /// Continuous range with minimum and maximum values.
     Continuous {
@@ -314,11 +315,5 @@ impl Limits {
             values,
             limit_expr_span,
         }
-    }
-}
-
-impl Default for Limits {
-    fn default() -> Self {
-        Self::Default
     }
 }
