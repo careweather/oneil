@@ -1,8 +1,10 @@
+// TODO: remove the `allow`s once I have the chance to resolve the issues.
 #![allow(clippy::cargo)]
 #![allow(clippy::cargo_common_metadata)]
 #![allow(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+#![allow(dead_code)]
 
 mod doc_store;
 mod symbol_lookup;
