@@ -17,11 +17,11 @@ pub enum Expr {
         /// The comparison operator to apply.
         op: ComparisonOp,
         /// The left-hand operand.
-        left: Box<Expr>,
+        left: Box<Self>,
         /// The right-hand operand.
-        right: Box<Expr>,
+        right: Box<Self>,
         /// Chained comparison operations (order matters).
-        rest_chained: Vec<(ComparisonOp, Expr)>,
+        rest_chained: Vec<(ComparisonOp, Self)>,
     },
     /// Binary operation combining two expressions with an operator.
     BinaryOp {
@@ -30,9 +30,9 @@ pub enum Expr {
         /// The binary operator to apply.
         op: BinaryOp,
         /// The left-hand operand.
-        left: Box<Expr>,
+        left: Box<Self>,
         /// The right-hand operand.
-        right: Box<Expr>,
+        right: Box<Self>,
     },
     /// Unary operation applied to a single expression.
     UnaryOp {
@@ -41,7 +41,7 @@ pub enum Expr {
         /// The unary operator to apply.
         op: UnaryOp,
         /// The operand expression.
-        expr: Box<Expr>,
+        expr: Box<Self>,
     },
     /// Function call with a name and argument list.
     FunctionCall {
@@ -52,7 +52,7 @@ pub enum Expr {
         /// The name of the function to call.
         name: FunctionName,
         /// The arguments to pass to the function.
-        args: Vec<Expr>,
+        args: Vec<Self>,
     },
     /// Variable reference (local, parameter, or external).
     Variable {

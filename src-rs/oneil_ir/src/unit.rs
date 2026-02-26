@@ -139,9 +139,9 @@ pub enum UnitInfo {
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayCompositeUnit {
     /// Multiplied units
-    Multiply(Box<DisplayCompositeUnit>, Box<DisplayCompositeUnit>),
+    Multiply(Box<Self>, Box<Self>),
     /// Divided units
-    Divide(Box<DisplayCompositeUnit>, Box<DisplayCompositeUnit>),
+    Divide(Box<Self>, Box<Self>),
     /// A single unit
     BaseUnit(DisplayUnit),
     /// `1` unit
