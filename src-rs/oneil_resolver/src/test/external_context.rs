@@ -17,7 +17,10 @@ use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_shared::load_result::LoadResult;
 
-use crate::{AstLoadingFailedError, ExternalResolutionContext, PythonImportLoadingFailedError};
+use crate::{
+    AstLoadingFailedError, ExternalResolutionContext, PythonImportLoadingFailedError,
+    ResolutionErrorCollection,
+};
 
 pub struct TestBuiltinUnit {
     pub name: &'static str,
@@ -215,5 +218,17 @@ impl ExternalResolutionContext for TestExternalContext {
             .get(python_path.as_ref())
             .map(|set| set.iter().map(String::as_str).collect())
             .ok_or(PythonImportLoadingFailedError)
+    }
+
+    #[expect(unreachable_code, reason = "this is unused in tests")]
+    fn get_preloaded_models(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            ir::ModelPath,
+            &LoadResult<ir::Model, ResolutionErrorCollection>,
+        ),
+    > {
+        (unimplemented!("this is unused in tests") as Vec<_>).into_iter()
     }
 }

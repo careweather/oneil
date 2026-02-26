@@ -1,6 +1,6 @@
 use indexmap::{IndexMap, IndexSet};
 use oneil_ir as ir;
-use oneil_shared::span::Span;
+use oneil_shared::{load_result::LoadResult, span::Span};
 
 use crate::error::{
     CircularDependencyError, ModelImportResolutionError, ParameterResolutionError,
@@ -34,6 +34,25 @@ impl ModelResolutionResult {
         Self {
             model: empty_model,
             model_errors: ResolutionErrorCollection::empty(),
+        }
+    }
+
+    /// Creates a resolution result from a model and errors.
+    #[must_use]
+    pub fn from_result(
+        model_path: ir::ModelPath,
+        result: &LoadResult<ir::Model, ResolutionErrorCollection>,
+    ) -> Self {
+        match result {
+            LoadResult::Success(model) => Self {
+                model: model.clone(),
+                model_errors: ResolutionErrorCollection::empty(),
+            },
+            LoadResult::Partial(model, errors) => Self {
+                model: model.clone(),
+                model_errors: errors.clone(),
+            },
+            LoadResult::Failure => Self::new(model_path),
         }
     }
 
@@ -86,6 +105,27 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             active_models: Vec::new(),
             visited_models: IndexSet::new(),
             model_results: IndexMap::new(),
+        }
+    }
+
+    /// Creates a resolution context from pre-loaded models and errors.
+    #[must_use]
+    pub fn with_preloaded_models(external_context: &'external mut E) -> Self {
+        let preloaded_models = external_context.get_preloaded_models();
+        let model_results = preloaded_models
+            .map(|(path, model)| {
+                (
+                    path.clone(),
+                    ModelResolutionResult::from_result(path, model),
+                )
+            })
+            .collect();
+
+        Self {
+            external_context,
+            active_models: Vec::new(),
+            visited_models: IndexSet::new(),
+            model_results,
         }
     }
 

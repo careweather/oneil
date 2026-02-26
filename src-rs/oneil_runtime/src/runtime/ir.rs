@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use indexmap::IndexSet;
+use oneil_ir as ir;
 use oneil_resolver::{self as resolver, error::VariableResolutionError};
 use oneil_shared::load_result::LoadResult;
 
@@ -111,5 +112,18 @@ impl resolver::ExternalResolutionContext for Runtime {
             .ok()
             .map(|functions| functions.get_function_names().collect())
             .ok_or(resolver::PythonImportLoadingFailedError)
+    }
+
+    fn get_preloaded_models(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            ir::ModelPath,
+            &LoadResult<ir::Model, resolver::ResolutionErrorCollection>,
+        ),
+    > {
+        self.ir_cache
+            .iter()
+            .map(|(path, result)| (ir::ModelPath::new(path), result))
     }
 }

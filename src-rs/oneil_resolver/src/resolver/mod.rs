@@ -25,6 +25,8 @@ mod resolve_trace_level;
 mod resolve_unit;
 mod resolve_variable;
 
+pub use resolve_expr::resolve_expr;
+
 /// Loads a model and all its dependencies, building a complete model collection.
 pub fn load_model<E>(model_path: &ir::ModelPath, resolution_context: &mut ResolutionContext<'_, E>)
 where
