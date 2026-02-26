@@ -82,7 +82,7 @@ fn eval_unit_component<E: ExternalEvaluationContext>(
 fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
     match unit {
         ir::DisplayCompositeUnit::BaseUnit(unit) => {
-            let name = unit.name.to_string();
+            let name = unit.name.clone();
             let exponent = unit.exponent;
             DisplayUnit::Unit { name, exponent }
         }

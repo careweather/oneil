@@ -10,9 +10,10 @@ use oneil_runtime::output::reference::ModelReference;
 use crate::stylesheet::debug as dbg_style;
 
 /// Which sections of the model result to include when printing.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum ModelResultSections {
     /// Show all sections.
+    #[default]
     All,
 
     /// Show only the specified sections.
@@ -22,12 +23,6 @@ pub enum ModelResultSections {
         parameters: bool,
         tests: bool,
     },
-}
-
-impl Default for ModelResultSections {
-    fn default() -> Self {
-        Self::All
-    }
 }
 
 impl ModelResultSections {

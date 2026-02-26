@@ -441,17 +441,12 @@ impl str::FromStr for ModelResultIncludeSection {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PrintMode {
+    #[default]
     Trace,
     Performance,
     All,
-}
-
-impl Default for PrintMode {
-    fn default() -> Self {
-        Self::Trace
-    }
 }
 
 impl str::FromStr for PrintMode {

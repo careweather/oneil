@@ -10,9 +10,10 @@ use oneil_runtime::output::{
 use crate::stylesheet::debug as dbg_style;
 
 /// Which sections of the IR to include when printing.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum IrSections {
     /// Show all sections.
+    #[default]
     All,
 
     /// Show only the specified sections.
@@ -23,12 +24,6 @@ pub enum IrSections {
         parameters: bool,
         tests: bool,
     },
-}
-
-impl Default for IrSections {
-    fn default() -> Self {
-        Self::All
-    }
 }
 
 impl IrSections {
