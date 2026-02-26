@@ -308,13 +308,13 @@ pub enum DisplayUnit {
         exponent: f64,
     },
     /// A multiplied unit
-    Multiply(Box<DisplayUnit>, Box<DisplayUnit>),
+    Multiply(Box<Self>, Box<Self>),
     /// A divided unit
-    Divide(Box<DisplayUnit>, Box<DisplayUnit>),
+    Divide(Box<Self>, Box<Self>),
     /// A power unit
     Power {
         /// The base of the power unit
-        base: Box<DisplayUnit>,
+        base: Box<Self>,
         /// The exponent of the power unit
         exponent: f64,
     },
