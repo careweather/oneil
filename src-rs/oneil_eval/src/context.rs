@@ -56,6 +56,11 @@ pub trait ExternalEvaluationContext {
 
     /// Returns a prefix by name if it is defined in the builtin context.
     fn lookup_prefix(&self, name: &str) -> Option<f64>;
+
+    /// Returns pre-loaded evaluated models.
+    fn get_preloaded_models(
+        &self,
+    ) -> impl Iterator<Item = (PathBuf, &LoadResult<output::Model, EvalErrors>)>;
 }
 
 /// Represents a model in progress of being evaluated.
@@ -104,6 +109,62 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     pub fn new(external_context: &'external mut E) -> Self {
         Self {
             models: IndexMap::new(),
+            active_models: Vec::new(),
+            external_context,
+        }
+    }
+
+    /// Creates a new evaluation context with the given pre-loaded models.
+    #[must_use]
+    pub fn with_preloaded_models(external_context: &'external mut E) -> Self {
+        let models = external_context
+            .get_preloaded_models()
+            .map(|(path, result)| {
+                let model = match result {
+                    LoadResult::Success(model) => ModelInProgress {
+                        parameters: model
+                            .parameters
+                            .iter()
+                            .map(|(name, parameter)| (name.clone(), Ok(parameter.clone())))
+                            .collect(),
+                        submodels: model.submodels.clone(),
+                        references: model.references.clone(),
+                        tests: model.tests.iter().cloned().map(Ok).collect(),
+                    },
+
+                    LoadResult::Partial(model, errors) => ModelInProgress {
+                        parameters: model
+                            .parameters
+                            .iter()
+                            .map(|(name, parameter)| (name.clone(), Ok(parameter.clone())))
+                            .chain(
+                                errors
+                                    .parameters
+                                    .iter()
+                                    .map(|(name, errs)| (name.clone(), Err(errs.clone()))),
+                            )
+                            .collect(),
+
+                        submodels: model.submodels.clone(),
+                        references: model.references.clone(),
+                        tests: model
+                            .tests
+                            .iter()
+                            .cloned()
+                            .map(Ok)
+                            .chain(errors.tests.iter().cloned().map(|error| Err(vec![error])))
+                            .collect(),
+                    },
+
+                    LoadResult::Failure => ModelInProgress::new(),
+                };
+
+                (path, model)
+            })
+            .collect();
+
+        Self {
+            models,
             active_models: Vec::new(),
             external_context,
         }
