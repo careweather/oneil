@@ -1225,11 +1225,11 @@ impl AsOneilError for EvalError {
                 message,
                 traceback,
             } => traceback.as_ref().map_or_else(
-                || vec![ErrorContext::Note(message.to_string())],
+                || vec![ErrorContext::Note(message.clone())],
                 |traceback| {
                     vec![
-                        ErrorContext::Note(message.to_string()),
-                        ErrorContext::Note(traceback.to_string()),
+                        ErrorContext::Note(message.clone()),
+                        ErrorContext::Note(traceback.clone()),
                     ]
                 },
             ),

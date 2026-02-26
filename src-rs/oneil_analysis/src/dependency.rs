@@ -67,7 +67,7 @@ fn get_dependency_value<E: ExternalAnalysisContext>(
         tree_context.lookup_parameter_value(&location.model_path, &location.parameter_name)?;
 
     let result = parameter.map(|parameter| {
-        let parameter_name = location.parameter_name.to_string();
+        let parameter_name = location.parameter_name.clone();
         let reference_name = location.reference_name.clone();
         let parameter_value = parameter.value;
         let display_info = Some((location.model_path.clone(), parameter.expr_span));
@@ -177,7 +177,7 @@ fn get_reference_value<E: ExternalAnalysisContext>(
 
     let result = parameter.map(|parameter| {
         let model_path = location.model_path.clone();
-        let parameter_name = location.parameter_name.to_string();
+        let parameter_name = location.parameter_name.clone();
         let parameter_value = parameter.value;
         let display_info = (model_path.clone(), parameter.expr_span);
 
