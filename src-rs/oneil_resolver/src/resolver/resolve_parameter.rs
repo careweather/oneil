@@ -16,7 +16,7 @@ use crate::{
         resolve_trace_level::resolve_trace_level,
         resolve_unit::resolve_unit,
     },
-    util::Stack,
+    stack::Stack,
 };
 
 /// Resolves a collection of AST parameters into resolved model parameters.

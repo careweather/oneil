@@ -6,20 +6,21 @@ use std::path::Path;
 use indexmap::IndexMap;
 use oneil_ir as ir;
 
+mod context;
 pub mod error;
 mod resolver;
-mod util;
+mod stack;
 
 #[cfg(test)]
 mod test;
 
-pub use crate::error::{CircularDependencyError, ResolutionErrorCollection};
-pub use crate::util::{
+pub use crate::context::{
     AstLoadingFailedError, ExternalResolutionContext, ModelResolutionResult,
     PythonImportLoadingFailedError,
 };
+pub use crate::error::{CircularDependencyError, ResolutionErrorCollection};
 
-use crate::util::ResolutionContext;
+use crate::context::ResolutionContext;
 
 /// Result of loading one or more models: resolved models and any per-model errors.
 #[derive(Debug)]

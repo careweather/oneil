@@ -17,9 +17,7 @@ use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_shared::load_result::LoadResult;
 
-use crate::util::{
-    AstLoadingFailedError, ExternalResolutionContext, PythonImportLoadingFailedError,
-};
+use crate::{AstLoadingFailedError, ExternalResolutionContext, PythonImportLoadingFailedError};
 
 pub struct TestBuiltinUnit {
     pub name: &'static str,

@@ -5,8 +5,8 @@ use oneil_ir as ir;
 use oneil_shared::span::Span;
 
 use crate::{
-    ExternalResolutionContext, ResolutionContext, error::ModelImportResolutionError,
-    util::ModelResult,
+    ExternalResolutionContext, ResolutionContext, context::ModelResult,
+    error::ModelImportResolutionError,
 };
 
 /// Resolves submodels and their associated tests from use model declarations.
