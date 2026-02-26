@@ -25,6 +25,7 @@ pub const PARAMETER_LABEL: Style = Style::new().dimmed();
 pub const PARAMETER_UNIT: Style = Style::new().blue();
 pub const TREE_VALUE_NAME: Style = Style::new().green();
 pub const TREE_VALUE_EQUATION: Style = Style::new().dimmed();
+pub const EXPR: Style = Style::new().green();
 
 // Builtin documentation styles
 pub const BUILTIN_SECTION_HEADER: Style = Style::new().blue().bold();
