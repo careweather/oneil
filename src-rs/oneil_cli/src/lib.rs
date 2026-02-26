@@ -346,6 +346,7 @@ fn handle_eval_command(args: EvalArgs, show_internal_errors: bool) {
         print_mode,
         debug: print_debug_info,
         watch,
+        exec: _exec,
         recursive,
         partial: display_partial_results,
         no_header,
