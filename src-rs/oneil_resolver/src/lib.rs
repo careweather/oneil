@@ -4,6 +4,7 @@
 use std::path::Path;
 
 use indexmap::IndexMap;
+use oneil_ast as ast;
 use oneil_ir as ir;
 
 mod context;
@@ -62,4 +63,24 @@ where
     }
 
     resolution_context.into_result()
+}
+
+/// Resolves an expression as if it were in the context
+/// of the given model.
+///
+/// # Errors
+///
+/// Returns the errors that occurred during variable resolution.
+pub fn resolve_expr_in_model<E>(
+    expr_ast: &ast::ExprNode,
+    file: &Path,
+    external_context: &mut E,
+) -> Result<ir::Expr, Vec<error::VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    let mut resolution_context = ResolutionContext::with_preloaded_models(external_context);
+    resolution_context.push_active_model(&ir::ModelPath::new(file));
+
+    resolver::resolve_expr(expr_ast, &resolution_context)
 }

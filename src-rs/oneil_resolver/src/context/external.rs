@@ -3,6 +3,8 @@ use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_shared::load_result::LoadResult;
 
+use crate::ResolutionErrorCollection;
+
 /// Error indicating that loading/parsing a model's AST failed.
 pub struct AstLoadingFailedError;
 
@@ -46,4 +48,14 @@ pub trait ExternalResolutionContext {
         &'context mut self,
         python_path: &ir::PythonPath,
     ) -> Result<IndexSet<&'context str>, PythonImportLoadingFailedError>;
+
+    /// Returns the pre-loaded models.
+    fn get_preloaded_models(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            ir::ModelPath,
+            &LoadResult<ir::Model, ResolutionErrorCollection>,
+        ),
+    >;
 }
