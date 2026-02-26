@@ -81,7 +81,7 @@ impl Runtime {
             let pseudo_path = format!("/oneil-eval/{index}");
             let pseudo_path = PathBuf::from(pseudo_path);
 
-            let expr_ast = match self.parse_expression(expression) {
+            let expr_ast = match Self::parse_expression(expression) {
                 Ok(expr_ast) => expr_ast,
                 Err(error) => {
                     let oneil_error =
