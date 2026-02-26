@@ -48,9 +48,9 @@ pub fn print_eval_result(
     if !model_config.no_parameters {
         if let Some(variables) = &model_config.variables {
             print_parameters_by_list(eval_result, model_config.print_debug_info, variables);
-            print_exec_results(&expr_results);
+            print_exec_results(expr_results);
         } else if !expr_results.is_empty() {
-            print_exec_results(&expr_results);
+            print_exec_results(expr_results);
         } else {
             print_parameters_by_filter(eval_result, model_config.print_debug_info, model_config);
         }
@@ -59,7 +59,7 @@ pub fn print_eval_result(
 
 fn print_exec_results(exec_results: &IndexMap<String, Value>) {
     for (expr, value) in exec_results {
-        let styled_expr = stylesheet::PARAMETER_IDENTIFIER.style(expr);
+        let styled_expr = stylesheet::EXPR.style(expr);
         print!("{styled_expr} = ");
         print_utils::print_value(value);
         println!();
