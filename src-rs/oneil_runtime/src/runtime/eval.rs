@@ -119,7 +119,7 @@ impl Runtime {
         for (index, expression) in expressions.iter().enumerate() {
             // a pseudo path for the expression, to be used for error reporting
             // this is not a real path, but it is a unique path for the expression
-            let pseudo_path = format!("/oneil-eval/{index}");
+            let pseudo_path = format!("/oneil-eval/expr-{index}");
             let pseudo_path = PathBuf::from(pseudo_path);
 
             let expr_ast = match Self::parse_expression(expression) {
