@@ -10,6 +10,7 @@ use crate::error::{
 use super::{AstLoadingFailedError, ExternalResolutionContext};
 
 /// Result of resolving one or more models: resolved models and per-model errors.
+#[derive(Debug)]
 pub struct ModelResolutionResult {
     /// Resolved model.
     model: ir::Model,
@@ -86,6 +87,7 @@ impl ModelResolutionResult {
 }
 
 /// In-memory context used while resolving one or more models.
+#[derive(Debug)]
 pub struct ResolutionContext<'external, E: ExternalResolutionContext> {
     external_context: &'external mut E,
     /// Stack of active models. The last element is the current model.
@@ -139,10 +141,9 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     pub fn push_active_model(&mut self, model_path: &ir::ModelPath) {
         self.active_models.push(model_path.clone());
         self.visited_models.insert(model_path.clone());
-        self.model_results.insert(
-            model_path.clone(),
-            ModelResolutionResult::new(model_path.clone()),
-        );
+        self.model_results
+            .entry(model_path.clone())
+            .or_insert_with(|| ModelResolutionResult::new(model_path.clone()));
     }
 
     /// Deactivates the current model.
