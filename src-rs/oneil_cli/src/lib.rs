@@ -405,8 +405,12 @@ fn eval_and_print_model(
         return;
     }
 
-    for error in expr_errors {
-        print_error::print(&error, show_internal_errors);
+    for error in &expr_errors {
+        print_error::print(error, show_internal_errors);
+    }
+
+    if !expr_errors.is_empty() && !display_partial_results {
+        return;
     }
 
     if let Some((model_ref, expr_results)) = result {
