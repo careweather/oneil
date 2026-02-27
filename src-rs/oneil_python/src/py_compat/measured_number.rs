@@ -493,7 +493,15 @@ impl PyMeasuredNumber {
 
     fn __repr__(&self) -> String {
         let (number, unit) = self.inner.clone().into_number_and_unit();
-        format!("MeasuredNumber({:?}, {})", number, unit.display_unit)
+
+        let number_repr = match number {
+            Number::Scalar(f) => f.to_string(),
+            Number::Interval(interval) => {
+                format!("Interval({}, {})", interval.min(), interval.max())
+            }
+        };
+
+        format!("MeasuredNumber({number_repr}, {})", unit.display_unit)
     }
 }
 
