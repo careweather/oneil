@@ -453,76 +453,84 @@ fn parenthesized_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError>
     clippy::float_cmp,
     reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
 )]
-#[expect(
-    clippy::bool_assert_comparison,
-    reason = "testing the contents of AST nodes"
-)]
 mod tests {
     use super::*;
     use crate::Config;
+
+    fn assert_literal_float(expr: &super::Node<Expr>, expected: f64) {
+        let Expr::Literal(lit) = expr.clone().take_value() else {
+            panic!("expected literal in {expr:?}");
+        };
+
+        let Literal::Number(value) = lit.clone().take_value() else {
+            panic!("expected number in {lit:?}");
+        };
+
+        assert_eq!(value, expected);
+    }
+
+    fn assert_literal_string(expr: &super::Node<Expr>, expected: &str) {
+        let Expr::Literal(lit) = expr.clone().take_value() else {
+            panic!("expected literal in {expr:?}");
+        };
+
+        let Literal::String(value) = lit.clone().take_value() else {
+            panic!("expected string in {lit:?}");
+        };
+
+        assert_eq!(value, expected);
+    }
+
+    fn assert_literal_bool(expr: &super::Node<Expr>, expected: bool) {
+        let Expr::Literal(lit) = expr.clone().take_value() else {
+            panic!("expected literal in {expr:?}");
+        };
+
+        let Literal::Boolean(value) = lit.clone().take_value() else {
+            panic!("expected boolean in {lit:?}");
+        };
+
+        assert_eq!(value, expected);
+    }
+
+    fn assert_variable(expr: &super::Node<Expr>, expected: &str) {
+        let Expr::Variable(var) = expr.clone().take_value() else {
+            panic!("expected variable in {expr:?}");
+        };
+
+        let Variable::Identifier(ident) = var.clone().take_value() else {
+            panic!("expected identifier in {var:?}");
+        };
+
+        assert_eq!(ident.take_value().as_str(), expected);
+    }
 
     #[test]
     fn primary_expr_number() {
         let input = InputSpan::new_extra("42", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
-
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 42.0);
+        assert_literal_float(&expr, 42.0);
     }
 
     #[test]
     fn primary_expr_string() {
         let input = InputSpan::new_extra("'hello'", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
-
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::String(value) = value.take_value() else {
-            panic!("expected string");
-        };
-
-        assert_eq!(value, "hello".to_string());
+        assert_literal_string(&expr, "hello");
     }
 
     #[test]
     fn primary_expr_boolean_true() {
         let input = InputSpan::new_extra("true", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
-
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Boolean(value) = value.take_value() else {
-            panic!("expected boolean");
-        };
-
-        assert_eq!(value, true);
+        assert_literal_bool(&expr, true);
     }
 
     #[test]
     fn primary_expr_boolean_false() {
         let input = InputSpan::new_extra("false", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
-
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Boolean(value) = value.take_value() else {
-            panic!("expected boolean");
-        };
-
-        assert_eq!(value, false);
+        assert_literal_bool(&expr, false);
     }
 
     #[test]
@@ -530,15 +538,7 @@ mod tests {
         let input = InputSpan::new_extra("foo", Config::default());
         let (_, expr) = parse(input).expect("parsing should succeed");
 
-        let Expr::Variable(value) = expr.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "foo");
+        assert_variable(&expr, "foo");
     }
 
     #[test]
@@ -572,32 +572,13 @@ mod tests {
         };
 
         assert_eq!(name.as_str(), "foo");
-
         assert_eq!(args.len(), 2);
 
         let arg1 = args.remove(0);
-
-        let Expr::Literal(value) = arg1.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 1.0);
+        assert_literal_float(&arg1, 1.0);
 
         let arg2 = args.remove(0);
-
-        let Expr::Literal(value) = arg2.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 2.0);
+        assert_literal_float(&arg2, 2.0);
     }
 
     #[test]
@@ -611,15 +592,7 @@ mod tests {
 
         assert_eq!(op.take_value(), UnaryOp::Neg);
 
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 42.0);
+        assert_literal_float(&expr, 42.0);
     }
 
     #[test]
@@ -632,26 +605,8 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), BinaryOp::Pow);
-
-        let Expr::Literal(value) = left.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 2.0);
-
-        let Expr::Literal(value) = right.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 3.0);
+        assert_literal_float(&left, 2.0);
+        assert_literal_float(&right, 3.0);
     }
 
     #[test]
@@ -664,26 +619,8 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), BinaryOp::Mul);
-
-        let Expr::Literal(value) = left.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 2.0);
-
-        let Expr::Literal(value) = right.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 3.0);
+        assert_literal_float(&left, 2.0);
+        assert_literal_float(&right, 3.0);
     }
 
     #[test]
@@ -696,26 +633,109 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), BinaryOp::Add);
+        assert_literal_float(&left, 2.0);
+        assert_literal_float(&right, 3.0);
+    }
 
-        let Expr::Literal(value) = left.take_value() else {
-            panic!("expected literal");
+    #[test]
+    fn mix_precedence_expr() {
+        let input = InputSpan::new_extra("5*2+1*3^4", Config::default());
+        let (_, expr) = parse(input).expect("parsing should succeed");
+
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
         };
 
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
+        assert_eq!(op.take_value(), BinaryOp::Add);
+
+        let Expr::BinaryOp {
+            op: op_mul1,
+            left: left_mul1,
+            right: right_mul1,
+        } = left.take_value()
+        else {
+            panic!("expected binary op");
         };
 
-        assert_eq!(value, 2.0);
+        assert_eq!(op_mul1.take_value(), BinaryOp::Mul);
+        assert_literal_float(&left_mul1, 5.0);
+        assert_literal_float(&right_mul1, 2.0);
 
-        let Expr::Literal(value) = right.take_value() else {
-            panic!("expected literal");
+        let Expr::BinaryOp {
+            op: op_mul2,
+            left: left_mul2,
+            right: right_mul2,
+        } = right.take_value()
+        else {
+            panic!("expected binary op");
+        };
+        assert_eq!(op_mul2.take_value(), BinaryOp::Mul);
+        assert_literal_float(&left_mul2, 1.0);
+
+        let Expr::BinaryOp {
+            op: op_exp,
+            left: left_exp,
+            right: right_exp,
+        } = right_mul2.take_value()
+        else {
+            panic!("expected binary op");
         };
 
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
+        assert_eq!(op_exp.take_value(), BinaryOp::Pow);
+        assert_literal_float(&left_exp, 3.0);
+        assert_literal_float(&right_exp, 4.0);
+    }
+
+    #[test]
+    fn right_associativity_expr() {
+        let input = InputSpan::new_extra("2^3^4", Config::default());
+        let (_, expr) = parse(input).expect("parsing should succeed");
+
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
         };
 
-        assert_eq!(value, 3.0);
+        assert_eq!(op.take_value(), BinaryOp::Pow);
+
+        assert_literal_float(&left, 2.0);
+        let Expr::BinaryOp {
+            op: op_exp,
+            left: left_exp,
+            right: right_exp,
+        } = right.take_value()
+        else {
+            panic!("expected binary op");
+        };
+
+        assert_eq!(op_exp.take_value(), BinaryOp::Pow);
+        assert_literal_float(&left_exp, 3.0);
+        assert_literal_float(&right_exp, 4.0);
+    }
+
+    #[test]
+    fn left_associativity_expr() {
+        let input = InputSpan::new_extra("2+3-4", Config::default());
+        let (_, expr) = parse(input).expect("parsing should succeed");
+
+        let Expr::BinaryOp { op, left, right } = expr.take_value() else {
+            panic!("expected binary op");
+        };
+
+        assert_eq!(op.take_value(), BinaryOp::Sub);
+
+        let Expr::BinaryOp {
+            op: op_add,
+            left: left_add,
+            right: right_add,
+        } = left.take_value()
+        else {
+            panic!("expected binary op");
+        };
+
+        assert_eq!(op_add.take_value(), BinaryOp::Add);
+        assert_literal_float(&left_add, 2.0);
+        assert_literal_float(&right_add, 3.0);
+        assert_literal_float(&right, 4.0);
     }
 
     #[test]
@@ -728,26 +748,8 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), BinaryOp::MinMax);
-
-        let Expr::Variable(value) = left.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "min_weight");
-
-        let Expr::Variable(value) = right.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "max_weight");
+        assert_variable(&left, "min_weight");
+        assert_variable(&right, "max_weight");
     }
 
     #[test]
@@ -766,27 +768,8 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), ComparisonOp::LessThan);
-
-        let Expr::Literal(value) = left.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 2.0);
-
-        let Expr::Literal(value) = right.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 3.0);
-
+        assert_literal_float(&left, 2.0);
+        assert_literal_float(&right, 3.0);
         assert_eq!(rest_chained.len(), 0);
     }
 
@@ -800,16 +783,7 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), UnaryOp::Not);
-
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Boolean(value) = value.take_value() else {
-            panic!("expected boolean");
-        };
-
-        assert_eq!(value, true);
+        assert_literal_bool(&expr, true);
     }
 
     #[test]
@@ -822,26 +796,8 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), BinaryOp::And);
-
-        let Expr::Literal(value) = left.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Boolean(value) = value.take_value() else {
-            panic!("expected boolean");
-        };
-
-        assert_eq!(value, true);
-
-        let Expr::Literal(value) = right.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Boolean(value) = value.take_value() else {
-            panic!("expected boolean");
-        };
-
-        assert_eq!(value, false);
+        assert_literal_bool(&left, true);
+        assert_literal_bool(&right, false);
     }
 
     #[test]
@@ -854,26 +810,8 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), BinaryOp::Or);
-
-        let Expr::Literal(value) = left.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Boolean(value) = value.take_value() else {
-            panic!("expected boolean");
-        };
-
-        assert_eq!(value, true);
-
-        let Expr::Literal(value) = right.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Boolean(value) = value.take_value() else {
-            panic!("expected boolean");
-        };
-
-        assert_eq!(value, false);
+        assert_literal_bool(&left, true);
+        assert_literal_bool(&right, false);
     }
 
     #[test]
@@ -892,42 +830,14 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), ComparisonOp::LessThan);
-
-        let Expr::Literal(value) = left.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 1.0);
-
-        let Expr::Literal(value) = right.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 2.0);
+        assert_literal_float(&left, 1.0);
+        assert_literal_float(&right, 2.0);
 
         assert_eq!(rest_chained.len(), 1);
-
         let (op, expr) = rest_chained.remove(0);
 
         assert_eq!(*op, ComparisonOp::LessThan);
-
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 3.0);
+        assert_literal_float(&expr, 3.0);
     }
 
     #[test]
@@ -946,42 +856,14 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), ComparisonOp::LessThanEq);
-
-        let Expr::Variable(value) = left.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "x");
-
-        let Expr::Variable(value) = right.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "y");
+        assert_variable(&left, "x");
+        assert_variable(&right, "y");
 
         assert_eq!(rest_chained.len(), 1);
-
         let (op, expr) = rest_chained.remove(0);
 
         assert_eq!(op.take_value(), ComparisonOp::LessThan);
-
-        let Expr::Variable(value) = expr.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "z");
+        assert_variable(&expr, "z");
     }
 
     #[test]
@@ -1010,27 +892,8 @@ mod tests {
         };
 
         assert_eq!(op.take_value(), ComparisonOp::NotEq);
-
-        let Expr::Variable(value) = left.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "x");
-
-        let Expr::Variable(value) = right.take_value() else {
-            panic!("expected variable");
-        };
-
-        let Variable::Identifier(value) = value.take_value() else {
-            panic!("expected identifier");
-        };
-
-        assert_eq!(value.as_str(), "y");
-
+        assert_variable(&left, "x");
+        assert_variable(&right, "y");
         assert_eq!(rest_chained.len(), 0);
     }
 
@@ -1038,16 +901,7 @@ mod tests {
     fn parse_complete_success() {
         let input = InputSpan::new_extra("42", Config::default());
         let (_, expr) = parse_complete(input).expect("parsing should succeed");
-
-        let Expr::Literal(value) = expr.take_value() else {
-            panic!("expected literal");
-        };
-
-        let Literal::Number(value) = value.take_value() else {
-            panic!("expected number");
-        };
-
-        assert_eq!(value, 42.0);
+        assert_literal_float(&expr, 42.0);
     }
 
     #[test]

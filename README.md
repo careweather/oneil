@@ -251,7 +251,7 @@ Equation assignments define a parameter as a function of other parameters using 
 
 ``` { .on }
 Cylinder radius: r = D/2 : ...
-Artificial gravity: g_a = r*omega**2 : ...
+Artificial gravity: g_a = r*omega^2 : ...
 ```
 
 Alternate equations for the minimum and maximum case can be given, separated by a pipe.
@@ -275,7 +275,7 @@ Rotation rate: omega = 1 :deg/min
 Amplifier efficiency (0, 1): eta = 0.5|0.7
 Boltzmann's constant: C_b = 1.380649e-23 :m^2*kg/s^2/K
 Cylinder radius: r = D/2 :km
-Artificial gravity: g_a = r*omega**2 :m/s^2
+Artificial gravity: g_a = r*omega^2 :m/s^2
 Temperature: T = temperature(D) :K
 ```
 
@@ -477,9 +477,9 @@ Oneil has the following builtin functions.
 Piecewise equations can be used for parameter assignments.
 
 ``` { .on }
-Orbital gravity: g_o = {G*m_E/h**2 if D_s == 'earth_orbital' :km/s
-                       {G*m_S/h**2 if D_s == 'interplanetary'
-                       {G*m_G/h**2 if D_s == 'interstellar'
+Orbital gravity: g_o = {G*m_E/h^2 if D_s == 'earth_orbital' :km/s
+                       {G*m_S/h^2 if D_s == 'interplanetary'
+                       {G*m_G/h^2 if D_s == 'interstellar'
 ```
 
 (`m_E`, `m_S`, and `m_G` are the masses of the Earth, Sun, and galactic center)
@@ -629,9 +629,9 @@ The CLI can be used for to query any parameter in the model, evaluate an express
 ``` { Oneil CLI }
 (cylinder) >>> r
 250 km
-(cylinder) >>>  (r/10)*omega**2
+(cylinder) >>>  (r/10)*omega^2
 2.795 g
-(cylinder) >>> (r/30)*omega**2 < R_E
+(cylinder) >>> (r/30)*omega^2 < R_E
 True
 (cylinder) >>> r:m
 250000 m
@@ -656,7 +656,7 @@ For example:
 ``` { .on }
 (cylinder) >>> tree g_a
 g_a: 27.95 g
-=r*omega**2
+=r*omega^2
     omega: 60.0 °/s
     r: 250.0 m
     =D/2
