@@ -89,8 +89,10 @@ pub fn print_test_results(eval_result: ModelReference<'_>, test_config: &TestPri
         print_model_header(eval_result.path(), &test_info);
     }
 
+    let mut visited = IndexSet::new();
+
     if !test_config.no_test_report {
-        print_all_tests(eval_result, test_config.recursive);
+        print_all_tests(eval_result, test_config.recursive, &mut visited);
     }
 }
 
@@ -459,9 +461,19 @@ fn print_variable_value(name: &str, value: &Value, indent: usize) {
     println!();
 }
 
-fn print_all_tests(model_ref: ModelReference<'_>, recursive: bool) {
+fn print_all_tests<'runtime>(
+    model_ref: ModelReference<'runtime>,
+    recursive: bool,
+    visited: &mut IndexSet<&'runtime Path>,
+) {
     let model_path = model_ref.path();
     let tests = model_ref.tests();
+
+    if visited.contains(model_path) {
+        return;
+    }
+
+    visited.insert(model_path);
 
     if recursive && !tests.is_empty() {
         print_model_path_header(model_path);
@@ -522,7 +534,7 @@ fn print_all_tests(model_ref: ModelReference<'_>, recursive: bool) {
         }
 
         for reference in model_ref.references().values() {
-            print_all_tests(*reference, recursive);
+            print_all_tests(*reference, recursive, visited);
         }
     }
 }
