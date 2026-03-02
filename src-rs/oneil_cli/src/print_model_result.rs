@@ -184,8 +184,9 @@ fn print_model_failing_tests(model_path: &Path, failing_tests: &[(Span, &DebugIn
         let test_expr_str = file_contents.get(test_start_offset..test_end_offset);
 
         if let Some(test_expr_str) = test_expr_str {
-            let test_label = stylesheet::TEST_EXPR_LABEL.style("test:");
-            let test_expr_str = stylesheet::TEST_EXPR_STR.style(test_expr_str);
+            let test_label = stylesheet::TEST_FAIL_EXPR_LABEL.style("test:");
+            let test_expr_str = stylesheet::TEST_FAIL_EXPR_STR.style(test_expr_str);
+
             println!("{test_label} {test_expr_str}");
         } else {
             let error_label = stylesheet::ERROR_COLOR.style("error");
