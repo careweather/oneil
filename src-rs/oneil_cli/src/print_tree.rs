@@ -97,15 +97,22 @@ fn print_tree_node<T: PrintableTreeValue>(
     // value_name = value
     //            = equation
     // ```
-    let (maybe_bar, equation_indent) = if children.is_empty() || has_reached_max_depth {
-        // replace the bar with a space if there are no children
-        ("", " ".repeat(value.get_value_name_len()))
-    } else {
-        // otherwise, include the bar
-        ("│", " ".repeat(value.get_value_name_len() - 1))
-    }; // -1 to account for the bar
-
     if let Some(display_info) = value.get_display_info() {
+        let is_in_top_model = display_info.0 == top_model_path;
+
+        let value_model_will_print = is_in_top_model || config.recursive;
+
+        let will_print_children =
+            !children.is_empty() && !has_reached_max_depth && value_model_will_print;
+
+        let (maybe_bar, equation_indent) = if will_print_children {
+            // include the bar if we're printing children
+            ("│", " ".repeat(value.get_value_name_len() - 1)) // -1 to account for the bar
+        } else {
+            // replace the bar with a space if we're not printing children
+            ("", " ".repeat(value.get_value_name_len()))
+        };
+
         let equation_str = get_equation_str(display_info, file_cache);
 
         match equation_str {
