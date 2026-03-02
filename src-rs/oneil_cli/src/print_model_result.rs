@@ -29,7 +29,7 @@ pub struct ModelPrintConfig {
 
 pub fn print_eval_result(
     model_result: ModelReference<'_>,
-    expr_results: &IndexMap<String, Value>,
+    expr_results: &IndexMap<&str, Value>,
     model_config: &ModelPrintConfig,
 ) {
     let test_info = get_model_tests(model_result, model_config.recursive, TestInfo::default());
@@ -57,7 +57,7 @@ pub fn print_eval_result(
     }
 }
 
-fn print_expr_results(expr_results: &IndexMap<String, Value>) {
+fn print_expr_results(expr_results: &IndexMap<&str, Value>) {
     for (expr, value) in expr_results {
         let styled_expr = stylesheet::EXPR.style(expr);
         print!("{styled_expr} = ");

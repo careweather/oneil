@@ -84,3 +84,21 @@ where
 
     resolver::resolve_expr(expr_ast, &resolution_context)
 }
+
+/// Resolves an AST unit expression into a composite unit representation.
+///
+/// # Errors
+///
+/// Returns the errors that occurred during unit resolution.
+pub fn resolve_unit<E>(
+    unit_ast: &ast::UnitExprNode,
+    external_context: &mut E,
+) -> Result<ir::CompositeUnit, Vec<error::UnitResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    // currently, we don't need any "pre-loaded" models, so we can
+    // just use a new context
+    let resolution_context = ResolutionContext::new(external_context);
+    resolver::resolve_unit(unit_ast, &resolution_context)
+}

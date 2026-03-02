@@ -4,7 +4,10 @@ use std::path::Path;
 
 use indexmap::IndexSet;
 use oneil_ir as ir;
-use oneil_resolver::{self as resolver, error::VariableResolutionError};
+use oneil_resolver::{
+    self as resolver,
+    error::{UnitResolutionError, VariableResolutionError},
+};
 use oneil_shared::load_result::LoadResult;
 
 use super::Runtime;
@@ -70,6 +73,14 @@ impl Runtime {
         file: &Path,
     ) -> Result<output::ir::Expr, Vec<VariableResolutionError>> {
         resolver::resolve_expr_in_model(expr_ast, file, self)
+    }
+
+    /// Resolves an AST unit expression into a composite unit representation.
+    pub(super) fn resolve_unit(
+        &mut self,
+        unit_ast: &ast::UnitExprNode,
+    ) -> Result<ir::CompositeUnit, Vec<UnitResolutionError>> {
+        resolver::resolve_unit(unit_ast, self)
     }
 }
 

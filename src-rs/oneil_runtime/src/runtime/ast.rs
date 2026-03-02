@@ -72,4 +72,8 @@ impl Runtime {
     pub(super) fn parse_expression(expression: &str) -> Result<ast::ExprNode, ParserError> {
         parser::parse_expression(expression, None)
     }
+
+    pub(super) fn parse_unit(unit: &str) -> Result<ast::UnitExprNode, ParserError> {
+        parser::parse_unit(unit, None)
+    }
 }

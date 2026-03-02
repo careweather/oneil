@@ -1,8 +1,8 @@
 use std::{cmp::Ordering, fmt};
 
 use crate::{
-    MeasuredNumber, Number, ValueType,
-    error::{BinaryEvalError, ExpectedType, UnaryEvalError, UnaryOperation},
+    MeasuredNumber, Number, Unit, ValueType,
+    error::{BinaryEvalError, ExpectedType, UnaryEvalError, UnaryOperation, UnitConversionError},
 };
 
 // TODO: document the layers of a value
@@ -595,6 +595,35 @@ impl Value {
                 unit: number.unit().clone(),
                 number_type: number.normalized_value().type_(),
             },
+        }
+    }
+
+    /// Converts the value to the target unit.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnitConversionError` if the value is not a measured number
+    /// or if the unit dimensions do not match.
+    pub fn with_unit(self, target_unit: Unit) -> Result<Self, UnitConversionError> {
+        match self {
+            Self::MeasuredNumber(measured_number) => {
+                if !measured_number.unit().dimensionally_eq(&target_unit) {
+                    return Err(UnitConversionError::UnitMismatch {
+                        value_unit: measured_number.unit().display_unit.clone(),
+                        target_unit: target_unit.display_unit,
+                    });
+                }
+
+                Ok(Self::MeasuredNumber(measured_number.with_unit(target_unit)))
+            }
+            Self::Number(number) => Ok(Self::MeasuredNumber(MeasuredNumber::from_number_and_unit(
+                number,
+                target_unit,
+            ))),
+            Self::Boolean(_) | Self::String(_) => Err(UnitConversionError::InvalidType {
+                value_type: Box::new(self.type_()),
+                target_unit: Box::new(target_unit.display_unit),
+            }),
         }
     }
 }

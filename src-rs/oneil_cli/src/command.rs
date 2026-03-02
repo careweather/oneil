@@ -124,6 +124,9 @@ pub struct EvalArgs {
     /// Evaluate expression(s). The expressions are evaluated in the context
     /// of the model being evaluated.
     ///
+    /// To convert an expression result to a unit, append `: <unit>` to the expression.
+    /// For example: `--expr "distance / time : km/h"`.
+    ///
     /// This option can be provided multiple times. Each occurrence accepts
     /// one string.
     ///

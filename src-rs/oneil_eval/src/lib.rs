@@ -10,8 +10,10 @@ mod eval_unit;
 
 pub use context::{ExternalEvaluationContext, IrLoadError};
 pub use error::{EvalError, EvalErrors};
+
 pub use eval_expr::eval_expr_in_model;
 pub use eval_model::eval_model;
+pub use eval_unit::eval_unit_external as eval_unit;
 
 #[cfg(test)]
 mod test_context;

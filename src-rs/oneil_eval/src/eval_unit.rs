@@ -6,6 +6,20 @@ use oneil_output::{DisplayUnit, Unit};
 use crate::context::{EvalContext, ExternalEvaluationContext};
 
 /// Evaluates a composite unit and returns the resulting sized unit.
+///
+/// Built for uses outside of this crate, where an `EvalContext` does
+/// not exist.
+pub fn eval_unit_external<E: ExternalEvaluationContext>(
+    unit: &ir::CompositeUnit,
+    context: &mut E,
+) -> Unit {
+    // we don't need any pre-loaded models, so we can just use a new context
+    let eval_context = EvalContext::new(context);
+
+    eval_unit(unit, &eval_context).0
+}
+
+/// Evaluates a composite unit and returns the resulting sized unit.
 pub fn eval_unit<E: ExternalEvaluationContext>(
     unit: &ir::CompositeUnit,
     context: &EvalContext<'_, E>,
