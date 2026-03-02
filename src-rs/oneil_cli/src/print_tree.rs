@@ -66,6 +66,11 @@ fn print_tree_node<T: PrintableTreeValue>(
     let value = tree.value();
     let children = tree.children();
 
+    // Check if we've reached the maximum depth
+    let has_reached_max_depth = config
+        .depth
+        .is_some_and(|max_depth| current_depth >= max_depth);
+
     // Build the prefix for this node
     let (first_prefix, rest_prefix) = if current_depth == 0 {
         ("", "")
@@ -92,7 +97,7 @@ fn print_tree_node<T: PrintableTreeValue>(
     // value_name = value
     //            = equation
     // ```
-    let (maybe_bar, equation_indent) = if children.is_empty() {
+    let (maybe_bar, equation_indent) = if children.is_empty() || has_reached_max_depth {
         // replace the bar with a space if there are no children
         ("", " ".repeat(value.get_value_name_len()))
     } else {
@@ -117,9 +122,7 @@ fn print_tree_node<T: PrintableTreeValue>(
     }
 
     // Check if we've exceeded the depth limit
-    if let Some(max_depth) = config.depth
-        && current_depth >= max_depth
-    {
+    if has_reached_max_depth {
         return;
     }
 
