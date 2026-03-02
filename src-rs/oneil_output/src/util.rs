@@ -49,7 +49,7 @@ pub fn db_to_linear(value: Number) -> Number {
 /// Converts a linear number to a decibel number.
 #[must_use]
 pub fn linear_to_db(value: Number) -> Number {
-    value.log10() * Number::Scalar(10.0)
+    Number::Scalar(10.0) * value.log10()
 }
 
 /// A list of homogeneous numbers.

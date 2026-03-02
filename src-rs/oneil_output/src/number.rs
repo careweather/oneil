@@ -581,9 +581,6 @@ pub struct NormalizedNumber(Number);
 impl NormalizedNumber {
     #[must_use]
     pub fn from_number_and_unit(value: Number, unit: &Unit) -> Self {
-        // adjust the magnitude based on the unit
-        let value = value * unit.magnitude;
-
         // convert the number from a logarithmic unit
         // to a linear unit if it is a dB unit
         let value = if unit.is_db {
@@ -592,6 +589,9 @@ impl NormalizedNumber {
             value
         };
 
+        // adjust the magnitude based on the unit
+        let value = value * unit.magnitude;
+
         Self(value)
     }
 
@@ -599,17 +599,16 @@ impl NormalizedNumber {
     pub fn into_number_using_unit(self, unit: &Unit) -> Number {
         let Self(value) = self;
 
+        // adjust the magnitude based on the unit
+        let value = value / unit.magnitude;
+
         // convert the number from a linear unit
         // to a logarithmic unit if it is a dB unit
-        let value = if unit.is_db {
+        if unit.is_db {
             linear_to_db(value)
         } else {
             value
-        };
-
-        // adjust the magnitude based on the unit
-
-        value / unit.magnitude
+        }
     }
 
     /// Subtracts two normalized numbers. This does not apply the
