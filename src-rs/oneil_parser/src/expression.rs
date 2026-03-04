@@ -195,12 +195,17 @@ fn comparison_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
         Some((second_op, second_operand)) => {
             let left = first_operand;
             let right = second_operand;
+            let rest_operands: Vec<_> = rest_operands.collect();
 
-            let span = Span::from_start_and_end(&left.span(), &right.span());
+            let last_span = rest_operands
+                .last()
+                .map_or_else(|| right.span(), |(_, operand)| operand.span());
+
+            let span = Span::from_start_and_end(&left.span(), &last_span);
             let whitespace_span = right.whitespace_span();
 
             Node::new(
-                Expr::comparison_op(second_op, left, right, rest_operands.collect()),
+                Expr::comparison_op(second_op, left, right, rest_operands),
                 span,
                 whitespace_span,
             )
