@@ -11,13 +11,16 @@ use nom::character::complete::{char, line_ending, not_line_ending};
 use nom::combinator::{recognize, verify};
 use nom::multi::many0;
 
-use crate::token::{
-    InputSpan, Result,
-    error::{ErrorHandlingParser, TokenError},
-    structure::end_of_line,
-    util::{Token, inline_whitespace},
+use crate::{
+    error::parser_trait::ErrorHandlingParser,
+    token::{
+        InputSpan, Result,
+        error::TokenError,
+        structure::end_of_line,
+        util::{Token, inline_whitespace},
+    },
+    util::span_from,
 };
-use crate::util::span_from;
 
 /// The kind of note that was parsed
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

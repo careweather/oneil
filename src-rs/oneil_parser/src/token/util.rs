@@ -3,10 +3,8 @@ use oneil_ast::Node;
 use oneil_shared::span::Span;
 
 use crate::{
-    token::{
-        InputSpan, Parser, Result,
-        error::{ErrorHandlingParser, TokenError},
-    },
+    error::parser_trait::ErrorHandlingParser,
+    token::{InputSpan, Parser, Result, error::TokenError},
     util::span_from,
 };
 

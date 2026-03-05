@@ -5,10 +5,6 @@ use oneil_shared::span::Span;
 
 use super::InputSpan;
 
-// Re-export the ErrorHandlingParser trait from the parent module for
-// convenience
-pub use super::super::error::ErrorHandlingParser;
-
 /// An error that occurred during token parsing.
 ///
 /// Contains both the type of error and the location where it occurred.

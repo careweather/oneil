@@ -6,4 +6,4 @@ Rotation rate: omega = 18 :rpm
 Amplifier efficiency (0, 1): eta = 0.5|0.7
 Boltzmann's constant: C_b = 1.380649e-23 :m^2*kg/s^2/K
 Cylinder radius: r = D/2 :km
-Artificial gravity: g_a = r*omega**2 :m/s^2
+Artificial gravity: g_a = r*omega^2 :m/s^2

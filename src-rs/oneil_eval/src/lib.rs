@@ -1,24 +1,22 @@
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 //! Evaluator for the Oneil programming language
 
-pub mod builtin;
 mod context;
-mod error;
+pub mod error;
 mod eval_expr;
 mod eval_model;
-mod eval_model_collection;
 mod eval_parameter;
 mod eval_unit;
-pub mod output;
-pub mod value;
 
-pub use context::EvalContext;
-pub use error::{EvalError, ModelError};
-pub use eval_expr::eval_expr;
+pub use context::{ExternalEvaluationContext, IrLoadError};
+pub use error::{EvalError, EvalErrors};
+
+pub use eval_expr::eval_expr_in_model;
 pub use eval_model::eval_model;
-pub use eval_model_collection::eval_model_collection;
-pub use eval_parameter::eval_parameter;
-pub use eval_unit::eval_unit;
+pub use eval_unit::eval_unit_external as eval_unit;
+
+#[cfg(test)]
+mod test_context;
 
 #[cfg(test)]
 mod test {
@@ -32,7 +30,7 @@ mod test {
     /// ```
     macro_rules! assert_is_close {
         ($expected:expr, $actual:expr) => {{
-            use $crate::value::util::is_close;
+            use oneil_output::util::is_close;
 
             let expected: f64 = $expected;
             let actual: f64 = $actual;
@@ -50,7 +48,8 @@ mod test {
     ///
     /// ```rust
     /// # use indexmap::IndexMap;
-    /// # use oneil_eval::{assert_units_eq, value::{Dimension, DimensionMap}};
+    /// # use oneil_eval::assert_units_eq;
+    /// # use oneil_output::{Dimension, DimensionMap};
     ///
     /// let unit = DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)]));
     /// assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
@@ -58,7 +57,7 @@ mod test {
     macro_rules! assert_units_dimensionally_eq {
         ($expected_unit_list:expr, $actual_unit:expr) => {{
             use indexmap::IndexMap;
-            use $crate::value::DimensionMap;
+            use oneil_output::{DimensionMap, Unit};
 
             let expected: DimensionMap = DimensionMap::new(IndexMap::from($expected_unit_list));
             let actual: &Unit = &$actual_unit;

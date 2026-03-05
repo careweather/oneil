@@ -48,6 +48,7 @@ pub struct Unit {
     name_span: Span,
     exponent: f64,
     exponent_span: Option<Span>,
+    info: UnitInfo,
 }
 
 impl Unit {
@@ -59,6 +60,7 @@ impl Unit {
         name_span: Span,
         exponent: f64,
         exponent_span: Option<Span>,
+        info: UnitInfo,
     ) -> Self {
         Self {
             span,
@@ -66,6 +68,7 @@ impl Unit {
             name_span,
             exponent,
             exponent_span,
+            info,
         }
     }
 
@@ -98,6 +101,32 @@ impl Unit {
     pub const fn exponent_span(&self) -> Option<Span> {
         self.exponent_span
     }
+
+    /// Returns the unit info of this unit.
+    #[must_use]
+    pub const fn info(&self) -> &UnitInfo {
+        &self.info
+    }
+}
+
+/// Information about a unit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnitInfo {
+    /// A standard unit
+    Standard {
+        /// The prefix of the unit, if any
+        prefix: Option<String>,
+        /// The stripped name of the unit, if any
+        base_name: String,
+    },
+
+    /// A decibel unit
+    Db {
+        /// The prefix of the unit, if any
+        prefix: Option<String>,
+        /// The stripped name of the unit, if any
+        base_name: Option<String>,
+    },
 }
 
 /// A unit used for displaying the unit to
@@ -110,13 +139,13 @@ impl Unit {
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayCompositeUnit {
     /// Multiplied units
-    Multiply(Box<DisplayCompositeUnit>, Box<DisplayCompositeUnit>),
+    Multiply(Box<Self>, Box<Self>),
     /// Divided units
-    Divide(Box<DisplayCompositeUnit>, Box<DisplayCompositeUnit>),
+    Divide(Box<Self>, Box<Self>),
     /// A single unit
     BaseUnit(DisplayUnit),
-    /// Unitless `1`
-    Unitless,
+    /// `1` unit
+    One,
 }
 
 /// A unit used for displaying the unit to

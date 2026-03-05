@@ -1,58 +1,69 @@
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use indexmap::{IndexMap, IndexSet};
-
 use oneil_ir as ir;
+use oneil_shared::partial::MaybePartialResult;
 use oneil_shared::span::Span;
+
+use oneil_output::{
+    self as output, BuiltinDependency, DependencySet, ExternalDependency, Model,
+    ParameterDependency, Value,
+};
 
 use crate::{
     EvalError,
-    builtin::BuiltinFunction,
-    context::EvalContext,
-    error::ExpectedType,
+    context::{EvalContext, ExternalEvaluationContext},
+    error::{EvalErrors, ExpectedType},
     eval_expr, eval_parameter,
-    output::{
-        dependency::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency},
-        eval_result,
-    },
-    value::Value,
 };
 
+/// Evaluates the model at the given path and all its dependencies, returning a map of
+/// path to evaluated model result for each model that was evaluated.
+pub fn eval_model<E: ExternalEvaluationContext>(
+    model_path: impl AsRef<Path>,
+    external_context: &mut E,
+) -> IndexMap<PathBuf, MaybePartialResult<Model, EvalErrors>> {
+    let model_path = ir::ModelPath::new(model_path);
+    let mut context = EvalContext::new(external_context);
+
+    eval_model_from_context(&model_path, &mut context);
+
+    context.into_result()
+}
+
 /// Evaluates a model and returns the context with the results of the model.
-#[expect(
-    clippy::missing_panics_doc,
-    reason = "the panic is only caused by breaking an internal invariant"
-)]
-#[must_use]
-pub fn eval_model<F: BuiltinFunction>(
+fn eval_model_from_context<E: ExternalEvaluationContext>(
     model_path: &ir::ModelPath,
-    model: &ir::Model,
-    mut context: EvalContext<F>,
-) -> EvalContext<F> {
+    context: &mut EvalContext<'_, E>,
+) {
     // Set the current model
     let model_path = model_path.as_ref().to_path_buf();
-    context.set_active_model(model_path);
+    context.push_active_model(model_path.clone());
 
-    // Bring Python imports into scope
-    let python_imports = model.get_python_imports();
-    context.clear_active_python_imports();
-    for python_import in python_imports.values() {
-        let path = python_import.import_path().as_ref().to_path_buf();
-        context.activate_python_import(path);
+    let model = context.get_ir(&model_path);
+
+    let Some(model) = model.value() else {
+        return;
+    };
+
+    // Recursively evaluate references
+    let references = model.get_references();
+    for reference_import in references.values() {
+        eval_model_from_context(reference_import.path(), context);
     }
 
     // Bring references into scope
-    let references = model.get_references();
     for (reference_name, reference_import) in references {
-        let path = reference_import.path().as_ref().to_path_buf();
-        context.activate_reference(path);
         context.add_reference(reference_name.as_str(), reference_import.path());
     }
 
     // Add submodels to the current model
     let submodels = model.get_submodels();
     for (submodel_name, submodel_import) in submodels {
-        context.add_submodel(submodel_name.as_str(), submodel_import.path());
+        context.add_submodel(submodel_name.as_str(), submodel_import.reference_name());
     }
 
     // Evaluate parameters
@@ -64,10 +75,10 @@ pub fn eval_model<F: BuiltinFunction>(
             .get(&parameter_name)
             .expect("parameter should exist because it comes from the keys of the parameters map");
 
-        let value = eval_parameter::eval_parameter(parameter, &context);
+        let value = eval_parameter::eval_parameter(parameter, context);
 
         let parameter_result = value
-            .map(|value| parameter_result_from(value.value, value.expr_span, parameter, &context));
+            .map(|value| parameter_result_from(value.value, value.expr_span, parameter, context));
 
         context.add_parameter_result(parameter_name.as_str().to_string(), parameter_result);
     }
@@ -75,21 +86,19 @@ pub fn eval_model<F: BuiltinFunction>(
     // Evaluate tests
     let tests = model.get_tests();
     for test in tests.values() {
-        let test_result = eval_test(test, &context);
+        let test_result = eval_test(test, context);
         context.add_test_result(test_result);
     }
 
-    context.clear_active_model();
-
-    context
+    context.pop_active_model(&model_path);
 }
 
-fn parameter_result_from<F: BuiltinFunction>(
+fn parameter_result_from<E: ExternalEvaluationContext>(
     value: Value,
     expr_span: Span,
     parameter: &ir::Parameter,
-    context: &EvalContext<F>,
-) -> eval_result::Parameter {
+    context: &EvalContext<'_, E>,
+) -> output::Parameter {
     let (print_level, debug_info) = match parameter.trace_level() {
         ir::TraceLevel::Debug if parameter.is_performance() => {
             let builtin_dependency_values =
@@ -99,8 +108,8 @@ fn parameter_result_from<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(parameter.dependencies().external(), context);
             (
-                eval_result::PrintLevel::Performance,
-                Some(eval_result::DebugInfo {
+                output::PrintLevel::Performance,
+                Some(output::DebugInfo {
                     builtin_dependency_values,
                     parameter_dependency_values,
                     external_dependency_values,
@@ -108,7 +117,7 @@ fn parameter_result_from<F: BuiltinFunction>(
             )
         }
         ir::TraceLevel::Trace | ir::TraceLevel::None if parameter.is_performance() => {
-            (eval_result::PrintLevel::Performance, None)
+            (output::PrintLevel::Performance, None)
         }
         ir::TraceLevel::Debug => {
             let builtin_dependency_values =
@@ -118,16 +127,16 @@ fn parameter_result_from<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(parameter.dependencies().external(), context);
             (
-                eval_result::PrintLevel::Trace,
-                Some(eval_result::DebugInfo {
+                output::PrintLevel::Trace,
+                Some(output::DebugInfo {
                     builtin_dependency_values,
                     parameter_dependency_values,
                     external_dependency_values,
                 }),
             )
         }
-        ir::TraceLevel::Trace => (eval_result::PrintLevel::Trace, None),
-        ir::TraceLevel::None => (eval_result::PrintLevel::None, None),
+        ir::TraceLevel::Trace => (output::PrintLevel::Trace, None),
+        ir::TraceLevel::None => (output::PrintLevel::None, None),
     };
 
     let builtin_dependencies = parameter
@@ -167,7 +176,7 @@ fn parameter_result_from<F: BuiltinFunction>(
         external_dependencies,
     };
 
-    eval_result::Parameter {
+    output::Parameter {
         ident: parameter.name().as_str().to_string(),
         label: parameter.label().as_str().to_string(),
         value,
@@ -196,9 +205,6 @@ fn get_evaluation_order(
             evaluation_order,
             parameters,
         );
-
-        evaluation_order.push(parameter_name.clone());
-        visited.insert(parameter_name.clone());
     }
 
     evaluation_order
@@ -236,15 +242,15 @@ fn process_parameter_dependencies(
     (evaluation_order, visited)
 }
 
-fn eval_test<F: BuiltinFunction>(
+fn eval_test<E: ExternalEvaluationContext>(
     test: &ir::Test,
-    context: &EvalContext<F>,
-) -> Result<eval_result::Test, Vec<EvalError>> {
-    let (test_result, expr_span) = eval_expr(test.expr(), context)?;
+    context: &EvalContext<'_, E>,
+) -> Result<output::Test, Vec<EvalError>> {
+    let (test_result, expr_span) = eval_expr::eval_expr(test.expr(), context)?;
 
     match test_result {
-        Value::Boolean(true) => Ok(eval_result::Test {
-            result: eval_result::TestResult::Passed,
+        Value::Boolean(true) => Ok(output::Test {
+            result: output::TestResult::Passed,
             expr_span: *expr_span,
         }),
         Value::Boolean(false) => {
@@ -255,13 +261,13 @@ fn eval_test<F: BuiltinFunction>(
             let external_dependency_values =
                 get_external_dependency_values(test.dependencies().external(), context);
 
-            let debug_info = Box::new(eval_result::DebugInfo {
+            let debug_info = Box::new(output::DebugInfo {
                 builtin_dependency_values,
                 parameter_dependency_values,
                 external_dependency_values,
             });
-            Ok(eval_result::Test {
-                result: eval_result::TestResult::Failed { debug_info },
+            Ok(output::Test {
+                result: output::TestResult::Failed { debug_info },
                 expr_span: *expr_span,
             })
         }
@@ -276,9 +282,9 @@ fn eval_test<F: BuiltinFunction>(
 }
 
 /// Gets the values of the builtin dependencies for debug reporting purposes.
-fn get_builtin_dependency_values<F: BuiltinFunction>(
+fn get_builtin_dependency_values<E: ExternalEvaluationContext>(
     dependencies: &IndexMap<ir::Identifier, Span>,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> IndexMap<String, Value> {
     dependencies
         .keys()
@@ -296,9 +302,9 @@ fn get_builtin_dependency_values<F: BuiltinFunction>(
 /// # Panics
 ///
 /// This function will panic if any of the dependencies are not found.
-fn get_parameter_dependency_values<F: BuiltinFunction>(
+fn get_parameter_dependency_values<E: ExternalEvaluationContext>(
     dependencies: &IndexMap<ir::ParameterName, Span>,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> IndexMap<String, Value> {
     dependencies
         .iter()
@@ -319,9 +325,9 @@ fn get_parameter_dependency_values<F: BuiltinFunction>(
 /// # Panics
 ///
 /// This function will panic if any of the dependencies are not found.
-fn get_external_dependency_values<F: BuiltinFunction>(
+fn get_external_dependency_values<E: ExternalEvaluationContext>(
     dependencies: &IndexMap<(ir::ReferenceName, ir::ParameterName), (ir::ModelPath, Span)>,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> IndexMap<(String, String), Value> {
     dependencies
         .iter()

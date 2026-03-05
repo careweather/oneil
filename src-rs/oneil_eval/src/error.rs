@@ -1,22 +1,22 @@
-use std::{fmt, path::PathBuf};
+//! Errors for the Oneil evaluator.
 
+use std::{error::Error, fmt, path::PathBuf};
+
+use indexmap::IndexMap;
 use oneil_shared::{
     error::{AsOneilError, Context as ErrorContext, ErrorLocation},
     span::Span,
 };
 
-use crate::value::{DisplayUnit, Interval, NumberType, Value, ValueType};
+use oneil_output::{DisplayUnit, Interval, NumberType, Value, ValueType};
 
-/// An error that occurred during model evaluation.
-///
-/// This error type associates an evaluation error with the path to the model file
-/// where the error occurred.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelError {
-    /// The path to the model file where the error occurred.
-    pub model_path: PathBuf,
-    /// The evaluation error that occurred.
-    pub error: EvalError,
+/// Errors that occurred during evaluation of a model.
+#[derive(Debug, Clone)]
+pub struct EvalErrors {
+    /// Errors that occurred during evaluation of the parameters.
+    pub parameters: IndexMap<String, Vec<EvalError>>,
+    /// Errors that occurred during evaluation of the tests.
+    pub tests: Vec<EvalError>,
 }
 
 /// Represents the expected type for type checking operations.
@@ -63,6 +63,20 @@ pub enum ExpectedArgumentCount {
     AtMost(usize),
     /// Between the minimum (inclusive) and maximum (inclusive) number of arguments is required.
     Between(usize, usize),
+}
+
+impl fmt::Display for ExpectedArgumentCount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Exact(1) => write!(f, "1 argument"),
+            Self::Exact(count) => write!(f, "{count} arguments"),
+            Self::AtLeast(1) => write!(f, "at least 1 argument"),
+            Self::AtLeast(count) => write!(f, "at least {count} arguments"),
+            Self::AtMost(1) => write!(f, "at most 1 argument"),
+            Self::AtMost(count) => write!(f, "at most {count} arguments"),
+            Self::Between(min, max) => write!(f, "between {min} and {max} arguments"),
+        }
+    }
 }
 
 /// Errors that can occur during expression evaluation.
@@ -180,6 +194,8 @@ pub enum EvalError {
     /// For error reporting, this error can typically be ignored. The main purpose of this error
     /// is error propagation, not error reporting.
     ParameterHasError {
+        /// The path of the model that contains the parameter.
+        model_path: Option<PathBuf>,
         /// The name of the parameter that has errors.
         parameter_name: String,
         /// The source span of the parameter name.
@@ -205,6 +221,8 @@ pub enum EvalError {
         param_expr_span: Span,
         /// The unit that the parameter value has.
         param_value_unit: DisplayUnit,
+        /// Whether the parameter value is dimensionless
+        is_dimensionless: bool,
     },
     /// An error indicating that a parameter value's unit does not match the parameter's declared unit.
     ///
@@ -219,16 +237,6 @@ pub enum EvalError {
         param_unit_span: Span,
         /// The unit that the parameter is declared to have.
         param_unit: DisplayUnit,
-    },
-    /// An error indicating that an unknown unit name was used.
-    ///
-    /// This occurs when a unit name is referenced that is not recognized by
-    /// the unit system.
-    UnknownUnit {
-        /// The name of the unknown unit.
-        unit_name: String,
-        /// The source span of the unit name.
-        unit_name_span: Span,
     },
     /// An error indicating that a piecewise expression condition does not evaluate to a boolean.
     InvalidIfExpressionType {
@@ -419,6 +427,26 @@ pub enum EvalError {
         /// The unit that the limit has.
         limit_unit: DisplayUnit,
     },
+    /// An error indicating that a Python function evaluation failed.
+    PythonEvalError {
+        /// The name of the Python function that was called.
+        function_name: String,
+        /// The source span of the function call.
+        function_call_span: Span,
+        /// The error message from Python or from conversion.
+        message: String,
+        /// The traceback from Python.
+        traceback: Option<String>,
+    },
+    /// An invalid return value from a Python function.
+    InvalidPythonReturnValue {
+        /// The name of the Python function that returned the invalid value.
+        function_name: String,
+        /// The source span of the function call.
+        function_call_span: Span,
+        /// The value that was invalid.
+        value_repr: String,
+    },
     /// An error indicating that an unsupported feature was used.
     ///
     /// This occurs when attempting to use a language feature that is not yet
@@ -431,28 +459,50 @@ pub enum EvalError {
         /// Whether this feature is planned to be supported in the future.
         will_be_supported: bool,
     },
+    /// An error indicating that Python is not enabled.
+    PythonNotEnabled {
+        /// The source span of the Python function usage.
+        relevant_span: Span,
+    },
+    /// Custom error from a builtin function.
+    BuiltinFnCustomError {
+        /// The error message.
+        msg: String,
+        /// Optional source location for the error.
+        ///
+        /// This will generally either be the span of the
+        /// function call or the span of the argument that
+        /// caused the error.
+        error_location: Span,
+    },
 }
 
-impl AsOneilError for EvalError {
+impl fmt::Display for EvalError {
     #[expect(clippy::too_many_lines, reason = "matching on each enum variant")]
     #[expect(
         clippy::match_same_arms,
         reason = "in order to keep the enums in order, we don't combine the same arms"
     )]
-    fn message(&self) -> String {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TypeMismatch {
                 expected_type,
                 expected_source_span: _,
                 found_type,
                 found_span: _,
-            } => format!("expected type `{expected_type}` but found `{found_type}`"),
+            } => write!(
+                f,
+                "expected type `{expected_type}` but found `{found_type}`"
+            ),
             Self::UnitMismatch {
                 expected_unit,
                 expected_source_span: _,
                 found_unit,
                 found_span: _,
-            } => format!("expected unit `{expected_unit}` but found `{found_unit}`"),
+            } => write!(
+                f,
+                "expected unit `{expected_unit}` but found `{found_unit}`"
+            ),
             Self::NumberTypeMismatch {
                 expected_number_type,
                 expected_source_span: _,
@@ -469,13 +519,19 @@ impl AsOneilError for EvalError {
                     NumberType::Interval => "interval",
                 };
 
-                format!("expected {expected_number_type} but found {found_number_type}")
+                write!(
+                    f,
+                    "expected {expected_number_type} but found {found_number_type}"
+                )
             }
             Self::InvalidType {
                 expected_type,
                 found_type,
                 found_span: _,
-            } => format!("expected type `{expected_type}` but found `{found_type}`"),
+            } => write!(
+                f,
+                "expected type `{expected_type}` but found `{found_type}`"
+            ),
             Self::InvalidUnit {
                 expected_unit,
                 found_unit,
@@ -485,11 +541,13 @@ impl AsOneilError for EvalError {
                     || "unitless number".to_string(),
                     |u| format!("number with unit `{u}`"),
                 );
+
                 let found = found_unit.as_ref().map_or_else(
                     || "unitless number".to_string(),
                     |u| format!("number with unit `{u}`"),
                 );
-                format!("expected {expected} but found {found}")
+
+                write!(f, "expected {expected} but found {found}")
             }
             Self::InvalidNumberType {
                 number_type,
@@ -506,21 +564,27 @@ impl AsOneilError for EvalError {
                     NumberType::Interval => "interval",
                 };
 
-                format!("expected {number_type} but found {found_number_type}")
+                write!(f, "expected {number_type} but found {found_number_type}")
             }
             Self::ExponentHasUnits {
                 exponent_span: _,
                 exponent_unit: _,
-            } => "exponent cannot have units".to_string(),
+            } => write!(f, "exponent cannot have units"),
             Self::ExponentIsInterval {
                 exponent_interval: _,
                 exponent_value_span: _,
-            } => "exponent cannot be an interval".to_string(),
+            } => write!(f, "exponent cannot be an interval"),
             Self::ParameterHasError {
+                model_path,
                 parameter_name,
                 variable_span: _,
             } => {
-                format!("parameter `{parameter_name}` has errors")
+                let model_path = model_path.as_ref().map_or_else(
+                    || "current model".to_string(),
+                    |path| format!("model `{}`", path.display()),
+                );
+
+                write!(f, "parameter `{parameter_name}` in {model_path} has errors")
             }
             Self::InvalidArgumentCount {
                 function_name,
@@ -528,105 +592,95 @@ impl AsOneilError for EvalError {
                 expected_argument_count,
                 actual_argument_count,
             } => {
-                let expected_argument_count = match expected_argument_count {
-                    ExpectedArgumentCount::Exact(count) if *count == 1 => "1 argument".to_string(),
-                    ExpectedArgumentCount::Exact(count) => format!("{count} arguments"),
-                    ExpectedArgumentCount::AtLeast(count) if *count == 1 => {
-                        "at least 1 argument".to_string()
-                    }
-                    ExpectedArgumentCount::AtLeast(count) => format!("at least {count} arguments"),
-                    ExpectedArgumentCount::AtMost(count) if *count == 1 => {
-                        "at most 1 argument".to_string()
-                    }
-                    ExpectedArgumentCount::AtMost(count) => format!("at most {count} arguments"),
-                    ExpectedArgumentCount::Between(min, max) => {
-                        format!("between {min} and {max} arguments")
-                    }
-                };
-
-                format!(
+                write!(
+                    f,
                     "{function_name} expects {expected_argument_count}, but found {actual_argument_count}"
                 )
             }
             Self::ParameterMissingUnitAnnotation {
                 param_expr_span: _,
                 param_value_unit: _,
-            } => "parameter is missing a unit".to_string(),
+                is_dimensionless: _,
+            } => write!(f, "parameter is missing a unit"),
             Self::ParameterUnitMismatch {
                 param_expr_span: _,
                 param_value_unit,
                 param_unit_span: _,
                 param_unit,
-            } => format!(
+            } => write!(
+                f,
                 "parameter value unit `{param_value_unit}` does not match expected unit `{param_unit}`"
             ),
-            Self::UnknownUnit {
-                unit_name,
-                unit_name_span: _,
-            } => format!("unknown unit `{unit_name}`"),
             Self::InvalidIfExpressionType {
                 expr_span: _,
                 found_value,
             } => {
-                format!("expected a boolean value, but found {found_value}")
+                write!(f, "expected a boolean value, but found {found_value}")
             }
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident,
                 param_ident_span: _,
                 matching_branche_spans,
-            } => format!(
+            } => write!(
+                f,
                 "parameter `{param_ident}` has {} matching piecewise branches",
                 matching_branche_spans.len()
             ),
             Self::NoPiecewiseBranchMatch {
                 param_ident,
                 param_ident_span: _,
-            } => format!("parameter `{param_ident}` does not have a matching piecewise branch"),
+            } => write!(
+                f,
+                "parameter `{param_ident}` does not have a matching piecewise branch"
+            ),
             Self::BooleanCannotHaveUnit {
                 expr_span: _,
                 unit_span: _,
-            } => "boolean value cannot have a unit".to_string(),
+            } => write!(f, "boolean value cannot have a unit"),
             Self::StringCannotHaveUnit {
                 expr_span: _,
                 unit_span: _,
-            } => "string value cannot have a unit".to_string(),
+            } => write!(f, "string value cannot have a unit"),
             Self::InvalidContinuousLimitMinType {
                 expr_span: _,
                 found_value,
             } => {
-                format!("expected a number value, but found {found_value}")
+                write!(f, "expected a number value, but found {found_value}")
             }
             Self::InvalidContinuousLimitMaxType {
                 expr_span: _,
                 found_value,
             } => {
-                format!("expected a number value, but found {found_value}")
+                write!(f, "expected a number value, but found {found_value}")
             }
             Self::MaxUnitDoesNotMatchMinUnit {
                 max_unit: _,
                 max_unit_span: _,
                 min_unit: _,
                 min_unit_span: _,
-            } => "max limit unit does not match min limit unit".to_string(),
+            } => write!(f, "max limit unit does not match min limit unit"),
             Self::BooleanCannotBeDiscreteLimitValue { expr_span: _ } => {
-                "discrete limit cannot contain a boolean value".to_string()
+                write!(f, "discrete limit cannot contain a boolean value")
             }
             Self::DuplicateStringLimit {
                 expr_span: _,
                 original_expr_span: _,
                 string_value,
-            } => format!("duplicate string value '{string_value}' in discrete limit"),
+            } => write!(
+                f,
+                "duplicate string value '{string_value}' in discrete limit"
+            ),
             Self::ExpectedStringLimit {
                 expr_span: _,
                 found_value,
             } => {
-                format!("expected a string value, but found {found_value}")
+                write!(f, "expected a string value, but found {found_value}")
             }
             Self::ExpectedNumberLimit {
                 expr_span: _,
                 found_value,
             } => {
-                format!("expected a number value, but found {found_value}")
+                write!(f, "expected a number value, but found {found_value}")
             }
             Self::DiscreteLimitUnitMismatch {
                 limit_unit,
@@ -634,7 +688,8 @@ impl AsOneilError for EvalError {
                 value_unit,
                 value_unit_span: _,
             } => {
-                format!(
+                write!(
+                    f,
                     "discrete limit value unit `{value_unit}` does not match expected unit `{limit_unit}`"
                 )
             }
@@ -642,7 +697,10 @@ impl AsOneilError for EvalError {
                 param_expr_span: _,
                 param_value,
             } => {
-                format!("parameter value {param_value} is below the default parameter limit")
+                write!(
+                    f,
+                    "parameter value {param_value} is below the default parameter limit"
+                )
             }
             Self::ParameterValueBelowContinuousLimits {
                 param_expr_span: _,
@@ -650,7 +708,7 @@ impl AsOneilError for EvalError {
                 min_expr_span: _,
                 min_value: _,
             } => {
-                format!("parameter value {param_value} is below the limit")
+                write!(f, "parameter value {param_value} is below the limit")
             }
             Self::ParameterValueAboveContinuousLimits {
                 param_expr_span: _,
@@ -658,7 +716,7 @@ impl AsOneilError for EvalError {
                 max_expr_span: _,
                 max_value: _,
             } => {
-                format!("parameter value {param_value} is above the limit")
+                write!(f, "parameter value {param_value} is above the limit")
             }
             Self::ParameterValueNotInDiscreteLimits {
                 param_expr_span: _,
@@ -666,46 +724,84 @@ impl AsOneilError for EvalError {
                 limit_expr_span: _,
                 limit_values: _,
             } => {
-                format!("parameter value {param_value} is not in the discrete limit")
+                write!(
+                    f,
+                    "parameter value {param_value} is not in the discrete limit"
+                )
             }
             Self::BooleanCannotHaveALimit {
                 expr_span: _,
                 limit_span: _,
-            } => "boolean value cannot have a limit".to_string(),
+            } => write!(f, "boolean value cannot have a limit"),
             Self::StringCannotHaveNumberLimit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: _,
-            } => "string value cannot have a number limit".to_string(),
+            } => write!(f, "string value cannot have a number limit"),
             Self::NumberCannotHaveStringLimit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: _,
-            } => "number value cannot have a string limit".to_string(),
+            } => write!(f, "number value cannot have a string limit"),
             Self::UnitlessNumberCannotHaveLimitWithUnit {
                 param_expr_span: _,
                 param_value: _,
                 limit_span: _,
                 limit_unit,
             } => {
-                format!("unitless number cannot have a limit with unit `{limit_unit}`")
+                write!(
+                    f,
+                    "unitless number cannot have a limit with unit `{limit_unit}`"
+                )
             }
             Self::LimitUnitDoesNotMatchParameterUnit {
                 param_unit,
                 limit_span: _,
                 limit_unit,
             } => {
-                format!("limit unit `{limit_unit}` does not match parameter unit `{param_unit}`")
+                write!(
+                    f,
+                    "limit unit `{limit_unit}` does not match parameter unit `{param_unit}`"
+                )
             }
+            Self::PythonEvalError {
+                function_name,
+                function_call_span: _,
+                message: _,
+                traceback: _,
+            } => write!(f, "python function `{function_name}` raised an error"),
+            Self::InvalidPythonReturnValue {
+                function_name,
+                function_call_span: _,
+                value_repr: _,
+            } => write!(
+                f,
+                "python function `{function_name}` returned an invalid value"
+            ),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
                 will_be_supported: _,
-            } => feature_name.as_ref().map_or_else(
-                || "unsupported feature".to_string(),
-                |feature_name| format!("unsupported feature: `{feature_name}`"),
-            ),
+            } => match feature_name {
+                Some(feature_name) => write!(f, "unsupported feature: `{feature_name}`"),
+                None => write!(f, "unsupported feature"),
+            },
+            Self::PythonNotEnabled { relevant_span: _ } => {
+                write!(f, "python feature is not enabled")
+            }
+            Self::BuiltinFnCustomError {
+                msg,
+                error_location: _,
+            } => write!(f, "{msg}"),
         }
+    }
+}
+
+impl Error for EvalError {}
+
+impl AsOneilError for EvalError {
+    fn message(&self) -> String {
+        self.to_string()
     }
 
     #[expect(clippy::too_many_lines, reason = "matching on each enum variant")]
@@ -753,6 +849,7 @@ impl AsOneilError for EvalError {
                 exponent_value_span: location_span,
             }
             | Self::ParameterHasError {
+                model_path: _,
                 parameter_name: _,
                 variable_span: location_span,
             }
@@ -765,16 +862,13 @@ impl AsOneilError for EvalError {
             | Self::ParameterMissingUnitAnnotation {
                 param_expr_span: location_span,
                 param_value_unit: _,
+                is_dimensionless: _,
             }
             | Self::ParameterUnitMismatch {
                 param_expr_span: location_span,
                 param_value_unit: _,
                 param_unit_span: _,
                 param_unit: _,
-            }
-            | Self::UnknownUnit {
-                unit_name: _,
-                unit_name_span: location_span,
             }
             | Self::InvalidIfExpressionType {
                 expr_span: location_span,
@@ -880,10 +974,28 @@ impl AsOneilError for EvalError {
                 limit_span: location_span,
                 limit_unit: _,
             }
+            | Self::PythonEvalError {
+                function_name: _,
+                function_call_span: location_span,
+                message: _,
+                traceback: _,
+            }
+            | Self::InvalidPythonReturnValue {
+                function_name: _,
+                function_call_span: location_span,
+                value_repr: _,
+            }
+            | Self::BuiltinFnCustomError {
+                error_location: location_span,
+                msg: _,
+            }
             | Self::Unsupported {
                 relevant_span: location_span,
                 feature_name: _,
                 will_be_supported: _,
+            }
+            | Self::PythonNotEnabled {
+                relevant_span: location_span,
             } => Some(ErrorLocation::from_source_and_span(source, *location_span)),
         }
     }
@@ -945,6 +1057,7 @@ impl AsOneilError for EvalError {
                 exponent_interval.max(),
             ))],
             Self::ParameterHasError {
+                model_path: _,
                 parameter_name: _,
                 variable_span: _,
             } => Vec::new(),
@@ -957,21 +1070,29 @@ impl AsOneilError for EvalError {
             Self::ParameterMissingUnitAnnotation {
                 param_expr_span: _,
                 param_value_unit,
-            } => vec![
-                ErrorContext::Note(format!("parameter value has unit `{param_value_unit}`")),
-                ErrorContext::Help(format!(
-                    "add a unit annotation `:{param_value_unit}` to the parameter"
-                )),
-            ],
+                is_dimensionless,
+            } => {
+                let mut context = vec![
+                    ErrorContext::Note(format!("parameter value has unit `{param_value_unit}`")),
+                    ErrorContext::Help(format!(
+                        "add a unit annotation `:{param_value_unit}` to the parameter"
+                    )),
+                ];
+
+                if *is_dimensionless {
+                    context.push(ErrorContext::Help(
+                        "or add `:1` if you intend for the parameter value to be dimensionless (such as a ratio)"
+                            .to_string(),
+                    ));
+                }
+
+                context
+            }
             Self::ParameterUnitMismatch {
                 param_expr_span: _,
                 param_value_unit: _,
                 param_unit_span: _,
                 param_unit: _,
-            } => Vec::new(),
-            Self::UnknownUnit {
-                unit_name: _,
-                unit_name_span: _,
             } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
@@ -1098,6 +1219,30 @@ impl AsOneilError for EvalError {
                 limit_span: _,
                 limit_unit: _,
             } => Vec::new(),
+            Self::PythonEvalError {
+                function_name: _,
+                function_call_span: _,
+                message,
+                traceback,
+            } => traceback.as_ref().map_or_else(
+                || vec![ErrorContext::Note(message.clone())],
+                |traceback| {
+                    vec![
+                        ErrorContext::Note(message.clone()),
+                        ErrorContext::Note(traceback.clone()),
+                    ]
+                },
+            ),
+            Self::InvalidPythonReturnValue {
+                function_name: _,
+                function_call_span: _,
+                value_repr,
+            } => vec![
+                ErrorContext::Note(format!("returned value `{value_repr}`")),
+                ErrorContext::Note(
+                    "expected bool, str, float, Interval, or MeasuredNumber".to_string(),
+                ),
+            ],
             Self::Unsupported {
                 relevant_span: _,
                 feature_name,
@@ -1117,6 +1262,13 @@ impl AsOneilError for EvalError {
                     Vec::new()
                 }
             }
+            Self::PythonNotEnabled { relevant_span: _ } => vec![ErrorContext::Help(
+                "rebuild Oneil with the `python` feature enabled".to_string(),
+            )],
+            Self::BuiltinFnCustomError {
+                msg: _,
+                error_location: _,
+            } => Vec::new(),
         }
     }
 
@@ -1200,6 +1352,7 @@ impl AsOneilError for EvalError {
                 exponent_value_span: _,
             } => Vec::new(),
             Self::ParameterHasError {
+                model_path: _,
                 parameter_name: _,
                 variable_span: _,
             } => Vec::new(),
@@ -1212,6 +1365,7 @@ impl AsOneilError for EvalError {
             Self::ParameterMissingUnitAnnotation {
                 param_expr_span: _,
                 param_value_unit: _,
+                is_dimensionless: _,
             } => Vec::new(),
             Self::ParameterUnitMismatch {
                 param_expr_span: _,
@@ -1225,10 +1379,6 @@ impl AsOneilError for EvalError {
                     *param_unit_span,
                 )),
             )],
-            Self::UnknownUnit {
-                unit_name: _,
-                unit_name_span: _,
-            } => Vec::new(),
             Self::InvalidIfExpressionType {
                 expr_span: _,
                 found_value: _,
@@ -1394,11 +1544,178 @@ impl AsOneilError for EvalError {
                 limit_span: _,
                 limit_unit: _,
             } => Vec::new(),
+            Self::PythonEvalError {
+                function_name: _,
+                function_call_span: _,
+                message: _,
+                traceback: _,
+            } => Vec::new(),
+            Self::InvalidPythonReturnValue {
+                function_name: _,
+                function_call_span: _,
+                value_repr: _,
+            } => Vec::new(),
             Self::Unsupported {
                 relevant_span: _,
                 feature_name: _,
                 will_be_supported: _,
             } => Vec::new(),
+            Self::PythonNotEnabled { relevant_span: _ } => Vec::new(),
+            Self::BuiltinFnCustomError {
+                msg: _,
+                error_location: _,
+            } => Vec::new(),
+        }
+    }
+
+    fn is_internal_error(&self) -> bool {
+        matches!(self, Self::ParameterHasError { .. })
+    }
+}
+
+/// Conversion from value-level errors (`oneil_output`) to evaluator errors.
+pub mod convert {
+    use oneil_output::{
+        BinaryEvalError, ExpectedType as OutputExpectedType, UnaryEvalError, UnaryOperation,
+    };
+    use oneil_shared::span::Span;
+
+    use super::{EvalError, ExpectedType};
+
+    /// Converts a binary eval error from the output crate into an evaluator error.
+    #[must_use]
+    pub fn binary_eval_error_to_eval_error(
+        error: BinaryEvalError,
+        lhs_span: Span,
+        rhs_span: Span,
+    ) -> EvalError {
+        match error {
+            BinaryEvalError::UnitMismatch { lhs_unit, rhs_unit } => EvalError::UnitMismatch {
+                expected_unit: lhs_unit,
+                expected_source_span: lhs_span,
+                found_unit: rhs_unit,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::TypeMismatch { lhs_type, rhs_type } => EvalError::TypeMismatch {
+                expected_type: *lhs_type,
+                expected_source_span: lhs_span,
+                found_type: *rhs_type,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::InvalidLhsType {
+                expected_type,
+                lhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *lhs_type,
+                found_span: lhs_span,
+            },
+            BinaryEvalError::InvalidRhsType {
+                expected_type,
+                rhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *rhs_type,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::ExponentHasUnits { exponent_unit } => EvalError::ExponentHasUnits {
+                exponent_span: rhs_span,
+                exponent_unit,
+            },
+            BinaryEvalError::ExponentIsInterval { exponent_interval } => {
+                EvalError::ExponentIsInterval {
+                    exponent_interval,
+                    exponent_value_span: rhs_span,
+                }
+            }
+        }
+    }
+
+    /// Converts a binary eval error that only applies to the left-hand side into an evaluator error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the error is not `InvalidLhsType`.
+    #[must_use]
+    pub fn binary_eval_error_expect_only_lhs(error: BinaryEvalError, lhs_span: Span) -> EvalError {
+        match error {
+            BinaryEvalError::InvalidLhsType {
+                expected_type,
+                lhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *lhs_type,
+                found_span: lhs_span,
+            },
+            BinaryEvalError::UnitMismatch { .. }
+            | BinaryEvalError::TypeMismatch { .. }
+            | BinaryEvalError::InvalidRhsType { .. }
+            | BinaryEvalError::ExponentHasUnits { .. }
+            | BinaryEvalError::ExponentIsInterval { .. } => {
+                panic!("expected only lhs errors, but got {error:?}")
+            }
+        }
+    }
+
+    /// Converts a binary eval error that only applies to the right-hand side into an evaluator error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the error is not `InvalidRhsType`, `ExponentHasUnits`, or `ExponentIsInterval`.
+    #[must_use]
+    pub fn binary_eval_error_expect_only_rhs(error: BinaryEvalError, rhs_span: Span) -> EvalError {
+        match error {
+            BinaryEvalError::InvalidRhsType {
+                expected_type,
+                rhs_type,
+            } => EvalError::InvalidType {
+                expected_type: expected_type_to_eval(expected_type),
+                found_type: *rhs_type,
+                found_span: rhs_span,
+            },
+            BinaryEvalError::ExponentHasUnits { exponent_unit } => EvalError::ExponentHasUnits {
+                exponent_span: rhs_span,
+                exponent_unit,
+            },
+            BinaryEvalError::ExponentIsInterval { exponent_interval } => {
+                EvalError::ExponentIsInterval {
+                    exponent_interval,
+                    exponent_value_span: rhs_span,
+                }
+            }
+            BinaryEvalError::UnitMismatch { .. }
+            | BinaryEvalError::TypeMismatch { .. }
+            | BinaryEvalError::InvalidLhsType { .. } => {
+                panic!("expected only rhs errors, but got {error:?}")
+            }
+        }
+    }
+
+    /// Converts a unary eval error from the output crate into an evaluator error.
+    #[must_use]
+    pub fn unary_eval_error_to_eval_error(error: UnaryEvalError, value_span: Span) -> EvalError {
+        match error {
+            UnaryEvalError::InvalidType { op, value_type } => {
+                let expected_type = match op {
+                    UnaryOperation::Neg => ExpectedType::Number,
+                    UnaryOperation::Not => ExpectedType::Boolean,
+                };
+                EvalError::InvalidType {
+                    expected_type,
+                    found_type: *value_type,
+                    found_span: value_span,
+                }
+            }
+        }
+    }
+
+    const fn expected_type_to_eval(e: OutputExpectedType) -> ExpectedType {
+        match e {
+            OutputExpectedType::Boolean => ExpectedType::Boolean,
+            OutputExpectedType::String => ExpectedType::String,
+            OutputExpectedType::Number => ExpectedType::Number,
+            OutputExpectedType::MeasuredNumber => ExpectedType::MeasuredNumber,
+            OutputExpectedType::NumberOrMeasuredNumber => ExpectedType::NumberOrMeasuredNumber,
         }
     }
 }

@@ -1,6 +1,7 @@
 //! Symbol lookup utilities for finding definitions in Oneil models
 
-use oneil_ir::{self as ir, ModelCollection, ModelPath, ParameterName};
+use oneil_runtime::Runtime;
+use oneil_runtime::output::ir;
 use oneil_shared::span::Span;
 use tower_lsp_server::UriExt;
 use tower_lsp_server::lsp_types::{Location, Position, Range, Uri};
@@ -9,32 +10,32 @@ use tower_lsp_server::lsp_types::{Location, Position, Range, Uri};
 #[derive(Debug, Clone)]
 pub enum SymbolAtPosition {
     /// A parameter definition (cursor is on the parameter name in its declaration)
-    ParameterDefinition { name: ParameterName, span: Span },
+    ParameterDefinition { name: ir::ParameterName, span: Span },
     /// A parameter reference (cursor is on a parameter used in an expression)
-    ParameterReference { name: ParameterName, span: Span },
+    ParameterReference { name: ir::ParameterName, span: Span },
     /// An external variable reference (e.g., `x.model_name`)
     ExternalReference {
         model_name: String,
         model_span: Span,
-        parameter_name: ParameterName,
+        parameter_name: ir::ParameterName,
         parameter_span: Span,
     },
     /// A submodel or reference import name
     ModelImport {
         name: String,
         span: Span,
-        path: ModelPath,
+        path: ir::ModelPath,
     },
 }
 
 /// Finds the symbol at a given byte offset in a model
 pub fn find_symbol_at_offset(
-    model: &ir::Model,
-    _model_path: &ModelPath,
+    model: oneil_runtime::output::reference::ModelIrReference<'_>,
+    _model_path: &ir::ModelPath,
     offset: usize,
 ) -> Option<SymbolAtPosition> {
     // Check if cursor is on a parameter definition
-    for (param_name, param) in model.get_parameters() {
+    for (param_name, param) in model.parameters() {
         if span_contains_offset(param.name_span(), offset) {
             return Some(SymbolAtPosition::ParameterDefinition {
                 name: param_name.clone(),
@@ -44,18 +45,20 @@ pub fn find_symbol_at_offset(
     }
 
     // Check if cursor is on a submodel import name
-    for (submodel_name, submodel_import) in model.get_submodels() {
+    for (submodel_name, submodel_import) in model.submodels() {
         if span_contains_offset(*submodel_import.name_span(), offset) {
+            let submodel_path = submodel_import.reference_import().path().clone();
+
             return Some(SymbolAtPosition::ModelImport {
                 name: submodel_name.to_string(),
                 span: *submodel_import.name_span(),
-                path: submodel_import.path().clone(),
+                path: submodel_path,
             });
         }
     }
 
     // Check if cursor is on a reference import name
-    for (reference_name, reference_import) in model.get_references() {
+    for (reference_name, reference_import) in model.references() {
         if span_contains_offset(*reference_import.name_span(), offset) {
             return Some(SymbolAtPosition::ModelImport {
                 name: reference_name.to_string(),
@@ -66,7 +69,7 @@ pub fn find_symbol_at_offset(
     }
 
     // Check if cursor is on a variable reference in parameter expressions
-    for param in model.get_parameters().values() {
+    for param in model.parameters().values() {
         if let Some(symbol) = find_symbol_in_parameter_value(param.value(), offset) {
             return Some(symbol);
         }
@@ -186,8 +189,8 @@ fn find_symbol_in_expr(expr: &ir::Expr, offset: usize) -> Option<SymbolAtPositio
 /// Resolves a symbol to its definition location
 pub fn resolve_definition(
     symbol: &SymbolAtPosition,
-    model_collection: &ModelCollection,
-    current_model_path: &ModelPath,
+    runtime: &mut Runtime,
+    current_model_path: &ir::ModelPath,
 ) -> Option<Location> {
     match symbol {
         SymbolAtPosition::ParameterDefinition { span, .. } => {
@@ -196,8 +199,11 @@ pub fn resolve_definition(
         }
         SymbolAtPosition::ParameterReference { name, .. } => {
             // Find the parameter in the current model
-            let model = model_collection.get_models().get(current_model_path)?;
+            let (model, _errors) = runtime.load_ir(current_model_path);
+            let model = model?;
+
             let param = model.get_parameter(name)?;
+
             Some(span_to_location(current_model_path, param.name_span()))
         }
         SymbolAtPosition::ExternalReference {
@@ -207,26 +213,35 @@ pub fn resolve_definition(
         } => {
             // Find the parameter in the external model
             // First, resolve the model name to a ModelPath through imports
-            let current_model = model_collection.get_models().get(current_model_path)?;
+            let (current_model, _errors) = runtime.load_ir(current_model_path);
+            let current_model = current_model?;
 
             // Check submodels
             if let Some(submodel) = current_model
-                .get_submodels()
+                .submodels()
                 .get(&ir::SubmodelName::new(model_name.clone()))
             {
-                let external_model = model_collection.get_models().get(submodel.path())?;
+                let submodel_path = submodel.reference_import().path().clone();
+
+                let (external_model, _errors) = runtime.load_ir(&submodel_path);
+                let external_model = external_model?;
+
                 let param = external_model.get_parameter(parameter_name)?;
-                return Some(span_to_location(submodel.path(), param.name_span()));
+                return Some(span_to_location(&submodel_path, param.name_span()));
             }
 
             // Check references
             if let Some(reference) = current_model
-                .get_references()
+                .references()
                 .get(&ir::ReferenceName::new(model_name.clone()))
             {
-                let external_model = model_collection.get_models().get(reference.path())?;
+                let path = reference.path().clone();
+
+                let (external_model, _errors) = runtime.load_ir(&path);
+                let external_model = external_model?;
+
                 let param = external_model.get_parameter(parameter_name)?;
-                return Some(span_to_location(reference.path(), param.name_span()));
+                return Some(span_to_location(&path, param.name_span()));
             }
 
             None
@@ -257,7 +272,7 @@ const fn span_contains_offset(span: Span, offset: usize) -> bool {
 }
 
 /// Converts a Span to an LSP Location
-fn span_to_location(model_path: &ModelPath, span: Span) -> Location {
+fn span_to_location(model_path: &ir::ModelPath, span: Span) -> Location {
     let uri = Uri::from_file_path(model_path.as_ref()).unwrap_or_else(|| {
         panic!(
             "Failed to convert model path to URI: {}",

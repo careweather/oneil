@@ -1,0 +1,20 @@
+[package]
+name = "oneil_builtins"
+description = "Standard builtin values, functions, units, and prefixes for Oneil"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+oneil_eval = { path = "../oneil_eval" }
+oneil_output = { path = "../oneil_output" }
+oneil_shared = { path = "../oneil_shared" }
+indexmap = { workspace = true }
+
+[lints]
+workspace = true

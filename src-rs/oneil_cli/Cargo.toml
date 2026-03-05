@@ -1,0 +1,28 @@
+[package]
+name = "oneil_cli"
+description = "CLI tool for using the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["python"]
+python = ["oneil_runtime/python"]
+
+[dependencies]
+#oneil_lsp = { path = "../oneil_lsp" }
+oneil_runtime = { path = "../oneil_runtime", default-features = false }
+oneil_shared = { path = "../oneil_shared" }
+anstream = "1.0.0"
+clap = { version = "4.5.1", features = ["derive"] }
+indexmap = { workspace = true }
+notify = "8.2.0"
+owo-colors = "4.2.3"
+
+[lints]
+workspace = true

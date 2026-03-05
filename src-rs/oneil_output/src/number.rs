@@ -1,0 +1,1389 @@
+use std::{fmt, ops};
+
+use crate::{
+    Interval, NumberType, Unit,
+    error::BinaryEvalError,
+    util::{db_to_linear, is_close, linear_to_db},
+};
+
+// TODO: document how this guarantees that the number is
+//       correctly constructed
+
+/// A number with a unit
+///
+/// The only way to construct a `MeasuredNumber` is to use `from_number_and_unit`,
+/// which performs adjustment based on the magnitude/dB of the unit.
+#[derive(Debug, Clone)]
+pub struct MeasuredNumber {
+    /// The value of the measured number.
+    ///
+    /// Note that this is stored in a "normalized" form,
+    /// where the magnitude/dB of the unit is already applied.
+    ///
+    /// See `from_number_and_unit` for more details.
+    normalized_value: NormalizedNumber,
+    /// The unit of the measured number.
+    unit: Unit,
+}
+
+impl MeasuredNumber {
+    /// Converts a number and a unit to a measured number.
+    ///
+    /// Note that this performs adjustment based on the magnitude/dB of the unit.
+    ///
+    /// A measured number stores the number in a "normalized" form,
+    /// where the magnitude/dB of the unit is already applied.
+    ///
+    /// For example, `value = 1` and `unit = km` will result in `1000 m`.
+    #[must_use]
+    pub fn from_number_and_unit(value: Number, unit: Unit) -> Self {
+        let normalized_value = NormalizedNumber::from_number_and_unit(value, &unit);
+        Self {
+            normalized_value,
+            unit,
+        }
+    }
+
+    /// Converts a measured number to a number and a unit.
+    ///
+    /// This is the inverse of `from_number_and_unit`. See that function
+    /// for a description of the conversion.
+    #[must_use]
+    pub fn into_number_and_unit(self) -> (Number, Unit) {
+        let Self {
+            normalized_value,
+            unit,
+        } = self;
+
+        let value = normalized_value.into_number_using_unit(&unit);
+
+        (value, unit)
+    }
+
+    /// Converts a measured number to a number based on the given unit.
+    ///
+    /// This performs adjustment based on the magnitude/dB of the unit.
+    ///
+    /// # Panics
+    ///
+    /// This panics if the new unit is not dimensionally equivalent
+    /// to the old unit.
+    #[must_use]
+    pub fn into_number_using_unit(self, unit: &Unit) -> Number {
+        debug_assert!(
+            self.unit.dimensionally_eq(unit),
+            "old unit {} is not dimensionally equivalent to new unit {}\nold unit dimensions: {:?}\nnew unit dimensions: {:?}",
+            self.unit.display_unit,
+            unit.display_unit,
+            self.unit.dimension_map,
+            unit.dimension_map,
+        );
+
+        self.normalized_value.into_number_using_unit(unit)
+    }
+
+    /// Updates the unit of the measured number.
+    ///
+    ///
+    /// # Panics
+    ///
+    /// This panics if the new unit is not dimensionally equivalent
+    /// to the old unit.
+    #[must_use]
+    pub fn with_unit(self, unit: Unit) -> Self {
+        debug_assert!(
+            self.unit.dimensionally_eq(&unit),
+            "old unit {} is not dimensionally equivalent to new unit {}\nold unit dimensions: {:?}\nnew unit dimensions: {:?}",
+            self.unit.display_unit,
+            unit.display_unit,
+            self.unit.dimension_map,
+            unit.dimension_map,
+        );
+
+        Self { unit, ..self }
+    }
+
+    /// Returns the normalized value of the measured number.
+    ///
+    /// The normalized value can be compared with other normalized
+    /// values, regardless of unit magnitude.
+    ///
+    /// For example, `1000 m` and `1 km` are normalized to the
+    /// same value.
+    #[must_use]
+    pub const fn normalized_value(&self) -> &NormalizedNumber {
+        &self.normalized_value
+    }
+
+    /// Returns the unit of the measured number.
+    #[must_use]
+    pub const fn unit(&self) -> &Unit {
+        &self.unit
+    }
+
+    /// Checks if two measured numbers are equal.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the dimensions don't match.
+    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value == rhs.normalized_value)
+    }
+
+    /// Checks if `self` is strictly less than `rhs`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_lt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.lt(&rhs.normalized_value))
+    }
+
+    /// Checks if `self` is strictly greater than `rhs`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_gt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.gt(&rhs.normalized_value))
+    }
+
+    /// Checks if `self` is less than or equal to `rhs`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_lte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.lte(&rhs.normalized_value))
+    }
+
+    /// Checks if `self` is greater than or equal to `rhs`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_gte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.gte(&rhs.normalized_value))
+    }
+
+    fn check_units(&self, rhs: &Self) -> Result<(), BinaryEvalError> {
+        if self.unit.dimensionally_eq(&rhs.unit) {
+            Ok(())
+        } else {
+            Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            })
+        }
+    }
+
+    /// Adds two dimensional numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_add(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(Self {
+            normalized_value: self.normalized_value + rhs.normalized_value,
+            unit: self.unit,
+        })
+    }
+
+    /// Subtracts two dimensional numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(Self {
+            normalized_value: self.normalized_value - rhs.normalized_value,
+            unit: self.unit,
+        })
+    }
+
+    /// Subtracts two dimensional numbers. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it subtracts the minimum
+    /// from the minimum and the maximum from the maximum.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_escaped_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(Self {
+            normalized_value: self.normalized_value.escaped_sub(rhs.normalized_value),
+            unit: self.unit,
+        })
+    }
+
+    /// Multiplies two dimensional numbers.
+    ///
+    /// # Errors
+    ///
+    /// This function never returns an error.
+    pub fn checked_mul(self, rhs: Self) -> Result<Self, BinaryEvalError> {
+        Ok(Self {
+            normalized_value: self.normalized_value * rhs.normalized_value,
+            unit: self.unit * rhs.unit,
+        })
+    }
+
+    /// Divides two dimensional numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_div(self, rhs: Self) -> Result<Self, BinaryEvalError> {
+        Ok(Self {
+            normalized_value: self.normalized_value / rhs.normalized_value,
+            unit: self.unit / rhs.unit,
+        })
+    }
+
+    /// Divides two dimensional numbers. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it divides the minimum
+    /// by the minimum and the maximum by the maximum.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_escaped_div(self, rhs: Self) -> Result<Self, BinaryEvalError> {
+        Ok(Self {
+            normalized_value: self.normalized_value.escaped_div(rhs.normalized_value),
+            unit: self.unit / rhs.unit,
+        })
+    }
+
+    /// Computes the remainder of two dimensional numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_rem(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(Self {
+            normalized_value: self.normalized_value % rhs.normalized_value,
+            unit: self.unit,
+        })
+    }
+
+    /// Raises a dimensional number to the power of another.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_pow(self, exponent: &Number) -> Result<Self, BinaryEvalError> {
+        match exponent {
+            Number::Scalar(exponent_value) => Ok(Self {
+                normalized_value: self.normalized_value.pow(Number::Scalar(*exponent_value)),
+                unit: self.unit.pow(*exponent_value),
+            }),
+            Number::Interval(exponent_interval) => Err(BinaryEvalError::ExponentIsInterval {
+                exponent_interval: *exponent_interval,
+            }),
+        }
+    }
+
+    /// Returns the tightest enclosing interval of two dimensional numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_min_max(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(Self {
+            normalized_value: self
+                .normalized_value
+                .tightest_enclosing_interval(rhs.normalized_value),
+            unit: self.unit,
+        })
+    }
+
+    /// Negates a number value.
+    #[must_use]
+    pub fn checked_neg(self) -> Self {
+        Self {
+            normalized_value: -self.normalized_value,
+            unit: self.unit,
+        }
+    }
+
+    /// Performs a min/max operation on a measured number and a regular number.
+    ///
+    /// The `Number` is implicitly coerced to a measured
+    /// number with the same unit as the `MeasuredNumber`.
+    ///
+    /// This operation is associative.
+    #[must_use]
+    pub fn min_max_number(self, rhs: Number) -> Self {
+        Self {
+            normalized_value: self
+                .normalized_value
+                .tightest_enclosing_interval_number(rhs),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the minimum value of the measured number.
+    #[must_use]
+    pub fn min(&self) -> Self {
+        Self {
+            normalized_value: NormalizedNumber(Number::Scalar(self.normalized_value.min())),
+            unit: self.unit.clone(),
+        }
+    }
+
+    /// Returns the maximum value of the measured number.
+    #[must_use]
+    pub fn max(&self) -> Self {
+        Self {
+            normalized_value: NormalizedNumber(Number::Scalar(self.normalized_value.max())),
+            unit: self.unit.clone(),
+        }
+    }
+
+    /// Returns the square root of the measured number.
+    #[must_use]
+    pub fn sqrt(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.sqrt(),
+            unit: self.unit.pow(0.5),
+        }
+    }
+
+    /// Returns the natural logarithm of the measured number.
+    #[must_use]
+    pub fn ln(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.ln(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the base 10 logarithm of the measured number.
+    #[must_use]
+    pub fn log10(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.log10(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the base 2 logarithm of the measured number.
+    #[must_use]
+    pub fn log2(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.log2(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the absolute value of the measured number.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.abs(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the measured number rounded down to the nearest integer.
+    #[must_use]
+    pub fn floor(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.floor(),
+            unit: self.unit,
+        }
+    }
+
+    /// Returns the measured number rounded up to the nearest integer.
+    #[must_use]
+    pub fn ceiling(self) -> Self {
+        Self {
+            normalized_value: self.normalized_value.ceiling(),
+            unit: self.unit,
+        }
+    }
+}
+
+impl PartialEq for MeasuredNumber {
+    /// Compares two measured numbers for equality.
+    ///
+    /// This treats units as equal if they have the same dimensions.
+    fn eq(&self, other: &Self) -> bool {
+        self.check_units(other).is_ok() && self.normalized_value == other.normalized_value
+    }
+}
+
+impl ops::Add<Number> for MeasuredNumber {
+    type Output = Self;
+
+    /// Add a measured number to a number.
+    ///
+    /// The `Number` is implicitly coerced to a measured
+    /// number with the same unit as the `MeasuredNumber`.
+    fn add(self, rhs: Number) -> Self::Output {
+        Self {
+            normalized_value: self.normalized_value + rhs,
+            unit: self.unit,
+        }
+    }
+}
+
+impl ops::Add<MeasuredNumber> for Number {
+    type Output = MeasuredNumber;
+
+    /// Add a number to a measured number.
+    ///
+    /// The `Number` is implicitly coerced to a measured
+    /// number with the same unit as the `MeasuredNumber`.
+    fn add(self, rhs: MeasuredNumber) -> Self::Output {
+        MeasuredNumber {
+            normalized_value: self + rhs.normalized_value,
+            unit: rhs.unit,
+        }
+    }
+}
+
+impl ops::Sub<Number> for MeasuredNumber {
+    type Output = Self;
+
+    /// Subtract a measured number from a number.
+    ///
+    /// The `Number` is implicitly coerced to a measured
+    /// number with the same unit as the `MeasuredNumber`.
+    fn sub(self, rhs: Number) -> Self::Output {
+        Self {
+            normalized_value: self.normalized_value - rhs,
+            unit: self.unit,
+        }
+    }
+}
+
+impl ops::Sub<MeasuredNumber> for Number {
+    type Output = MeasuredNumber;
+
+    /// Subtract a number from a measured number.
+    ///
+    /// The `Number` is implicitly coerced to a measured
+    /// number with the same unit as the `MeasuredNumber`.
+    fn sub(self, rhs: MeasuredNumber) -> Self::Output {
+        MeasuredNumber {
+            normalized_value: self - rhs.normalized_value,
+            unit: rhs.unit,
+        }
+    }
+}
+
+impl ops::Mul<Number> for MeasuredNumber {
+    type Output = Self;
+
+    /// Multiply a measured number by a number.
+    ///
+    /// The `Number` is implicitly coerced to a
+    /// measured number with unit `1`.
+    fn mul(self, rhs: Number) -> Self::Output {
+        Self {
+            normalized_value: self.normalized_value * rhs,
+            unit: self.unit,
+        }
+    }
+}
+
+impl ops::Mul<MeasuredNumber> for Number {
+    type Output = MeasuredNumber;
+
+    /// Multiply a number by a measured number.
+    ///
+    /// The `Number` is implicitly coerced to a
+    /// measured number with unit `1`.
+    fn mul(self, rhs: MeasuredNumber) -> Self::Output {
+        MeasuredNumber {
+            normalized_value: self * rhs.normalized_value,
+            unit: rhs.unit,
+        }
+    }
+}
+
+impl ops::Div<Number> for MeasuredNumber {
+    type Output = Self;
+
+    /// Divide a measured number by a number.
+    ///
+    /// The `Number` is implicitly coerced to a dimensionless
+    /// measured number.
+    fn div(self, rhs: Number) -> Self::Output {
+        Self {
+            normalized_value: self.normalized_value / rhs,
+            unit: self.unit,
+        }
+    }
+}
+
+impl ops::Div<MeasuredNumber> for Number {
+    type Output = MeasuredNumber;
+
+    /// Divide a number by a measured number.
+    ///
+    /// The `Number` is implicitly coerced to a dimensionless
+    /// measured number.
+    fn div(self, rhs: MeasuredNumber) -> Self::Output {
+        MeasuredNumber {
+            normalized_value: self / rhs.normalized_value,
+            unit: Unit::one() / rhs.unit,
+        }
+    }
+}
+
+impl ops::Rem<Number> for MeasuredNumber {
+    type Output = Self;
+
+    /// Computes the remainder of dividing a measured number by a number.
+    ///
+    /// The `Number` is implicitly coerced to a measured
+    /// number with the same unit as the `MeasuredNumber`.
+    fn rem(self, rhs: Number) -> Self::Output {
+        Self {
+            normalized_value: self.normalized_value % rhs,
+            unit: self.unit,
+        }
+    }
+}
+
+impl ops::Rem<MeasuredNumber> for Number {
+    type Output = MeasuredNumber;
+
+    /// Computes the remainder of dividing a number by a measured number.
+    ///
+    /// The `Number` is implicitly coerced to a measured
+    /// number with the same unit as the `MeasuredNumber`.
+    fn rem(self, rhs: MeasuredNumber) -> Self::Output {
+        MeasuredNumber {
+            normalized_value: self % rhs.normalized_value,
+            unit: rhs.unit,
+        }
+    }
+}
+
+/// A normalized number value.
+///
+/// This is a wrapper around a `Number` that has been normalized
+/// based on the magnitude/dB of the unit.
+///
+/// The main purpose of this wrapper is to ensure that the normalized
+/// number is not used when a number value is expected.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NormalizedNumber(Number);
+
+impl NormalizedNumber {
+    #[must_use]
+    pub fn from_number_and_unit(value: Number, unit: &Unit) -> Self {
+        // convert the number from a logarithmic unit
+        // to a linear unit if it is a dB unit
+        let value = if unit.is_db {
+            db_to_linear(value)
+        } else {
+            value
+        };
+
+        // adjust the magnitude based on the unit
+        let value = value * unit.magnitude;
+
+        Self(value)
+    }
+
+    #[must_use]
+    pub fn into_number_using_unit(self, unit: &Unit) -> Number {
+        let Self(value) = self;
+
+        // adjust the magnitude based on the unit
+        let value = value / unit.magnitude;
+
+        // convert the number from a linear unit
+        // to a logarithmic unit if it is a dB unit
+        if unit.is_db {
+            linear_to_db(value)
+        } else {
+            value
+        }
+    }
+
+    /// Subtracts two normalized numbers. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it subtracts the minimum
+    /// from the minimum and the maximum from the maximum.
+    #[must_use]
+    pub fn escaped_sub(self, rhs: Self) -> Self {
+        Self(self.0.escaped_sub(rhs.0))
+    }
+
+    /// Divides two normalized numbers. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it divides the minimum
+    /// by the minimum and the maximum by the maximum.
+    #[must_use]
+    pub fn escaped_div(self, rhs: Self) -> Self {
+        Self(self.0.escaped_div(rhs.0))
+    }
+
+    /// Raises a normalized number to the power of another.
+    #[must_use]
+    pub fn pow(self, exponent: Number) -> Self {
+        Self(self.0.pow(exponent))
+    }
+
+    /// Returns the smallest interval that contains both normalized numbers.
+    #[must_use]
+    pub fn tightest_enclosing_interval(self, rhs: Self) -> Self {
+        Self(self.0.tightest_enclosing_interval(rhs.0))
+    }
+
+    /// Returns the smallest interval that contains both a normalized number and a number.
+    #[must_use]
+    pub fn tightest_enclosing_interval_number(self, rhs: Number) -> Self {
+        Self(self.0.tightest_enclosing_interval(rhs))
+    }
+
+    /// Returns true if the normalized number contains the other normalized number.
+    #[must_use]
+    pub fn contains(&self, rhs: &Self) -> bool {
+        self.0.contains(&rhs.0)
+    }
+
+    /// Returns the minimum value of the normalized number.
+    #[must_use]
+    pub const fn min(&self) -> f64 {
+        self.0.min()
+    }
+
+    /// Returns the maximum value of the normalized number.
+    #[must_use]
+    pub const fn max(&self) -> f64 {
+        self.0.max()
+    }
+
+    /// Returns the type of the normalized number.
+    #[must_use]
+    pub const fn type_(&self) -> NumberType {
+        self.0.type_()
+    }
+
+    /// Returns a reference to the inner number.
+    #[must_use]
+    pub const fn as_number(&self) -> &Number {
+        &self.0
+    }
+
+    /// Returns the square root of the normalized number.
+    #[must_use]
+    pub fn sqrt(self) -> Self {
+        Self(self.0.sqrt())
+    }
+
+    /// Returns the natural logarithm of the normalized number.
+    #[must_use]
+    pub fn ln(self) -> Self {
+        Self(self.0.ln())
+    }
+
+    /// Returns the base 10 logarithm of the normalized number.
+    #[must_use]
+    pub fn log10(self) -> Self {
+        Self(self.0.log10())
+    }
+
+    /// Returns the base 2 logarithm of the normalized number.
+    #[must_use]
+    pub fn log2(self) -> Self {
+        Self(self.0.log2())
+    }
+
+    /// Returns the absolute value of the normalized number.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        Self(self.0.abs())
+    }
+
+    /// Returns the normalized number rounded down to the nearest integer.
+    #[must_use]
+    pub fn floor(self) -> Self {
+        Self(self.0.floor())
+    }
+
+    /// Returns the normalized number rounded up to the nearest integer.
+    #[must_use]
+    pub fn ceiling(self) -> Self {
+        Self(self.0.ceiling())
+    }
+
+    /// Returns true if this normalized number is equal to `rhs`.
+    #[must_use]
+    pub fn eq(&self, rhs: &Self) -> bool {
+        self.0.eq(&rhs.0)
+    }
+
+    /// Returns true if `self` is strictly less than `rhs`.
+    #[must_use]
+    pub fn lt(&self, rhs: &Self) -> bool {
+        self.0.lt(&rhs.0)
+    }
+
+    /// Returns true if `self` is strictly greater than `rhs`.
+    #[must_use]
+    pub fn gt(&self, rhs: &Self) -> bool {
+        self.0.gt(&rhs.0)
+    }
+
+    /// Returns true if `self` is less than or equal to `rhs`.
+    #[must_use]
+    pub fn lte(&self, rhs: &Self) -> bool {
+        self.0.lte(&rhs.0)
+    }
+
+    /// Returns true if `self` is greater than or equal to `rhs`.
+    #[must_use]
+    pub fn gte(&self, rhs: &Self) -> bool {
+        self.0.gte(&rhs.0)
+    }
+}
+
+impl PartialEq<Number> for NormalizedNumber {
+    fn eq(&self, other: &Number) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<NormalizedNumber> for Number {
+    fn eq(&self, other: &NormalizedNumber) -> bool {
+        *self == other.0
+    }
+}
+
+impl ops::Neg for NormalizedNumber {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(-self.0)
+    }
+}
+
+impl ops::Add for NormalizedNumber {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl ops::Add<Number> for NormalizedNumber {
+    type Output = Self;
+
+    fn add(self, rhs: Number) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl ops::Add<NormalizedNumber> for Number {
+    type Output = NormalizedNumber;
+
+    fn add(self, rhs: NormalizedNumber) -> Self::Output {
+        NormalizedNumber(self + rhs.0)
+    }
+}
+
+impl ops::Sub for NormalizedNumber {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl ops::Sub<Number> for NormalizedNumber {
+    type Output = Self;
+
+    fn sub(self, rhs: Number) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}
+
+impl ops::Sub<NormalizedNumber> for Number {
+    type Output = NormalizedNumber;
+
+    fn sub(self, rhs: NormalizedNumber) -> Self::Output {
+        NormalizedNumber(self - rhs.0)
+    }
+}
+
+impl ops::Mul for NormalizedNumber {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(self.0 * rhs.0)
+    }
+}
+
+impl ops::Mul<Number> for NormalizedNumber {
+    type Output = Self;
+
+    fn mul(self, rhs: Number) -> Self::Output {
+        Self(self.0 * rhs)
+    }
+}
+
+impl ops::Mul<NormalizedNumber> for Number {
+    type Output = NormalizedNumber;
+
+    fn mul(self, rhs: NormalizedNumber) -> Self::Output {
+        NormalizedNumber(self * rhs.0)
+    }
+}
+
+impl ops::Div for NormalizedNumber {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self(self.0 / rhs.0)
+    }
+}
+
+impl ops::Div<Number> for NormalizedNumber {
+    type Output = Self;
+
+    fn div(self, rhs: Number) -> Self::Output {
+        Self(self.0 / rhs)
+    }
+}
+
+impl ops::Div<NormalizedNumber> for Number {
+    type Output = NormalizedNumber;
+
+    fn div(self, rhs: NormalizedNumber) -> Self::Output {
+        NormalizedNumber(self / rhs.0)
+    }
+}
+
+impl ops::Rem for NormalizedNumber {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        Self(self.0 % rhs.0)
+    }
+}
+
+impl ops::Rem<Number> for NormalizedNumber {
+    type Output = Self;
+
+    fn rem(self, rhs: Number) -> Self::Output {
+        Self(self.0 % rhs)
+    }
+}
+
+impl ops::Rem<NormalizedNumber> for Number {
+    type Output = NormalizedNumber;
+
+    fn rem(self, rhs: NormalizedNumber) -> Self::Output {
+        NormalizedNumber(self % rhs.0)
+    }
+}
+
+/// A number value in Oneil.
+///
+/// A number value is either a scalar or an interval.
+#[derive(Debug, Clone, Copy)]
+pub enum Number {
+    /// A scalar number value.
+    Scalar(f64),
+    /// An interval number value.
+    Interval(Interval),
+}
+
+impl Number {
+    /// Creates a new scalar number value.
+    #[must_use]
+    pub const fn new_scalar(value: f64) -> Self {
+        Self::Scalar(value)
+    }
+
+    /// Creates a new interval number value.
+    #[must_use]
+    pub fn new_interval(min: f64, max: f64) -> Self {
+        Self::Interval(Interval::new(min, max))
+    }
+
+    /// Creates a new empty interval number value.
+    #[must_use]
+    pub const fn new_empty() -> Self {
+        Self::Interval(Interval::empty())
+    }
+
+    /// Returns the type of the number value.
+    #[must_use]
+    pub const fn type_(&self) -> NumberType {
+        match self {
+            Self::Scalar(_) => NumberType::Scalar,
+            Self::Interval(_) => NumberType::Interval,
+        }
+    }
+
+    /// Returns the minimum value of the number value.
+    ///
+    /// For scalar values, this is simply the value itself.
+    #[must_use]
+    pub const fn min(&self) -> f64 {
+        match self {
+            Self::Scalar(value) => *value,
+            Self::Interval(interval) => interval.min(),
+        }
+    }
+
+    /// Returns the maximum value of the number value.
+    ///
+    /// For scalar values, this is simply the value itself.
+    #[must_use]
+    pub const fn max(&self) -> f64 {
+        match self {
+            Self::Scalar(value) => *value,
+            Self::Interval(interval) => interval.max(),
+        }
+    }
+
+    /// Subtracts two number values. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it subtracts the minimum
+    /// from the minimum and the maximum from the maximum.
+    #[must_use]
+    pub fn escaped_sub(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs - rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).escaped_sub(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.escaped_sub(Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.escaped_sub(rhs)),
+        }
+    }
+
+    /// Divides two number values. This does not apply the
+    /// standard rules of interval arithmetic. Instead, it divides the minimum
+    /// by the minimum and the maximum by the maximum.
+    #[must_use]
+    pub fn escaped_div(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs / rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).escaped_div(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.escaped_div(Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.escaped_div(rhs)),
+        }
+    }
+
+    /// Raises a number value to the power of another.
+    #[must_use]
+    pub fn pow(self, exponent: Self) -> Self {
+        match (self, exponent) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs.powf(rhs)),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).pow(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.pow(Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.pow(rhs)),
+        }
+    }
+
+    /// Returns the intersection of two number values.
+    ///
+    /// This operation converts both number values to intervals
+    /// (if they are not already) and then returns the
+    /// intersection of the two intervals.
+    ///
+    /// This operation always returns an interval number value.
+    #[must_use]
+    pub fn intersection(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(Interval::from(lhs).intersection(Interval::from(rhs)))
+            }
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).intersection(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.intersection(Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs.intersection(rhs)),
+        }
+    }
+
+    /// Returns the smallest interval that contains both number values.
+    ///
+    /// For example:
+    ///
+    /// ```text
+    /// |--- a ---|
+    ///        |--- b ---|
+    /// |---- result ----|
+    /// ```
+    ///
+    /// ```text
+    ///              |--- a ---|
+    /// |--- b ---|
+    /// |------- result -------|
+    /// ```
+    ///
+    /// This operation always returns an interval number value.
+    #[must_use]
+    pub fn tightest_enclosing_interval(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => {
+                let min = f64::min(lhs, rhs);
+                let max = f64::max(lhs, rhs);
+                Self::Interval(Interval::new(min, max))
+            }
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                Self::Interval(Interval::from(lhs).tightest_enclosing_interval(rhs))
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                Self::Interval(lhs.tightest_enclosing_interval(Interval::from(rhs)))
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => {
+                Self::Interval(lhs.tightest_enclosing_interval(rhs))
+            }
+        }
+    }
+
+    /// Checks if `self` contains another number value.
+    ///
+    /// If `self` is a scalar, then the other value must be equal to `self`.
+    ///
+    /// If `self` is an interval, then the other value must be contained in `self`.
+    #[must_use]
+    pub fn contains(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => is_close(*lhs, *rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                is_close(*lhs, rhs.min()) && is_close(*lhs, rhs.max())
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => *rhs >= lhs.min() && *rhs <= lhs.max(),
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.contains(rhs),
+        }
+    }
+
+    /// Returns the square root of the number value.
+    #[must_use]
+    pub fn sqrt(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.sqrt()),
+            Self::Interval(interval) => Self::Interval(interval.sqrt()),
+        }
+    }
+
+    /// Returns the sine of the number value (angle in radians).
+    #[must_use]
+    pub fn sin(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.sin()),
+            Self::Interval(interval) => Self::Interval(interval.sin()),
+        }
+    }
+
+    /// Returns the cosine of the number value (angle in radians).
+    #[must_use]
+    pub fn cos(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.cos()),
+            Self::Interval(interval) => Self::Interval(interval.cos()),
+        }
+    }
+
+    /// Returns the tangent of the number value (angle in radians).
+    #[must_use]
+    pub fn tan(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.tan()),
+            Self::Interval(interval) => Self::Interval(interval.tan()),
+        }
+    }
+
+    /// Returns the arc sine of the number value (result in radians).
+    #[must_use]
+    pub fn asin(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.asin()),
+            Self::Interval(interval) => Self::Interval(interval.asin()),
+        }
+    }
+
+    /// Returns the arc cosine of the number value (result in radians).
+    #[must_use]
+    pub fn acos(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.acos()),
+            Self::Interval(interval) => Self::Interval(interval.acos()),
+        }
+    }
+
+    /// Returns the arc tangent of the number value (result in radians).
+    #[must_use]
+    pub fn atan(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.atan()),
+            Self::Interval(interval) => Self::Interval(interval.atan()),
+        }
+    }
+
+    /// Returns the natural logarithm of the number value.
+    #[must_use]
+    pub fn ln(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.ln()),
+            Self::Interval(interval) => Self::Interval(interval.ln()),
+        }
+    }
+
+    /// Returns the base 10 logarithm of the number value.
+    #[must_use]
+    pub fn log10(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.log10()),
+            Self::Interval(interval) => Self::Interval(interval.log10()),
+        }
+    }
+
+    /// Returns the base 2 logarithm of the number value.
+    #[must_use]
+    pub fn log2(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.log2()),
+            Self::Interval(interval) => Self::Interval(interval.log2()),
+        }
+    }
+
+    /// Returns the absolute value of the number.
+    #[must_use]
+    pub fn abs(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.abs()),
+            Self::Interval(interval) => Self::Interval(interval.abs()),
+        }
+    }
+
+    /// Returns the sign of the number: -1 for negative, 0 for zero, or 1 for positive.
+    ///
+    /// For an interval, returns the tightest interval containing the possible sign values.
+    #[must_use]
+    pub fn sign(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.signum()),
+            Self::Interval(interval) => Self::Interval(interval.sign()),
+        }
+    }
+
+    /// Returns the number rounded down to the nearest integer.
+    #[must_use]
+    pub fn floor(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.floor()),
+            Self::Interval(interval) => Self::Interval(interval.floor()),
+        }
+    }
+
+    /// Returns the number rounded up to the nearest integer.
+    #[must_use]
+    pub fn ceiling(self) -> Self {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value.ceil()),
+            Self::Interval(interval) => Self::Interval(interval.ceiling()),
+        }
+    }
+
+    /// Returns true if `self` is strictly less than `rhs`.
+    ///
+    /// For scalars, uses the built-in `<` operator. For intervals, delegates to [`Interval::lt`].
+    #[must_use]
+    pub fn lt(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs < rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs < rhs.min(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.max() < *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.lt(rhs),
+        }
+    }
+
+    /// Returns true if `self` is strictly greater than `rhs`.
+    ///
+    /// For scalars, uses the built-in `>` operator. For intervals, delegates to [`Interval::gt`].
+    #[must_use]
+    pub fn gt(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs > rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs > rhs.max(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.min() > *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.gt(rhs),
+        }
+    }
+
+    /// Returns true if `self` is less than or equal to `rhs`.
+    ///
+    /// For scalars, uses the built-in `<=` operator. For intervals, delegates to [`Interval::lte`].
+    ///
+    /// Note that this must be implemented seperately from `lt` because `lte`
+    /// differs from `lt` for intervals. See [`Interval::lte`] for more details.
+    #[must_use]
+    pub fn lte(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs <= rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs <= rhs.min(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.max() <= *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.lte(rhs),
+        }
+    }
+
+    /// Returns true if `self` is greater than or equal to `rhs`.
+    ///
+    /// For scalars, uses the built-in `>=` operator. For intervals, delegates to [`Interval::gte`].
+    ///
+    /// Note that this must be implemented seperately from `gt` because `gte`
+    /// differs from `gt` for intervals. See [`Interval::gte`] for more details.
+    #[must_use]
+    pub fn gte(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs >= rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs >= rhs.max(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.min() >= *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.gte(rhs),
+        }
+    }
+}
+
+impl PartialEq for Number {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self, other) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => is_close(*lhs, *rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => {
+                is_close(*lhs, rhs.min()) && is_close(*lhs, rhs.max())
+            }
+            (Self::Interval(lhs), Self::Scalar(rhs)) => {
+                is_close(lhs.min(), *rhs) && is_close(lhs.max(), *rhs)
+            }
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.eq(rhs),
+        }
+    }
+}
+
+impl ops::Neg for Number {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Self::Scalar(value) => Self::Scalar(-value),
+            Self::Interval(interval) => Self::Interval(-interval),
+        }
+    }
+}
+
+impl ops::Add for Number {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs + rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => Self::Interval(Interval::from(lhs) + rhs),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs + Interval::from(rhs)),
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs + rhs),
+        }
+    }
+}
+
+impl ops::Sub for Number {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs - rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => Self::Interval(Interval::from(lhs) - rhs),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs - Interval::from(rhs)),
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs - rhs),
+        }
+    }
+}
+
+impl ops::Mul for Number {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs * rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => Self::Interval(Interval::from(lhs) * rhs),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs * Interval::from(rhs)),
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs * rhs),
+        }
+    }
+}
+
+impl ops::Mul<f64> for Number {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value * rhs),
+            Self::Interval(interval) => Self::Interval(interval * Interval::from(rhs)),
+        }
+    }
+}
+
+impl ops::Div for Number {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs / rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => Self::Interval(Interval::from(lhs) / rhs),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs / Interval::from(rhs)),
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs / rhs),
+        }
+    }
+}
+
+impl ops::Div<f64> for Number {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        match self {
+            Self::Scalar(value) => Self::Scalar(value / rhs),
+            Self::Interval(interval) => Self::Interval(interval / Interval::from(rhs)),
+        }
+    }
+}
+
+impl ops::Rem for Number {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => Self::Scalar(lhs % rhs),
+            (Self::Scalar(lhs), Self::Interval(rhs)) => Self::Interval(Interval::from(lhs) % rhs),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => Self::Interval(lhs % rhs), // use the specialized version of the modulo operation
+            (Self::Interval(lhs), Self::Interval(rhs)) => Self::Interval(lhs % rhs),
+        }
+    }
+}
+
+impl fmt::Display for Number {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Scalar(value) => write!(f, "{value}"),
+            Self::Interval(interval) => write!(f, "{} | {}", interval.min(), interval.max()),
+        }
+    }
+}

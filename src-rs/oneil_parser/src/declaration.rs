@@ -14,7 +14,7 @@ use oneil_ast::{
 use oneil_shared::span::Span;
 
 use crate::{
-    error::{ErrorHandlingParser, ParserError},
+    error::{ParserError, parser_trait::ErrorHandlingParser},
     parameter::parse as parse_parameter,
     test::parse as parse_test,
     token::{
@@ -693,7 +693,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 1);
 
             let submodel = &submodels[0];
@@ -719,7 +721,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 1);
 
             let submodel = &submodels[0];
@@ -745,7 +749,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 1);
 
             let submodel = &submodels[0];
@@ -772,7 +778,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
@@ -806,7 +814,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
@@ -838,7 +848,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
@@ -872,7 +884,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
@@ -903,7 +917,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels - should be empty
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 0);
 
             assert_eq!(rest.fragment(), &"");
@@ -924,7 +940,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "bar");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
@@ -963,7 +981,9 @@ mod tests {
             assert_eq!(use_model_node.directory_path()[0].as_str(), "utils");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];
@@ -994,7 +1014,9 @@ mod tests {
             assert_eq!(use_model_info.get_alias().as_str(), "foo");
 
             // Check submodels
-            let submodels = use_model_node.submodels().expect("should have submodels");
+            let submodels = use_model_node
+                .imported_submodels()
+                .expect("should have submodels");
             assert_eq!(submodels.len(), 2);
 
             let submodel1 = &submodels[0];

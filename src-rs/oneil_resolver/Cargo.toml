@@ -1,0 +1,27 @@
+[package]
+name = "oneil_resolver"
+description = "Resolver for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+oneil_ast = { path = "../oneil_ast" }
+oneil_shared = { path = "../oneil_shared" }
+oneil_ir = { path = "../oneil_ir" }
+indexmap = { workspace = true }
+
+[features]
+default = ["python"]
+python = []
+
+[dev-dependencies]
+oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
+
+[lints]
+workspace = true

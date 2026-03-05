@@ -1,9 +1,8 @@
 #![cfg_attr(doc, doc = include_str!("../README.md"))]
 //! Parser for the Oneil programming language
 
-use oneil_ast::{
-    DeclNode, ExprNode, Model, ModelNode, NoteNode, ParameterNode, TestNode, UnitExprNode,
-};
+use oneil_ast::{DeclNode, ExprNode, ModelNode, NoteNode, ParameterNode, TestNode, UnitExprNode};
+use oneil_shared::partial::{MaybePartialResult, PartialError};
 
 mod config;
 pub mod error;
@@ -30,8 +29,9 @@ pub use config::Config;
 pub fn parse_model(
     input: &str,
     config: Option<Config>,
-) -> Result<ModelNode, error::ErrorsWithPartialResult<Box<Model>, error::ParserError>> {
-    parse(input, config, model::parse_complete)
+) -> MaybePartialResult<ModelNode, Vec<error::ParserError>> {
+    let result = parse(input, config, model::parse_complete).map_err(|e| PartialError::from(*e));
+    MaybePartialResult::from(result)
 }
 
 /// Parses a single declaration from source code.

@@ -1,23 +1,45 @@
-use std::iter;
+use std::{iter, path::Path};
 
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
+use oneil_output::{Number, Value};
+
 use crate::{
-    builtin::BuiltinFunction,
-    context::EvalContext,
-    error::EvalError,
-    value::{Number, Value},
+    context::{EvalContext, ExternalEvaluationContext},
+    error::{
+        EvalError,
+        convert::{binary_eval_error_to_eval_error, unary_eval_error_to_eval_error},
+    },
 };
+
+/// Evaluates an expression in the context of the given model.
+///
+/// # Errors
+///
+/// Returns an error if the expression is invalid.
+// TODO: remove the `&mut`, since the context is never actually mutated.
+//       Maybe add a new kind of context? Also do the same when resolving
+//       an IR expression
+pub fn eval_expr_in_model<E: ExternalEvaluationContext>(
+    expr: &ir::Expr,
+    model_path: &Path,
+    context: &mut E,
+) -> Result<Value, Vec<EvalError>> {
+    let mut eval_context = EvalContext::with_preloaded_models(context);
+    eval_context.push_active_model(model_path.to_path_buf());
+
+    eval_expr(expr, &eval_context).map(|(value, _span)| value)
+}
 
 /// Evaluates an expression and returns the resulting value.
 ///
 /// # Errors
 ///
 /// Returns an error if the expression is invalid.
-pub fn eval_expr<'a, F: BuiltinFunction>(
+pub fn eval_expr<'a, E: ExternalEvaluationContext>(
     expr: &'a ir::Expr,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<(Value, &'a Span), Vec<EvalError>> {
     match expr {
         ir::Expr::ComparisonOp {
@@ -63,11 +85,12 @@ pub fn eval_expr<'a, F: BuiltinFunction>(
         ir::Expr::FunctionCall {
             name,
             args,
-            span,
+            span: function_call_span,
             name_span: _,
         } => {
             let args_results = eval_function_call_args(args, context)?;
-            eval_function_call(name, args_results, context).map(|result| (result, span))
+            eval_function_call(name, *function_call_span, args_results, context)
+                .map(|result| (result, function_call_span))
         }
         ir::Expr::Variable { variable, span } => {
             eval_variable(variable, context).map(|result| (result, span))
@@ -85,12 +108,12 @@ struct ComparisonSubexpressionsResult {
     rest_results: Vec<(ir::ComparisonOp, (Value, Span))>,
 }
 
-fn eval_comparison_subexpressions<F: BuiltinFunction>(
+fn eval_comparison_subexpressions<E: ExternalEvaluationContext>(
     left: &ir::Expr,
     op: ir::ComparisonOp,
     right: &ir::Expr,
     rest_chained: &[(ir::ComparisonOp, ir::Expr)],
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<ComparisonSubexpressionsResult, Vec<EvalError>> {
     let left_result = eval_expr(left, context);
     let rest_results = iter::once((op, right))
@@ -235,7 +258,7 @@ fn eval_comparison_op(
         ir::ComparisonOp::GreaterThanEq => lhs.checked_gte(rhs),
     };
 
-    result.map_err(|error| Box::new(error.into_eval_error(lhs_span, rhs_span)))
+    result.map_err(|error| Box::new(binary_eval_error_to_eval_error(error, lhs_span, rhs_span)))
 }
 
 struct BinaryOpSubexpressionsResult {
@@ -245,10 +268,10 @@ struct BinaryOpSubexpressionsResult {
     right_result_span: Span,
 }
 
-fn eval_binary_op_subexpressions<F: BuiltinFunction>(
+fn eval_binary_op_subexpressions<E: ExternalEvaluationContext>(
     left: &ir::Expr,
     right: &ir::Expr,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<BinaryOpSubexpressionsResult, Vec<EvalError>> {
     let left_result = eval_expr(left, context);
     let right_result = eval_expr(right, context);
@@ -291,7 +314,13 @@ fn eval_binary_op(
         ir::BinaryOp::MinMax => left_result.checked_min_max(right_result),
     };
 
-    result.map_err(|error| vec![error.into_eval_error(left_result_span, right_result_span)])
+    result.map_err(|error| {
+        vec![binary_eval_error_to_eval_error(
+            error,
+            left_result_span,
+            right_result_span,
+        )]
+    })
 }
 
 fn eval_unary_op(
@@ -304,12 +333,12 @@ fn eval_unary_op(
         ir::UnaryOp::Not => expr_result.checked_not(),
     };
 
-    result.map_err(|error| vec![error.into_eval_error(expr_result_span)])
+    result.map_err(|error| vec![unary_eval_error_to_eval_error(error, expr_result_span)])
 }
 
-fn eval_function_call_args<F: BuiltinFunction>(
+fn eval_function_call_args<E: ExternalEvaluationContext>(
     args: &[ir::Expr],
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Vec<(Value, Span)>, Vec<EvalError>> {
     let args_results = args.iter().map(|arg| eval_expr(arg, context));
 
@@ -330,24 +359,29 @@ fn eval_function_call_args<F: BuiltinFunction>(
     Ok(args)
 }
 
-fn eval_function_call<F: BuiltinFunction>(
+fn eval_function_call<E: ExternalEvaluationContext>(
     name: &ir::FunctionName,
+    function_call_span: Span,
     args: Vec<(Value, Span)>,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {
     match name {
         ir::FunctionName::Builtin(fn_identifier, fn_identifier_span) => {
             context.evaluate_builtin_function(fn_identifier, *fn_identifier_span, args)
         }
-        ir::FunctionName::Imported(fn_identifier, fn_identifier_span) => {
-            context.evaluate_imported_function(fn_identifier, *fn_identifier_span, args)
-        }
+        ir::FunctionName::Imported {
+            python_path,
+            name,
+            name_span: _,
+        } => context
+            .evaluate_imported_function(python_path, name, function_call_span, args)
+            .map_err(|error| vec![*error]),
     }
 }
 
-fn eval_variable<F: BuiltinFunction>(
+fn eval_variable<E: ExternalEvaluationContext>(
     variable: &ir::Variable,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {
     match variable {
         ir::Variable::Builtin {

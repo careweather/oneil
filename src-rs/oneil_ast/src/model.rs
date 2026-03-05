@@ -28,6 +28,16 @@ impl Model {
         }
     }
 
+    /// Creates a new empty model
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            note: None,
+            decls: vec![],
+            sections: vec![],
+        }
+    }
+
     /// Returns the optional note attached to this model
     #[must_use]
     pub const fn note(&self) -> Option<&NoteNode> {
@@ -44,6 +54,12 @@ impl Model {
     #[must_use]
     pub fn sections(&self) -> &[SectionNode] {
         &self.sections
+    }
+}
+
+impl Default for Model {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 

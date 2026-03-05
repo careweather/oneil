@@ -15,7 +15,7 @@ pub use debug_info::TraceLevel;
 pub use expr::{
     BinaryOp, ComparisonOp, Expr, ExprVisitor, FunctionName, Literal, UnaryOp, Variable,
 };
-pub use model::{Model, ModelCollection};
+pub use model::Model;
 pub use model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName};
 pub use parameter::{
     Dependencies, Label, Limits, Parameter, ParameterName, ParameterValue, PiecewiseExpr,
@@ -23,4 +23,4 @@ pub use parameter::{
 pub use python_import::PythonImport;
 pub use reference::{Identifier, ModelPath, PythonPath};
 pub use test::{Test, TestIndex};
-pub use unit::{CompositeUnit, DisplayCompositeUnit, DisplayUnit, Unit};
+pub use unit::{CompositeUnit, DisplayCompositeUnit, DisplayUnit, Unit, UnitInfo};

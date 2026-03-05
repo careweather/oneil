@@ -1,0 +1,26 @@
+[package]
+name = "oneil_python"
+description = "Python integration for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+indexmap.workspace = true
+oneil_builtins = { path = "../oneil_builtins" }
+oneil_output = { path = "../oneil_output" }
+oneil_shared = { path = "../oneil_shared" }
+pyo3 = { workspace = true }
+
+[features]
+default = ["python-lib", "rust-lib"]
+python-lib = []
+rust-lib = []
+
+[lints]
+workspace = true

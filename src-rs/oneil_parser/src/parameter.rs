@@ -1,9 +1,11 @@
 //! Parser for parameter declarations in an Oneil program.
 
-use nom::Parser;
-use nom::branch::alt;
-use nom::combinator::{all_consuming, opt};
-use nom::multi::{many0, separated_list1};
+use nom::{
+    Parser,
+    branch::alt,
+    combinator::{all_consuming, opt},
+    multi::{many0, separated_list1},
+};
 use oneil_ast::{
     IdentifierNode, LabelNode, Limits, LimitsNode, Node, Parameter, ParameterNode, ParameterValue,
     ParameterValueNode, PerformanceMarker, PerformanceMarkerNode, PiecewisePart, PiecewisePartNode,
@@ -11,20 +13,22 @@ use oneil_ast::{
 };
 use oneil_shared::span::Span;
 
-use crate::error::{ErrorHandlingParser, ParserError};
-use crate::expression::parse as parse_expr;
-use crate::note::parse as parse_note;
-use crate::token::{
-    keyword::if_,
-    naming::{identifier, label},
-    structure::end_of_line,
-    symbol::{
-        brace_left, bracket_left, bracket_right, colon, comma, dollar, equals, paren_left,
-        paren_right, star, star_star,
+use crate::{
+    error::{ParserError, parser_trait::ErrorHandlingParser},
+    expression::parse as parse_expr,
+    note::parse as parse_note,
+    token::{
+        keyword::if_,
+        naming::{identifier, label},
+        structure::end_of_line,
+        symbol::{
+            brace_left, bracket_left, bracket_right, colon, comma, dollar, equals, paren_left,
+            paren_right, star, star_star,
+        },
     },
+    unit::parse as parse_unit,
+    util::{InputSpan, Result},
 };
-use crate::unit::parse as parse_unit;
-use crate::util::{InputSpan, Result};
 
 /// Parse a parameter declaration, e.g. `$ * x(0,100): y = 2*z : kg`.
 ///

@@ -11,10 +11,14 @@ categories.workspace = true
 readme = "README.md"
 
 [dependencies]
+oneil_output = { path = "../oneil_output" }
 oneil_shared = { path = "../oneil_shared" }
 oneil_ir = { path = "../oneil_ir" }
-arbitrary = { version = "1.4.2", optional = true }
 indexmap = { workspace = true }
+
+[features]
+default = ["python"]
+python = []
 
 [dev-dependencies]
 oneil_shared = { path = "../oneil_shared", features = ["random_span"] }

@@ -28,6 +28,8 @@ pub struct OneilError {
     context: Vec<Context>,
     /// Optional context information with source location
     context_with_source: Vec<(Context, ErrorLocation)>,
+    /// Whether the error is an internal error.
+    is_internal_error: bool,
 }
 
 impl OneilError {
@@ -68,6 +70,7 @@ impl OneilError {
         let location = None;
         let context = error.context();
         let context_with_source = vec![];
+        let is_internal_error = error.is_internal_error();
 
         Self {
             path,
@@ -75,6 +78,7 @@ impl OneilError {
             location,
             context,
             context_with_source,
+            is_internal_error,
         }
     }
 
@@ -141,12 +145,15 @@ impl OneilError {
             }
         }
 
+        let is_internal_error = error.is_internal_error();
+
         Self {
             path,
             message,
             location,
             context,
             context_with_source,
+            is_internal_error,
         }
     }
 
@@ -226,8 +233,8 @@ impl OneilError {
     ///
     /// Returns a reference to the error message string.
     #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
+    pub const fn message(&self) -> &str {
+        self.message.as_str()
     }
 
     /// Returns the optional source location information
@@ -246,8 +253,8 @@ impl OneilError {
     ///
     /// Returns a reference to the context information.
     #[must_use]
-    pub fn context(&self) -> &[Context] {
-        &self.context
+    pub const fn context(&self) -> &[Context] {
+        self.context.as_slice()
     }
 
     /// Returns the optional context information with source location
@@ -256,7 +263,17 @@ impl OneilError {
     ///
     /// Returns a reference to the context information with source location.
     #[must_use]
-    pub fn context_with_source(&self) -> &[(Context, ErrorLocation)] {
-        &self.context_with_source
+    pub const fn context_with_source(&self) -> &[(Context, ErrorLocation)] {
+        self.context_with_source.as_slice()
+    }
+
+    /// Returns whether the error is an internal error.
+    ///
+    /// Internal errors are errors that are not important for the user to see,
+    /// such as errors that are caused by other errors. In that case, it's most
+    /// useful to see only the first error.
+    #[must_use]
+    pub const fn is_internal_error(&self) -> bool {
+        self.is_internal_error
     }
 }

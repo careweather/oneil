@@ -1,0 +1,22 @@
+[package]
+name = "oneil_output"
+description = "Output and value types for the Oneil programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[features]
+arbitrary = ["dep:arbitrary"]
+
+[dependencies]
+oneil_shared = { path = "../oneil_shared" }
+indexmap = { workspace = true }
+arbitrary = { version = "1.4.2", optional = true }
+
+[lints]
+workspace = true

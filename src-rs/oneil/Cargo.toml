@@ -1,7 +1,7 @@
 [package]
 name = "oneil"
-description = "CLI tool for using the Oneil programming language"
 default-run = "oneil"
+description = "Oneil programming language and tools"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -11,20 +11,52 @@ repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[lib]
+name = "oneil"
+# We need to set the crate type to `cdylib` to allow the Python bindings to be
+# used in a Python extension module.
+crate-type = ["lib", "cdylib"]
+
+[features]
+default = ["rust-lib", "python-imports", "python-lib"]
+rust-lib = [
+	"oneil_analysis",
+	"oneil_ast",
+	"oneil_builtins",
+	"oneil_cli",
+	"oneil_eval",
+	"oneil_ir",
+	"oneil_lsp",
+	"oneil_output",
+	"oneil_parser",
+	"oneil_resolver",
+	"oneil_runtime",
+	"oneil_shared",
+]
+python-imports = [
+	"oneil_cli/python",
+	"oneil_eval/python",
+	"oneil_python/rust-lib",
+	"oneil_resolver/python",
+	"oneil_runtime/python",
+]
+python-lib = ["oneil_python/python-lib", "pyo3"]
+
 [dependencies]
-oneil_ast = { path = "../oneil_ast" }
-oneil_eval = { path = "../oneil_eval" }
-oneil_ir = { path = "../oneil_ir" }
-oneil_lsp = { path = "../oneil_lsp" }
-oneil_model_resolver = { path = "../oneil_model_resolver" }
-oneil_parser = { path = "../oneil_parser" }
-oneil_shared = { path = "../oneil_shared" }
-oneil_runner = { path = "../oneil_runner" }
-anstream = "0.6.21"
-clap = { version = "4.5.1", features = ["derive"] }
-indexmap = { workspace = true }
-notify = "8.2.0"
-owo-colors = "4.2.3"
+oneil_analysis = { path = "../oneil_analysis", optional = true }
+oneil_ast = { path = "../oneil_ast", optional = true }
+oneil_builtins = { path = "../oneil_builtins", optional = true }
+oneil_cli = { path = "../oneil_cli", default-features = false, optional = true }
+oneil_eval = { path = "../oneil_eval", default-features = false, optional = true }
+oneil_ir = { path = "../oneil_ir", optional = true }
+oneil_lsp = { path = "../oneil_lsp", optional = true }
+oneil_output = { path = "../oneil_output", optional = true }
+oneil_parser = { path = "../oneil_parser", optional = true }
+oneil_python = { path = "../oneil_python", default-features = false, optional = true }
+oneil_resolver = { path = "../oneil_resolver", default-features = false, optional = true }
+oneil_runtime = { path = "../oneil_runtime", default-features = false, optional = true }
+oneil_shared = { path = "../oneil_shared", default-features = false, optional = true }
+pyo3 = { workspace = true, optional = true }
 
 [lints]
 workspace = true

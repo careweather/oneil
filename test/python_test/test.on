@@ -1,0 +1,16 @@
+import calc
+
+Scalar: s = 2
+$ X: x = iter_sum(s, 10)
+
+Interval: i = 2 | 3
+$ Y: y = iter_sum(i, 10)
+
+Measured: m = 3 :m/s
+$ Z: z = iter_sum(m, 10) :m/s
+
+Interval and measured: im = 2 | 3 :m/s
+$ ZZ: zz = iter_sum(im, 10) :m/s
+
+Velocity level(1, 10): level = 1
+$ Velocity: v = calc_velocity(level) :m/s

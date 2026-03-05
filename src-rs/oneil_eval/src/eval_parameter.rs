@@ -3,12 +3,12 @@ use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
+use oneil_output::{MeasuredNumber, Number, Unit, Value};
+
 use crate::{
-    builtin::BuiltinFunction,
-    context::EvalContext,
+    context::{EvalContext, ExternalEvaluationContext},
     error::EvalError,
     eval_expr, eval_unit,
-    value::{MeasuredNumber, Number, Unit, Value},
 };
 
 pub struct EvalParameterResult {
@@ -25,9 +25,9 @@ pub struct EvalParameterResult {
 /// - The parameter value does not match the given unit, if there is one.
 /// - The parameter value is outside the limits.
 /// - The parameter unit does not match the limit.
-pub fn eval_parameter<F: BuiltinFunction>(
+pub fn eval_parameter<E: ExternalEvaluationContext>(
     parameter: &ir::Parameter,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<EvalParameterResult, Vec<EvalError>> {
     // TODO: this is about where we would use `trace_level`, but I'm not yet sure
     //       how to handle it.
@@ -35,7 +35,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
     // evaluate the value and the unit
     let (value, expr_span, unit_ir) = match parameter.value() {
         ir::ParameterValue::Simple(expr, unit) => {
-            let (value, expr_span) = eval_expr(expr, context)?;
+            let (value, expr_span) = eval_expr::eval_expr(expr, context)?;
             (value, expr_span, unit)
         }
         ir::ParameterValue::Piecewise(piecewise, unit) => {
@@ -49,9 +49,7 @@ pub fn eval_parameter<F: BuiltinFunction>(
 
     let unit = unit_ir
         .as_ref()
-        .map(|unit_ir| eval_unit(unit_ir, context))
-        .transpose()?
-        .flatten();
+        .map(|unit_ir| eval_unit::eval_unit(unit_ir, context));
 
     // typecheck the value against the unit
     let value = match (value, unit) {
@@ -74,15 +72,11 @@ pub fn eval_parameter<F: BuiltinFunction>(
             let number = MeasuredNumber::from_number_and_unit(number, unit);
             Value::MeasuredNumber(number)
         }
-        (Value::MeasuredNumber(number), None) if number.unit().is_unitless() => {
-            // if the unit is unitless, then we can just return the measured number
-            // even if there is no explicit unit
-            Value::MeasuredNumber(number)
-        }
         (Value::MeasuredNumber(number), None) => {
             return Err(vec![EvalError::ParameterMissingUnitAnnotation {
                 param_expr_span: *expr_span,
                 param_value_unit: number.unit().display_unit.clone(),
+                is_dimensionless: number.unit().is_dimensionless(),
             }]);
         }
         (Value::MeasuredNumber(number), Some((unit, unit_span)))
@@ -110,16 +104,17 @@ pub fn eval_parameter<F: BuiltinFunction>(
     })
 }
 
-fn get_piecewise_result<'a, F: BuiltinFunction>(
+fn get_piecewise_result<'a, E: ExternalEvaluationContext>(
     piecewise: &'a [ir::PiecewiseExpr],
     param_ident: &str,
     param_ident_span: Span,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<(Value, &'a Span), Vec<EvalError>> {
     // evaluate each of the conditions and their bodies
     let results = piecewise.iter().map(|piecewise_expr| {
-        let (if_result, if_expr_span) = eval_expr(piecewise_expr.if_expr(), context)?;
-        let (branch_result, branch_expr_span) = eval_expr(piecewise_expr.expr(), context)?;
+        let (if_result, if_expr_span) = eval_expr::eval_expr(piecewise_expr.if_expr(), context)?;
+        let (branch_result, branch_expr_span) =
+            eval_expr::eval_expr(piecewise_expr.expr(), context)?;
 
         match if_result {
             Value::Boolean(true) => Ok(Some((branch_result, branch_expr_span, if_expr_span))),
@@ -207,9 +202,9 @@ enum Limits {
     },
 }
 
-fn eval_limits<F: BuiltinFunction>(
+fn eval_limits<E: ExternalEvaluationContext>(
     limits: &ir::Limits,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Limits, Vec<EvalError>> {
     match limits {
         ir::Limits::Default => Ok(Limits::AnyStringOrBooleanOrPositiveNumber),
@@ -225,13 +220,13 @@ fn eval_limits<F: BuiltinFunction>(
     }
 }
 
-fn eval_continuous_limits<F: BuiltinFunction>(
+fn eval_continuous_limits<E: ExternalEvaluationContext>(
     min: &oneil_ir::Expr,
     max: &oneil_ir::Expr,
     limit_expr_span: &Span,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Limits, Vec<EvalError>> {
-    let min = eval_expr(min, context).and_then(|(value, expr_span)| match value {
+    let min = eval_expr::eval_expr(min, context).and_then(|(value, expr_span)| match value {
         Value::MeasuredNumber(number) => {
             let (number, unit) = number.into_number_and_unit();
             Ok((number, *expr_span, Some(unit)))
@@ -245,7 +240,7 @@ fn eval_continuous_limits<F: BuiltinFunction>(
         }
     });
 
-    let max = eval_expr(max, context).and_then(|(value, expr_span)| match value {
+    let max = eval_expr::eval_expr(max, context).and_then(|(value, expr_span)| match value {
         Value::MeasuredNumber(number) => {
             let (number, unit) = number.into_number_and_unit();
             Ok((number, *expr_span, Some(unit)))
@@ -302,12 +297,14 @@ fn eval_continuous_limits<F: BuiltinFunction>(
     clippy::panic_in_result_fn,
     reason = "enforcing an invariant that should always hold"
 )]
-fn eval_discrete_limits<F: BuiltinFunction>(
+fn eval_discrete_limits<E: ExternalEvaluationContext>(
     values: &[ir::Expr],
     limit_expr_span: &Span,
-    context: &EvalContext<F>,
+    context: &EvalContext<'_, E>,
 ) -> Result<Limits, Vec<EvalError>> {
-    let values = values.iter().map(|value| eval_expr(value, context));
+    let values = values
+        .iter()
+        .map(|value| eval_expr::eval_expr(value, context));
 
     let mut errors = Vec::new();
     let mut results = Vec::new();
@@ -750,10 +747,13 @@ fn verify_value_is_within_string_discrete_limit(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use oneil_output::Dimension;
+
     use crate::{
-        assert_is_close, assert_units_dimensionally_eq,
-        builtin::{self},
-        value::Dimension,
+        assert_is_close, assert_units_dimensionally_eq, context::EvalContext,
+        test_context::TestExternalContext,
     };
 
     use super::*;
@@ -762,7 +762,10 @@ mod tests {
     fn eval_no_unit() {
         // setup parameter and context
         let parameter = helper::build_simple_parameter("x", 1.0, []);
-        let context = helper::create_eval_context([]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         // check the parameter value
@@ -781,8 +784,15 @@ mod tests {
     #[test]
     fn eval_with_unit_m() {
         // setup parameter and context
-        let parameter = helper::build_simple_parameter("x", 1.0, [("m", 1.0)]);
-        let context = helper::create_eval_context([]);
+        let parameter = helper::build_simple_parameter(
+            "x",
+            1.0,
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -811,8 +821,15 @@ mod tests {
     #[test]
     fn eval_with_unit_km() {
         // setup parameter and context
-        let parameter = helper::build_simple_parameter("x", 1.0, [("km", 1.0)]);
-        let context = helper::create_eval_context([]);
+        let parameter = helper::build_simple_parameter(
+            "x",
+            1.0,
+            [helper::UnitSpec::new(Some("m"), Some("k"), false, 1.0)],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -841,8 +858,18 @@ mod tests {
     #[test]
     fn eval_with_unit_km_per_hr() {
         // setup parameter and context
-        let parameter = helper::build_simple_parameter("x", 1.0, [("km", 1.0), ("hr", -1.0)]);
-        let context = helper::create_eval_context([]);
+        let parameter = helper::build_simple_parameter(
+            "x",
+            1.0,
+            [
+                helper::UnitSpec::new(Some("m"), Some("k"), false, 1.0),
+                helper::UnitSpec::new(Some("hr"), None, false, -1.0),
+            ],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)];
@@ -872,8 +899,15 @@ mod tests {
     #[test]
     fn eval_with_unit_db() {
         // setup parameter and context
-        let parameter = helper::build_simple_parameter("x", 1.0, [("dB", 1.0)]);
-        let context = helper::create_eval_context([]);
+        let parameter = helper::build_simple_parameter(
+            "x",
+            1.0,
+            [helper::UnitSpec::new(None, None, true, 1.0)],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [];
@@ -903,8 +937,15 @@ mod tests {
     #[test]
     fn eval_with_unit_dbw() {
         // setup parameter and context
-        let parameter = helper::build_simple_parameter("x", 1.0, [("dBW", 1.0)]);
-        let context = helper::create_eval_context([]);
+        let parameter = helper::build_simple_parameter(
+            "x",
+            1.0,
+            [helper::UnitSpec::new(Some("W"), None, true, 1.0)],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [
@@ -937,13 +978,33 @@ mod tests {
     #[test]
     fn eval_add_parameters_with_different_units() {
         // setup context with x = 1.0 m and y = 1.0 km
-        let context = helper::create_eval_context([
-            ("x", 1.0, vec![("m", 1.0)]),
-            ("y", 1.0, vec![("km", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    1.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    1.0,
+                    vec![helper::UnitSpec::new(Some("m"), Some("k"), false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x + y with unit km
-        let parameter = helper::build_add_parameter("z", "x", "y", [("km", 1.0)]);
+        let parameter = helper::build_add_parameter(
+            "z",
+            "x",
+            "y",
+            [helper::UnitSpec::new(Some("m"), Some("k"), false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -973,13 +1034,37 @@ mod tests {
     #[test]
     fn eval_add_parameters_kg_m_per_s2_and_n() {
         // setup context with x = 1.0 kg*m/s^2 and y = 1.0 N
-        let context = helper::create_eval_context([
-            ("x", 1.0, vec![("kg", 1.0), ("m", 1.0), ("s", -2.0)]),
-            ("y", 1.0, vec![("N", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    1.0,
+                    vec![
+                        helper::UnitSpec::new(Some("g"), Some("k"), false, 1.0),
+                        helper::UnitSpec::new(Some("m"), None, false, 1.0),
+                        helper::UnitSpec::new(Some("s"), None, false, -2.0),
+                    ],
+                ),
+                (
+                    "y",
+                    1.0,
+                    vec![helper::UnitSpec::new(Some("N"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x + y with unit N
-        let parameter = helper::build_add_parameter("z", "x", "y", [("N", 1.0)]);
+        let parameter = helper::build_add_parameter(
+            "z",
+            "x",
+            "y",
+            [helper::UnitSpec::new(Some("N"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [
@@ -1013,13 +1098,33 @@ mod tests {
     #[test]
     fn eval_add_parameters_dbw_and_w() {
         // setup context with x = 1.0 dBW and y = 1.0 W
-        let context = helper::create_eval_context([
-            ("x", 1.0, vec![("dBW", 1.0)]),
-            ("y", 1.0, vec![("W", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    1.0,
+                    vec![helper::UnitSpec::new(Some("W"), None, true, 1.0)],
+                ),
+                (
+                    "y",
+                    1.0,
+                    vec![helper::UnitSpec::new(Some("W"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x + y with unit W
-        let parameter = helper::build_add_parameter("z", "x", "y", [("W", 1.0)]);
+        let parameter = helper::build_add_parameter(
+            "z",
+            "x",
+            "y",
+            [helper::UnitSpec::new(Some("W"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [
@@ -1054,10 +1159,26 @@ mod tests {
     #[test]
     fn eval_exponent_parameter_w_squared() {
         // setup context with x = 1.0 W
-        let context = helper::create_eval_context([("x", 1.0, vec![("W", 1.0)])]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [(
+                "x",
+                1.0,
+                vec![helper::UnitSpec::new(Some("W"), None, false, 1.0)],
+            )],
+        );
 
         // setup parameter y = x^2 with unit W^2
-        let parameter = helper::build_exponent_parameter("y", "x", 2.0, [("W", 2.0)]);
+        let parameter = helper::build_exponent_parameter(
+            "y",
+            "x",
+            2.0,
+            [helper::UnitSpec::new(Some("W"), None, false, 2.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [
@@ -1090,13 +1211,33 @@ mod tests {
     #[test]
     fn eval_mul_function() {
         // setup context with x = 3.0 m and y = 2.0 m
-        let context = helper::create_eval_context([
-            ("x", 3.0, vec![("m", 1.0)]),
-            ("y", 2.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    3.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    2.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x * y with unit m^2
-        let parameter = helper::build_mul_parameter("z", "x", "y", [("m", 2.0)]);
+        let parameter = helper::build_mul_parameter(
+            "z",
+            "x",
+            "y",
+            [helper::UnitSpec::new(Some("m"), None, false, 2.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 2.0)];
@@ -1125,13 +1266,33 @@ mod tests {
     #[test]
     fn eval_div_function() {
         // setup context with x = 6.0 m^2 and y = 2.0 m
-        let context = helper::create_eval_context([
-            ("x", 6.0, vec![("m", 2.0)]),
-            ("y", 2.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    6.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 2.0)],
+                ),
+                (
+                    "y",
+                    2.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x / y with unit m
-        let parameter = helper::build_div_parameter("z", "x", "y", [("m", 1.0)]);
+        let parameter = helper::build_div_parameter(
+            "z",
+            "x",
+            "y",
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1160,14 +1321,37 @@ mod tests {
     #[test]
     fn eval_escaped_div_function() {
         // setup context with x = 6.0 m and y = 2.0 m
-        let context = helper::create_eval_context([
-            ("x", 6.0, vec![("m", 1.0)]),
-            ("y", 2.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    6.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    2.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x // y with unit m
         // Escaped division requires matching units
-        let parameter = helper::build_escaped_div_parameter("z", "x", "y", []);
+        let parameter = helper::build_escaped_div_parameter(
+            "z",
+            "x",
+            "y",
+            [
+                helper::UnitSpec::new(Some("m"), None, false, 1.0),
+                helper::UnitSpec::new(Some("m"), None, false, -1.0),
+            ],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [];
@@ -1197,14 +1381,34 @@ mod tests {
     #[test]
     fn eval_escaped_sub_function() {
         // setup context with x = 6.0 m and y = 2.0 m
-        let context = helper::create_eval_context([
-            ("x", 6.0, vec![("m", 1.0)]),
-            ("y", 2.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    6.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    2.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x -- y with unit m
         // Escaped subtraction requires matching units
-        let parameter = helper::build_escaped_sub_parameter("z", "x", "y", [("m", 1.0)]);
+        let parameter = helper::build_escaped_sub_parameter(
+            "z",
+            "x",
+            "y",
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1234,13 +1438,33 @@ mod tests {
     #[test]
     fn eval_mod_function() {
         // setup context with x = 7.0 m and y = 3.0 m
-        let context = helper::create_eval_context([
-            ("x", 7.0, vec![("m", 1.0)]),
-            ("y", 3.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    7.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    3.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = x % y with unit m
-        let parameter = helper::build_mod_parameter("z", "x", "y", [("m", 1.0)]);
+        let parameter = helper::build_mod_parameter(
+            "z",
+            "x",
+            "y",
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1269,10 +1493,26 @@ mod tests {
     #[test]
     fn eval_sqrt_function() {
         // setup context with x = 4.0 m^2
-        let context = helper::create_eval_context([("x", 4.0, vec![("m", 2.0)])]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [(
+                "x",
+                4.0,
+                vec![helper::UnitSpec::new(Some("m"), None, false, 2.0)],
+            )],
+        );
 
         // setup parameter y = sqrt(x) with unit m
-        let parameter = helper::build_function_call_parameter("y", "sqrt", ["x"], [("m", 1.0)]);
+        let parameter = helper::build_function_call_parameter(
+            "y",
+            "sqrt",
+            ["x"],
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1301,13 +1541,33 @@ mod tests {
     #[test]
     fn eval_min_function() {
         // setup context with x = 3.0 m and y = 5.0 m
-        let context = helper::create_eval_context([
-            ("x", 3.0, vec![("m", 1.0)]),
-            ("y", 5.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    3.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    5.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = min(x, y) with unit m
-        let parameter = helper::build_function_call_parameter("z", "min", ["x", "y"], [("m", 1.0)]);
+        let parameter = helper::build_function_call_parameter(
+            "z",
+            "min",
+            ["x", "y"],
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1336,16 +1596,29 @@ mod tests {
     #[test]
     fn eval_min_function_with_interval() {
         // setup context
-        let mut context = helper::create_eval_context([]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
 
         // add x as an interval parameter [2.0, 4.0] m
-        let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
+        let x_parameter = helper::build_interval_parameter(
+            "x",
+            2.0,
+            4.0,
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
         let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
         let parameter_result = helper::build_parameter_result("x", x_value.value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = min(x) with unit m
-        let parameter = helper::build_function_call_parameter("z", "min", ["x"], [("m", 1.0)]);
+        let parameter = helper::build_function_call_parameter(
+            "z",
+            "min",
+            ["x"],
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1375,13 +1648,33 @@ mod tests {
     #[test]
     fn eval_max_function() {
         // setup context with x = 3.0 m and y = 5.0 m
-        let context = helper::create_eval_context([
-            ("x", 3.0, vec![("m", 1.0)]),
-            ("y", 5.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    3.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    5.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = max(x, y) with unit m
-        let parameter = helper::build_function_call_parameter("z", "max", ["x", "y"], [("m", 1.0)]);
+        let parameter = helper::build_function_call_parameter(
+            "z",
+            "max",
+            ["x", "y"],
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1410,16 +1703,29 @@ mod tests {
     #[test]
     fn eval_max_function_with_interval() {
         // setup context
-        let mut context = helper::create_eval_context([]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
 
         // add x as an interval parameter [2.0, 4.0] m
-        let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
+        let x_parameter = helper::build_interval_parameter(
+            "x",
+            2.0,
+            4.0,
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
         let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
         let parameter_result = helper::build_parameter_result("x", x_value.value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = max(x) with unit m
-        let parameter = helper::build_function_call_parameter("z", "max", ["x"], [("m", 1.0)]);
+        let parameter = helper::build_function_call_parameter(
+            "z",
+            "max",
+            ["x"],
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1449,16 +1755,29 @@ mod tests {
     #[test]
     fn eval_range_function() {
         // setup context
-        let mut context = helper::create_eval_context([]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
 
         // add x as an interval parameter [2.0, 4.0] m
-        let x_parameter = helper::build_interval_parameter("x", 2.0, 4.0, [("m", 1.0)]);
+        let x_parameter = helper::build_interval_parameter(
+            "x",
+            2.0,
+            4.0,
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
         let x_value = eval_parameter(&x_parameter, &context).expect("eval should succeed");
         let parameter_result = helper::build_parameter_result("x", x_value.value);
         context.add_parameter_result("x".to_string(), Ok(parameter_result));
 
         // setup parameter z = range(x) with unit m
-        let parameter = helper::build_function_call_parameter("z", "range", ["x"], [("m", 1.0)]);
+        let parameter = helper::build_function_call_parameter(
+            "z",
+            "range",
+            ["x"],
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1488,13 +1807,33 @@ mod tests {
     #[test]
     fn eval_mid_function() {
         // setup context with x = 2.0 m and y = 4.0 m
-        let context = helper::create_eval_context([
-            ("x", 2.0, vec![("m", 1.0)]),
-            ("y", 4.0, vec![("m", 1.0)]),
-        ]);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(PathBuf::from("test"));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [
+                (
+                    "x",
+                    2.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+                (
+                    "y",
+                    4.0,
+                    vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+                ),
+            ],
+        );
 
         // setup parameter z = mid(x, y) with unit m
-        let parameter = helper::build_function_call_parameter("z", "mid", ["x", "y"], [("m", 1.0)]);
+        let parameter = helper::build_function_call_parameter(
+            "z",
+            "mid",
+            ["x", "y"],
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+        );
+
         let parameter_value = eval_parameter(&parameter, &context).expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
@@ -1523,13 +1862,9 @@ mod tests {
     mod helper {
         use super::*;
 
-        use std::path::PathBuf;
-
-        use crate::builtin::BuiltinMap;
-        use crate::builtin::std::StdBuiltinFunction;
         use crate::context::EvalContext;
-        use crate::output::dependency::DependencySet;
-        use crate::output::eval_result;
+        use crate::test_context::TestExternalContext;
+        use oneil_output as output;
 
         use oneil_ir::DisplayCompositeUnit;
         use oneil_shared::span::SourceLocation;
@@ -1560,13 +1895,99 @@ mod tests {
             DisplayCompositeUnit::BaseUnit(ir::DisplayUnit::new("unimportant".to_string(), 1.0))
         }
 
+        /// Specification for a unit in tests.
+        #[derive(Debug, Clone, Copy)]
+        pub struct UnitSpec {
+            /// The base unit name (e.g., "m", "s", "W"). Use `None` for pure dB.
+            pub base_name: Option<&'static str>,
+            /// Optional SI prefix (e.g., "k" for kilo, "m" for milli).
+            pub prefix: Option<&'static str>,
+            /// Whether this is a decibel unit.
+            pub is_db: bool,
+            /// The exponent of the unit.
+            pub exponent: f64,
+        }
+
+        impl UnitSpec {
+            pub const fn new(
+                base_name: Option<&'static str>,
+                prefix: Option<&'static str>,
+                is_db: bool,
+                exponent: f64,
+            ) -> Self {
+                Self {
+                    base_name,
+                    prefix,
+                    is_db,
+                    exponent,
+                }
+            }
+        }
+
+        fn build_full_name(base_name: Option<&str>, prefix: Option<&str>, is_db: bool) -> String {
+            format!(
+                "{}{}{}",
+                if is_db { "dB" } else { "" },
+                prefix.unwrap_or(""),
+                base_name.unwrap_or("")
+            )
+        }
+
+        fn build_unit_info(
+            base_name: Option<&str>,
+            prefix: Option<&str>,
+            is_db: bool,
+        ) -> ir::UnitInfo {
+            if is_db {
+                ir::UnitInfo::Db {
+                    prefix: prefix.map(String::from),
+                    base_name: base_name.map(String::from),
+                }
+            } else {
+                ir::UnitInfo::Standard {
+                    prefix: prefix.map(String::from),
+                    base_name: base_name.unwrap_or("").to_string(),
+                }
+            }
+        }
+
+        fn build_resolved_units(
+            units: impl IntoIterator<Item = UnitSpec>,
+        ) -> Option<ir::CompositeUnit> {
+            let units: Vec<_> = units
+                .into_iter()
+                .map(|spec| {
+                    let full_name = build_full_name(spec.base_name, spec.prefix, spec.is_db);
+                    let info = build_unit_info(spec.base_name, spec.prefix, spec.is_db);
+                    ir::Unit::new(
+                        random_span(),
+                        full_name,
+                        random_span(),
+                        spec.exponent,
+                        None,
+                        info,
+                    )
+                })
+                .collect();
+
+            if units.is_empty() {
+                None
+            } else {
+                Some(ir::CompositeUnit::new(
+                    units,
+                    unimportant_display_composite_unit(),
+                    random_span(),
+                ))
+            }
+        }
+
         /// Builds a simple parameter with a literal numeric value.
         ///
         /// # Arguments
         ///
         /// * `name` - The name of the parameter
         /// * `value` - The numeric value of the parameter
-        /// * `units` - An iterator of unit names and their exponents (e.g., `[("m", 1.0), ("s", -1.0)]` for m/s)
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -1574,27 +1995,14 @@ mod tests {
         pub fn build_simple_parameter(
             name: &str,
             value: f64,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr = ir::Expr::Literal {
                 span: random_span(),
                 value: ir::Literal::Number(value),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -1602,7 +2010,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -1616,7 +2024,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `value_a` - The minimum value of the interval
         /// * `value_b` - The maximum value of the interval
-        /// * `units` - An iterator of unit names and their exponents
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -1625,7 +2033,7 @@ mod tests {
             name: &str,
             value_a: f64,
             value_b: f64,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_a = ir::Expr::Literal {
                 span: random_span(),
@@ -1644,20 +2052,7 @@ mod tests {
                 right: Box::new(expr_b),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -1665,7 +2060,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -1679,7 +2074,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `value_a` - The name of the first parameter to add
         /// * `value_b` - The name of the second parameter to add
-        /// * `units` - An iterator of unit names and their exponents
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -1688,7 +2083,7 @@ mod tests {
             name: &str,
             value_a: &str,
             value_b: &str,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_a = ir::Expr::Variable {
                 span: random_span(),
@@ -1713,20 +2108,7 @@ mod tests {
                 right: Box::new(expr_b),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -1734,7 +2116,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -1748,7 +2130,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `value_a` - The name of the first parameter to multiply
         /// * `value_b` - The name of the second parameter to multiply
-        /// * `units` - An iterator of unit names and their exponents
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -1757,7 +2139,7 @@ mod tests {
             name: &str,
             value_a: &str,
             value_b: &str,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_a = ir::Expr::Variable {
                 span: random_span(),
@@ -1782,20 +2164,7 @@ mod tests {
                 right: Box::new(expr_b),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -1803,7 +2172,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -1817,7 +2186,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `value_a` - The name of the dividend parameter
         /// * `value_b` - The name of the divisor parameter
-        /// * `units` - An iterator of unit names and their exponents
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -1826,7 +2195,7 @@ mod tests {
             name: &str,
             value_a: &str,
             value_b: &str,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_a = ir::Expr::Variable {
                 span: random_span(),
@@ -1851,20 +2220,7 @@ mod tests {
                 right: Box::new(expr_b),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -1872,7 +2228,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -1889,7 +2245,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `value_a` - The name of the dividend parameter
         /// * `value_b` - The name of the divisor parameter
-        /// * `units` - An iterator of unit names and their exponents (must match the units of both operands)
+        /// * `units` - An iterator of unit specs (must match the units of both operands)
         ///
         /// # Returns
         ///
@@ -1898,7 +2254,7 @@ mod tests {
             name: &str,
             value_a: &str,
             value_b: &str,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_a = ir::Expr::Variable {
                 span: random_span(),
@@ -1923,20 +2279,7 @@ mod tests {
                 right: Box::new(expr_b),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -1944,7 +2287,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -1961,7 +2304,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `value_a` - The name of the minuend parameter
         /// * `value_b` - The name of the subtrahend parameter
-        /// * `units` - An iterator of unit names and their exponents (must match the units of both operands)
+        /// * `units` - An iterator of unit specs (must match the units of both operands)
         ///
         /// # Returns
         ///
@@ -1970,7 +2313,7 @@ mod tests {
             name: &str,
             value_a: &str,
             value_b: &str,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_a = ir::Expr::Variable {
                 span: random_span(),
@@ -1995,20 +2338,7 @@ mod tests {
                 right: Box::new(expr_b),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -2016,7 +2346,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -2030,7 +2360,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `value_a` - The name of the dividend parameter
         /// * `value_b` - The name of the divisor parameter
-        /// * `units` - An iterator of unit names and their exponents
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -2039,7 +2369,7 @@ mod tests {
             name: &str,
             value_a: &str,
             value_b: &str,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_a = ir::Expr::Variable {
                 span: random_span(),
@@ -2064,20 +2394,7 @@ mod tests {
                 right: Box::new(expr_b),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -2085,7 +2402,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -2099,7 +2416,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `base` - The name of the base parameter
         /// * `exponent` - The exponent value (a literal number)
-        /// * `units` - An iterator of unit names and their exponents
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -2108,7 +2425,7 @@ mod tests {
             name: &str,
             base: &str,
             exponent: f64,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let expr_base = ir::Expr::Variable {
                 span: random_span(),
@@ -2130,20 +2447,7 @@ mod tests {
                 right: Box::new(expr_exponent),
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -2151,7 +2455,7 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
@@ -2165,7 +2469,7 @@ mod tests {
         /// * `name` - The name of the parameter
         /// * `function` - The name of the builtin function to call
         /// * `args` - An iterator of parameter names to pass as arguments
-        /// * `units` - An iterator of unit names and their exponents
+        /// * `units` - An iterator of `UnitSpec` values
         ///
         /// # Returns
         ///
@@ -2174,7 +2478,7 @@ mod tests {
             name: &str,
             function: &str,
             args: impl IntoIterator<Item = &'static str>,
-            units: impl IntoIterator<Item = (&'static str, f64)>,
+            units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
             let args = args
                 .into_iter()
@@ -2197,20 +2501,7 @@ mod tests {
                 args,
             };
 
-            let units = units
-                .into_iter()
-                .map(|(unit, exponent)| {
-                    ir::Unit::new(
-                        random_span(),
-                        unit.to_string(),
-                        random_span(),
-                        exponent,
-                        None,
-                    )
-                })
-                .collect();
-            let units =
-                ir::CompositeUnit::new(units, unimportant_display_composite_unit(), random_span());
+            let units = build_resolved_units(units);
 
             ir::Parameter::new(
                 ir::Dependencies::new(),
@@ -2218,58 +2509,47 @@ mod tests {
                 random_span(),
                 random_span(),
                 ir::Label::new(name.to_string()),
-                ir::ParameterValue::simple(expr, Some(units)),
+                ir::ParameterValue::simple(expr, units),
                 ir::Limits::default(),
                 false,
                 ir::TraceLevel::None,
             )
         }
 
-        /// Creates an evaluation context with pre-defined parameters.
+        /// Loads pre-defined parameters into an existing evaluation context.
+        ///
+        /// The context must already have an active model pushed (e.g. via
+        /// `context.push_active_model(PathBuf::from("test"))`).
         ///
         /// # Arguments
         ///
+        /// * `context` - The evaluation context to add parameter results to
         /// * `previous_parameters` - An iterator of tuples containing:
         ///   - Parameter name
         ///   - Parameter value (a literal number)
-        ///   - Units as a vector of tuples (unit name, exponent)
-        ///
-        /// # Returns
-        ///
-        /// An evaluation context with the standard builtin values, functions, units, and prefixes,
-        /// and with the specified parameters already evaluated and added to the context.
-        pub fn create_eval_context(
-            previous_parameters: impl IntoIterator<Item = (&'static str, f64, Vec<(&'static str, f64)>)>,
-        ) -> EvalContext<StdBuiltinFunction> {
-            let mut context = EvalContext::new(BuiltinMap::new(
-                builtin::std::builtin_values(),
-                builtin::std::builtin_functions(),
-                builtin::std::builtin_units(),
-                builtin::std::builtin_prefixes(),
-            ));
-
-            let model_path = PathBuf::from("test");
-            context.set_active_model(model_path);
-
+        ///   - Units as a vector of unit specs
+        pub fn setup_context_with_parameters(
+            context: &mut EvalContext<'_, TestExternalContext>,
+            previous_parameters: impl IntoIterator<Item = (&'static str, f64, Vec<UnitSpec>)>,
+        ) {
             for (name, value, units) in previous_parameters {
                 let parameter = build_simple_parameter(name, value, units);
+
                 let parameter_value =
-                    eval_parameter(&parameter, &context).expect("eval should succeed");
+                    eval_parameter(&parameter, context).expect("eval should succeed");
                 let parameter_result = build_parameter_result(name, parameter_value.value);
                 context.add_parameter_result(name.to_string(), Ok(parameter_result));
             }
-
-            context
         }
 
-        pub fn build_parameter_result(name: &str, value: Value) -> eval_result::Parameter {
-            eval_result::Parameter {
+        pub fn build_parameter_result(name: &str, value: Value) -> output::Parameter {
+            output::Parameter {
                 value,
                 ident: name.to_string(),
                 label: name.to_string(),
-                print_level: eval_result::PrintLevel::None,
+                print_level: output::PrintLevel::None,
                 debug_info: None,
-                dependencies: DependencySet::default(),
+                dependencies: output::DependencySet::default(),
                 expr_span: random_span(),
             }
         }

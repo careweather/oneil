@@ -1,20 +1,20 @@
 //! Model structures and collections for the Oneil programming language.
 
-use std::collections::HashSet;
-
 use indexmap::IndexMap;
 
 use crate::{
+    ModelPath,
     model_import::{ReferenceImport, ReferenceName, SubmodelImport, SubmodelName},
     parameter::{Parameter, ParameterName},
     python_import::PythonImport,
-    reference::{ModelPath, PythonPath},
+    reference::PythonPath,
     test::{Test, TestIndex},
 };
 
 /// Represents a single Oneil model containing parameters, tests, submodels, and imports.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
+    path: ModelPath,
     python_imports: IndexMap<PythonPath, PythonImport>,
     submodels: IndexMap<SubmodelName, SubmodelImport>,
     references: IndexMap<ReferenceName, ReferenceImport>,
@@ -26,6 +26,7 @@ impl Model {
     /// Creates a new model with the specified components.
     #[must_use]
     pub const fn new(
+        path: ModelPath,
         python_imports: IndexMap<PythonPath, PythonImport>,
         submodels: IndexMap<SubmodelName, SubmodelImport>,
         references: IndexMap<ReferenceName, ReferenceImport>,
@@ -33,12 +34,19 @@ impl Model {
         tests: IndexMap<TestIndex, Test>,
     ) -> Self {
         Self {
+            path,
             python_imports,
             submodels,
             references,
             parameters,
             tests,
         }
+    }
+
+    /// Returns the path of this model.
+    #[must_use]
+    pub const fn get_path(&self) -> &ModelPath {
+        &self.path
     }
 
     /// Returns a reference to the set of Python imports for this model.
@@ -51,6 +59,21 @@ impl Model {
     #[must_use]
     pub fn get_submodel(&self, identifier: &SubmodelName) -> Option<&SubmodelImport> {
         self.submodels.get(identifier)
+    }
+
+    /// Returns the reference that a submodel is associated with.
+    #[must_use]
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "the panic is only caused by breaking an internal invariant"
+    )]
+    pub fn get_submodel_reference(&self, identifier: &SubmodelName) -> Option<&ReferenceImport> {
+        let submodel = self.submodels.get(identifier)?;
+        let reference = self
+            .references
+            .get(submodel.reference_name())
+            .expect("reference corresponding to submodel should exist");
+        Some(reference)
     }
 
     /// Returns a reference to all submodels in this model.
@@ -71,6 +94,12 @@ impl Model {
         &self.parameters
     }
 
+    /// Looks up a reference by its identifier.
+    #[must_use]
+    pub fn get_reference(&self, identifier: &ReferenceName) -> Option<&ReferenceImport> {
+        self.references.get(identifier)
+    }
+
     /// Returns a reference to all references in this model.
     #[must_use]
     pub const fn get_references(&self) -> &IndexMap<ReferenceName, ReferenceImport> {
@@ -82,46 +111,29 @@ impl Model {
     pub const fn get_tests(&self) -> &IndexMap<TestIndex, Test> {
         &self.tests
     }
-}
 
-/// A collection of models that can be managed together.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelCollection {
-    initial_models: HashSet<ModelPath>,
-    models: IndexMap<ModelPath, Model>,
-}
-
-impl ModelCollection {
-    /// Creates a new model collection with the specified initial models and model mapping.
-    #[must_use]
-    pub const fn new(
-        initial_models: HashSet<ModelPath>,
-        models: IndexMap<ModelPath, Model>,
-    ) -> Self {
-        Self {
-            initial_models,
-            models,
-        }
+    /// Adds a Python import to this model.
+    pub fn add_python_import(&mut self, path: PythonPath, import: PythonImport) {
+        self.python_imports.insert(path, import);
     }
 
-    /// Returns all Python imports from all models in the collection.
-    #[must_use]
-    pub fn get_python_imports(&self) -> Vec<&PythonImport> {
-        self.models
-            .values()
-            .flat_map(|model| model.python_imports.values())
-            .collect()
+    /// Adds a reference to this model.
+    pub fn add_reference(&mut self, name: ReferenceName, import: ReferenceImport) {
+        self.references.insert(name, import);
     }
 
-    /// Returns all models in the collection.
-    #[must_use]
-    pub const fn get_models(&self) -> &IndexMap<ModelPath, Model> {
-        &self.models
+    /// Adds a submodel to this model.
+    pub fn add_submodel(&mut self, name: SubmodelName, import: SubmodelImport) {
+        self.submodels.insert(name, import);
     }
 
-    /// Returns the initial models (entry points).
-    #[must_use]
-    pub const fn get_initial_models(&self) -> &HashSet<ModelPath> {
-        &self.initial_models
+    /// Adds a parameter to this model.
+    pub fn add_parameter(&mut self, name: ParameterName, parameter: Parameter) {
+        self.parameters.insert(name, parameter);
+    }
+
+    /// Adds a test to this model.
+    pub fn add_test(&mut self, index: TestIndex, test: Test) {
+        self.tests.insert(index, test);
     }
 }

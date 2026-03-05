@@ -1,3 +1,5 @@
-** X: x = pi
+X: x = y
 
-# TODO: don't show the same error multiple times...
+Y(1, 2): y = 3
+
+Z(1, 2): z = y
