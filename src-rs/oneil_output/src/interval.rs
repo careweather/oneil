@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, ops};
+use std::ops;
 
 use crate::util::is_close;
 
@@ -264,6 +264,48 @@ impl Interval {
         }
 
         self.min <= rhs.min && self.max >= rhs.max
+    }
+
+    /// Returns true if `self` is entirely strictly to the left of `rhs`.
+    ///
+    /// That is, every value in `self` is less than every value in `rhs`
+    /// (equivalently, `self.max < rhs.min`). Returns false if either interval is empty.
+    #[must_use]
+    pub fn lt(&self, rhs: &Self) -> bool {
+        !self.is_empty() && !rhs.is_empty() && self.max < rhs.min
+    }
+
+    /// Returns true if `self` is entirely to the left of or touching `rhs`.
+    ///
+    /// That is, `self.max <= rhs.min`. Returns false if either interval is empty.
+    ///
+    /// Note that this must be implemented seperately from `lt` because in this case,
+    /// `a <= b` is not equivalent to `a < b || a == b`. For example, `1 | 2 <= 2 | 2`
+    /// is true, but `1 | 2 < 2 | 2` is false and `1 | 2 == 2 | 2` is false.
+    #[must_use]
+    pub fn lte(&self, rhs: &Self) -> bool {
+        !self.is_empty() && !rhs.is_empty() && self.max <= rhs.min
+    }
+
+    /// Returns true if `self` is entirely strictly to the right of `rhs`.
+    ///
+    /// That is, every value in `self` is greater than every value in `rhs`
+    /// (equivalently, `self.min > rhs.max`). Returns false if either interval is empty.
+    #[must_use]
+    pub fn gt(&self, rhs: &Self) -> bool {
+        !self.is_empty() && !rhs.is_empty() && self.min > rhs.max
+    }
+
+    /// Returns true if `self` is entirely to the right of or touching `rhs`.
+    ///
+    /// That is, `self.min >= rhs.max`. Returns false if either interval is empty.
+    ///
+    /// Note that this must be implemented seperately from `gt` because in this case,
+    /// `a >= b` is not equivalent to `a > b || a == b`. For example, `2 | 2 >= 1 | 2`
+    /// is true, but `2 | 2 > 1 | 2` is false and `2 | 2 == 1 | 2` is false.
+    #[must_use]
+    pub fn gte(&self, rhs: &Self) -> bool {
+        !self.is_empty() && !rhs.is_empty() && self.min >= rhs.max
     }
 
     /// Returns the square root of the interval
@@ -625,47 +667,8 @@ impl From<&f64> for Interval {
 
 impl PartialEq for Interval {
     fn eq(&self, other: &Self) -> bool {
-        self.is_empty() && other.is_empty() || self.min == other.min && self.max == other.max
-    }
-}
-
-impl PartialOrd for Interval {
-    /// Partial ordering for number values
-    ///
-    /// For scalar values, we use the partial ordering of f64.
-    ///
-    /// An interval is less than a scalar if both the min and max are less than the
-    /// scalar. Same goes for greater than and equal to.
-    ///
-    /// An interval is less than another interval if both the min and max are less
-    /// than the other interval. Same goes for greater than and equal to.
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // if the min and max are the same, they are equal
-        //
-        //       |--- self ---|
-        //       |--- other --|
-        if is_close(self.min, other.min) && is_close(self.max, other.max) {
-            return Some(Ordering::Equal);
-        }
-
-        // if the min of self is greater than the max of other, self is greater than other
-        //
-        //                  |--- self ---|
-        // |--- other ---|
-        if self.min.partial_cmp(&other.max) == Some(Ordering::Greater) {
-            return Some(Ordering::Greater);
-        }
-
-        // if the max of self is less than the min of other, self is less than other
-        //
-        // |--- self ---|
-        //                  |--- other ---|
-        if self.max.partial_cmp(&other.min) == Some(Ordering::Less) {
-            return Some(Ordering::Less);
-        }
-
-        // otherwise, there is not a clear ordering
-        None
+        self.is_empty() && other.is_empty()
+            || is_close(self.min, other.min) && is_close(self.max, other.max)
     }
 }
 

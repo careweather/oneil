@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, fmt, ops};
+use std::{fmt, ops};
 
 use crate::{
     Interval, NumberType, Unit,
@@ -121,30 +121,65 @@ impl MeasuredNumber {
         &self.unit
     }
 
-    /// Compares two measured numbers for ordering.
+    /// Checks if two measured numbers are equal.
     ///
     /// # Errors
     ///
-    /// Returns `Err(ValueError::InvalidUnit)` if the units don't match.
-    pub fn checked_partial_cmp(&self, rhs: &Self) -> Result<Option<Ordering>, BinaryEvalError> {
-        if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit.clone(),
-                rhs_unit: rhs.unit.display_unit.clone(),
-            });
-        }
-
-        Ok(self.normalized_value.partial_cmp(&rhs.normalized_value))
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the dimensions don't match.
+    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value == rhs.normalized_value)
     }
 
-    /// Checks if two dimensional numbers are equal.
+    /// Checks if `self` is strictly less than `rhs`.
     ///
     /// # Errors
     ///
-    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
-    pub fn checked_eq(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
-        self.checked_partial_cmp(rhs)
-            .map(|ordering| ordering == Some(Ordering::Equal))
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_lt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.lt(&rhs.normalized_value))
+    }
+
+    /// Checks if `self` is strictly greater than `rhs`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_gt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.gt(&rhs.normalized_value))
+    }
+
+    /// Checks if `self` is less than or equal to `rhs`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_lte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.lte(&rhs.normalized_value))
+    }
+
+    /// Checks if `self` is greater than or equal to `rhs`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(BinaryEvalError::UnitMismatch)` if the units don't match.
+    pub fn checked_gte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(self.normalized_value.gte(&rhs.normalized_value))
+    }
+
+    fn check_units(&self, rhs: &Self) -> Result<(), BinaryEvalError> {
+        if self.unit.dimensionally_eq(&rhs.unit) {
+            Ok(())
+        } else {
+            Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            })
+        }
     }
 
     /// Adds two dimensional numbers.
@@ -153,13 +188,7 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_add(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
-        if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit,
-                rhs_unit: rhs.unit.display_unit.clone(),
-            });
-        }
-
+        self.check_units(rhs)?;
         Ok(Self {
             normalized_value: self.normalized_value + rhs.normalized_value,
             unit: self.unit,
@@ -172,13 +201,7 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
-        if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit,
-                rhs_unit: rhs.unit.display_unit.clone(),
-            });
-        }
-
+        self.check_units(rhs)?;
         Ok(Self {
             normalized_value: self.normalized_value - rhs.normalized_value,
             unit: self.unit,
@@ -193,13 +216,7 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_escaped_sub(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
-        if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit,
-                rhs_unit: rhs.unit.display_unit.clone(),
-            });
-        }
-
+        self.check_units(rhs)?;
         Ok(Self {
             normalized_value: self.normalized_value.escaped_sub(rhs.normalized_value),
             unit: self.unit,
@@ -250,13 +267,7 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_rem(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
-        if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit,
-                rhs_unit: rhs.unit.display_unit.clone(),
-            });
-        }
-
+        self.check_units(rhs)?;
         Ok(Self {
             normalized_value: self.normalized_value % rhs.normalized_value,
             unit: self.unit,
@@ -286,14 +297,7 @@ impl MeasuredNumber {
     ///
     /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
     pub fn checked_min_max(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
-        // check that the units match
-        if !self.unit.dimensionally_eq(&rhs.unit) {
-            return Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit,
-                rhs_unit: rhs.unit.display_unit.clone(),
-            });
-        }
-
+        self.check_units(rhs)?;
         Ok(Self {
             normalized_value: self
                 .normalized_value
@@ -414,7 +418,7 @@ impl PartialEq for MeasuredNumber {
     ///
     /// This treats units as equal if they have the same dimensions.
     fn eq(&self, other: &Self) -> bool {
-        self.normalized_value == other.normalized_value && self.unit.dimensionally_eq(&other.unit)
+        self.check_units(other).is_ok() && self.normalized_value == other.normalized_value
     }
 }
 
@@ -716,11 +720,35 @@ impl NormalizedNumber {
     pub fn ceiling(self) -> Self {
         Self(self.0.ceiling())
     }
-}
 
-impl PartialOrd for NormalizedNumber {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
+    /// Returns true if this normalized number is equal to `rhs`.
+    #[must_use]
+    pub fn eq(&self, rhs: &Self) -> bool {
+        self.0.eq(&rhs.0)
+    }
+
+    /// Returns true if `self` is strictly less than `rhs`.
+    #[must_use]
+    pub fn lt(&self, rhs: &Self) -> bool {
+        self.0.lt(&rhs.0)
+    }
+
+    /// Returns true if `self` is strictly greater than `rhs`.
+    #[must_use]
+    pub fn gt(&self, rhs: &Self) -> bool {
+        self.0.gt(&rhs.0)
+    }
+
+    /// Returns true if `self` is less than or equal to `rhs`.
+    #[must_use]
+    pub fn lte(&self, rhs: &Self) -> bool {
+        self.0.lte(&rhs.0)
+    }
+
+    /// Returns true if `self` is greater than or equal to `rhs`.
+    #[must_use]
+    pub fn gte(&self, rhs: &Self) -> bool {
+        self.0.gte(&rhs.0)
     }
 }
 
@@ -733,18 +761,6 @@ impl PartialEq<Number> for NormalizedNumber {
 impl PartialEq<NormalizedNumber> for Number {
     fn eq(&self, other: &NormalizedNumber) -> bool {
         *self == other.0
-    }
-}
-
-impl PartialOrd<Number> for NormalizedNumber {
-    fn partial_cmp(&self, other: &Number) -> Option<Ordering> {
-        self.0.partial_cmp(other)
-    }
-}
-
-impl PartialOrd<NormalizedNumber> for Number {
-    fn partial_cmp(&self, other: &NormalizedNumber) -> Option<Ordering> {
-        self.partial_cmp(&other.0)
     }
 }
 
@@ -1190,11 +1206,69 @@ impl Number {
             Self::Interval(interval) => Self::Interval(interval.ceiling()),
         }
     }
+
+    /// Returns true if `self` is strictly less than `rhs`.
+    ///
+    /// For scalars, uses the built-in `<` operator. For intervals, delegates to [`Interval::lt`].
+    #[must_use]
+    pub fn lt(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs < rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs < rhs.min(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.max() < *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.lt(rhs),
+        }
+    }
+
+    /// Returns true if `self` is strictly greater than `rhs`.
+    ///
+    /// For scalars, uses the built-in `>` operator. For intervals, delegates to [`Interval::gt`].
+    #[must_use]
+    pub fn gt(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs > rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs > rhs.max(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.min() > *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.gt(rhs),
+        }
+    }
+
+    /// Returns true if `self` is less than or equal to `rhs`.
+    ///
+    /// For scalars, uses the built-in `<=` operator. For intervals, delegates to [`Interval::lte`].
+    ///
+    /// Note that this must be implemented seperately from `lt` because `lte`
+    /// differs from `lt` for intervals. See [`Interval::lte`] for more details.
+    #[must_use]
+    pub fn lte(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs <= rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs <= rhs.min(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.max() <= *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.lte(rhs),
+        }
+    }
+
+    /// Returns true if `self` is greater than or equal to `rhs`.
+    ///
+    /// For scalars, uses the built-in `>=` operator. For intervals, delegates to [`Interval::gte`].
+    ///
+    /// Note that this must be implemented seperately from `gt` because `gte`
+    /// differs from `gt` for intervals. See [`Interval::gte`] for more details.
+    #[must_use]
+    pub fn gte(&self, rhs: &Self) -> bool {
+        match (self, rhs) {
+            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs >= rhs,
+            (Self::Scalar(lhs), Self::Interval(rhs)) => *lhs >= rhs.max(),
+            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.min() >= *rhs,
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.gte(rhs),
+        }
+    }
 }
 
 impl PartialEq for Number {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
+        match (&self, other) {
             (Self::Scalar(lhs), Self::Scalar(rhs)) => is_close(*lhs, *rhs),
             (Self::Scalar(lhs), Self::Interval(rhs)) => {
                 is_close(*lhs, rhs.min()) && is_close(*lhs, rhs.max())
@@ -1202,27 +1276,7 @@ impl PartialEq for Number {
             (Self::Interval(lhs), Self::Scalar(rhs)) => {
                 is_close(lhs.min(), *rhs) && is_close(lhs.max(), *rhs)
             }
-            (Self::Interval(lhs), Self::Interval(rhs)) => lhs == rhs,
-        }
-    }
-}
-
-impl PartialOrd for Number {
-    /// Partial ordering for number values
-    ///
-    /// For scalar values, we use the partial ordering of f64.
-    ///
-    /// An interval is less than a scalar if both the min and max are less than the
-    /// scalar. Same goes for greater than and equal to.
-    ///
-    /// An interval is less than another interval if both the min and max are less
-    /// than the other interval. Same goes for greater than and equal to.
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Self::Scalar(lhs), Self::Scalar(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Scalar(lhs), Self::Interval(rhs)) => Interval::from(lhs).partial_cmp(rhs),
-            (Self::Interval(lhs), Self::Scalar(rhs)) => lhs.partial_cmp(&Interval::from(rhs)),
-            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Interval(lhs), Self::Interval(rhs)) => lhs.eq(rhs),
         }
     }
 }

@@ -1,7 +1,5 @@
 //! Python wrapper for Oneil’s [`MeasuredNumber`].
 
-use std::cmp::Ordering;
-
 use oneil_output::{BinaryEvalError, MeasuredNumber, Number, Unit};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -324,64 +322,71 @@ impl PyMeasuredNumber {
         Bound::new(py, Self { inner }).map(|b| b.into_any())
     }
 
-    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
             Some(m) => m,
-            None => return Ok(None),
+            None => return Ok(false),
         };
 
         self.inner
             .checked_eq(&rhs)
             .map_err(binary_eval_error_to_py_err)
-            .map(Some)
     }
 
-    fn __lt__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+    fn __ne__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
             Some(m) => m,
-            None => return Ok(None),
+            None => return Ok(true),
         };
 
         self.inner
-            .checked_partial_cmp(&rhs)
+            .checked_eq(&rhs)
+            .map(|eq| !eq)
             .map_err(binary_eval_error_to_py_err)
-            .map(|opt| opt.map(|o| o == Ordering::Less))
     }
 
-    fn __le__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+    fn __lt__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
             Some(m) => m,
-            None => return Ok(None),
+            None => return Ok(false),
         };
 
         self.inner
-            .checked_partial_cmp(&rhs)
+            .checked_lt(&rhs)
             .map_err(binary_eval_error_to_py_err)
-            .map(|opt| opt.map(|o| o == Ordering::Less || o == Ordering::Equal))
     }
 
-    fn __gt__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+    fn __le__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
             Some(m) => m,
-            None => return Ok(None),
+            None => return Ok(false),
         };
 
         self.inner
-            .checked_partial_cmp(&rhs)
+            .checked_lte(&rhs)
             .map_err(binary_eval_error_to_py_err)
-            .map(|opt| opt.map(|o| o == Ordering::Greater))
     }
 
-    fn __ge__(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+    fn __gt__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
             Some(m) => m,
-            None => return Ok(None),
+            None => return Ok(false),
         };
 
         self.inner
-            .checked_partial_cmp(&rhs)
+            .checked_gt(&rhs)
             .map_err(binary_eval_error_to_py_err)
-            .map(|opt| opt.map(|o| o == Ordering::Greater || o == Ordering::Equal))
+    }
+
+    fn __ge__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+            Some(m) => m,
+            None => return Ok(false),
+        };
+
+        self.inner
+            .checked_gte(&rhs)
+            .map_err(binary_eval_error_to_py_err)
     }
 
     /// Escaped subtraction (min-min, max-max). Raises if units do not match.

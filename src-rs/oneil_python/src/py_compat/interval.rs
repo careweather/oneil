@@ -19,8 +19,8 @@ fn py_any_to_py_interval(other: &Bound<'_, PyAny>) -> Option<Interval> {
 /// Python wrapper for Oneil’s [`Interval`].
 ///
 /// An interval is a closed, connected set of numbers with a minimum and maximum.
-#[pyclass(name = "Interval", module = "oneil", eq, ord, frozen, from_py_object)]
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[pyclass(name = "Interval", module = "oneil", frozen, from_py_object)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PyInterval {
     inner: Interval,
 }
@@ -105,6 +105,54 @@ impl PyInterval {
     /// Returns true if this interval contains the other.
     fn contains(&self, other: &Bound<'_, Self>) -> bool {
         self.inner.contains(&other.borrow().inner)
+    }
+
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let rhs = match py_any_to_py_interval(other) {
+            Some(i) => i,
+            None => return Ok(false),
+        };
+        Ok(self.inner.eq(&rhs))
+    }
+
+    fn __ne__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let rhs = match py_any_to_py_interval(other) {
+            Some(i) => i,
+            None => return Ok(true),
+        };
+        Ok(!self.inner.eq(&rhs))
+    }
+
+    fn __lt__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let rhs = match py_any_to_py_interval(other) {
+            Some(i) => i,
+            None => return Ok(false),
+        };
+        Ok(self.inner.lt(&rhs))
+    }
+
+    fn __le__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let rhs = match py_any_to_py_interval(other) {
+            Some(i) => i,
+            None => return Ok(false),
+        };
+        Ok(self.inner.lte(&rhs))
+    }
+
+    fn __gt__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let rhs = match py_any_to_py_interval(other) {
+            Some(i) => i,
+            None => return Ok(false),
+        };
+        Ok(self.inner.gt(&rhs))
+    }
+
+    fn __ge__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let rhs = match py_any_to_py_interval(other) {
+            Some(i) => i,
+            None => return Ok(false),
+        };
+        Ok(self.inner.gte(&rhs))
     }
 
     /// Returns the square root of the interval.

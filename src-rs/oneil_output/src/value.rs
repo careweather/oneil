@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, fmt};
+use std::fmt;
 
 use crate::{
     MeasuredNumber, Number, Unit, ValueType,
@@ -40,9 +40,7 @@ impl Value {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs == rhs),
             (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(lhs == rhs.normalized_value()),
             (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(lhs.normalized_value() == rhs),
-            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs
-                .checked_partial_cmp(rhs)
-                .map(|ordering| ordering == Some(Ordering::Equal)),
+            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_eq(rhs),
             (lhs, rhs) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(lhs.type_()),
                 rhs_type: Box::new(rhs.type_()),
@@ -69,12 +67,14 @@ impl Value {
     pub fn checked_lt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
-            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs < rhs),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(lhs < rhs.normalized_value()),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(lhs.normalized_value() < rhs),
-            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs
-                .checked_partial_cmp(rhs)
-                .map(|ordering| ordering == Some(Ordering::Less)),
+            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.lt(rhs)),
+            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
+                Ok(lhs.lt(rhs.normalized_value().as_number()))
+            }
+            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
+                Ok(lhs.normalized_value().as_number().lt(rhs))
+            }
+            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_lt(rhs),
             (Self::Number(_) | Self::MeasuredNumber(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
                 rhs_type: Box::new(rhs.type_()),
@@ -96,14 +96,14 @@ impl Value {
     pub fn checked_lte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
-            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs <= rhs),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(lhs <= rhs.normalized_value()),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(lhs.normalized_value() <= rhs),
-            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
-                lhs.checked_partial_cmp(rhs).map(|ordering| {
-                    ordering == Some(Ordering::Less) || ordering == Some(Ordering::Equal)
-                })
+            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.lte(rhs)),
+            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
+                Ok(lhs.lte(rhs.normalized_value().as_number()))
             }
+            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
+                Ok(lhs.normalized_value().as_number().lte(rhs))
+            }
+            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_lte(rhs),
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
                 rhs_type: Box::new(rhs.type_()),
@@ -125,12 +125,14 @@ impl Value {
     pub fn checked_gt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
-            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs > rhs),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(lhs > rhs.normalized_value()),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(lhs.normalized_value() > rhs),
-            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs
-                .checked_partial_cmp(rhs)
-                .map(|ordering| ordering == Some(Ordering::Greater)),
+            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.gt(rhs)),
+            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
+                Ok(lhs.gt(rhs.normalized_value().as_number()))
+            }
+            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
+                Ok(lhs.normalized_value().as_number().gt(rhs))
+            }
+            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_gt(rhs),
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
                 rhs_type: Box::new(rhs.type_()),
@@ -152,14 +154,14 @@ impl Value {
     pub fn checked_gte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
             // if either number isn't measured, then units don't matter
-            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs >= rhs),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(lhs >= rhs.normalized_value()),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(lhs.normalized_value() >= rhs),
-            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
-                lhs.checked_partial_cmp(rhs).map(|ordering| {
-                    ordering == Some(Ordering::Greater) || ordering == Some(Ordering::Equal)
-                })
+            (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.gte(rhs)),
+            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
+                Ok(lhs.gte(rhs.normalized_value().as_number()))
             }
+            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
+                Ok(lhs.normalized_value().as_number().gte(rhs))
+            }
+            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_gte(rhs),
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
                 rhs_type: Box::new(rhs.type_()),

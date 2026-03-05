@@ -940,7 +940,7 @@ mod std_builtins {
                             }
                         })
                         .reduce(|a, b| {
-                            if a.normalized_value() < b.normalized_value() {
+                            if a.normalized_value().lt(b.normalized_value()) {
                                 a
                             } else {
                                 b
@@ -1005,7 +1005,7 @@ mod std_builtins {
                             }
                         })
                         .reduce(|a, b| {
-                            if a.normalized_value() > b.normalized_value() {
+                            if a.normalized_value().gt(b.normalized_value()) {
                                 a
                             } else {
                                 b
