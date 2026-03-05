@@ -2,7 +2,8 @@
 
 use crate::{MeasuredNumber, Number};
 
-const TOLERANCE: f64 = 1e-10;
+const RELATIVE_TOLERANCE: f64 = 1e-15;
+const ABSOLUTE_TOLERANCE: f64 = 32.0 * f64::MIN_POSITIVE;
 
 /// Checks if two floating point numbers are close to each other.
 ///
@@ -14,7 +15,8 @@ const TOLERANCE: f64 = 1e-10;
 /// In the future, we may want to implement other methods
 /// from the `is_close` crate.
 ///
-/// The tolerance is fixed at 1e-10.
+/// The relative tolerance is fixed at `1e-15`. The absolute tolerance is
+/// fixed at `32.0 * f64::MIN_POSITIVE`.
 #[must_use]
 pub const fn is_close(a: f64, b: f64) -> bool {
     #[expect(
@@ -34,8 +36,8 @@ pub const fn is_close(a: f64, b: f64) -> bool {
     }
 
     let difference = (a - b).abs();
-    let relative_tolerance = TOLERANCE * f64::min(a.abs(), b.abs());
-    let absolute_tolerance = TOLERANCE;
+    let relative_tolerance = RELATIVE_TOLERANCE * f64::min(a.abs(), b.abs());
+    let absolute_tolerance = ABSOLUTE_TOLERANCE;
 
     difference <= relative_tolerance || difference <= absolute_tolerance
 }
