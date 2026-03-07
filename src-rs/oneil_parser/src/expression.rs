@@ -342,21 +342,21 @@ fn primary_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
             let parse_result = n.lexeme_str.parse::<f64>();
             let parse_result = parse_result.expect("all valid numbers should parse correctly");
 
-            let literal_node = n.into_node_with_value(Literal::number(parse_result));
+            let literal_node = n.into_node_with_value(Literal::Number(parse_result));
             literal_node.wrap(Expr::literal)
         }),
         map(string.convert_errors(), |s| {
             // trim quotes from the string
             let s_contents = s.lexeme_str[1..s.lexeme_str.len() - 1].to_string();
-            let literal_node = s.into_node_with_value(Literal::string(s_contents));
+            let literal_node = s.into_node_with_value(Literal::String(s_contents));
             literal_node.wrap(Expr::literal)
         }),
         map(true_.convert_errors(), |t| {
-            let literal_node = t.into_node_with_value(Literal::boolean(true));
+            let literal_node = t.into_node_with_value(Literal::Boolean(true));
             literal_node.wrap(Expr::literal)
         }),
         map(false_.convert_errors(), |t| {
-            let literal_node = t.into_node_with_value(Literal::boolean(false));
+            let literal_node = t.into_node_with_value(Literal::Boolean(false));
             literal_node.wrap(Expr::literal)
         }),
         function_call,

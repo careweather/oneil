@@ -166,41 +166,19 @@ where
     resolve_expr(expr, resolution_context)
 }
 
-/// Converts an AST comparison operation to a model comparison operation.
+/// Extracts the comparison operator from an AST node.
 fn resolve_comparison_op(op: &ast::ComparisonOpNode) -> ir::ComparisonOp {
-    match &**op {
-        ast::ComparisonOp::LessThan => ir::ComparisonOp::LessThan,
-        ast::ComparisonOp::LessThanEq => ir::ComparisonOp::LessThanEq,
-        ast::ComparisonOp::GreaterThan => ir::ComparisonOp::GreaterThan,
-        ast::ComparisonOp::GreaterThanEq => ir::ComparisonOp::GreaterThanEq,
-        ast::ComparisonOp::Eq => ir::ComparisonOp::Eq,
-        ast::ComparisonOp::NotEq => ir::ComparisonOp::NotEq,
-    }
+    **op
 }
 
-/// Converts an AST binary operation to a model binary operation.
+/// Extracts the binary operator from an AST node.
 fn resolve_binary_op(op: &ast::BinaryOpNode) -> ir::BinaryOp {
-    match &**op {
-        ast::BinaryOp::Add => ir::BinaryOp::Add,
-        ast::BinaryOp::Sub => ir::BinaryOp::Sub,
-        ast::BinaryOp::EscapedSub => ir::BinaryOp::EscapedSub,
-        ast::BinaryOp::Mul => ir::BinaryOp::Mul,
-        ast::BinaryOp::Div => ir::BinaryOp::Div,
-        ast::BinaryOp::EscapedDiv => ir::BinaryOp::EscapedDiv,
-        ast::BinaryOp::Mod => ir::BinaryOp::Mod,
-        ast::BinaryOp::Pow => ir::BinaryOp::Pow,
-        ast::BinaryOp::And => ir::BinaryOp::And,
-        ast::BinaryOp::Or => ir::BinaryOp::Or,
-        ast::BinaryOp::MinMax => ir::BinaryOp::MinMax,
-    }
+    **op
 }
 
-/// Converts an AST unary operation to a model unary operation.
+/// Extracts the unary operator from an AST node.
 fn resolve_unary_op(op: &ast::UnaryOpNode) -> ir::UnaryOp {
-    match &**op {
-        ast::UnaryOp::Neg => ir::UnaryOp::Neg,
-        ast::UnaryOp::Not => ir::UnaryOp::Not,
-    }
+    **op
 }
 
 /// Resolves a function name to a model function name.
@@ -237,13 +215,9 @@ where
     }
 }
 
-/// Converts an AST literal to a model literal.
+/// Extracts the literal value from an AST node.
 fn resolve_literal(literal: &ast::LiteralNode) -> ir::Literal {
-    match &**literal {
-        ast::Literal::Number(number) => ir::Literal::number(*number),
-        ast::Literal::String(string) => ir::Literal::string(string.clone()),
-        ast::Literal::Boolean(boolean) => ir::Literal::boolean(*boolean),
-    }
+    (**literal).clone()
 }
 
 /// Extracts internal dependencies from an expression.

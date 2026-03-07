@@ -1,5 +1,6 @@
 //! Expression system for mathematical and logical operations in Oneil.
 
+pub use oneil_shared::expr_ops::{BinaryOp, ComparisonOp, Literal, UnaryOp};
 use oneil_shared::span::Span;
 
 use crate::{
@@ -275,99 +276,6 @@ impl Expr {
     }
 }
 
-/// Binary operators for mathematical and logical operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BinaryOp {
-    /// Addition: `a + b`
-    Add,
-    /// Subtraction: `a - b`
-    Sub,
-    /// Escaped subtraction: `a -- b`
-    EscapedSub,
-    /// Multiplication: `a * b`
-    Mul,
-    /// Division: `a / b`
-    Div,
-    /// Escaped division: `a // b`
-    EscapedDiv,
-    /// Modulo: `a % b`
-    Mod,
-    /// Exponentiation: `a ^ b`
-    Pow,
-    /// Logical AND: `a && b`
-    And,
-    /// Logical OR: `a || b`
-    Or,
-    /// Minimum/maximum: `a | b`
-    MinMax,
-}
-
-/// Comparison operators for expressions.
-///
-/// Comparison operations support chaining for expressions like `a < b < c`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ComparisonOp {
-    /// Less than comparison: `a < b`
-    LessThan,
-    /// Less than or equal comparison: `a <= b`
-    LessThanEq,
-    /// Greater than comparison: `a > b`
-    GreaterThan,
-    /// Greater than or equal comparison: `a >= b`
-    GreaterThanEq,
-    /// Equality comparison: `a == b`
-    Eq,
-    /// Inequality comparison: `a != b`
-    NotEq,
-}
-
-impl ComparisonOp {
-    /// Creates a less than operator.
-    #[must_use]
-    pub const fn less_than() -> Self {
-        Self::LessThan
-    }
-
-    /// Creates a less than or equal operator.
-    #[must_use]
-    pub const fn less_than_eq() -> Self {
-        Self::LessThanEq
-    }
-
-    /// Creates a greater than operator.
-    #[must_use]
-    pub const fn greater_than() -> Self {
-        Self::GreaterThan
-    }
-
-    /// Creates a greater than or equal operator.
-    #[must_use]
-    pub const fn greater_than_eq() -> Self {
-        Self::GreaterThanEq
-    }
-
-    /// Creates an equality operator.
-    #[must_use]
-    pub const fn eq() -> Self {
-        Self::Eq
-    }
-
-    /// Creates an inequality operator.
-    #[must_use]
-    pub const fn not_eq() -> Self {
-        Self::NotEq
-    }
-}
-
-/// Unary operators for single-operand operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnaryOp {
-    /// Negation: `-a`
-    Neg,
-    /// Logical NOT: `!a`
-    Not,
-}
-
 /// Function names for built-in and imported functions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionName {
@@ -466,37 +374,6 @@ impl Variable {
             parameter_name,
             parameter_span,
         }
-    }
-}
-
-/// Literal values that can appear in expressions.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
-    /// Numeric literal (floating-point).
-    Number(f64),
-    /// String literal.
-    String(String),
-    /// Boolean literal.
-    Boolean(bool),
-}
-
-impl Literal {
-    /// Creates a numeric literal.
-    #[must_use]
-    pub const fn number(value: f64) -> Self {
-        Self::Number(value)
-    }
-
-    /// Creates a string literal.
-    #[must_use]
-    pub const fn string(value: String) -> Self {
-        Self::String(value)
-    }
-
-    /// Creates a boolean literal.
-    #[must_use]
-    pub const fn boolean(value: bool) -> Self {
-        Self::Boolean(value)
     }
 }
 
