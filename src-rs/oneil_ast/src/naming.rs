@@ -1,60 +1,14 @@
 //! Naming constructs for the AST
 
-use crate::node::Node;
+pub use oneil_shared::naming::{Identifier, Label};
 
-/// An identifier in the Oneil language
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Identifier(String);
+use crate::node::Node;
 
 /// A node containing an identifier
 pub type IdentifierNode = Node<Identifier>;
 
-impl Identifier {
-    /// Creates a new identifier with the given string value
-    #[must_use]
-    pub const fn new(value: String) -> Self {
-        Self(value)
-    }
-
-    /// Returns the identifier as a string slice
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl From<String> for Identifier {
-    fn from(value: String) -> Self {
-        Self::new(value)
-    }
-}
-
-/// A label in the Oneil language
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Label(String);
-
 /// A node containing a label
 pub type LabelNode = Node<Label>;
-
-impl Label {
-    /// Creates a new label with the given string value
-    #[must_use]
-    pub const fn new(value: String) -> Self {
-        Self(value)
-    }
-
-    /// Returns the label as a string slice
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl From<String> for Label {
-    fn from(value: String) -> Self {
-        Self::new(value)
-    }
-}
 
 /// A directory name in the Oneil language
 #[derive(Debug, Clone, PartialEq, Eq)]

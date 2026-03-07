@@ -1,5 +1,6 @@
 //! Expression constructs for the AST
 
+pub use oneil_shared::expr_ops::{BinaryOp, ComparisonOp, Literal, UnaryOp};
 use oneil_shared::span::Span;
 
 use crate::{naming::IdentifierNode, node::Node};
@@ -114,187 +115,14 @@ impl Expr {
     }
 }
 
-/// Comparison operators for expressions
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ComparisonOp {
-    /// Less than comparison (<)
-    LessThan,
-    /// Less than or equal comparison (<=)
-    LessThanEq,
-    /// Greater than comparison (>)
-    GreaterThan,
-    /// Greater than or equal comparison (>=)
-    GreaterThanEq,
-    /// Equality comparison (==)
-    Eq,
-    /// Inequality comparison (!=)
-    NotEq,
-}
-
 /// A node containing a comparison operator
 pub type ComparisonOpNode = Node<ComparisonOp>;
-
-impl ComparisonOp {
-    /// Creates a less than operator
-    #[must_use]
-    pub const fn less_than() -> Self {
-        Self::LessThan
-    }
-
-    /// Creates a less than or equal operator
-    #[must_use]
-    pub const fn less_than_eq() -> Self {
-        Self::LessThanEq
-    }
-
-    /// Creates a greater than operator
-    #[must_use]
-    pub const fn greater_than() -> Self {
-        Self::GreaterThan
-    }
-
-    /// Creates a greater than or equal operator
-    #[must_use]
-    pub const fn greater_than_eq() -> Self {
-        Self::GreaterThanEq
-    }
-
-    /// Creates an equality operator
-    #[must_use]
-    pub const fn eq() -> Self {
-        Self::Eq
-    }
-
-    /// Creates an inequality operator
-    #[must_use]
-    pub const fn not_eq() -> Self {
-        Self::NotEq
-    }
-}
-
-/// Binary operators for expressions
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BinaryOp {
-    /// Addition operator (+)
-    Add,
-    /// Subtraction operator (-)
-    Sub,
-    /// Escaped subtraction operator (--)
-    EscapedSub,
-    /// Multiplication operator (*)
-    Mul,
-    /// Division operator (/)
-    Div,
-    /// Escaped division operator (//)
-    EscapedDiv,
-    /// Modulo operator (%)
-    Mod,
-    /// Power operator (**)
-    Pow,
-    /// Logical AND operator (&&)
-    And,
-    /// Logical OR operator (||)
-    Or,
-    /// Min/max operator (min/max)
-    MinMax,
-}
 
 /// A node containing a binary operator
 pub type BinaryOpNode = Node<BinaryOp>;
 
-impl BinaryOp {
-    /// Creates an addition operator
-    #[must_use]
-    pub const fn add() -> Self {
-        Self::Add
-    }
-
-    /// Creates a subtraction operator
-    #[must_use]
-    pub const fn sub() -> Self {
-        Self::Sub
-    }
-
-    /// Creates an escaped subtraction operator
-    #[must_use]
-    pub const fn escaped_sub() -> Self {
-        Self::EscapedSub
-    }
-
-    /// Creates a multiplication operator
-    #[must_use]
-    pub const fn mul() -> Self {
-        Self::Mul
-    }
-
-    /// Creates a division operator
-    #[must_use]
-    pub const fn div() -> Self {
-        Self::Div
-    }
-
-    /// Creates an escaped division operator
-    #[must_use]
-    pub const fn escaped_div() -> Self {
-        Self::EscapedDiv
-    }
-
-    /// Creates a modulo operator
-    #[must_use]
-    pub const fn modulo() -> Self {
-        Self::Mod
-    }
-
-    /// Creates a power operator
-    #[must_use]
-    pub const fn pow() -> Self {
-        Self::Pow
-    }
-
-    /// Creates a logical AND operator
-    #[must_use]
-    pub const fn and() -> Self {
-        Self::And
-    }
-
-    /// Creates a logical OR operator
-    #[must_use]
-    pub const fn or() -> Self {
-        Self::Or
-    }
-
-    /// Creates a min/max operator
-    #[must_use]
-    pub const fn min_max() -> Self {
-        Self::MinMax
-    }
-}
-
-/// Unary operators for expressions
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnaryOp {
-    /// Negation operator (-)
-    Neg,
-    /// Logical NOT operator (!)
-    Not,
-}
-
 /// A node containing a unary operator
 pub type UnaryOpNode = Node<UnaryOp>;
-
-impl UnaryOp {
-    /// Creates a negation operator
-    #[must_use]
-    pub const fn neg() -> Self {
-        Self::Neg
-    }
-
-    /// Creates a logical NOT operator
-    #[must_use]
-    pub const fn not() -> Self {
-        Self::Not
-    }
-}
 
 /// Variable references in expressions
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -335,39 +163,8 @@ impl Variable {
     }
 }
 
-/// Literal values in expressions
-#[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
-    /// Numeric literal value
-    Number(f64),
-    /// String literal value
-    String(String),
-    /// Boolean literal value
-    Boolean(bool),
-}
-
 /// A node containing a literal value
 pub type LiteralNode = Node<Literal>;
-
-impl Literal {
-    /// Creates a numeric literal
-    #[must_use]
-    pub const fn number(num: f64) -> Self {
-        Self::Number(num)
-    }
-
-    /// Creates a string literal
-    #[must_use]
-    pub const fn string(str: String) -> Self {
-        Self::String(str)
-    }
-
-    /// Creates a boolean literal
-    #[must_use]
-    pub const fn boolean(bool: bool) -> Self {
-        Self::Boolean(bool)
-    }
-}
 
 #[expect(
     unused_variables,
