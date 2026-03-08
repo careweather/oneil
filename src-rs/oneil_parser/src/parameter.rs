@@ -658,582 +658,107 @@ mod tests {
     mod error {
         use super::*;
 
-        #[test]
-        fn missing_label() {
-            let input = InputSpan::new_extra(": y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Error(error)) = result else {
-                panic!("Unexpected result {result:?}");
+        /// Asserts that `parse(input_str)` returns `Err(Failure(...))` with the
+        /// given `IncompleteKind` and cause span.
+        #[track_caller]
+        fn assert_failure(
+            input_str: &str,
+            error_offset: usize,
+            expected_kind: IncompleteKind,
+            cause_start: usize,
+            cause_end: usize,
+        ) {
+            let input = InputSpan::new_extra(input_str, Config::default());
+            let Err(nom::Err::Failure(error)) = parse(input) else {
+                panic!("Expected Failure for {input_str:?}");
             };
-
-            assert_eq!(error.error_offset, 0);
-            assert!(matches!(
-                error.reason,
-                ParserErrorReason::Expect(ExpectKind::Parameter)
-            ));
+            assert_eq!(error.error_offset, error_offset, "offset for {input_str:?}");
+            let ParserErrorReason::Incomplete { kind, cause } = error.reason else {
+                panic!("Expected Incomplete for {input_str:?}, got {:?}", error.reason);
+            };
+            assert_eq!(kind, expected_kind, "kind for {input_str:?}");
+            assert_eq!(cause.start().offset, cause_start, "cause_start for {input_str:?}");
+            assert_eq!(cause.end().offset, cause_end, "cause_end for {input_str:?}");
         }
 
         #[test]
-        fn missing_identifier() {
-            let input = InputSpan::new_extra("x: = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 3); // After ":"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingIdentifier),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {:?}", error.reason);
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
+        fn expect_parameter_errors() {
+            // (input, expected error_offset)
+            let cases: &[(&str, usize)] = &[
+                (": y = 42\n", 0),
+                ("$$ x: y = 42\n", 1),
+                ("*** x: y = 42\n", 2),
+                ("", 0),
+                ("   \n", 0),
+                ("x y = 42\n", 4),
+                ("x(0, 100) y = 42\n", 10),
+            ];
+            for &(input_str, expected_offset) in cases {
+                let input = InputSpan::new_extra(input_str, Config::default());
+                let Err(nom::Err::Error(error)) = parse(input) else {
+                    panic!("Expected Error for {input_str:?}");
+                };
+                assert_eq!(error.error_offset, expected_offset, "offset for {input_str:?}");
+                assert_eq!(
+                    error.reason,
+                    ParserErrorReason::Expect(ExpectKind::Parameter),
+                    "reason for {input_str:?}"
+                );
+            }
         }
 
         #[test]
-        fn missing_equals_sign() {
-            let input = InputSpan::new_extra("x: y 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 5); // After "y"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingEqualsSign),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 3);
-            assert_eq!(cause.end().offset, 4);
+        fn parameter_incomplete_errors() {
+            use ParameterKind::*;
+            // (input, offset, kind, cause_start, cause_end)
+            let cases: &[(&str, usize, ParameterKind, usize, usize)] = &[
+                ("x: = 42\n", 3, MissingIdentifier, 1, 2),
+                ("x: y 42\n", 5, MissingEqualsSign, 3, 4),
+                ("x: y =\n", 6, MissingValue, 5, 6),
+                ("x: y = 42 :\n", 11, MissingUnit, 10, 11),
+                ("x(, 100): y = 42\n", 2, LimitMissingMin, 1, 2),
+                ("x(0 100): y = 42\n", 4, LimitMissingComma, 2, 3),
+                ("x(0,): y = 42\n", 4, LimitMissingMax, 3, 4),
+                ("x[]: y = 42\n", 2, LimitMissingValues, 1, 2),
+                ("x: y = { if z > 0\n", 9, PiecewiseMissingExpr, 7, 8),
+                ("x: y = {2*z z > 0\n", 12, PiecewiseMissingIf, 8, 11),
+                ("x: y = {2*z if\n", 14, PiecewiseMissingIfExpr, 12, 14),
+                ("x: y = {2*z if z > 0 :\n", 22, MissingUnit, 21, 22),
+                ("x: y = @invalid\n", 7, MissingValue, 5, 6),
+                ("x: y = 42 : @invalid\n", 12, MissingUnit, 10, 11),
+                ("x: y = {2*z if z > 0 {0 if z <= 0\n", 21, MissingEndOfLine, 7, 20),
+                (
+                    "x: y = {2*z if z > 0\n{0 if z <= 0 : m/s\n",
+                    34,
+                    MissingEndOfLine,
+                    7,
+                    33,
+                ),
+            ];
+            for &(input_str, offset, ref param_kind, cs, ce) in cases {
+                assert_failure(
+                    input_str,
+                    offset,
+                    IncompleteKind::Parameter(*param_kind),
+                    cs,
+                    ce,
+                );
+            }
         }
 
         #[test]
-        fn missing_value() {
-            let input = InputSpan::new_extra("x: y =\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 6); // After "="
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingValue),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 5);
-            assert_eq!(cause.end().offset, 6);
-        }
-
-        #[test]
-        fn missing_unit_after_colon() {
-            let input = InputSpan::new_extra("x: y = 42 :\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 11); // After ":"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingUnit),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 10);
-            assert_eq!(cause.end().offset, 11);
-        }
-
-        #[test]
-        fn continuous_limits_missing_min() {
-            let input = InputSpan::new_extra("x(, 100): y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 2); // After "("
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::LimitMissingMin),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
-        }
-
-        #[test]
-        fn continuous_limits_missing_comma() {
-            let input = InputSpan::new_extra("x(0 100): y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 4); // After "0"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::LimitMissingComma),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 2);
-            assert_eq!(cause.end().offset, 3);
-        }
-
-        #[test]
-        fn continuous_limits_missing_max() {
-            let input = InputSpan::new_extra("x(0,): y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 4); // After ","
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::LimitMissingMax),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 3);
-            assert_eq!(cause.end().offset, 4);
-        }
-
-        #[test]
-        fn continuous_limits_unclosed_paren() {
-            let input = InputSpan::new_extra("x(0, 100: y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 8); // After "100"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::UnclosedParen,
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
-        }
-
-        #[test]
-        fn discrete_limits_missing_values() {
-            let input = InputSpan::new_extra("x[]: y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 2); // After "["
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::LimitMissingValues),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
-        }
-
-        #[test]
-        fn discrete_limits_unclosed_bracket() {
-            let input = InputSpan::new_extra("x[1, 2, 3: y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 9); // After "3"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::UnclosedBracket,
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
-        }
-
-        #[test]
-        fn piecewise_missing_expr() {
-            let input = InputSpan::new_extra("x: y = { if z > 0\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 9); // After "{"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::PiecewiseMissingExpr),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 7);
-            assert_eq!(cause.end().offset, 8);
-        }
-
-        #[test]
-        fn piecewise_missing_if() {
-            let input = InputSpan::new_extra("x: y = {2*z z > 0\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 12); // After "2*z"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::PiecewiseMissingIf),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 8);
-            assert_eq!(cause.end().offset, 11);
-        }
-
-        #[test]
-        fn piecewise_missing_if_expr() {
-            let input = InputSpan::new_extra("x: y = {2*z if\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 14); // After "if"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::PiecewiseMissingIfExpr),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 12);
-            assert_eq!(cause.end().offset, 14);
-        }
-
-        #[test]
-        fn piecewise_missing_unit_after_colon() {
-            let input = InputSpan::new_extra("x: y = {2*z if z > 0 :\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 22); // After ":"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingUnit),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 21);
-            assert_eq!(cause.end().offset, 22);
-        }
-
-        #[test]
-        fn invalid_expression() {
-            let input = InputSpan::new_extra("x: y = @invalid\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 7); // At "@"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingValue),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 5);
-            assert_eq!(cause.end().offset, 6);
-        }
-
-        #[test]
-        fn invalid_unit() {
-            let input = InputSpan::new_extra("x: y = 42 : @invalid\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 12); // After ":"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingUnit),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 10);
-            assert_eq!(cause.end().offset, 11);
-        }
-
-        #[test]
-        fn malformed_performance_marker() {
-            let input = InputSpan::new_extra("$$ x: y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Error(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 1);
-            assert!(matches!(
-                error.reason,
-                ParserErrorReason::Expect(ExpectKind::Parameter)
-            ));
-        }
-
-        #[test]
-        fn malformed_trace_level() {
-            let input = InputSpan::new_extra("*** x: y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Error(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 2);
-            assert!(matches!(
-                error.reason,
-                ParserErrorReason::Expect(ExpectKind::Parameter)
-            ));
-        }
-
-        #[test]
-        fn empty_input() {
-            let input = InputSpan::new_extra("", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Error(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 0);
-            assert!(matches!(
-                error.reason,
-                ParserErrorReason::Expect(ExpectKind::Parameter)
-            ));
-        }
-
-        #[test]
-        fn whitespace_only() {
-            let input = InputSpan::new_extra("   \n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Error(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 0);
-            assert!(matches!(
-                error.reason,
-                ParserErrorReason::Expect(ExpectKind::Parameter)
-            ));
-        }
-
-        #[test]
-        fn missing_colon_after_label() {
-            let input = InputSpan::new_extra("x y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Error(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 4); // After "x"
-            assert!(matches!(
-                error.reason,
-                ParserErrorReason::Expect(ExpectKind::Parameter)
-            ));
-        }
-
-        #[test]
-        fn missing_colon_after_limits() {
-            let input = InputSpan::new_extra("x(0, 100) y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Error(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 10); // After ")"
-            assert!(matches!(
-                error.reason,
-                ParserErrorReason::Expect(ExpectKind::Parameter)
-            ));
-        }
-
-        #[test]
-        fn mixed_limits_syntax() {
-            let input = InputSpan::new_extra("x(0, 100][1, 2]: y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 8); // At "]"
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::UnclosedParen,
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
-        }
-
-        #[test]
-        fn piecewise_missing_newline_between_parts() {
-            let input =
-                InputSpan::new_extra("x: y = {2*z if z > 0 {0 if z <= 0\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 21); // After first part
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingEndOfLine),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 7);
-            assert_eq!(cause.end().offset, 20);
-        }
-
-        #[test]
-        fn continuous_limits_with_extra_comma() {
-            let input = InputSpan::new_extra("x(0, 100,): y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 8); // At extra ","
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::UnclosedParen,
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
-        }
-
-        #[test]
-        fn discrete_limits_with_trailing_comma() {
-            let input = InputSpan::new_extra("x[1, 2, 3,]: y = 42\n", Config::default());
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 9); // At trailing ","
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::UnclosedBracket,
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 1);
-            assert_eq!(cause.end().offset, 2);
-        }
-
-        #[test]
-        fn piecewise_with_unit_on_wrong_line() {
-            let input = InputSpan::new_extra(
-                "x: y = {2*z if z > 0\n{0 if z <= 0 : m/s\n",
-                Config::default(),
-            );
-            let result = parse(input);
-
-            let Err(nom::Err::Failure(error)) = result else {
-                panic!("Unexpected result {result:?}");
-            };
-
-            assert_eq!(error.error_offset, 34); // After second part
-            let ParserErrorReason::Incomplete {
-                kind: IncompleteKind::Parameter(ParameterKind::MissingEndOfLine),
-                cause,
-            } = error.reason
-            else {
-                panic!("Unexpected error {error:?}");
-            };
-
-            assert_eq!(cause.start().offset, 7);
-            assert_eq!(cause.end().offset, 33);
+        fn unclosed_delimiter_errors() {
+            // (input, offset, kind, cause_start, cause_end)
+            let cases: &[(&str, usize, IncompleteKind, usize, usize)] = &[
+                ("x(0, 100: y = 42\n", 8, IncompleteKind::UnclosedParen, 1, 2),
+                ("x[1, 2, 3: y = 42\n", 9, IncompleteKind::UnclosedBracket, 1, 2),
+                ("x(0, 100][1, 2]: y = 42\n", 8, IncompleteKind::UnclosedParen, 1, 2),
+                ("x(0, 100,): y = 42\n", 8, IncompleteKind::UnclosedParen, 1, 2),
+                ("x[1, 2, 3,]: y = 42\n", 9, IncompleteKind::UnclosedBracket, 1, 2),
+            ];
+            for &(input_str, offset, ref expected_kind, cs, ce) in cases {
+                assert_failure(input_str, offset, *expected_kind, cs, ce);
+            }
         }
     }
 }
