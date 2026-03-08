@@ -1034,706 +1034,199 @@ mod tests {
     }
 
     mod error {
+        use crate::error::reason::{
+            DeclKind, ExpectKind, ImportKind, IncompleteKind, ParserErrorReason, UseKind,
+        };
+        use crate::token::error::{ExpectKind as TokenExpectKind, TokenErrorKind};
+
         use super::*;
 
-        mod import_error_tests {
-            use crate::error::reason::{
-                DeclKind, ExpectKind, ImportKind, IncompleteKind, ParserErrorReason,
+        /// Asserts that `parse(input_str)` returns `Err(Failure(...))` with the
+        /// given `IncompleteKind` and cause span.
+        fn assert_failure(
+            input_str: &str,
+            error_offset: usize,
+            expected_kind: IncompleteKind,
+            cause_start: usize,
+            cause_end: usize,
+        ) {
+            let input = InputSpan::new_extra(input_str, Config::default());
+            let Err(nom::Err::Failure(error)) = parse(input) else {
+                panic!("Expected Failure for {input_str:?}");
             };
-
-            use super::*;
-
-            #[test]
-            fn empty_input() {
-                let input = InputSpan::new_extra("", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Expected error for empty input");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn missing_import_keyword() {
-                let input = InputSpan::new_extra("foo\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Expected error for missing import keyword");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn missing_path() {
-                let input = InputSpan::new_extra("import\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 6);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::Import(ImportKind::MissingPath)),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 0);
-                assert_eq!(cause.end().offset, 6);
-            }
-
-            #[test]
-            fn invalid_path_identifier() {
-                let input = InputSpan::new_extra("import 123\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 7);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::Import(ImportKind::MissingPath)),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 0);
-                assert_eq!(cause.end().offset, 6);
-            }
-
-            #[test]
-            fn path_with_missing_end_of_line() {
-                let input = InputSpan::new_extra("import foo@bar\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 10);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::Import(ImportKind::MissingEndOfLine)),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 7);
-                assert_eq!(cause.end().offset, 10);
-            }
-
-            #[test]
-            fn whitespace_only() {
-                let input = InputSpan::new_extra("   \n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Expected error for whitespace only");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn comment_only() {
-                let input = InputSpan::new_extra("# comment\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Expected error for comment only");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-        }
-
-        mod use_error {
-            use crate::error::reason::{
-                DeclKind, ExpectKind, IncompleteKind, ParserErrorReason, UseKind,
+            assert_eq!(error.error_offset, error_offset, "offset for {input_str:?}");
+            let ParserErrorReason::Incomplete { kind, cause } = error.reason else {
+                panic!("Expected Incomplete for {input_str:?}, got {:?}", error.reason);
             };
-
-            use super::*;
-
-            #[test]
-            fn missing_use_keyword() {
-                let input = InputSpan::new_extra("foo.bar as baz\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Expected error for missing use keyword");
-                };
-
-                assert_eq!(error.error_offset, 0);
-
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn missing_as_keyword() {
-                let input = InputSpan::new_extra("use foo.bar baz\n", Config::default());
-                let result = parse(input);
-
-                // This should fail because 'baz' is not a valid continuation after a use declaration
-                // The parser correctly parses "use foo.bar" but then expects a newline
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Expected error for invalid continuation after use declaration");
-                };
-
-                assert_eq!(error.error_offset, 12);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingEndOfLine)),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                // The cause should be the span of "foo.bar"
-                assert_eq!(cause.start().offset, 4);
-                assert_eq!(cause.end().offset, 11);
-            }
-
-            #[test]
-            fn missing_alias() {
-                let input = InputSpan::new_extra("use foo.bar as\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 14);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::AsMissingAlias),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 12);
-                assert_eq!(cause.end().offset, 14);
-            }
-
-            #[test]
-            fn invalid_path_identifier() {
-                // TODO: Add context to this error (in error module): "invalid path identifier"
-                let input = InputSpan::new_extra("use 123.bar as baz\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 4);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::Use(UseKind::MissingModelInfo)),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 0);
-                assert_eq!(cause.end().offset, 3);
-            }
-
-            #[test]
-            fn invalid_alias_identifier() {
-                // TODO: Add context to this error (in error module): "invalid alias identifier"
-                let input = InputSpan::new_extra("use foo.bar as 123\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 15);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::AsMissingAlias),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 12);
-                assert_eq!(cause.end().offset, 14);
-            }
+            assert_eq!(kind, expected_kind, "kind for {input_str:?}");
+            assert_eq!(cause.start().offset, cause_start, "cause_start for {input_str:?}");
+            assert_eq!(cause.end().offset, cause_end, "cause_end for {input_str:?}");
         }
 
-        mod model_info_error {
-            use crate::error::reason::{DeclKind, IncompleteKind, ParserErrorReason};
-            use crate::token::error::{ExpectKind, TokenErrorKind};
-
-            use super::*;
-
-            #[test]
-            fn empty_path() {
-                let input = InputSpan::new_extra("", Config::default());
-                let result = model_info(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
+        #[test]
+        fn expect_decl_errors() {
+            let cases: &[&str] = &[
+                "",
+                "foo\n",
+                "   \n",
+                "# comment\n",
+                "invalid syntax\n",
+                "impor\n",
+                "export foo\n",
+                "Import foo\n",
+                "+++---\n",
+                "123 456\n",
+                "foo.bar as baz\n",
+            ];
+            for input_str in cases {
+                let input = InputSpan::new_extra(input_str, Config::default());
+                let Err(nom::Err::Error(error)) = parse(input) else {
+                    panic!("Expected Error for {input_str:?}");
                 };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
+                assert_eq!(error.error_offset, 0, "offset for {input_str:?}");
+                assert_eq!(
                     error.reason,
-                    ParserErrorReason::TokenError(TokenErrorKind::Expect(ExpectKind::Identifier))
-                ));
-            }
-
-            #[test]
-            fn invalid_first_identifier() {
-                let input = InputSpan::new_extra("123.bar", Config::default());
-                let result = model_info(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::TokenError(TokenErrorKind::Expect(ExpectKind::Identifier))
-                ));
-            }
-
-            #[test]
-            fn missing_subcomponent_after_dot() {
-                let input = InputSpan::new_extra("foo.", Config::default());
-                let result = model_info(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 4);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::ModelMissingSubcomponent),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 3);
-                assert_eq!(cause.end().offset, 4);
-            }
-
-            #[test]
-            fn invalid_subcomponent_after_dot() {
-                let input = InputSpan::new_extra("foo.123", Config::default());
-                let result = model_info(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 4);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::ModelMissingSubcomponent),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 3);
-                assert_eq!(cause.end().offset, 4);
-            }
-
-            #[test]
-            fn dot_at_end() {
-                let input = InputSpan::new_extra("foo.bar.", Config::default());
-                let result = model_info(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 8);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::Decl(DeclKind::ModelMissingSubcomponent),
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 7);
-                assert_eq!(cause.end().offset, 8);
-            }
-        }
-
-        mod general_error {
-            use crate::error::reason::{ExpectKind, IncompleteKind, ParserErrorReason};
-
-            use super::*;
-
-            #[test]
-            fn no_valid_declaration() {
-                let input = InputSpan::new_extra("invalid syntax\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn partial_keyword() {
-                let input = InputSpan::new_extra("impor\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn wrong_keyword() {
-                let input = InputSpan::new_extra("export foo\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn mixed_case_keywords() {
-                let input = InputSpan::new_extra("Import foo\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn symbols_only() {
-                let input = InputSpan::new_extra("+++---\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn numbers_only() {
-                let input = InputSpan::new_extra("123 456\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 0);
-                assert!(matches!(
-                    error.reason,
-                    ParserErrorReason::Expect(ExpectKind::Decl)
-                ));
-            }
-
-            #[test]
-            fn parse_complete_with_remaining_input() {
-                let input = InputSpan::new_extra("import foo\nrest", Config::default());
-                let result = parse_complete(input);
-
-                let Err(nom::Err::Error(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 11);
-                assert!(matches!(error.reason, ParserErrorReason::UnexpectedToken));
-            }
-
-            #[test]
-            fn use_decl_with_unclosed_bracket_empty() {
-                let input = InputSpan::new_extra("use foo with [\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 15);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 13);
-                assert_eq!(cause.end().offset, 14);
-            }
-
-            #[test]
-            fn use_decl_with_unclosed_bracket_single_submodel() {
-                let input = InputSpan::new_extra("use foo with [bar\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 18);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 13);
-                assert_eq!(cause.end().offset, 14);
-            }
-
-            #[test]
-            fn use_decl_with_unclosed_bracket_multiple_submodels() {
-                let input = InputSpan::new_extra("use foo with [bar, baz\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 23);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 13);
-                assert_eq!(cause.end().offset, 14);
-            }
-
-            #[test]
-            fn use_decl_with_unclosed_bracket_with_trailing_comma() {
-                let input = InputSpan::new_extra("use foo with [bar, baz,\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 24);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 13);
-                assert_eq!(cause.end().offset, 14);
-            }
-
-            #[test]
-            fn use_decl_with_unclosed_bracket_with_subcomponents() {
-                let input =
-                    InputSpan::new_extra("use foo with [bar.qux, baz.quux\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 32);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 13);
-                assert_eq!(cause.end().offset, 14);
-            }
-
-            #[test]
-            fn use_decl_with_unclosed_bracket_with_aliases() {
-                let input = InputSpan::new_extra(
-                    "use foo with [bar as baz, qux as quux\n",
-                    Config::default(),
+                    ParserErrorReason::Expect(ExpectKind::Decl),
+                    "reason for {input_str:?}"
                 );
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 38);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 13);
-                assert_eq!(cause.end().offset, 14);
             }
+        }
 
-            #[test]
-            fn use_decl_with_unclosed_bracket_with_model_alias() {
-                let input =
-                    InputSpan::new_extra("use foo as bar with [qux, baz\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 30);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 20);
-                assert_eq!(cause.end().offset, 21);
+        #[test]
+        fn import_incomplete_errors() {
+            use ImportKind::*;
+            let cases: &[(&str, usize, ImportKind, usize, usize)] = &[
+                ("import\n", 6, MissingPath, 0, 6),
+                ("import 123\n", 7, MissingPath, 0, 6),
+                ("import foo@bar\n", 10, MissingEndOfLine, 7, 10),
+            ];
+            for &(input_str, offset, ref import_kind, cs, ce) in cases {
+                assert_failure(
+                    input_str,
+                    offset,
+                    IncompleteKind::Decl(DeclKind::Import(*import_kind)),
+                    cs,
+                    ce,
+                );
             }
+        }
 
-            #[test]
-            fn use_decl_with_unclosed_bracket_with_newlines() {
-                let input = InputSpan::new_extra("use foo with [\nbar,\nbaz\n", Config::default());
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 24);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 13);
-                assert_eq!(cause.end().offset, 14);
+        #[test]
+        fn use_incomplete_errors() {
+            let cases: &[(&str, usize, IncompleteKind, usize, usize)] = &[
+                (
+                    "use foo.bar baz\n",
+                    12,
+                    IncompleteKind::Decl(DeclKind::Use(UseKind::MissingEndOfLine)),
+                    4,
+                    11,
+                ),
+                (
+                    "use foo.bar as\n",
+                    14,
+                    IncompleteKind::Decl(DeclKind::AsMissingAlias),
+                    12,
+                    14,
+                ),
+                (
+                    "use 123.bar as baz\n",
+                    4,
+                    IncompleteKind::Decl(DeclKind::Use(UseKind::MissingModelInfo)),
+                    0,
+                    3,
+                ),
+                (
+                    "use foo.bar as 123\n",
+                    15,
+                    IncompleteKind::Decl(DeclKind::AsMissingAlias),
+                    12,
+                    14,
+                ),
+            ];
+            for &(input_str, offset, ref expected_kind, cs, ce) in cases {
+                assert_failure(input_str, offset, *expected_kind, cs, ce);
             }
+        }
 
-            #[test]
-            fn use_decl_with_unclosed_bracket_with_complex_path() {
-                let input = InputSpan::new_extra(
+        #[test]
+        fn model_info_expect_identifier_errors() {
+            let cases: &[&str] = &["", "123.bar"];
+            for input_str in cases {
+                let input = InputSpan::new_extra(input_str, Config::default());
+                let Err(nom::Err::Error(error)) = model_info(input) else {
+                    panic!("Expected Error for {input_str:?}");
+                };
+                assert_eq!(error.error_offset, 0, "offset for {input_str:?}");
+                assert_eq!(
+                    error.reason,
+                    ParserErrorReason::TokenError(TokenErrorKind::Expect(
+                        TokenExpectKind::Identifier
+                    )),
+                    "reason for {input_str:?}"
+                );
+            }
+        }
+
+        #[test]
+        fn model_info_missing_subcomponent() {
+            let cases: &[(&str, usize, usize, usize)] = &[
+                ("foo.", 4, 3, 4),
+                ("foo.123", 4, 3, 4),
+                ("foo.bar.", 8, 7, 8),
+            ];
+            for &(input_str, offset, cs, ce) in cases {
+                let input = InputSpan::new_extra(input_str, Config::default());
+                let Err(nom::Err::Failure(error)) = model_info(input) else {
+                    panic!("Expected Failure for {input_str:?}");
+                };
+                assert_eq!(error.error_offset, offset, "offset for {input_str:?}");
+                let ParserErrorReason::Incomplete { kind, cause } = error.reason else {
+                    panic!("Expected Incomplete for {input_str:?}, got {:?}", error.reason);
+                };
+                assert_eq!(
+                    kind,
+                    IncompleteKind::Decl(DeclKind::ModelMissingSubcomponent),
+                    "kind for {input_str:?}"
+                );
+                assert_eq!(cause.start().offset, cs, "cause_start for {input_str:?}");
+                assert_eq!(cause.end().offset, ce, "cause_end for {input_str:?}");
+            }
+        }
+
+        #[test]
+        fn parse_complete_with_remaining_input() {
+            let input = InputSpan::new_extra("import foo\nrest", Config::default());
+            let result = parse_complete(input);
+
+            let Err(nom::Err::Error(error)) = result else {
+                panic!("Unexpected result {result:?}");
+            };
+
+            assert_eq!(error.error_offset, 11);
+            assert_eq!(error.reason, ParserErrorReason::UnexpectedToken);
+        }
+
+        #[test]
+        fn unclosed_bracket_errors() {
+            // (input, error_offset, cause_start, cause_end)
+            let cases: &[(&str, usize, usize, usize)] = &[
+                ("use foo with [\n", 15, 13, 14),
+                ("use foo with [bar\n", 18, 13, 14),
+                ("use foo with [bar, baz\n", 23, 13, 14),
+                ("use foo with [bar, baz,\n", 24, 13, 14),
+                ("use foo with [bar.qux, baz.quux\n", 32, 13, 14),
+                ("use foo with [bar as baz, qux as quux\n", 38, 13, 14),
+                ("use foo as bar with [qux, baz\n", 30, 20, 21),
+                ("use foo with [\nbar,\nbaz\n", 24, 13, 14),
+                (
                     "use utils/math.trigonometry as trig with [sin, cos as cosine\n",
-                    Config::default(),
-                );
-                let result = parse(input);
-
-                let Err(nom::Err::Failure(error)) = result else {
-                    panic!("Unexpected result {result:?}");
-                };
-
-                assert_eq!(error.error_offset, 61);
-
-                let ParserErrorReason::Incomplete {
-                    kind: IncompleteKind::UnclosedBracket,
-                    cause,
-                } = error.reason
-                else {
-                    panic!("Unexpected reason {:?}", error.reason);
-                };
-
-                assert_eq!(cause.start().offset, 41);
-                assert_eq!(cause.end().offset, 42);
+                    61,
+                    41,
+                    42,
+                ),
+            ];
+            for &(input_str, offset, cs, ce) in cases {
+                assert_failure(input_str, offset, IncompleteKind::UnclosedBracket, cs, ce);
             }
         }
     }
