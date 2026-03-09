@@ -640,6 +640,11 @@ fn print_expression(expr: &ir::Expr, indent: usize) {
                 print_expression(expr, indent + 2);
             }
         }
+        ir::Expr::UnitCast { expr, unit, .. } => {
+            println!("{}    ├── UnitCast", "    ".repeat(indent));
+            print_expression(expr, indent + 1);
+            print_unit(unit, indent + 1);
+        }
     }
 }
 

@@ -9,7 +9,7 @@ use oneil_shared::span::Span;
 use crate::{
     ExternalResolutionContext, ResolutionContext,
     error::{self, VariableResolutionError},
-    resolver::resolve_variable::resolve_variable,
+    resolver::{resolve_unit::resolve_unit, resolve_variable::resolve_variable},
 };
 
 /// Resolves an AST expression into a model expression.
@@ -37,6 +37,9 @@ where
         }
         ast::Expr::FunctionCall { name, args } => {
             resolve_function_call_expression(span, name, args, resolution_context)
+        }
+        ast::Expr::UnitCast { expr, unit } => {
+            resolve_unit_cast_expression(span, expr, unit, resolution_context)
         }
         ast::Expr::Variable(variable) => resolve_variable_expression(variable, resolution_context),
         ast::Expr::Literal(literal) => Ok(resolve_literal_expression(span, literal)),
@@ -164,6 +167,25 @@ where
     E: ExternalResolutionContext,
 {
     resolve_expr(expr, resolution_context)
+}
+
+/// Resolves a unit cast expression.
+fn resolve_unit_cast_expression<E>(
+    span: Span,
+    expr: &ast::ExprNode,
+    unit: &ast::UnitExprNode,
+    resolution_context: &ResolutionContext<'_, E>,
+) -> Result<ir::Expr, Vec<VariableResolutionError>>
+where
+    E: ExternalResolutionContext,
+{
+    let expr = resolve_expr(expr, resolution_context)?;
+    let unit = resolve_unit(unit, resolution_context).map_err(|errs| {
+        errs.into_iter()
+            .map(VariableResolutionError::from)
+            .collect::<Vec<VariableResolutionError>>()
+    })?;
+    Ok(ir::Expr::unit_cast(span, expr, unit))
 }
 
 /// Converts an AST comparison operation to a model comparison operation.

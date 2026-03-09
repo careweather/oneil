@@ -196,6 +196,13 @@ impl ParserError {
         }
     }
 
+    /// Creates a new `ParserError` for a unit cast expression missing its unit after `:`
+    pub(crate) fn expr_unit_cast_missing_unit(colon_span: Span) -> impl Fn(Self) -> Self {
+        move |error| {
+            error.convert_reason(ParserErrorReason::expr_unit_cast_missing_unit(colon_span))
+        }
+    }
+
     /// Creates a new `ParserError` for a missing parent in a variable accessor
     pub(crate) fn expr_variable_missing_reference_model(
         dot_token: Span,

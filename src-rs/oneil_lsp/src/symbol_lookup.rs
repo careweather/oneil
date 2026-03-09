@@ -172,7 +172,9 @@ fn find_symbol_in_expr(expr: &ir::Expr, offset: usize) -> Option<SymbolAtPositio
             }
             find_symbol_in_expr(right, offset)
         }
-        ir::Expr::UnaryOp { expr, .. } => find_symbol_in_expr(expr, offset),
+        ir::Expr::UnaryOp { expr, .. } | ir::Expr::UnitCast { expr, .. } => {
+            find_symbol_in_expr(expr, offset)
+        }
         ir::Expr::FunctionCall { args, .. } => {
             // TODO: Handle function name span
             for arg in args {

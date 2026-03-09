@@ -3,7 +3,7 @@
 use oneil_shared::span::Span;
 
 use crate::{
-    ParameterName, PythonPath, ReferenceName,
+    CompositeUnit, ParameterName, PythonPath, ReferenceName,
     reference::{Identifier, ModelPath},
 };
 
@@ -67,6 +67,15 @@ pub enum Expr {
         span: Span,
         /// The literal value.
         value: Literal,
+    },
+    /// Unit cast expression: (expr : unit)
+    UnitCast {
+        /// Span of the entire unit cast expression.
+        span: Span,
+        /// The expression to cast.
+        expr: Box<Self>,
+        /// The unit to cast to.
+        unit: CompositeUnit,
     },
 }
 
@@ -176,6 +185,16 @@ impl Expr {
         Self::Literal { span, value }
     }
 
+    /// Creates a unit cast expression.
+    #[must_use]
+    pub fn unit_cast(span: Span, expr: Self, unit: CompositeUnit) -> Self {
+        Self::UnitCast {
+            span,
+            expr: Box::new(expr),
+            unit,
+        }
+    }
+
     /// Visits the expression with a visitor in pre-order
     /// (parent nodes are visited before their children).
     #[must_use]
@@ -221,6 +240,10 @@ impl Expr {
             }
             Self::Variable { span, variable } => visitor.visit_variable(*span, variable),
             Self::Literal { span, value } => visitor.visit_literal(*span, value),
+            Self::UnitCast { span, expr, unit } => {
+                let visitor = visitor.visit_unit_cast(*span, expr, unit);
+                expr.pre_order_visit(visitor)
+            }
         }
     }
 
@@ -271,6 +294,10 @@ impl Expr {
             }
             Self::Variable { span, variable } => visitor.visit_variable(*span, variable),
             Self::Literal { span, value } => visitor.visit_literal(*span, value),
+            Self::UnitCast { span, expr, unit } => {
+                let visitor = expr.post_order_visit(visitor);
+                visitor.visit_unit_cast(*span, expr, unit)
+            }
         }
     }
 }
@@ -552,6 +579,12 @@ pub trait ExprVisitor: Sized {
     /// Visits a literal value expression.
     #[must_use]
     fn visit_literal(self, span: Span, value: &Literal) -> Self {
+        self
+    }
+
+    /// Visits a unit cast expression.
+    #[must_use]
+    fn visit_unit_cast(self, span: Span, expr: &Expr, unit: &CompositeUnit) -> Self {
         self
     }
 }

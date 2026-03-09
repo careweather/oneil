@@ -6,6 +6,8 @@ use oneil_shared::{
     span::Span,
 };
 
+use super::unit::UnitResolutionError;
+
 /// Represents an error that occurred during variable resolution within expressions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VariableResolutionError {
@@ -62,6 +64,8 @@ pub enum VariableResolutionError {
         /// The Python paths that export this function
         python_paths: Vec<ir::PythonPath>,
     },
+    /// A unit resolution error occurred (e.g. in a unit cast expression).
+    UnitResolution(UnitResolutionError),
 }
 
 impl VariableResolutionError {
@@ -234,6 +238,7 @@ impl fmt::Display for VariableResolutionError {
                     "function `{function_name}` is defined in multiple Python imports"
                 )
             }
+            Self::UnitResolution(unit_error) => unit_error.fmt(f),
         }
     }
 }
@@ -281,6 +286,7 @@ impl AsOneilError for VariableResolutionError {
                 let location = ErrorLocation::from_source_and_span(source, *relevant_span);
                 Some(location)
             }
+            Self::UnitResolution(unit_error) => unit_error.error_location(source),
         }
     }
 
@@ -310,7 +316,8 @@ impl AsOneilError for VariableResolutionError {
             | Self::UndefinedFunction {
                 function_name: _,
                 relevant_span: _,
-            } => Vec::new(),
+            }
+            | Self::UnitResolution(_) => Vec::new(),
             Self::MultipleFunctionsFound {
                 function_name,
                 relevant_span: _,
@@ -334,5 +341,11 @@ impl AsOneilError for VariableResolutionError {
                 | Self::ParameterHasError { .. }
                 | Self::ReferenceResolutionFailed { .. }
         )
+    }
+}
+
+impl From<UnitResolutionError> for VariableResolutionError {
+    fn from(error: UnitResolutionError) -> Self {
+        Self::UnitResolution(error)
     }
 }

@@ -116,6 +116,7 @@ impl fmt::Display for ExprKind {
             Self::VariableMissingReferenceModel => {
                 write!(f, "expected parent model name after `.`")
             }
+            Self::UnitCastMissingUnit => write!(f, "expected unit after `:`"),
         }
     }
 }

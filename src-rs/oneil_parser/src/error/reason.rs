@@ -153,6 +153,14 @@ impl ParserErrorReason {
     }
 
     #[must_use]
+    pub(crate) const fn expr_unit_cast_missing_unit(colon_span: Span) -> Self {
+        Self::Incomplete {
+            cause: colon_span,
+            kind: IncompleteKind::Expr(ExprKind::UnitCastMissingUnit),
+        }
+    }
+
+    #[must_use]
     pub(crate) const fn section_missing_label(section_span: Span) -> Self {
         Self::Incomplete {
             cause: section_span,
@@ -441,6 +449,8 @@ pub enum ExprKind {
     },
     /// Found a missing reference model in a variable accessor
     VariableMissingReferenceModel,
+    /// Found a unit cast expression missing its unit after `:`
+    UnitCastMissingUnit,
 }
 
 /// The different kind of incomplete section errors

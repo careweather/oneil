@@ -20,11 +20,12 @@ use crate::{
         literal::{number, string},
         naming::identifier,
         symbol::{
-            bang_equals, bar, caret, comma, dot, equals_equals, greater_than, greater_than_equals,
-            less_than, less_than_equals, minus, minus_minus, paren_left, paren_right, percent,
-            plus, slash, slash_slash, star,
+            bang_equals, bar, caret, colon, comma, dot, equals_equals, greater_than,
+            greater_than_equals, less_than, less_than_equals, minus, minus_minus, paren_left,
+            paren_right, percent, plus, slash, slash_slash, star,
         },
     },
+    unit::parse as parse_unit,
     util::{InputSpan, Parser, Result},
 };
 
@@ -360,6 +361,7 @@ fn primary_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
             literal_node.wrap(Expr::literal)
         }),
         function_call,
+        unit_cast,
         variable,
         parenthesized_expr,
     ))
@@ -383,6 +385,33 @@ fn function_call(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
     Ok((
         rest,
         Node::new(Expr::function_call(name_node, args), span, whitespace_span),
+    ))
+}
+
+/// Parses a unit casting expression
+fn unit_cast(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError> {
+    let (rest, paren_left_token) = paren_left.convert_errors().parse(input)?;
+    let (rest, expr) = expr.parse(rest)?;
+    let (rest, colon_token) = colon.convert_errors().parse(rest)?;
+    let (rest, unit) = parse_unit
+        .or_fail_with(ParserError::expr_unit_cast_missing_unit(
+            colon_token.lexeme_span,
+        ))
+        .parse(rest)?;
+    let (rest, paren_right_token) = paren_right
+        .or_fail_with(ParserError::unclosed_paren(paren_left_token.lexeme_span))
+        .parse(rest)?;
+
+    let span = Span::from_start_and_end(
+        &paren_left_token.lexeme_span,
+        &paren_right_token.lexeme_span,
+    );
+
+    let whitespace_span = paren_right_token.whitespace_span;
+
+    Ok((
+        rest,
+        Node::new(Expr::unit_cast(expr, unit), span, whitespace_span),
     ))
 }
 

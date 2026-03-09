@@ -280,6 +280,11 @@ fn print_expression(expr: &ast::ExprNode, indent: usize) {
         ast::Expr::Literal(lit) => {
             print_literal(lit, indent);
         }
+        ast::Expr::UnitCast { expr, unit } => {
+            println!("{}UnitCast:", "    ".repeat(indent));
+            print_expression(expr, indent + 1);
+            print_unit_expression(unit, indent + 1);
+        }
     }
 }
 
