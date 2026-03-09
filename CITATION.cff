@@ -1,0 +1,34 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Oneil Programming Language
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: M Patrick
+    family-names: Walton
+    email: patrick@careweather.com
+    orcid: "https://orcid.org/0000-0002-4951-5422"
+    affiliation: Care Weather
+  - given-names: Brendon
+    family-names: Bown
+    email: brendon.bown@proton.me
+    orcid: "https://orcid.org/0009-0001-7248-1865"
+    affiliation: Care Weather
+repository-code: "https://github.com/careweather/oneil"
+abstract: >-
+  Oneil is a design specification language for modeling large physical
+  systems (spacecraft, cars, aircraft) with code. Key features include units as
+  types; interval arithmetic for propagating ranges of outcomes, and model-based
+  plug-ins. Oneil calculation and typesetting use the same source, providing a
+  single source of truth for derivation and evaluation. Oneil replaces complex,
+  GUI-based system engineering software with a clean-syntax, AI-ready
+  alternative.
+keywords:
+  - programming-language
+  - systems-engineering
+  - unit-checking
+license: MPL-2.0
