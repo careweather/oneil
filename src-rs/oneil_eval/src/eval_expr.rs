@@ -412,10 +412,11 @@ fn eval_unit_cast(
         UnitConversionError::InvalidType {
             value_type,
             target_unit: _,
-        } => vec![EvalError::InvalidType {
-            expected_type: ExpectedType::NumberOrMeasuredNumber,
+        } => vec![EvalError::TypeMismatch {
+            expected_type: ExpectedType::NumberOrMeasuredNumber { number_type: None },
+            expected_source_span: unit_result_span,
             found_type: *value_type,
-            found_span: unit_result_span,
+            found_span: expr_result_span,
         }],
     })
 }

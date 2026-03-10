@@ -23,28 +23,63 @@ pub struct EvalErrors {
 ///
 /// This enum is used to specify what type is expected in various type checking
 /// contexts, such as function arguments or expression evaluation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExpectedType {
     /// A boolean value.
     Boolean,
     /// A string value.
     String,
     /// A unitless number (scalar or interval without units).
-    Number,
+    Number {
+        /// The type of the expected number (if any)
+        number_type: Option<NumberType>,
+    },
     /// A number with a unit (measured number).
-    MeasuredNumber,
+    MeasuredNumber {
+        /// The type of the expected number (if any)
+        number_type: Option<NumberType>,
+        /// The unit of the expected measured number (if any)
+        unit: Option<DisplayUnit>,
+    },
     /// Either a unitless number or a number with a unit.
-    NumberOrMeasuredNumber,
+    NumberOrMeasuredNumber {
+        /// The type of the expected number (if any)
+        number_type: Option<NumberType>,
+    },
 }
 
 impl fmt::Display for ExpectedType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let number_type_to_string = |type_: &Option<NumberType>| match type_ {
+            Some(NumberType::Scalar) => "scalar",
+            Some(NumberType::Interval) => "interval",
+            None => "number",
+        };
+
+        let unit_to_string = |unit: &Option<DisplayUnit>| {
+            unit.as_ref()
+                .map_or_else(|| "a unit".to_string(), |unit| format!("unit `{unit}`"))
+        };
+
         match self {
-            Self::Number => write!(f, "unitless number"),
             Self::Boolean => write!(f, "boolean"),
             Self::String => write!(f, "string"),
-            Self::MeasuredNumber => write!(f, "number with a unit"),
-            Self::NumberOrMeasuredNumber => write!(f, "number"),
+            Self::Number { number_type: type_ } => {
+                let type_str = number_type_to_string(type_);
+                write!(f, "unitless {type_str}")
+            }
+            Self::MeasuredNumber {
+                number_type: type_,
+                unit,
+            } => {
+                let type_str = number_type_to_string(type_);
+                let unit_str = unit_to_string(unit);
+                write!(f, "{type_str} with {unit_str}")
+            }
+            Self::NumberOrMeasuredNumber { number_type: type_ } => {
+                let type_str = number_type_to_string(type_);
+                write!(f, "{type_str}")
+            }
         }
     }
 }
@@ -93,7 +128,7 @@ pub enum EvalError {
     /// different type.
     TypeMismatch {
         /// The expected value type.
-        expected_type: ValueType,
+        expected_type: ExpectedType,
         /// The source span of the expression that caused the expected type.
         expected_source_span: Span,
         /// The actual value type that was found.
@@ -490,10 +525,7 @@ impl fmt::Display for EvalError {
                 expected_source_span: _,
                 found_type,
                 found_span: _,
-            } => write!(
-                f,
-                "expected type `{expected_type}` but found `{found_type}`"
-            ),
+            } => write!(f, "expected {expected_type} but found {found_type}"),
             Self::UnitMismatch {
                 expected_unit,
                 expected_source_span: _,
@@ -528,10 +560,7 @@ impl fmt::Display for EvalError {
                 expected_type,
                 found_type,
                 found_span: _,
-            } => write!(
-                f,
-                "expected type `{expected_type}` but found `{found_type}`"
-            ),
+            } => write!(f, "expected {expected_type} but found {found_type}"),
             Self::InvalidUnit {
                 expected_unit,
                 found_unit,
@@ -1286,7 +1315,7 @@ impl AsOneilError for EvalError {
                 found_span: _,
             } => vec![(
                 ErrorContext::Note(format!(
-                    "expected because this expression has type `{expected_type}`",
+                    "expected because this expression is {expected_type}",
                 )),
                 Some(ErrorLocation::from_source_and_span(
                     source,
@@ -1577,6 +1606,7 @@ impl AsOneilError for EvalError {
 pub mod convert {
     use oneil_output::{
         BinaryEvalError, ExpectedType as OutputExpectedType, UnaryEvalError, UnaryOperation,
+        ValueType,
     };
     use oneil_shared::span::Span;
 
@@ -1597,7 +1627,7 @@ pub mod convert {
                 found_span: rhs_span,
             },
             BinaryEvalError::TypeMismatch { lhs_type, rhs_type } => EvalError::TypeMismatch {
-                expected_type: *lhs_type,
+                expected_type: value_type_to_expected_type(*lhs_type),
                 expected_source_span: lhs_span,
                 found_type: *rhs_type,
                 found_span: rhs_span,
@@ -1697,7 +1727,7 @@ pub mod convert {
         match error {
             UnaryEvalError::InvalidType { op, value_type } => {
                 let expected_type = match op {
-                    UnaryOperation::Neg => ExpectedType::Number,
+                    UnaryOperation::Neg => ExpectedType::Number { number_type: None },
                     UnaryOperation::Not => ExpectedType::Boolean,
                 };
                 EvalError::InvalidType {
@@ -1713,9 +1743,28 @@ pub mod convert {
         match e {
             OutputExpectedType::Boolean => ExpectedType::Boolean,
             OutputExpectedType::String => ExpectedType::String,
-            OutputExpectedType::Number => ExpectedType::Number,
-            OutputExpectedType::MeasuredNumber => ExpectedType::MeasuredNumber,
-            OutputExpectedType::NumberOrMeasuredNumber => ExpectedType::NumberOrMeasuredNumber,
+            OutputExpectedType::Number => ExpectedType::Number { number_type: None },
+            OutputExpectedType::MeasuredNumber => ExpectedType::MeasuredNumber {
+                number_type: None,
+                unit: None,
+            },
+            OutputExpectedType::NumberOrMeasuredNumber => {
+                ExpectedType::NumberOrMeasuredNumber { number_type: None }
+            }
+        }
+    }
+
+    fn value_type_to_expected_type(value_type: ValueType) -> ExpectedType {
+        match value_type {
+            ValueType::Boolean => ExpectedType::Boolean,
+            ValueType::String => ExpectedType::String,
+            ValueType::Number { number_type } => ExpectedType::Number {
+                number_type: Some(number_type),
+            },
+            ValueType::MeasuredNumber { unit, number_type } => ExpectedType::MeasuredNumber {
+                number_type: Some(number_type),
+                unit: Some(unit.display_unit),
+            },
         }
     }
 }

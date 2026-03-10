@@ -546,7 +546,9 @@ mod fns {
                     Value::Number(number) => (number, None),
                     Value::Boolean(_) | Value::String(_) => {
                         return Err(vec![EvalError::InvalidType {
-                            expected_type: ExpectedType::NumberOrMeasuredNumber,
+                            expected_type: ExpectedType::NumberOrMeasuredNumber {
+                                number_type: None,
+                            },
                             found_type: arg.type_(),
                             found_span: arg_span,
                         }]);
@@ -650,7 +652,9 @@ mod fns {
                     Value::Number(number) => (number, None),
                     Value::Boolean(_) | Value::String(_) => {
                         return Err(vec![EvalError::InvalidType {
-                            expected_type: ExpectedType::NumberOrMeasuredNumber,
+                            expected_type: ExpectedType::NumberOrMeasuredNumber {
+                                number_type: None,
+                            },
                             found_type: arg.type_(),
                             found_span: arg_span,
                         }]);
@@ -770,7 +774,7 @@ mod helper {
         EvalError,
         error::{ExpectedArgumentCount, ExpectedType},
     };
-    use oneil_output::{DisplayUnit, MeasuredNumber, Number, Unit, Value};
+    use oneil_output::{MeasuredNumber, Number, Unit, Value, ValueType};
 
     pub fn unary_number_or_measured_number_fn<F, G>(
         identifier_span: Span,
@@ -802,7 +806,7 @@ mod helper {
             Value::Number(number) => number_op(number, arg_span),
             Value::MeasuredNumber(measured) => measured_op(measured, arg_span),
             Value::Boolean(_) | Value::String(_) => Err(vec![EvalError::InvalidType {
-                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                expected_type: ExpectedType::NumberOrMeasuredNumber { number_type: None },
                 found_type,
                 found_span: arg_span,
             }]),
@@ -837,7 +841,10 @@ mod helper {
             Value::MeasuredNumber(measured) => measured_op(measured, arg_span),
             Value::Number(_) | Value::Boolean(_) | Value::String(_) => {
                 Err(vec![EvalError::InvalidType {
-                    expected_type: ExpectedType::MeasuredNumber,
+                    expected_type: ExpectedType::MeasuredNumber {
+                        number_type: None,
+                        unit: None,
+                    },
                     found_type,
                     found_span: arg_span,
                 }])
@@ -944,10 +951,13 @@ mod helper {
                 numbers: _,
                 first_number_span,
             }) => {
-                errors.push(EvalError::UnitMismatch {
-                    expected_unit: DisplayUnit::One,
+                errors.push(EvalError::TypeMismatch {
+                    expected_type: ExpectedType::Number { number_type: None },
                     expected_source_span: **first_number_span,
-                    found_unit: number.unit().display_unit.clone(),
+                    found_type: ValueType::MeasuredNumber {
+                        number_type: number.normalized_value().type_(),
+                        unit: number.unit().clone(),
+                    },
                     found_span: *value_span,
                 });
             }
@@ -975,10 +985,15 @@ mod helper {
                 expected_unit,
                 expected_unit_value_span,
             }) => {
-                errors.push(EvalError::UnitMismatch {
-                    expected_unit: expected_unit.display_unit.clone(),
+                errors.push(EvalError::TypeMismatch {
+                    expected_type: ExpectedType::MeasuredNumber {
+                        number_type: None,
+                        unit: Some(expected_unit.display_unit.clone()),
+                    },
                     expected_source_span: **expected_unit_value_span,
-                    found_unit: DisplayUnit::One,
+                    found_type: ValueType::Number {
+                        number_type: number.type_(),
+                    },
                     found_span: *value_span,
                 });
             }
@@ -996,7 +1011,7 @@ mod helper {
 
     fn handle_invalid_type(value: &Value, value_span: &Span, errors: &mut Vec<EvalError>) {
         errors.push(EvalError::InvalidType {
-            expected_type: ExpectedType::NumberOrMeasuredNumber,
+            expected_type: ExpectedType::NumberOrMeasuredNumber { number_type: None },
             found_type: value.type_(),
             found_span: *value_span,
         });

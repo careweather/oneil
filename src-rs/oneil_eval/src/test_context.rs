@@ -1213,7 +1213,9 @@ mod std_builtins {
                         Value::Number(number) => (number, None),
                         Value::Boolean(_) | Value::String(_) => {
                             return Err(vec![EvalError::InvalidType {
-                                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                                expected_type: ExpectedType::NumberOrMeasuredNumber {
+                                    number_type: None,
+                                },
                                 found_type: arg.type_(),
                                 found_span: arg_span,
                             }]);
@@ -1302,7 +1304,9 @@ mod std_builtins {
                         Value::Number(number) => (number, None),
                         Value::Boolean(_) | Value::String(_) => {
                             return Err(vec![EvalError::InvalidType {
-                                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                                expected_type: ExpectedType::NumberOrMeasuredNumber {
+                                    number_type: None,
+                                },
                                 found_type: arg.type_(),
                                 found_span: arg_span,
                             }]);
@@ -1500,7 +1504,7 @@ mod std_builtins {
 
         fn handle_invalid_type(value: &Value, value_span: &Span, errors: &mut Vec<EvalError>) {
             errors.push(EvalError::InvalidType {
-                expected_type: ExpectedType::NumberOrMeasuredNumber,
+                expected_type: ExpectedType::NumberOrMeasuredNumber { number_type: None },
                 found_type: value.type_(),
                 found_span: *value_span,
             });
