@@ -36,10 +36,7 @@ impl Value {
         match (self, rhs) {
             (Self::Boolean(lhs), Self::Boolean(rhs)) => Ok(lhs == rhs),
             (Self::String(lhs), Self::String(rhs)) => Ok(lhs == rhs),
-            // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs == rhs),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(lhs == rhs.normalized_value()),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(lhs.normalized_value() == rhs),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_eq(rhs),
             (lhs, rhs) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(lhs.type_()),
@@ -66,14 +63,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_lt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
-            // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.lt(rhs)),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
-                Ok(lhs.lt(rhs.normalized_value().as_number()))
-            }
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
-                Ok(lhs.normalized_value().as_number().lt(rhs))
-            }
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_lt(rhs),
             (Self::Number(_) | Self::MeasuredNumber(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
@@ -95,14 +85,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_lte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
-            // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.lte(rhs)),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
-                Ok(lhs.lte(rhs.normalized_value().as_number()))
-            }
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
-                Ok(lhs.normalized_value().as_number().lte(rhs))
-            }
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_lte(rhs),
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
@@ -124,14 +107,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_gt(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
-            // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.gt(rhs)),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
-                Ok(lhs.gt(rhs.normalized_value().as_number()))
-            }
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
-                Ok(lhs.normalized_value().as_number().gt(rhs))
-            }
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_gt(rhs),
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
@@ -153,14 +129,7 @@ impl Value {
     /// Returns `ValueError::InvalidOperation` if the left operand is not a number.
     pub fn checked_gte(&self, rhs: &Self) -> Result<bool, BinaryEvalError> {
         match (self, rhs) {
-            // if either number isn't measured, then units don't matter
             (Self::Number(lhs), Self::Number(rhs)) => Ok(lhs.gte(rhs)),
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
-                Ok(lhs.gte(rhs.normalized_value().as_number()))
-            }
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
-                Ok(lhs.normalized_value().as_number().gte(rhs))
-            }
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => lhs.checked_gte(rhs),
             (Self::MeasuredNumber(_) | Self::Number(_), _) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(self.type_()),
@@ -183,10 +152,6 @@ impl Value {
     pub fn checked_add(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs + rhs)),
-            // if any of the numbers is not measured, it is implicitly coerced to a measured number
-            // with the same unit as the measured number
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs + rhs)),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs + rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_add(&rhs).map(Self::MeasuredNumber)
             }
@@ -220,10 +185,6 @@ impl Value {
     pub fn checked_sub(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs - rhs)),
-            // if any of the numbers is not measured, it is implicitly coerced to a measured number
-            // with the same unit as the measured number
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs - rhs)),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs - rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_sub(&rhs).map(Self::MeasuredNumber)
             }
@@ -259,10 +220,6 @@ impl Value {
     pub fn checked_escaped_sub(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs - rhs)),
-            // if any of the numbers is not measured, it is implicitly coerced to a measured number
-            // with the same unit as the measured number
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs - rhs)),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs - rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_escaped_sub(&rhs).map(Self::MeasuredNumber)
             }
@@ -409,10 +366,6 @@ impl Value {
     pub fn checked_rem(self, rhs: Self) -> Result<Self, BinaryEvalError> {
         match (self, rhs) {
             (Self::Number(lhs), Self::Number(rhs)) => Ok(Self::Number(lhs % rhs)),
-            // if any of the numbers is not measured, it is implicitly coerced to a
-            // measured number with unit `1`
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => Ok(Self::MeasuredNumber(lhs % rhs)),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => Ok(Self::MeasuredNumber(lhs % rhs)),
             (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
                 lhs.checked_rem(&rhs).map(Self::MeasuredNumber)
             }
@@ -521,9 +474,8 @@ impl Value {
             (Self::Number(lhs), Self::Number(rhs)) => {
                 Ok(Self::Number(lhs.tightest_enclosing_interval(rhs)))
             }
-            (Self::Number(lhs), Self::MeasuredNumber(rhs)) => {
-                // the operation is associative
-                Ok(Self::MeasuredNumber(rhs.min_max_number(lhs)))
+            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
+                lhs.checked_min_max(&rhs).map(Self::MeasuredNumber)
             }
             (Self::Number(lhs), rhs) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(ValueType::Number {
@@ -531,12 +483,6 @@ impl Value {
                 }),
                 rhs_type: Box::new(rhs.type_()),
             }),
-            (Self::MeasuredNumber(lhs), Self::Number(rhs)) => {
-                Ok(Self::MeasuredNumber(lhs.min_max_number(rhs)))
-            }
-            (Self::MeasuredNumber(lhs), Self::MeasuredNumber(rhs)) => {
-                lhs.checked_min_max(&rhs).map(Self::MeasuredNumber)
-            }
             (Self::MeasuredNumber(lhs), rhs) => Err(BinaryEvalError::TypeMismatch {
                 lhs_type: Box::new(ValueType::MeasuredNumber {
                     unit: lhs.unit().clone(),

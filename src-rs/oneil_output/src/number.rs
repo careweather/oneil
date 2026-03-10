@@ -171,17 +171,6 @@ impl MeasuredNumber {
         Ok(self.normalized_value.gte(&rhs.normalized_value))
     }
 
-    fn check_units(&self, rhs: &Self) -> Result<(), BinaryEvalError> {
-        if self.unit.dimensionally_eq(&rhs.unit) {
-            Ok(())
-        } else {
-            Err(BinaryEvalError::UnitMismatch {
-                lhs_unit: self.unit.display_unit.clone(),
-                rhs_unit: rhs.unit.display_unit.clone(),
-            })
-        }
-    }
-
     /// Adds two dimensional numbers.
     ///
     /// # Errors
@@ -315,22 +304,6 @@ impl MeasuredNumber {
         }
     }
 
-    /// Performs a min/max operation on a measured number and a regular number.
-    ///
-    /// The `Number` is implicitly coerced to a measured
-    /// number with the same unit as the `MeasuredNumber`.
-    ///
-    /// This operation is associative.
-    #[must_use]
-    pub fn min_max_number(self, rhs: Number) -> Self {
-        Self {
-            normalized_value: self
-                .normalized_value
-                .tightest_enclosing_interval_number(rhs),
-            unit: self.unit,
-        }
-    }
-
     /// Returns the minimum value of the measured number.
     #[must_use]
     pub fn min(&self) -> Self {
@@ -411,6 +384,17 @@ impl MeasuredNumber {
             unit: self.unit,
         }
     }
+
+    fn check_units(&self, rhs: &Self) -> Result<(), BinaryEvalError> {
+        if self.unit.dimensionally_eq(&rhs.unit) {
+            Ok(())
+        } else {
+            Err(BinaryEvalError::UnitMismatch {
+                lhs_unit: self.unit.display_unit.clone(),
+                rhs_unit: rhs.unit.display_unit.clone(),
+            })
+        }
+    }
 }
 
 impl PartialEq for MeasuredNumber {
@@ -419,66 +403,6 @@ impl PartialEq for MeasuredNumber {
     /// This treats units as equal if they have the same dimensions.
     fn eq(&self, other: &Self) -> bool {
         self.check_units(other).is_ok() && self.normalized_value == other.normalized_value
-    }
-}
-
-impl ops::Add<Number> for MeasuredNumber {
-    type Output = Self;
-
-    /// Add a measured number to a number.
-    ///
-    /// The `Number` is implicitly coerced to a measured
-    /// number with the same unit as the `MeasuredNumber`.
-    fn add(self, rhs: Number) -> Self::Output {
-        Self {
-            normalized_value: self.normalized_value + rhs,
-            unit: self.unit,
-        }
-    }
-}
-
-impl ops::Add<MeasuredNumber> for Number {
-    type Output = MeasuredNumber;
-
-    /// Add a number to a measured number.
-    ///
-    /// The `Number` is implicitly coerced to a measured
-    /// number with the same unit as the `MeasuredNumber`.
-    fn add(self, rhs: MeasuredNumber) -> Self::Output {
-        MeasuredNumber {
-            normalized_value: self + rhs.normalized_value,
-            unit: rhs.unit,
-        }
-    }
-}
-
-impl ops::Sub<Number> for MeasuredNumber {
-    type Output = Self;
-
-    /// Subtract a measured number from a number.
-    ///
-    /// The `Number` is implicitly coerced to a measured
-    /// number with the same unit as the `MeasuredNumber`.
-    fn sub(self, rhs: Number) -> Self::Output {
-        Self {
-            normalized_value: self.normalized_value - rhs,
-            unit: self.unit,
-        }
-    }
-}
-
-impl ops::Sub<MeasuredNumber> for Number {
-    type Output = MeasuredNumber;
-
-    /// Subtract a number from a measured number.
-    ///
-    /// The `Number` is implicitly coerced to a measured
-    /// number with the same unit as the `MeasuredNumber`.
-    fn sub(self, rhs: MeasuredNumber) -> Self::Output {
-        MeasuredNumber {
-            normalized_value: self - rhs.normalized_value,
-            unit: rhs.unit,
-        }
     }
 }
 
@@ -538,36 +462,6 @@ impl ops::Div<MeasuredNumber> for Number {
         MeasuredNumber {
             normalized_value: self / rhs.normalized_value,
             unit: Unit::one() / rhs.unit,
-        }
-    }
-}
-
-impl ops::Rem<Number> for MeasuredNumber {
-    type Output = Self;
-
-    /// Computes the remainder of dividing a measured number by a number.
-    ///
-    /// The `Number` is implicitly coerced to a measured
-    /// number with the same unit as the `MeasuredNumber`.
-    fn rem(self, rhs: Number) -> Self::Output {
-        Self {
-            normalized_value: self.normalized_value % rhs,
-            unit: self.unit,
-        }
-    }
-}
-
-impl ops::Rem<MeasuredNumber> for Number {
-    type Output = MeasuredNumber;
-
-    /// Computes the remainder of dividing a number by a measured number.
-    ///
-    /// The `Number` is implicitly coerced to a measured
-    /// number with the same unit as the `MeasuredNumber`.
-    fn rem(self, rhs: MeasuredNumber) -> Self::Output {
-        MeasuredNumber {
-            normalized_value: self % rhs.normalized_value,
-            unit: rhs.unit,
         }
     }
 }
@@ -752,18 +646,6 @@ impl NormalizedNumber {
     }
 }
 
-impl PartialEq<Number> for NormalizedNumber {
-    fn eq(&self, other: &Number) -> bool {
-        self.0 == *other
-    }
-}
-
-impl PartialEq<NormalizedNumber> for Number {
-    fn eq(&self, other: &NormalizedNumber) -> bool {
-        *self == other.0
-    }
-}
-
 impl ops::Neg for NormalizedNumber {
     type Output = Self;
 
@@ -780,43 +662,11 @@ impl ops::Add for NormalizedNumber {
     }
 }
 
-impl ops::Add<Number> for NormalizedNumber {
-    type Output = Self;
-
-    fn add(self, rhs: Number) -> Self::Output {
-        Self(self.0 + rhs)
-    }
-}
-
-impl ops::Add<NormalizedNumber> for Number {
-    type Output = NormalizedNumber;
-
-    fn add(self, rhs: NormalizedNumber) -> Self::Output {
-        NormalizedNumber(self + rhs.0)
-    }
-}
-
 impl ops::Sub for NormalizedNumber {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0)
-    }
-}
-
-impl ops::Sub<Number> for NormalizedNumber {
-    type Output = Self;
-
-    fn sub(self, rhs: Number) -> Self::Output {
-        Self(self.0 - rhs)
-    }
-}
-
-impl ops::Sub<NormalizedNumber> for Number {
-    type Output = NormalizedNumber;
-
-    fn sub(self, rhs: NormalizedNumber) -> Self::Output {
-        NormalizedNumber(self - rhs.0)
     }
 }
 
@@ -873,22 +723,6 @@ impl ops::Rem for NormalizedNumber {
 
     fn rem(self, rhs: Self) -> Self::Output {
         Self(self.0 % rhs.0)
-    }
-}
-
-impl ops::Rem<Number> for NormalizedNumber {
-    type Output = Self;
-
-    fn rem(self, rhs: Number) -> Self::Output {
-        Self(self.0 % rhs)
-    }
-}
-
-impl ops::Rem<NormalizedNumber> for Number {
-    type Output = NormalizedNumber;
-
-    fn rem(self, rhs: NormalizedNumber) -> Self::Output {
-        NormalizedNumber(self % rhs.0)
     }
 }
 

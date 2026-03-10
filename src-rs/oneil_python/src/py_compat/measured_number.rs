@@ -123,7 +123,7 @@ impl PyMeasuredNumber {
         other: &Bound<'_, PyAny>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
         };
@@ -142,7 +142,7 @@ impl PyMeasuredNumber {
         other: &Bound<'_, PyAny>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let lhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let lhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
         };
@@ -159,7 +159,7 @@ impl PyMeasuredNumber {
         other: &Bound<'_, PyAny>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
         };
@@ -178,7 +178,7 @@ impl PyMeasuredNumber {
         other: &Bound<'_, PyAny>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let lhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let lhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
         };
@@ -267,7 +267,7 @@ impl PyMeasuredNumber {
         other: &Bound<'_, PyAny>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
         };
@@ -286,7 +286,7 @@ impl PyMeasuredNumber {
         other: &Bound<'_, PyAny>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let lhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let lhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(PyNotImplemented::get(py).to_owned().into_any()),
         };
@@ -323,7 +323,7 @@ impl PyMeasuredNumber {
     }
 
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(false),
         };
@@ -334,7 +334,7 @@ impl PyMeasuredNumber {
     }
 
     fn __ne__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(true),
         };
@@ -346,7 +346,7 @@ impl PyMeasuredNumber {
     }
 
     fn __lt__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(false),
         };
@@ -357,7 +357,7 @@ impl PyMeasuredNumber {
     }
 
     fn __le__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(false),
         };
@@ -368,7 +368,7 @@ impl PyMeasuredNumber {
     }
 
     fn __gt__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(false),
         };
@@ -379,7 +379,7 @@ impl PyMeasuredNumber {
     }
 
     fn __ge__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let rhs = match py_any_to_measured_number_with_unit(other, self.inner.unit()) {
+        let rhs = match py_any_to_measured_number_exact(other) {
             Some(m) => m,
             None => return Ok(false),
         };
@@ -391,7 +391,7 @@ impl PyMeasuredNumber {
 
     /// Escaped subtraction (min-min, max-max). Raises if units do not match.
     fn escaped_sub(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let rhs = py_any_to_measured_number_with_unit(other, self.inner.unit())
+        let rhs = py_any_to_measured_number_exact(other)
             .ok_or_else(|| PyErr::new::<PyValueError, _>("expected MeasuredNumber"))?;
 
         self.inner
@@ -415,7 +415,7 @@ impl PyMeasuredNumber {
 
     /// Returns the tightest enclosing interval of this and the other measured number. Raises if units do not match.
     fn min_max(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let rhs = py_any_to_measured_number_with_unit(other, self.inner.unit())
+        let rhs = py_any_to_measured_number_exact(other)
             .ok_or_else(|| PyErr::new::<PyValueError, _>("expected MeasuredNumber"))?;
 
         self.inner
@@ -488,14 +488,6 @@ impl PyMeasuredNumber {
         }
     }
 
-    /// Returns the tightest enclosing measured number of this and the given number (float or Interval) in the same unit.
-    fn min_max_number(&self, rhs: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let number = py_any_to_number(rhs)?;
-        Ok(Self {
-            inner: self.inner.clone().min_max_number(number),
-        })
-    }
-
     fn __repr__(&self) -> String {
         let (number, unit) = self.inner.clone().into_number_and_unit();
 
@@ -532,17 +524,11 @@ impl From<&PyMeasuredNumber> for MeasuredNumber {
 /// float/interval which is interpreted as a measured value in the given `unit`.
 ///
 /// Used by binary operators to accept `PyAny` and return `NotImplemented` when conversion fails.
-fn py_any_to_measured_number_with_unit(
-    other: &Bound<'_, PyAny>,
-    unit: &Unit,
-) -> Option<MeasuredNumber> {
-    if let Ok(py_mn) = other.extract::<PyMeasuredNumber>() {
-        return Some(MeasuredNumber::from(py_mn));
-    }
-
-    py_any_to_number(other)
+fn py_any_to_measured_number_exact(other: &Bound<'_, PyAny>) -> Option<MeasuredNumber> {
+    other
+        .extract::<PyMeasuredNumber>()
         .ok()
-        .map(|number| MeasuredNumber::from_number_and_unit(number, unit.clone()))
+        .map(MeasuredNumber::from)
 }
 
 /// Tries to convert a Python object to a [`MeasuredNumber`]: accepts [`PyMeasuredNumber`], or a
