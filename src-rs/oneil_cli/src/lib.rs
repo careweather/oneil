@@ -37,6 +37,7 @@ use crate::{
 };
 
 mod command;
+mod panic_handler;
 mod print_builtins;
 mod print_debug_ast;
 mod print_debug_ir;
@@ -50,6 +51,8 @@ mod stylesheet;
 
 /// Main entry point for the Oneil CLI application.
 pub fn main() {
+    panic_handler::register_panic_handler();
+
     let cli = CliCommand::parse();
 
     set_color_choice(cli.no_colors);
