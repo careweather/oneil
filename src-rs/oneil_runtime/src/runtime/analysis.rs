@@ -32,10 +32,13 @@ impl Runtime {
     ) -> (Option<tree::Tree<tree::DependencyTreeValue>>, RuntimeErrors) {
         let (tree, tree_errors) = self.get_dependency_tree_internal(model_path, parameter_name);
 
+        // includes indirect errors because the tree is built from evaluated models
+        let include_indirect_errors = true;
+
         let errors = tree_errors
             .model_paths()
             .fold(RuntimeErrors::new(), |mut acc, path| {
-                acc.extend(self.get_model_errors(path));
+                acc.extend(self.get_model_errors(path, include_indirect_errors));
                 acc
             });
 
@@ -67,10 +70,13 @@ impl Runtime {
     ) -> (Option<tree::Tree<tree::ReferenceTreeValue>>, RuntimeErrors) {
         let (tree, tree_errors) = self.get_reference_tree_internal(model_path, parameter_name);
 
+        // includes indirect errors because the tree is built from evaluated models
+        let include_indirect_errors = true;
+
         let errors = tree_errors
             .model_paths()
             .fold(RuntimeErrors::new(), |mut acc, path| {
-                acc.extend(self.get_model_errors(path));
+                acc.extend(self.get_model_errors(path, include_indirect_errors));
                 acc
             });
 
@@ -96,10 +102,13 @@ impl Runtime {
     pub fn get_independents(&mut self, model_path: &Path) -> (Independents, RuntimeErrors) {
         let (independents, independents_errors) = self.get_independents_internal(model_path);
 
+        // includes indirect errors because the tree is built from evaluated models
+        let include_indirect_errors = true;
+
         let errors = independents_errors
             .paths()
             .fold(RuntimeErrors::new(), |mut acc, path| {
-                acc.extend(self.get_model_errors(path));
+                acc.extend(self.get_model_errors(path, include_indirect_errors));
                 acc
             });
 

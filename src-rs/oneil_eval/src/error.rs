@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt, path::PathBuf};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use oneil_shared::{
     error::{AsOneilError, Context as ErrorContext, ErrorLocation},
     span::Span,
@@ -17,6 +17,8 @@ pub struct EvalErrors {
     pub parameters: IndexMap<String, Vec<EvalError>>,
     /// Errors that occurred during evaluation of the tests.
     pub tests: Vec<EvalError>,
+    /// References that had errors.
+    pub references: IndexSet<PathBuf>,
 }
 
 /// Represents the expected type for type checking operations.

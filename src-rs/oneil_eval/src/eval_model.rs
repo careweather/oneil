@@ -55,6 +55,13 @@ fn eval_model_from_context<E: ExternalEvaluationContext>(
         eval_model_from_context(reference_import.path(), context);
     }
 
+    // Check for errors in references
+    for reference_import in references.values() {
+        if context.reference_has_errors(reference_import.path()) {
+            context.add_reference_error_to_active_model(reference_import.path());
+        }
+    }
+
     // Bring references into scope
     for (reference_name, reference_import) in references {
         context.add_reference(reference_name.as_str(), reference_import.path());

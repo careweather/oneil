@@ -5,7 +5,10 @@ use std::path::{Path, PathBuf};
 use indexmap::{IndexMap, IndexSet};
 use oneil_eval::{EvalError, EvalErrors};
 use oneil_resolver::ResolutionErrorCollection;
-use oneil_resolver::error::{ModelImportResolutionError, PythonImportResolutionError};
+use oneil_resolver::error::{
+    ModelImportResolutionError, ParameterResolutionError, PythonImportResolutionError,
+    VariableResolutionError,
+};
 use oneil_shared::error::OneilError;
 use oneil_shared::load_result::LoadResult;
 
@@ -21,8 +24,21 @@ impl Runtime {
     ///
     /// Source or parsing failures are reported as a [`ModelError::FileError`].
     /// Resolution or evaluation failures are reported as [`ModelError::EvalErrors`].
+    ///
+    /// If `include_indirect_errors` is true, then errors from models that are referenced
+    /// by the model are always included, regardless of whether they are referenced directly.
+    ///
+    /// For example, imagine there is an `x` in `model_a` that references `y` in `model_b`. Neither of
+    /// these parameters have errors, but `model_b` has a parameter `z` that is used in a test, and both
+    /// `z` and the test have errors. If `include_indirect_errors` is true, then the errors from `model_b`
+    /// will be included in the errors for `model_a`. If `include_indirect_errors` is false, then the errors from `model_b`
+    /// will not be included in the errors for `model_a` since there is no direct reference to `z` or to the test.
     #[must_use]
-    pub(super) fn get_model_errors(&self, model_path: &Path) -> RuntimeErrors {
+    pub(super) fn get_model_errors(
+        &self,
+        model_path: &Path,
+        include_indirect_errors: bool,
+    ) -> RuntimeErrors {
         let path_buf = model_path.to_path_buf();
 
         // Handle source errors
@@ -70,14 +86,14 @@ impl Runtime {
             .ir_cache
             .get_entry(model_path)
             .and_then(|entry| entry.error())
-            .map(|errors| collect_ir_errors(errors, &path_buf, source));
+            .map(|errors| collect_ir_errors(errors, &path_buf, source, include_indirect_errors));
 
         // get the eval errors, if any
         let eval_errors = self
             .eval_cache
             .get_entry(model_path)
             .and_then(|entry| entry.error())
-            .map(|errors| collect_eval_errors(errors, &path_buf, source));
+            .map(|errors| collect_eval_errors(errors, &path_buf, source, include_indirect_errors));
 
         // combine the IR and eval errors
         let MergedErrors {
@@ -93,7 +109,7 @@ impl Runtime {
 
         // add the errors for models that are referenced
         for model_path in models_with_errors {
-            let model_errors = self.get_model_errors(&model_path);
+            let model_errors = self.get_model_errors(&model_path, include_indirect_errors);
             errors.extend(model_errors);
         }
 
@@ -179,21 +195,27 @@ struct IrErrorsResult {
 }
 
 /// Collects resolution errors from IR into structured error data and model/python path sets.
+///
+/// See [`Runtime::get_model_errors`] for more details on the `include_indirect_errors` parameter.
 fn collect_ir_errors(
     errors: &ResolutionErrorCollection,
     path: &Path,
     source: &str,
+    include_indirect_errors: bool,
 ) -> IrErrorsResult {
     // collect model import errors
     let mut model_import_errors = IndexMap::new();
     let mut models_with_errors = IndexSet::new();
-    for (ref_name, (_submodel_name, ref_error)) in errors.get_model_import_resolution_errors() {
-        if let Some(model_path) = get_model_path_from_model_import_error(ref_error) {
-            models_with_errors.insert(model_path);
-        }
 
-        let error = OneilError::from_error_with_source(ref_error, path.to_path_buf(), source);
-        model_import_errors.insert(ref_name.to_string(), error);
+    if include_indirect_errors {
+        for (ref_name, (_submodel_name, ref_error)) in errors.get_model_import_resolution_errors() {
+            if let Some(model_path) = get_model_path_from_model_import_error(ref_error) {
+                models_with_errors.insert(model_path);
+            }
+
+            let error = OneilError::from_error_with_source(ref_error, path.to_path_buf(), source);
+            model_import_errors.insert(ref_name.to_string(), error);
+        }
     }
 
     // collect Python import errors
@@ -211,6 +233,21 @@ fn collect_ir_errors(
     // collect parameter errors
     let mut parameter_errors = IndexMap::new();
     for (param_name, param_errs) in errors.get_parameter_resolution_errors() {
+        let models_with_errors_in_param: IndexSet<PathBuf> = param_errs
+            .iter()
+            .filter_map(|error| {
+                if let ParameterResolutionError::VariableResolution(
+                    VariableResolutionError::ModelHasError { path, .. },
+                ) = error
+                {
+                    Some(path.as_ref().to_path_buf())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        models_with_errors.extend(models_with_errors_in_param);
+
         let oneil_errors: Vec<OneilError> = param_errs
             .iter()
             .map(|e| OneilError::from_error_with_source(e, path.to_path_buf(), source))
@@ -221,6 +258,18 @@ fn collect_ir_errors(
     // collect test errors
     let mut test_errors = Vec::new();
     for (_, test_errs) in errors.get_test_resolution_errors() {
+        let models_with_errors_in_test: IndexSet<PathBuf> = test_errs
+            .iter()
+            .filter_map(|error| {
+                if let VariableResolutionError::ModelHasError { path, .. } = error {
+                    Some(path.as_ref().to_path_buf())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        models_with_errors.extend(models_with_errors_in_test);
+
         let oneil_errors: Vec<OneilError> = test_errs
             .iter()
             .map(|e| OneilError::from_error_with_source(e, path.to_path_buf(), source))
@@ -254,8 +303,21 @@ struct EvalErrorsResult {
 }
 
 /// Collects evaluation errors into structured error data and model path set.
-fn collect_eval_errors(errors: &EvalErrors, path: &Path, source: &str) -> EvalErrorsResult {
+///
+/// See [`Runtime::get_model_errors`] for more details on the `include_indirect_errors` parameter.
+fn collect_eval_errors(
+    errors: &EvalErrors,
+    path: &Path,
+    source: &str,
+    include_indirect_errors: bool,
+) -> EvalErrorsResult {
     let mut models_with_errors = IndexSet::new();
+
+    if include_indirect_errors {
+        for reference_path in &errors.references {
+            models_with_errors.insert(reference_path.clone());
+        }
+    }
 
     let mut parameter_errors = IndexMap::new();
     for (name, param_errs) in &errors.parameters {

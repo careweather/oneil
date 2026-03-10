@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use oneil_ir as ir;
 use oneil_output as output;
@@ -69,6 +69,7 @@ struct ModelInProgress {
     parameters: IndexMap<String, Result<output::Parameter, Vec<EvalError>>>,
     submodels: IndexMap<String, String>,
     references: IndexMap<String, PathBuf>,
+    references_with_errors: IndexSet<PathBuf>,
     tests: Vec<Result<output::Test, Vec<EvalError>>>,
 }
 
@@ -79,6 +80,7 @@ impl ModelInProgress {
             parameters: IndexMap::new(),
             submodels: IndexMap::new(),
             references: IndexMap::new(),
+            references_with_errors: IndexSet::new(),
             tests: Vec::new(),
         }
     }
@@ -129,6 +131,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                             .collect(),
                         submodels: model.submodels.clone(),
                         references: model.references.clone(),
+                        references_with_errors: IndexSet::new(),
                         tests: model.tests.iter().cloned().map(Ok).collect(),
                     },
 
@@ -147,6 +150,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
                         submodels: model.submodels.clone(),
                         references: model.references.clone(),
+                        references_with_errors: errors.references.clone(),
                         tests: model
                             .tests
                             .iter()
@@ -218,7 +222,10 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                 tests,
             };
 
-            if parameter_errors.is_empty() && test_errors.is_empty() {
+            if parameter_errors.is_empty()
+                && test_errors.is_empty()
+                && model.references_with_errors.is_empty()
+            {
                 result.insert(path, MaybePartialResult::ok(output_model));
             } else {
                 result.insert(
@@ -228,6 +235,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                         EvalErrors {
                             parameters: parameter_errors,
                             tests: test_errors,
+                            references: model.references_with_errors,
                         },
                     ),
                 );
@@ -464,6 +472,43 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             reference_name.to_string(),
             reference_path.as_ref().to_path_buf(),
         );
+    }
+
+    /// Returns whether the model at the given path has any evaluation errors.
+    ///
+    /// A model has errors if any of its parameters failed to evaluate or any of its tests failed.
+    #[must_use]
+    pub fn reference_has_errors(&self, path: impl AsRef<Path>) -> bool {
+        let path = path.as_ref();
+        let Some(model) = self.models.get(path) else {
+            return false;
+        };
+
+        let has_parameter_errors = model.parameters.values().any(Result::is_err);
+        let has_test_errors = model.tests.iter().any(Result::is_err);
+        let has_reference_errors = !model.references_with_errors.is_empty();
+
+        has_parameter_errors || has_test_errors || has_reference_errors
+    }
+
+    /// Records that the given reference path has errors on the current active model.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no current model is set or if the current model was not created.
+    pub fn add_reference_error_to_active_model(&mut self, path: &ir::ModelPath) {
+        let Some(current_model) = self.active_models.last() else {
+            panic!("current model should be set when adding a reference error");
+        };
+
+        let model = self
+            .models
+            .get_mut(current_model)
+            .expect("current model should be created when set");
+
+        model
+            .references_with_errors
+            .insert(path.as_ref().to_path_buf());
     }
 
     /// Adds a test evaluation result to the current model.

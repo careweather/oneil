@@ -18,8 +18,11 @@ impl Runtime {
         let path = path.as_ref();
         self.load_ast_internal(path);
 
+        // doesn't matter for AST loading since we only touch one file
+        let include_indirect_errors = true;
+
         let ast_opt = self.ast_cache.get_entry(path).and_then(LoadResult::value);
-        let errors = self.get_model_errors(path);
+        let errors = self.get_model_errors(path, include_indirect_errors);
 
         (ast_opt, errors)
     }

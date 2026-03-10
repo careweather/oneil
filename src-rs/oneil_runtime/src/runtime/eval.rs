@@ -41,7 +41,9 @@ impl Runtime {
             .and_then(LoadResult::value)
             .map(|model| output::reference::ModelReference::new(model, &self.eval_cache));
 
-        let errors = self.get_model_errors(path);
+        let include_indirect_errors = true;
+
+        let errors = self.get_model_errors(path, include_indirect_errors);
 
         (model_opt, errors)
     }
@@ -73,7 +75,9 @@ impl Runtime {
 
         let result = model_opt.map(|model| (model, expr_results));
 
-        let model_errors = self.get_model_errors(path.as_ref());
+        let include_indirect_errors = true;
+
+        let model_errors = self.get_model_errors(path.as_ref(), include_indirect_errors);
 
         (result, model_errors, expr_errors)
     }

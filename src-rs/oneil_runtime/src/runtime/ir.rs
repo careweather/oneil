@@ -36,7 +36,9 @@ impl Runtime {
             .and_then(LoadResult::value)
             .map(|ir| output::reference::ModelIrReference::new(ir, &self.ir_cache));
 
-        let errors = self.get_model_errors(path);
+        let include_indirect_errors = true;
+
+        let errors = self.get_model_errors(path, include_indirect_errors);
 
         (ir_opt, errors)
     }
