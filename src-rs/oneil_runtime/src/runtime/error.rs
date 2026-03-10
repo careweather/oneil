@@ -230,6 +230,8 @@ fn collect_ir_errors(
         python_import_errors.insert(python_path.as_ref().to_path_buf(), error);
     }
 
+    let has_python_import_errors = !python_import_errors.is_empty();
+
     // collect parameter errors
     let mut parameter_errors = IndexMap::new();
     for (param_name, param_errs) in errors.get_parameter_resolution_errors() {
@@ -250,6 +252,7 @@ fn collect_ir_errors(
 
         let oneil_errors: Vec<OneilError> = param_errs
             .iter()
+            .filter(|e| !(has_python_import_errors && is_undefined_function_error(e)))
             .map(|e| OneilError::from_error_with_source(e, path.to_path_buf(), source))
             .collect();
         parameter_errors.insert(param_name.as_str().to_string(), oneil_errors);
@@ -285,6 +288,15 @@ fn collect_ir_errors(
         parameter_errors,
         test_errors,
     }
+}
+
+const fn is_undefined_function_error(error: &ParameterResolutionError) -> bool {
+    matches!(
+        error,
+        ParameterResolutionError::VariableResolution(
+            VariableResolutionError::UndefinedFunction { .. }
+        )
+    )
 }
 
 /// Result of collecting errors from evaluation.
