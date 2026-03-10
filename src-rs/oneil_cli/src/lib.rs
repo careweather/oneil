@@ -56,9 +56,7 @@ pub fn main() {
 
     match cli.command {
         Commands::Lsp {} => {
-            // TODO: uncomment this when we're ready to deal with
-            //       the LSP
-            //oneil_lsp::run();
+            oneil_lsp::run();
         }
         Commands::Dev { command } => handle_dev_command(command, cli.dev_show_internal_errors),
         Commands::Eval(args) => handle_eval_command(args, cli.dev_show_internal_errors),

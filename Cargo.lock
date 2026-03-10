@@ -664,6 +664,7 @@ dependencies = [
  "clap",
  "indexmap",
  "notify",
+ "oneil_lsp",
  "oneil_runtime",
  "oneil_shared",
  "owo-colors",
