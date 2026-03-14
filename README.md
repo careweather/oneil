@@ -352,9 +352,11 @@ This is particularly useful for:
 Python function results are automatically cached to avoid re-running expensive calculations. The cache:
 
 - **Persists across REPL sessions** - Close and reopen Oneil, cached results remain
-- **Is version-controllable** - Stored in `__oncache__/` directory that can be committed to git
+- **Is version-controllable** - Stored as one cache file per model under `__oncache__/`
 - **Is shareable** - Other users can use cached results even without Python dependencies
-- **Auto-invalidates** when Python source files change or input values change
+- **Is human-readable** - Each model cache stores the simulation function, simulation file, and parameter input/output snapshots (`min`, `max`, `units`) as JSON for cleaner git diffs
+- **Only rewrites changed entries** - Re-running Oneil leaves the cache file untouched unless a simulation's latest cached inputs or output changed
+- **Auto-invalidates** when imported Python source files, their local Python dependencies, or the simulation inputs change
 
 Use the `cache` command in the CLI to view cache statistics or `cache clear` to clear it.
 

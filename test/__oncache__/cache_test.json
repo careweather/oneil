@@ -1,0 +1,31 @@
+{
+  "entries": {
+    "y": {
+      "dependency_files": [
+        "cache_test_funcs.py",
+        "cache_test_helper.py"
+      ],
+      "function": "expensive_calculation",
+      "inputs": [
+        {
+          "max": 5,
+          "min": 5,
+          "units": {}
+        }
+      ],
+      "inputs_hash": "3fa978005983e4f2",
+      "inputs_repr": "x=5",
+      "module": "cache_test_funcs",
+      "output": {
+        "max": 10,
+        "min": 10,
+        "units": {}
+      },
+      "simulation_file": "cache_test_funcs.py",
+      "simulation_id": "y",
+      "source_hash": "1b6cacca5855f537060b21189c476795432d5848a2dcedca5068b8b7d0071fc6"
+    }
+  },
+  "model_file": "cache_test.on",
+  "version": 5
+}

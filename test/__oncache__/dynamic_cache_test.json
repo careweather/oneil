@@ -1,0 +1,31 @@
+{
+  "entries": {
+    "y": {
+      "dependency_files": [
+        "dynamic_cache_test_funcs.py",
+        "dynamic_cache_test_helper.py"
+      ],
+      "function": "dynamic_expensive_calculation",
+      "inputs": [
+        {
+          "max": 5,
+          "min": 5,
+          "units": {}
+        }
+      ],
+      "inputs_hash": "3fa978005983e4f2",
+      "inputs_repr": "x=5",
+      "module": "dynamic_cache_test_funcs",
+      "output": {
+        "max": 15,
+        "min": 15,
+        "units": {}
+      },
+      "simulation_file": "dynamic_cache_test_funcs.py",
+      "simulation_id": "y",
+      "source_hash": "702c3d279aec86cab2e6723d5e2858e89797047fce3733d4c5ffb7e9926d43ed"
+    }
+  },
+  "model_file": "dynamic_cache_test.on",
+  "version": 5
+}

@@ -1,8 +1,14 @@
-from pkg_resources import get_distribution
+try:
+    from importlib.metadata import version as get_version
+except ImportError:
+    from pkg_resources import get_distribution
+
+    def get_version(package_name):
+        return get_distribution(package_name).version
 
 from . import bcolors
 
-__version__ = get_distribution("oneil").version
+__version__ = get_version("oneil")
 
 def print_welcome_message():
     print("Oneil " + __version__)
