@@ -1,20 +1,29 @@
-use indexmap::IndexMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use indexmap::{IndexMap, IndexSet};
 use oneil_shared::symbols::PyFunctionName;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PythonModule {
     docs: Option<String>,
     functions: IndexMap<PyFunctionName, PythonFunction>,
+    imports: IndexSet<PathBuf>,
 }
 
 impl PythonModule {
     pub const fn new(
         docs: Option<String>,
         functions: IndexMap<PyFunctionName, PythonFunction>,
+        imports: IndexSet<PathBuf>,
     ) -> Self {
-        Self { docs, functions }
+        Self {
+            docs,
+            functions,
+            imports,
+        }
     }
 
     pub fn get_function(&self, identifier: &PyFunctionName) -> Option<&PythonFunction> {
@@ -28,17 +37,22 @@ impl PythonModule {
     pub fn get_docs(&self) -> Option<&str> {
         self.docs.as_deref()
     }
+
+    pub const fn get_imports(&self) -> &IndexSet<PathBuf> {
+        &self.imports
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PythonFunction {
-    function: Py<PyAny>,
+    function: Arc<Py<PyAny>>,
     docs: Option<String>,
     line_no: Option<u32>,
 }
 
 impl PythonFunction {
-    pub const fn new(function: Py<PyAny>, docs: Option<String>, line_no: Option<u32>) -> Self {
+    pub fn new(function: Py<PyAny>, docs: Option<String>, line_no: Option<u32>) -> Self {
+        let function = Arc::new(function);
         Self {
             function,
             docs,

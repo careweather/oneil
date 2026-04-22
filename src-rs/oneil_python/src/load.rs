@@ -1,12 +1,16 @@
 //! Loading Python code and extracting callables.
 
-use std::{ffi::CString, path::Path};
+use std::{
+    ffi::CString,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use oneil_shared::{paths::PythonPath, symbols::PyFunctionName};
 use pyo3::{
     prelude::*,
-    types::{PyDict, PyList},
+    types::{PyDict, PyList, PyTuple},
     wrap_pymodule,
 };
 
@@ -50,7 +54,9 @@ pub fn load_python_import(
         add_module_directory_to_sys_path(py, &module_directory)?;
 
         // load the code module
+        start_tracking_imports(py, &module_directory)?;
         let code_module = PyModule::from_code(py, &source_cstr, &path_cstr, &module_name_cstr)?;
+        let imports = stop_tracking_imports(py)?;
 
         // get the inspect module
         let inspect_module = PyModule::import(py, "inspect")?;
@@ -74,12 +80,14 @@ pub fn load_python_import(
 
         let module_docs = get_doc_string(&code_module, &inspect_module);
 
-        Ok::<_, PyErr>((module_docs, functions))
+        Ok::<_, PyErr>((module_docs, functions, imports))
     });
 
     // return the functions
     match functions {
-        Ok((module_docs, functions)) => Ok(PythonModule::new(module_docs, functions)),
+        Ok((module_docs, functions, imports)) => {
+            Ok(PythonModule::new(module_docs, functions, imports))
+        }
         Err(e) => Err(LoadPythonImportError::CouldNotLoadPythonModule(e)),
     }
 }
@@ -107,6 +115,29 @@ fn add_module_directory_to_sys_path(py: Python<'_>, module_directory: &Path) -> 
     Ok(())
 }
 
+fn start_tracking_imports(py: Python<'_>, module_directory: &Path) -> PyResult<()> {
+    let builtins = PyModule::import(py, "builtins")?;
+    let builtins_import_orig = builtins.getattr("__import__")?;
+
+    let import_tracker = ImportTracker::new(module_directory, builtins_import_orig.unbind())?;
+
+    builtins.setattr("__import__", import_tracker)?;
+
+    Ok(())
+}
+
+fn stop_tracking_imports(py: Python<'_>) -> PyResult<IndexSet<PathBuf>> {
+    let builtins = PyModule::import(py, "builtins")?;
+    let builtins_import_orig = builtins.getattr("__import__")?;
+
+    let import_tracker = builtins_import_orig.extract::<ImportTracker>()?;
+    let (imports, builtins_import_orig) = import_tracker.into_imports_and_original_import_fn(py);
+
+    builtins.setattr("__import__", builtins_import_orig)?;
+
+    Ok(imports)
+}
+
 fn get_doc_string(
     value: &Bound<'_, PyAny>,
     inspect_module: &Bound<'_, PyModule>,
@@ -131,4 +162,88 @@ fn get_line_no(value: &Bound<'_, PyAny>, inspect_module: &Bound<'_, PyModule>) -
         .expect("`getsourcelines` should return a tuple of a string and a u32");
 
     Some(line_no)
+}
+
+/// Tracks imports made by a Python module.
+///
+/// Note that only imports from the module directory are tracked. This ensures
+/// that imports from builtin libraries and other libraries like `numpy` are not
+/// tracked.
+#[pyclass(from_py_object)]
+#[derive(Debug)]
+struct ImportTracker {
+    pub module_directory: PathBuf,
+    pub imports: Arc<Mutex<IndexSet<PathBuf>>>,
+    pub builtins_import_orig: Py<PyAny>,
+}
+
+impl ImportTracker {
+    pub fn new(module_directory: &Path, builtins_import_orig: Py<PyAny>) -> PyResult<Self> {
+        Ok(Self {
+            module_directory: module_directory.to_path_buf(),
+            imports: Arc::new(Mutex::new(IndexSet::new())),
+            builtins_import_orig,
+        })
+    }
+
+    pub fn into_imports_and_original_import_fn(
+        self,
+        py: Python<'_>,
+    ) -> (IndexSet<PathBuf>, Py<PyAny>) {
+        (
+            self.imports
+                .lock()
+                .expect("imports should not be poisoned")
+                .clone(),
+            self.builtins_import_orig.clone_ref(py),
+        )
+    }
+}
+
+#[expect(
+    clippy::multiple_inherent_impl,
+    reason = "this block is for Python, not Rust"
+)]
+#[pymethods]
+impl ImportTracker {
+    #[pyo3(signature = (*args, **kwargs))]
+    fn __call__<'py>(
+        &self,
+        py: Python<'py>,
+        args: &Bound<'py, PyTuple>,
+        kwargs: Option<&Bound<'py, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let result = self.builtins_import_orig.bind(py).call(args, kwargs)?;
+
+        let result_module = result.cast::<PyModule>()?;
+
+        // try to get the file path of the imported module
+        //
+        // built-in modules do not have a __file__ attribute, so we skip them
+        if let Ok(file_path) = result_module.getattr("__file__") {
+            let file_path = file_path.extract::<String>()?;
+            let file_path = PathBuf::from(file_path);
+
+            // if the file path starts with the module directory, add it to the
+            // import list
+            if file_path.starts_with(&self.module_directory) {
+                self.imports
+                    .lock()
+                    .expect("imports should not be poisoned")
+                    .insert(file_path);
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+impl Clone for ImportTracker {
+    fn clone(&self) -> Self {
+        Python::attach(|py| Self {
+            module_directory: self.module_directory.clone(),
+            imports: Arc::clone(&self.imports),
+            builtins_import_orig: self.builtins_import_orig.clone_ref(py),
+        })
+    }
 }
