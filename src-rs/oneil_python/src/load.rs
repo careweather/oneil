@@ -1,10 +1,14 @@
 //! Loading Python code and extracting callables.
 
-use std::ffi::CString;
+use std::{ffi::CString, path::Path};
 
 use indexmap::IndexMap;
 use oneil_shared::{paths::PythonPath, symbols::PyFunctionName};
-use pyo3::{prelude::*, types::PyDict, wrap_pymodule};
+use pyo3::{
+    prelude::*,
+    types::{PyDict, PyList},
+    wrap_pymodule,
+};
 
 use crate::{
     error::LoadPythonImportError,
@@ -16,12 +20,22 @@ pub fn load_python_import(
     path: &PythonPath,
     source: &str,
 ) -> Result<PythonModule, LoadPythonImportError> {
+    // get the module directory from the path
+    let module_directory = path
+        .as_path()
+        .parent()
+        // if the parent is an empty string, use the current directory
+        .map(|p| if p == "" { Path::new(".") } else { p })
+        .unwrap_or_else(|| Path::new("."))
+        .canonicalize()
+        .expect("path should be directory that exists");
+
     // get the module name from the path
-    let path = path.as_path().to_string_lossy();
-    let module_name = path.trim_end_matches(".py").replace('/', ".");
+    let path_str = path.as_path().to_string_lossy();
+    let module_name = path_str.trim_end_matches(".py").replace('/', ".");
 
     // convert the path and module name to C strings
-    let path_cstr = CString::new(path.as_bytes()).expect("path should not have a null byte");
+    let path_cstr = CString::new(path_str.as_bytes()).expect("path should not have a null byte");
     let module_name_cstr =
         CString::new(module_name).expect("module name should not have a null byte");
 
@@ -33,6 +47,7 @@ pub fn load_python_import(
 
     let functions = Python::attach(|py| {
         insert_oneil_module_into_python(py)?;
+        add_module_directory_to_sys_path(py, &module_directory)?;
 
         // load the code module
         let code_module = PyModule::from_code(py, &source_cstr, &path_cstr, &module_name_cstr)?;
@@ -80,6 +95,15 @@ fn insert_oneil_module_into_python(py: Python<'_>) -> PyResult<()> {
     // Insert oneil_python_module into sys.modules
     py_modules.set_item("oneil", oneil_module)?;
 
+    Ok(())
+}
+
+// this adds the module directory to the sys.path so that the module can import
+// other modules in the module directory
+fn add_module_directory_to_sys_path(py: Python<'_>, module_directory: &Path) -> PyResult<()> {
+    let sys = PyModule::import(py, "sys")?;
+    let path = sys.getattr("path")?.cast_into::<PyList>()?;
+    path.insert(0, module_directory.as_os_str())?;
     Ok(())
 }
 
