@@ -12,6 +12,8 @@ use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use indexmap::{IndexMap, IndexSet};
 use notify::Watcher;
+#[cfg(feature = "python")]
+use oneil_runtime::output::PythonModule;
 use oneil_runtime::{
     Runtime,
     output::{
@@ -146,19 +148,15 @@ fn apply_common_side_effects(common_args: &CommonArgs) {
 fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool) {
     let mut runtime = Runtime::new();
 
-    let mut imports: IndexMap<PythonPath, IndexSet<String>> = IndexMap::new();
+    let mut imports: IndexMap<PythonPath, PythonModule> = IndexMap::new();
     let mut errors = Vec::new();
 
     for file in files {
         let import_result = runtime.load_python_import(file);
 
         match import_result {
-            Ok(import) => {
-                let functions: IndexSet<String> = import
-                    .into_iter()
-                    .map(|name| name.as_str().to_string())
-                    .collect();
-                imports.insert(file.clone(), functions);
+            Ok(module) => {
+                imports.insert(file.clone(), module.clone());
             }
 
             Err(runtime_errors) => {
@@ -174,20 +172,47 @@ fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool)
     }
 
     let is_multiple_files = imports.len() > 1;
-    for (file, import) in imports {
+    for (file, module) in imports {
         if is_multiple_files {
             println!("===== {} =====", file.as_path().display());
         }
 
-        if import.is_empty() {
-            let message = format!("no functions found in `{}`", file.as_path().display());
-            let styled_message = stylesheet::NO_PYTHON_FUNCTIONS_FOUND_MESSAGE.style(message);
-            println!("{styled_message}");
-            continue;
+        let doc_string = module.get_docs();
+
+        if let Some(doc_string) = doc_string {
+            let styled_doc_string = stylesheet::PYTHON_MODULE_DOC_STRING.style(doc_string);
+            println!("{styled_doc_string}");
+            println!();
         }
 
-        for s in import {
-            println!("{s}");
+        let header = stylesheet::PYTHON_MODULE_SECTION_HEADER.style("Functions:");
+        println!("{header}");
+
+        let functions = module.get_function_names().collect::<Vec<_>>();
+
+        if functions.is_empty() {
+            let message = format!("  (no functions found in `{}`)", file.as_path().display());
+            let styled_message = stylesheet::NO_PYTHON_FUNCTIONS_FOUND_MESSAGE.style(message);
+            println!("{styled_message}");
+        } else {
+            for function in functions {
+                let styled_function =
+                    stylesheet::PYTHON_MODULE_SECTION_ITEM.style(function.as_str());
+                println!("- {styled_function}");
+            }
+        }
+
+        let imports = module.get_imports();
+        if !imports.is_empty() {
+            println!();
+
+            let header = stylesheet::PYTHON_MODULE_SECTION_HEADER.style("Imports:");
+            println!("{header}");
+
+            for import in imports {
+                let styled_import = stylesheet::PYTHON_MODULE_SECTION_ITEM.style(import.display());
+                println!("- {styled_import}");
+            }
         }
     }
 }

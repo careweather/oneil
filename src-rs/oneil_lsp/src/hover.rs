@@ -178,6 +178,7 @@ fn format_python_import_hover(
         let functions = runtime
             .load_python_import(path)
             .ok()
+            .map(|module| module.get_function_names().collect::<Vec<_>>())
             .filter(|functions| !functions.is_empty())
             .map(|functions| {
                 let mut function_list = "**Functions:**\n".to_string();

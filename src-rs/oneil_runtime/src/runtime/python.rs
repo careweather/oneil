@@ -1,6 +1,5 @@
 //! Python import and evaluation for the runtime (when the `python` feature is enabled).
 
-use indexmap::IndexSet;
 use oneil_output::EvalError;
 use oneil_python::{PythonEvalError, PythonFunction, function::PythonModule};
 
@@ -46,14 +45,13 @@ impl Runtime {
     pub fn load_python_import(
         &mut self,
         path: &PythonPath,
-    ) -> Result<IndexSet<&PyFunctionName>, RuntimeErrors> {
+    ) -> Result<&PythonModule, RuntimeErrors> {
         self.load_python_import_internal(path);
 
         let names_opt = self
             .python_import_cache
             .get_entry(path)
-            .and_then(|result| result.as_ref().ok())
-            .map(|functions| functions.get_function_names().collect());
+            .and_then(|result| result.as_ref().ok());
 
         let errors = self.get_python_import_errors(path);
 

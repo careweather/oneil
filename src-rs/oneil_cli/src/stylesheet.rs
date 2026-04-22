@@ -9,7 +9,16 @@ pub const SOURCE_ANNOTATION: Style = Style::new().blue().bold();
 
 // Python output styles
 #[cfg(feature = "python")]
-pub const NO_PYTHON_FUNCTIONS_FOUND_MESSAGE: Style = Style::new().italic().dimmed();
+mod python {
+    use owo_colors::Style;
+    pub const PYTHON_MODULE_DOC_STRING: Style = Style::new().green();
+    pub const PYTHON_MODULE_SECTION_HEADER: Style = Style::new().blue().bold();
+    pub const PYTHON_MODULE_SECTION_ITEM: Style = Style::new().green();
+    pub const NO_PYTHON_FUNCTIONS_FOUND_MESSAGE: Style = Style::new().italic().dimmed();
+}
+
+#[cfg(feature = "python")]
+pub use python::*;
 
 // Model output styles
 pub const MODEL_LABEL: Style = Style::new().blue();

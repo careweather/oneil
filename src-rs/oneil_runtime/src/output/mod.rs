@@ -10,6 +10,7 @@ pub use oneil_output::{
     BuiltinDependency, DebugInfo, DependencySet, ExternalDependency, Model, ModelEvalErrors,
     Number, Parameter, ParameterDependency, PrintLevel, Test, TestResult, Unit, Value,
 };
+pub use oneil_python::function::PythonModule;
 pub use oneil_shared::{error::OneilDiagnostic, span::Span};
 
 pub mod tree {
