@@ -777,6 +777,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil_py_call_cache"
+version = "0.16.0"
+dependencies = [
+ "indexmap",
+ "oneil_output",
+ "oneil_python",
+ "oneil_shared",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "oneil_python"
 version = "0.16.0"
 dependencies = [
