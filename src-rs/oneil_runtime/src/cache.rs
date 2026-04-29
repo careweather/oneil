@@ -10,9 +10,10 @@ use oneil_shared::{
     paths::{ModelPath, PythonPath, SourcePath},
 };
 
-use crate::{error::SourceError, output};
-
-use crate::error::PythonImportError;
+use crate::{
+    error::{PythonImportError, SourceError},
+    output,
+};
 
 /// Content hash for cached source, used to detect when file contents change.
 pub fn source_hash(source: &str) -> u64 {
@@ -190,6 +191,47 @@ impl EvalCache {
     }
 }
 
+/// Generic cache keyed by path, storing [`LoadResult<T, E>`] per path.
+///
+/// Used to cache load outcomes (success, partial, or failure) for files or
+/// resources identified by path.
+#[derive(Debug)]
+pub struct ModelCache<T, E> {
+    entries: IndexMap<ModelPath, LoadResult<T, E>>,
+}
+
+impl<T, E> Default for ModelCache<T, E> {
+    fn default() -> Self {
+        Self {
+            entries: IndexMap::new(),
+        }
+    }
+}
+
+impl<T, E> ModelCache<T, E> {
+    /// Creates an empty cache.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the full cached entry for `path`.
+    #[must_use]
+    pub fn get_entry(&self, path: &ModelPath) -> Option<&LoadResult<T, E>> {
+        self.entries.get(path)
+    }
+
+    /// Inserts a [`LoadResult`] for `path`, replacing any existing entry.
+    pub fn insert(&mut self, path: ModelPath, result: LoadResult<T, E>) {
+        self.entries.insert(path, result);
+    }
+
+    /// Removes the cached entry for `path`, if present.
+    pub fn remove(&mut self, path: &ModelPath) {
+        self.entries.swap_remove(path);
+    }
+}
+
 /// Cache for Python import function maps keyed by path.
 ///
 /// Stores a [`Result`] per path: either the loaded [`PythonFunctionMap`] or a
@@ -234,47 +276,6 @@ impl PythonImportCache {
 
     /// Removes the cached entry for `path`, if present.
     pub fn remove(&mut self, path: &PythonPath) {
-        self.entries.swap_remove(path);
-    }
-}
-
-/// Generic cache keyed by path, storing [`LoadResult<T, E>`] per path.
-///
-/// Used to cache load outcomes (success, partial, or failure) for files or
-/// resources identified by path.
-#[derive(Debug)]
-pub struct ModelCache<T, E> {
-    entries: IndexMap<ModelPath, LoadResult<T, E>>,
-}
-
-impl<T, E> Default for ModelCache<T, E> {
-    fn default() -> Self {
-        Self {
-            entries: IndexMap::new(),
-        }
-    }
-}
-
-impl<T, E> ModelCache<T, E> {
-    /// Creates an empty cache.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Returns the full cached entry for `path`.
-    #[must_use]
-    pub fn get_entry(&self, path: &ModelPath) -> Option<&LoadResult<T, E>> {
-        self.entries.get(path)
-    }
-
-    /// Inserts a [`LoadResult`] for `path`, replacing any existing entry.
-    pub fn insert(&mut self, path: ModelPath, result: LoadResult<T, E>) {
-        self.entries.insert(path, result);
-    }
-
-    /// Removes the cached entry for `path`, if present.
-    pub fn remove(&mut self, path: &ModelPath) {
         self.entries.swap_remove(path);
     }
 }
