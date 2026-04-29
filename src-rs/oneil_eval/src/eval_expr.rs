@@ -427,7 +427,7 @@ fn eval_function_call<E: ExternalEvaluationContext>(
     name: &ir::FunctionName,
     function_call_span: Span,
     args: Vec<(Value, Span)>,
-    context: &EvalContext<'_, E>,
+    context: &mut EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {
     match name {
         ir::FunctionName::Builtin(fn_identifier, fn_identifier_span) => {

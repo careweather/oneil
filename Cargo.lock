@@ -815,6 +815,7 @@ dependencies = [
  "oneil_ir",
  "oneil_output",
  "oneil_parser",
+ "oneil_py_call_cache",
  "oneil_python",
  "oneil_shared",
 ]

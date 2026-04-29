@@ -15,6 +15,8 @@ use oneil_shared::{
     symbols::{BuiltinFunctionName, BuiltinValueName, UnitBaseName, UnitPrefix},
 };
 
+#[cfg(feature = "python")]
+use crate::context::CallsiteInfo;
 use crate::context::ExternalEvaluationContext;
 
 /// Returns a [`ModelPath`] for use in tests (path without extension, e.g. `"test"` → `test.on`).
@@ -66,11 +68,12 @@ impl ExternalEvaluationContext for TestExternalContext {
 
     #[cfg(feature = "python")]
     fn evaluate_imported_function(
-        &self,
+        &mut self,
         _python_path: &oneil_shared::paths::PythonPath,
         _identifier: &oneil_shared::symbols::PyFunctionName,
         _function_call_span: Span,
         _args: Vec<(Value, Span)>,
+        _callsite_info: &CallsiteInfo,
     ) -> Option<Result<Value, Box<EvalError>>> {
         // For now, we don't support imported functions in tests
         None

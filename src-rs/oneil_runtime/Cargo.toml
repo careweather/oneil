@@ -20,6 +20,7 @@ oneil_ir = { path = "../oneil_ir" }
 oneil_frontend = { path = "../oneil_frontend", default-features = false }
 oneil_output = { path = "../oneil_output" }
 oneil_parser = { path = "../oneil_parser" }
+oneil_py_call_cache = { path = "../oneil_py_call_cache", optional = true }
 oneil_python = { path = "../oneil_python", features = [
 	"rust-lib",
 ], optional = true }
@@ -28,7 +29,12 @@ indexmap = { workspace = true }
 
 [features]
 default = ["python"]
-python = ["oneil_python", "oneil_frontend/python", "oneil_eval/python"]
+python = [
+	"oneil_py_call_cache",
+	"oneil_python",
+	"oneil_frontend/python",
+	"oneil_eval/python",
+]
 
 [lints]
 workspace = true

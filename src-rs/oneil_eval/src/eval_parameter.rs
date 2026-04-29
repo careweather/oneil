@@ -32,28 +32,27 @@ pub struct EvalParameterResult {
 /// - The parameter value is outside the limits.
 /// - The parameter unit does not match the limit.
 pub fn eval_parameter<E: ExternalEvaluationContext>(
+    parameter_name: ParameterName,
     parameter: &ir::Parameter,
     context: &mut EvalContext<'_, E>,
 ) -> Result<EvalParameterResult, Vec<EvalError>> {
-    // TODO: this is about where we would use `trace_level`, but I'm not yet sure
-    //       how to handle it.
-
     // Overlay RHSes have already been applied to `parameter.value()` by
     // the design composition step, and any anchor-scope handling is
     // expressed through [`ir::DesignProvenance::anchor_path`] which the
     // caller has already pushed onto `context`'s scope stack. Eval
     // therefore just runs the parameter's value as-is — no overlay
     // lookup needed here.
-    eval_parameter_from_resolved_value(parameter.value(), parameter, context)
+    eval_parameter_from_resolved_value(parameter_name, parameter.value(), parameter, context)
 }
 
 /// Evaluates a parameter using an explicit resolved [`ir::ParameterValue`] (IR default or overlay).
 pub fn eval_parameter_from_resolved_value<E: ExternalEvaluationContext>(
+    parameter_name: ParameterName,
     value_source: &ir::ParameterValue,
     parameter: &ir::Parameter,
     context: &mut EvalContext<'_, E>,
 ) -> Result<EvalParameterResult, Vec<EvalError>> {
-    context.begin_expression_evaluation();
+    context.begin_parameter_evaluation(parameter_name);
 
     // evaluate the value and the unit
     let (value, expr_span, unit_ir) = match value_source {
@@ -954,8 +953,8 @@ mod tests {
         let mut context = EvalContext::new(&mut external);
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         // check the parameter value
         let Value::Number(number) = parameter_value.value else {
@@ -982,8 +981,8 @@ mod tests {
         let mut context = EvalContext::new(&mut external);
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
@@ -1020,8 +1019,8 @@ mod tests {
         let mut context = EvalContext::new(&mut external);
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
@@ -1061,8 +1060,8 @@ mod tests {
         let mut context = EvalContext::new(&mut external);
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)];
 
@@ -1100,8 +1099,8 @@ mod tests {
         let mut context = EvalContext::new(&mut external);
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [];
 
@@ -1139,8 +1138,8 @@ mod tests {
         let mut context = EvalContext::new(&mut external);
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [
             (Dimension::Mass, 1.0),
@@ -1199,8 +1198,8 @@ mod tests {
             [helper::UnitSpec::new(Some("m"), Some("k"), false, 1.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
@@ -1260,8 +1259,8 @@ mod tests {
             [helper::UnitSpec::new(Some("N"), None, false, 1.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [
             (Dimension::Mass, 1.0),
@@ -1321,8 +1320,8 @@ mod tests {
             [helper::UnitSpec::new(Some("W"), None, false, 1.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [
             (Dimension::Mass, 1.0),
@@ -1376,8 +1375,8 @@ mod tests {
             [helper::UnitSpec::new(Some("W"), None, false, 2.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [
             (Dimension::Mass, 2.0),
@@ -1436,8 +1435,8 @@ mod tests {
             [helper::UnitSpec::new(Some("m"), None, false, 2.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 2.0)];
 
@@ -1492,8 +1491,8 @@ mod tests {
             [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
@@ -1552,8 +1551,8 @@ mod tests {
             ],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [];
 
@@ -1610,8 +1609,8 @@ mod tests {
             [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
@@ -1667,8 +1666,8 @@ mod tests {
             [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
         );
 
-        let parameter_value =
-            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let parameter_value = eval_parameter(parameter.name().clone(), &parameter, &mut context)
+            .expect("eval should succeed");
 
         let expected_dimensions = [(Dimension::Distance, 1.0)];
 
@@ -2236,8 +2235,8 @@ mod tests {
             for (name, value, units) in previous_parameters {
                 let parameter = build_simple_parameter(name, value, units);
 
-                let parameter_value =
-                    eval_parameter(&parameter, context).expect("eval should succeed");
+                let parameter_value = eval_parameter(parameter.name().clone(), &parameter, context)
+                    .expect("eval should succeed");
                 let parameter_result = build_parameter_result(name, parameter_value.value);
                 context.add_parameter_result(ParameterName::from(name), Ok(parameter_result));
             }

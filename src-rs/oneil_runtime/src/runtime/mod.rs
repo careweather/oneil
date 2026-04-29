@@ -21,8 +21,11 @@ mod util;
 mod python;
 
 #[cfg(feature = "python")]
-use crate::cache::PythonImportCache;
+use std::path::PathBuf;
+
 use crate::cache::{AstCache, EvalCache, SourceCache};
+#[cfg(feature = "python")]
+use crate::cache::{PythonCallCache, PythonImportCache};
 use indexmap::IndexMap;
 use oneil_builtins::BuiltinRef;
 use oneil_frontend::instance::graph::{ModelDesignInfo, UnitGraphCache};
@@ -50,6 +53,8 @@ impl BuiltinLookup for RuntimeBuiltinLookup<'_> {
 /// and evaluation results, and provides methods to load and process Oneil models.
 #[derive(Debug)]
 pub struct Runtime {
+    #[cfg(feature = "python")]
+    cache_dir: PathBuf,
     source_cache: SourceCache,
     ast_cache: AstCache,
     /// Per-compilation-unit instance graph cache. Each entry is the unit's
@@ -83,5 +88,9 @@ pub struct Runtime {
     composed_graph: Option<InstanceGraph>,
     #[cfg(feature = "python")]
     python_import_cache: PythonImportCache,
+    #[cfg(feature = "python")]
+    python_call_cache: PythonCallCache,
+    #[cfg(feature = "python")]
+    python_call_replacement_cache: PythonCallCache,
     builtins: BuiltinRef,
 }

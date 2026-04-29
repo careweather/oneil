@@ -1,10 +1,15 @@
 //! Python import and evaluation for the runtime (when the `python` feature is enabled).
 
+use oneil_eval::CallsiteInfo;
 use oneil_output::EvalError;
 use oneil_python::{PythonEvalError, PythonFunction, function::PythonModule};
 
 use crate::error::PythonImportError;
-use oneil_shared::{paths::PythonPath, span::Span, symbols::PyFunctionName};
+use oneil_shared::{
+    paths::{ModelPath, PythonPath},
+    span::Span,
+    symbols::{ParameterName, PyFunctionName, TestIndex},
+};
 
 use super::Runtime;
 use crate::output::{self, error::RuntimeErrors};
@@ -93,12 +98,32 @@ impl Runtime {
 
     /// Evaluates a Python function by path and identifier.
     pub(super) fn evaluate_python_function(
-        &self,
+        &mut self,
         python_path: &PythonPath,
         identifier: &PyFunctionName,
         function_call_span: Span,
         args: Vec<(output::Value, Span)>,
+        callsite_info: &CallsiteInfo,
     ) -> Option<Result<output::Value, Box<EvalError>>> {
+        let args_no_spans: Vec<_> = args.clone().into_iter().map(|(value, _)| value).collect();
+        let cached_eval_result = match callsite_info {
+            CallsiteInfo::Parameter(instance_key, parameter_name) => self
+                .try_load_parameter_cache_entry(
+                    &instance_key.model_path,
+                    parameter_name,
+                    identifier,
+                    &args_no_spans,
+                ),
+            CallsiteInfo::Test(instance_key, test_index) => self.try_load_test_cache_entry(
+                &instance_key.model_path,
+                *test_index,
+                identifier,
+                &args_no_spans,
+            ),
+            // caching does not apply to other callsites
+            CallsiteInfo::Other => None,
+        };
+
         let python_functions = self
             .python_import_cache
             .get_entry(python_path)?
@@ -107,7 +132,30 @@ impl Runtime {
 
         let function = python_functions.get_function(identifier)?;
 
-        let eval_result = oneil_python::evaluate_python_function(function, args);
+        let eval_result = cached_eval_result
+            .unwrap_or_else(|| oneil_python::evaluate_python_function(function, args));
+
+        match callsite_info {
+            CallsiteInfo::Parameter(instance_key, parameter_name) => {
+                self.add_parameter_cache_entry(
+                    &instance_key.model_path,
+                    parameter_name,
+                    identifier,
+                    &args_no_spans,
+                    eval_result.clone(),
+                );
+            }
+            CallsiteInfo::Test(instance_key, test_index) => {
+                self.add_test_cache_entry(
+                    &instance_key.model_path,
+                    *test_index,
+                    identifier,
+                    &args_no_spans,
+                    eval_result.clone(),
+                );
+            }
+            CallsiteInfo::Other => (),
+        }
 
         Some(eval_result.map_err(|e| match e {
             PythonEvalError::PyErr { message, traceback } => Box::new(EvalError::PythonEvalError {
@@ -124,5 +172,73 @@ impl Runtime {
                 })
             }
         }))
+    }
+
+    fn try_load_parameter_cache_entry(
+        &mut self,
+        model_path: &ModelPath,
+        parameter_name: &ParameterName,
+        function_name: &PyFunctionName,
+        args: &[output::Value],
+    ) -> Option<Result<output::Value, PythonEvalError>> {
+        let calls = &self
+            .python_call_cache
+            .get_parameter_entry(model_path, parameter_name)?;
+
+        calls
+            .iter()
+            .find(|call| call.function == *function_name && call.inputs == args)
+            .map(|call| call.output.clone().into())
+    }
+
+    fn try_load_test_cache_entry(
+        &mut self,
+        model_path: &ModelPath,
+        test_index: TestIndex,
+        function_name: &PyFunctionName,
+        args: &[output::Value],
+    ) -> Option<Result<output::Value, PythonEvalError>> {
+        let calls = &self
+            .python_call_cache
+            .get_test_entry(model_path, test_index)?;
+
+        calls
+            .iter()
+            .find(|call| call.function == *function_name && call.inputs == args)
+            .map(|call| call.output.clone().into())
+    }
+
+    fn add_parameter_cache_entry(
+        &mut self,
+        model_path: &ModelPath,
+        parameter_name: &ParameterName,
+        function_name: &PyFunctionName,
+        args: &[output::Value],
+        eval_result: Result<output::Value, PythonEvalError>,
+    ) {
+        self.python_call_replacement_cache.add_parameter_entry(
+            model_path,
+            parameter_name,
+            function_name,
+            args,
+            eval_result,
+        );
+    }
+
+    fn add_test_cache_entry(
+        &mut self,
+        model_path: &ModelPath,
+        test_index: TestIndex,
+        function_name: &PyFunctionName,
+        args: &[output::Value],
+        eval_result: Result<output::Value, PythonEvalError>,
+    ) {
+        self.python_call_replacement_cache.add_test_entry(
+            model_path,
+            test_index,
+            function_name,
+            args,
+            eval_result,
+        );
     }
 }

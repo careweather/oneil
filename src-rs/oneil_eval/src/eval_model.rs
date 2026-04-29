@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use oneil_frontend::{InstanceGraph, InstancedModel};
 use oneil_ir as ir;
-use oneil_shared::{EvalInstanceKey, partial::MaybePartialResult};
+use oneil_shared::{EvalInstanceKey, partial::MaybePartialResult, symbols::TestIndex};
 
 use oneil_output::{self as output, EvalError, ExpectedType, Model, ModelEvalErrors, Value};
 
@@ -77,7 +77,7 @@ fn force_all_models<E: ExternalEvaluationContext>(
         }
         context.push_active_model(key.clone());
         for (test_index, test) in tests {
-            let test_result = eval_test(&test, context);
+            let test_result = eval_test(test_index, &test, context);
             context.add_test_result(&key, test_index, test_result);
         }
         context.pop_active_model(&key);
@@ -96,10 +96,12 @@ fn propagate_reference_errors<E: ExternalEvaluationContext>(context: &mut EvalCo
 
 /// Evaluates a single test in the context of the currently active scope.
 fn eval_test<E: ExternalEvaluationContext>(
+    test_index: TestIndex,
     test: &ir::Test,
     context: &mut EvalContext<'_, E>,
 ) -> Result<output::Test, Vec<EvalError>> {
-    context.begin_expression_evaluation();
+    context.begin_test_evaluation(test_index);
+
     let (test_result, expr_span) = eval_expr::eval_expr(test.expr(), context)?;
     let warnings = context.take_expression_warnings();
 

@@ -4,8 +4,6 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use indexmap::IndexMap;
 use oneil_parser::error::ParserError;
-#[cfg(feature = "python")]
-use oneil_shared::paths::PythonPath;
 use oneil_shared::{
     EvalInstanceKey,
     load_result::LoadResult,
@@ -13,9 +11,6 @@ use oneil_shared::{
 };
 
 use crate::{error::SourceError, output};
-
-#[cfg(feature = "python")]
-use crate::error::PythonImportError;
 
 /// Content hash for cached source, used to detect when file contents change.
 pub fn source_hash(source: &str) -> u64 {
@@ -193,57 +188,6 @@ impl EvalCache {
     }
 }
 
-/// Cache for Python import function maps keyed by path.
-///
-/// Stores a [`Result`] per path: either the loaded [`PythonFunctionMap`] or a
-/// [`PythonImportError`](crate::error::PythonImportError) when loading failed.
-#[cfg(feature = "python")]
-#[derive(Debug)]
-pub struct PythonImportCache {
-    entries: IndexMap<PythonPath, Result<oneil_python::function::PythonModule, PythonImportError>>,
-}
-
-#[cfg(feature = "python")]
-impl Default for PythonImportCache {
-    fn default() -> Self {
-        Self {
-            entries: IndexMap::new(),
-        }
-    }
-}
-
-#[cfg(feature = "python")]
-impl PythonImportCache {
-    /// Creates an empty Python import cache.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Returns the full cached entry for `path`.
-    #[must_use]
-    pub fn get_entry(
-        &self,
-        path: &PythonPath,
-    ) -> Option<&Result<oneil_python::function::PythonModule, PythonImportError>> {
-        self.entries.get(path)
-    }
-
-    /// Inserts a result for `path`, replacing any existing entry.
-    pub fn insert(
-        &mut self,
-        path: PythonPath,
-        result: Result<oneil_python::function::PythonModule, PythonImportError>,
-    ) {
-        self.entries.insert(path, result);
-    }
-
-    /// Removes the cached entry for `path`, if present.
-    pub fn remove(&mut self, path: &PythonPath) {
-        self.entries.swap_remove(path);
-    }
-}
-
 /// Generic cache keyed by path, storing [`LoadResult<T, E>`] per path.
 ///
 /// Used to cache load outcomes (success, partial, or failure) for files or
@@ -282,5 +226,267 @@ impl<T, E> ModelCache<T, E> {
     /// Removes the cached entry for `path`, if present.
     pub fn remove(&mut self, path: &ModelPath) {
         self.entries.swap_remove(path);
+    }
+}
+
+#[cfg(feature = "python")]
+pub use python::{PythonCallCache, PythonImportCache};
+
+#[cfg(feature = "python")]
+mod python {
+    use std::path::{Component, PathBuf};
+
+    #[cfg(feature = "python")]
+    use indexmap::IndexMap;
+    use oneil_py_call_cache::{
+        FileCache, FunctionCall, FunctionCallResult, ReadCacheError, WriteCacheError,
+    };
+    use oneil_python::PythonEvalError;
+    #[cfg(feature = "python")]
+    use oneil_shared::paths::ModelPath;
+    use oneil_shared::{
+        paths::PythonPath,
+        symbols::{ParameterName, PyFunctionName, TestIndex},
+    };
+
+    use crate::error::PythonImportError;
+    #[cfg(feature = "python")]
+    use crate::output;
+    /// Cache for Python import function maps keyed by path.
+    ///
+    /// Stores a [`Result`] per path: either the loaded [`PythonFunctionMap`] or a
+    /// [`PythonImportError`](crate::error::PythonImportError) when loading failed.
+    #[cfg(feature = "python")]
+    #[derive(Debug)]
+    pub struct PythonImportCache {
+        entries:
+            IndexMap<PythonPath, Result<oneil_python::function::PythonModule, PythonImportError>>,
+    }
+
+    #[cfg(feature = "python")]
+    impl Default for PythonImportCache {
+        fn default() -> Self {
+            Self {
+                entries: IndexMap::new(),
+            }
+        }
+    }
+
+    #[cfg(feature = "python")]
+    impl PythonImportCache {
+        /// Creates an empty Python import cache.
+        #[must_use]
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Returns the full cached entry for `path`.
+        #[must_use]
+        pub fn get_entry(
+            &self,
+            path: &PythonPath,
+        ) -> Option<&Result<oneil_python::function::PythonModule, PythonImportError>> {
+            self.entries.get(path)
+        }
+
+        /// Inserts a result for `path`, replacing any existing entry.
+        pub fn insert(
+            &mut self,
+            path: PythonPath,
+            result: Result<oneil_python::function::PythonModule, PythonImportError>,
+        ) {
+            self.entries.insert(path, result);
+        }
+
+        /// Removes the cached entry for `path`, if present.
+        pub fn remove(&mut self, path: &PythonPath) {
+            self.entries.swap_remove(path);
+        }
+    }
+
+    /// Cache for Python function calls keyed by path.
+    #[cfg(feature = "python")]
+    #[derive(Debug)]
+    pub struct PythonCallCache {
+        cache_dir: PathBuf,
+        entries: IndexMap<ModelPath, FileCache>,
+    }
+
+    #[cfg(feature = "python")]
+    impl PythonCallCache {
+        /// Creates an empty Python call cache.
+        #[must_use]
+        pub fn new(cache_dir: PathBuf) -> Self {
+            Self {
+                cache_dir,
+                entries: IndexMap::new(),
+            }
+        }
+
+        /// Clears the cache.
+        pub fn clear(&mut self) {
+            self.entries.clear();
+        }
+
+        /// Merges another cache into this one.
+        ///
+        /// If there are conflicting entries, the entries in the other cache are preferred.
+        pub fn merge(&mut self, other: Self) {
+            self.entries.extend(other.entries);
+        }
+
+        /// Returns the cached entry for `parameter` in `model_path`, if present.
+        ///
+        /// If the cache entry has not been loaded yet, it is loaded from disk.
+        ///
+        /// # Errors
+        ///
+        /// Returns [`ReadCacheError`] if the cache file cannot be read.
+        pub fn get_parameter_entry(
+            &mut self,
+            model_path: &ModelPath,
+            parameter_name: &ParameterName,
+        ) -> Option<&[FunctionCall]> {
+            self.load(model_path).ok()?;
+
+            let entry = self.entries.get(model_path)?;
+            entry.parameters.get(parameter_name).map(Vec::as_slice)
+        }
+
+        pub fn get_test_entry(
+            &mut self,
+            model_path: &ModelPath,
+            test_index: TestIndex,
+        ) -> Option<&[FunctionCall]> {
+            self.load(model_path).ok()?;
+
+            let entry = self.entries.get(model_path)?;
+            entry.tests.get(&test_index).map(Vec::as_slice)
+        }
+
+        pub fn add_parameter_entry(
+            &mut self,
+            model_path: &ModelPath,
+            parameter_name: &ParameterName,
+            function_name: &PyFunctionName,
+            args: &[output::Value],
+            eval_result: Result<output::Value, PythonEvalError>,
+        ) {
+            let entry = self.entries.entry(model_path.clone()).or_default();
+
+            let cached_eval_result = FunctionCallResult::from(eval_result);
+
+            entry
+                .parameters
+                .entry(parameter_name.clone())
+                .or_default()
+                .push(FunctionCall {
+                    function: function_name.clone(),
+                    inputs: args.to_vec(),
+                    output: cached_eval_result,
+                });
+        }
+
+        pub fn add_test_entry(
+            &mut self,
+            model_path: &ModelPath,
+            test_index: TestIndex,
+            function_name: &PyFunctionName,
+            args: &[output::Value],
+            eval_result: Result<output::Value, PythonEvalError>,
+        ) {
+            let entry = self.entries.entry(model_path.clone()).or_default();
+
+            let cached_eval_result = FunctionCallResult::from(eval_result);
+
+            entry
+                .tests
+                .entry(test_index)
+                .or_default()
+                .push(FunctionCall {
+                    function: function_name.clone(),
+                    inputs: args.to_vec(),
+                    output: cached_eval_result,
+                });
+        }
+
+        /// Loads a cache entry from disk.
+        ///
+        /// If the cache entry already exists, this does nothing.
+        ///
+        /// # Errors
+        ///
+        /// Returns [`ReadCacheError`] if the cache file cannot be read.
+        fn load(&mut self, model_path: &ModelPath) -> Result<(), ReadCacheError> {
+            if self.entries.contains_key(model_path) {
+                return Ok(());
+            }
+
+            let cache_relative_path = get_cache_relative_path(model_path);
+            let cache_path = self.cache_dir.join(cache_relative_path);
+            let cache = FileCache::read_from_path(cache_path)?;
+            self.entries.insert(model_path.clone(), cache);
+            Ok(())
+        }
+
+        /// Saves all cache entries to disk.
+        ///
+        /// # Errors
+        ///
+        /// Returns a vector of [`WriteCacheError`] if the cache files cannot be written.
+        pub fn save_all(&self) -> Result<(), Vec<WriteCacheError>> {
+            let mut errors = Vec::new();
+            for (model_path, cache) in &self.entries {
+                let cache_relative_path = get_cache_relative_path(model_path);
+                let cache_path = self.cache_dir.join(cache_relative_path);
+                match cache.write_to_path(cache_path) {
+                    Ok(()) => (),
+                    Err(e) => errors.push(e),
+                }
+            }
+
+            if errors.is_empty() {
+                Ok(())
+            } else {
+                Err(errors)
+            }
+        }
+    }
+
+    fn get_cache_relative_path(model_path: &ModelPath) -> PathBuf {
+        model_path
+            .as_path()
+            .with_extension("json")
+            .components()
+            // convert to a path that can be used in the cache directory
+            .fold(PathBuf::new(), append_normalized_component)
+    }
+
+    fn append_normalized_component(mut path: PathBuf, component: Component<'_>) -> PathBuf {
+        match component {
+            Component::Prefix(_) => {
+                path.push("__prefix__");
+            }
+            Component::RootDir => {
+                path.push("__root__");
+            }
+            Component::CurDir => {}
+            // in order to avoid overwriting files outside of the cache directory,
+            // we convert ".." to "__parent__"
+            Component::ParentDir => {
+                if let Some(parent) = path.parent()
+                    && !parent.ends_with("__parent__")
+                {
+                    path = parent.to_path_buf();
+                } else {
+                    path.push("__parent__");
+                }
+            }
+            Component::Normal(os_str) => {
+                path.push(os_str);
+            }
+        }
+
+        path
     }
 }

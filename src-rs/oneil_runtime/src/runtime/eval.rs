@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use indexmap::IndexMap;
 use oneil_analysis::validate_instance_graph;
 use oneil_eval as eval;
+#[cfg(feature = "python")]
+use oneil_eval::CallsiteInfo;
 use oneil_frontend::{
     ApplyDesign, CompilationUnit, InstanceGraph, InstancedModel, ResolutionErrorCollection,
     apply_designs,
@@ -22,6 +24,8 @@ use oneil_shared::{
 use oneil_shared::{paths::PythonPath, symbols::PyFunctionName};
 
 use super::{Runtime, RuntimeBuiltinLookup};
+#[cfg(feature = "python")]
+use crate::cache::PythonCallCache;
 use crate::output::{self, error::RuntimeErrors};
 
 type EvalModelAndExpressionsResult<'runtime, 'expr> = (
@@ -252,8 +256,28 @@ impl Runtime {
             || !graph.contribution_errors.is_empty();
 
         if !has_blocking_errors {
+            // make sure the replacement cache is empty
+            #[cfg(feature = "python")]
+            self.python_call_replacement_cache.clear();
+
             // Evaluate the model and its dependencies
             let eval_result = eval::eval_model_from_graph(&graph, self);
+
+            #[cfg(feature = "python")]
+            {
+                // save the updated call cache
+                // TODO: handle errors from saving the replacement cache
+                self.python_call_replacement_cache
+                    .save_all()
+                    .expect("should be able to save the replacement cache");
+
+                // merge the replacement cache into the call cache
+                let replacement_cache = std::mem::replace(
+                    &mut self.python_call_replacement_cache,
+                    PythonCallCache::new(self.cache_dir.clone()),
+                );
+                self.python_call_cache.merge(replacement_cache);
+            }
 
             for (instance_key, maybe_partial) in eval_result {
                 match maybe_partial.into_result() {
@@ -433,13 +457,20 @@ impl eval::ExternalEvaluationContext for Runtime {
 
     #[cfg(feature = "python")]
     fn evaluate_imported_function(
-        &self,
+        &mut self,
         python_path: &PythonPath,
         identifier: &PyFunctionName,
         function_call_span: Span,
         args: Vec<(output::Value, Span)>,
+        callsite_info: &CallsiteInfo,
     ) -> Option<Result<output::Value, Box<EvalError>>> {
-        self.evaluate_python_function(python_path, identifier, function_call_span, args)
+        self.evaluate_python_function(
+            python_path,
+            identifier,
+            function_call_span,
+            args,
+            callsite_info,
+        )
     }
 
     fn lookup_unit(&self, name: &UnitBaseName) -> Option<&Unit> {

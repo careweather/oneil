@@ -7,7 +7,7 @@ mod eval_model;
 mod eval_parameter;
 mod eval_unit;
 
-pub use context::{ExternalEvaluationContext, IrLoadError};
+pub use context::{CallsiteInfo, ExternalEvaluationContext, IrLoadError};
 pub use eval_expr::eval_expr_in_model;
 pub use eval_model::eval_model_from_graph;
 

@@ -49,11 +49,12 @@ pub trait ExternalEvaluationContext {
     /// Returns an error if there was an error evaluating the imported function.
     #[cfg(feature = "python")]
     fn evaluate_imported_function(
-        &self,
+        &mut self,
         python_path: &PythonPath,
         identifier: &PyFunctionName,
         function_call_span: Span,
         args: Vec<(output::Value, Span)>,
+        callsite_info: &CallsiteInfo,
     ) -> Option<Result<output::Value, Box<EvalError>>>;
 
     /// Returns a unit by name if it is defined in the builtin context.
@@ -225,6 +226,20 @@ enum SlotPeek {
     TakenForEval(Box<ir::Parameter>),
 }
 
+/// Information about the callsite of the function being evaluated.
+///
+/// This is used for caching Python function calls.
+#[derive(Debug, Default, Clone)]
+pub enum CallsiteInfo {
+    /// A parameter in a model.
+    Parameter(EvalInstanceKey, ParameterName),
+    /// A test in a model.
+    Test(EvalInstanceKey, TestIndex),
+    /// Other callsite (e.g. an expression in the REPL).
+    #[default]
+    Other,
+}
+
 /// Evaluation context that tracks per-instance memo state for lazy parameter evaluation.
 ///
 /// The context owns the parameter memo table for every instance the evaluator may touch:
@@ -245,6 +260,9 @@ pub struct EvalContext<'external, E: ExternalEvaluationContext> {
     eval_scope: Vec<EvalInstanceKey>,
     external_context: &'external mut E,
 
+    /// Context for the callsite of any function evaluated in the context.
+    callsite_context: Vec<CallsiteInfo>,
+
     /// Warnings for the parameter or test expression currently being evaluated.
     expression_eval_warnings: Vec<output::EvalWarning>,
 }
@@ -264,6 +282,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             eval_scope: Vec::new(),
             external_context,
             expression_eval_warnings: Vec::new(),
+            callsite_context: Vec::new(),
         }
     }
 
@@ -292,6 +311,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             models,
             eval_scope: Vec::new(),
             external_context,
+            callsite_context: Vec::new(),
             expression_eval_warnings: Vec::new(),
         }
     }
@@ -366,6 +386,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             models,
             eval_scope: Vec::new(),
             external_context,
+            callsite_context: Vec::new(),
             expression_eval_warnings: Vec::new(),
         }
     }
@@ -617,7 +638,11 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
                     self.push_active_model(ak.clone());
                 }
 
-                let eval_result = eval_parameter::eval_parameter(&param, self);
+                let eval_result =
+                    eval_parameter::eval_parameter(parameter_name.clone(), &param, self);
+
+                // pop the callsite context the parameter evaluation
+                let _callsite_info = self.pop_callsite_context();
 
                 if let Some(ref ak) = anchor_key {
                     self.pop_active_model(ak);
@@ -698,7 +723,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
     /// Evaluates an imported function with the given arguments.
     pub fn evaluate_imported_function(
-        &self,
+        &mut self,
         python_path: &PythonPath,
         name: &PyFunctionName,
         function_call_span: Span,
@@ -706,8 +731,15 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     ) -> Result<output::Value, Box<EvalError>> {
         #[cfg(feature = "python")]
         {
+            let callsite_info = self.callsite_context.last().cloned().unwrap_or_default();
             self.external_context
-                .evaluate_imported_function(python_path, name, function_call_span, args)
+                .evaluate_imported_function(
+                    python_path,
+                    name,
+                    function_call_span,
+                    args,
+                    &callsite_info,
+                )
                 .expect("imported function should be defined (checked during resolution)")
         }
 
@@ -735,8 +767,31 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     /// Clears warnings for a new parameter or test expression evaluation.
     ///
     /// Call at the start of evaluating each top-level parameter or test expression.
-    pub fn begin_expression_evaluation(&mut self) {
+    pub fn begin_parameter_evaluation(&mut self, parameter_name: ParameterName) {
         self.expression_eval_warnings.clear();
+
+        let current_key = self
+            .eval_scope
+            .last()
+            .expect("current model should be set when beginning a parameter evaluation");
+
+        self.callsite_context
+            .push(CallsiteInfo::Parameter(current_key.clone(), parameter_name));
+    }
+
+    /// Clears warnings for a new test expression evaluation.
+    ///
+    /// Call at the start of evaluating each top-level test expression.
+    pub fn begin_test_evaluation(&mut self, test_index: TestIndex) {
+        self.expression_eval_warnings.clear();
+
+        let current_key = self
+            .eval_scope
+            .last()
+            .expect("current model should be set when beginning a test evaluation");
+
+        self.callsite_context
+            .push(CallsiteInfo::Test(current_key.clone(), test_index));
     }
 
     /// Takes warnings collected while evaluating the current expression.
@@ -831,6 +886,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             panic!("current model should be set when adding a parameter result");
         };
 
+        // add the parameter result to the current model
         let model = self
             .models
             .get_mut(current_key)
@@ -886,11 +942,37 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         test_index: TestIndex,
         test_result: Result<output::Test, Vec<EvalError>>,
     ) {
+        let current_model = self
+            .eval_scope
+            .last()
+            .expect("current model should be set when adding a test result");
+
+        // assert that the callsite context is the expected test index
+        let Some(CallsiteInfo::Test(expected_model_path, expected_test_index)) =
+            self.callsite_context.pop()
+        else {
+            panic!("callsite context should be a test when adding a test result");
+        };
+        assert_eq!(&expected_model_path, current_model);
+        assert_eq!(expected_test_index, test_index);
+
+        // add the test result to the current model
         let model = self
             .models
             .get_mut(key)
             .expect("model should be registered when adding a test result");
 
         model.tests.insert(test_index, test_result);
+    }
+
+    /// Pops the last callsite context.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the callsite context is empty.
+    fn pop_callsite_context(&mut self) -> CallsiteInfo {
+        self.callsite_context
+            .pop()
+            .expect("callsite context should not be empty")
     }
 }
