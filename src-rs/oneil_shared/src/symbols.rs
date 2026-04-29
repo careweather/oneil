@@ -1,7 +1,7 @@
 //! Symbol types (identifiers and names for program entities).
 
 /// A name for a built-in value (e.g. "pi", "e").
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BuiltinValueName(String);
 
 impl BuiltinValueName {
@@ -43,7 +43,7 @@ impl From<&str> for BuiltinValueName {
 }
 
 /// A name for a built-in function (e.g. "sin", "max").
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BuiltinFunctionName(String);
 
 impl BuiltinFunctionName {
@@ -85,7 +85,7 @@ impl From<&str> for BuiltinFunctionName {
 }
 
 /// A name for a Python function (from an imported module).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PyFunctionName(String);
 
 impl PyFunctionName {
@@ -127,7 +127,7 @@ impl From<&str> for PyFunctionName {
 }
 
 /// A name for a parameter in a model.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ParameterName(String);
 
 impl ParameterName {
@@ -169,7 +169,7 @@ impl From<&str> for ParameterName {
 }
 
 /// A name for a reference to another model.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ReferenceName(String);
 
 impl ReferenceName {
@@ -211,7 +211,7 @@ impl From<&str> for ReferenceName {
 }
 
 /// A name for a submodel.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SubmodelName(String);
 
 impl SubmodelName {
@@ -253,7 +253,7 @@ impl From<&str> for SubmodelName {
 }
 
 /// A full unit name (e.g. "m", "kg", "km", "dBW").
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitName(String);
 
 impl UnitName {
@@ -295,7 +295,7 @@ impl From<&str> for UnitName {
 }
 
 /// The base part of a unit name without prefix (e.g. "m" in "km", "W" in "dBW").
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitBaseName(String);
 
 impl UnitBaseName {
@@ -337,7 +337,7 @@ impl From<&str> for UnitBaseName {
 }
 
 /// A prefix for a unit name (e.g. "k" in "km", "m" in "ms").
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitPrefix(String);
 
 impl UnitPrefix {
@@ -373,7 +373,7 @@ impl From<&str> for UnitPrefix {
 }
 
 /// An index for identifying tests (0-based position in the model).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TestIndex(usize);
 
 impl TestIndex {
