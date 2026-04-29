@@ -45,6 +45,12 @@ impl FileCache {
     ///
     /// Returns [`WriteCacheError`] if the file cannot be created or JSON serialization fails.
     pub fn write_to_path(&self, path: impl AsRef<Path>) -> Result<(), WriteCacheError> {
+        if let Some(dir) = path.as_ref().parent()
+            && !dir.exists()
+        {
+            std::fs::create_dir_all(dir).map_err(WriteCacheError::Io)?;
+        }
+
         let file = File::create(path.as_ref()).map_err(WriteCacheError::Io)?;
         serde_json::to_writer_pretty(file, self).map_err(WriteCacheError::Serde)?;
         Ok(())
